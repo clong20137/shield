@@ -1,0 +1,105 @@
+@import '../variables.scss';
+
+.dashboard-page {
+  h1 {
+    color: $primary-color;
+    margin-bottom: 30px;
+    font-size: 32px;
+  }
+
+  .dashboard-content {
+    .recent-users {
+      background-color: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+      h2 {
+        color: $primary-color;
+        margin-bottom: 20px;
+        font-size: 20px;
+      }
+
+      .users-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+
+        .user-card {
+          background: linear-gradient(135deg, $light-bg 0%, white 100%);
+          border: 1px solid $border-color;
+          border-radius: 8px;
+          padding: 20px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          transition: $transition;
+
+          &:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-4px);
+          }
+
+          .user-info {
+            flex: 1;
+
+            h3 {
+              margin: 0 0 10px 0;
+              color: $primary-color;
+              font-size: 16px;
+            }
+
+            p {
+              margin: 5px 0;
+              font-size: 13px;
+              color: #555;
+
+              &.badge-info {
+                font-weight: 600;
+              }
+
+              &.rank-info {
+                color: $secondary-color;
+              }
+
+              &.district-info {
+                color: $accent-color;
+              }
+            }
+          }
+
+          .user-status {
+            .status {
+              padding: 6px 12px;
+              border-radius: 20px;
+              font-size: 12px;
+              font-weight: 600;
+
+              &.active {
+                background-color: lighten($success-color, 35%);
+                color: $success-color;
+              }
+
+              &.inactive {
+                background-color: lighten($danger-color, 35%);
+                color: $danger-color;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-page {
+    .dashboard-content {
+      .recent-users {
+        .users-list {
+          grid-template-columns: 1fr;
+        }
+      }
+    }
+  }
+}

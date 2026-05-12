@@ -1,0 +1,29 @@
+import express, { Express, Request, Response } from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import userRoutes from './routes/userRoutes';
+import reportRoutes from './routes/reportRoutes';
+
+dotenv.config();
+
+const app: Express = express();
+const PORT = process.env.PORT || 5000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Routes
+app.use('/api/users', userRoutes);
+app.use('/api/reports', reportRoutes);
+
+// Health check
+app.get('/health', (req: Request, res: Response) => {
+  res.json({ status: 'Server is running' });
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`Shield backend running on port ${PORT}`);
+});

@@ -1,0 +1,151 @@
+@import '../variables.scss';
+
+.user-detail {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+
+  .detail-header {
+    background-color: $primary-color;
+    color: white;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    h2 {
+      font-size: 24px;
+      margin: 0;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: $transition;
+
+      &:hover {
+        background-color: rgba(0, 0, 0, 0.2);
+      }
+    }
+  }
+
+  .detail-content {
+    padding: 30px;
+    max-height: 70vh;
+    overflow-y: auto;
+
+    .detail-section {
+      margin-bottom: 25px;
+
+      h3 {
+        color: $primary-color;
+        font-size: 16px;
+        margin-bottom: 15px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid $border-color;
+      }
+
+      .detail-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid lighten($border-color, 10%);
+
+        .label {
+          font-weight: 600;
+          color: $dark-text;
+          min-width: 200px;
+        }
+
+        .value {
+          color: #555;
+          text-align: right;
+          flex: 1;
+
+          &.active {
+            color: $success-color;
+            font-weight: 600;
+          }
+
+          &.inactive {
+            color: $danger-color;
+            font-weight: 600;
+          }
+        }
+      }
+    }
+
+    .detail-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 25px;
+      padding-top: 20px;
+      border-top: 2px solid $border-color;
+
+      button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: $transition;
+
+        &.btn-edit {
+          background-color: $primary-color;
+          color: white;
+
+          &:hover {
+            background-color: darken($primary-color, 10%);
+          }
+        }
+
+        &.btn-close {
+          background-color: $border-color;
+          color: $dark-text;
+
+          &:hover {
+            background-color: darken($border-color, 10%);
+          }
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .user-detail {
+    .detail-header {
+      h2 {
+        font-size: 18px;
+      }
+    }
+
+    .detail-content {
+      padding: 15px;
+
+      .detail-row {
+        flex-direction: column;
+
+        .label {
+          margin-bottom: 5px;
+          min-width: unset;
+        }
+
+        .value {
+          text-align: left;
+        }
+      }
+    }
+  }
+}

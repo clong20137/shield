@@ -1,0 +1,116 @@
+@import '../variables.scss';
+
+.user-table-container {
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+  .user-table {
+    width: 100%;
+    border-collapse: collapse;
+
+    thead {
+      background-color: $primary-color;
+      color: white;
+
+      th {
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid $border-color;
+      }
+    }
+
+    tbody {
+      tr {
+        border-bottom: 1px solid $border-color;
+        transition: $transition;
+        cursor: pointer;
+
+        &:hover {
+          background-color: $light-bg;
+        }
+
+        &.user-row {
+          td {
+            padding: 12px 15px;
+          }
+        }
+
+        td {
+          &.actions {
+            display: flex;
+            gap: 8px;
+
+            button {
+              padding: 6px 12px;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+              font-size: 12px;
+              transition: $transition;
+
+              &.btn-edit {
+                background-color: $primary-color;
+                color: white;
+
+                &:hover {
+                  background-color: darken($primary-color, 10%);
+                }
+              }
+
+              &.btn-delete {
+                background-color: $danger-color;
+                color: white;
+
+                &:hover {
+                  background-color: darken($danger-color, 10%);
+                }
+              }
+            }
+          }
+
+          .status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+
+            &.active {
+              background-color: lighten($success-color, 35%);
+              color: $success-color;
+            }
+
+            &.inactive {
+              background-color: lighten($danger-color, 35%);
+              color: $danger-color;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .loading,
+  .empty-state {
+    padding: 40px;
+    text-align: center;
+    color: #7f8c8d;
+  }
+}
+
+@media (max-width: 768px) {
+  .user-table-container {
+    overflow-x: auto;
+
+    .user-table {
+      font-size: 14px;
+
+      th,
+      td {
+        padding: 10px;
+      }
+    }
+  }
+}

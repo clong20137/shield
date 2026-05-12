@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans text-gray-800 bg-gray-50;
+  }
+
+  h1 {
+    @apply text-4xl font-bold text-primary-500;
+  }
+
+  h2 {
+    @apply text-2xl font-bold text-primary-500;
+  }
+
+  h3 {
+    @apply text-lg font-bold text-primary-500;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 border-none rounded transition-all cursor-pointer font-semibold text-sm;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary-500 text-white hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg;
+  }
+
+  .btn-secondary {
+    @apply btn bg-secondary-500 text-white hover:bg-secondary-600 hover:-translate-y-0.5 hover:shadow-lg;
+  }
+
+  .btn-danger {
+    @apply btn bg-danger text-white hover:bg-red-800 hover:-translate-y-0.5 hover:shadow-lg;
+  }
+
+  .btn-success {
+    @apply btn bg-success text-white hover:bg-green-700 hover:-translate-y-0.5 hover:shadow-lg;
+  }
+
+  .container {
+    @apply max-w-6xl mx-auto px-5;
+  }
+
+  .error {
+    @apply bg-red-100 text-danger px-4 py-3 rounded mb-5 border-l-4 border-danger;
+  }
+
+  .success {
+    @apply bg-green-100 text-success px-4 py-3 rounded mb-5 border-l-4 border-success;
+  }
+
+  .loading {
+    @apply text-center py-10 text-gray-500 text-base;
+  }
+
+  .empty-state {
+    @apply text-center py-10 text-gray-500 text-base;
+  }
+}

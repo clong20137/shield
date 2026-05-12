@@ -1,0 +1,128 @@
+@import '../variables.scss';
+
+.reports-page {
+  h1 {
+    color: $primary-color;
+    margin-bottom: 30px;
+    font-size: 32px;
+  }
+
+  .statistics-section {
+    margin-bottom: 40px;
+
+    h2 {
+      color: $primary-color;
+      margin-bottom: 20px;
+      font-size: 20px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 20px;
+
+      .stat-box {
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border-left: 4px solid $primary-color;
+
+        h3 {
+          font-size: 32px;
+          color: $primary-color;
+          margin: 0 0 10px 0;
+        }
+
+        p {
+          margin: 0;
+          color: #7f8c8d;
+          font-size: 14px;
+        }
+
+        &.active {
+          border-left-color: $success-color;
+
+          h3 {
+            color: $success-color;
+          }
+        }
+      }
+    }
+  }
+
+  .reports-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 30px;
+    margin-bottom: 30px;
+
+    .report-section {
+      background-color: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+      h2 {
+        color: $primary-color;
+        margin-bottom: 15px;
+        font-size: 18px;
+      }
+
+      .report-table {
+        width: 100%;
+        border-collapse: collapse;
+
+        thead {
+          background-color: $light-bg;
+
+          th {
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid $border-color;
+            color: $dark-text;
+          }
+        }
+
+        tbody {
+          tr {
+            border-bottom: 1px solid $border-color;
+
+            &:last-child {
+              border-bottom: none;
+            }
+
+            td {
+              padding: 10px;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .refresh-btn {
+    background-color: $primary-color;
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: $transition;
+
+    &:hover {
+      background-color: darken($primary-color, 10%);
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .reports-page {
+    .reports-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+}
