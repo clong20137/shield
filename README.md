@@ -22,7 +22,7 @@ A comprehensive internal application for searching users throughout an agency an
 - **React 18** - UI library
 - **TypeScript** - Type-safe development
 - **Vite** - Fast build tool
-- **SASS** - CSS preprocessing
+- **Tailwind CSS** - Utility-first CSS framework
 - **Axios** - HTTP client
 
 ## Project Structure
@@ -235,7 +235,7 @@ npm run type-check
 
 ## Styling
 
-The application uses SASS for styling with the following color scheme:
+The application uses Tailwind CSS for efficient and maintainable styling with the following color scheme:
 
 - **Primary**: #1a365d (Dark Blue)
 - **Secondary**: #2d5a8c (Medium Blue)
@@ -244,7 +244,7 @@ The application uses SASS for styling with the following color scheme:
 - **Danger**: #c0392b (Dark Red)
 - **Light Background**: #f5f7fa
 
-Customize colors in `frontend/src/styles/variables.scss`
+Customize colors in `frontend/tailwind.config.js`
 
 ## Features Overview
 
