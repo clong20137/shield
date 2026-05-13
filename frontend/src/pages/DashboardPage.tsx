@@ -6,6 +6,7 @@ const DashboardPage: React.FC = () => {
   const [stats, setStats] = useState<SystemStatistics | null>(null);
   const [recentUsers, setRecentUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadDashboard();
@@ -13,6 +14,7 @@ const DashboardPage: React.FC = () => {
 
   const loadDashboard = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [statsRes, usersRes] = await Promise.all([
         reportService.getStatistics(),
@@ -22,6 +24,7 @@ const DashboardPage: React.FC = () => {
       setStats(statsRes.data);
       setRecentUsers(usersRes.data.data);
     } catch (err) {
+      setError('Failed to load dashboard data. Check that the backend is running and MySQL is available.');
       console.error('Failed to load dashboard:', err);
     } finally {
       setLoading(false);
@@ -44,6 +47,8 @@ const DashboardPage: React.FC = () => {
   return (
     <div>
       <h1 className="mb-8">Dashboard</h1>
+
+      {error && <div className="error">{error}</div>}
 
       {stats && (
         <StatisticsCard

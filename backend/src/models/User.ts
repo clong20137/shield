@@ -46,6 +46,26 @@ export class UserModel {
     'sex',
   ] as const;
 
+  private static readonly columnNames: Record<typeof UserModel.editableFields[number], string> = {
+    firstName: '`firstName`',
+    lastName: '`lastName`',
+    peNumber: '`peNumber`',
+    carNumber: '`carNumber`',
+    badgeNumber: '`badgeNumber`',
+    assignedTo: '`assignedTo`',
+    district: '`district`',
+    rank: '`rank`',
+    isActive: '`isActive`',
+    employmentType: '`employmentType`',
+    typeDetails: '`typeDetails`',
+    status: '`status`',
+    supervisor: '`supervisor`',
+    specialtyCertifications: '`specialtyCertifications`',
+    publicSafetyId: '`publicSafetyId`',
+    race: '`race`',
+    sex: '`sex`',
+  };
+
   static async searchUsers(
     searchTerm: string,
     filters?: Partial<User>
@@ -58,32 +78,28 @@ export class UserModel {
       const trimmedSearchTerm = searchTerm.trim();
 
       if (trimmedSearchTerm) {
-        conditions.push(`(
-          firstName LIKE ?
-          OR lastName LIKE ?
-          OR peNumber LIKE ?
-          OR badgeNumber LIKE ?
-          OR publicSafetyId LIKE ?
-        )`);
+        conditions.push(
+          '(`firstName` LIKE ? OR `lastName` LIKE ? OR `peNumber` LIKE ? OR `badgeNumber` LIKE ? OR `publicSafetyId` LIKE ?)'
+        );
 
         const likeTerm = `%${trimmedSearchTerm}%`;
         params.push(likeTerm, likeTerm, likeTerm, likeTerm, likeTerm);
       }
 
       if (filters?.rank) {
-        conditions.push('rank = ?');
+        conditions.push('`rank` = ?');
         params.push(filters.rank);
       }
       if (filters?.district) {
-        conditions.push('district = ?');
+        conditions.push('`district` = ?');
         params.push(filters.district);
       }
       if (filters?.isActive !== undefined) {
-        conditions.push('isActive = ?');
+        conditions.push('`isActive` = ?');
         params.push(filters.isActive ? 1 : 0);
       }
       if (filters?.employmentType) {
-        conditions.push('employmentType = ?');
+        conditions.push('`employmentType` = ?');
         params.push(filters.employmentType);
       }
 
@@ -91,7 +107,7 @@ export class UserModel {
         query += ` WHERE ${conditions.join(' AND ')}`;
       }
 
-      query += ' ORDER BY lastName, firstName LIMIT 100';
+      query += ' ORDER BY `lastName`, `firstName` LIMIT 100';
 
       const [rows] = await conn.query(query, params);
       return rows as User[];
@@ -103,7 +119,7 @@ export class UserModel {
   static async getUserById(id: string): Promise<User | null> {
     const conn = await pool.getConnection();
     try {
-      const [rows] = await conn.query('SELECT * FROM users WHERE id = ?', [id]);
+      const [rows] = await conn.query('SELECT * FROM users WHERE `id` = ?', [id]);
       const users = rows as User[];
       return users.length > 0 ? users[0] : null;
     } finally {
@@ -115,7 +131,7 @@ export class UserModel {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query(
-        'SELECT * FROM users ORDER BY lastName, firstName LIMIT ? OFFSET ?',
+        'SELECT * FROM users ORDER BY `lastName`, `firstName` LIMIT ? OFFSET ?',
         [limit, offset]
       );
       return rows as User[];
@@ -132,10 +148,10 @@ export class UserModel {
 
       await conn.query(
         `INSERT INTO users (
-          id, firstName, lastName, peNumber, carNumber, badgeNumber,
-          assignedTo, district, rank, isActive, employmentType, typeDetails,
-          status, supervisor, specialtyCertifications, publicSafetyId,
-          race, sex, createdAt, updatedAt
+          \`id\`, \`firstName\`, \`lastName\`, \`peNumber\`, \`carNumber\`, \`badgeNumber\`,
+          \`assignedTo\`, \`district\`, \`rank\`, \`isActive\`, \`employmentType\`, \`typeDetails\`,
+          \`status\`, \`supervisor\`, \`specialtyCertifications\`, \`publicSafetyId\`,
+          \`race\`, \`sex\`, \`createdAt\`, \`updatedAt\`
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
@@ -176,19 +192,19 @@ export class UserModel {
 
       Object.entries(updates).forEach(([key, value]) => {
         if (UserModel.editableFields.includes(key as typeof UserModel.editableFields[number])) {
-          fields.push(`${key} = ?`);
+          fields.push(`${UserModel.columnNames[key as typeof UserModel.editableFields[number]]} = ?`);
           values.push(value as string | boolean | null);
         }
       });
 
       if (fields.length === 0) return true;
 
-      fields.push('updatedAt = ?');
+      fields.push('`updatedAt` = ?');
       values.push(now);
       values.push(id);
 
       const [result] = await conn.query<ResultSetHeader>(
-        `UPDATE users SET ${fields.join(', ')} WHERE id = ?`,
+        `UPDATE users SET ${fields.join(', ')} WHERE \`id\` = ?`,
         values
       );
 
@@ -201,7 +217,7 @@ export class UserModel {
   static async deleteUser(id: string): Promise<boolean> {
     const conn = await pool.getConnection();
     try {
-      const [result] = await conn.query<ResultSetHeader>('DELETE FROM users WHERE id = ?', [id]);
+      const [result] = await conn.query<ResultSetHeader>('DELETE FROM users WHERE `id` = ?', [id]);
       return result.affectedRows > 0;
     } finally {
       conn.release();
