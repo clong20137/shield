@@ -1,6 +1,7 @@
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { initializeDatabase } from './config/initializeDatabase';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
 import reportRoutes from './routes/reportRoutes';
@@ -26,6 +27,13 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`Shield backend running on port ${PORT}`);
-});
+initializeDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Shield backend running on port ${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error('Failed to initialize database:', error);
+    process.exit(1);
+  });
