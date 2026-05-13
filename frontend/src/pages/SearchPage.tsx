@@ -16,16 +16,16 @@ const SearchPage: React.FC = () => {
 
   const handleSearch = async (query: string) => {
     setCurrentQuery(query);
-    if (!query.trim()) {
-      setUsers([]);
-      return;
-    }
-
     setLoading(true);
     setError(null);
     try {
-      const response = await userService.search(query);
-      setUsers(response.data);
+      if (!query.trim()) {
+        const response = await userService.getAll(1, 100);
+        setUsers(response.data.data);
+      } else {
+        const response = await userService.search(query);
+        setUsers(response.data);
+      }
     } catch (err) {
       setError('Failed to search users. Please try again.');
       console.error(err);
@@ -60,9 +60,7 @@ const SearchPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (globalQuery) {
-      handleSearch(globalQuery);
-    }
+    handleSearch(globalQuery);
   }, [globalQuery]);
 
   return (

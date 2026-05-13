@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { BarChart3, Bell, ChevronLeft, ChevronRight, LayoutDashboard, LucideIcon, Moon, Search, Settings, Shield, Sun, UserCircle } from 'lucide-react';
+import { BarChart3, Bell, ChevronLeft, ChevronRight, LayoutDashboard, LogOut, LucideIcon, Moon, Search, Settings, Shield, Sun, UserCircle } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -271,14 +271,23 @@ function GlobalSearch({ compact }: { compact: boolean }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="relative">
-      <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-blue-100" size={18} />
-      <input
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Global search"
-        className="h-11 w-full rounded border border-white/10 bg-white/10 py-2 pl-10 pr-3 text-sm text-white outline-none placeholder:text-blue-100 focus:border-white/40 focus:bg-white/15"
-      />
+    <form onSubmit={handleSubmit} className="flex gap-2">
+      <div className="relative min-w-0 flex-1">
+        <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-blue-100" size={18} />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Global search"
+          className="h-11 w-full rounded border border-white/10 bg-white/10 py-2 pl-10 pr-3 text-sm text-white outline-none placeholder:text-blue-100 focus:border-white/40 focus:bg-white/15"
+        />
+      </div>
+      <button
+        type="submit"
+        className="flex h-11 w-11 items-center justify-center rounded bg-accent text-white hover:bg-accent/90"
+        aria-label="Search users"
+      >
+        <Search size={18} />
+      </button>
     </form>
   );
 }
@@ -352,8 +361,8 @@ function App() {
       {!isAuthenticated ? (
         <LoginSplash onLogin={handleLogin} onToast={showToast} />
       ) : (
-        <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
-          <aside className={`relative flex shrink-0 flex-col bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
+        <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
+          <aside className={`relative flex h-screen shrink-0 flex-col overflow-y-auto bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed((value) => !value)}
@@ -363,7 +372,7 @@ function App() {
               {isSidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
             </button>
 
-            <div className="flex h-20 items-center border-b border-white/10 px-4 dark:border-gray-800">
+            <div className="flex h-20 shrink-0 items-center border-b border-white/10 px-4 dark:border-gray-800">
               {!isSidebarCollapsed && (
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded bg-white text-primary-500">
@@ -414,7 +423,7 @@ function App() {
               <SidebarLink to="/account" label="Account" compact={isSidebarCollapsed} icon={Settings} />
             </nav>
 
-            <div className="border-t border-white/10 p-3">
+            <div className="shrink-0 border-t border-white/10 p-3">
               {!isSidebarCollapsed && (
                 <div className="mb-3 rounded bg-white/10 px-3 py-2">
                   <p className="text-xs uppercase text-blue-100">Session</p>
@@ -427,13 +436,13 @@ function App() {
                 className="flex h-10 w-full items-center justify-center rounded bg-white/10 px-3 text-sm font-semibold text-white hover:bg-white/20"
                 title={isSidebarCollapsed ? 'Sign out' : undefined}
               >
-                {isSidebarCollapsed ? 'Out' : 'Sign out'}
+                {isSidebarCollapsed ? <LogOut size={18} /> : 'Sign out'}
               </button>
             </div>
           </aside>
 
-          <div className="flex min-w-0 flex-1 flex-col">
-            <header className="flex h-20 items-center justify-between border-b border-gray-200 bg-white px-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
+            <header className="flex h-20 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Internal System</p>
                 <h2 className="text-2xl font-bold text-primary-500">Agency Workspace</h2>
@@ -492,7 +501,7 @@ function App() {
               </div>
             </header>
 
-            <main className="flex-1 overflow-auto px-6 py-8 dark:bg-gray-950">
+            <main className="flex-1 overflow-y-auto px-6 py-8 dark:bg-gray-950">
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/search" element={<SearchPage />} />

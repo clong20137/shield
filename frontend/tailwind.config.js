@@ -32,7 +32,7 @@ export default {
           800: '#1a3452',
           900: '#162844',
         },
-        accent: '#e74c3c',
+        accent: '#9C865C',
         success: '#27ae60',
         warning: '#f39c12',
         danger: '#c0392b',
