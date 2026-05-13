@@ -1,12 +1,13 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { BarChart3, Bell, ChevronLeft, ChevronRight, LayoutDashboard, LogOut, LucideIcon, Moon, Search, Settings, Shield, Sun, UserCircle } from 'lucide-react';
+import { BarChart3, Bell, ChevronLeft, ChevronRight, Laptop, LayoutDashboard, LogOut, LucideIcon, Moon, Search, Settings, Shield, Sun, UserCircle } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
 import DashboardPage from './pages/DashboardPage';
 import { AccountSettingsPage } from './pages/AccountSettingsPage';
+import DeviceManagementPage from './pages/DeviceManagementPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
-import { AuthAccount, authService } from './services/api';
+import { AuthAccount, authService, userService, User } from './services/api';
 
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
@@ -244,10 +245,42 @@ function SidebarLink({ to, label, compact, icon: Icon }: SidebarLinkProps) {
 
 function GlobalSearch({ compact }: { compact: boolean }) {
   const [query, setQuery] = useState('');
+  const [results, setResults] = useState<User[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isResultsOpen, setIsResultsOpen] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const trimmedQuery = query.trim();
+
+    if (compact || trimmedQuery.length < 2) {
+      setResults([]);
+      setIsResultsOpen(false);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const searchTimer = window.setTimeout(async () => {
+      try {
+        const response = await userService.search(trimmedQuery);
+        setResults(Array.isArray(response.data) ? response.data.slice(0, 6) : []);
+        setIsResultsOpen(true);
+      } catch (err) {
+        setResults([]);
+        setIsResultsOpen(true);
+        console.error('Failed to load live search results:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 250);
+
+    return () => window.clearTimeout(searchTimer);
+  }, [compact, query]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setIsResultsOpen(false);
 
     if (!query.trim()) {
       navigate('/search');
@@ -255,6 +288,13 @@ function GlobalSearch({ compact }: { compact: boolean }) {
     }
 
     navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+  };
+
+  const openSearchResult = (user: User) => {
+    const displayName = `${user.firstName} ${user.lastName}`.trim();
+    setQuery(displayName);
+    setIsResultsOpen(false);
+    navigate(`/search?q=${encodeURIComponent(displayName || user.badgeNumber || user.id)}`);
   };
 
   if (compact) {
@@ -271,12 +311,17 @@ function GlobalSearch({ compact }: { compact: boolean }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2">
+    <form onSubmit={handleSubmit} className="relative flex gap-2">
       <div className="relative min-w-0 flex-1">
         <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-blue-100" size={18} />
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          onFocus={() => {
+            if (query.trim().length >= 2) {
+              setIsResultsOpen(true);
+            }
+          }}
           placeholder="Global search"
           className="h-11 w-full rounded border border-white/10 bg-white/10 py-2 pl-10 pr-3 text-sm text-white outline-none placeholder:text-blue-100 focus:border-white/40 focus:bg-white/15"
         />
@@ -288,6 +333,45 @@ function GlobalSearch({ compact }: { compact: boolean }) {
       >
         <Search size={18} />
       </button>
+
+      {isResultsOpen && query.trim().length >= 2 && (
+        <div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded border border-gray-200 bg-white text-gray-800 shadow-xl dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+          {isSearching ? (
+            <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">Searching...</div>
+          ) : results.length > 0 ? (
+            <div className="max-h-80 overflow-y-auto py-1">
+              {results.map((user) => (
+                <button
+                  key={user.id}
+                  type="button"
+                  onClick={() => openSearchResult(user)}
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold">
+                      {user.firstName} {user.lastName}
+                    </p>
+                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                      Badge {user.badgeNumber || 'N/A'} - {user.district || 'No district'}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded bg-accent/10 px-2 py-1 text-xs font-bold text-accent">
+                    {user.rank || 'User'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">No matching users found.</div>
+          )}
+          <button
+            type="submit"
+            className="w-full border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+          >
+            View full search results
+          </button>
+        </div>
+      )}
     </form>
   );
 }
@@ -419,6 +503,7 @@ function App() {
 
             <nav className="flex flex-1 flex-col gap-2 px-3 py-3">
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
+              <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
               <SidebarLink to="/account" label="Account" compact={isSidebarCollapsed} icon={Settings} />
             </nav>
@@ -504,6 +589,7 @@ function App() {
             <main className="flex-1 overflow-y-auto px-6 py-8 dark:bg-gray-950">
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
+                <Route path="/devices" element={<DeviceManagementPage />} />
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 {currentUser && (
