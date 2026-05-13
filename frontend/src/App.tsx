@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { BarChart3, ChevronLeft, ChevronRight, LayoutDashboard, LucideIcon, Search, Settings, Shield, UserCircle } from 'lucide-react';
-import { BrowserRouter as Router, Navigate, NavLink, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
 import DashboardPage from './pages/DashboardPage';
@@ -241,6 +241,47 @@ function SidebarLink({ to, label, compact, icon: Icon }: SidebarLinkProps) {
   );
 }
 
+function GlobalSearch({ compact }: { compact: boolean }) {
+  const [query, setQuery] = useState('');
+  const navigate = useNavigate();
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!query.trim()) {
+      navigate('/search');
+      return;
+    }
+
+    navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+  };
+
+  if (compact) {
+    return (
+      <button
+        type="button"
+        onClick={() => navigate('/search')}
+        className="mx-auto flex h-11 w-11 items-center justify-center rounded bg-white/10 text-white hover:bg-white/20"
+        title="Global search"
+      >
+        <Search size={20} />
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="relative">
+      <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-blue-100" size={18} />
+      <input
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Global search"
+        className="h-11 w-full rounded border border-white/10 bg-white/10 py-2 pl-10 pr-3 text-sm text-white outline-none placeholder:text-blue-100 focus:border-white/40 focus:bg-white/15"
+      />
+    </form>
+  );
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthAccount | null>(null);
@@ -324,17 +365,27 @@ function App() {
               )}
             </div>
 
-            <div className={isSidebarCollapsed ? 'px-3 py-5' : 'px-4 py-5'}>
-              <div className={`overflow-hidden rounded-lg bg-white/10 ${isSidebarCollapsed ? 'p-2' : 'p-0'}`}>
-                <div className={`flex h-28 items-end bg-gradient-to-br from-primary-700 to-secondary-500 ${isSidebarCollapsed ? 'justify-center rounded p-2' : 'p-4'}`}>
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-white bg-white text-lg font-bold text-primary-500 shadow">
+            <div className={isSidebarCollapsed ? 'px-3 pb-3 pt-5' : 'px-4 pb-3 pt-5'}>
+              <GlobalSearch compact={isSidebarCollapsed} />
+            </div>
+
+            <div className={isSidebarCollapsed ? 'px-3 py-3' : 'px-4 py-3'}>
+              <div className={`overflow-hidden rounded bg-white/10 ${isSidebarCollapsed ? 'p-2' : 'p-3'}`}>
+                <div className={isSidebarCollapsed ? 'flex justify-center' : 'flex items-center gap-3'}>
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white bg-white text-base font-bold text-primary-500 shadow">
                     {currentUser ? getInitials(currentUser.displayName, currentUser.email) : <UserCircle size={32} />}
                   </div>
+                  {!isSidebarCollapsed && (
+                    <div className="min-w-0 text-white">
+                      <p className="mb-1 text-xs uppercase tracking-[0.14em] text-blue-100">Profile</p>
+                    <p className="truncate text-sm font-bold">{currentUser?.displayName}</p>
+                      <p className="truncate text-xs text-blue-100">{currentUser?.email}</p>
+                    </div>
+                  )}
                 </div>
                 {!isSidebarCollapsed && (
-                  <div className="bg-white px-4 py-3 text-primary-500">
-                    <p className="truncate text-sm font-bold">{currentUser?.displayName}</p>
-                    <p className="truncate text-xs text-gray-500">{currentUser?.email}</p>
+                  <div className="mt-3 rounded bg-black/15 px-3 py-2 text-xs font-semibold text-white">
+                    {currentUser?.twoFactorEnabled ? '2FA enabled' : '2FA not enabled'}
                   </div>
                 )}
               </div>
@@ -342,7 +393,6 @@ function App() {
 
             <nav className="flex flex-1 flex-col gap-2 px-3 py-3">
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
-              <SidebarLink to="/search" label="Search" compact={isSidebarCollapsed} icon={Search} />
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
               <SidebarLink to="/account" label="Account" compact={isSidebarCollapsed} icon={Settings} />
             </nav>

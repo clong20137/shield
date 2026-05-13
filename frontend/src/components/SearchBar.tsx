@@ -5,14 +5,16 @@ interface SearchBarProps {
   onSearch: (query: string) => void;
   onFilterChange?: (filters: UserFilters) => void;
   placeholder?: string;
+  initialQuery?: string;
 }
 
 export const SearchBar: React.FC<SearchBarProps> = ({
   onSearch,
   onFilterChange,
   placeholder = 'Search by name, PE #, Badge #, or ID...',
+  initialQuery = '',
 }) => {
-  const [query, setQuery] = React.useState('');
+  const [query, setQuery] = React.useState(initialQuery);
   const [showFilters, setShowFilters] = React.useState(false);
   const [filters, setFilters] = React.useState({
     rank: '',
@@ -25,6 +27,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     e.preventDefault();
     onSearch(query);
   };
+
+  React.useEffect(() => {
+    setQuery(initialQuery);
+  }, [initialQuery]);
 
   const handleFilterChange = (field: keyof UserFilters, value: string) => {
     const newFilters = { ...filters, [field]: value };

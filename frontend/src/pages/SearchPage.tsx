@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { userService, User, UserFilters } from '../services/api';
 import { SearchBar } from '../components/SearchBar';
 import { UserTable } from '../components/UserTable';
@@ -10,6 +11,8 @@ const SearchPage: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentQuery, setCurrentQuery] = useState('');
+  const [searchParams] = useSearchParams();
+  const globalQuery = useMemo(() => searchParams.get('q') ?? '', [searchParams]);
 
   const handleSearch = async (query: string) => {
     setCurrentQuery(query);
@@ -56,6 +59,12 @@ const SearchPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (globalQuery) {
+      handleSearch(globalQuery);
+    }
+  }, [globalQuery]);
+
   return (
     <div>
       <h1 className="mb-8">Search Users</h1>
@@ -65,6 +74,7 @@ const SearchPage: React.FC = () => {
       <SearchBar
         onSearch={handleSearch}
         onFilterChange={handleFilterChange}
+        initialQuery={globalQuery}
         placeholder="Search by name, PE #, Badge #, or ID..."
       />
 
