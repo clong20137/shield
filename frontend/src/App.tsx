@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { BarChart3, ChevronLeft, ChevronRight, LayoutDashboard, LucideIcon, Search, Settings, Shield, UserCircle } from 'lucide-react';
+import { BarChart3, Bell, ChevronLeft, ChevronRight, LayoutDashboard, LucideIcon, Moon, Search, Settings, Shield, Sun, UserCircle } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -9,6 +9,7 @@ import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { AuthAccount, authService } from './services/api';
 
 const SESSION_KEY = 'shield_session';
+const THEME_KEY = 'shield_theme';
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (
@@ -90,7 +91,7 @@ function LoginSplash({
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 text-gray-900">
+    <div className="min-h-screen bg-gray-100 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
       <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[minmax(0,1fr)_480px]">
         <section className="flex items-center bg-primary-500 px-8 py-12 text-white lg:px-16">
           <div className="max-w-3xl">
@@ -107,12 +108,12 @@ function LoginSplash({
         </section>
 
         <section className="flex items-center justify-center px-6 py-10">
-          <form onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-6 shadow-lg">
+          <form onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-6 shadow-lg dark:border-gray-800 dark:bg-gray-900">
             <div className="mb-6">
               <h2 className="mb-2 text-2xl font-bold text-primary-500">
                 {mode === 'register' ? 'Create login' : 'Sign in'}
               </h2>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 {mode === 'register' ? 'Create an email and password login.' : 'Use your email and password to continue.'}
               </p>
             </div>
@@ -120,12 +121,12 @@ function LoginSplash({
             {error && <div className="error">{error}</div>}
 
             <label className="mb-4 block">
-              <span className="mb-2 block text-sm font-semibold text-gray-700">Email</span>
+              <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Email</span>
               <input
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
                 autoComplete="email"
                 autoFocus
               />
@@ -133,35 +134,35 @@ function LoginSplash({
 
             {mode === 'register' && (
               <label className="mb-4 block">
-                <span className="mb-2 block text-sm font-semibold text-gray-700">Display name</span>
+                <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Display name</span>
                 <input
                   value={displayName}
                   onChange={(event) => setDisplayName(event.target.value)}
-                  className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                  className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
                   autoComplete="name"
                 />
               </label>
             )}
 
             <label className="mb-6 block">
-              <span className="mb-2 block text-sm font-semibold text-gray-700">Password</span>
+              <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Password</span>
               <input
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
                 autoComplete="current-password"
               />
             </label>
 
             {mode === 'register' && (
               <label className="mb-6 block">
-                <span className="mb-2 block text-sm font-semibold text-gray-700">Confirm password</span>
+                <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Confirm password</span>
                 <input
                   type="password"
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
-                  className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                  className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
                   autoComplete="new-password"
                 />
               </label>
@@ -169,11 +170,11 @@ function LoginSplash({
 
             {requiresTwoFactor && mode === 'login' && (
               <label className="mb-6 block">
-                <span className="mb-2 block text-sm font-semibold text-gray-700">2FA code</span>
+                <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">2FA code</span>
                 <input
                   value={twoFactorCode}
                   onChange={(event) => setTwoFactorCode(event.target.value)}
-                  className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                  className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
                   autoComplete="one-time-code"
                   inputMode="numeric"
                 />
@@ -287,14 +288,30 @@ function App() {
   const [currentUser, setCurrentUser] = useState<AuthAccount | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [notifications, setNotifications] = useState<ToastMessage[]>([]);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   const showToast = (type: ToastType, message: string) => {
     const id = Date.now();
-    setToasts((currentToasts) => [...currentToasts, { id, type, message }]);
+    const toast = { id, type, message };
+    setToasts((currentToasts) => [...currentToasts, toast]);
+    setNotifications((currentNotifications) => [toast, ...currentNotifications].slice(0, 20));
     window.setTimeout(() => {
       setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== id));
     }, 4500);
   };
+
+  useEffect(() => {
+    const storedTheme = window.localStorage.getItem(THEME_KEY);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setTheme(storedTheme === 'dark' || (!storedTheme && prefersDark) ? 'dark' : 'light');
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    window.localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
 
   useEffect(() => {
     const storedSession = window.localStorage.getItem(SESSION_KEY);
@@ -335,8 +352,8 @@ function App() {
       {!isAuthenticated ? (
         <LoginSplash onLogin={handleLogin} onToast={showToast} />
       ) : (
-        <div className="flex min-h-screen bg-gray-50">
-          <aside className={`relative flex shrink-0 flex-col bg-primary-500 text-white shadow-xl transition-all duration-200 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
+        <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
+          <aside className={`relative flex shrink-0 flex-col bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed((value) => !value)}
@@ -346,7 +363,7 @@ function App() {
               {isSidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
             </button>
 
-            <div className="flex h-20 items-center border-b border-white/10 px-4">
+            <div className="flex h-20 items-center border-b border-white/10 px-4 dark:border-gray-800">
               {!isSidebarCollapsed && (
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded bg-white text-primary-500">
@@ -416,14 +433,66 @@ function App() {
           </aside>
 
           <div className="flex min-w-0 flex-1 flex-col">
-            <header className="flex h-20 items-center justify-between border-b border-gray-200 bg-white px-6 shadow-sm">
+            <header className="flex h-20 items-center justify-between border-b border-gray-200 bg-white px-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Internal System</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Internal System</p>
                 <h2 className="text-2xl font-bold text-primary-500">Agency Workspace</h2>
+              </div>
+              <div className="relative flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
+                  className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                  aria-label="Toggle light and dark mode"
+                >
+                  {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsNotificationsOpen((value) => !value)}
+                  className="relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                  aria-label="Open notifications"
+                >
+                  <Bell size={18} />
+                  {notifications.length > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
+                      {notifications.length > 9 ? '9+' : notifications.length}
+                    </span>
+                  )}
+                </button>
+
+                {isNotificationsOpen && (
+                  <div className="absolute right-0 top-12 z-40 w-80 rounded border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                    <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                      <h3 className="text-base font-bold text-primary-500 dark:text-blue-100">Notifications</h3>
+                      <button
+                        type="button"
+                        onClick={() => setNotifications([])}
+                        className="text-xs font-semibold text-gray-500 hover:text-primary-500 dark:text-gray-400"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto p-2">
+                      {notifications.length === 0 ? (
+                        <div className="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                          No notifications yet
+                        </div>
+                      ) : (
+                        notifications.map((notification) => (
+                          <div key={notification.id} className="rounded px-3 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <p className="font-semibold text-gray-800 dark:text-gray-100">{notification.message}</p>
+                            <p className="mt-1 text-xs uppercase text-gray-400">{notification.type}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </header>
 
-            <main className="flex-1 overflow-auto px-6 py-8">
+            <main className="flex-1 overflow-auto px-6 py-8 dark:bg-gray-950">
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/search" element={<SearchPage />} />

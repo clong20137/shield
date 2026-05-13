@@ -133,19 +133,19 @@ export function AccountSettingsPage({
       <h1 className="mb-8">Account Settings</h1>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <section className="rounded-lg bg-white p-6 shadow">
+        <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
           <h2 className="mb-2">Profile</h2>
           <div className="mt-5 space-y-3 text-sm">
-            <p><span className="font-semibold text-gray-700">Name:</span> {account.displayName}</p>
-            <p><span className="font-semibold text-gray-700">Email:</span> {account.email}</p>
+            <p><span className="font-semibold text-gray-700 dark:text-gray-300">Name:</span> {account.displayName}</p>
+            <p><span className="font-semibold text-gray-700 dark:text-gray-300">Email:</span> {account.email}</p>
             <p>
-              <span className="font-semibold text-gray-700">2FA:</span>{' '}
+              <span className="font-semibold text-gray-700 dark:text-gray-300">2FA:</span>{' '}
               {account.twoFactorEnabled ? 'Enabled' : 'Not enabled'}
             </p>
           </div>
         </section>
 
-        <section className="rounded-lg bg-white p-6 shadow">
+        <section className="rounded-lg bg-white p-6 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
           <h2 className="mb-2">Reset Password</h2>
           <form onSubmit={handlePasswordChange} className="mt-5 space-y-4">
             <input
@@ -153,7 +153,7 @@ export function AccountSettingsPage({
               value={currentPassword}
               onChange={(event) => setCurrentPassword(event.target.value)}
               placeholder="Current password"
-              className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none focus:border-primary-500"
+              className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
               autoComplete="current-password"
             />
             <input
@@ -161,7 +161,7 @@ export function AccountSettingsPage({
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
               placeholder="New password"
-              className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none focus:border-primary-500"
+              className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
               autoComplete="new-password"
             />
             <input
@@ -169,7 +169,7 @@ export function AccountSettingsPage({
               value={confirmNewPassword}
               onChange={(event) => setConfirmNewPassword(event.target.value)}
               placeholder="Confirm new password"
-              className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none focus:border-primary-500"
+              className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
               autoComplete="new-password"
             />
             <button type="submit" className="btn-primary" disabled={isPasswordSaving}>
@@ -178,9 +178,9 @@ export function AccountSettingsPage({
           </form>
         </section>
 
-        <section className="rounded-lg bg-white p-6 shadow xl:col-span-2">
+        <section className="rounded-lg bg-white p-6 shadow xl:col-span-2 dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
           <h2 className="mb-2">Authenticator App 2FA</h2>
-          <p className="mb-5 text-sm text-gray-600">
+          <p className="mb-5 text-sm text-gray-600 dark:text-gray-400">
             Use Google Authenticator, Microsoft Authenticator, 1Password, or another TOTP app.
           </p>
 
@@ -192,8 +192,8 @@ export function AccountSettingsPage({
 
           {!account.twoFactorEnabled && twoFactorSetup && (
             <form onSubmit={handleEnableTwoFactor} className="space-y-4">
-              <div className="grid grid-cols-1 gap-5 rounded border border-gray-300 bg-gray-50 p-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-                <div className="flex items-center justify-center rounded bg-white p-5">
+              <div className="grid grid-cols-1 gap-5 rounded border border-gray-300 bg-gray-50 p-4 lg:grid-cols-[260px_minmax(0,1fr)] dark:border-gray-700 dark:bg-gray-950">
+                <div className="flex items-center justify-center rounded bg-white p-5 dark:bg-gray-900">
                   {qrCodeDataUrl ? (
                     <img src={qrCodeDataUrl} alt="Authenticator setup QR code" className="h-56 w-56" />
                   ) : (
@@ -201,17 +201,17 @@ export function AccountSettingsPage({
                   )}
                 </div>
                 <div>
-                  <p className="mb-2 text-sm font-semibold text-gray-700">Secret key</p>
-                  <code className="block break-all rounded bg-white p-3 text-sm">{twoFactorSetup.secret}</code>
-                  <p className="mt-3 text-sm text-gray-600">Manual setup URI:</p>
-                  <code className="block break-all rounded bg-white p-3 text-xs">{twoFactorSetup.otpauthUrl}</code>
+                  <p className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Secret key</p>
+                  <code className="block break-all rounded bg-white p-3 text-sm dark:bg-gray-900">{twoFactorSetup.secret}</code>
+                  <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">Manual setup URI:</p>
+                  <code className="block break-all rounded bg-white p-3 text-xs dark:bg-gray-900">{twoFactorSetup.otpauthUrl}</code>
                 </div>
               </div>
               <input
                 value={twoFactorCode}
                 onChange={(event) => setTwoFactorCode(event.target.value)}
                 placeholder="6-digit code"
-                className="w-full max-w-xs rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none focus:border-primary-500"
+                className="w-full max-w-xs rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
                 inputMode="numeric"
               />
               <div>
@@ -230,7 +230,7 @@ export function AccountSettingsPage({
                 value={disablePassword}
                 onChange={(event) => setDisablePassword(event.target.value)}
                 placeholder="Password to disable 2FA"
-                className="rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none focus:border-primary-500"
+                className="rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
                 autoComplete="current-password"
               />
               <button type="submit" className="btn-danger w-fit" disabled={isTwoFactorSaving}>

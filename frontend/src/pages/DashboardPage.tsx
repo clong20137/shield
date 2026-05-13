@@ -57,20 +57,20 @@ const DashboardPage: React.FC = () => {
         />
       )}
 
-      <div className="bg-white rounded-lg p-5 shadow">
+      <div className="bg-white rounded-lg p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
         <h2 className="mb-6">Recent Users</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {recentUsers.map((user) => (
             <div
               key={user.id}
-              className="bg-gradient-to-br from-gray-50 to-white border border-gray-300 rounded-lg p-5 transition hover:shadow-lg hover:-translate-y-1"
+              className="bg-gradient-to-br from-gray-50 to-white border border-gray-300 rounded-lg p-5 transition hover:shadow-lg hover:-translate-y-1 dark:from-gray-800 dark:to-gray-900 dark:border-gray-700"
             >
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <h3 className="text-primary-500 m-0 mb-2 text-base font-bold">
                     {user.firstName} {user.lastName}
                   </h3>
-                  <p className="m-0 mb-1 text-sm text-gray-600 font-semibold">
+                  <p className="m-0 mb-1 text-sm text-gray-600 font-semibold dark:text-gray-300">
                     Badge: {user.badgeNumber}
                   </p>
                   <p className="m-0 mb-1 text-sm text-secondary-500">

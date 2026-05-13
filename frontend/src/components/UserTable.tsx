@@ -25,7 +25,7 @@ export const UserTable: React.FC<UserTableProps> = ({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
+    <div className="bg-white rounded-lg shadow overflow-hidden dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
@@ -44,7 +44,7 @@ export const UserTable: React.FC<UserTableProps> = ({
               <tr
                 key={user.id}
                 onClick={() => onUserSelect?.(user)}
-                className="border-b border-gray-300 hover:bg-gray-50 transition cursor-pointer"
+                className="border-b border-gray-300 hover:bg-gray-50 transition cursor-pointer dark:border-gray-800 dark:hover:bg-gray-800"
               >
                 <td className="px-4 py-3">{user.lastName}</td>
                 <td className="px-4 py-3">{user.firstName}</td>

@@ -9,7 +9,7 @@ interface UserDetailProps {
 
 export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit }) => {
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
+    <div className="bg-white rounded-lg shadow overflow-hidden dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
       <div className="bg-primary-500 text-white px-5 py-4 flex justify-between items-center">
         <h2 className="text-2xl font-bold m-0">{user.firstName} {user.lastName}</h2>
         <button
@@ -26,17 +26,17 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit })
           <h3 className="text-primary-500 text-base mb-4 pb-2 border-b-2 border-gray-300 font-bold">
             Personal Information
           </h3>
-          <div className="flex justify-between py-2 border-b border-gray-200">
-            <span className="font-semibold text-gray-700">Name:</span>
-            <span className="text-gray-600">{user.firstName} {user.lastName}</span>
+          <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-800">
+            <span className="font-semibold text-gray-700 dark:text-gray-300">Name:</span>
+            <span className="text-gray-600 dark:text-gray-300">{user.firstName} {user.lastName}</span>
           </div>
-          <div className="flex justify-between py-2 border-b border-gray-200">
-            <span className="font-semibold text-gray-700">Race:</span>
-            <span className="text-gray-600">{user.race}</span>
+          <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-800">
+            <span className="font-semibold text-gray-700 dark:text-gray-300">Race:</span>
+            <span className="text-gray-600 dark:text-gray-300">{user.race}</span>
           </div>
-          <div className="flex justify-between py-2 border-b border-gray-200">
-            <span className="font-semibold text-gray-700">Sex:</span>
-            <span className="text-gray-600">{user.sex}</span>
+          <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-800">
+            <span className="font-semibold text-gray-700 dark:text-gray-300">Sex:</span>
+            <span className="text-gray-600 dark:text-gray-300">{user.sex}</span>
           </div>
         </div>
 

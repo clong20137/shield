@@ -4,19 +4,19 @@
 
 @layer base {
   body {
-    @apply font-sans text-gray-800 bg-gray-50;
+    @apply font-sans text-gray-800 bg-gray-50 dark:bg-gray-950 dark:text-gray-100;
   }
 
   h1 {
-    @apply text-4xl font-bold text-primary-500;
+    @apply text-4xl font-bold text-primary-500 dark:text-blue-100;
   }
 
   h2 {
-    @apply text-2xl font-bold text-primary-500;
+    @apply text-2xl font-bold text-primary-500 dark:text-blue-100;
   }
 
   h3 {
-    @apply text-lg font-bold text-primary-500;
+    @apply text-lg font-bold text-primary-500 dark:text-blue-100;
   }
 }
 
@@ -46,18 +46,18 @@
   }
 
   .error {
-    @apply bg-red-100 text-danger px-4 py-3 rounded mb-5 border-l-4 border-danger;
+    @apply bg-red-100 text-danger px-4 py-3 rounded mb-5 border-l-4 border-danger dark:bg-red-950 dark:text-red-200;
   }
 
   .success {
-    @apply bg-green-100 text-success px-4 py-3 rounded mb-5 border-l-4 border-success;
+    @apply bg-green-100 text-success px-4 py-3 rounded mb-5 border-l-4 border-success dark:bg-green-950 dark:text-green-200;
   }
 
   .loading {
-    @apply text-center py-10 text-gray-500 text-base;
+    @apply text-center py-10 text-gray-500 text-base dark:text-gray-400;
   }
 
   .empty-state {
-    @apply text-center py-10 text-gray-500 text-base;
+    @apply text-center py-10 text-gray-500 text-base dark:text-gray-400;
   }
 }
