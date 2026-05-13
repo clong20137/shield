@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Navigate, NavLink, Routes, Route } from 'react
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
 import DashboardPage from './pages/DashboardPage';
+import { AccountSettingsPage } from './pages/AccountSettingsPage';
+import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { AuthAccount, authService } from './services/api';
 
 const SESSION_KEY = 'shield_session';
@@ -20,13 +22,22 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-function LoginSplash({ onLogin }: { onLogin: (account: AuthAccount) => void }) {
+function LoginSplash({
+  onLogin,
+  onToast,
+}: {
+  onLogin: (account: AuthAccount) => void;
+  onToast: (type: ToastType, message: string) => void;
+}) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [twoFactorCode, setTwoFactorCode] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -41,6 +52,16 @@ function LoginSplash({ onLogin }: { onLogin: (account: AuthAccount) => void }) {
       return;
     }
 
+    if (mode === 'register' && password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    if (requiresTwoFactor && !twoFactorCode.trim()) {
+      setError('Enter your 2FA code.');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -48,11 +69,20 @@ function LoginSplash({ onLogin }: { onLogin: (account: AuthAccount) => void }) {
       const response =
         mode === 'register'
           ? await authService.register(email, password, displayName)
-          : await authService.login(email, password);
+          : await authService.login(email, password, requiresTwoFactor ? twoFactorCode : undefined);
 
-      onLogin(response.data.account);
+      if (response.data.requiresTwoFactor) {
+        setRequiresTwoFactor(true);
+        return;
+      }
+
+      if (response.data.account) {
+        onLogin(response.data.account);
+      }
     } catch (err) {
-      setError(getErrorMessage(err, mode === 'register' ? 'Failed to create account.' : 'Failed to sign in.'));
+      const message = getErrorMessage(err, mode === 'register' ? 'Failed to create account.' : 'Failed to sign in.');
+      setError(message);
+      onToast('error', message);
     } finally {
       setIsSubmitting(false);
     }
@@ -123,6 +153,32 @@ function LoginSplash({ onLogin }: { onLogin: (account: AuthAccount) => void }) {
               />
             </label>
 
+            {mode === 'register' && (
+              <label className="mb-6 block">
+                <span className="mb-2 block text-sm font-semibold text-gray-700">Confirm password</span>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                  autoComplete="new-password"
+                />
+              </label>
+            )}
+
+            {requiresTwoFactor && mode === 'login' && (
+              <label className="mb-6 block">
+                <span className="mb-2 block text-sm font-semibold text-gray-700">2FA code</span>
+                <input
+                  value={twoFactorCode}
+                  onChange={(event) => setTwoFactorCode(event.target.value)}
+                  className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                />
+              </label>
+            )}
+
             <button type="submit" className="btn-primary w-full py-3" disabled={isSubmitting}>
               {isSubmitting ? 'Working...' : mode === 'register' ? 'Create login' : 'Sign in'}
             </button>
@@ -131,6 +187,9 @@ function LoginSplash({ onLogin }: { onLogin: (account: AuthAccount) => void }) {
               type="button"
               onClick={() => {
                 setMode((value) => (value === 'login' ? 'register' : 'login'));
+                setConfirmPassword('');
+                setTwoFactorCode('');
+                setRequiresTwoFactor(false);
                 setError(null);
               }}
               className="mt-4 w-full text-sm font-semibold text-primary-500 hover:text-primary-700"
@@ -167,6 +226,15 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthAccount | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const showToast = (type: ToastType, message: string) => {
+    const id = Date.now();
+    setToasts((currentToasts) => [...currentToasts, { id, type, message }]);
+    window.setTimeout(() => {
+      setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== id));
+    }, 4500);
+  };
 
   useEffect(() => {
     const storedSession = window.localStorage.getItem(SESSION_KEY);
@@ -186,18 +254,26 @@ function App() {
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(account));
     setCurrentUser(account);
     setIsAuthenticated(true);
+    showToast('success', `Signed in as ${account.email}.`);
   };
 
   const handleLogout = () => {
     window.localStorage.removeItem(SESSION_KEY);
     setCurrentUser(null);
     setIsAuthenticated(false);
+    showToast('info', 'Signed out.');
+  };
+
+  const handleAccountUpdate = (account: AuthAccount) => {
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify(account));
+    setCurrentUser(account);
   };
 
   return (
     <Router>
+      <ToastHost toasts={toasts} />
       {!isAuthenticated ? (
-        <LoginSplash onLogin={handleLogin} />
+        <LoginSplash onLogin={handleLogin} onToast={showToast} />
       ) : (
         <div className="flex min-h-screen bg-gray-50">
           <aside className={`flex shrink-0 flex-col bg-primary-500 text-white shadow-xl transition-all duration-200 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
@@ -222,6 +298,7 @@ function App() {
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} />
               <SidebarLink to="/search" label="Search" compact={isSidebarCollapsed} />
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} />
+              <SidebarLink to="/account" label="Account" compact={isSidebarCollapsed} />
             </nav>
 
             <div className="border-t border-white/10 p-3">
@@ -256,6 +333,19 @@ function App() {
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
+                {currentUser && (
+                  <Route
+                    path="/account"
+                    element={
+                      <AccountSettingsPage
+                        account={currentUser}
+                        onAccountUpdate={handleAccountUpdate}
+                        onToast={showToast}
+                        getErrorMessage={getErrorMessage}
+                      />
+                    }
+                  />
+                )}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>

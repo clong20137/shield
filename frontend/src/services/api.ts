@@ -64,20 +64,39 @@ export interface AuthAccount {
   id: string;
   email: string;
   displayName: string;
+  twoFactorEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface AuthResponse {
-  account: AuthAccount;
+  account?: AuthAccount;
+  requiresTwoFactor?: boolean;
+}
+
+export interface TwoFactorSetupResponse {
+  secret: string;
+  otpauthUrl: string;
 }
 
 export const authService = {
   register: (email: string, password: string, displayName: string) =>
     api.post<AuthResponse>('/auth/register', { email, password, displayName }),
 
-  login: (email: string, password: string) =>
-    api.post<AuthResponse>('/auth/login', { email, password }),
+  login: (email: string, password: string, twoFactorCode?: string) =>
+    api.post<AuthResponse>('/auth/login', { email, password, twoFactorCode }),
+
+  changePassword: (accountId: string, currentPassword: string, newPassword: string) =>
+    api.post('/auth/change-password', { accountId, currentPassword, newPassword }),
+
+  setupTwoFactor: (accountId: string) =>
+    api.post<TwoFactorSetupResponse>('/auth/2fa/setup', { accountId }),
+
+  enableTwoFactor: (accountId: string, code: string) =>
+    api.post<AuthResponse>('/auth/2fa/enable', { accountId, code }),
+
+  disableTwoFactor: (accountId: string, password: string) =>
+    api.post<AuthResponse>('/auth/2fa/disable', { accountId, password }),
 };
 
 export const userService = {

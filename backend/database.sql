@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS auth_accounts (
   `email` VARCHAR(255) NOT NULL UNIQUE,
   `passwordHash` VARCHAR(255) NOT NULL,
   `displayName` VARCHAR(100) NOT NULL,
+  `twoFactorSecret` VARCHAR(64),
+  `twoFactorEnabled` BOOLEAN DEFAULT 0,
   `createdAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updatedAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_auth_email` (`email`)
