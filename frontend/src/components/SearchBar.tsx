@@ -1,8 +1,9 @@
 import React from 'react';
+import { UserFilters } from '../services/api';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
-  onFilterChange?: (filters: any) => void;
+  onFilterChange?: (filters: UserFilters) => void;
   placeholder?: string;
 }
 
@@ -25,7 +26,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     onSearch(query);
   };
 
-  const handleFilterChange = (field: string, value: string) => {
+  const handleFilterChange = (field: keyof UserFilters, value: string) => {
     const newFilters = { ...filters, [field]: value };
     setFilters(newFilters);
     onFilterChange?.(newFilters);

@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -11,7 +10,7 @@ function App() {
         <nav className="bg-primary-500 text-white py-5 px-10 shadow-md">
           <div className="flex justify-between items-center">
             <div className="flex flex-col gap-1">
-              <h1 className="text-3xl font-bold tracking-wider">⚔️ SHIELD</h1>
+              <h1 className="text-3xl font-bold tracking-wider">SHIELD</h1>
               <p className="text-xs opacity-80">Agency User Search & Reporting System</p>
             </div>
             <ul className="flex gap-8">

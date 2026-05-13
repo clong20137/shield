@@ -27,51 +27,52 @@ A comprehensive internal application for searching users throughout an agency an
 
 ## Project Structure
 
-```
+```text
 SHIELD/
-├── backend/
-│   ├── src/
-│   │   ├── config/
-│   │   │   └── database.ts       # Database configuration
-│   │   ├── models/
-│   │   │   └── User.ts           # User model
-│   │   ├── controllers/
-│   │   │   ├── userController.ts # User endpoints
-│   │   │   └── reportController.ts # Report endpoints
-│   │   ├── routes/
-│   │   │   ├── userRoutes.ts     # User routes
-│   │   │   └── reportRoutes.ts   # Report routes
-│   │   └── index.ts              # Server entry point
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── .env.example              # Environment variables template
-│   └── database.sql              # Database schema
-│
-└── frontend/
-    ├── src/
-    │   ├── components/
-    │   │   ├── SearchBar.tsx      # Search component
-    │   │   ├── UserTable.tsx      # User table display
-    │   │   ├── UserDetail.tsx     # User detail view
-    │   │   └── StatisticsCard.tsx # Statistics display
-    │   ├── pages/
-    │   │   ├── DashboardPage.tsx  # Dashboard page
-    │   │   ├── SearchPage.tsx     # Search page
-    │   │   └── ReportsPage.tsx    # Reports page
-    │   ├── services/
-    │   │   └── api.ts             # API service
-    │   ├── styles/
-    │   │   ├── App.scss
-    │   │   ├── index.scss
-    │   │   ├── variables.scss
-    │   │   ├── components/        # Component styles
-    │   │   └── pages/             # Page styles
-    │   ├── App.tsx                # Main App component
-    │   └── main.tsx               # React entry point
-    ├── index.html
-    ├── package.json
-    ├── tsconfig.json
-    └── vite.config.ts
+|-- backend/
+|   |-- src/
+|   |   |-- config/
+|   |   |   `-- database.ts          # Database configuration
+|   |   |-- models/
+|   |   |   `-- User.ts              # User model
+|   |   |-- controllers/
+|   |   |   |-- userController.ts    # User endpoints
+|   |   |   `-- reportController.ts  # Report endpoints
+|   |   |-- routes/
+|   |   |   |-- userRoutes.ts        # User routes
+|   |   |   `-- reportRoutes.ts      # Report routes
+|   |   `-- index.ts                 # Server entry point
+|   |-- package.json
+|   |-- tsconfig.json
+|   |-- .env.example                 # Environment variables template
+|   `-- database.sql                 # Database schema
+|
+`-- frontend/
+    |-- src/
+    |   |-- components/
+    |   |   |-- SearchBar.tsx        # Search component
+    |   |   |-- UserTable.tsx        # User table display
+    |   |   |-- UserDetail.tsx       # User detail view
+    |   |   `-- StatisticsCard.tsx   # Statistics display
+    |   |-- pages/
+    |   |   |-- DashboardPage.tsx    # Dashboard page
+    |   |   |-- SearchPage.tsx       # Search page
+    |   |   `-- ReportsPage.tsx      # Reports page
+    |   |-- services/
+    |   |   `-- api.ts               # API service
+    |   |-- styles/
+    |   |   |-- App.scss
+    |   |   |-- index.scss
+    |   |   |-- variables.scss
+    |   |   |-- components/          # Component styles
+    |   |   `-- pages/               # Page styles
+    |   |-- App.tsx                  # Main App component
+    |   |-- main.tsx                 # React entry point
+    |   `-- vite-env.d.ts            # Vite TypeScript env types
+    |-- index.html
+    |-- package.json
+    |-- tsconfig.json
+    `-- vite.config.ts
 ```
 
 ## Installation
@@ -99,7 +100,7 @@ cp .env.example .env
 ```
 
 4. Update `.env` with your MySQL credentials:
-```
+```env
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=your_password
@@ -122,11 +123,10 @@ npm run build
 7. Start the server:
 ```bash
 npm run dev  # For development
-# or
-npm start   # For production
+npm start    # For production
 ```
 
-The backend will run on `http://localhost:5000`
+The backend will run on `http://localhost:5000`.
 
 ### Frontend Setup
 
@@ -145,13 +145,19 @@ npm install
 npm run dev
 ```
 
-The frontend will run on `http://localhost:3000`
+The frontend will run on `http://localhost:3000`.
+
+To override the API URL in Vite, set `VITE_API_URL`, for example:
+
+```env
+VITE_API_URL=http://localhost:5000/api
+```
 
 ## API Endpoints
 
 ### Users
-- `GET /api/users/search?q=query` - Search users
-- `GET /api/users/all?page=1&limit=50` - Get all users (paginated)
+- `GET /api/users/search?q=query` - Search users; also supports `rank`, `district`, `active`, and `employmentType` filters
+- `GET /api/users/all?page=1&limit=50` - Get all users, paginated
 - `GET /api/users/:id` - Get user by ID
 - `POST /api/users` - Create new user
 - `PUT /api/users/:id` - Update user
@@ -168,12 +174,12 @@ The frontend will run on `http://localhost:3000`
 
 The application tracks the following information for each user:
 
-- **Name**: First name, Last name
-- **Identification**: PE Number, Badge Number, Car Number, Public Safety ID
-- **Status**: Active/Inactive
-- **Employment**: Rank, District, Assigned to, Employment Type, Type Details, Status
-- **Management**: Supervisor, Specialty Certifications
-- **Demographics**: Race, Sex
+- **Name**: First name, last name
+- **Identification**: PE number, badge number, car number, public safety ID
+- **Status**: Active or inactive
+- **Employment**: Rank, district, assigned to, employment type, type details, status
+- **Management**: Supervisor, specialty certifications
+- **Demographics**: Race, sex
 
 ## Database Schema
 
@@ -237,14 +243,14 @@ npm run type-check
 
 The application uses Tailwind CSS for efficient and maintainable styling with the following color scheme:
 
-- **Primary**: #1a365d (Dark Blue)
-- **Secondary**: #2d5a8c (Medium Blue)
-- **Accent**: #e74c3c (Red)
-- **Success**: #27ae60 (Green)
-- **Danger**: #c0392b (Dark Red)
-- **Light Background**: #f5f7fa
+- **Primary**: `#1a365d` (Dark Blue)
+- **Secondary**: `#2d5a8c` (Medium Blue)
+- **Accent**: `#e74c3c` (Red)
+- **Success**: `#27ae60` (Green)
+- **Danger**: `#c0392b` (Dark Red)
+- **Light Background**: `#f5f7fa`
 
-Customize colors in `frontend/tailwind.config.js`
+Customize colors in `frontend/tailwind.config.js`.
 
 ## Features Overview
 
@@ -284,10 +290,6 @@ Customize colors in `frontend/tailwind.config.js`
 - Integration with external systems
 - Email notifications
 - Batch user imports
-
-## Support
-
-For issues or questions, please contact the development team.
 
 ## License
 

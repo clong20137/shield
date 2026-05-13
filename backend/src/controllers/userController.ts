@@ -1,22 +1,24 @@
 import { Request, Response } from 'express';
-import { UserModel } from '../models/User';
+import { User, UserModel } from '../models/User';
 
 export class UserController {
   static async searchUsers(req: Request, res: Response) {
     try {
       const { q, rank, district, active, employmentType } = req.query;
-      
-      if (!q || typeof q !== 'string') {
-        return res.status(400).json({ error: 'Search term required' });
+
+      if (q !== undefined && typeof q !== 'string') {
+        return res.status(400).json({ error: 'Search term must be a string' });
       }
 
-      const filters: any = {};
-      if (rank) filters.rank = rank;
-      if (district) filters.district = district;
-      if (active !== undefined) filters.isActive = active === 'true';
-      if (employmentType) filters.employmentType = employmentType;
+      const filters: Partial<User> = {};
+      if (typeof rank === 'string' && rank) filters.rank = rank;
+      if (typeof district === 'string' && district) filters.district = district;
+      if (typeof active === 'string' && active) filters.isActive = active === 'true';
+      if (typeof employmentType === 'string' && employmentType) {
+        filters.employmentType = employmentType;
+      }
 
-      const users = await UserModel.searchUsers(q, filters);
+      const users = await UserModel.searchUsers(q ?? '', filters);
       res.json(users);
     } catch (error) {
       console.error('Search error:', error);

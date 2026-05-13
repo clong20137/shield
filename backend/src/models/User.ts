@@ -1,3 +1,5 @@
+import { ResultSetHeader } from 'mysql2';
+import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database';
 
 export interface User {
@@ -24,48 +26,72 @@ export interface User {
 }
 
 export class UserModel {
+  private static readonly editableFields = [
+    'firstName',
+    'lastName',
+    'peNumber',
+    'carNumber',
+    'badgeNumber',
+    'assignedTo',
+    'district',
+    'rank',
+    'isActive',
+    'employmentType',
+    'typeDetails',
+    'status',
+    'supervisor',
+    'specialtyCertifications',
+    'publicSafetyId',
+    'race',
+    'sex',
+  ] as const;
+
   static async searchUsers(
     searchTerm: string,
     filters?: Partial<User>
   ): Promise<User[]> {
     const conn = await pool.getConnection();
     try {
-      let query = `
-        SELECT * FROM users 
-        WHERE firstName LIKE ? 
-        OR lastName LIKE ? 
-        OR peNumber LIKE ? 
-        OR badgeNumber LIKE ? 
-        OR publicSafetyId LIKE ?
-      `;
-      
-      const params = [
-        `%${searchTerm}%`,
-        `%${searchTerm}%`,
-        `%${searchTerm}%`,
-        `%${searchTerm}%`,
-        `%${searchTerm}%`,
-      ];
+      let query = 'SELECT * FROM users';
+      const conditions: string[] = [];
+      const params: Array<string | number> = [];
+      const trimmedSearchTerm = searchTerm.trim();
 
-      // Add filter conditions
+      if (trimmedSearchTerm) {
+        conditions.push(`(
+          firstName LIKE ?
+          OR lastName LIKE ?
+          OR peNumber LIKE ?
+          OR badgeNumber LIKE ?
+          OR publicSafetyId LIKE ?
+        )`);
+
+        const likeTerm = `%${trimmedSearchTerm}%`;
+        params.push(likeTerm, likeTerm, likeTerm, likeTerm, likeTerm);
+      }
+
       if (filters?.rank) {
-        query += ` AND rank = ?`;
+        conditions.push('rank = ?');
         params.push(filters.rank);
       }
       if (filters?.district) {
-        query += ` AND district = ?`;
+        conditions.push('district = ?');
         params.push(filters.district);
       }
       if (filters?.isActive !== undefined) {
-        query += ` AND isActive = ?`;
+        conditions.push('isActive = ?');
         params.push(filters.isActive ? 1 : 0);
       }
       if (filters?.employmentType) {
-        query += ` AND employmentType = ?`;
+        conditions.push('employmentType = ?');
         params.push(filters.employmentType);
       }
 
-      query += ` ORDER BY lastName, firstName LIMIT 100`;
+      if (conditions.length > 0) {
+        query += ` WHERE ${conditions.join(' AND ')}`;
+      }
+
+      query += ' ORDER BY lastName, firstName LIMIT 100';
 
       const [rows] = await conn.query(query, params);
       return rows as User[];
@@ -101,7 +127,7 @@ export class UserModel {
   static async createUser(user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User> {
     const conn = await pool.getConnection();
     try {
-      const id = require('uuid').v4();
+      const id = uuidv4();
       const now = new Date();
 
       await conn.query(
@@ -146,12 +172,12 @@ export class UserModel {
     try {
       const now = new Date();
       const fields: string[] = [];
-      const values: any[] = [];
+      const values: Array<string | boolean | Date | null> = [];
 
       Object.entries(updates).forEach(([key, value]) => {
-        if (key !== 'id' && key !== 'createdAt') {
+        if (UserModel.editableFields.includes(key as typeof UserModel.editableFields[number])) {
           fields.push(`${key} = ?`);
-          values.push(value);
+          values.push(value as string | boolean | null);
         }
       });
 
@@ -161,12 +187,12 @@ export class UserModel {
       values.push(now);
       values.push(id);
 
-      const [result] = await conn.query(
+      const [result] = await conn.query<ResultSetHeader>(
         `UPDATE users SET ${fields.join(', ')} WHERE id = ?`,
         values
       );
 
-      return (result as any).affectedRows > 0;
+      return result.affectedRows > 0;
     } finally {
       conn.release();
     }
@@ -175,8 +201,8 @@ export class UserModel {
   static async deleteUser(id: string): Promise<boolean> {
     const conn = await pool.getConnection();
     try {
-      const [result] = await conn.query('DELETE FROM users WHERE id = ?', [id]);
-      return (result as any).affectedRows > 0;
+      const [result] = await conn.query<ResultSetHeader>('DELETE FROM users WHERE id = ?', [id]);
+      return result.affectedRows > 0;
     } finally {
       conn.release();
     }

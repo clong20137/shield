@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -29,12 +29,42 @@ export interface User {
   updatedAt: string;
 }
 
+export interface UserFilters {
+  rank?: string;
+  district?: string;
+  active?: string;
+  employmentType?: string;
+}
+
+export interface UserListResponse {
+  data: User[];
+  page: number;
+  limit: number;
+  count: number;
+}
+
+export interface SystemStatistics {
+  totalUsers: number;
+  activeUsers: number;
+  inactiveUsers: number;
+  totalDistricts: number;
+  totalRanks: number;
+}
+
+export interface ReportRow {
+  rank?: string;
+  district?: string;
+  employmentType?: string;
+  count: number;
+  activeCount: number;
+}
+
 export const userService = {
-  search: (searchTerm: string, filters?: any) =>
+  search: (searchTerm: string, filters?: UserFilters) =>
     api.get('/users/search', { params: { q: searchTerm, ...filters } }),
   
   getAll: (page: number = 1, limit: number = 50) =>
-    api.get('/users/all', { params: { page, limit } }),
+    api.get<UserListResponse>('/users/all', { params: { page, limit } }),
   
   getById: (id: string) =>
     api.get(`/users/${id}`),
@@ -51,18 +81,18 @@ export const userService = {
 
 export const reportService = {
   getByRank: () =>
-    api.get('/reports/by-rank'),
+    api.get<ReportRow[]>('/reports/by-rank'),
   
   getByDistrict: () =>
-    api.get('/reports/by-district'),
+    api.get<ReportRow[]>('/reports/by-district'),
   
   getByEmploymentType: () =>
-    api.get('/reports/by-employment-type'),
+    api.get<ReportRow[]>('/reports/by-employment-type'),
   
   getStatistics: () =>
-    api.get('/reports/statistics'),
+    api.get<SystemStatistics>('/reports/statistics'),
   
-  getDetailedReport: (filters?: any) =>
+  getDetailedReport: (filters?: UserFilters) =>
     api.get('/reports/detailed', { params: filters }),
 };
 

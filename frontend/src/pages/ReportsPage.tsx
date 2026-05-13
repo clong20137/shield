@@ -1,18 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { reportService } from '../services/api';
-
-interface Report {
-  label: string;
-  value: number;
-  count?: number;
-  activeCount?: number;
-}
+import { reportService, ReportRow, SystemStatistics } from '../services/api';
 
 const ReportsPage: React.FC = () => {
-  const [rankReport, setRankReport] = useState<any[]>([]);
-  const [districtReport, setDistrictReport] = useState<any[]>([]);
-  const [employmentReport, setEmploymentReport] = useState<any[]>([]);
-  const [statistics, setStatistics] = useState<any>(null);
+  const [rankReport, setRankReport] = useState<ReportRow[]>([]);
+  const [districtReport, setDistrictReport] = useState<ReportRow[]>([]);
+  const [employmentReport, setEmploymentReport] = useState<ReportRow[]>([]);
+  const [statistics, setStatistics] = useState<SystemStatistics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

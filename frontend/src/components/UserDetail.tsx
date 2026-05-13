@@ -15,8 +15,9 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit })
         <button
           className="bg-transparent border-none text-white text-2xl cursor-pointer w-10 h-10 flex items-center justify-center rounded hover:bg-black/20"
           onClick={onClose}
+          aria-label="Close user detail"
         >
-          ✕
+          x
         </button>
       </div>
 

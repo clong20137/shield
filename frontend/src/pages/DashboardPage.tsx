@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { userService, reportService } from '../services/api';
+import { userService, reportService, SystemStatistics, User } from '../services/api';
 import { StatisticsCard } from '../components/StatisticsCard';
 
 const DashboardPage: React.FC = () => {
-  const [stats, setStats] = useState<any>(null);
-  const [recentUsers, setRecentUsers] = useState<any[]>([]);
+  const [stats, setStats] = useState<SystemStatistics | null>(null);
+  const [recentUsers, setRecentUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,10 +34,10 @@ const DashboardPage: React.FC = () => {
 
   const statItems = stats
     ? [
-        { label: 'Total Users', value: stats.totalUsers || 0, icon: '👥' },
-        { label: 'Active Users', value: stats.activeUsers || 0, icon: '✓' },
-        { label: 'Inactive Users', value: stats.inactiveUsers || 0, icon: '✗' },
-        { label: 'Districts', value: stats.totalDistricts || 0, icon: '🗺️' },
+        { label: 'Total Users', value: stats.totalUsers || 0, icon: 'Users' },
+        { label: 'Active Users', value: stats.activeUsers || 0, icon: 'On' },
+        { label: 'Inactive Users', value: stats.inactiveUsers || 0, icon: 'Off' },
+        { label: 'Districts', value: stats.totalDistricts || 0, icon: 'Map' },
       ]
     : [];
 

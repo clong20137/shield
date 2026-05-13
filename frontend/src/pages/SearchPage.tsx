@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { userService, User } from '../services/api';
+import React, { useState } from 'react';
+import { userService, User, UserFilters } from '../services/api';
 import { SearchBar } from '../components/SearchBar';
 import { UserTable } from '../components/UserTable';
 import { UserDetail } from '../components/UserDetail';
@@ -9,8 +9,10 @@ const SearchPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [currentQuery, setCurrentQuery] = useState('');
 
   const handleSearch = async (query: string) => {
+    setCurrentQuery(query);
     if (!query.trim()) {
       setUsers([]);
       return;
@@ -29,12 +31,11 @@ const SearchPage: React.FC = () => {
     }
   };
 
-  const handleFilterChange = async (filters: any) => {
-    // Implement filter logic when search is active
+  const handleFilterChange = async (filters: UserFilters) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await userService.search('', filters);
+      const response = await userService.search(currentQuery, filters);
       setUsers(response.data);
     } catch (err) {
       setError('Failed to apply filters. Please try again.');
