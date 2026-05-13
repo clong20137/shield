@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { BarChart3, ChevronLeft, ChevronRight, LayoutDashboard, LucideIcon, Search, Settings, Shield, UserCircle } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -203,7 +204,25 @@ function LoginSplash({
   );
 }
 
-function SidebarLink({ to, label, compact }: { to: string; label: string; compact: boolean }) {
+function getInitials(name?: string, email?: string): string {
+  const source = name?.trim() || email?.trim() || 'SHIELD User';
+  const parts = source.split(/\s+/u).filter(Boolean);
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+interface SidebarLinkProps {
+  to: string;
+  label: string;
+  compact: boolean;
+  icon: LucideIcon;
+}
+
+function SidebarLink({ to, label, compact, icon: Icon }: SidebarLinkProps) {
   return (
     <NavLink
       to={to}
@@ -216,7 +235,7 @@ function SidebarLink({ to, label, compact }: { to: string; label: string; compac
       }
       title={compact ? label : undefined}
     >
-      <span className="w-8 text-center text-xs uppercase">{label.slice(0, 2)}</span>
+      <Icon className={compact ? '' : 'mr-3'} size={19} />
       {!compact && <span>{label}</span>}
     </NavLink>
   );
@@ -276,37 +295,63 @@ function App() {
         <LoginSplash onLogin={handleLogin} onToast={showToast} />
       ) : (
         <div className="flex min-h-screen bg-gray-50">
-          <aside className={`flex shrink-0 flex-col bg-primary-500 text-white shadow-xl transition-all duration-200 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
-            <div className="flex h-20 items-center justify-between border-b border-white/10 px-4">
+          <aside className={`relative flex shrink-0 flex-col bg-primary-500 text-white shadow-xl transition-all duration-200 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
+            <button
+              type="button"
+              onClick={() => setIsSidebarCollapsed((value) => !value)}
+              className="absolute -right-4 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-primary-500 shadow-lg hover:bg-gray-50"
+              aria-label={isSidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+            >
+              {isSidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+            </button>
+
+            <div className="flex h-20 items-center border-b border-white/10 px-4">
               {!isSidebarCollapsed && (
-                <div>
-                  <h1 className="text-2xl font-bold tracking-wider text-white">SHIELD</h1>
-                  <p className="text-xs text-blue-100">Agency User Search</p>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded bg-white text-primary-500">
+                    <Shield size={22} />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold tracking-wider text-white">SHIELD</h1>
+                    <p className="text-xs text-blue-100">Agency User Search</p>
+                  </div>
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => setIsSidebarCollapsed((value) => !value)}
-                className="flex h-10 w-10 items-center justify-center rounded text-lg font-bold text-white hover:bg-white/10"
-                aria-label={isSidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
-              >
-                {isSidebarCollapsed ? '>' : '<'}
-              </button>
+              {isSidebarCollapsed && (
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded bg-white text-primary-500">
+                  <Shield size={22} />
+                </div>
+              )}
             </div>
 
-            <nav className="flex flex-1 flex-col gap-2 px-3 py-5">
-              <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} />
-              <SidebarLink to="/search" label="Search" compact={isSidebarCollapsed} />
-              <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} />
-              <SidebarLink to="/account" label="Account" compact={isSidebarCollapsed} />
+            <div className={isSidebarCollapsed ? 'px-3 py-5' : 'px-4 py-5'}>
+              <div className={`overflow-hidden rounded-lg bg-white/10 ${isSidebarCollapsed ? 'p-2' : 'p-0'}`}>
+                <div className={`flex h-28 items-end bg-gradient-to-br from-primary-700 to-secondary-500 ${isSidebarCollapsed ? 'justify-center rounded p-2' : 'p-4'}`}>
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-white bg-white text-lg font-bold text-primary-500 shadow">
+                    {currentUser ? getInitials(currentUser.displayName, currentUser.email) : <UserCircle size={32} />}
+                  </div>
+                </div>
+                {!isSidebarCollapsed && (
+                  <div className="bg-white px-4 py-3 text-primary-500">
+                    <p className="truncate text-sm font-bold">{currentUser?.displayName}</p>
+                    <p className="truncate text-xs text-gray-500">{currentUser?.email}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <nav className="flex flex-1 flex-col gap-2 px-3 py-3">
+              <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
+              <SidebarLink to="/search" label="Search" compact={isSidebarCollapsed} icon={Search} />
+              <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
+              <SidebarLink to="/account" label="Account" compact={isSidebarCollapsed} icon={Settings} />
             </nav>
 
             <div className="border-t border-white/10 p-3">
               {!isSidebarCollapsed && (
                 <div className="mb-3 rounded bg-white/10 px-3 py-2">
-                  <p className="text-xs uppercase text-blue-100">Signed in</p>
-                  <p className="truncate text-sm font-semibold">{currentUser?.displayName}</p>
-                  <p className="truncate text-xs text-blue-100">{currentUser?.email}</p>
+                  <p className="text-xs uppercase text-blue-100">Session</p>
+                  <p className="text-xs text-blue-100">Agency User Search</p>
                 </div>
               )}
               <button

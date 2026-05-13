@@ -1,4 +1,5 @@
-import { FormEvent, useState } from 'react';
+import QRCode from 'qrcode';
+import { FormEvent, useEffect, useState } from 'react';
 import { AuthAccount, TwoFactorSetupResponse, authService } from '../services/api';
 
 interface AccountSettingsPageProps {
@@ -20,8 +21,38 @@ export function AccountSettingsPage({
   const [twoFactorSetup, setTwoFactorSetup] = useState<TwoFactorSetupResponse | null>(null);
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [disablePassword, setDisablePassword] = useState('');
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [isPasswordSaving, setIsPasswordSaving] = useState(false);
   const [isTwoFactorSaving, setIsTwoFactorSaving] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!twoFactorSetup) {
+      setQrCodeDataUrl('');
+      return;
+    }
+
+    QRCode.toDataURL(twoFactorSetup.otpauthUrl, {
+      errorCorrectionLevel: 'M',
+      margin: 2,
+      width: 220,
+    })
+      .then((dataUrl) => {
+        if (isMounted) {
+          setQrCodeDataUrl(dataUrl);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          onToast('error', 'Failed to generate 2FA QR code.');
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [onToast, twoFactorSetup]);
 
   const handlePasswordChange = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -161,11 +192,20 @@ export function AccountSettingsPage({
 
           {!account.twoFactorEnabled && twoFactorSetup && (
             <form onSubmit={handleEnableTwoFactor} className="space-y-4">
-              <div className="rounded border border-gray-300 bg-gray-50 p-4">
-                <p className="mb-2 text-sm font-semibold text-gray-700">Secret key</p>
-                <code className="block break-all rounded bg-white p-3 text-sm">{twoFactorSetup.secret}</code>
-                <p className="mt-3 text-sm text-gray-600">Manual setup URI:</p>
-                <code className="block break-all rounded bg-white p-3 text-xs">{twoFactorSetup.otpauthUrl}</code>
+              <div className="grid grid-cols-1 gap-5 rounded border border-gray-300 bg-gray-50 p-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+                <div className="flex items-center justify-center rounded bg-white p-5">
+                  {qrCodeDataUrl ? (
+                    <img src={qrCodeDataUrl} alt="Authenticator setup QR code" className="h-56 w-56" />
+                  ) : (
+                    <div className="loading">Generating QR code...</div>
+                  )}
+                </div>
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-gray-700">Secret key</p>
+                  <code className="block break-all rounded bg-white p-3 text-sm">{twoFactorSetup.secret}</code>
+                  <p className="mt-3 text-sm text-gray-600">Manual setup URI:</p>
+                  <code className="block break-all rounded bg-white p-3 text-xs">{twoFactorSetup.otpauthUrl}</code>
+                </div>
               </div>
               <input
                 value={twoFactorCode}
