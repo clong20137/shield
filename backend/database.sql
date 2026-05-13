@@ -2,6 +2,17 @@
 CREATE DATABASE IF NOT EXISTS shield;
 USE shield;
 
+-- Create Login Accounts Table
+CREATE TABLE IF NOT EXISTS auth_accounts (
+  `id` VARCHAR(36) PRIMARY KEY,
+  `email` VARCHAR(255) NOT NULL UNIQUE,
+  `passwordHash` VARCHAR(255) NOT NULL,
+  `displayName` VARCHAR(100) NOT NULL,
+  `createdAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_auth_email` (`email`)
+);
+
 -- Create Users Table
 CREATE TABLE IF NOT EXISTS users (
   `id` VARCHAR(36) PRIMARY KEY,

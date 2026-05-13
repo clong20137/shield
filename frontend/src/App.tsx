@@ -3,24 +3,59 @@ import { BrowserRouter as Router, Navigate, NavLink, Routes, Route } from 'react
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
 import DashboardPage from './pages/DashboardPage';
+import { AuthAccount, authService } from './services/api';
 
 const SESSION_KEY = 'shield_session';
 
-function LoginSplash({ onLogin }: { onLogin: (name: string) => void }) {
-  const [identifier, setIdentifier] = useState('');
-  const [accessCode, setAccessCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error === 'string'
+  ) {
+    return (error as { response: { data: { error: string } } }).response.data.error;
+  }
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  return fallback;
+}
+
+function LoginSplash({ onLogin }: { onLogin: (account: AuthAccount) => void }) {
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!identifier.trim() || !accessCode.trim()) {
-      setError('Enter your agency ID and access code.');
+    if (!email.trim() || !password.trim()) {
+      setError('Enter your email and password.');
       return;
     }
 
+    if (mode === 'register' && !displayName.trim()) {
+      setError('Enter your display name.');
+      return;
+    }
+
+    setIsSubmitting(true);
     setError(null);
-    onLogin(identifier.trim());
+
+    try {
+      const response =
+        mode === 'register'
+          ? await authService.register(email, password, displayName)
+          : await authService.login(email, password);
+
+      onLogin(response.data.account);
+    } catch (err) {
+      setError(getErrorMessage(err, mode === 'register' ? 'Failed to create account.' : 'Failed to sign in.'));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -43,36 +78,64 @@ function LoginSplash({ onLogin }: { onLogin: (name: string) => void }) {
         <section className="flex items-center justify-center px-6 py-10">
           <form onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-6 shadow-lg">
             <div className="mb-6">
-              <h2 className="mb-2 text-2xl font-bold text-primary-500">Sign in</h2>
-              <p className="text-sm text-gray-600">Use your agency credentials to continue.</p>
+              <h2 className="mb-2 text-2xl font-bold text-primary-500">
+                {mode === 'register' ? 'Create login' : 'Sign in'}
+              </h2>
+              <p className="text-sm text-gray-600">
+                {mode === 'register' ? 'Create an email and password login.' : 'Use your email and password to continue.'}
+              </p>
             </div>
 
             {error && <div className="error">{error}</div>}
 
             <label className="mb-4 block">
-              <span className="mb-2 block text-sm font-semibold text-gray-700">Agency ID</span>
+              <span className="mb-2 block text-sm font-semibold text-gray-700">Email</span>
               <input
-                value={identifier}
-                onChange={(event) => setIdentifier(event.target.value)}
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
                 className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-                autoComplete="username"
+                autoComplete="email"
                 autoFocus
               />
             </label>
 
+            {mode === 'register' && (
+              <label className="mb-4 block">
+                <span className="mb-2 block text-sm font-semibold text-gray-700">Display name</span>
+                <input
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                  autoComplete="name"
+                />
+              </label>
+            )}
+
             <label className="mb-6 block">
-              <span className="mb-2 block text-sm font-semibold text-gray-700">Access code</span>
+              <span className="mb-2 block text-sm font-semibold text-gray-700">Password</span>
               <input
                 type="password"
-                value={accessCode}
-                onChange={(event) => setAccessCode(event.target.value)}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
                 className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
                 autoComplete="current-password"
               />
             </label>
 
-            <button type="submit" className="btn-primary w-full py-3">
-              Enter SHIELD
+            <button type="submit" className="btn-primary w-full py-3" disabled={isSubmitting}>
+              {isSubmitting ? 'Working...' : mode === 'register' ? 'Create login' : 'Sign in'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMode((value) => (value === 'login' ? 'register' : 'login'));
+                setError(null);
+              }}
+              className="mt-4 w-full text-sm font-semibold text-primary-500 hover:text-primary-700"
+            >
+              {mode === 'register' ? 'Already have a login? Sign in' : 'Need a login? Create one'}
             </button>
           </form>
         </section>
@@ -102,27 +165,32 @@ function SidebarLink({ to, label, compact }: { to: string; label: string; compac
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState('');
+  const [currentUser, setCurrentUser] = useState<AuthAccount | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const storedSession = window.localStorage.getItem(SESSION_KEY);
 
     if (storedSession) {
-      setCurrentUser(storedSession);
-      setIsAuthenticated(true);
+      try {
+        const account = JSON.parse(storedSession) as AuthAccount;
+        setCurrentUser(account);
+        setIsAuthenticated(true);
+      } catch {
+        window.localStorage.removeItem(SESSION_KEY);
+      }
     }
   }, []);
 
-  const handleLogin = (name: string) => {
-    window.localStorage.setItem(SESSION_KEY, name);
-    setCurrentUser(name);
+  const handleLogin = (account: AuthAccount) => {
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify(account));
+    setCurrentUser(account);
     setIsAuthenticated(true);
   };
 
   const handleLogout = () => {
     window.localStorage.removeItem(SESSION_KEY);
-    setCurrentUser('');
+    setCurrentUser(null);
     setIsAuthenticated(false);
   };
 
@@ -160,7 +228,8 @@ function App() {
               {!isSidebarCollapsed && (
                 <div className="mb-3 rounded bg-white/10 px-3 py-2">
                   <p className="text-xs uppercase text-blue-100">Signed in</p>
-                  <p className="truncate text-sm font-semibold">{currentUser}</p>
+                  <p className="truncate text-sm font-semibold">{currentUser?.displayName}</p>
+                  <p className="truncate text-xs text-blue-100">{currentUser?.email}</p>
                 </div>
               )}
               <button

@@ -60,6 +60,26 @@ export interface ReportRow {
   activeCount: number;
 }
 
+export interface AuthAccount {
+  id: string;
+  email: string;
+  displayName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AuthResponse {
+  account: AuthAccount;
+}
+
+export const authService = {
+  register: (email: string, password: string, displayName: string) =>
+    api.post<AuthResponse>('/auth/register', { email, password, displayName }),
+
+  login: (email: string, password: string) =>
+    api.post<AuthResponse>('/auth/login', { email, password }),
+};
+
 export const userService = {
   search: (searchTerm: string, filters?: UserFilters) =>
     api.get('/users/search', { params: { q: searchTerm, ...filters } }),
