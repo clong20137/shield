@@ -9,5 +9,7 @@ router.post('/change-password', AuthController.changePassword);
 router.post('/2fa/setup', AuthController.setupTwoFactor);
 router.post('/2fa/enable', AuthController.enableTwoFactor);
 router.post('/2fa/disable', AuthController.disableTwoFactor);
+router.get('/accounts', AuthController.listAccounts);
+router.put('/accounts/:accountId/role', AuthController.updateRole);
 
 export default router;

@@ -50,6 +50,9 @@ export interface SystemStatistics {
   inactiveUsers: number;
   totalDistricts: number;
   totalRanks: number;
+  totalAccounts: number;
+  administratorAccounts: number;
+  standardAccounts: number;
 }
 
 export interface ReportRow {
@@ -64,6 +67,7 @@ export interface AuthAccount {
   id: string;
   email: string;
   displayName: string;
+  role: 'administrator' | 'user';
   twoFactorEnabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -97,6 +101,12 @@ export const authService = {
 
   disableTwoFactor: (accountId: string, password: string) =>
     api.post<AuthResponse>('/auth/2fa/disable', { accountId, password }),
+
+  getAccounts: (requesterId: string) =>
+    api.get<AuthAccount[]>('/auth/accounts', { params: { requesterId } }),
+
+  updateRole: (requesterId: string, accountId: string, role: AuthAccount['role']) =>
+    api.put<AuthResponse>(`/auth/accounts/${accountId}/role`, { requesterId, role }),
 };
 
 export const userService = {

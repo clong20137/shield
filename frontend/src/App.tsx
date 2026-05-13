@@ -1,11 +1,12 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { BarChart3, Bell, ChevronLeft, ChevronRight, Laptop, LayoutDashboard, LogOut, LucideIcon, Moon, Search, Settings, Shield, Sun, UserCircle } from 'lucide-react';
+import { BarChart3, Bell, ChevronLeft, ChevronRight, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Moon, Search, Settings, Shield, Sun, UserCircle } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
 import DashboardPage from './pages/DashboardPage';
 import { AccountSettingsPage } from './pages/AccountSettingsPage';
 import DeviceManagementPage from './pages/DeviceManagementPage';
+import PermissionsPage from './pages/PermissionsPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { AuthAccount, authService, userService, User } from './services/api';
 
@@ -439,6 +440,8 @@ function App() {
     setCurrentUser(account);
   };
 
+  const isAdministrator = currentUser?.role === 'administrator';
+
   return (
     <Router>
       <ToastHost toasts={toasts} />
@@ -495,7 +498,7 @@ function App() {
                 </div>
                 {!isSidebarCollapsed && (
                   <div className="mt-3 rounded bg-black/15 px-3 py-2 text-xs font-semibold text-white">
-                    {currentUser?.twoFactorEnabled ? '2FA enabled' : '2FA not enabled'}
+                    {currentUser?.role === 'administrator' ? 'Administrator' : 'User'} - {currentUser?.twoFactorEnabled ? '2FA enabled' : '2FA not enabled'}
                   </div>
                 )}
               </div>
@@ -505,6 +508,9 @@ function App() {
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
               <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
+              {isAdministrator && (
+                <SidebarLink to="/permissions" label="Permissions" compact={isSidebarCollapsed} icon={LockKeyhole} />
+              )}
               <SidebarLink to="/account" label="Account" compact={isSidebarCollapsed} icon={Settings} />
             </nav>
 
@@ -592,6 +598,19 @@ function App() {
                 <Route path="/devices" element={<DeviceManagementPage />} />
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
+                {currentUser && isAdministrator && (
+                  <Route
+                    path="/permissions"
+                    element={
+                      <PermissionsPage
+                        account={currentUser}
+                        onAccountUpdate={handleAccountUpdate}
+                        onToast={showToast}
+                        getErrorMessage={getErrorMessage}
+                      />
+                    }
+                  />
+                )}
                 {currentUser && (
                   <Route
                     path="/account"

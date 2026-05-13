@@ -527,6 +527,9 @@ const DashboardPage: React.FC = () => {
         { label: 'Active Users', value: stats.activeUsers || 0, icon: 'On' },
         { label: 'Inactive Users', value: stats.inactiveUsers || 0, icon: 'Off' },
         { label: 'Districts', value: stats.totalDistricts || 0, icon: 'Map' },
+        { label: 'Login Accounts', value: stats.totalAccounts || 0, icon: 'Accounts' },
+        { label: 'Administrators', value: stats.administratorAccounts || 0, icon: 'Admin' },
+        { label: 'Standard Users', value: stats.standardAccounts || 0, icon: 'User' },
       ]
     : [];
 

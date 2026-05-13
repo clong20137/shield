@@ -28,6 +28,7 @@ export async function initializeDatabase() {
         \`email\` VARCHAR(255) NOT NULL UNIQUE,
         \`passwordHash\` VARCHAR(255) NOT NULL,
         \`displayName\` VARCHAR(100) NOT NULL,
+        \`role\` VARCHAR(20) NOT NULL DEFAULT 'user',
         \`twoFactorSecret\` VARCHAR(64),
         \`twoFactorEnabled\` BOOLEAN DEFAULT 0,
         \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -41,4 +42,5 @@ export async function initializeDatabase() {
 
   await ensureColumn('auth_accounts', 'twoFactorSecret', '`twoFactorSecret` VARCHAR(64)');
   await ensureColumn('auth_accounts', 'twoFactorEnabled', '`twoFactorEnabled` BOOLEAN DEFAULT 0');
+  await ensureColumn('auth_accounts', 'role', "`role` VARCHAR(20) NOT NULL DEFAULT 'user'");
 }

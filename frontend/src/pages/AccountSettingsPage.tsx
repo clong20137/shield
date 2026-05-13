@@ -139,6 +139,10 @@ export function AccountSettingsPage({
             <p><span className="font-semibold text-gray-700 dark:text-gray-300">Name:</span> {account.displayName}</p>
             <p><span className="font-semibold text-gray-700 dark:text-gray-300">Email:</span> {account.email}</p>
             <p>
+              <span className="font-semibold text-gray-700 dark:text-gray-300">Role:</span>{' '}
+              {account.role === 'administrator' ? 'Administrator' : 'User'}
+            </p>
+            <p>
               <span className="font-semibold text-gray-700 dark:text-gray-300">2FA:</span>{' '}
               {account.twoFactorEnabled ? 'Enabled' : 'Not enabled'}
             </p>

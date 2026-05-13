@@ -7,6 +7,7 @@ export interface AuthAccount {
   id: string;
   email: string;
   displayName: string;
+  role: 'administrator' | 'user';
   twoFactorEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -16,6 +17,7 @@ interface AuthAccountRow extends RowDataPacket {
   id: string;
   email: string;
   displayName: string;
+  role: 'administrator' | 'user';
   passwordHash: string;
   twoFactorSecret: string | null;
   twoFactorEnabled: boolean | number;
@@ -126,6 +128,7 @@ function toPublicAccount(account: AuthAccountRow): AuthAccount {
     id: account.id,
     email: account.email,
     displayName: account.displayName,
+    role: account.role || 'user',
     twoFactorEnabled: Boolean(account.twoFactorEnabled),
     createdAt: account.createdAt,
     updatedAt: account.updatedAt,
@@ -145,18 +148,22 @@ export class AuthAccountModel {
       const now = new Date();
       const normalizedEmail = normalizeEmail(email);
       const passwordHash = hashPassword(password);
+      const [accountCountRows] = await conn.query<RowDataPacket[]>('SELECT COUNT(*) as count FROM auth_accounts');
+      const accountCount = Number(accountCountRows[0]?.count) || 0;
+      const role: AuthAccount['role'] = accountCount === 0 ? 'administrator' : 'user';
 
       await conn.query<ResultSetHeader>(
         `INSERT INTO auth_accounts (
-          \`id\`, \`email\`, \`passwordHash\`, \`displayName\`, \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?)`,
-        [id, normalizedEmail, passwordHash, displayName.trim(), now, now]
+          \`id\`, \`email\`, \`passwordHash\`, \`displayName\`, \`role\`, \`createdAt\`, \`updatedAt\`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [id, normalizedEmail, passwordHash, displayName.trim(), role, now, now]
       );
 
       return {
         id,
         email: normalizedEmail,
         displayName: displayName.trim(),
+        role,
         twoFactorEnabled: false,
         createdAt: now,
         updatedAt: now,
@@ -300,6 +307,54 @@ export class AuthAccountModel {
         ...toPublicAccount(account),
         twoFactorEnabled: false,
       };
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async listAccounts(): Promise<AuthAccount[]> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<AuthAccountRow[]>(
+        'SELECT * FROM auth_accounts ORDER BY `role`, `displayName`, `email`'
+      );
+
+      return rows.map(toPublicAccount);
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async getAccountById(accountId: string): Promise<AuthAccount | null> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<AuthAccountRow[]>(
+        'SELECT * FROM auth_accounts WHERE `id` = ? LIMIT 1',
+        [accountId]
+      );
+      const account = rows[0];
+
+      return account ? toPublicAccount(account) : null;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async updateRole(accountId: string, role: AuthAccount['role']): Promise<AuthAccount | null> {
+    const conn = await pool.getConnection();
+    try {
+      await conn.query<ResultSetHeader>(
+        'UPDATE auth_accounts SET `role` = ?, `updatedAt` = ? WHERE `id` = ?',
+        [role, new Date(), accountId]
+      );
+
+      const [rows] = await conn.query<AuthAccountRow[]>(
+        'SELECT * FROM auth_accounts WHERE `id` = ? LIMIT 1',
+        [accountId]
+      );
+      const account = rows[0];
+
+      return account ? toPublicAccount(account) : null;
     } finally {
       conn.release();
     }

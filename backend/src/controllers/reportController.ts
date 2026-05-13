@@ -10,6 +10,12 @@ interface StatisticsRow extends RowDataPacket {
   totalRanks: number;
 }
 
+interface AccountStatisticsRow extends RowDataPacket {
+  totalAccounts: number;
+  administratorAccounts: number;
+  standardAccounts: number;
+}
+
 export class ReportController {
   static async getUsersByRank(req: Request, res: Response) {
     let conn;
@@ -84,7 +90,20 @@ export class ReportController {
           COUNT(DISTINCT \`rank\`) as totalRanks
         FROM users
       `);
-      res.json(stats[0]);
+      const [accountStats] = await conn.query<AccountStatisticsRow[]>(`
+        SELECT
+          COUNT(*) as totalAccounts,
+          SUM(CASE WHEN \`role\` = 'administrator' THEN 1 ELSE 0 END) as administratorAccounts,
+          SUM(CASE WHEN \`role\` = 'user' THEN 1 ELSE 0 END) as standardAccounts
+        FROM auth_accounts
+      `);
+
+      res.json({
+        ...stats[0],
+        totalAccounts: accountStats[0]?.totalAccounts || 0,
+        administratorAccounts: accountStats[0]?.administratorAccounts || 0,
+        standardAccounts: accountStats[0]?.standardAccounts || 0,
+      });
     } catch (error) {
       console.error('Report error:', error);
       res.status(500).json({ error: 'Failed to generate statistics' });

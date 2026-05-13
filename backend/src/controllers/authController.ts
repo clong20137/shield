@@ -14,6 +14,19 @@ function isDuplicateEmailError(error: unknown): boolean {
   );
 }
 
+function isAccountRole(role: unknown): role is 'administrator' | 'user' {
+  return role === 'administrator' || role === 'user';
+}
+
+async function isAdministrator(accountId?: string): Promise<boolean> {
+  if (!accountId) {
+    return false;
+  }
+
+  const account = await AuthAccountModel.getAccountById(accountId);
+  return account?.role === 'administrator';
+}
+
 export class AuthController {
   static async register(req: Request, res: Response) {
     try {
@@ -165,6 +178,58 @@ export class AuthController {
     } catch (error) {
       console.error('Disable 2FA error:', error);
       res.status(500).json({ error: 'Failed to disable 2FA' });
+    }
+  }
+
+  static async listAccounts(req: Request, res: Response) {
+    try {
+      const requesterId = typeof req.query.requesterId === 'string' ? req.query.requesterId : undefined;
+
+      if (!(await isAdministrator(requesterId))) {
+        return res.status(403).json({ error: 'Administrator permission required' });
+      }
+
+      const accounts = await AuthAccountModel.listAccounts();
+      res.json(accounts);
+    } catch (error) {
+      console.error('List accounts error:', error);
+      res.status(500).json({ error: 'Failed to load accounts' });
+    }
+  }
+
+  static async updateRole(req: Request, res: Response) {
+    try {
+      const { requesterId, role } = req.body as {
+        requesterId?: string;
+        role?: string;
+      };
+      const { accountId } = req.params;
+
+      if (!(await isAdministrator(requesterId))) {
+        return res.status(403).json({ error: 'Administrator permission required' });
+      }
+
+      if (!isAccountRole(role)) {
+        return res.status(400).json({ error: 'Role must be administrator or user' });
+      }
+
+      const accounts = await AuthAccountModel.listAccounts();
+      const administratorCount = accounts.filter((account) => account.role === 'administrator').length;
+      const targetAccount = accounts.find((account) => account.id === accountId);
+
+      if (!targetAccount) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+
+      if (targetAccount.role === 'administrator' && role === 'user' && administratorCount <= 1) {
+        return res.status(400).json({ error: 'At least one administrator account is required' });
+      }
+
+      const account = await AuthAccountModel.updateRole(accountId, role);
+      res.json({ account });
+    } catch (error) {
+      console.error('Update account role error:', error);
+      res.status(500).json({ error: 'Failed to update account role' });
     }
   }
 }
