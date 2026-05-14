@@ -18,32 +18,22 @@ async function ensureColumn(table: string, column: string, definition: string) {
   }
 }
 
+async function tableExists(table: string): Promise<boolean> {
+  const [rows] = await pool.query(
+    `
+      SELECT TABLE_NAME
+      FROM INFORMATION_SCHEMA.TABLES
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?
+      LIMIT 1
+    `,
+    [table]
+  );
+
+  return (rows as unknown[]).length > 0;
+}
+
 export async function initializeDatabase() {
-  const conn = await pool.getConnection();
-
-  try {
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS auth_accounts (
-        \`id\` VARCHAR(36) PRIMARY KEY,
-        \`email\` VARCHAR(255) NOT NULL UNIQUE,
-        \`passwordHash\` VARCHAR(255) NOT NULL,
-        \`displayName\` VARCHAR(100) NOT NULL,
-        \`role\` VARCHAR(20) NOT NULL DEFAULT 'user',
-        \`twoFactorSecret\` VARCHAR(64),
-        \`twoFactorEnabled\` BOOLEAN DEFAULT 0,
-        \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX \`idx_auth_email\` (\`email\`)
-      )
-    `);
-  } finally {
-    conn.release();
-  }
-
-  await ensureColumn('auth_accounts', 'twoFactorSecret', '`twoFactorSecret` VARCHAR(64)');
-  await ensureColumn('auth_accounts', 'twoFactorEnabled', '`twoFactorEnabled` BOOLEAN DEFAULT 0');
-  await ensureColumn('auth_accounts', 'role', "`role` VARCHAR(20) NOT NULL DEFAULT 'user'");
-
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       \`id\` VARCHAR(36) PRIMARY KEY,
@@ -51,6 +41,11 @@ export async function initializeDatabase() {
       \`lastName\` VARCHAR(100) NOT NULL,
       \`email\` VARCHAR(255),
       \`profilePictureUrl\` TEXT,
+      \`displayName\` VARCHAR(100),
+      \`passwordHash\` VARCHAR(255),
+      \`role\` VARCHAR(20) NOT NULL DEFAULT 'user',
+      \`twoFactorSecret\` VARCHAR(64),
+      \`twoFactorEnabled\` BOOLEAN DEFAULT 0,
       \`peNumber\` VARCHAR(50) UNIQUE,
       \`peopleSoftId\` VARCHAR(50),
       \`carNumber\` VARCHAR(50),
@@ -86,6 +81,11 @@ export async function initializeDatabase() {
 
   await ensureColumn('users', 'email', '`email` VARCHAR(255)');
   await ensureColumn('users', 'profilePictureUrl', '`profilePictureUrl` TEXT');
+  await ensureColumn('users', 'displayName', '`displayName` VARCHAR(100)');
+  await ensureColumn('users', 'passwordHash', '`passwordHash` VARCHAR(255)');
+  await ensureColumn('users', 'role', "`role` VARCHAR(20) NOT NULL DEFAULT 'user'");
+  await ensureColumn('users', 'twoFactorSecret', '`twoFactorSecret` VARCHAR(64)');
+  await ensureColumn('users', 'twoFactorEnabled', '`twoFactorEnabled` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'peopleSoftId', '`peopleSoftId` VARCHAR(50)');
   await ensureColumn('users', 'radioNumber', '`radioNumber` VARCHAR(50)');
   await ensureColumn('users', 'personalPhoneNumber', '`personalPhoneNumber` VARCHAR(50)');
@@ -93,6 +93,59 @@ export async function initializeDatabase() {
   await ensureColumn('users', 'maritalStatus', '`maritalStatus` VARCHAR(50)');
   await ensureColumn('users', 'residentialAddress', '`residentialAddress` TEXT');
   await ensureColumn('users', 'mailingAddress', '`mailingAddress` TEXT');
+
+  if (await tableExists('auth_accounts')) {
+    await ensureColumn('auth_accounts', 'twoFactorSecret', '`twoFactorSecret` VARCHAR(64)');
+    await ensureColumn('auth_accounts', 'twoFactorEnabled', '`twoFactorEnabled` BOOLEAN DEFAULT 0');
+    await ensureColumn('auth_accounts', 'role', "`role` VARCHAR(20) NOT NULL DEFAULT 'user'");
+
+    await pool.query(`
+      UPDATE users u
+      INNER JOIN auth_accounts a ON LOWER(u.email) = LOWER(a.email)
+      SET
+        u.displayName = COALESCE(NULLIF(u.displayName, ''), a.displayName),
+        u.passwordHash = COALESCE(u.passwordHash, a.passwordHash),
+        u.role = COALESCE(NULLIF(u.role, ''), a.role, 'user'),
+        u.twoFactorSecret = COALESCE(u.twoFactorSecret, a.twoFactorSecret),
+        u.twoFactorEnabled = CASE
+          WHEN u.twoFactorEnabled = 1 THEN 1
+          ELSE COALESCE(a.twoFactorEnabled, 0)
+        END
+    `);
+
+    await pool.query(`
+      INSERT INTO users (
+        \`id\`, \`firstName\`, \`lastName\`, \`email\`, \`displayName\`, \`passwordHash\`, \`role\`,
+        \`twoFactorSecret\`, \`twoFactorEnabled\`, \`isActive\`, \`employmentType\`, \`status\`,
+        \`createdAt\`, \`updatedAt\`
+      )
+      SELECT
+        a.\`id\`,
+        TRIM(SUBSTRING_INDEX(a.\`displayName\`, ' ', 1)),
+        CASE
+          WHEN TRIM(SUBSTRING_INDEX(a.\`displayName\`, ' ', -1)) = TRIM(SUBSTRING_INDEX(a.\`displayName\`, ' ', 1))
+            THEN 'User'
+          ELSE TRIM(SUBSTRING_INDEX(a.\`displayName\`, ' ', -1))
+        END,
+        LOWER(a.\`email\`),
+        a.\`displayName\`,
+        a.\`passwordHash\`,
+        COALESCE(a.\`role\`, 'user'),
+        a.\`twoFactorSecret\`,
+        COALESCE(a.\`twoFactorEnabled\`, 0),
+        1,
+        'Other',
+        'Active',
+        a.\`createdAt\`,
+        a.\`updatedAt\`
+      FROM auth_accounts a
+      WHERE NOT EXISTS (
+        SELECT 1 FROM users u WHERE LOWER(u.\`email\`) = LOWER(a.\`email\`)
+      )
+    `);
+
+    await pool.query('DROP TABLE auth_accounts');
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_messages (

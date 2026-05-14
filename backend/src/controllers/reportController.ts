@@ -95,7 +95,8 @@ export class ReportController {
           COUNT(*) as totalAccounts,
           SUM(CASE WHEN \`role\` = 'administrator' THEN 1 ELSE 0 END) as administratorAccounts,
           SUM(CASE WHEN \`role\` = 'user' THEN 1 ELSE 0 END) as standardAccounts
-        FROM auth_accounts
+        FROM users
+        WHERE \`passwordHash\` IS NOT NULL
       `);
 
       res.json({

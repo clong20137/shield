@@ -2,20 +2,6 @@
 CREATE DATABASE IF NOT EXISTS shield;
 USE shield;
 
--- Create Login Accounts Table
-CREATE TABLE IF NOT EXISTS auth_accounts (
-  `id` VARCHAR(36) PRIMARY KEY,
-  `email` VARCHAR(255) NOT NULL UNIQUE,
-  `passwordHash` VARCHAR(255) NOT NULL,
-  `displayName` VARCHAR(100) NOT NULL,
-  `role` VARCHAR(20) NOT NULL DEFAULT 'user',
-  `twoFactorSecret` VARCHAR(64),
-  `twoFactorEnabled` BOOLEAN DEFAULT 0,
-  `createdAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updatedAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX `idx_auth_email` (`email`)
-);
-
 -- Create Users Table
 CREATE TABLE IF NOT EXISTS users (
   `id` VARCHAR(36) PRIMARY KEY,
@@ -23,6 +9,11 @@ CREATE TABLE IF NOT EXISTS users (
   `lastName` VARCHAR(100) NOT NULL,
   `email` VARCHAR(255),
   `profilePictureUrl` TEXT,
+  `displayName` VARCHAR(100),
+  `passwordHash` VARCHAR(255),
+  `role` VARCHAR(20) NOT NULL DEFAULT 'user',
+  `twoFactorSecret` VARCHAR(64),
+  `twoFactorEnabled` BOOLEAN DEFAULT 0,
   `peNumber` VARCHAR(50) UNIQUE,
   `peopleSoftId` VARCHAR(50),
   `carNumber` VARCHAR(50),
@@ -56,6 +47,8 @@ CREATE TABLE IF NOT EXISTS users (
   INDEX `idx_district` (`district`),
   INDEX `idx_isActive` (`isActive`),
   INDEX `idx_employmentType` (`employmentType`),
+  INDEX `idx_user_email` (`email`),
+  INDEX `idx_user_role` (`role`),
   FULLTEXT INDEX `ft_search` (`firstName`, `lastName`, `email`, `peNumber`, `peopleSoftId`, `badgeNumber`, `publicSafetyId`, `district`)
 );
 
