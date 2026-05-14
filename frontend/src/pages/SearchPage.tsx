@@ -406,11 +406,15 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Sex</span>
-                  <input value={String(editForm.sex || '')} onChange={(event) => updateEditField('sex', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  <select value={String(editForm.sex || '')} onChange={(event) => updateEditField('sex', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                    {['', 'Male', 'Female'].map((option) => <option key={option} value={option}>{option || 'Select'}</option>)}
+                  </select>
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Marital Status</span>
-                  <input value={String(editForm.maritalStatus || '')} onChange={(event) => updateEditField('maritalStatus', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  <select value={String(editForm.maritalStatus || '')} onChange={(event) => updateEditField('maritalStatus', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                    {['', 'Single', 'Married', 'Divorced', 'Widowed'].map((option) => <option key={option} value={option}>{option || 'Select'}</option>)}
+                  </select>
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Supervisor</span>

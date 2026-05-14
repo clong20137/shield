@@ -1,6 +1,7 @@
 import { ResultSetHeader } from 'mysql2';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database';
+import { createPasswordHash } from './AuthAccount';
 
 export interface User {
   id: string;
@@ -30,9 +31,14 @@ export interface User {
   maritalStatus: string;
   residentialAddress: string;
   mailingAddress: string;
+  role: string;
   createdAt: Date;
   updatedAt: Date;
 }
+
+export type CreateUserInput = Omit<User, 'id' | 'createdAt' | 'updatedAt'> & {
+  password?: string;
+};
 
 export class UserModel {
   private static readonly editableFields = [
@@ -218,7 +224,7 @@ export class UserModel {
     }
   }
 
-  static async createUser(user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User> {
+  static async createUser(user: CreateUserInput): Promise<User> {
     const conn = await pool.getConnection();
     try {
       const id = uuidv4();
@@ -226,18 +232,21 @@ export class UserModel {
 
       await conn.query(
         `INSERT INTO users (
-          \`id\`, \`firstName\`, \`lastName\`, \`email\`, \`profilePictureUrl\`, \`peNumber\`, \`peopleSoftId\`, \`carNumber\`, \`badgeNumber\`,
+          \`id\`, \`firstName\`, \`lastName\`, \`email\`, \`profilePictureUrl\`, \`displayName\`, \`passwordHash\`, \`role\`, \`peNumber\`, \`peopleSoftId\`, \`carNumber\`, \`badgeNumber\`,
           \`radioNumber\`, \`personalPhoneNumber\`, \`departmentPhoneNumber\`, \`assignedTo\`, \`district\`, \`rank\`,
           \`isActive\`, \`employmentType\`, \`typeDetails\`, \`status\`, \`supervisor\`, \`specialtyCertifications\`,
           \`publicSafetyId\`, \`race\`, \`sex\`, \`maritalStatus\`, \`residentialAddress\`, \`mailingAddress\`,
           \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           user.firstName,
           user.lastName,
           UserModel.blankToNull(user.email),
           user.profilePictureUrl,
+          `${user.firstName} ${user.lastName}`.trim(),
+          user.password ? createPasswordHash(user.password) : null,
+          user.role || 'user',
           UserModel.blankToNull(user.peNumber),
           user.peopleSoftId,
           user.carNumber,
@@ -265,7 +274,7 @@ export class UserModel {
         ]
       );
 
-      return { ...user, id, createdAt: now, updatedAt: now };
+      return { ...user, role: user.role || 'user', id, createdAt: now, updatedAt: now };
     } finally {
       conn.release();
     }

@@ -55,8 +55,13 @@ export interface User {
   maritalStatus: string;
   residentialAddress: string;
   mailingAddress: string;
+  role: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateUserPayload extends Omit<User, 'id' | 'createdAt' | 'updatedAt'> {
+  password?: string;
 }
 
 export interface UserFilters {
@@ -103,8 +108,16 @@ export interface AuthAccount {
   email: string;
   displayName: string;
   profilePictureUrl: string;
-  role: 'administrator' | 'user';
+  role: string;
   twoFactorEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AuthRole {
+  id: string;
+  name: string;
+  permissions: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -145,7 +158,7 @@ export interface AuditLog {
 
 export interface DeviceRecord {
   id: string;
-  type: 'Cell Phone' | 'MiFi Device' | 'Computer' | 'Radio';
+  type: 'Cell Phone' | 'MiFi Device' | 'Computer' | 'Radio' | 'Cradlepoint';
   assetTag: string;
   makeModel: string;
   serialNumber: string;
@@ -199,8 +212,14 @@ export const authService = {
   getAccounts: (requesterId: string) =>
     api.get<AuthAccount[]>('/auth/accounts', { params: { requesterId } }),
 
-  updateRole: (requesterId: string, accountId: string, role: AuthAccount['role']) =>
+  updateRole: (requesterId: string, accountId: string, role: string) =>
     api.put<AuthResponse>(`/auth/accounts/${accountId}/role`, { requesterId, role }),
+
+  getRoles: (requesterId: string) =>
+    api.get<AuthRole[]>('/auth/roles', { params: { requesterId } }),
+
+  createRole: (requesterId: string, name: string, permissions: string[]) =>
+    api.post<AuthRole>('/auth/roles', { requesterId, name, permissions }),
 };
 
 export const userService = {
@@ -213,7 +232,7 @@ export const userService = {
   getById: (id: string) =>
     api.get(`/users/${id}`),
   
-  create: (user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>) =>
+  create: (user: CreateUserPayload) =>
     api.post('/users', user),
   
   update: (id: string, updates: Partial<User>) =>
@@ -253,14 +272,14 @@ export const calendarService = {
   getAll: () =>
     api.get<CalendarEntry[]>('/calendar'),
 
-  create: (entry: Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>) =>
+  create: (entry: Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'> & { actorId?: string; actorName?: string }) =>
     api.post<CalendarEntry>('/calendar', entry),
 
-  update: (id: string, entry: Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>) =>
+  update: (id: string, entry: Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'> & { actorId?: string; actorName?: string }) =>
     api.put<CalendarEntry>(`/calendar/${id}`, entry),
 
-  delete: (id: string) =>
-    api.delete(`/calendar/${id}`),
+  delete: (id: string, actor?: { actorId?: string; actorName?: string }) =>
+    api.delete(`/calendar/${id}`, { data: actor }),
 };
 
 export const auditService = {

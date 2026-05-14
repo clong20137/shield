@@ -69,6 +69,12 @@ export class UserController {
 
   static async createUser(req: Request, res: Response) {
     try {
+      const { password } = req.body as { password?: string };
+
+      if (password && password.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      }
+
       const user = await UserModel.createUser(req.body);
       res.status(201).json(user);
     } catch (error) {

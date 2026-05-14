@@ -13,5 +13,7 @@ router.post('/2fa/enable', AuthController.enableTwoFactor);
 router.post('/2fa/disable', AuthController.disableTwoFactor);
 router.get('/accounts', AuthController.listAccounts);
 router.put('/accounts/:accountId/role', AuthController.updateRole);
+router.get('/roles', AuthController.listRoles);
+router.post('/roles', AuthController.createRole);
 
 export default router;

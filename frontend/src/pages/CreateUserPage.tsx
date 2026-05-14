@@ -1,6 +1,6 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, userService } from '../services/api';
+import { CreateUserPayload, User, userService } from '../services/api';
 
 interface CreateUserPageProps {
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
@@ -38,8 +38,10 @@ const districtOptions = [
 
 const employmentTypes = ['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inactive', 'Other', 'CPS'];
 const statusOptions = ['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Administrative Duty', 'Inactive'];
+const sexOptions = ['', 'Male', 'Female'];
+const maritalStatusOptions = ['', 'Single', 'Married', 'Divorced', 'Widowed'];
 
-type UserForm = Omit<User, 'id' | 'createdAt' | 'updatedAt'>;
+type UserForm = CreateUserPayload;
 
 const emptyUserForm: UserForm = {
   firstName: '',
@@ -68,12 +70,26 @@ const emptyUserForm: UserForm = {
   maritalStatus: '',
   residentialAddress: '',
   mailingAddress: '',
+  role: 'user',
+  password: '',
 };
 
 function CreateUserPage({ onToast }: CreateUserPageProps) {
   const [form, setForm] = useState<UserForm>(emptyUserForm);
+  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    userService.getAll(1, 100)
+      .then((response) => {
+        const addresses = response.data.data
+          .flatMap((user: User) => [user.residentialAddress, user.mailingAddress])
+          .filter((address): address is string => Boolean(address?.trim()));
+        setAddressSuggestions(Array.from(new Set(addresses)).slice(0, 50));
+      })
+      .catch(() => setAddressSuggestions([]));
+  }, []);
 
   const updateField = (field: keyof UserForm, value: string | boolean) => {
     setForm((currentForm) => ({ ...currentForm, [field]: value }));
@@ -84,6 +100,11 @@ function CreateUserPage({ onToast }: CreateUserPageProps) {
 
     if (!form.firstName.trim() || !form.lastName.trim()) {
       onToast('error', 'First and last name are required.');
+      return;
+    }
+
+    if (form.password && form.password.length < 8) {
+      onToast('error', 'Password must be at least 8 characters.');
       return;
     }
 
@@ -120,6 +141,10 @@ function CreateUserPage({ onToast }: CreateUserPageProps) {
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Email</span>
             <input type="email" value={form.email} onChange={(event) => updateField('email', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Login Password</span>
+            <input type="password" value={form.password || ''} onChange={(event) => setForm((currentForm) => ({ ...currentForm, password: event.target.value }))} autoComplete="new-password" className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">PE Number</span>
@@ -177,11 +202,15 @@ function CreateUserPage({ onToast }: CreateUserPageProps) {
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Sex</span>
-            <input value={form.sex} onChange={(event) => updateField('sex', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+            <select value={form.sex} onChange={(event) => updateField('sex', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+              {sexOptions.map((option) => <option key={option} value={option}>{option || 'Select'}</option>)}
+            </select>
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Marital Status</span>
-            <input value={form.maritalStatus} onChange={(event) => updateField('maritalStatus', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+            <select value={form.maritalStatus} onChange={(event) => updateField('maritalStatus', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+              {maritalStatusOptions.map((option) => <option key={option} value={option}>{option || 'Select'}</option>)}
+            </select>
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Public Safety ID</span>
@@ -189,13 +218,16 @@ function CreateUserPage({ onToast }: CreateUserPageProps) {
           </label>
           <label className="block md:col-span-2 xl:col-span-3">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Residential Address</span>
-            <textarea value={form.residentialAddress} onChange={(event) => updateField('residentialAddress', event.target.value)} className="min-h-20 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+            <input value={form.residentialAddress} onChange={(event) => updateField('residentialAddress', event.target.value)} autoComplete="street-address" list="shield-addresses" className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
           </label>
           <label className="block md:col-span-2 xl:col-span-3">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Mailing Address</span>
-            <textarea value={form.mailingAddress} onChange={(event) => updateField('mailingAddress', event.target.value)} className="min-h-20 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+            <input value={form.mailingAddress} onChange={(event) => updateField('mailingAddress', event.target.value)} autoComplete="street-address" list="shield-addresses" className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
           </label>
         </div>
+        <datalist id="shield-addresses">
+          {addressSuggestions.map((address) => <option key={address} value={address} />)}
+        </datalist>
 
         <div className="mt-5 flex flex-wrap gap-3 border-t border-gray-200 pt-5 dark:border-gray-800">
           <button type="submit" className="btn-primary" disabled={isSaving}>

@@ -8,8 +8,16 @@ export interface AuthAccount {
   email: string;
   displayName: string;
   profilePictureUrl: string;
-  role: 'administrator' | 'user';
+  role: string;
   twoFactorEnabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface AuthRole {
+  id: string;
+  name: string;
+  permissions: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,7 +29,7 @@ interface AuthAccountRow extends RowDataPacket {
   lastName: string;
   displayName: string | null;
   profilePictureUrl: string | null;
-  role: 'administrator' | 'user';
+  role: string;
   passwordHash: string | null;
   twoFactorSecret: string | null;
   twoFactorEnabled: boolean | number;
@@ -46,6 +54,10 @@ function hashPassword(password: string, salt = crypto.randomBytes(16).toString('
     .toString('hex');
 
   return `${salt}:${hash}`;
+}
+
+export function createPasswordHash(password: string): string {
+  return hashPassword(password);
 }
 
 function verifyPassword(password: string, storedPasswordHash: string): boolean {
@@ -176,7 +188,7 @@ export class AuthAccountModel {
         'SELECT COUNT(*) as count FROM users WHERE `passwordHash` IS NOT NULL'
       );
       const accountCount = Number(accountCountRows[0]?.count) || 0;
-      const role: AuthAccount['role'] = accountCount === 0 ? 'administrator' : 'user';
+      const role = accountCount === 0 ? 'administrator' : 'user';
       const [existingRows] = await conn.query<AuthAccountRow[]>(
         'SELECT * FROM users WHERE LOWER(`email`) = ? LIMIT 1',
         [normalizedEmail]
@@ -402,7 +414,62 @@ export class AuthAccountModel {
     }
   }
 
-  static async updateRole(accountId: string, role: AuthAccount['role']): Promise<AuthAccount | null> {
+  static async roleExists(role: string): Promise<boolean> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<RowDataPacket[]>(
+        'SELECT `id` FROM roles WHERE `name` = ? LIMIT 1',
+        [role]
+      );
+
+      return rows.length > 0;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async listRoles(): Promise<AuthRole[]> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<RowDataPacket[]>('SELECT * FROM roles ORDER BY `name`');
+
+      return rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        permissions: row.permissions ? JSON.parse(row.permissions) : [],
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      }));
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async createRole(name: string, permissions: string[]): Promise<AuthRole> {
+    const conn = await pool.getConnection();
+    try {
+      const id = uuidv4();
+      const now = new Date();
+      const normalizedName = name.trim().toLowerCase().replace(/\s+/gu, '-');
+
+      await conn.query<ResultSetHeader>(
+        'INSERT INTO roles (`id`, `name`, `permissions`, `createdAt`, `updatedAt`) VALUES (?, ?, ?, ?, ?)',
+        [id, normalizedName, JSON.stringify(permissions), now, now]
+      );
+
+      return {
+        id,
+        name: normalizedName,
+        permissions,
+        createdAt: now,
+        updatedAt: now,
+      };
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async updateRole(accountId: string, role: string): Promise<AuthAccount | null> {
     const conn = await pool.getConnection();
     try {
       await conn.query<ResultSetHeader>(

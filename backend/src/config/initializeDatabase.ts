@@ -43,7 +43,7 @@ export async function initializeDatabase() {
       \`profilePictureUrl\` TEXT,
       \`displayName\` VARCHAR(100),
       \`passwordHash\` VARCHAR(255),
-      \`role\` VARCHAR(20) NOT NULL DEFAULT 'user',
+      \`role\` VARCHAR(100) NOT NULL DEFAULT 'user',
       \`twoFactorSecret\` VARCHAR(64),
       \`twoFactorEnabled\` BOOLEAN DEFAULT 0,
       \`peNumber\` VARCHAR(50) UNIQUE,
@@ -83,7 +83,8 @@ export async function initializeDatabase() {
   await ensureColumn('users', 'profilePictureUrl', '`profilePictureUrl` TEXT');
   await ensureColumn('users', 'displayName', '`displayName` VARCHAR(100)');
   await ensureColumn('users', 'passwordHash', '`passwordHash` VARCHAR(255)');
-  await ensureColumn('users', 'role', "`role` VARCHAR(20) NOT NULL DEFAULT 'user'");
+  await ensureColumn('users', 'role', "`role` VARCHAR(100) NOT NULL DEFAULT 'user'");
+  await pool.query("ALTER TABLE `users` MODIFY COLUMN `role` VARCHAR(100) NOT NULL DEFAULT 'user'");
   await ensureColumn('users', 'twoFactorSecret', '`twoFactorSecret` VARCHAR(64)');
   await ensureColumn('users', 'twoFactorEnabled', '`twoFactorEnabled` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'peopleSoftId', '`peopleSoftId` VARCHAR(50)');
@@ -158,6 +159,23 @@ export async function initializeDatabase() {
       INDEX \`idx_user_sessions_user\` (\`userId\`),
       INDEX \`idx_user_sessions_token\` (\`tokenHash\`)
     )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS roles (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`name\` VARCHAR(100) NOT NULL UNIQUE,
+      \`permissions\` TEXT,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+
+  await pool.query(`
+    INSERT IGNORE INTO roles (\`id\`, \`name\`, \`permissions\`)
+    VALUES
+      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","devices:manage","calendar:manage","audit:view","roles:manage","messages:send"]'),
+      ('role-user', 'user', '["users:view","calendar:manage","messages:send"]')
   `);
 
   await pool.query(`

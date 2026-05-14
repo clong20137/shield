@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AuthAccount, authService } from '../services/api';
+import { AuthAccount, AuthRole, authService } from '../services/api';
 
 interface PermissionsPageProps {
   account: AuthAccount;
@@ -8,6 +8,17 @@ interface PermissionsPageProps {
   getErrorMessage: (error: unknown, fallback: string) => string;
 }
 
+const permissionOptions = [
+  { key: 'users:view', label: 'View users' },
+  { key: 'users:create', label: 'Create users' },
+  { key: 'users:edit', label: 'Edit users' },
+  { key: 'devices:manage', label: 'Manage devices' },
+  { key: 'calendar:manage', label: 'Manage calendar' },
+  { key: 'audit:view', label: 'View audit log' },
+  { key: 'roles:manage', label: 'Manage roles' },
+  { key: 'messages:send', label: 'Send messages' },
+];
+
 function PermissionsPage({
   account,
   onAccountUpdate,
@@ -15,6 +26,9 @@ function PermissionsPage({
   getErrorMessage,
 }: PermissionsPageProps) {
   const [accounts, setAccounts] = useState<AuthAccount[]>([]);
+  const [roles, setRoles] = useState<AuthRole[]>([]);
+  const [newRoleName, setNewRoleName] = useState('');
+  const [newRolePermissions, setNewRolePermissions] = useState<string[]>(['users:view']);
   const [loading, setLoading] = useState(true);
   const [savingAccountId, setSavingAccountId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +39,9 @@ function PermissionsPage({
 
     try {
       const response = await authService.getAccounts(account.id);
+      const rolesResponse = await authService.getRoles(account.id);
       setAccounts(response.data);
+      setRoles(rolesResponse.data);
     } catch (err) {
       const message = getErrorMessage(err, 'Failed to load accounts.');
       setError(message);
@@ -39,7 +55,7 @@ function PermissionsPage({
     loadAccounts();
   }, [account.id]);
 
-  const updateRole = async (targetAccount: AuthAccount, role: AuthAccount['role']) => {
+  const updateRole = async (targetAccount: AuthAccount, role: string) => {
     setSavingAccountId(targetAccount.id);
     setError(null);
 
@@ -65,6 +81,26 @@ function PermissionsPage({
       onToast('error', message);
     } finally {
       setSavingAccountId(null);
+    }
+  };
+
+  const createRole = async () => {
+    if (!newRoleName.trim()) {
+      onToast('error', 'Role name is required.');
+      return;
+    }
+
+    setError(null);
+    try {
+      const response = await authService.createRole(account.id, newRoleName, newRolePermissions);
+      setRoles((currentRoles) => [...currentRoles, response.data].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewRoleName('');
+      setNewRolePermissions(['users:view']);
+      onToast('success', 'Role created.');
+    } catch (err) {
+      const message = getErrorMessage(err, 'Failed to create role.');
+      setError(message);
+      onToast('error', message);
     }
   };
 
@@ -103,6 +139,47 @@ function PermissionsPage({
       </div>
 
       <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+        <div className="mb-8 rounded border border-gray-200 p-4 dark:border-gray-800">
+          <h2 className="mb-4 text-xl">Create Role</h2>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)_auto]">
+            <label>
+              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Role Name</span>
+              <input
+                value={newRoleName}
+                onChange={(event) => setNewRoleName(event.target.value)}
+                placeholder="supervisor"
+                className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+              />
+            </label>
+            <div>
+              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Permissions</span>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {permissionOptions.map((permission) => (
+                  <label key={permission.key} className="flex items-center gap-2 rounded border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
+                    <input
+                      type="checkbox"
+                      checked={newRolePermissions.includes(permission.key)}
+                      onChange={(event) => {
+                        setNewRolePermissions((currentPermissions) =>
+                          event.target.checked
+                            ? [...currentPermissions, permission.key]
+                            : currentPermissions.filter((item) => item !== permission.key),
+                        );
+                      }}
+                    />
+                    {permission.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-end">
+              <button type="button" onClick={createRole} className="btn-primary">
+                Create Role
+              </button>
+            </div>
+          </div>
+        </div>
+
         <h2 className="mb-5">Account Roles</h2>
         {loading ? (
           <div className="loading">Loading accounts...</div>
@@ -129,12 +206,15 @@ function PermissionsPage({
                     <td className="px-3 py-4">
                       <select
                         value={item.role}
-                        onChange={(event) => updateRole(item, event.target.value as AuthAccount['role'])}
+                        onChange={(event) => updateRole(item, event.target.value)}
                         disabled={savingAccountId === item.id}
                         className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
                       >
-                        <option value="administrator">Administrator</option>
-                        <option value="user">User</option>
+                        {roles.map((role) => (
+                          <option key={role.id} value={role.name}>
+                            {role.name}
+                          </option>
+                        ))}
                       </select>
                     </td>
                     <td className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400">

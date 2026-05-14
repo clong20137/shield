@@ -16,10 +16,6 @@ function isDuplicateEmailError(error: unknown): boolean {
   );
 }
 
-function isAccountRole(role: unknown): role is 'administrator' | 'user' {
-  return role === 'administrator' || role === 'user';
-}
-
 async function isAdministrator(accountId?: string): Promise<boolean> {
   if (!accountId) {
     return false;
@@ -243,8 +239,8 @@ export class AuthController {
         return res.status(403).json({ error: 'Administrator permission required' });
       }
 
-      if (!isAccountRole(role)) {
-        return res.status(400).json({ error: 'Role must be administrator or user' });
+      if (!role || !(await AuthAccountModel.roleExists(role))) {
+        return res.status(400).json({ error: 'Choose an existing role' });
       }
 
       const accounts = await AuthAccountModel.listAccounts();
@@ -255,7 +251,7 @@ export class AuthController {
         return res.status(404).json({ error: 'Account not found' });
       }
 
-      if (targetAccount.role === 'administrator' && role === 'user' && administratorCount <= 1) {
+      if (targetAccount.role === 'administrator' && role !== 'administrator' && administratorCount <= 1) {
         return res.status(400).json({ error: 'At least one administrator account is required' });
       }
 
@@ -264,6 +260,50 @@ export class AuthController {
     } catch (error) {
       console.error('Update account role error:', error);
       res.status(500).json({ error: 'Failed to update account role' });
+    }
+  }
+
+  static async listRoles(req: Request, res: Response) {
+    try {
+      const requesterId = typeof req.query.requesterId === 'string' ? req.query.requesterId : undefined;
+
+      if (!(await isAdministrator(requesterId))) {
+        return res.status(403).json({ error: 'Administrator permission required' });
+      }
+
+      const roles = await AuthAccountModel.listRoles();
+      res.json(roles);
+    } catch (error) {
+      console.error('List roles error:', error);
+      res.status(500).json({ error: 'Failed to load roles' });
+    }
+  }
+
+  static async createRole(req: Request, res: Response) {
+    try {
+      const { requesterId, name, permissions } = req.body as {
+        requesterId?: string;
+        name?: string;
+        permissions?: string[];
+      };
+
+      if (!(await isAdministrator(requesterId))) {
+        return res.status(403).json({ error: 'Administrator permission required' });
+      }
+
+      if (!name?.trim()) {
+        return res.status(400).json({ error: 'Role name is required' });
+      }
+
+      const role = await AuthAccountModel.createRole(name, Array.isArray(permissions) ? permissions : []);
+      res.status(201).json(role);
+    } catch (error) {
+      if (isDuplicateEmailError(error)) {
+        return res.status(409).json({ error: 'A role with that name already exists' });
+      }
+
+      console.error('Create role error:', error);
+      res.status(500).json({ error: 'Failed to create role' });
     }
   }
 }

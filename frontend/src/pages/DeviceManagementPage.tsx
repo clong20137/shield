@@ -1,13 +1,13 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Laptop, Radio, Router, Smartphone } from 'lucide-react';
-import { deviceService, DeviceRecord } from '../services/api';
+import { Laptop, Radio, Router, Smartphone, Wifi } from 'lucide-react';
+import { authService, AuthAccount, deviceService, DeviceRecord } from '../services/api';
 
-type DeviceType = 'Cell Phone' | 'MiFi Device' | 'Computer' | 'Radio';
+type DeviceType = 'Cell Phone' | 'MiFi Device' | 'Computer' | 'Radio' | 'Cradlepoint';
 type DeviceStatus = 'Available' | 'Assigned' | 'Maintenance' | 'Retired';
 
 type DeviceForm = Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'>;
 
-const deviceTypes: DeviceType[] = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio'];
+const deviceTypes: DeviceType[] = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio', 'Cradlepoint'];
 const deviceStatuses: DeviceStatus[] = ['Available', 'Assigned', 'Maintenance', 'Retired'];
 
 const defaultDeviceForm: DeviceForm = {
@@ -26,10 +26,12 @@ const deviceIconMap = {
   'MiFi Device': Router,
   Computer: Laptop,
   Radio,
+  Cradlepoint: Wifi,
 };
 
-function DeviceManagementPage() {
+function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null }) {
   const [devices, setDevices] = useState<DeviceRecord[]>([]);
+  const [registeredUsers, setRegisteredUsers] = useState<AuthAccount[]>([]);
   const [form, setForm] = useState<DeviceForm>(defaultDeviceForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<DeviceType | 'All'>('All');
@@ -39,7 +41,23 @@ function DeviceManagementPage() {
 
   useEffect(() => {
     loadDevices();
+    loadRegisteredUsers();
   }, []);
+
+  const loadRegisteredUsers = async () => {
+    if (!currentUser) {
+      setRegisteredUsers([]);
+      return;
+    }
+
+    try {
+      const response = await authService.getAccounts(currentUser.id);
+      setRegisteredUsers(response.data);
+    } catch (err) {
+      console.error('Failed to load registered users:', err);
+      setRegisteredUsers([]);
+    }
+  };
 
   const loadDevices = async () => {
     setLoading(true);
@@ -220,11 +238,18 @@ function DeviceManagementPage() {
 
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Assigned To</span>
-            <input
+            <select
               value={form.assignedTo}
               onChange={(event) => setForm((currentForm) => ({ ...currentForm, assignedTo: event.target.value }))}
               className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-            />
+            >
+              <option value="">Unassigned</option>
+              {registeredUsers.map((user) => (
+                <option key={user.id} value={user.email}>
+                  {user.displayName} ({user.email})
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className="block">

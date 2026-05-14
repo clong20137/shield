@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { BarChart3, Bell, ChevronLeft, ChevronRight, ClipboardList, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Search, Settings, Shield, Sun, UserCircle, UserPlus } from 'lucide-react';
+import { BarChart3, Bell, ChevronLeft, ChevronRight, ClipboardList, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Search, Settings, Shield, Sun, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -224,6 +224,19 @@ function getInitials(name?: string, email?: string): string {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
+function ShieldLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
+      <div className="text-center">
+        <div className="shield-loader mx-auto mb-4">
+          <Shield size={76} />
+        </div>
+        <p className="text-sm font-bold uppercase tracking-[0.24em] text-accent">Loading SHIELD</p>
+      </div>
+    </div>
+  );
+}
+
 interface SidebarLinkProps {
   to: string;
   label: string;
@@ -444,6 +457,7 @@ function App() {
   const [notifications, setNotifications] = useState<ToastMessage[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSessionLoading, setIsSessionLoading] = useState(true);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   const showToast = (type: ToastType, message: string) => {
     const id = Date.now();
@@ -513,12 +527,12 @@ function App() {
     <Router>
       <ToastHost toasts={toasts} />
       {isSessionLoading ? (
-        <div className="loading min-h-screen">Loading session...</div>
+        <ShieldLoading />
       ) : !isAuthenticated ? (
         <LoginSplash onLogin={handleLogin} onToast={showToast} />
       ) : (
         <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
-          <aside className={`relative flex h-screen shrink-0 flex-col overflow-y-auto bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
+          <aside className={`shield-sidebar relative flex h-screen shrink-0 flex-col overflow-y-auto bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed((value) => !value)}
@@ -552,16 +566,21 @@ function App() {
             </div>
 
             <div className={isSidebarCollapsed ? 'px-3 py-3' : 'px-4 py-3'}>
-              <div className={`overflow-hidden rounded bg-white/10 ${isSidebarCollapsed ? 'p-2' : 'p-3'}`}>
+              <button
+                type="button"
+                onClick={() => setIsProfileModalOpen(true)}
+                className={`w-full overflow-hidden rounded bg-white/10 text-left transition hover:bg-white/15 ${isSidebarCollapsed ? 'p-1.5' : 'p-3'}`}
+                title="Open profile"
+              >
                 <div className={isSidebarCollapsed ? 'flex justify-center' : 'flex items-center gap-3'}>
                   {currentUser?.profilePictureUrl ? (
                     <img
                       src={currentUser.profilePictureUrl}
                       alt={currentUser.displayName}
-                      className="h-14 w-14 shrink-0 rounded-full border border-white bg-white object-cover shadow"
+                      className={`${isSidebarCollapsed ? 'h-10 w-10' : 'h-14 w-14'} shrink-0 rounded-full border border-white bg-white object-cover shadow`}
                     />
                   ) : (
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white bg-white text-base font-bold text-primary-500 shadow">
+                    <div className={`${isSidebarCollapsed ? 'h-10 w-10 text-sm' : 'h-14 w-14 text-base'} flex shrink-0 items-center justify-center rounded-full border border-white bg-white font-bold text-primary-500 shadow`}>
                       {currentUser ? getInitials(currentUser.displayName, currentUser.email) : <UserCircle size={32} />}
                     </div>
                   )}
@@ -575,10 +594,10 @@ function App() {
                 </div>
                 {!isSidebarCollapsed && (
                   <div className="mt-3 rounded bg-black/15 px-3 py-2 text-xs font-semibold text-white">
-                    {currentUser?.role === 'administrator' ? 'Administrator' : 'User'} - {currentUser?.twoFactorEnabled ? '2FA enabled' : '2FA not enabled'}
+                    {currentUser?.role || 'user'} - {currentUser?.twoFactorEnabled ? '2FA enabled' : '2FA not enabled'}
                   </div>
                 )}
-              </div>
+              </button>
             </div>
 
             <nav className="flex flex-1 flex-col gap-2 px-3 py-3">
@@ -622,15 +641,6 @@ function App() {
               <div className="relative flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
-                  className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
-                  aria-label="Toggle light and dark mode"
-                >
-                  {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-                </button>
-                <HeaderMessagesButton currentUser={currentUser} />
-                <button
-                  type="button"
                   onClick={() => setIsNotificationsOpen((value) => !value)}
                   className="relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
                   aria-label="Open notifications"
@@ -641,6 +651,15 @@ function App() {
                       {notifications.length > 9 ? '9+' : notifications.length}
                     </span>
                   )}
+                </button>
+                <HeaderMessagesButton currentUser={currentUser} />
+                <button
+                  type="button"
+                  onClick={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
+                  className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                  aria-label="Toggle light and dark mode"
+                >
+                  {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
                 </button>
 
                 {isNotificationsOpen && (
@@ -678,7 +697,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
                 {currentUser && <Route path="/messages" element={<MessageInboxPage currentUser={currentUser} onToast={showToast} />} />}
-                <Route path="/devices" element={<DeviceManagementPage />} />
+                <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
                 <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
                 {currentUser && isAdministrator && (
                   <Route path="/users/create" element={<CreateUserPage onToast={showToast} />} />
@@ -717,6 +736,29 @@ function App() {
               </Routes>
             </main>
           </div>
+          {isProfileModalOpen && currentUser && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+                <div className="mb-5 flex items-center justify-between">
+                  <h2>Profile Settings</h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsProfileModalOpen(false)}
+                    className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                    aria-label="Close profile settings"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <AccountSettingsPage
+                  account={currentUser}
+                  onAccountUpdate={handleAccountUpdate}
+                  onToast={showToast}
+                  getErrorMessage={getErrorMessage}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Router>

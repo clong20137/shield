@@ -20,6 +20,22 @@
   }
 }
 
+@keyframes shield-fill {
+  0% {
+    clip-path: inset(100% 0 0 0);
+  }
+
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 @layer base {
   body {
     @apply font-sans text-gray-800 bg-gray-50 dark:bg-gray-950 dark:text-gray-100;
@@ -72,7 +88,13 @@
   }
 
   .loading {
-    @apply text-center py-10 text-gray-500 text-base dark:text-gray-400;
+    @apply relative overflow-hidden text-center py-10 text-gray-500 text-base dark:text-gray-400;
+  }
+
+  .loading::after {
+    content: '';
+    @apply absolute inset-y-0 -left-full w-full bg-gradient-to-r from-transparent via-white/60 to-transparent dark:via-white/10;
+    animation: shimmer 1.4s infinite;
   }
 
   .empty-state {
@@ -81,5 +103,38 @@
 
   .toast-notification {
     animation: toast-lifecycle 4.5s ease-in-out both;
+  }
+
+  .shield-loader {
+    @apply relative flex h-28 w-28 items-center justify-center text-gray-300 dark:text-gray-800;
+  }
+
+  .shield-loader::after {
+    content: '';
+    @apply absolute inset-0 text-accent;
+    background: currentColor;
+    clip-path: inset(100% 0 0 0);
+    animation: shield-fill 1.4s ease-in-out infinite alternate;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='76' height='76' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'/%3E%3C/svg%3E") center / 76px 76px no-repeat;
+  }
+
+  .shield-sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 134, 92, 0.9) rgba(255, 255, 255, 0.12);
+  }
+
+  .shield-sidebar::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .shield-sidebar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .shield-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(156, 134, 92, 0.9);
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
   }
 }
