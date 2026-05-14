@@ -1,25 +1,11 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Laptop, Radio, Router, Smartphone } from 'lucide-react';
+import { deviceService, DeviceRecord } from '../services/api';
 
 type DeviceType = 'Cell Phone' | 'MiFi Device' | 'Computer' | 'Radio';
 type DeviceStatus = 'Available' | 'Assigned' | 'Maintenance' | 'Retired';
 
-type DeviceRecord = {
-  id: string;
-  type: DeviceType;
-  assetTag: string;
-  makeModel: string;
-  serialNumber: string;
-  assignedTo: string;
-  status: DeviceStatus;
-  location: string;
-  notes: string;
-  updatedAt: string;
-};
-
-type DeviceForm = Omit<DeviceRecord, 'id' | 'updatedAt'>;
-
-const deviceStorageKey = 'shield_device_inventory';
+type DeviceForm = Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'>;
 
 const deviceTypes: DeviceType[] = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio'];
 const deviceStatuses: DeviceStatus[] = ['Available', 'Assigned', 'Maintenance', 'Retired'];
@@ -44,38 +30,30 @@ const deviceIconMap = {
 
 function DeviceManagementPage() {
   const [devices, setDevices] = useState<DeviceRecord[]>([]);
-  const [devicesLoaded, setDevicesLoaded] = useState(false);
   const [form, setForm] = useState<DeviceForm>(defaultDeviceForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<DeviceType | 'All'>('All');
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedDevices = window.localStorage.getItem(deviceStorageKey);
-
-    if (!savedDevices) {
-      setDevicesLoaded(true);
-      return;
-    }
-
-    try {
-      const parsedDevices = JSON.parse(savedDevices) as DeviceRecord[];
-      setDevices(Array.isArray(parsedDevices) ? parsedDevices : []);
-    } catch (err) {
-      console.error('Failed to load device inventory:', err);
-    } finally {
-      setDevicesLoaded(true);
-    }
+    loadDevices();
   }, []);
 
-  useEffect(() => {
-    if (!devicesLoaded) {
-      return;
+  const loadDevices = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await deviceService.getAll();
+      setDevices(response.data);
+    } catch (err) {
+      console.error('Failed to load device inventory:', err);
+      setError('Failed to load device inventory. Check that the backend is running.');
+    } finally {
+      setLoading(false);
     }
-
-    window.localStorage.setItem(deviceStorageKey, JSON.stringify(devices));
-  }, [devices, devicesLoaded]);
+  };
 
   const filteredDevices = useMemo(() => {
     const searchTerm = query.trim().toLowerCase();
@@ -106,7 +84,7 @@ function DeviceManagementPage() {
     [devices],
   );
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!form.assetTag.trim() || !form.makeModel.trim()) {
@@ -116,27 +94,23 @@ function DeviceManagementPage() {
 
     setError(null);
 
-    if (editingId) {
-      setDevices((currentDevices) =>
-        currentDevices.map((device) =>
-          device.id === editingId
-            ? { ...device, ...form, updatedAt: new Date().toISOString() }
-            : device,
-        ),
-      );
-      setEditingId(null);
-    } else {
-      setDevices((currentDevices) => [
-        {
-          ...form,
-          id: `${form.type}-${Date.now()}`,
-          updatedAt: new Date().toISOString(),
-        },
-        ...currentDevices,
-      ]);
-    }
+    try {
+      if (editingId) {
+        const response = await deviceService.update(editingId, form);
+        setDevices((currentDevices) =>
+          currentDevices.map((device) => (device.id === editingId ? response.data : device)),
+        );
+        setEditingId(null);
+      } else {
+        const response = await deviceService.create(form);
+        setDevices((currentDevices) => [response.data, ...currentDevices]);
+      }
 
-    setForm(defaultDeviceForm);
+      setForm(defaultDeviceForm);
+    } catch (err) {
+      console.error('Failed to save device:', err);
+      setError('Failed to save device. Check for duplicate asset tags and try again.');
+    }
   };
 
   const editDevice = (device: DeviceRecord) => {
@@ -153,12 +127,18 @@ function DeviceManagementPage() {
     });
   };
 
-  const deleteDevice = (deviceId: string) => {
-    setDevices((currentDevices) => currentDevices.filter((device) => device.id !== deviceId));
+  const deleteDevice = async (deviceId: string) => {
+    try {
+      await deviceService.delete(deviceId);
+      setDevices((currentDevices) => currentDevices.filter((device) => device.id !== deviceId));
 
-    if (editingId === deviceId) {
-      setEditingId(null);
-      setForm(defaultDeviceForm);
+      if (editingId === deviceId) {
+        setEditingId(null);
+        setForm(defaultDeviceForm);
+      }
+    } catch (err) {
+      console.error('Failed to delete device:', err);
+      setError('Failed to delete device.');
     }
   };
 
@@ -168,15 +148,21 @@ function DeviceManagementPage() {
         <div>
           <h1>Device Management</h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Track cell phones, MiFi devices, computers, and radios in one inventory.
+            Track cell phones, MiFi devices, computers, and radios in the shared database.
           </p>
         </div>
-        <div className="rounded bg-accent/10 px-4 py-2 text-sm font-bold text-accent">
-          {devices.length} total devices
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="rounded bg-accent/10 px-4 py-2 text-sm font-bold text-accent">
+            {devices.length} total devices
+          </div>
+          <button type="button" onClick={loadDevices} className="btn-secondary">
+            Refresh Devices
+          </button>
         </div>
       </div>
 
       {error && <div className="error">{error}</div>}
+      {loading && <div className="loading">Loading device inventory...</div>}
 
       <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-4">
         {statusCounts.map((item) => (

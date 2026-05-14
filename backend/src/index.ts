@@ -5,6 +5,8 @@ import { initializeDatabase } from './config/initializeDatabase';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
 import reportRoutes from './routes/reportRoutes';
+import calendarRoutes from './routes/calendarRoutes';
+import deviceRoutes from './routes/deviceRoutes';
 
 dotenv.config();
 
@@ -20,6 +22,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/calendar', calendarRoutes);
+app.use('/api/devices', deviceRoutes);
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {

@@ -1,20 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { userService, reportService, ReportRow, SystemStatistics, User } from '../services/api';
+import { calendarService, CalendarEntry, userService, reportService, ReportRow, SystemStatistics, User } from '../services/api';
 import { StatisticsCard } from '../components/StatisticsCard';
 
-type CalendarEntry = {
-  id: string;
-  category: 'General Information';
-  date: string;
-  dutyHours: string;
-  districtWorked: string;
-  specialStatus: string;
-  color: string;
-};
-
-type CalendarEntryForm = Omit<CalendarEntry, 'id'>;
-
-const calendarStorageKey = 'shield_calendar_entries';
+type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>;
 
 const districtOptions = [
   'Area 1',
@@ -93,37 +81,30 @@ function DashboardCalendar() {
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
   const [entries, setEntries] = useState<CalendarEntry[]>([]);
-  const [entriesLoaded, setEntriesLoaded] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [entryForm, setEntryForm] = useState<CalendarEntryForm>(() =>
     createDefaultEntryForm(formatDateKey(new Date())),
   );
+  const [isCalendarLoading, setIsCalendarLoading] = useState(true);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
 
   useEffect(() => {
-    const savedEntries = window.localStorage.getItem(calendarStorageKey);
-
-    if (!savedEntries) {
-      setEntriesLoaded(true);
-      return;
-    }
-
-    try {
-      const parsedEntries = JSON.parse(savedEntries) as CalendarEntry[];
-      setEntries(Array.isArray(parsedEntries) ? parsedEntries : []);
-    } catch (err) {
-      console.error('Failed to load calendar entries:', err);
-    } finally {
-      setEntriesLoaded(true);
-    }
+    loadCalendarEntries();
   }, []);
 
-  useEffect(() => {
-    if (!entriesLoaded) {
-      return;
+  const loadCalendarEntries = async () => {
+    setIsCalendarLoading(true);
+    setCalendarError(null);
+    try {
+      const response = await calendarService.getAll();
+      setEntries(response.data);
+    } catch (err) {
+      console.error('Failed to load calendar entries:', err);
+      setCalendarError('Failed to load calendar entries.');
+    } finally {
+      setIsCalendarLoading(false);
     }
-
-    window.localStorage.setItem(calendarStorageKey, JSON.stringify(entries));
-  }, [entries, entriesLoaded]);
+  };
 
   const openDay = (dateKey: string) => {
     setSelectedDate(dateKey);
@@ -142,7 +123,7 @@ function DashboardCalendar() {
     });
   };
 
-  const saveEntry = (event: React.FormEvent<HTMLFormElement>) => {
+  const saveEntry = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const hours = Number(entryForm.dutyHours);
@@ -151,18 +132,29 @@ function DashboardCalendar() {
       return;
     }
 
-    const newEntry: CalendarEntry = {
-      ...entryForm,
-      dutyHours: hours.toFixed(2).replace(/\.?0+$/, ''),
-      id: `${entryForm.date}-${Date.now()}`,
-    };
-
-    setEntries((currentEntries) => [...currentEntries, newEntry]);
-    setEntryForm(createDefaultEntryForm(entryForm.date));
+    setCalendarError(null);
+    try {
+      const response = await calendarService.create({
+        ...entryForm,
+        dutyHours: hours.toFixed(2).replace(/\.?0+$/, ''),
+      });
+      setEntries((currentEntries) => [response.data, ...currentEntries]);
+      setEntryForm(createDefaultEntryForm(entryForm.date));
+    } catch (err) {
+      console.error('Failed to save calendar entry:', err);
+      setCalendarError('Failed to save calendar entry.');
+    }
   };
 
-  const deleteEntry = (entryId: string) => {
-    setEntries((currentEntries) => currentEntries.filter((entry) => entry.id !== entryId));
+  const deleteEntry = async (entryId: string) => {
+    setCalendarError(null);
+    try {
+      await calendarService.delete(entryId);
+      setEntries((currentEntries) => currentEntries.filter((entry) => entry.id !== entryId));
+    } catch (err) {
+      console.error('Failed to delete calendar entry:', err);
+      setCalendarError('Failed to delete calendar entry.');
+    }
   };
 
   const selectedEntries = selectedDate
@@ -189,7 +181,7 @@ function DashboardCalendar() {
         <div>
           <h2>Interactive Calendar</h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Click a day to add color-coded duty information.
+            Click a day to add color-coded duty information stored in the database.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -204,6 +196,9 @@ function DashboardCalendar() {
           </button>
         </div>
       </div>
+
+      {calendarError && <div className="error">{calendarError}</div>}
+      {isCalendarLoading && <div className="loading">Loading calendar entries...</div>}
 
       <div className="grid grid-cols-7 gap-2 text-center text-xs font-bold uppercase text-gray-500 dark:text-gray-400">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (

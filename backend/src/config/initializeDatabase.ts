@@ -43,4 +43,37 @@ export async function initializeDatabase() {
   await ensureColumn('auth_accounts', 'twoFactorSecret', '`twoFactorSecret` VARCHAR(64)');
   await ensureColumn('auth_accounts', 'twoFactorEnabled', '`twoFactorEnabled` BOOLEAN DEFAULT 0');
   await ensureColumn('auth_accounts', 'role', "`role` VARCHAR(20) NOT NULL DEFAULT 'user'");
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS calendar_entries (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`category\` VARCHAR(100) NOT NULL DEFAULT 'General Information',
+      \`entryDate\` DATE NOT NULL,
+      \`dutyHours\` DECIMAL(6,2) NOT NULL,
+      \`districtWorked\` VARCHAR(100) NOT NULL,
+      \`specialStatus\` VARCHAR(50) NOT NULL DEFAULT 'None',
+      \`color\` VARCHAR(20) NOT NULL DEFAULT '#9C865C',
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX \`idx_calendar_entry_date\` (\`entryDate\`)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS devices (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`type\` VARCHAR(50) NOT NULL,
+      \`assetTag\` VARCHAR(100) NOT NULL UNIQUE,
+      \`makeModel\` VARCHAR(150) NOT NULL,
+      \`serialNumber\` VARCHAR(150),
+      \`assignedTo\` VARCHAR(150),
+      \`status\` VARCHAR(50) NOT NULL DEFAULT 'Available',
+      \`location\` VARCHAR(150),
+      \`notes\` TEXT,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX \`idx_devices_type\` (\`type\`),
+      INDEX \`idx_devices_status\` (\`status\`)
+    )
+  `);
 }

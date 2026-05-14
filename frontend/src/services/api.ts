@@ -83,6 +83,32 @@ export interface TwoFactorSetupResponse {
   otpauthUrl: string;
 }
 
+export interface CalendarEntry {
+  id: string;
+  category: 'General Information';
+  date: string;
+  dutyHours: string;
+  districtWorked: string;
+  specialStatus: string;
+  color: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DeviceRecord {
+  id: string;
+  type: 'Cell Phone' | 'MiFi Device' | 'Computer' | 'Radio';
+  assetTag: string;
+  makeModel: string;
+  serialNumber: string;
+  assignedTo: string;
+  status: 'Available' | 'Assigned' | 'Maintenance' | 'Retired';
+  location: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const authService = {
   register: (email: string, password: string, displayName: string) =>
     api.post<AuthResponse>('/auth/register', { email, password, displayName }),
@@ -144,6 +170,31 @@ export const reportService = {
   
   getDetailedReport: (filters?: UserFilters) =>
     api.get('/reports/detailed', { params: filters }),
+};
+
+export const calendarService = {
+  getAll: () =>
+    api.get<CalendarEntry[]>('/calendar'),
+
+  create: (entry: Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>) =>
+    api.post<CalendarEntry>('/calendar', entry),
+
+  delete: (id: string) =>
+    api.delete(`/calendar/${id}`),
+};
+
+export const deviceService = {
+  getAll: () =>
+    api.get<DeviceRecord[]>('/devices'),
+
+  create: (device: Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'>) =>
+    api.post<DeviceRecord>('/devices', device),
+
+  update: (id: string, device: Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'>) =>
+    api.put<DeviceRecord>(`/devices/${id}`, device),
+
+  delete: (id: string) =>
+    api.delete(`/devices/${id}`),
 };
 
 export default api;
