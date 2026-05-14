@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Inbox, Send, Smile, X } from 'lucide-react';
+import { Inbox, Paperclip, Send, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, messageService, userService, User, UserMessage } from '../services/api';
 
@@ -25,7 +25,18 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
   const [selectedRecipient, setSelectedRecipient] = useState<User | null>(null);
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
+  const [composeAttachments, setComposeAttachments] = useState<File[]>([]);
+  const [replyAttachments, setReplyAttachments] = useState<File[]>([]);
   const [isRecipientSearching, setIsRecipientSearching] = useState(false);
+  const emojiButton = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
+
+  const withAttachmentSummary = (body: string, files: File[]) => {
+    if (files.length === 0) {
+      return body;
+    }
+
+    return `${body.trim()}\n\nAttachments: ${files.map((file) => file.name).join(', ')}`;
+  };
 
   const loadMessages = async () => {
     setIsLoading(true);
@@ -122,9 +133,10 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
         senderAccountId: currentUser.id,
         recipientUserId: selectedMessage.senderAccountId,
         subject: selectedMessage.subject.startsWith('Re:') ? selectedMessage.subject : `Re: ${selectedMessage.subject}`,
-        body: replyBody,
+        body: withAttachmentSummary(replyBody, replyAttachments),
       });
       setReplyBody('');
+      setReplyAttachments([]);
       await loadMessages();
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
       onToast('success', 'Reply sent.');
@@ -159,12 +171,13 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
         senderAccountId: currentUser.id,
         recipientUserId: selectedRecipient.id,
         subject: composeSubject,
-        body: composeBody,
+        body: withAttachmentSummary(composeBody, composeAttachments),
       });
       setSelectedRecipient(null);
       setRecipientQuery('');
       setComposeSubject('');
       setComposeBody('');
+      setComposeAttachments([]);
       setIsComposeOpen(false);
       setIsEmojiPickerOpen(false);
       await loadMessages();
@@ -253,8 +266,8 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-        <section className="rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+      <div className="grid min-h-[640px] grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+        <section className="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
           {isLoading ? (
             <div className="loading">Loading messages...</div>
           ) : filteredMessages.length === 0 ? (
@@ -286,12 +299,12 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
           )}
         </section>
 
-        <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+        <section className="flex min-h-[640px] flex-col rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
           {!selectedMessage ? (
             <div className="empty-state">Select a message to view it.</div>
           ) : (
-            <div>
-              <div className="border-b border-gray-200 pb-4 dark:border-gray-800">
+            <>
+              <div className="border-b border-gray-200 p-5 dark:border-gray-800">
                 <h2>{selectedMessage.subject}</h2>
                 <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                   From {selectedMessage.senderName || selectedMessage.senderEmail || 'Unknown'} to {selectedMessage.recipientName || selectedMessage.recipientEmail || 'Unknown'}
@@ -308,36 +321,63 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
                   </button>
                 </div>
               </div>
-              <p className="whitespace-pre-wrap py-5 text-gray-800 dark:text-gray-100">{selectedMessage.body}</p>
+              <div className="flex-1 space-y-4 overflow-y-auto bg-gray-50 p-5 dark:bg-gray-950">
+                <div className={`flex ${tab === 'sent' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[78%] rounded-2xl px-4 py-3 shadow-sm ${
+                    tab === 'sent'
+                      ? 'rounded-br bg-accent text-white'
+                      : 'rounded-bl bg-white text-gray-800 dark:bg-gray-900 dark:text-gray-100'
+                  }`}>
+                    <p className="whitespace-pre-wrap text-sm leading-6">{selectedMessage.body}</p>
+                  </div>
+                </div>
+              </div>
 
               {tab === 'inbox' && (
-                <form onSubmit={sendReply} className="border-t border-gray-200 pt-4 dark:border-gray-800">
-                  <label className="mb-3 block">
-                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Reply</span>
-                    <textarea
-                      value={replyBody}
-                      onChange={(event) => setReplyBody(event.target.value)}
-                      className="min-h-32 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-                    />
-                  </label>
-                  <div className="relative mb-3">
+                <form onSubmit={sendReply} className="border-t border-gray-200 p-4 dark:border-gray-800">
+                  {replyAttachments.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-2">
+                      {replyAttachments.map((file) => (
+                        <span key={`${file.name}-${file.size}`} className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">
+                          {file.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-end gap-2 rounded-full border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
                     <button
                       type="button"
                       onClick={() => {
                         setEmojiTarget('reply');
                         setIsEmojiPickerOpen(true);
                       }}
-                      className="btn-secondary inline-flex items-center gap-2"
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-xl hover:bg-gray-100 dark:hover:bg-gray-800"
+                      aria-label="Add emoji"
                     >
-                      <Smile size={16} /> Emoji
+                      {emojiButton}
+                    </button>
+                    <label className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800" title="Attach files">
+                      <Paperclip size={18} />
+                      <input
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={(event) => setReplyAttachments(Array.from(event.target.files || []))}
+                      />
+                    </label>
+                    <textarea
+                      value={replyBody}
+                      onChange={(event) => setReplyBody(event.target.value)}
+                      placeholder="Type a reply"
+                      className="max-h-32 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none"
+                    />
+                    <button type="submit" className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600" disabled={isSending} aria-label="Send reply">
+                      <Send size={17} />
                     </button>
                   </div>
-                  <button type="submit" className="btn-primary" disabled={isSending}>
-                    {isSending ? 'Sending...' : 'Send Reply'}
-                  </button>
                 </form>
               )}
-            </div>
+            </>
           )}
         </section>
       </div>
@@ -417,17 +457,37 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
               />
             </label>
 
-            <div className="mb-4">
+            {composeAttachments.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {composeAttachments.map((file) => (
+                  <span key={`${file.name}-${file.size}`} className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">
+                    {file.name}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="mb-4 flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => {
                   setEmojiTarget('compose');
                   setIsEmojiPickerOpen(true);
                 }}
-                className="btn-secondary inline-flex items-center gap-2"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-xl hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                aria-label="Add emoji"
               >
-                <Smile size={16} /> Emoji
+                {emojiButton}
               </button>
+              <label className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-gray-100 text-primary-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700" title="Attach files">
+                <Paperclip size={18} />
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => setComposeAttachments(Array.from(event.target.files || []))}
+                />
+              </label>
             </div>
 
             <button type="submit" className="btn-primary" disabled={isSending}>

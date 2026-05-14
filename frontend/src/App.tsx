@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { BarChart3, Bell, ChevronLeft, ChevronRight, ClipboardList, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Search, Settings, Shield, Sun, UserCircle, UserPlus, X } from 'lucide-react';
+import { BarChart3, Bell, ChevronLeft, ChevronRight, ClipboardList, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Search, Shield, Sun, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -458,6 +458,7 @@ function App() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 
   const showToast = (type: ToastType, message: string) => {
     const id = Date.now();
@@ -611,25 +612,9 @@ function App() {
                   <SidebarLink to="/permissions" label="Permissions" compact={isSidebarCollapsed} icon={LockKeyhole} />
                 </>
               )}
-              <SidebarLink to="/account" label="Account" compact={isSidebarCollapsed} icon={Settings} />
             </nav>
 
-            <div className="shrink-0 border-t border-white/10 p-3">
-              {!isSidebarCollapsed && (
-                <div className="mb-3 rounded bg-white/10 px-3 py-2">
-                  <p className="text-xs uppercase text-blue-100">Session</p>
-                  <p className="text-xs text-blue-100">Agency User Search</p>
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="flex h-10 w-full items-center justify-center rounded bg-white/10 px-3 text-sm font-semibold text-white hover:bg-white/20"
-                title={isSidebarCollapsed ? 'Sign out' : undefined}
-              >
-                {isSidebarCollapsed ? <LogOut size={18} /> : 'Sign out'}
-              </button>
-            </div>
+            <div className="shrink-0 border-t border-white/10 p-3" />
           </aside>
 
           <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
@@ -661,6 +646,19 @@ function App() {
                 >
                   {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAccountMenuOpen((value) => !value)}
+                  className="flex h-10 w-10 items-center justify-center overflow-hidden rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                  aria-label="Open account menu"
+                  title="Account"
+                >
+                  {currentUser?.profilePictureUrl ? (
+                    <img src={currentUser.profilePictureUrl} alt={currentUser.displayName} className="h-full w-full object-cover" />
+                  ) : (
+                    <UserCircle size={20} />
+                  )}
+                </button>
 
                 {isNotificationsOpen && (
                   <div className="absolute right-0 top-12 z-40 w-80 rounded border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
@@ -690,6 +688,34 @@ function App() {
                     </div>
                   </div>
                 )}
+                {isAccountMenuOpen && (
+                  <div className="absolute right-0 top-12 z-40 w-64 rounded border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                    <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                      <p className="truncate text-sm font-bold text-gray-800 dark:text-gray-100">{currentUser?.displayName}</p>
+                      <p className="truncate text-xs text-gray-500 dark:text-gray-400">{currentUser?.email}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfileModalOpen(true);
+                        setIsAccountMenuOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+                    >
+                      <UserCircle size={16} /> Account Settings
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAccountMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-danger hover:bg-red-50 dark:border-gray-700 dark:hover:bg-red-950"
+                    >
+                      <LogOut size={16} /> Sign out
+                    </button>
+                  </div>
+                )}
               </div>
             </header>
 
@@ -711,19 +737,6 @@ function App() {
                     path="/permissions"
                     element={
                       <PermissionsPage
-                        account={currentUser}
-                        onAccountUpdate={handleAccountUpdate}
-                        onToast={showToast}
-                        getErrorMessage={getErrorMessage}
-                      />
-                    }
-                  />
-                )}
-                {currentUser && (
-                  <Route
-                    path="/account"
-                    element={
-                      <AccountSettingsPage
                         account={currentUser}
                         onAccountUpdate={handleAccountUpdate}
                         onToast={showToast}

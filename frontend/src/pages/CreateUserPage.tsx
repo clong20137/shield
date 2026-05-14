@@ -43,6 +43,20 @@ const maritalStatusOptions = ['', 'Single', 'Married', 'Divorced', 'Widowed'];
 
 type UserForm = CreateUserPayload;
 
+function formatPhoneNumber(value: string): string {
+  const digits = value.replace(/\D/gu, '').slice(0, 10);
+
+  if (digits.length <= 3) {
+    return digits;
+  }
+
+  if (digits.length <= 6) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  }
+
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 const emptyUserForm: UserForm = {
   firstName: '',
   lastName: '',
@@ -190,11 +204,11 @@ function CreateUserPage({ onToast }: CreateUserPageProps) {
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Personal Phone</span>
-            <input value={form.personalPhoneNumber} onChange={(event) => updateField('personalPhoneNumber', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+            <input type="tel" inputMode="tel" placeholder="(555) 555-5555" value={form.personalPhoneNumber} onChange={(event) => updateField('personalPhoneNumber', formatPhoneNumber(event.target.value))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Department Phone</span>
-            <input value={form.departmentPhoneNumber} onChange={(event) => updateField('departmentPhoneNumber', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+            <input type="tel" inputMode="tel" placeholder="(555) 555-5555" value={form.departmentPhoneNumber} onChange={(event) => updateField('departmentPhoneNumber', formatPhoneNumber(event.target.value))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Supervisor</span>

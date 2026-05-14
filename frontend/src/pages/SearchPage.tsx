@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Smile, X } from 'lucide-react';
+import { Camera, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { useSearchParams } from 'react-router-dom';
 import { AuthAccount, messageService, userService, User, UserFilters } from '../services/api';
@@ -10,6 +10,20 @@ import { UserDetail } from '../components/UserDetail';
 interface SearchPageProps {
   currentUser: AuthAccount | null;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
+}
+
+function formatPhoneNumber(value: string): string {
+  const digits = value.replace(/\D/gu, '').slice(0, 10);
+
+  if (digits.length <= 3) {
+    return digits;
+  }
+
+  if (digits.length <= 6) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  }
+
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
 const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
@@ -398,11 +412,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Personal Phone</span>
-                  <input value={String(editForm.personalPhoneNumber || '')} onChange={(event) => updateEditField('personalPhoneNumber', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  <input type="tel" inputMode="tel" placeholder="(555) 555-5555" value={String(editForm.personalPhoneNumber || '')} onChange={(event) => updateEditField('personalPhoneNumber', formatPhoneNumber(event.target.value))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Department Phone</span>
-                  <input value={String(editForm.departmentPhoneNumber || '')} onChange={(event) => updateEditField('departmentPhoneNumber', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  <input type="tel" inputMode="tel" placeholder="(555) 555-5555" value={String(editForm.departmentPhoneNumber || '')} onChange={(event) => updateEditField('departmentPhoneNumber', formatPhoneNumber(event.target.value))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Sex</span>
@@ -474,8 +488,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
               />
             </label>
             <div className="relative mb-4">
-              <button type="button" onClick={() => setIsEmojiPickerOpen((value) => !value)} className="btn-secondary inline-flex items-center gap-2">
-                <Smile size={16} /> Emoji
+              <button type="button" onClick={() => setIsEmojiPickerOpen((value) => !value)} className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-xl hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700" aria-label="Add emoji">
+                🙂
               </button>
               {isEmojiPickerOpen && (
                 <div className="absolute z-20 mt-2">
