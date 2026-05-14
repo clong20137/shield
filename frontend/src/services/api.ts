@@ -210,9 +210,7 @@ export const userService = {
   uploadProfilePicture: (id: string, file: File) => {
     const formData = new FormData();
     formData.append('profilePicture', file);
-    return api.post<{ profilePictureUrl: string; user: User }>(`/users/${id}/profile-picture`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return api.post<{ profilePictureUrl: string; user: User }>(`/users/${id}/profile-picture`, formData);
   },
   
   delete: (id: string) =>

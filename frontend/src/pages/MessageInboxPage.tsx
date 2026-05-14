@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Inbox, Send, Smile } from 'lucide-react';
+import { Inbox, Send, Smile, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
-import { AuthAccount, messageService, UserMessage } from '../services/api';
+import { AuthAccount, messageService, userService, User, UserMessage } from '../services/api';
 
 interface MessageInboxPageProps {
   currentUser: AuthAccount;
@@ -18,6 +18,14 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
   const [isSending, setIsSending] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [emojiTarget, setEmojiTarget] = useState<'reply' | 'compose'>('reply');
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [recipientQuery, setRecipientQuery] = useState('');
+  const [recipientResults, setRecipientResults] = useState<User[]>([]);
+  const [selectedRecipient, setSelectedRecipient] = useState<User | null>(null);
+  const [composeSubject, setComposeSubject] = useState('');
+  const [composeBody, setComposeBody] = useState('');
+  const [isRecipientSearching, setIsRecipientSearching] = useState(false);
 
   const loadMessages = async () => {
     setIsLoading(true);
@@ -39,6 +47,35 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
   useEffect(() => {
     loadMessages();
   }, [currentUser.id]);
+
+  useEffect(() => {
+    if (!isComposeOpen || recipientQuery.trim().length < 2 || selectedRecipient) {
+      setRecipientResults([]);
+      return;
+    }
+
+    let isMounted = true;
+    setIsRecipientSearching(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await userService.search(recipientQuery);
+        if (isMounted) {
+          setRecipientResults(response.data.slice(0, 8));
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (isMounted) {
+          setIsRecipientSearching(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timer);
+    };
+  }, [isComposeOpen, recipientQuery, selectedRecipient]);
 
   const activeMessages = tab === 'inbox' ? inboxMessages : sentMessages;
   const filteredMessages = useMemo(() => {
@@ -98,7 +135,45 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
   };
 
   const addEmoji = (emojiData: EmojiClickData) => {
+    if (emojiTarget === 'compose') {
+      setComposeBody((body) => `${body}${emojiData.emoji}`);
+      return;
+    }
+
     setReplyBody((body) => `${body}${emojiData.emoji}`);
+  };
+
+  const sendNewMessage = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!selectedRecipient || !composeSubject.trim() || !composeBody.trim()) {
+      onToast('error', 'Choose a recipient and enter a subject and message.');
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      await messageService.send({
+        senderAccountId: currentUser.id,
+        recipientUserId: selectedRecipient.id,
+        subject: composeSubject,
+        body: composeBody,
+      });
+      setSelectedRecipient(null);
+      setRecipientQuery('');
+      setComposeSubject('');
+      setComposeBody('');
+      setIsComposeOpen(false);
+      setIsEmojiPickerOpen(false);
+      await loadMessages();
+      setTab('sent');
+      onToast('success', 'Message sent.');
+    } catch (err) {
+      console.error(err);
+      onToast('error', 'Failed to send message.');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
@@ -110,9 +185,14 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
             Review inbox and sent messages.
           </p>
         </div>
-        <button type="button" onClick={loadMessages} className="btn-secondary">
-          Refresh Messages
-        </button>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setIsComposeOpen(true)} className="btn-primary">
+            Compose
+          </button>
+          <button type="button" onClick={loadMessages} className="btn-secondary">
+            Refresh Messages
+          </button>
+        </div>
       </div>
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -190,14 +270,16 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
                     />
                   </label>
                   <div className="relative mb-3">
-                    <button type="button" onClick={() => setIsEmojiPickerOpen((value) => !value)} className="btn-secondary inline-flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmojiTarget('reply');
+                        setIsEmojiPickerOpen(true);
+                      }}
+                      className="btn-secondary inline-flex items-center gap-2"
+                    >
                       <Smile size={16} /> Emoji
                     </button>
-                    {isEmojiPickerOpen && (
-                      <div className="absolute z-20 mt-2">
-                        <EmojiPicker onEmojiClick={addEmoji} />
-                      </div>
-                    )}
                   </div>
                   <button type="submit" className="btn-primary" disabled={isSending}>
                     {isSending ? 'Sending...' : 'Send Reply'}
@@ -208,6 +290,109 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
           )}
         </section>
       </div>
+
+      {isComposeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <form onSubmit={sendNewMessage} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2>Compose Message</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Search for a user and send a message.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsComposeOpen(false);
+                  setIsEmojiPickerOpen(false);
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                aria-label="Close compose message"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <label className="mb-4 block">
+              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">To</span>
+              <input
+                value={selectedRecipient ? `${selectedRecipient.firstName} ${selectedRecipient.lastName}` : recipientQuery}
+                onChange={(event) => {
+                  setSelectedRecipient(null);
+                  setRecipientQuery(event.target.value);
+                }}
+                placeholder="Search users by name, email, PE, badge..."
+                className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+              />
+              {(recipientResults.length > 0 || isRecipientSearching) && !selectedRecipient && (
+                <div className="mt-2 overflow-hidden rounded border border-gray-200 bg-white shadow dark:border-gray-700 dark:bg-gray-950">
+                  {isRecipientSearching ? (
+                    <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>
+                  ) : (
+                    recipientResults.map((user) => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedRecipient(user);
+                          setRecipientQuery('');
+                          setRecipientResults([]);
+                        }}
+                        className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                      >
+                        <span className="font-semibold">{user.firstName} {user.lastName}</span>
+                        <span className="ml-2 text-gray-500">{user.email || user.peNumber}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </label>
+
+            <label className="mb-4 block">
+              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Subject</span>
+              <input
+                value={composeSubject}
+                onChange={(event) => setComposeSubject(event.target.value)}
+                className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+              />
+            </label>
+
+            <label className="mb-4 block">
+              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Message</span>
+              <textarea
+                value={composeBody}
+                onChange={(event) => setComposeBody(event.target.value)}
+                className="min-h-40 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+              />
+            </label>
+
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmojiTarget('compose');
+                  setIsEmojiPickerOpen(true);
+                }}
+                className="btn-secondary inline-flex items-center gap-2"
+              >
+                <Smile size={16} /> Emoji
+              </button>
+            </div>
+
+            <button type="submit" className="btn-primary" disabled={isSending}>
+              {isSending ? 'Sending...' : 'Send Message'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {isEmojiPickerOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onClick={() => setIsEmojiPickerOpen(false)}>
+          <div className="max-h-[90vh] overflow-auto rounded-lg bg-white p-2 shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <EmojiPicker onEmojiClick={addEmoji} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

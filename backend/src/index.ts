@@ -2,6 +2,7 @@ import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import multer from 'multer';
 import { initializeDatabase } from './config/initializeDatabase';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
@@ -28,6 +29,18 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/api/messages', messageRoutes);
+
+app.use((error: Error, req: Request, res: Response, next: express.NextFunction) => {
+  if (error instanceof multer.MulterError) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  if (error.message === 'Only image uploads are allowed') {
+    return res.status(400).json({ error: error.message });
+  }
+
+  next(error);
+});
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {

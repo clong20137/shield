@@ -125,6 +125,10 @@ export class UserController {
       }
 
       const user = await UserModel.getUserById(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
       res.json({ profilePictureUrl, user });
     } catch (error) {
       console.error('Profile picture upload error:', error);
