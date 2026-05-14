@@ -188,6 +188,17 @@ export interface UserMessage {
   recipientProfilePictureUrl?: string;
 }
 
+export interface DashboardPost {
+  id: string;
+  title: string;
+  body: string;
+  category: 'Update' | 'News' | 'Alert';
+  authorId: string | null;
+  authorName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const authService = {
   register: (email: string, password: string, displayName: string) =>
     api.post<AuthResponse>('/auth/register', { email, password, displayName }),
@@ -326,6 +337,17 @@ export const messageService = {
 
   delete: (messageId: string, accountId: string) =>
     api.delete(`/messages/${messageId}`, { data: { accountId } }),
+};
+
+export const dashboardPostService = {
+  getAll: (limit = 10) =>
+    api.get<DashboardPost[]>('/dashboard-posts', { params: { limit } }),
+
+  create: (post: Pick<DashboardPost, 'title' | 'body' | 'category'> & { requesterId: string; authorName: string }) =>
+    api.post<DashboardPost>('/dashboard-posts', post),
+
+  delete: (id: string, requesterId: string) =>
+    api.delete(`/dashboard-posts/${id}`, { data: { requesterId } }),
 };
 
 export default api;

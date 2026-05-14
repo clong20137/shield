@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { authService, calendarService, CalendarEntry, userService, reportService, ReportRow, SystemStatistics, User } from '../services/api';
+import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, userService, reportService, ReportRow, SystemStatistics, User } from '../services/api';
 import { StatisticsCard } from '../components/StatisticsCard';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>;
+type DashboardPostForm = Pick<DashboardPost, 'title' | 'body' | 'category'>;
 
 const districtOptions = [
   'Area 1',
@@ -44,6 +45,12 @@ const entryColors = [
   { label: 'Red', value: '#DC2626' },
   { label: 'Purple', value: '#7C3AED' },
 ];
+
+const defaultPostForm: DashboardPostForm = {
+  title: '',
+  body: '',
+  category: 'Update',
+};
 
 const createDefaultEntryForm = (date: string): CalendarEntryForm => ({
   category: 'General Information',
@@ -540,7 +547,163 @@ function ReportBarChart({
   );
 }
 
-const DashboardPage: React.FC = () => {
+function DashboardNews({
+  currentUser,
+}: {
+  currentUser: AuthAccount | null;
+}) {
+  const [posts, setPosts] = useState<DashboardPost[]>([]);
+  const [postForm, setPostForm] = useState<DashboardPostForm>(defaultPostForm);
+  const [isLoadingPosts, setIsLoadingPosts] = useState(true);
+  const [isSavingPost, setIsSavingPost] = useState(false);
+  const [postError, setPostError] = useState<string | null>(null);
+  const isAdministrator = currentUser?.role === 'administrator';
+
+  const loadPosts = async () => {
+    setIsLoadingPosts(true);
+    setPostError(null);
+    try {
+      const response = await dashboardPostService.getAll(8);
+      setPosts(response.data);
+    } catch (err) {
+      console.error('Failed to load dashboard posts:', err);
+      setPostError('Failed to load updates and news.');
+    } finally {
+      setIsLoadingPosts(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPosts();
+  }, []);
+
+  const createPost = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!currentUser || !postForm.title.trim() || !postForm.body.trim()) {
+      setPostError('Title and body are required.');
+      return;
+    }
+
+    setIsSavingPost(true);
+    setPostError(null);
+    try {
+      const response = await dashboardPostService.create({
+        ...postForm,
+        requesterId: currentUser.id,
+        authorName: currentUser.displayName || currentUser.email,
+      });
+      setPosts((currentPosts) => [response.data, ...currentPosts]);
+      setPostForm(defaultPostForm);
+    } catch (err) {
+      console.error('Failed to create dashboard post:', err);
+      setPostError('Failed to publish update.');
+    } finally {
+      setIsSavingPost(false);
+    }
+  };
+
+  const deletePost = async (postId: string) => {
+    if (!currentUser || !window.confirm('Delete this dashboard post?')) {
+      return;
+    }
+
+    setPostError(null);
+    try {
+      await dashboardPostService.delete(postId, currentUser.id);
+      setPosts((currentPosts) => currentPosts.filter((post) => post.id !== postId));
+    } catch (err) {
+      console.error('Failed to delete dashboard post:', err);
+      setPostError('Failed to delete update.');
+    }
+  };
+
+  return (
+    <section className="mb-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2>Updates & News</h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Administrative posts for everyone using SHIELD.</p>
+        </div>
+        <button type="button" onClick={loadPosts} className="btn-secondary">
+          Refresh Posts
+        </button>
+      </div>
+
+      {postError && <div className="error">{postError}</div>}
+
+      {isAdministrator && (
+        <form onSubmit={createPost} className="mb-6 rounded border border-gray-200 p-4 dark:border-gray-800">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[160px_minmax(0,1fr)]">
+            <label>
+              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Type</span>
+              <select
+                value={postForm.category}
+                onChange={(event) => setPostForm((form) => ({ ...form, category: event.target.value as DashboardPost['category'] }))}
+                className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+              >
+                <option>Update</option>
+                <option>News</option>
+                <option>Alert</option>
+              </select>
+            </label>
+            <label>
+              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Title</span>
+              <input
+                value={postForm.title}
+                onChange={(event) => setPostForm((form) => ({ ...form, title: event.target.value }))}
+                className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+              />
+            </label>
+            <label className="lg:col-span-2">
+              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Post</span>
+              <textarea
+                value={postForm.body}
+                onChange={(event) => setPostForm((form) => ({ ...form, body: event.target.value }))}
+                className="min-h-24 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+              />
+            </label>
+          </div>
+          <div className="mt-4">
+            <button type="submit" className="btn-primary" disabled={isSavingPost}>
+              {isSavingPost ? 'Publishing...' : 'Publish Post'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {isLoadingPosts ? (
+        <div className="loading">Loading updates...</div>
+      ) : posts.length === 0 ? (
+        <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No updates posted yet.</div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          {posts.map((post) => (
+            <article key={post.id} className="rounded border border-gray-200 p-4 dark:border-gray-800">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold uppercase text-accent">{post.category}</span>
+                  <h3 className="mt-3 text-base">{post.title}</h3>
+                </div>
+                {isAdministrator && (
+                  <button type="button" onClick={() => deletePost(post.id)} className="btn-danger">
+                    Delete
+                  </button>
+                )}
+              </div>
+              <p className="whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300">{post.body}</p>
+              <p className="mt-4 text-xs text-gray-400">
+                Posted by {post.authorName || 'Administrator'} on {new Date(post.createdAt).toLocaleString()}
+              </p>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUser }) => {
   const [stats, setStats] = useState<SystemStatistics | null>(null);
   const [recentUsers, setRecentUsers] = useState<User[]>([]);
   const [rankReport, setRankReport] = useState<ReportRow[]>([]);
@@ -626,6 +789,8 @@ const DashboardPage: React.FC = () => {
           title="System Overview"
         />
       )}
+
+      <DashboardNews currentUser={currentUser} />
 
       <div className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
         <ReportBarChart title="Users by Rank" labelKey="rank" data={rankReport} />

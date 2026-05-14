@@ -195,6 +195,21 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS dashboard_posts (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`title\` VARCHAR(200) NOT NULL,
+      \`body\` TEXT NOT NULL,
+      \`category\` VARCHAR(50) NOT NULL DEFAULT 'Update',
+      \`authorId\` VARCHAR(36),
+      \`authorName\` VARCHAR(150),
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX \`idx_dashboard_posts_created\` (\`createdAt\`),
+      INDEX \`idx_dashboard_posts_category\` (\`category\`)
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS user_messages (
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`senderAccountId\` VARCHAR(36) NOT NULL,

@@ -11,6 +11,7 @@ import calendarRoutes from './routes/calendarRoutes';
 import deviceRoutes from './routes/deviceRoutes';
 import messageRoutes from './routes/messageRoutes';
 import auditRoutes from './routes/auditRoutes';
+import dashboardPostRoutes from './routes/dashboardPostRoutes';
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ app.use('/api/calendar', calendarRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/dashboard-posts', dashboardPostRoutes);
 
 app.use((error: Error, req: Request, res: Response, next: express.NextFunction) => {
   if (error instanceof multer.MulterError) {

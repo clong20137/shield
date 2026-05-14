@@ -794,7 +794,7 @@ function App() {
 
             <main className="flex-1 overflow-y-auto px-6 py-8 dark:bg-gray-950">
               <Routes>
-                <Route path="/" element={<DashboardPage />} />
+                <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
                 {currentUser && <Route path="/messages" element={<MessageInboxPage currentUser={currentUser} onToast={showToast} />} />}
                 <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
                 <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
