@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
   `firstName` VARCHAR(100) NOT NULL,
   `lastName` VARCHAR(100) NOT NULL,
   `email` VARCHAR(255),
+  `profilePictureUrl` TEXT,
   `peNumber` VARCHAR(50) UNIQUE,
   `peopleSoftId` VARCHAR(50),
   `carNumber` VARCHAR(50),
@@ -56,6 +57,18 @@ CREATE TABLE IF NOT EXISTS users (
   INDEX `idx_isActive` (`isActive`),
   INDEX `idx_employmentType` (`employmentType`),
   FULLTEXT INDEX `ft_search` (`firstName`, `lastName`, `email`, `peNumber`, `peopleSoftId`, `badgeNumber`, `publicSafetyId`, `district`)
+);
+
+CREATE TABLE IF NOT EXISTS user_messages (
+  `id` VARCHAR(36) PRIMARY KEY,
+  `senderAccountId` VARCHAR(36) NOT NULL,
+  `recipientUserId` VARCHAR(36) NOT NULL,
+  `subject` VARCHAR(200) NOT NULL,
+  `body` TEXT NOT NULL,
+  `isRead` BOOLEAN DEFAULT 0,
+  `createdAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_messages_sender` (`senderAccountId`),
+  INDEX `idx_messages_recipient` (`recipientUserId`)
 );
 
 -- Sample Data (Optional)

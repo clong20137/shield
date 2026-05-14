@@ -352,9 +352,9 @@ function GlobalSearch({ compact }: { compact: boolean }) {
                     <p className="truncate text-sm font-bold">
                       {user.firstName} {user.lastName}
                     </p>
-                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-                      PE {user.peNumber || 'N/A'} - {user.district || 'No district'}
-                    </p>
+                      <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                        {user.email || `PE ${user.peNumber || 'N/A'}`} - {user.district || 'No district'}
+                      </p>
                   </div>
                   <span className="shrink-0 rounded bg-accent/10 px-2 py-1 text-xs font-bold text-accent">
                     {user.rank || 'User'}
@@ -596,7 +596,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/devices" element={<DeviceManagementPage />} />
-                <Route path="/search" element={<SearchPage />} />
+                <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 {currentUser && isAdministrator && (
                   <Route

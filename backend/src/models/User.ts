@@ -7,6 +7,7 @@ export interface User {
   firstName: string;
   lastName: string;
   email: string;
+  profilePictureUrl: string;
   peNumber: string;
   peopleSoftId: string;
   carNumber: string;
@@ -38,6 +39,7 @@ export class UserModel {
     'firstName',
     'lastName',
     'email',
+    'profilePictureUrl',
     'peNumber',
     'peopleSoftId',
     'carNumber',
@@ -66,6 +68,7 @@ export class UserModel {
     firstName: '`firstName`',
     lastName: '`lastName`',
     email: '`email`',
+    profilePictureUrl: '`profilePictureUrl`',
     peNumber: '`peNumber`',
     peopleSoftId: '`peopleSoftId`',
     carNumber: '`carNumber`',
@@ -104,8 +107,8 @@ export class UserModel {
       if (trimmedSearchTerm) {
         conditions.push(
           `(
-            \`firstName\` LIKE ? OR \`lastName\` LIKE ? OR CONCAT(\`firstName\`, ' ', \`lastName\`) LIKE ?
-            OR \`email\` LIKE ? OR \`peNumber\` LIKE ? OR \`peopleSoftId\` LIKE ?
+            \`firstName\` LIKE ? OR \`lastName\` LIKE ? OR CONCAT_WS(' ', \`firstName\`, \`lastName\`) LIKE ?
+            OR COALESCE(\`email\`, '') LIKE ? OR \`peNumber\` LIKE ? OR \`peopleSoftId\` LIKE ?
             OR \`badgeNumber\` LIKE ? OR \`radioNumber\` LIKE ? OR \`publicSafetyId\` LIKE ?
             OR \`district\` LIKE ? OR \`employmentType\` LIKE ? OR \`status\` LIKE ?
             OR \`supervisor\` LIKE ? OR \`personalPhoneNumber\` LIKE ? OR \`departmentPhoneNumber\` LIKE ?
@@ -194,17 +197,18 @@ export class UserModel {
 
       await conn.query(
         `INSERT INTO users (
-          \`id\`, \`firstName\`, \`lastName\`, \`email\`, \`peNumber\`, \`peopleSoftId\`, \`carNumber\`, \`badgeNumber\`,
+          \`id\`, \`firstName\`, \`lastName\`, \`email\`, \`profilePictureUrl\`, \`peNumber\`, \`peopleSoftId\`, \`carNumber\`, \`badgeNumber\`,
           \`radioNumber\`, \`personalPhoneNumber\`, \`departmentPhoneNumber\`, \`assignedTo\`, \`district\`, \`rank\`,
           \`isActive\`, \`employmentType\`, \`typeDetails\`, \`status\`, \`supervisor\`, \`specialtyCertifications\`,
           \`publicSafetyId\`, \`race\`, \`sex\`, \`maritalStatus\`, \`residentialAddress\`, \`mailingAddress\`,
           \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           user.firstName,
           user.lastName,
           user.email,
+          user.profilePictureUrl,
           user.peNumber,
           user.peopleSoftId,
           user.carNumber,

@@ -12,6 +12,7 @@ export interface User {
   firstName: string;
   lastName: string;
   email: string;
+  profilePictureUrl: string;
   peNumber: string;
   peopleSoftId: string;
   carNumber: string;
@@ -117,6 +118,16 @@ export interface DeviceRecord {
   updatedAt: string;
 }
 
+export interface UserMessage {
+  id: string;
+  senderAccountId: string;
+  recipientUserId: string;
+  subject: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
 export const authService = {
   register: (email: string, password: string, displayName: string) =>
     api.post<AuthResponse>('/auth/register', { email, password, displayName }),
@@ -203,6 +214,14 @@ export const deviceService = {
 
   delete: (id: string) =>
     api.delete(`/devices/${id}`),
+};
+
+export const messageService = {
+  send: (message: Pick<UserMessage, 'senderAccountId' | 'recipientUserId' | 'subject' | 'body'>) =>
+    api.post<UserMessage>('/messages', message),
+
+  getForUser: (userId: string) =>
+    api.get<UserMessage[]>(`/messages/user/${userId}`),
 };
 
 export default api;

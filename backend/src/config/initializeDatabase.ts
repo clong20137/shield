@@ -50,6 +50,7 @@ export async function initializeDatabase() {
       \`firstName\` VARCHAR(100) NOT NULL,
       \`lastName\` VARCHAR(100) NOT NULL,
       \`email\` VARCHAR(255),
+      \`profilePictureUrl\` TEXT,
       \`peNumber\` VARCHAR(50) UNIQUE,
       \`peopleSoftId\` VARCHAR(50),
       \`carNumber\` VARCHAR(50),
@@ -84,6 +85,7 @@ export async function initializeDatabase() {
   `);
 
   await ensureColumn('users', 'email', '`email` VARCHAR(255)');
+  await ensureColumn('users', 'profilePictureUrl', '`profilePictureUrl` TEXT');
   await ensureColumn('users', 'peopleSoftId', '`peopleSoftId` VARCHAR(50)');
   await ensureColumn('users', 'radioNumber', '`radioNumber` VARCHAR(50)');
   await ensureColumn('users', 'personalPhoneNumber', '`personalPhoneNumber` VARCHAR(50)');
@@ -91,6 +93,20 @@ export async function initializeDatabase() {
   await ensureColumn('users', 'maritalStatus', '`maritalStatus` VARCHAR(50)');
   await ensureColumn('users', 'residentialAddress', '`residentialAddress` TEXT');
   await ensureColumn('users', 'mailingAddress', '`mailingAddress` TEXT');
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_messages (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`senderAccountId\` VARCHAR(36) NOT NULL,
+      \`recipientUserId\` VARCHAR(36) NOT NULL,
+      \`subject\` VARCHAR(200) NOT NULL,
+      \`body\` TEXT NOT NULL,
+      \`isRead\` BOOLEAN DEFAULT 0,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX \`idx_messages_sender\` (\`senderAccountId\`),
+      INDEX \`idx_messages_recipient\` (\`recipientUserId\`)
+    )
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS calendar_entries (

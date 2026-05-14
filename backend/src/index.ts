@@ -7,6 +7,7 @@ import userRoutes from './routes/userRoutes';
 import reportRoutes from './routes/reportRoutes';
 import calendarRoutes from './routes/calendarRoutes';
 import deviceRoutes from './routes/deviceRoutes';
+import messageRoutes from './routes/messageRoutes';
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/devices', deviceRoutes);
+app.use('/api/messages', messageRoutes);
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {

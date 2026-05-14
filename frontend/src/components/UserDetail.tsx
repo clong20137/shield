@@ -5,6 +5,7 @@ interface UserDetailProps {
   user: User;
   onClose?: () => void;
   onEdit?: (user: User) => void;
+  onMessage?: (user: User) => void;
 }
 
 function DetailRow({ label, value }: { label: string; value?: string | boolean | null }) {
@@ -29,11 +30,32 @@ function DetailSection({ title, children }: { title: string; children: React.Rea
   );
 }
 
-export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit }) => {
+function getInitials(user: User): string {
+  return `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U';
+}
+
+export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, onMessage }) => {
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-      <div className="bg-primary-500 text-white px-5 py-4 flex justify-between items-center">
-        <h2 className="text-2xl font-bold m-0">{user.firstName} {user.lastName}</h2>
+    <div className="bg-white rounded-lg shadow-xl overflow-hidden dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+      <div className="bg-primary-500 text-white px-5 py-5 flex flex-wrap justify-between gap-4">
+        <div className="flex items-center gap-4">
+          {user.profilePictureUrl ? (
+            <img
+              src={user.profilePictureUrl}
+              alt={`${user.firstName} ${user.lastName}`}
+              className="h-20 w-20 rounded-full border-2 border-white object-cover"
+            />
+          ) : (
+            <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-white bg-white text-2xl font-bold text-primary-500">
+              {getInitials(user)}
+            </div>
+          )}
+          <div>
+            <h2 className="text-2xl font-bold m-0 text-white">{user.firstName} {user.lastName}</h2>
+            <p className="mt-1 text-sm text-blue-100">{user.email || 'No email on file'}</p>
+            <p className="mt-1 text-sm text-blue-100">PE {user.peNumber || 'N/A'} - {user.district || 'No district'}</p>
+          </div>
+        </div>
         <button
           className="bg-transparent border-none text-white text-2xl cursor-pointer w-10 h-10 flex items-center justify-center rounded hover:bg-black/20"
           onClick={onClose}
@@ -85,6 +107,9 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit })
       </div>
 
       <div className="flex gap-2 px-5 py-4 border-t-2 border-gray-300">
+        <button className="btn-secondary" onClick={() => onMessage?.(user)}>
+          Send Message
+        </button>
         <button className="btn-primary" onClick={() => onEdit?.(user)}>
           Edit User
         </button>
