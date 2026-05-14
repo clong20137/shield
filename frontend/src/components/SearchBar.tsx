@@ -51,6 +51,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     district: '',
     active: '',
     employmentType: '',
+    status: '',
+    sex: '',
+    supervisor: '',
+    badgeNumber: '',
+    radioNumber: '',
+    peNumber: '',
   });
 
   const handleSearch = (e: React.FormEvent) => {
@@ -136,6 +142,55 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               <option key={type} value={type}>{type}</option>
             ))}
           </select>
+
+          <select
+            value={filters.status}
+            onChange={(e) => handleFilterChange('status', e.target.value)}
+            className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+          >
+            <option value="">All Special Status</option>
+            {['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Administrative Duty', 'Inactive'].map((status) => (
+              <option key={status} value={status}>{status}</option>
+            ))}
+          </select>
+
+          <select
+            value={filters.sex}
+            onChange={(e) => handleFilterChange('sex', e.target.value)}
+            className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+          >
+            <option value="">All Sex</option>
+            <option value="M">M</option>
+            <option value="F">F</option>
+          </select>
+
+          <input
+            value={filters.supervisor}
+            onChange={(e) => handleFilterChange('supervisor', e.target.value)}
+            placeholder="Supervisor"
+            className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+          />
+
+          <input
+            value={filters.peNumber}
+            onChange={(e) => handleFilterChange('peNumber', e.target.value)}
+            placeholder="PE number"
+            className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+          />
+
+          <input
+            value={filters.badgeNumber}
+            onChange={(e) => handleFilterChange('badgeNumber', e.target.value)}
+            placeholder="Badge number"
+            className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+          />
+
+          <input
+            value={filters.radioNumber}
+            onChange={(e) => handleFilterChange('radioNumber', e.target.value)}
+            placeholder="Radio number"
+            className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+          />
         </div>
       )}
     </div>

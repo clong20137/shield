@@ -4,7 +4,7 @@ import { User, UserModel } from '../models/User';
 export class UserController {
   static async searchUsers(req: Request, res: Response) {
     try {
-      const { q, rank, district, active, employmentType } = req.query;
+      const { q, rank, district, active, employmentType, status, sex, supervisor, badgeNumber, radioNumber, peNumber } = req.query;
 
       if (q !== undefined && typeof q !== 'string') {
         return res.status(400).json({ error: 'Search term must be a string' });
@@ -17,6 +17,12 @@ export class UserController {
       if (typeof employmentType === 'string' && employmentType) {
         filters.employmentType = employmentType;
       }
+      if (typeof status === 'string' && status) filters.status = status;
+      if (typeof sex === 'string' && sex) filters.sex = sex;
+      if (typeof supervisor === 'string' && supervisor) filters.supervisor = supervisor;
+      if (typeof badgeNumber === 'string' && badgeNumber) filters.badgeNumber = badgeNumber;
+      if (typeof radioNumber === 'string' && radioNumber) filters.radioNumber = radioNumber;
+      if (typeof peNumber === 'string' && peNumber) filters.peNumber = peNumber;
 
       const users = await UserModel.searchUsers(q ?? '', filters);
       res.json(users);

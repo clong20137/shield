@@ -4,6 +4,9 @@ import { MessageController } from '../controllers/messageController';
 const router = Router();
 
 router.post('/', MessageController.createMessage);
+router.get('/inbox/:accountId', MessageController.listInbox);
+router.get('/sent/:accountId', MessageController.listSent);
 router.get('/user/:userId', MessageController.listMessagesForUser);
+router.put('/:id/read', MessageController.markRead);
 
 export default router;

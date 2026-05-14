@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { BarChart3, Bell, ChevronLeft, ChevronRight, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Moon, Search, Settings, Shield, Sun, UserCircle } from 'lucide-react';
+import { BarChart3, Bell, ChevronLeft, ChevronRight, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Search, Settings, Shield, Sun, UserCircle } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -7,6 +7,7 @@ import DashboardPage from './pages/DashboardPage';
 import { AccountSettingsPage } from './pages/AccountSettingsPage';
 import DeviceManagementPage from './pages/DeviceManagementPage';
 import PermissionsPage from './pages/PermissionsPage';
+import MessageInboxPage from './pages/MessageInboxPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { AuthAccount, authService, userService, User } from './services/api';
 
@@ -506,6 +507,7 @@ function App() {
 
             <nav className="flex flex-1 flex-col gap-2 px-3 py-3">
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
+              <SidebarLink to="/messages" label="Messages" compact={isSidebarCollapsed} icon={Mail} />
               <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
               {isAdministrator && (
@@ -595,6 +597,7 @@ function App() {
             <main className="flex-1 overflow-y-auto px-6 py-8 dark:bg-gray-950">
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
+                {currentUser && <Route path="/messages" element={<MessageInboxPage currentUser={currentUser} onToast={showToast} />} />}
                 <Route path="/devices" element={<DeviceManagementPage />} />
                 <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
                 <Route path="/reports" element={<ReportsPage />} />

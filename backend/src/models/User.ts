@@ -151,6 +151,30 @@ export class UserModel {
         conditions.push('`employmentType` = ?');
         params.push(filters.employmentType);
       }
+      if (filters?.status) {
+        conditions.push('`status` = ?');
+        params.push(filters.status);
+      }
+      if (filters?.sex) {
+        conditions.push('`sex` = ?');
+        params.push(filters.sex);
+      }
+      if (filters?.supervisor) {
+        conditions.push('`supervisor` LIKE ?');
+        params.push(`%${filters.supervisor}%`);
+      }
+      if (filters?.badgeNumber) {
+        conditions.push('`badgeNumber` LIKE ?');
+        params.push(`%${filters.badgeNumber}%`);
+      }
+      if (filters?.radioNumber) {
+        conditions.push('`radioNumber` LIKE ?');
+        params.push(`%${filters.radioNumber}%`);
+      }
+      if (filters?.peNumber) {
+        conditions.push('`peNumber` LIKE ?');
+        params.push(`%${filters.peNumber}%`);
+      }
 
       if (conditions.length > 0) {
         query += ` WHERE ${conditions.join(' AND ')}`;

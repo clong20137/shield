@@ -38,4 +38,45 @@ export class MessageController {
       res.status(500).json({ error: 'Failed to load messages' });
     }
   }
+
+  static async listInbox(req: Request, res: Response) {
+    try {
+      const messages = await UserMessageModel.listInbox(req.params.accountId);
+      res.json(messages);
+    } catch (error) {
+      console.error('List inbox error:', error);
+      res.status(500).json({ error: 'Failed to load inbox' });
+    }
+  }
+
+  static async listSent(req: Request, res: Response) {
+    try {
+      const messages = await UserMessageModel.listSent(req.params.accountId);
+      res.json(messages);
+    } catch (error) {
+      console.error('List sent messages error:', error);
+      res.status(500).json({ error: 'Failed to load sent messages' });
+    }
+  }
+
+  static async markRead(req: Request, res: Response) {
+    try {
+      const { recipientUserId } = req.body as { recipientUserId?: string };
+
+      if (!recipientUserId) {
+        return res.status(400).json({ error: 'Recipient is required' });
+      }
+
+      const updated = await UserMessageModel.markRead(req.params.id, recipientUserId);
+
+      if (!updated) {
+        return res.status(404).json({ error: 'Message not found' });
+      }
+
+      res.json({ message: 'Message marked read' });
+    } catch (error) {
+      console.error('Mark message read error:', error);
+      res.status(500).json({ error: 'Failed to mark message read' });
+    }
+  }
 }

@@ -44,6 +44,12 @@ export interface UserFilters {
   district?: string;
   active?: string;
   employmentType?: string;
+  status?: string;
+  sex?: string;
+  supervisor?: string;
+  badgeNumber?: string;
+  radioNumber?: string;
+  peNumber?: string;
 }
 
 export interface UserListResponse {
@@ -126,6 +132,10 @@ export interface UserMessage {
   body: string;
   isRead: boolean;
   createdAt: string;
+  senderName?: string;
+  senderEmail?: string;
+  recipientName?: string;
+  recipientEmail?: string;
 }
 
 export const authService = {
@@ -222,6 +232,15 @@ export const messageService = {
 
   getForUser: (userId: string) =>
     api.get<UserMessage[]>(`/messages/user/${userId}`),
+
+  getInbox: (accountId: string) =>
+    api.get<UserMessage[]>(`/messages/inbox/${accountId}`),
+
+  getSent: (accountId: string) =>
+    api.get<UserMessage[]>(`/messages/sent/${accountId}`),
+
+  markRead: (messageId: string, recipientUserId: string) =>
+    api.put(`/messages/${messageId}/read`, { recipientUserId }),
 };
 
 export default api;
