@@ -148,6 +148,19 @@ export async function initializeDatabase() {
   }
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_sessions (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`userId\` VARCHAR(36) NOT NULL,
+      \`tokenHash\` VARCHAR(128) NOT NULL UNIQUE,
+      \`expiresAt\` TIMESTAMP NOT NULL,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`revokedAt\` TIMESTAMP NULL,
+      INDEX \`idx_user_sessions_user\` (\`userId\`),
+      INDEX \`idx_user_sessions_token\` (\`tokenHash\`)
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS user_messages (
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`senderAccountId\` VARCHAR(36) NOT NULL,

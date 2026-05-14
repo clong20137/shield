@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Camera, Smile, X } from 'lucide-react';
+import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { useSearchParams } from 'react-router-dom';
 import { AuthAccount, messageService, userService, User, UserFilters } from '../services/api';
 import { SearchBar } from '../components/SearchBar';
@@ -12,7 +13,6 @@ interface SearchPageProps {
 }
 
 const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
-  const emojiOptions = ['👍', '✅', '📌', '🚔', '📞', '🙏', '⚠️', '🎉'];
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -22,6 +22,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [messageSubject, setMessageSubject] = useState('');
   const [messageBody, setMessageBody] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState<Partial<User>>({});
   const [isSavingUser, setIsSavingUser] = useState(false);
@@ -169,6 +170,10 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     } finally {
       setIsSendingMessage(false);
     }
+  };
+
+  const addEmoji = (emojiData: EmojiClickData) => {
+    setMessageBody((body) => `${body}${emojiData.emoji}`);
   };
 
   useEffect(() => {
@@ -400,13 +405,15 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                 className="min-h-40 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
               />
             </label>
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-sm font-semibold text-gray-500 dark:text-gray-400"><Smile size={16} /> Emoji</span>
-              {emojiOptions.map((emoji) => (
-                <button key={emoji} type="button" onClick={() => setMessageBody((body) => `${body}${emoji}`)} className="rounded border border-gray-200 px-2 py-1 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
-                  {emoji}
-                </button>
-              ))}
+            <div className="relative mb-4">
+              <button type="button" onClick={() => setIsEmojiPickerOpen((value) => !value)} className="btn-secondary inline-flex items-center gap-2">
+                <Smile size={16} /> Emoji
+              </button>
+              {isEmojiPickerOpen && (
+                <div className="absolute z-20 mt-2">
+                  <EmojiPicker onEmojiClick={addEmoji} />
+                </div>
+              )}
             </div>
             <button type="submit" className="btn-primary" disabled={isSendingMessage}>
               {isSendingMessage ? 'Sending...' : 'Send Message'}

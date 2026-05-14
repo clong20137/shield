@@ -1,13 +1,12 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Inbox, Send, Smile } from 'lucide-react';
+import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, messageService, UserMessage } from '../services/api';
 
 interface MessageInboxPageProps {
   currentUser: AuthAccount;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
 }
-
-const emojiOptions = ['👍', '✅', '📌', '🚔', '📞', '🙏', '⚠️', '🎉'];
 
 function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
   const [tab, setTab] = useState<'inbox' | 'sent'>('inbox');
@@ -18,6 +17,7 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
 
   const loadMessages = async () => {
     setIsLoading(true);
@@ -95,6 +95,10 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
     } finally {
       setIsSending(false);
     }
+  };
+
+  const addEmoji = (emojiData: EmojiClickData) => {
+    setReplyBody((body) => `${body}${emojiData.emoji}`);
   };
 
   return (
@@ -185,13 +189,15 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
                       className="min-h-32 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
                     />
                   </label>
-                  <div className="mb-3 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1 text-sm font-semibold text-gray-500 dark:text-gray-400"><Smile size={16} /> Emoji</span>
-                    {emojiOptions.map((emoji) => (
-                      <button key={emoji} type="button" onClick={() => setReplyBody((body) => `${body}${emoji}`)} className="rounded border border-gray-200 px-2 py-1 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
-                        {emoji}
-                      </button>
-                    ))}
+                  <div className="relative mb-3">
+                    <button type="button" onClick={() => setIsEmojiPickerOpen((value) => !value)} className="btn-secondary inline-flex items-center gap-2">
+                      <Smile size={16} /> Emoji
+                    </button>
+                    {isEmojiPickerOpen && (
+                      <div className="absolute z-20 mt-2">
+                        <EmojiPicker onEmojiClick={addEmoji} />
+                      </div>
+                    )}
                   </div>
                   <button type="submit" className="btn-primary" disabled={isSending}>
                     {isSending ? 'Sending...' : 'Send Reply'}

@@ -7,6 +7,26 @@ const api = axios.create({
   timeout: 8000,
 });
 
+const AUTH_TOKEN_KEY = 'shield_auth_token';
+
+api.interceptors.request.use((config) => {
+  const token = window.localStorage.getItem(AUTH_TOKEN_KEY);
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
+
+export function setAuthToken(token: string) {
+  window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+export function clearAuthToken() {
+  window.localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
 export interface User {
   id: string;
   firstName: string;
@@ -91,6 +111,7 @@ export interface AuthAccount {
 export interface AuthResponse {
   account?: AuthAccount;
   requiresTwoFactor?: boolean;
+  token?: string;
 }
 
 export interface TwoFactorSetupResponse {
@@ -144,6 +165,12 @@ export const authService = {
 
   login: (email: string, password: string, twoFactorCode?: string) =>
     api.post<AuthResponse>('/auth/login', { email, password, twoFactorCode }),
+
+  getSession: () =>
+    api.get<AuthResponse>('/auth/session'),
+
+  logout: () =>
+    api.post('/auth/logout'),
 
   changePassword: (accountId: string, currentPassword: string, newPassword: string) =>
     api.post('/auth/change-password', { accountId, currentPassword, newPassword }),

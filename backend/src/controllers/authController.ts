@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthAccountModel } from '../models/AuthAccount';
+import { AuthSessionModel } from '../models/AuthSession';
+import { getBearerToken, getSessionAccount } from '../middleware/authSession';
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -49,7 +51,8 @@ export class AuthController {
       }
 
       const account = await AuthAccountModel.createAccount(email, password, displayName);
-      res.status(201).json({ account });
+      const token = await AuthSessionModel.createSession(account.id);
+      res.status(201).json({ account, token });
     } catch (error) {
       if (isDuplicateEmailError(error)) {
         return res.status(409).json({ error: 'An account already exists for that email' });
@@ -82,7 +85,8 @@ export class AuthController {
         return res.status(401).json({ error: 'Invalid email or password' });
       }
 
-      res.json({ account: result.account });
+      const token = await AuthSessionModel.createSession(result.account.id);
+      res.json({ account: result.account, token });
     } catch (error) {
       console.error('Login error:', error);
       res.status(500).json({ error: 'Failed to sign in' });
@@ -115,6 +119,36 @@ export class AuthController {
     } catch (error) {
       console.error('Change password error:', error);
       res.status(500).json({ error: 'Failed to update password' });
+    }
+  }
+
+  static async getSession(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+
+      if (!account) {
+        return res.status(401).json({ error: 'Session expired or invalid' });
+      }
+
+      res.json({ account });
+    } catch (error) {
+      console.error('Get session error:', error);
+      res.status(500).json({ error: 'Failed to load session' });
+    }
+  }
+
+  static async logout(req: Request, res: Response) {
+    try {
+      const token = getBearerToken(req);
+
+      if (token) {
+        await AuthSessionModel.revokeToken(token);
+      }
+
+      res.json({ message: 'Signed out' });
+    } catch (error) {
+      console.error('Logout error:', error);
+      res.status(500).json({ error: 'Failed to sign out' });
     }
   }
 

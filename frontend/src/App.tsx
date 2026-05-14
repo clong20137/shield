@@ -9,7 +9,7 @@ import DeviceManagementPage from './pages/DeviceManagementPage';
 import PermissionsPage from './pages/PermissionsPage';
 import MessageInboxPage from './pages/MessageInboxPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
-import { AuthAccount, authService, userService, User } from './services/api';
+import { AuthAccount, authService, clearAuthToken, setAuthToken, userService, User } from './services/api';
 
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
@@ -82,6 +82,9 @@ function LoginSplash({
       }
 
       if (response.data.account) {
+        if (response.data.token) {
+          setAuthToken(response.data.token);
+        }
         onLogin(response.data.account);
       }
     } catch (err) {
@@ -386,6 +389,7 @@ function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [notifications, setNotifications] = useState<ToastMessage[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
 
   const showToast = (type: ToastType, message: string) => {
     const id = Date.now();
@@ -409,17 +413,19 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
-    const storedSession = window.localStorage.getItem(SESSION_KEY);
-
-    if (storedSession) {
-      try {
-        const account = JSON.parse(storedSession) as AuthAccount;
-        setCurrentUser(account);
-        setIsAuthenticated(true);
-      } catch {
+    authService.getSession()
+      .then((response) => {
+        if (response.data.account) {
+          setCurrentUser(response.data.account);
+          setIsAuthenticated(true);
+          window.localStorage.setItem(SESSION_KEY, JSON.stringify(response.data.account));
+        }
+      })
+      .catch(() => {
+        clearAuthToken();
         window.localStorage.removeItem(SESSION_KEY);
-      }
-    }
+      })
+      .finally(() => setIsSessionLoading(false));
   }, []);
 
   const handleLogin = (account: AuthAccount) => {
@@ -429,7 +435,13 @@ function App() {
     showToast('success', `Signed in as ${account.email}.`);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } catch {
+      // Local sign out should still complete if the server is unreachable.
+    }
+    clearAuthToken();
     window.localStorage.removeItem(SESSION_KEY);
     setCurrentUser(null);
     setIsAuthenticated(false);
@@ -446,7 +458,9 @@ function App() {
   return (
     <Router>
       <ToastHost toasts={toasts} />
-      {!isAuthenticated ? (
+      {isSessionLoading ? (
+        <div className="loading min-h-screen">Loading session...</div>
+      ) : !isAuthenticated ? (
         <LoginSplash onLogin={handleLogin} onToast={showToast} />
       ) : (
         <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
