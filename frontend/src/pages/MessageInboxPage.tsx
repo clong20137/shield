@@ -1,11 +1,38 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Inbox, Paperclip, Send, X } from 'lucide-react';
+import { Archive, Check, CheckCheck, Inbox, Paperclip, Send, Trash2, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, messageService, userService, User, UserMessage } from '../services/api';
 
 interface MessageInboxPageProps {
   currentUser: AuthAccount;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
+}
+
+function formatMessageTime(value: string): string {
+  const date = new Date(value);
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+
+  if (date.toDateString() === yesterday.toDateString()) {
+    return `Yesterday ${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+  }
+
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function getContactName(message: UserMessage, tab: 'inbox' | 'sent'): string {
+  return tab === 'inbox'
+    ? message.senderName || message.senderEmail || 'Unknown'
+    : message.recipientName || message.recipientEmail || 'Unknown';
+}
+
+function getDeliveryLabel(message: UserMessage): string {
+  return message.isRead ? 'Read' : 'Delivered';
 }
 
 function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
@@ -27,8 +54,11 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
   const [composeBody, setComposeBody] = useState('');
   const [composeAttachments, setComposeAttachments] = useState<File[]>([]);
   const [replyAttachments, setReplyAttachments] = useState<File[]>([]);
+  const emojiButtonLabel = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
   const [isRecipientSearching, setIsRecipientSearching] = useState(false);
   const emojiButton = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
+
+  void emojiButton;
 
   const withAttachmentSummary = (body: string, files: File[]) => {
     if (files.length === 0) {
@@ -194,11 +224,17 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
 
   const archiveSelectedMessage = async () => {
     if (!selectedMessage || tab !== 'inbox') return;
+    await archiveMessage(selectedMessage);
+  };
 
+  const archiveMessage = async (message: UserMessage) => {
+    if (tab !== 'inbox') return;
     try {
-      await messageService.archive(selectedMessage.id, currentUser.id);
-      setInboxMessages((messages) => messages.filter((message) => message.id !== selectedMessage.id));
-      setSelectedMessage(null);
+      await messageService.archive(message.id, currentUser.id);
+      setInboxMessages((messages) => messages.filter((item) => item.id !== message.id));
+      if (selectedMessage?.id === message.id) {
+        setSelectedMessage(null);
+      }
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
       onToast('success', 'Message archived.');
     } catch (err) {
@@ -209,19 +245,24 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
 
   const deleteSelectedMessage = async () => {
     if (!selectedMessage) return;
+    await deleteMessage(selectedMessage);
+  };
 
+  const deleteMessage = async (message: UserMessage) => {
     if (!window.confirm('Delete this message from your mailbox?')) {
       return;
     }
 
     try {
-      await messageService.delete(selectedMessage.id, currentUser.id);
+      await messageService.delete(message.id, currentUser.id);
       if (tab === 'inbox') {
-        setInboxMessages((messages) => messages.filter((message) => message.id !== selectedMessage.id));
+        setInboxMessages((messages) => messages.filter((item) => item.id !== message.id));
       } else {
-        setSentMessages((messages) => messages.filter((message) => message.id !== selectedMessage.id));
+        setSentMessages((messages) => messages.filter((item) => item.id !== message.id));
       }
-      setSelectedMessage(null);
+      if (selectedMessage?.id === message.id) {
+        setSelectedMessage(null);
+      }
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
       onToast('success', 'Message deleted.');
     } catch (err) {
@@ -275,25 +316,43 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
           ) : (
             <div className="divide-y divide-gray-200 dark:divide-gray-800">
               {filteredMessages.map((message) => (
-                <button
+                <div
                   key={message.id}
-                  type="button"
-                  onClick={() => openMessage(message)}
-                  className="block w-full px-4 py-4 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
+                  className={`flex items-center gap-2 px-3 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                    selectedMessage?.id === message.id ? 'bg-accent/10' : ''
+                  }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className={`truncate text-sm ${!message.isRead && tab === 'inbox' ? 'font-bold text-primary-500' : 'font-semibold text-gray-800 dark:text-gray-100'}`}>
-                        {message.subject}
-                      </p>
-                      <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
-                        {tab === 'inbox' ? message.senderName || message.senderEmail : message.recipientName || message.recipientEmail}
-                      </p>
+                  <button type="button" onClick={() => openMessage(message)} className="min-w-0 flex-1 text-left">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className={`truncate text-sm ${!message.isRead && tab === 'inbox' ? 'font-bold text-primary-500' : 'font-semibold text-gray-800 dark:text-gray-100'}`}>
+                          {getContactName(message, tab)}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
+                          {message.subject}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs text-gray-400">{formatMessageTime(message.createdAt)}</span>
                     </div>
-                    <span className="text-xs text-gray-400">{new Date(message.createdAt).toLocaleDateString()}</span>
-                  </div>
-                  <p className="mt-2 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">{message.body}</p>
-                </button>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <p className="line-clamp-1 min-w-0 text-sm text-gray-500 dark:text-gray-400">{message.body}</p>
+                      {tab === 'sent' && (
+                        <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-accent">
+                          {message.isRead ? <CheckCheck size={14} /> : <Check size={14} />}
+                          {getDeliveryLabel(message)}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                  {tab === 'inbox' && (
+                    <button type="button" onClick={() => archiveMessage(message)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-primary-500 dark:hover:bg-gray-800" aria-label="Archive message" title="Archive">
+                      <Archive size={17} />
+                    </button>
+                  )}
+                  <button type="button" onClick={() => deleteMessage(message)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-danger dark:hover:bg-red-950" aria-label="Delete message" title="Delete">
+                    <Trash2 size={17} />
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -305,23 +364,42 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
           ) : (
             <>
               <div className="border-b border-gray-200 p-5 dark:border-gray-800">
-                <h2>{selectedMessage.subject}</h2>
-                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                  From {selectedMessage.senderName || selectedMessage.senderEmail || 'Unknown'} to {selectedMessage.recipientName || selectedMessage.recipientEmail || 'Unknown'}
-                </p>
-                <p className="mt-1 text-xs text-gray-400">{new Date(selectedMessage.createdAt).toLocaleString()}</p>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2>{getContactName(selectedMessage, tab)}</h2>
+                    <p className="mt-1 text-sm font-semibold text-gray-600 dark:text-gray-300">{selectedMessage.subject}</p>
+                    <p className="mt-1 text-xs text-gray-400">
+                      Last active {formatMessageTime(selectedMessage.createdAt)}
+                    </p>
+                  </div>
+                  {tab === 'sent' && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">
+                      {selectedMessage.isRead ? <CheckCheck size={14} /> : <Check size={14} />}
+                      {getDeliveryLabel(selectedMessage)}
+                    </span>
+                  )}
+                </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {tab === 'inbox' && (
-                    <button type="button" onClick={archiveSelectedMessage} className="btn-secondary">
-                      Archive
+                    <button type="button" onClick={archiveSelectedMessage} className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800" aria-label="Archive message" title="Archive">
+                      <Archive size={18} />
                     </button>
                   )}
-                  <button type="button" onClick={deleteSelectedMessage} className="btn-danger">
-                    Delete
+                  <button type="button" onClick={deleteSelectedMessage} className="flex h-10 w-10 items-center justify-center rounded bg-danger text-white hover:bg-red-800" aria-label="Delete message" title="Delete">
+                    <Trash2 size={18} />
                   </button>
                 </div>
               </div>
               <div className="flex-1 space-y-4 overflow-y-auto bg-gray-50 p-5 dark:bg-gray-950">
+                <div className="text-center text-xs font-semibold text-gray-400">
+                  {new Date(selectedMessage.createdAt).toLocaleString(undefined, {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
+                </div>
                 <div className={`flex ${tab === 'sent' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[78%] rounded-2xl px-4 py-3 shadow-sm ${
                     tab === 'sent'
@@ -331,6 +409,11 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
                     <p className="whitespace-pre-wrap text-sm leading-6">{selectedMessage.body}</p>
                   </div>
                 </div>
+                {tab === 'sent' && (
+                  <div className="flex justify-end text-xs font-semibold text-gray-400">
+                    {getDeliveryLabel(selectedMessage)}
+                  </div>
+                )}
               </div>
 
               {tab === 'inbox' && (
@@ -354,7 +437,7 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
                       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg hover:bg-gray-100 dark:hover:bg-gray-800"
                       aria-label="Add emoji"
                     >
-                      {emojiButton}
+                      {emojiButtonLabel}
                     </button>
                     <label className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800" title="Attach files">
                       <Paperclip size={18} />
@@ -478,7 +561,7 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-xl hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
                 aria-label="Add emoji"
               >
-                {emojiButton}
+                {emojiButtonLabel}
               </button>
               <label className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-gray-100 text-primary-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700" title="Attach files">
                 <Paperclip size={18} />
