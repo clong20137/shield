@@ -1,5 +1,5 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react';
-import { Check, CheckCheck, Paperclip, Send, Trash2, X } from 'lucide-react';
+import { Check, CheckCheck, Paperclip, Plus, Send, Trash2, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, messageService, userService, User, UserMessage } from '../services/api';
 
@@ -339,6 +339,27 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
     }
   };
 
+  const deleteThread = async (thread: MessageThread) => {
+    if (!window.confirm(`Delete the conversation with ${thread.contactName}?`)) {
+      return;
+    }
+
+    try {
+      await Promise.all(thread.messages.map((message) => messageService.delete(message.id, currentUser.id)));
+      setInboxMessages((messages) => messages.filter((message) => !thread.messages.some((item) => item.id === message.id)));
+      setSentMessages((messages) => messages.filter((message) => !thread.messages.some((item) => item.id === message.id)));
+      if (selectedThreadId === thread.id) {
+        const nextThread = threads.find((item) => item.id !== thread.id);
+        setSelectedThreadId(nextThread?.id ?? null);
+      }
+      window.dispatchEvent(new CustomEvent('shield:messages-updated'));
+      onToast('success', 'Conversation deleted.');
+    } catch (err) {
+      console.error(err);
+      onToast('error', 'Failed to delete conversation.');
+    }
+  };
+
   const handleReplyKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -355,9 +376,6 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
             Conversations update automatically.
           </p>
         </div>
-        <button type="button" onClick={() => setIsComposeOpen(true)} className="btn-primary">
-          New Message
-        </button>
       </div>
 
       <div className="mb-5">
@@ -369,52 +387,74 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
         />
       </div>
 
-      <div className="grid min-h-[680px] grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-        <section className="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+      <div className="grid h-[calc(100vh-230px)] min-h-[620px] grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+        <section className="relative flex min-h-0 flex-col overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
           {isLoading ? (
             <div className="loading">Loading conversations...</div>
           ) : filteredThreads.length === 0 ? (
             <div className="empty-state">No conversations found.</div>
           ) : (
-            <div className="divide-y divide-gray-200 dark:divide-gray-800">
+            <div className="min-h-0 flex-1 divide-y divide-gray-200 overflow-y-auto pb-20 dark:divide-gray-800">
               {filteredThreads.map((thread) => (
-                <button
+                <div
                   key={thread.id}
-                  type="button"
-                  onClick={() => setSelectedThreadId(thread.id)}
-                  className={`block w-full px-4 py-4 text-left hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                  className={`flex items-center gap-2 px-3 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 ${
                     selectedThreadId === thread.id ? 'bg-accent/10' : ''
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className={`truncate text-sm ${thread.unreadCount > 0 ? 'font-bold text-primary-500' : 'font-semibold text-gray-800 dark:text-gray-100'}`}>
-                        {thread.contactName}
-                      </p>
-                      <p className="mt-0.5 truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
-                        {thread.subject}
-                      </p>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedThreadId(thread.id)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className={`truncate text-sm ${thread.unreadCount > 0 ? 'font-bold text-primary-500' : 'font-semibold text-gray-800 dark:text-gray-100'}`}>
+                          {thread.contactName}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
+                          {thread.subject}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs text-gray-400">{formatMessageTime(thread.latestMessage.createdAt)}</span>
                     </div>
-                    <span className="shrink-0 text-xs text-gray-400">{formatMessageTime(thread.latestMessage.createdAt)}</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <p className="line-clamp-1 min-w-0 text-sm text-gray-500 dark:text-gray-400">
-                      {thread.latestMessage.senderAccountId === currentUser.id ? 'You: ' : ''}
-                      {thread.latestMessage.body}
-                    </p>
-                    {thread.unreadCount > 0 && (
-                      <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
-                        {thread.unreadCount > 9 ? '9+' : thread.unreadCount}
-                      </span>
-                    )}
-                  </div>
-                </button>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <p className="line-clamp-1 min-w-0 text-sm text-gray-500 dark:text-gray-400">
+                        {thread.latestMessage.senderAccountId === currentUser.id ? 'You: ' : ''}
+                        {thread.latestMessage.body}
+                      </p>
+                      {thread.unreadCount > 0 && (
+                        <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
+                          {thread.unreadCount > 9 ? '9+' : thread.unreadCount}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteThread(thread)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-danger dark:hover:bg-red-950"
+                    aria-label="Delete conversation"
+                    title="Delete conversation"
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </div>
               ))}
             </div>
           )}
+          <button
+            type="button"
+            onClick={() => setIsComposeOpen(true)}
+            className="absolute bottom-4 right-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary-500 text-white shadow-lg hover:bg-primary-600"
+            aria-label="New message"
+            title="New message"
+          >
+            <Plus size={22} />
+          </button>
         </section>
 
-        <section className="flex min-h-[680px] flex-col rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+        <section className="flex min-h-0 flex-col rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
           {!selectedThread ? (
             <div className="empty-state">Select a conversation to view it.</div>
           ) : (
