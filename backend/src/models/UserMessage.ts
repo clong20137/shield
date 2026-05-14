@@ -15,8 +15,12 @@ export interface UserMessage {
   createdAt: Date;
   senderName?: string;
   senderEmail?: string;
+  senderRank?: string;
+  senderProfilePictureUrl?: string;
   recipientName?: string;
   recipientEmail?: string;
+  recipientRank?: string;
+  recipientProfilePictureUrl?: string;
 }
 
 interface UserMessageRow extends RowDataPacket {
@@ -32,8 +36,12 @@ interface UserMessageRow extends RowDataPacket {
   createdAt: Date;
   senderName?: string;
   senderEmail?: string;
+  senderRank?: string;
+  senderProfilePictureUrl?: string;
   recipientName?: string;
   recipientEmail?: string;
+  recipientRank?: string;
+  recipientProfilePictureUrl?: string;
 }
 
 function toUserMessage(row: UserMessageRow): UserMessage {
@@ -50,8 +58,12 @@ function toUserMessage(row: UserMessageRow): UserMessage {
     createdAt: row.createdAt,
     senderName: row.senderName,
     senderEmail: row.senderEmail,
+    senderRank: row.senderRank,
+    senderProfilePictureUrl: row.senderProfilePictureUrl,
     recipientName: row.recipientName,
     recipientEmail: row.recipientEmail,
+    recipientRank: row.recipientRank,
+    recipientProfilePictureUrl: row.recipientProfilePictureUrl,
   };
 }
 
@@ -104,8 +116,12 @@ export class UserMessageModel {
         `SELECT m.*,
           COALESCE(s.displayName, CONCAT(s.firstName, ' ', s.lastName), s.email) as senderName,
           s.email as senderEmail,
+          s.rank as senderRank,
+          s.profilePictureUrl as senderProfilePictureUrl,
           COALESCE(r.displayName, CONCAT(r.firstName, ' ', r.lastName), r.email) as recipientName,
-          r.email as recipientEmail
+          r.email as recipientEmail,
+          r.rank as recipientRank,
+          r.profilePictureUrl as recipientProfilePictureUrl
         FROM user_messages m
         LEFT JOIN users s ON s.id = m.senderAccountId
         LEFT JOIN users r ON r.id = m.recipientUserId
@@ -129,8 +145,12 @@ export class UserMessageModel {
         `SELECT m.*,
           COALESCE(s.displayName, CONCAT(s.firstName, ' ', s.lastName), s.email) as senderName,
           s.email as senderEmail,
+          s.rank as senderRank,
+          s.profilePictureUrl as senderProfilePictureUrl,
           COALESCE(r.displayName, CONCAT(r.firstName, ' ', r.lastName), r.email) as recipientName,
-          r.email as recipientEmail
+          r.email as recipientEmail,
+          r.rank as recipientRank,
+          r.profilePictureUrl as recipientProfilePictureUrl
         FROM user_messages m
         LEFT JOIN users s ON s.id = m.senderAccountId
         LEFT JOIN users r ON r.id = m.recipientUserId

@@ -12,6 +12,8 @@ interface MessageThread {
   id: string;
   contactName: string;
   contactEmail: string;
+  contactRank: string;
+  contactProfilePictureUrl: string;
   subject: string;
   latestMessage: UserMessage;
   messages: UserMessage[];
@@ -49,6 +51,32 @@ function getContactEmail(message: UserMessage, currentUserId: string): string {
   return message.senderAccountId === currentUserId
     ? message.recipientEmail || ''
     : message.senderEmail || '';
+}
+
+function getContactRank(message: UserMessage, currentUserId: string): string {
+  return message.senderAccountId === currentUserId
+    ? message.recipientRank || ''
+    : message.senderRank || '';
+}
+
+function getContactProfilePicture(message: UserMessage, currentUserId: string): string {
+  return message.senderAccountId === currentUserId
+    ? message.recipientProfilePictureUrl || ''
+    : message.senderProfilePictureUrl || '';
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/u).filter(Boolean);
+
+  if (parts.length === 0) {
+    return 'U';
+  }
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
 function getDeliveryLabel(message: UserMessage): string {
@@ -151,6 +179,8 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
           id,
           contactName: getContactName(message, currentUser.id),
           contactEmail: getContactEmail(message, currentUser.id),
+          contactRank: getContactRank(message, currentUser.id),
+          contactProfilePictureUrl: getContactProfilePicture(message, currentUser.id),
           subject,
           latestMessage: message,
           messages: [message],
@@ -390,17 +420,25 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
           ) : (
             <>
               <div className="border-b border-gray-200 p-5 dark:border-gray-800">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h2>{selectedThread.contactName}</h2>
-                    <p className="mt-1 text-sm font-semibold text-gray-600 dark:text-gray-300">{selectedThread.subject}</p>
-                    <p className="mt-1 text-xs text-gray-400">
-                      Last online {formatMessageTime(selectedThread.latestMessage.createdAt)}
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700 dark:bg-green-950 dark:text-green-200">
-                    Live
-                  </span>
+                <div className="flex flex-col items-center text-center">
+                  {selectedThread.contactProfilePictureUrl ? (
+                    <img
+                      src={selectedThread.contactProfilePictureUrl}
+                      alt={selectedThread.contactName}
+                      className="h-20 w-20 rounded-full border border-gray-200 object-cover shadow-sm dark:border-gray-700"
+                    />
+                  ) : (
+                    <div className="flex h-20 w-20 items-center justify-center rounded-full border border-gray-200 bg-accent/10 text-xl font-bold text-accent shadow-sm dark:border-gray-700">
+                      {getInitials(selectedThread.contactName)}
+                    </div>
+                  )}
+                  <h2 className="mt-3">{selectedThread.contactName}</h2>
+                  <p className="mt-1 text-sm font-semibold text-gray-600 dark:text-gray-300">
+                    {selectedThread.contactRank || 'No rank listed'}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    Last online {formatMessageTime(selectedThread.latestMessage.createdAt)}
+                  </p>
                 </div>
               </div>
 
@@ -432,7 +470,7 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
                               ? 'rounded-br bg-accent text-white'
                               : 'rounded-bl bg-white text-gray-800 dark:bg-gray-900 dark:text-gray-100'
                           }`}>
-                            <p className="whitespace-pre-wrap text-sm leading-6">{message.body}</p>
+                            <p className="w-fit max-w-full whitespace-pre-wrap text-left text-sm leading-6">{message.body}</p>
                           </div>
                           <div className={`mt-1 flex items-center gap-2 text-xs font-semibold text-gray-400 ${isMine ? 'justify-end' : 'justify-start'}`}>
                             <span>{formatMessageTime(message.createdAt)}</span>

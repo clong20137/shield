@@ -180,8 +180,12 @@ export interface UserMessage {
   createdAt: string;
   senderName?: string;
   senderEmail?: string;
+  senderRank?: string;
+  senderProfilePictureUrl?: string;
   recipientName?: string;
   recipientEmail?: string;
+  recipientRank?: string;
+  recipientProfilePictureUrl?: string;
 }
 
 export const authService = {
