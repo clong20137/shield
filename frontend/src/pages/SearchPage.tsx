@@ -128,6 +128,30 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     }
   };
 
+  const removeProfilePicture = async () => {
+    if (!editingUser) {
+      return;
+    }
+
+    setIsUploadingPicture(true);
+    try {
+      const response = await userService.removeProfilePicture(editingUser.id);
+      const updatedUser = response.data.user;
+      setEditForm(updatedUser);
+      setEditingUser(updatedUser);
+      setSelectedUser(updatedUser);
+      setUsers((currentUsers) =>
+        currentUsers.map((user) => (user.id === updatedUser.id ? updatedUser : user)),
+      );
+      onToast('success', 'Profile picture removed.');
+    } catch (err) {
+      console.error(err);
+      onToast('error', 'Failed to remove profile picture.');
+    } finally {
+      setIsUploadingPicture(false);
+    }
+  };
+
   const handleSaveUser = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -316,6 +340,16 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                 onChange={handleProfilePictureUpload}
                 className="hidden"
               />
+              {editForm.profilePictureUrl && (
+                <button
+                  type="button"
+                  onClick={removeProfilePicture}
+                  className="btn-danger mb-6"
+                  disabled={isUploadingPicture}
+                >
+                  Remove Profile Picture
+                </button>
+              )}
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <label className="block">

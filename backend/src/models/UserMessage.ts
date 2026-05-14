@@ -9,6 +9,9 @@ export interface UserMessage {
   subject: string;
   body: string;
   isRead: boolean;
+  isArchived: boolean;
+  senderDeleted: boolean;
+  recipientDeleted: boolean;
   createdAt: Date;
   senderName?: string;
   senderEmail?: string;
@@ -23,6 +26,9 @@ interface UserMessageRow extends RowDataPacket {
   subject: string;
   body: string;
   isRead: boolean | number;
+  isArchived: boolean | number;
+  senderDeleted: boolean | number;
+  recipientDeleted: boolean | number;
   createdAt: Date;
   senderName?: string;
   senderEmail?: string;
@@ -38,6 +44,9 @@ function toUserMessage(row: UserMessageRow): UserMessage {
     subject: row.subject,
     body: row.body,
     isRead: Boolean(row.isRead),
+    isArchived: Boolean(row.isArchived),
+    senderDeleted: Boolean(row.senderDeleted),
+    recipientDeleted: Boolean(row.recipientDeleted),
     createdAt: row.createdAt,
     senderName: row.senderName,
     senderEmail: row.senderEmail,
@@ -47,7 +56,7 @@ function toUserMessage(row: UserMessageRow): UserMessage {
 }
 
 export class UserMessageModel {
-  static async createMessage(message: Omit<UserMessage, 'id' | 'isRead' | 'createdAt'>): Promise<UserMessage> {
+  static async createMessage(message: Omit<UserMessage, 'id' | 'isRead' | 'isArchived' | 'senderDeleted' | 'recipientDeleted' | 'createdAt'>): Promise<UserMessage> {
     const conn = await pool.getConnection();
     try {
       const id = uuidv4();
@@ -64,6 +73,9 @@ export class UserMessageModel {
         ...message,
         id,
         isRead: false,
+        isArchived: false,
+        senderDeleted: false,
+        recipientDeleted: false,
         createdAt: now,
       };
     } finally {
@@ -98,6 +110,8 @@ export class UserMessageModel {
         LEFT JOIN users s ON s.id = m.senderAccountId
         LEFT JOIN users r ON r.id = m.recipientUserId
         WHERE m.recipientUserId = ?
+          AND m.recipientDeleted = 0
+          AND m.isArchived = 0
         ORDER BY m.createdAt DESC`,
         [accountId]
       );
@@ -121,6 +135,7 @@ export class UserMessageModel {
         LEFT JOIN users s ON s.id = m.senderAccountId
         LEFT JOIN users r ON r.id = m.recipientUserId
         WHERE m.senderAccountId = ?
+          AND m.senderDeleted = 0
         ORDER BY m.createdAt DESC`,
         [accountId]
       );
@@ -137,6 +152,38 @@ export class UserMessageModel {
       const [result] = await conn.query<ResultSetHeader>(
         'UPDATE user_messages SET `isRead` = 1 WHERE `id` = ? AND `recipientUserId` = ?',
         [messageId, recipientUserId]
+      );
+
+      return result.affectedRows > 0;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async archiveForRecipient(messageId: string, recipientUserId: string): Promise<boolean> {
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>(
+        'UPDATE user_messages SET `isArchived` = 1 WHERE `id` = ? AND `recipientUserId` = ?',
+        [messageId, recipientUserId]
+      );
+
+      return result.affectedRows > 0;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async deleteForUser(messageId: string, accountId: string): Promise<boolean> {
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>(
+        `UPDATE user_messages
+        SET
+          \`recipientDeleted\` = CASE WHEN \`recipientUserId\` = ? THEN 1 ELSE \`recipientDeleted\` END,
+          \`senderDeleted\` = CASE WHEN \`senderAccountId\` = ? THEN 1 ELSE \`senderDeleted\` END
+        WHERE \`id\` = ? AND (\`recipientUserId\` = ? OR \`senderAccountId\` = ?)`,
+        [accountId, accountId, messageId, accountId, accountId]
       );
 
       return result.affectedRows > 0;

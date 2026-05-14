@@ -406,10 +406,12 @@ function HeaderMessagesButton({ currentUser }: { currentUser: AuthAccount | null
 
     loadUnreadCount();
     const interval = window.setInterval(loadUnreadCount, 30000);
+    window.addEventListener('shield:messages-updated', loadUnreadCount);
 
     return () => {
       isMounted = false;
       window.clearInterval(interval);
+      window.removeEventListener('shield:messages-updated', loadUnreadCount);
     };
   }, [currentUser]);
 

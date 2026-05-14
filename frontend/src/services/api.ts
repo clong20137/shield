@@ -212,6 +212,9 @@ export const userService = {
     formData.append('profilePicture', file);
     return api.post<{ profilePictureUrl: string; user: User }>(`/users/${id}/profile-picture`, formData);
   },
+
+  removeProfilePicture: (id: string) =>
+    api.delete<{ profilePictureUrl: string; user: User }>(`/users/${id}/profile-picture`),
   
   delete: (id: string) =>
     api.delete(`/users/${id}`),
@@ -274,6 +277,12 @@ export const messageService = {
 
   markRead: (messageId: string, recipientUserId: string) =>
     api.put(`/messages/${messageId}/read`, { recipientUserId }),
+
+  archive: (messageId: string, recipientUserId: string) =>
+    api.put(`/messages/${messageId}/archive`, { recipientUserId }),
+
+  delete: (messageId: string, accountId: string) =>
+    api.delete(`/messages/${messageId}`, { data: { accountId } }),
 };
 
 export default api;

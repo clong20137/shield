@@ -135,4 +135,24 @@ export class UserController {
       res.status(500).json({ error: 'Failed to upload profile picture' });
     }
   }
+
+  static async removeProfilePicture(req: Request, res: Response) {
+    try {
+      const success = await UserModel.updateUser(req.params.id, { profilePictureUrl: '' });
+
+      if (!success) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const user = await UserModel.getUserById(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json({ profilePictureUrl: '', user });
+    } catch (error) {
+      console.error('Profile picture remove error:', error);
+      res.status(500).json({ error: 'Failed to remove profile picture' });
+    }
+  }
 }

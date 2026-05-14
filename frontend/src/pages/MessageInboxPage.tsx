@@ -101,6 +101,7 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
         setInboxMessages((messages) =>
           messages.map((item) => (item.id === message.id ? { ...item, isRead: true } : item)),
         );
+        window.dispatchEvent(new CustomEvent('shield:messages-updated'));
       } catch (err) {
         console.error(err);
       }
@@ -125,6 +126,7 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
       });
       setReplyBody('');
       await loadMessages();
+      window.dispatchEvent(new CustomEvent('shield:messages-updated'));
       onToast('success', 'Reply sent.');
     } catch (err) {
       console.error(err);
@@ -167,12 +169,51 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
       setIsEmojiPickerOpen(false);
       await loadMessages();
       setTab('sent');
+      window.dispatchEvent(new CustomEvent('shield:messages-updated'));
       onToast('success', 'Message sent.');
     } catch (err) {
       console.error(err);
       onToast('error', 'Failed to send message.');
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const archiveSelectedMessage = async () => {
+    if (!selectedMessage || tab !== 'inbox') return;
+
+    try {
+      await messageService.archive(selectedMessage.id, currentUser.id);
+      setInboxMessages((messages) => messages.filter((message) => message.id !== selectedMessage.id));
+      setSelectedMessage(null);
+      window.dispatchEvent(new CustomEvent('shield:messages-updated'));
+      onToast('success', 'Message archived.');
+    } catch (err) {
+      console.error(err);
+      onToast('error', 'Failed to archive message.');
+    }
+  };
+
+  const deleteSelectedMessage = async () => {
+    if (!selectedMessage) return;
+
+    if (!window.confirm('Delete this message from your mailbox?')) {
+      return;
+    }
+
+    try {
+      await messageService.delete(selectedMessage.id, currentUser.id);
+      if (tab === 'inbox') {
+        setInboxMessages((messages) => messages.filter((message) => message.id !== selectedMessage.id));
+      } else {
+        setSentMessages((messages) => messages.filter((message) => message.id !== selectedMessage.id));
+      }
+      setSelectedMessage(null);
+      window.dispatchEvent(new CustomEvent('shield:messages-updated'));
+      onToast('success', 'Message deleted.');
+    } catch (err) {
+      console.error(err);
+      onToast('error', 'Failed to delete message.');
     }
   };
 
@@ -256,6 +297,16 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
                   From {selectedMessage.senderName || selectedMessage.senderEmail || 'Unknown'} to {selectedMessage.recipientName || selectedMessage.recipientEmail || 'Unknown'}
                 </p>
                 <p className="mt-1 text-xs text-gray-400">{new Date(selectedMessage.createdAt).toLocaleString()}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {tab === 'inbox' && (
+                    <button type="button" onClick={archiveSelectedMessage} className="btn-secondary">
+                      Archive
+                    </button>
+                  )}
+                  <button type="button" onClick={deleteSelectedMessage} className="btn-danger">
+                    Delete
+                  </button>
+                </div>
               </div>
               <p className="whitespace-pre-wrap py-5 text-gray-800 dark:text-gray-100">{selectedMessage.body}</p>
 

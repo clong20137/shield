@@ -79,4 +79,46 @@ export class MessageController {
       res.status(500).json({ error: 'Failed to mark message read' });
     }
   }
+
+  static async archiveMessage(req: Request, res: Response) {
+    try {
+      const { recipientUserId } = req.body as { recipientUserId?: string };
+
+      if (!recipientUserId) {
+        return res.status(400).json({ error: 'Recipient is required' });
+      }
+
+      const updated = await UserMessageModel.archiveForRecipient(req.params.id, recipientUserId);
+
+      if (!updated) {
+        return res.status(404).json({ error: 'Message not found' });
+      }
+
+      res.json({ message: 'Message archived' });
+    } catch (error) {
+      console.error('Archive message error:', error);
+      res.status(500).json({ error: 'Failed to archive message' });
+    }
+  }
+
+  static async deleteMessage(req: Request, res: Response) {
+    try {
+      const { accountId } = req.body as { accountId?: string };
+
+      if (!accountId) {
+        return res.status(400).json({ error: 'Account is required' });
+      }
+
+      const updated = await UserMessageModel.deleteForUser(req.params.id, accountId);
+
+      if (!updated) {
+        return res.status(404).json({ error: 'Message not found' });
+      }
+
+      res.json({ message: 'Message deleted' });
+    } catch (error) {
+      console.error('Delete message error:', error);
+      res.status(500).json({ error: 'Failed to delete message' });
+    }
+  }
 }

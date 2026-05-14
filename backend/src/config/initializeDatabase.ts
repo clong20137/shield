@@ -168,11 +168,18 @@ export async function initializeDatabase() {
       \`subject\` VARCHAR(200) NOT NULL,
       \`body\` TEXT NOT NULL,
       \`isRead\` BOOLEAN DEFAULT 0,
+      \`isArchived\` BOOLEAN DEFAULT 0,
+      \`senderDeleted\` BOOLEAN DEFAULT 0,
+      \`recipientDeleted\` BOOLEAN DEFAULT 0,
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       INDEX \`idx_messages_sender\` (\`senderAccountId\`),
       INDEX \`idx_messages_recipient\` (\`recipientUserId\`)
     )
   `);
+
+  await ensureColumn('user_messages', 'isArchived', '`isArchived` BOOLEAN DEFAULT 0');
+  await ensureColumn('user_messages', 'senderDeleted', '`senderDeleted` BOOLEAN DEFAULT 0');
+  await ensureColumn('user_messages', 'recipientDeleted', '`recipientDeleted` BOOLEAN DEFAULT 0');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS calendar_entries (
