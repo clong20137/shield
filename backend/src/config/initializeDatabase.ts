@@ -45,6 +45,54 @@ export async function initializeDatabase() {
   await ensureColumn('auth_accounts', 'role', "`role` VARCHAR(20) NOT NULL DEFAULT 'user'");
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`firstName\` VARCHAR(100) NOT NULL,
+      \`lastName\` VARCHAR(100) NOT NULL,
+      \`email\` VARCHAR(255),
+      \`peNumber\` VARCHAR(50) UNIQUE,
+      \`peopleSoftId\` VARCHAR(50),
+      \`carNumber\` VARCHAR(50),
+      \`badgeNumber\` VARCHAR(50) UNIQUE,
+      \`radioNumber\` VARCHAR(50),
+      \`personalPhoneNumber\` VARCHAR(50),
+      \`departmentPhoneNumber\` VARCHAR(50),
+      \`assignedTo\` VARCHAR(100),
+      \`district\` VARCHAR(100),
+      \`rank\` VARCHAR(100),
+      \`isActive\` BOOLEAN DEFAULT 1,
+      \`employmentType\` VARCHAR(100),
+      \`typeDetails\` VARCHAR(255),
+      \`status\` VARCHAR(100),
+      \`supervisor\` VARCHAR(100),
+      \`specialtyCertifications\` TEXT,
+      \`publicSafetyId\` VARCHAR(50) UNIQUE,
+      \`race\` VARCHAR(50),
+      \`sex\` VARCHAR(10),
+      \`maritalStatus\` VARCHAR(50),
+      \`residentialAddress\` TEXT,
+      \`mailingAddress\` TEXT,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX \`idx_firstName\` (\`firstName\`),
+      INDEX \`idx_lastName\` (\`lastName\`),
+      INDEX \`idx_peNumber\` (\`peNumber\`),
+      INDEX \`idx_badgeNumber\` (\`badgeNumber\`),
+      INDEX \`idx_district\` (\`district\`),
+      INDEX \`idx_employmentType\` (\`employmentType\`)
+    )
+  `);
+
+  await ensureColumn('users', 'email', '`email` VARCHAR(255)');
+  await ensureColumn('users', 'peopleSoftId', '`peopleSoftId` VARCHAR(50)');
+  await ensureColumn('users', 'radioNumber', '`radioNumber` VARCHAR(50)');
+  await ensureColumn('users', 'personalPhoneNumber', '`personalPhoneNumber` VARCHAR(50)');
+  await ensureColumn('users', 'departmentPhoneNumber', '`departmentPhoneNumber` VARCHAR(50)');
+  await ensureColumn('users', 'maritalStatus', '`maritalStatus` VARCHAR(50)');
+  await ensureColumn('users', 'residentialAddress', '`residentialAddress` TEXT');
+  await ensureColumn('users', 'mailingAddress', '`mailingAddress` TEXT');
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS calendar_entries (
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`category\` VARCHAR(100) NOT NULL DEFAULT 'General Information',

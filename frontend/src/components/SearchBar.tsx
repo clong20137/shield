@@ -14,6 +14,36 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   placeholder = 'Search by name, PE #, Badge #, or ID...',
   initialQuery = '',
 }) => {
+  const districtOptions = [
+    'Area 1',
+    'Toll Road',
+    'Lowell',
+    'Lafayette',
+    'Peru',
+    'Area 2',
+    'Fort Wayne',
+    'Bremen',
+    'Area 3',
+    'Bloomington',
+    'Jasper',
+    'Evansville',
+    'Area 4',
+    'Versailles',
+    'Sellersburg',
+    'Area 5',
+    'Pendleton',
+    'Indianapolis',
+    'Putnamville',
+    'Headquarters',
+    'North Zone',
+    'South Zone',
+    'Central Zone',
+    'Laboratory',
+    'Polygraph',
+    'CSI Section',
+    'Digital Forensics Unit',
+  ];
+  const employmentTypes = ['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inactive', 'Other', 'CPS'];
   const [query, setQuery] = React.useState(initialQuery);
   const [showFilters, setShowFilters] = React.useState(false);
   const [filters, setFilters] = React.useState({
@@ -81,11 +111,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
           >
             <option value="">All Districts</option>
-            <option value="District 1">District 1</option>
-            <option value="District 2">District 2</option>
-            <option value="District 3">District 3</option>
-            <option value="District 4">District 4</option>
-            <option value="District 5">District 5</option>
+            {districtOptions.map((district) => (
+              <option key={district} value={district}>{district}</option>
+            ))}
           </select>
 
           <select
@@ -104,9 +132,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
           >
             <option value="">All Employment Types</option>
-            <option value="Full-time">Full-time</option>
-            <option value="Part-time">Part-time</option>
-            <option value="Contract">Contract</option>
+            {employmentTypes.map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
           </select>
         </div>
       )}

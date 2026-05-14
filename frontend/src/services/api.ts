@@ -11,9 +11,14 @@ export interface User {
   id: string;
   firstName: string;
   lastName: string;
+  email: string;
   peNumber: string;
+  peopleSoftId: string;
   carNumber: string;
   badgeNumber: string;
+  radioNumber: string;
+  personalPhoneNumber: string;
+  departmentPhoneNumber: string;
   assignedTo: string;
   district: string;
   rank: string;
@@ -26,6 +31,9 @@ export interface User {
   publicSafetyId: string;
   race: string;
   sex: string;
+  maritalStatus: string;
+  residentialAddress: string;
+  mailingAddress: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -295,7 +295,7 @@ function GlobalSearch({ compact }: { compact: boolean }) {
     const displayName = `${user.firstName} ${user.lastName}`.trim();
     setQuery(displayName);
     setIsResultsOpen(false);
-    navigate(`/search?q=${encodeURIComponent(displayName || user.badgeNumber || user.id)}`);
+    navigate(`/search?userId=${encodeURIComponent(user.id)}&q=${encodeURIComponent(displayName || user.badgeNumber || user.id)}`);
   };
 
   if (compact) {
@@ -353,7 +353,7 @@ function GlobalSearch({ compact }: { compact: boolean }) {
                       {user.firstName} {user.lastName}
                     </p>
                     <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-                      Badge {user.badgeNumber || 'N/A'} - {user.district || 'No district'}
+                      PE {user.peNumber || 'N/A'} - {user.district || 'No district'}
                     </p>
                   </div>
                   <span className="shrink-0 rounded bg-accent/10 px-2 py-1 text-xs font-bold text-accent">

@@ -6,9 +6,14 @@ export interface User {
   id: string;
   firstName: string;
   lastName: string;
+  email: string;
   peNumber: string;
+  peopleSoftId: string;
   carNumber: string;
   badgeNumber: string;
+  radioNumber: string;
+  personalPhoneNumber: string;
+  departmentPhoneNumber: string;
   assignedTo: string;
   district: string;
   rank: string;
@@ -21,6 +26,9 @@ export interface User {
   publicSafetyId: string;
   race: string;
   sex: string;
+  maritalStatus: string;
+  residentialAddress: string;
+  mailingAddress: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,9 +37,14 @@ export class UserModel {
   private static readonly editableFields = [
     'firstName',
     'lastName',
+    'email',
     'peNumber',
+    'peopleSoftId',
     'carNumber',
     'badgeNumber',
+    'radioNumber',
+    'personalPhoneNumber',
+    'departmentPhoneNumber',
     'assignedTo',
     'district',
     'rank',
@@ -44,14 +57,22 @@ export class UserModel {
     'publicSafetyId',
     'race',
     'sex',
+    'maritalStatus',
+    'residentialAddress',
+    'mailingAddress',
   ] as const;
 
   private static readonly columnNames: Record<typeof UserModel.editableFields[number], string> = {
     firstName: '`firstName`',
     lastName: '`lastName`',
+    email: '`email`',
     peNumber: '`peNumber`',
+    peopleSoftId: '`peopleSoftId`',
     carNumber: '`carNumber`',
     badgeNumber: '`badgeNumber`',
+    radioNumber: '`radioNumber`',
+    personalPhoneNumber: '`personalPhoneNumber`',
+    departmentPhoneNumber: '`departmentPhoneNumber`',
     assignedTo: '`assignedTo`',
     district: '`district`',
     rank: '`rank`',
@@ -64,6 +85,9 @@ export class UserModel {
     publicSafetyId: '`publicSafetyId`',
     race: '`race`',
     sex: '`sex`',
+    maritalStatus: '`maritalStatus`',
+    residentialAddress: '`residentialAddress`',
+    mailingAddress: '`mailingAddress`',
   };
 
   static async searchUsers(
@@ -79,11 +103,33 @@ export class UserModel {
 
       if (trimmedSearchTerm) {
         conditions.push(
-          '(`firstName` LIKE ? OR `lastName` LIKE ? OR `peNumber` LIKE ? OR `badgeNumber` LIKE ? OR `publicSafetyId` LIKE ?)'
+          `(
+            \`firstName\` LIKE ? OR \`lastName\` LIKE ? OR CONCAT(\`firstName\`, ' ', \`lastName\`) LIKE ?
+            OR \`email\` LIKE ? OR \`peNumber\` LIKE ? OR \`peopleSoftId\` LIKE ?
+            OR \`badgeNumber\` LIKE ? OR \`radioNumber\` LIKE ? OR \`publicSafetyId\` LIKE ?
+            OR \`district\` LIKE ? OR \`employmentType\` LIKE ? OR \`status\` LIKE ?
+            OR \`supervisor\` LIKE ? OR \`personalPhoneNumber\` LIKE ? OR \`departmentPhoneNumber\` LIKE ?
+          )`
         );
 
         const likeTerm = `%${trimmedSearchTerm}%`;
-        params.push(likeTerm, likeTerm, likeTerm, likeTerm, likeTerm);
+        params.push(
+          likeTerm,
+          likeTerm,
+          likeTerm,
+          likeTerm,
+          likeTerm,
+          likeTerm,
+          likeTerm,
+          likeTerm,
+          likeTerm,
+          likeTerm,
+          likeTerm,
+          likeTerm,
+          likeTerm,
+          likeTerm,
+          likeTerm
+        );
       }
 
       if (filters?.rank) {
@@ -148,18 +194,24 @@ export class UserModel {
 
       await conn.query(
         `INSERT INTO users (
-          \`id\`, \`firstName\`, \`lastName\`, \`peNumber\`, \`carNumber\`, \`badgeNumber\`,
-          \`assignedTo\`, \`district\`, \`rank\`, \`isActive\`, \`employmentType\`, \`typeDetails\`,
-          \`status\`, \`supervisor\`, \`specialtyCertifications\`, \`publicSafetyId\`,
-          \`race\`, \`sex\`, \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          \`id\`, \`firstName\`, \`lastName\`, \`email\`, \`peNumber\`, \`peopleSoftId\`, \`carNumber\`, \`badgeNumber\`,
+          \`radioNumber\`, \`personalPhoneNumber\`, \`departmentPhoneNumber\`, \`assignedTo\`, \`district\`, \`rank\`,
+          \`isActive\`, \`employmentType\`, \`typeDetails\`, \`status\`, \`supervisor\`, \`specialtyCertifications\`,
+          \`publicSafetyId\`, \`race\`, \`sex\`, \`maritalStatus\`, \`residentialAddress\`, \`mailingAddress\`,
+          \`createdAt\`, \`updatedAt\`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           user.firstName,
           user.lastName,
+          user.email,
           user.peNumber,
+          user.peopleSoftId,
           user.carNumber,
           user.badgeNumber,
+          user.radioNumber,
+          user.personalPhoneNumber,
+          user.departmentPhoneNumber,
           user.assignedTo,
           user.district,
           user.rank,
@@ -172,6 +224,9 @@ export class UserModel {
           user.publicSafetyId,
           user.race,
           user.sex,
+          user.maritalStatus,
+          user.residentialAddress,
+          user.mailingAddress,
           now,
           now,
         ]

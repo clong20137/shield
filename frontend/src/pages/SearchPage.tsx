@@ -13,6 +13,7 @@ const SearchPage: React.FC = () => {
   const [currentQuery, setCurrentQuery] = useState('');
   const [searchParams] = useSearchParams();
   const globalQuery = useMemo(() => searchParams.get('q') ?? '', [searchParams]);
+  const selectedUserId = useMemo(() => searchParams.get('userId') ?? '', [searchParams]);
 
   const handleSearch = async (query: string) => {
     setCurrentQuery(query);
@@ -63,6 +64,31 @@ const SearchPage: React.FC = () => {
     handleSearch(globalQuery);
   }, [globalQuery]);
 
+  useEffect(() => {
+    if (!selectedUserId) {
+      return;
+    }
+
+    let isMounted = true;
+
+    userService.getById(selectedUserId)
+      .then((response) => {
+        if (isMounted) {
+          setSelectedUser(response.data);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setError('Failed to load selected user profile.');
+        }
+        console.error(err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedUserId]);
+
   return (
     <div>
       <h1 className="mb-8">Search Users</h1>
@@ -73,7 +99,7 @@ const SearchPage: React.FC = () => {
         onSearch={handleSearch}
         onFilterChange={handleFilterChange}
         initialQuery={globalQuery}
-        placeholder="Search by name, PE #, Badge #, or ID..."
+        placeholder="Search by email, name, PE #, district, badge, radio, phone, or ID..."
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

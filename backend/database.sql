@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS auth_accounts (
   `email` VARCHAR(255) NOT NULL UNIQUE,
   `passwordHash` VARCHAR(255) NOT NULL,
   `displayName` VARCHAR(100) NOT NULL,
+  `role` VARCHAR(20) NOT NULL DEFAULT 'user',
   `twoFactorSecret` VARCHAR(64),
   `twoFactorEnabled` BOOLEAN DEFAULT 0,
   `createdAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -20,9 +21,14 @@ CREATE TABLE IF NOT EXISTS users (
   `id` VARCHAR(36) PRIMARY KEY,
   `firstName` VARCHAR(100) NOT NULL,
   `lastName` VARCHAR(100) NOT NULL,
+  `email` VARCHAR(255),
   `peNumber` VARCHAR(50) UNIQUE,
+  `peopleSoftId` VARCHAR(50),
   `carNumber` VARCHAR(50),
   `badgeNumber` VARCHAR(50) UNIQUE,
+  `radioNumber` VARCHAR(50),
+  `personalPhoneNumber` VARCHAR(50),
+  `departmentPhoneNumber` VARCHAR(50),
   `assignedTo` VARCHAR(100),
   `district` VARCHAR(100),
   `rank` VARCHAR(100),
@@ -35,6 +41,9 @@ CREATE TABLE IF NOT EXISTS users (
   `publicSafetyId` VARCHAR(50) UNIQUE,
   `race` VARCHAR(50),
   `sex` VARCHAR(10),
+  `maritalStatus` VARCHAR(50),
+  `residentialAddress` TEXT,
+  `mailingAddress` TEXT,
   `createdAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updatedAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_firstName` (`firstName`),
@@ -46,7 +55,7 @@ CREATE TABLE IF NOT EXISTS users (
   INDEX `idx_district` (`district`),
   INDEX `idx_isActive` (`isActive`),
   INDEX `idx_employmentType` (`employmentType`),
-  FULLTEXT INDEX `ft_search` (`firstName`, `lastName`, `peNumber`, `badgeNumber`, `publicSafetyId`)
+  FULLTEXT INDEX `ft_search` (`firstName`, `lastName`, `email`, `peNumber`, `peopleSoftId`, `badgeNumber`, `publicSafetyId`, `district`)
 );
 
 -- Sample Data (Optional)
