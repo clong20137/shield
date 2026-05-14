@@ -7,6 +7,7 @@ interface UserTableProps {
   onUserSelect?: (user: User) => void;
   onEdit?: (user: User) => void;
   onDelete?: (userId: string) => void;
+  canEdit?: boolean;
 }
 
 export const UserTable: React.FC<UserTableProps> = ({
@@ -15,6 +16,7 @@ export const UserTable: React.FC<UserTableProps> = ({
   onUserSelect,
   onEdit,
   onDelete,
+  canEdit = false,
 }) => {
   if (loading) {
     return <div className="loading">Loading users...</div>;
@@ -37,7 +39,7 @@ export const UserTable: React.FC<UserTableProps> = ({
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Employee Type</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">District</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Status</th>
-              <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Actions</th>
+              {canEdit && <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -62,28 +64,30 @@ export const UserTable: React.FC<UserTableProps> = ({
                     {user.isActive ? 'Active' : 'Inactive'}
                   </span>
                 </td>
-                <td className="px-4 py-3 flex gap-2">
-                  <button
-                    className="btn btn-primary text-xs"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit?.(user);
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    className="btn btn-danger text-xs"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (window.confirm(`Delete ${user.firstName} ${user.lastName}?`)) {
-                        onDelete?.(user.id);
-                      }
-                    }}
-                  >
-                    Delete
-                  </button>
-                </td>
+                {canEdit && (
+                  <td className="px-4 py-3 flex gap-2">
+                    <button
+                      className="btn btn-primary text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit?.(user);
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="btn btn-danger text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm(`Delete ${user.firstName} ${user.lastName}?`)) {
+                          onDelete?.(user.id);
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

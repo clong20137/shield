@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Camera, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { AuthAccount, messageService, userService, User, UserFilters } from '../services/api';
 import { SearchBar } from '../components/SearchBar';
@@ -20,9 +21,13 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [messageSubject, setMessageSubject] = useState('');
   const [messageBody, setMessageBody] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editForm, setEditForm] = useState<Partial<User>>({});
+  const [isSavingUser, setIsSavingUser] = useState(false);
   const [searchParams] = useSearchParams();
   const globalQuery = useMemo(() => searchParams.get('q') ?? '', [searchParams]);
   const selectedUserId = useMemo(() => searchParams.get('userId') ?? '', [searchParams]);
+  const isAdministrator = currentUser?.role === 'administrator';
 
   const handleSearch = async (query: string) => {
     setCurrentQuery(query);
@@ -59,6 +64,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   };
 
   const handleDelete = async (userId: string) => {
+    if (!isAdministrator) {
+      onToast('error', 'Administrator permission required.');
+      return;
+    }
+
     try {
       await userService.delete(userId);
       setUsers(users.filter(u => u.id !== userId));
@@ -66,6 +76,63 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     } catch (err) {
       setError('Failed to delete user. Please try again.');
       console.error(err);
+    }
+  };
+
+  const openEditUser = (user: User) => {
+    if (!isAdministrator) {
+      onToast('error', 'Administrator permission required.');
+      return;
+    }
+
+    setEditingUser(user);
+    setEditForm(user);
+  };
+
+  const updateEditField = (field: keyof User, value: string | boolean) => {
+    setEditForm((currentForm) => ({ ...currentForm, [field]: value }));
+  };
+
+  const updateProfilePicture = () => {
+    const pictureUrl = window.prompt('Enter a profile picture URL', String(editForm.profilePictureUrl || ''));
+
+    if (pictureUrl === null) {
+      return;
+    }
+
+    updateEditField('profilePictureUrl', pictureUrl.trim());
+  };
+
+  const handleSaveUser = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!editingUser || !isAdministrator) {
+      onToast('error', 'Administrator permission required.');
+      return;
+    }
+
+    if (!String(editForm.firstName || '').trim() || !String(editForm.lastName || '').trim()) {
+      onToast('error', 'First and last name are required.');
+      return;
+    }
+
+    setIsSavingUser(true);
+
+    try {
+      await userService.update(editingUser.id, editForm);
+      const updatedUser = { ...editingUser, ...editForm } as User;
+      setUsers((currentUsers) =>
+        currentUsers.map((user) => (user.id === editingUser.id ? updatedUser : user)),
+      );
+      setSelectedUser(updatedUser);
+      setEditingUser(null);
+      setEditForm({});
+      onToast('success', 'User updated.');
+    } catch (err) {
+      console.error(err);
+      onToast('error', 'Failed to update user.');
+    } finally {
+      setIsSavingUser(false);
     }
   };
 
@@ -149,7 +216,9 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
         users={users}
         loading={loading}
         onUserSelect={setSelectedUser}
+        onEdit={openEditUser}
         onDelete={handleDelete}
+        canEdit={isAdministrator}
       />
 
       {selectedUser && (
@@ -158,9 +227,145 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
             <UserDetail
               user={selectedUser}
               onClose={() => setSelectedUser(null)}
+              onEdit={openEditUser}
               onMessage={setMessageRecipient}
+              canEdit={isAdministrator}
             />
           </div>
+        </div>
+      )}
+
+      {editingUser && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
+          <form onSubmit={handleSaveUser} className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-lg bg-white shadow-xl dark:bg-gray-900">
+            <div className="flex items-center justify-between gap-4 bg-primary-500 px-5 py-4 text-white">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Edit User</h2>
+                <p className="mt-1 text-sm text-blue-100">{editingUser.firstName} {editingUser.lastName}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingUser(null)}
+                className="flex h-10 w-10 items-center justify-center rounded border border-white/20 bg-white/10 hover:bg-white/20"
+                aria-label="Close edit user modal"
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            <div className="p-5">
+              <button
+                type="button"
+                onClick={updateProfilePicture}
+                className="mb-6 flex items-center gap-4 rounded border border-gray-200 bg-gray-50 p-4 text-left hover:border-accent dark:border-gray-800 dark:bg-gray-950"
+              >
+                {editForm.profilePictureUrl ? (
+                  <img
+                    src={String(editForm.profilePictureUrl)}
+                    alt="Profile"
+                    className="h-20 w-20 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary-500 text-2xl font-bold text-white">
+                    {String(editForm.firstName || 'U').slice(0, 1)}{String(editForm.lastName || '').slice(0, 1)}
+                  </div>
+                )}
+                <div>
+                  <p className="flex items-center gap-2 font-bold text-gray-800 dark:text-gray-100">
+                    <Camera size={18} className="text-accent" />
+                    Profile Picture
+                  </p>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Click to add or change the profile picture URL.
+                  </p>
+                </div>
+              </button>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">First Name</span>
+                  <input value={String(editForm.firstName || '')} onChange={(event) => updateEditField('firstName', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Last Name</span>
+                  <input value={String(editForm.lastName || '')} onChange={(event) => updateEditField('lastName', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Email</span>
+                  <input value={String(editForm.email || '')} onChange={(event) => updateEditField('email', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">PE Number</span>
+                  <input value={String(editForm.peNumber || '')} onChange={(event) => updateEditField('peNumber', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">PeopleSoft ID</span>
+                  <input value={String(editForm.peopleSoftId || '')} onChange={(event) => updateEditField('peopleSoftId', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Employee Type</span>
+                  <select value={String(editForm.employmentType || '')} onChange={(event) => updateEditField('employmentType', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                    {['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inactive', 'Other', 'CPS'].map((type) => <option key={type}>{type}</option>)}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Status</span>
+                  <select value={String(editForm.status || '')} onChange={(event) => updateEditField('status', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                    {['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Administrative Duty', 'Inactive'].map((status) => <option key={status}>{status}</option>)}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">District</span>
+                  <input value={String(editForm.district || '')} onChange={(event) => updateEditField('district', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Badge Number</span>
+                  <input value={String(editForm.badgeNumber || '')} onChange={(event) => updateEditField('badgeNumber', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Radio Number</span>
+                  <input value={String(editForm.radioNumber || '')} onChange={(event) => updateEditField('radioNumber', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Personal Phone</span>
+                  <input value={String(editForm.personalPhoneNumber || '')} onChange={(event) => updateEditField('personalPhoneNumber', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Department Phone</span>
+                  <input value={String(editForm.departmentPhoneNumber || '')} onChange={(event) => updateEditField('departmentPhoneNumber', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Sex</span>
+                  <input value={String(editForm.sex || '')} onChange={(event) => updateEditField('sex', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Marital Status</span>
+                  <input value={String(editForm.maritalStatus || '')} onChange={(event) => updateEditField('maritalStatus', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Supervisor</span>
+                  <input value={String(editForm.supervisor || '')} onChange={(event) => updateEditField('supervisor', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="block md:col-span-2 xl:col-span-3">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Residential Address</span>
+                  <textarea value={String(editForm.residentialAddress || '')} onChange={(event) => updateEditField('residentialAddress', event.target.value)} className="min-h-20 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="block md:col-span-2 xl:col-span-3">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Mailing Address</span>
+                  <textarea value={String(editForm.mailingAddress || '')} onChange={(event) => updateEditField('mailingAddress', event.target.value)} className="min-h-20 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-800">
+              <button type="submit" className="btn-primary" disabled={isSavingUser}>
+                {isSavingUser ? 'Saving...' : 'Save User'}
+              </button>
+              <button type="button" onClick={() => setEditingUser(null)} className="btn-secondary">
+                Cancel
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

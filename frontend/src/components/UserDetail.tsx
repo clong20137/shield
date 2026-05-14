@@ -1,4 +1,5 @@
 import React from 'react';
+import { X } from 'lucide-react';
 import { User } from '../services/api';
 
 interface UserDetailProps {
@@ -6,6 +7,7 @@ interface UserDetailProps {
   onClose?: () => void;
   onEdit?: (user: User) => void;
   onMessage?: (user: User) => void;
+  canEdit?: boolean;
 }
 
 function DetailRow({ label, value }: { label: string; value?: string | boolean | null }) {
@@ -34,7 +36,7 @@ function getInitials(user: User): string {
   return `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U';
 }
 
-export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, onMessage }) => {
+export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, onMessage, canEdit = false }) => {
   return (
     <div className="bg-white rounded-lg shadow-xl overflow-hidden dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
       <div className="bg-primary-500 text-white px-5 py-5 flex flex-wrap justify-between gap-4">
@@ -57,11 +59,12 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           </div>
         </div>
         <button
-          className="bg-transparent border-none text-white text-2xl cursor-pointer w-10 h-10 flex items-center justify-center rounded hover:bg-black/20"
+          className="flex h-10 w-10 cursor-pointer items-center justify-center rounded border border-white/20 bg-white/10 text-white hover:bg-white/20"
           onClick={onClose}
           aria-label="Close user detail"
+          type="button"
         >
-          x
+          <X size={22} />
         </button>
       </div>
 
@@ -110,9 +113,11 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
         <button className="btn-secondary" onClick={() => onMessage?.(user)}>
           Send Message
         </button>
-        <button className="btn-primary" onClick={() => onEdit?.(user)}>
-          Edit User
-        </button>
+        {canEdit && (
+          <button className="btn-primary" onClick={() => onEdit?.(user)}>
+            Edit User
+          </button>
+        )}
         <button className="btn bg-gray-400 text-gray-800 hover:bg-gray-500" onClick={onClose}>
           Close
         </button>
