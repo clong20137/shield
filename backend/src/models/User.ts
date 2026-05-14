@@ -93,6 +93,11 @@ export class UserModel {
     mailingAddress: '`mailingAddress`',
   };
 
+  private static blankToNull(value: string): string | null {
+    const trimmedValue = value?.trim();
+    return trimmedValue ? trimmedValue : null;
+  }
+
   static async searchUsers(
     searchTerm: string,
     filters?: Partial<User>
@@ -231,12 +236,12 @@ export class UserModel {
           id,
           user.firstName,
           user.lastName,
-          user.email,
+          UserModel.blankToNull(user.email),
           user.profilePictureUrl,
-          user.peNumber,
+          UserModel.blankToNull(user.peNumber),
           user.peopleSoftId,
           user.carNumber,
-          user.badgeNumber,
+          UserModel.blankToNull(user.badgeNumber),
           user.radioNumber,
           user.personalPhoneNumber,
           user.departmentPhoneNumber,
@@ -249,7 +254,7 @@ export class UserModel {
           user.status,
           user.supervisor,
           user.specialtyCertifications,
-          user.publicSafetyId,
+          UserModel.blankToNull(user.publicSafetyId),
           user.race,
           user.sex,
           user.maritalStatus,

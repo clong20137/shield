@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { BarChart3, Bell, ChevronLeft, ChevronRight, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Search, Settings, Shield, Sun, UserCircle } from 'lucide-react';
+import { BarChart3, Bell, ChevronLeft, ChevronRight, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Search, Settings, Shield, Sun, UserCircle, UserPlus } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -8,6 +8,7 @@ import { AccountSettingsPage } from './pages/AccountSettingsPage';
 import DeviceManagementPage from './pages/DeviceManagementPage';
 import PermissionsPage from './pages/PermissionsPage';
 import MessageInboxPage from './pages/MessageInboxPage';
+import CreateUserPage from './pages/CreateUserPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { AuthAccount, authService, clearAuthToken, messageService, setAuthToken, userService, User } from './services/api';
 
@@ -552,9 +553,17 @@ function App() {
             <div className={isSidebarCollapsed ? 'px-3 py-3' : 'px-4 py-3'}>
               <div className={`overflow-hidden rounded bg-white/10 ${isSidebarCollapsed ? 'p-2' : 'p-3'}`}>
                 <div className={isSidebarCollapsed ? 'flex justify-center' : 'flex items-center gap-3'}>
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white bg-white text-base font-bold text-primary-500 shadow">
-                    {currentUser ? getInitials(currentUser.displayName, currentUser.email) : <UserCircle size={32} />}
-                  </div>
+                  {currentUser?.profilePictureUrl ? (
+                    <img
+                      src={currentUser.profilePictureUrl}
+                      alt={currentUser.displayName}
+                      className="h-14 w-14 shrink-0 rounded-full border border-white bg-white object-cover shadow"
+                    />
+                  ) : (
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white bg-white text-base font-bold text-primary-500 shadow">
+                      {currentUser ? getInitials(currentUser.displayName, currentUser.email) : <UserCircle size={32} />}
+                    </div>
+                  )}
                   {!isSidebarCollapsed && (
                     <div className="min-w-0 text-white">
                       <p className="mb-1 text-xs uppercase tracking-[0.14em] text-blue-100">Profile</p>
@@ -576,7 +585,10 @@ function App() {
               <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
               {isAdministrator && (
-                <SidebarLink to="/permissions" label="Permissions" compact={isSidebarCollapsed} icon={LockKeyhole} />
+                <>
+                  <SidebarLink to="/users/create" label="Create User" compact={isSidebarCollapsed} icon={UserPlus} />
+                  <SidebarLink to="/permissions" label="Permissions" compact={isSidebarCollapsed} icon={LockKeyhole} />
+                </>
               )}
               <SidebarLink to="/account" label="Account" compact={isSidebarCollapsed} icon={Settings} />
             </nav>
@@ -666,6 +678,9 @@ function App() {
                 {currentUser && <Route path="/messages" element={<MessageInboxPage currentUser={currentUser} onToast={showToast} />} />}
                 <Route path="/devices" element={<DeviceManagementPage />} />
                 <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
+                {currentUser && isAdministrator && (
+                  <Route path="/users/create" element={<CreateUserPage onToast={showToast} />} />
+                )}
                 <Route path="/reports" element={<ReportsPage />} />
                 {currentUser && isAdministrator && (
                   <Route

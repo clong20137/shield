@@ -18,7 +18,7 @@ export function ToastHost({ toasts }: { toasts: ToastMessage[] }) {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className={`rounded border-l-4 px-4 py-3 text-sm font-semibold shadow-lg ${toastStyles[toast.type]}`}
+          className={`toast-notification rounded border-l-4 px-4 py-3 text-sm font-semibold shadow-lg ${toastStyles[toast.type]}`}
         >
           {toast.message}
         </div>

@@ -7,6 +7,7 @@ export interface AuthAccount {
   id: string;
   email: string;
   displayName: string;
+  profilePictureUrl: string;
   role: 'administrator' | 'user';
   twoFactorEnabled: boolean;
   createdAt: Date;
@@ -19,6 +20,7 @@ interface AuthAccountRow extends RowDataPacket {
   firstName: string;
   lastName: string;
   displayName: string | null;
+  profilePictureUrl: string | null;
   role: 'administrator' | 'user';
   passwordHash: string | null;
   twoFactorSecret: string | null;
@@ -132,6 +134,7 @@ function toPublicAccount(account: AuthAccountRow): AuthAccount {
     id: account.id,
     email: account.email,
     displayName: account.displayName || fallbackName || account.email,
+    profilePictureUrl: account.profilePictureUrl || '',
     role: account.role || 'user',
     twoFactorEnabled: Boolean(account.twoFactorEnabled),
     createdAt: account.createdAt,
@@ -199,6 +202,7 @@ export class AuthAccountModel {
           id: existingUser.id,
           email: normalizedEmail,
           displayName: displayName.trim(),
+          profilePictureUrl: existingUser.profilePictureUrl || '',
           role,
           twoFactorEnabled: Boolean(existingUser.twoFactorEnabled),
           createdAt: existingUser.createdAt,
@@ -220,6 +224,7 @@ export class AuthAccountModel {
         id,
         email: normalizedEmail,
         displayName: displayName.trim(),
+        profilePictureUrl: '',
         role,
         twoFactorEnabled: false,
         createdAt: now,

@@ -102,6 +102,7 @@ export interface AuthAccount {
   id: string;
   email: string;
   displayName: string;
+  profilePictureUrl: string;
   role: 'administrator' | 'user';
   twoFactorEnabled: boolean;
   createdAt: string;
