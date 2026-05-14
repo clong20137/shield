@@ -1,11 +1,21 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Archive, Check, CheckCheck, Inbox, Paperclip, Send, Trash2, X } from 'lucide-react';
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react';
+import { Check, CheckCheck, Paperclip, Send, Trash2, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, messageService, userService, User, UserMessage } from '../services/api';
 
 interface MessageInboxPageProps {
   currentUser: AuthAccount;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
+}
+
+interface MessageThread {
+  id: string;
+  contactName: string;
+  contactEmail: string;
+  subject: string;
+  latestMessage: UserMessage;
+  messages: UserMessage[];
+  unreadCount: number;
 }
 
 function formatMessageTime(value: string): string {
@@ -25,27 +35,40 @@ function formatMessageTime(value: string): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function getContactName(message: UserMessage, tab: 'inbox' | 'sent'): string {
-  return tab === 'inbox'
-    ? message.senderName || message.senderEmail || 'Unknown'
-    : message.recipientName || message.recipientEmail || 'Unknown';
+function getThreadId(message: UserMessage, currentUserId: string): string {
+  return message.senderAccountId === currentUserId ? message.recipientUserId : message.senderAccountId;
+}
+
+function getContactName(message: UserMessage, currentUserId: string): string {
+  return message.senderAccountId === currentUserId
+    ? message.recipientName || message.recipientEmail || 'Unknown'
+    : message.senderName || message.senderEmail || 'Unknown';
+}
+
+function getContactEmail(message: UserMessage, currentUserId: string): string {
+  return message.senderAccountId === currentUserId
+    ? message.recipientEmail || ''
+    : message.senderEmail || '';
 }
 
 function getDeliveryLabel(message: UserMessage): string {
   return message.isRead ? 'Read' : 'Delivered';
 }
 
+function normalizeSubject(subject: string): string {
+  return subject.replace(/^(re:\s*)+/iu, '').trim() || 'Message';
+}
+
 function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
-  const [tab, setTab] = useState<'inbox' | 'sent'>('inbox');
   const [inboxMessages, setInboxMessages] = useState<UserMessage[]>([]);
   const [sentMessages, setSentMessages] = useState<UserMessage[]>([]);
-  const [selectedMessage, setSelectedMessage] = useState<UserMessage | null>(null);
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState('');
+  const [replyAttachments, setReplyAttachments] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
-  const [emojiTarget, setEmojiTarget] = useState<'reply' | 'compose'>('reply');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [recipientQuery, setRecipientQuery] = useState('');
   const [recipientResults, setRecipientResults] = useState<User[]>([]);
@@ -53,23 +76,14 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
   const [composeAttachments, setComposeAttachments] = useState<File[]>([]);
-  const [replyAttachments, setReplyAttachments] = useState<File[]>([]);
-  const emojiButtonLabel = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
   const [isRecipientSearching, setIsRecipientSearching] = useState(false);
-  const emojiButton = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
+  const emojiButtonLabel = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
 
-  void emojiButton;
-
-  const withAttachmentSummary = (body: string, files: File[]) => {
-    if (files.length === 0) {
-      return body;
+  const loadMessages = async (showLoading = false) => {
+    if (showLoading) {
+      setIsLoading(true);
     }
 
-    return `${body.trim()}\n\nAttachments: ${files.map((file) => file.name).join(', ')}`;
-  };
-
-  const loadMessages = async () => {
-    setIsLoading(true);
     try {
       const [inboxResponse, sentResponse] = await Promise.all([
         messageService.getInbox(currentUser.id),
@@ -86,7 +100,10 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
   };
 
   useEffect(() => {
-    loadMessages();
+    loadMessages(true);
+    const interval = window.setInterval(() => loadMessages(false), 5000);
+
+    return () => window.clearInterval(interval);
   }, [currentUser.id]);
 
   useEffect(() => {
@@ -118,42 +135,105 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
     };
   }, [isComposeOpen, recipientQuery, selectedRecipient]);
 
-  const activeMessages = tab === 'inbox' ? inboxMessages : sentMessages;
-  const filteredMessages = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    if (!term) return activeMessages;
-
-    return activeMessages.filter((message) =>
-      [message.subject, message.body, message.senderName, message.senderEmail, message.recipientName, message.recipientEmail]
-        .join(' ')
-        .toLowerCase()
-        .includes(term),
+  const threads = useMemo<MessageThread[]>(() => {
+    const threadMap = new Map<string, MessageThread>();
+    const combinedMessages = [...inboxMessages, ...sentMessages].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
-  }, [activeMessages, searchTerm]);
-  const unreadCount = inboxMessages.filter((message) => !message.isRead).length;
 
-  const openMessage = async (message: UserMessage) => {
-    setSelectedMessage(message);
-    setReplyBody('');
+    combinedMessages.forEach((message) => {
+      const id = getThreadId(message, currentUser.id);
+      const existingThread = threadMap.get(id);
+      const subject = normalizeSubject(message.subject);
 
-    if (tab === 'inbox' && !message.isRead) {
-      try {
-        await messageService.markRead(message.id, currentUser.id);
-        setInboxMessages((messages) =>
-          messages.map((item) => (item.id === message.id ? { ...item, isRead: true } : item)),
-        );
-        window.dispatchEvent(new CustomEvent('shield:messages-updated'));
-      } catch (err) {
-        console.error(err);
+      if (!existingThread) {
+        threadMap.set(id, {
+          id,
+          contactName: getContactName(message, currentUser.id),
+          contactEmail: getContactEmail(message, currentUser.id),
+          subject,
+          latestMessage: message,
+          messages: [message],
+          unreadCount: message.recipientUserId === currentUser.id && !message.isRead ? 1 : 0,
+        });
+        return;
       }
+
+      existingThread.messages.push(message);
+      existingThread.latestMessage = message;
+      existingThread.subject = existingThread.subject || subject;
+      if (message.recipientUserId === currentUser.id && !message.isRead) {
+        existingThread.unreadCount += 1;
+      }
+    });
+
+    return Array.from(threadMap.values()).sort(
+      (a, b) => new Date(b.latestMessage.createdAt).getTime() - new Date(a.latestMessage.createdAt).getTime(),
+    );
+  }, [currentUser.id, inboxMessages, sentMessages]);
+
+  const filteredThreads = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return threads;
+
+    return threads.filter((thread) =>
+      [
+        thread.contactName,
+        thread.contactEmail,
+        thread.subject,
+        thread.latestMessage.body,
+      ].join(' ').toLowerCase().includes(term),
+    );
+  }, [searchTerm, threads]);
+
+  const selectedThread = threads.find((thread) => thread.id === selectedThreadId) || null;
+
+  useEffect(() => {
+    if (!selectedThreadId && threads.length > 0) {
+      setSelectedThreadId(threads[0].id);
     }
+  }, [selectedThreadId, threads]);
+
+  useEffect(() => {
+    if (!selectedThread) return;
+
+    const unreadMessages = selectedThread.messages.filter(
+      (message) => message.recipientUserId === currentUser.id && !message.isRead,
+    );
+
+    if (unreadMessages.length === 0) return;
+
+    unreadMessages.forEach((message) => {
+      messageService.markRead(message.id, currentUser.id).catch((err) => console.error(err));
+    });
+
+    setInboxMessages((messages) =>
+      messages.map((message) =>
+        unreadMessages.some((unreadMessage) => unreadMessage.id === message.id)
+          ? { ...message, isRead: true }
+          : message,
+      ),
+    );
+    window.dispatchEvent(new CustomEvent('shield:messages-updated'));
+  }, [currentUser.id, selectedThread]);
+
+  const withAttachmentSummary = (body: string, files: File[]) => {
+    if (files.length === 0) {
+      return body;
+    }
+
+    return `${body.trim()}\n\nAttachments: ${files.map((file) => file.name).join(', ')}`;
   };
 
-  const sendReply = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const addEmojiToReply = (emojiData: EmojiClickData) => {
+    setReplyBody((body) => `${body}${emojiData.emoji}`);
+  };
 
-    if (!selectedMessage || !replyBody.trim()) {
-      onToast('error', 'Enter a reply message.');
+  const sendReply = async (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+
+    if (!selectedThread || !replyBody.trim()) {
+      onToast('error', 'Enter a message.');
       return;
     }
 
@@ -161,30 +241,20 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
     try {
       await messageService.send({
         senderAccountId: currentUser.id,
-        recipientUserId: selectedMessage.senderAccountId,
-        subject: selectedMessage.subject.startsWith('Re:') ? selectedMessage.subject : `Re: ${selectedMessage.subject}`,
+        recipientUserId: selectedThread.id,
+        subject: selectedThread.subject,
         body: withAttachmentSummary(replyBody, replyAttachments),
       });
       setReplyBody('');
       setReplyAttachments([]);
-      await loadMessages();
+      await loadMessages(false);
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
-      onToast('success', 'Reply sent.');
     } catch (err) {
       console.error(err);
-      onToast('error', 'Failed to send reply.');
+      onToast('error', 'Failed to send message.');
     } finally {
       setIsSending(false);
     }
-  };
-
-  const addEmoji = (emojiData: EmojiClickData) => {
-    if (emojiTarget === 'compose') {
-      setComposeBody((body) => `${body}${emojiData.emoji}`);
-      return;
-    }
-
-    setReplyBody((body) => `${body}${emojiData.emoji}`);
   };
 
   const sendNewMessage = async (event: FormEvent<HTMLFormElement>) => {
@@ -203,6 +273,7 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
         subject: composeSubject,
         body: withAttachmentSummary(composeBody, composeAttachments),
       });
+      setSelectedThreadId(selectedRecipient.id);
       setSelectedRecipient(null);
       setRecipientQuery('');
       setComposeSubject('');
@@ -210,42 +281,14 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
       setComposeAttachments([]);
       setIsComposeOpen(false);
       setIsEmojiPickerOpen(false);
-      await loadMessages();
-      setTab('sent');
+      await loadMessages(false);
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
-      onToast('success', 'Message sent.');
     } catch (err) {
       console.error(err);
       onToast('error', 'Failed to send message.');
     } finally {
       setIsSending(false);
     }
-  };
-
-  const archiveSelectedMessage = async () => {
-    if (!selectedMessage || tab !== 'inbox') return;
-    await archiveMessage(selectedMessage);
-  };
-
-  const archiveMessage = async (message: UserMessage) => {
-    if (tab !== 'inbox') return;
-    try {
-      await messageService.archive(message.id, currentUser.id);
-      setInboxMessages((messages) => messages.filter((item) => item.id !== message.id));
-      if (selectedMessage?.id === message.id) {
-        setSelectedMessage(null);
-      }
-      window.dispatchEvent(new CustomEvent('shield:messages-updated'));
-      onToast('success', 'Message archived.');
-    } catch (err) {
-      console.error(err);
-      onToast('error', 'Failed to archive message.');
-    }
-  };
-
-  const deleteSelectedMessage = async () => {
-    if (!selectedMessage) return;
-    await deleteMessage(selectedMessage);
   };
 
   const deleteMessage = async (message: UserMessage) => {
@@ -255,19 +298,21 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
 
     try {
       await messageService.delete(message.id, currentUser.id);
-      if (tab === 'inbox') {
-        setInboxMessages((messages) => messages.filter((item) => item.id !== message.id));
-      } else {
-        setSentMessages((messages) => messages.filter((item) => item.id !== message.id));
-      }
-      if (selectedMessage?.id === message.id) {
-        setSelectedMessage(null);
-      }
+      setInboxMessages((messages) => messages.filter((item) => item.id !== message.id));
+      setSentMessages((messages) => messages.filter((item) => item.id !== message.id));
+      await loadMessages(false);
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
       onToast('success', 'Message deleted.');
     } catch (err) {
       console.error(err);
       onToast('error', 'Failed to delete message.');
+    }
+  };
+
+  const handleReplyKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      sendReply();
     }
   };
 
@@ -277,190 +322,184 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
         <div>
           <h1>Messages</h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Review inbox and sent messages.
+            Conversations update automatically.
           </p>
         </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={() => setIsComposeOpen(true)} className="btn-primary">
-            Compose
-          </button>
-          <button type="button" onClick={loadMessages} className="btn-secondary">
-            Refresh Messages
-          </button>
-        </div>
+        <button type="button" onClick={() => setIsComposeOpen(true)} className="btn-primary">
+          New Message
+        </button>
       </div>
 
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-2">
-          <button type="button" onClick={() => setTab('inbox')} className={tab === 'inbox' ? 'btn-primary' : 'btn-secondary'}>
-            <span className="inline-flex items-center gap-2"><Inbox size={16} /> Inbox {unreadCount > 0 ? `(${unreadCount})` : ''}</span>
-          </button>
-          <button type="button" onClick={() => setTab('sent')} className={tab === 'sent' ? 'btn-primary' : 'btn-secondary'}>
-            <span className="inline-flex items-center gap-2"><Send size={16} /> Sent</span>
-          </button>
-        </div>
+      <div className="mb-5">
         <input
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
-          placeholder="Search messages"
-          className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+          placeholder="Search conversations"
+          className="w-full max-w-md rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
         />
       </div>
 
-      <div className="grid min-h-[640px] grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+      <div className="grid min-h-[680px] grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
         <section className="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
           {isLoading ? (
-            <div className="loading">Loading messages...</div>
-          ) : filteredMessages.length === 0 ? (
-            <div className="empty-state">No messages found.</div>
+            <div className="loading">Loading conversations...</div>
+          ) : filteredThreads.length === 0 ? (
+            <div className="empty-state">No conversations found.</div>
           ) : (
             <div className="divide-y divide-gray-200 dark:divide-gray-800">
-              {filteredMessages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex items-center gap-2 px-3 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 ${
-                    selectedMessage?.id === message.id ? 'bg-accent/10' : ''
+              {filteredThreads.map((thread) => (
+                <button
+                  key={thread.id}
+                  type="button"
+                  onClick={() => setSelectedThreadId(thread.id)}
+                  className={`block w-full px-4 py-4 text-left hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                    selectedThreadId === thread.id ? 'bg-accent/10' : ''
                   }`}
                 >
-                  <button type="button" onClick={() => openMessage(message)} className="min-w-0 flex-1 text-left">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className={`truncate text-sm ${!message.isRead && tab === 'inbox' ? 'font-bold text-primary-500' : 'font-semibold text-gray-800 dark:text-gray-100'}`}>
-                          {getContactName(message, tab)}
-                        </p>
-                        <p className="mt-0.5 truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
-                          {message.subject}
-                        </p>
-                      </div>
-                      <span className="shrink-0 text-xs text-gray-400">{formatMessageTime(message.createdAt)}</span>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className={`truncate text-sm ${thread.unreadCount > 0 ? 'font-bold text-primary-500' : 'font-semibold text-gray-800 dark:text-gray-100'}`}>
+                        {thread.contactName}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
+                        {thread.subject}
+                      </p>
                     </div>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <p className="line-clamp-1 min-w-0 text-sm text-gray-500 dark:text-gray-400">{message.body}</p>
-                      {tab === 'sent' && (
-                        <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-accent">
-                          {message.isRead ? <CheckCheck size={14} /> : <Check size={14} />}
-                          {getDeliveryLabel(message)}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                  {tab === 'inbox' && (
-                    <button type="button" onClick={() => archiveMessage(message)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-primary-500 dark:hover:bg-gray-800" aria-label="Archive message" title="Archive">
-                      <Archive size={17} />
-                    </button>
-                  )}
-                  <button type="button" onClick={() => deleteMessage(message)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-danger dark:hover:bg-red-950" aria-label="Delete message" title="Delete">
-                    <Trash2 size={17} />
-                  </button>
-                </div>
+                    <span className="shrink-0 text-xs text-gray-400">{formatMessageTime(thread.latestMessage.createdAt)}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <p className="line-clamp-1 min-w-0 text-sm text-gray-500 dark:text-gray-400">
+                      {thread.latestMessage.senderAccountId === currentUser.id ? 'You: ' : ''}
+                      {thread.latestMessage.body}
+                    </p>
+                    {thread.unreadCount > 0 && (
+                      <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
+                        {thread.unreadCount > 9 ? '9+' : thread.unreadCount}
+                      </span>
+                    )}
+                  </div>
+                </button>
               ))}
             </div>
           )}
         </section>
 
-        <section className="flex min-h-[640px] flex-col rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-          {!selectedMessage ? (
-            <div className="empty-state">Select a message to view it.</div>
+        <section className="flex min-h-[680px] flex-col rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+          {!selectedThread ? (
+            <div className="empty-state">Select a conversation to view it.</div>
           ) : (
             <>
               <div className="border-b border-gray-200 p-5 dark:border-gray-800">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h2>{getContactName(selectedMessage, tab)}</h2>
-                    <p className="mt-1 text-sm font-semibold text-gray-600 dark:text-gray-300">{selectedMessage.subject}</p>
+                    <h2>{selectedThread.contactName}</h2>
+                    <p className="mt-1 text-sm font-semibold text-gray-600 dark:text-gray-300">{selectedThread.subject}</p>
                     <p className="mt-1 text-xs text-gray-400">
-                      Last active {formatMessageTime(selectedMessage.createdAt)}
+                      Last online {formatMessageTime(selectedThread.latestMessage.createdAt)}
                     </p>
                   </div>
-                  {tab === 'sent' && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">
-                      {selectedMessage.isRead ? <CheckCheck size={14} /> : <Check size={14} />}
-                      {getDeliveryLabel(selectedMessage)}
-                    </span>
-                  )}
+                  <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700 dark:bg-green-950 dark:text-green-200">
+                    Live
+                  </span>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {tab === 'inbox' && (
-                    <button type="button" onClick={archiveSelectedMessage} className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800" aria-label="Archive message" title="Archive">
-                      <Archive size={18} />
-                    </button>
-                  )}
-                  <button type="button" onClick={deleteSelectedMessage} className="flex h-10 w-10 items-center justify-center rounded bg-danger text-white hover:bg-red-800" aria-label="Delete message" title="Delete">
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              </div>
-              <div className="flex-1 space-y-4 overflow-y-auto bg-gray-50 p-5 dark:bg-gray-950">
-                <div className="text-center text-xs font-semibold text-gray-400">
-                  {new Date(selectedMessage.createdAt).toLocaleString(undefined, {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit',
-                  })}
-                </div>
-                <div className={`flex ${tab === 'sent' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[78%] rounded-2xl px-4 py-3 shadow-sm ${
-                    tab === 'sent'
-                      ? 'rounded-br bg-accent text-white'
-                      : 'rounded-bl bg-white text-gray-800 dark:bg-gray-900 dark:text-gray-100'
-                  }`}>
-                    <p className="whitespace-pre-wrap text-sm leading-6">{selectedMessage.body}</p>
-                  </div>
-                </div>
-                {tab === 'sent' && (
-                  <div className="flex justify-end text-xs font-semibold text-gray-400">
-                    {getDeliveryLabel(selectedMessage)}
-                  </div>
-                )}
               </div>
 
-              {tab === 'inbox' && (
-                <form onSubmit={sendReply} className="border-t border-gray-200 p-4 dark:border-gray-800">
-                  {replyAttachments.length > 0 && (
-                    <div className="mb-2 flex flex-wrap gap-2">
-                      {replyAttachments.map((file) => (
-                        <span key={`${file.name}-${file.size}`} className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">
-                          {file.name}
-                        </span>
-                      ))}
+              <div className="flex-1 space-y-4 overflow-y-auto bg-gray-50 p-5 dark:bg-gray-950">
+                {selectedThread.messages.map((message, index) => {
+                  const isMine = message.senderAccountId === currentUser.id;
+                  const previousMessage = selectedThread.messages[index - 1];
+                  const showTimestamp =
+                    !previousMessage ||
+                    new Date(message.createdAt).getTime() - new Date(previousMessage.createdAt).getTime() > 10 * 60 * 1000;
+
+                  return (
+                    <div key={message.id}>
+                      {showTimestamp && (
+                        <div className="mb-3 text-center text-xs font-semibold text-gray-400">
+                          {new Date(message.createdAt).toLocaleString(undefined, {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })}
+                        </div>
+                      )}
+                      <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`group max-w-[78%] ${isMine ? 'text-right' : 'text-left'}`}>
+                          <div className={`rounded-2xl px-4 py-3 shadow-sm ${
+                            isMine
+                              ? 'rounded-br bg-accent text-white'
+                              : 'rounded-bl bg-white text-gray-800 dark:bg-gray-900 dark:text-gray-100'
+                          }`}>
+                            <p className="whitespace-pre-wrap text-sm leading-6">{message.body}</p>
+                          </div>
+                          <div className={`mt-1 flex items-center gap-2 text-xs font-semibold text-gray-400 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                            <span>{formatMessageTime(message.createdAt)}</span>
+                            {isMine && (
+                              <span className="inline-flex items-center gap-1">
+                                {message.isRead ? <CheckCheck size={13} /> : <Check size={13} />}
+                                {getDeliveryLabel(message)}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => deleteMessage(message)}
+                              className="opacity-0 transition group-hover:opacity-100 hover:text-danger"
+                              aria-label="Delete message"
+                              title="Delete"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  <div className="flex h-14 items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 dark:border-gray-700 dark:bg-gray-950">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEmojiTarget('reply');
-                        setIsEmojiPickerOpen(true);
-                      }}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg hover:bg-gray-100 dark:hover:bg-gray-800"
-                      aria-label="Add emoji"
-                    >
-                      {emojiButtonLabel}
-                    </button>
-                    <label className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800" title="Attach files">
-                      <Paperclip size={18} />
-                      <input
-                        type="file"
-                        multiple
-                        className="hidden"
-                        onChange={(event) => setReplyAttachments(Array.from(event.target.files || []))}
-                      />
-                    </label>
-                    <textarea
-                      value={replyBody}
-                      onChange={(event) => setReplyBody(event.target.value)}
-                      placeholder="Type a reply"
-                      rows={1}
-                      className="h-8 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm leading-5 outline-none"
-                    />
-                    <button type="submit" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600" disabled={isSending} aria-label="Send reply">
-                      <Send size={17} />
-                    </button>
+                  );
+                })}
+              </div>
+
+              <form onSubmit={sendReply} className="border-t border-gray-200 p-4 dark:border-gray-800">
+                {replyAttachments.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {replyAttachments.map((file) => (
+                      <span key={`${file.name}-${file.size}`} className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">
+                        {file.name}
+                      </span>
+                    ))}
                   </div>
-                </form>
-              )}
+                )}
+                <div className="flex h-14 items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 dark:border-gray-700 dark:bg-gray-950">
+                  <button
+                    type="button"
+                    onClick={() => setIsEmojiPickerOpen(true)}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                    aria-label="Add emoji"
+                  >
+                    {emojiButtonLabel}
+                  </button>
+                  <label className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800" title="Attach files">
+                    <Paperclip size={18} />
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(event) => setReplyAttachments(Array.from(event.target.files || []))}
+                    />
+                  </label>
+                  <textarea
+                    value={replyBody}
+                    onChange={(event) => setReplyBody(event.target.value)}
+                    onKeyDown={handleReplyKeyDown}
+                    placeholder="Message"
+                    rows={1}
+                    className="h-8 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm leading-5 outline-none"
+                  />
+                  <button type="submit" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600" disabled={isSending} aria-label="Send message">
+                    <Send size={17} />
+                  </button>
+                </div>
+              </form>
             </>
           )}
         </section>
@@ -471,8 +510,8 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
           <form onSubmit={sendNewMessage} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
-                <h2>Compose Message</h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Search for a user and send a message.</p>
+                <h2>New Message</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Search for a user and start a conversation.</p>
               </div>
               <button
                 type="button"
@@ -554,10 +593,7 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
             <div className="mb-4 flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setEmojiTarget('compose');
-                  setIsEmojiPickerOpen(true);
-                }}
+                onClick={() => setIsEmojiPickerOpen(true)}
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-xl hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
                 aria-label="Add emoji"
               >
@@ -584,7 +620,7 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
       {isEmojiPickerOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onClick={() => setIsEmojiPickerOpen(false)}>
           <div className="max-h-[90vh] overflow-auto rounded-lg bg-white p-2 shadow-xl" onClick={(event) => event.stopPropagation()}>
-            <EmojiPicker onEmojiClick={addEmoji} />
+            <EmojiPicker onEmojiClick={isComposeOpen ? (emojiData) => setComposeBody((body) => `${body}${emojiData.emoji}`) : addEmojiToReply} />
           </div>
         </div>
       )}
