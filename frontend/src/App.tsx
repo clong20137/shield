@@ -381,6 +381,22 @@ function GlobalSearch({ compact }: { compact: boolean }) {
   );
 }
 
+function HeaderMessagesButton() {
+  const navigate = useNavigate();
+
+  return (
+    <button
+      type="button"
+      onClick={() => navigate('/messages')}
+      className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+      aria-label="Open messages"
+      title="Messages"
+    >
+      <Mail size={18} />
+    </button>
+  );
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthAccount | null>(null);
@@ -521,7 +537,6 @@ function App() {
 
             <nav className="flex flex-1 flex-col gap-2 px-3 py-3">
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
-              <SidebarLink to="/messages" label="Messages" compact={isSidebarCollapsed} icon={Mail} />
               <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
               {isAdministrator && (
@@ -563,6 +578,7 @@ function App() {
                 >
                   {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
                 </button>
+                <HeaderMessagesButton />
                 <button
                   type="button"
                   onClick={() => setIsNotificationsOpen((value) => !value)}
