@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, Smile, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { useSearchParams } from 'react-router-dom';
@@ -26,6 +26,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState<Partial<User>>({});
   const [isSavingUser, setIsSavingUser] = useState(false);
+  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
+  const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
   const [searchParams] = useSearchParams();
   const globalQuery = useMemo(() => searchParams.get('q') ?? '', [searchParams]);
   const selectedUserId = useMemo(() => searchParams.get('userId') ?? '', [searchParams]);
@@ -96,13 +98,34 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   };
 
   const updateProfilePicture = () => {
-    const pictureUrl = window.prompt('Enter a profile picture URL', String(editForm.profilePictureUrl || ''));
+    profilePictureInputRef.current?.click();
+  };
 
-    if (pictureUrl === null) {
+  const handleProfilePictureUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file || !editingUser) {
       return;
     }
 
-    updateEditField('profilePictureUrl', pictureUrl.trim());
+    setIsUploadingPicture(true);
+    try {
+      const response = await userService.uploadProfilePicture(editingUser.id, file);
+      const updatedUser = response.data.user;
+      setEditForm(updatedUser);
+      setEditingUser(updatedUser);
+      setSelectedUser(updatedUser);
+      setUsers((currentUsers) =>
+        currentUsers.map((user) => (user.id === updatedUser.id ? updatedUser : user)),
+      );
+      onToast('success', 'Profile picture uploaded.');
+    } catch (err) {
+      console.error(err);
+      onToast('error', 'Failed to upload profile picture.');
+    } finally {
+      setIsUploadingPicture(false);
+      event.target.value = '';
+    }
   };
 
   const handleSaveUser = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -282,10 +305,17 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                     Profile Picture
                   </p>
                   <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Click to add or change the profile picture URL.
+                    {isUploadingPicture ? 'Uploading picture...' : 'Click to upload or change the profile picture.'}
                   </p>
                 </div>
               </button>
+              <input
+                ref={profilePictureInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleProfilePictureUpload}
+                className="hidden"
+              />
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <label className="block">

@@ -9,7 +9,7 @@ import DeviceManagementPage from './pages/DeviceManagementPage';
 import PermissionsPage from './pages/PermissionsPage';
 import MessageInboxPage from './pages/MessageInboxPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
-import { AuthAccount, authService, clearAuthToken, setAuthToken, userService, User } from './services/api';
+import { AuthAccount, authService, clearAuthToken, messageService, setAuthToken, userService, User } from './services/api';
 
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
@@ -381,18 +381,52 @@ function GlobalSearch({ compact }: { compact: boolean }) {
   );
 }
 
-function HeaderMessagesButton() {
+function HeaderMessagesButton({ currentUser }: { currentUser: AuthAccount | null }) {
   const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setUnreadCount(0);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadUnreadCount = async () => {
+      try {
+        const response = await messageService.getInbox(currentUser.id);
+        if (isMounted) {
+          setUnreadCount(response.data.filter((message) => !message.isRead).length);
+        }
+      } catch (err) {
+        console.error('Failed to load unread messages:', err);
+      }
+    };
+
+    loadUnreadCount();
+    const interval = window.setInterval(loadUnreadCount, 30000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
+  }, [currentUser]);
 
   return (
     <button
       type="button"
       onClick={() => navigate('/messages')}
-      className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+      className="relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
       aria-label="Open messages"
       title="Messages"
     >
       <Mail size={18} />
+      {unreadCount > 0 && (
+        <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
+          {unreadCount > 9 ? '9+' : unreadCount}
+        </span>
+      )}
     </button>
   );
 }
@@ -578,7 +612,7 @@ function App() {
                 >
                   {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
                 </button>
-                <HeaderMessagesButton />
+                <HeaderMessagesButton currentUser={currentUser} />
                 <button
                   type="button"
                   onClick={() => setIsNotificationsOpen((value) => !value)}

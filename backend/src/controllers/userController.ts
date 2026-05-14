@@ -108,4 +108,27 @@ export class UserController {
       res.status(500).json({ error: 'Failed to delete user' });
     }
   }
+
+  static async uploadProfilePicture(req: Request, res: Response) {
+    try {
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ error: 'Profile picture is required' });
+      }
+
+      const profilePictureUrl = `${req.protocol}://${req.get('host')}/uploads/profile-pictures/${file.filename}`;
+      const success = await UserModel.updateUser(req.params.id, { profilePictureUrl });
+
+      if (!success) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const user = await UserModel.getUserById(req.params.id);
+      res.json({ profilePictureUrl, user });
+    } catch (error) {
+      console.error('Profile picture upload error:', error);
+      res.status(500).json({ error: 'Failed to upload profile picture' });
+    }
+  }
 }

@@ -51,6 +51,10 @@ build/
 *.sql.bak
 dump.sql
 
+# Uploaded files
+uploads/
+backend/uploads/
+
 # Package managers
 package-lock.json
 yarn.lock

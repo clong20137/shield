@@ -206,6 +206,14 @@ export const userService = {
   
   update: (id: string, updates: Partial<User>) =>
     api.put(`/users/${id}`, updates),
+
+  uploadProfilePicture: (id: string, file: File) => {
+    const formData = new FormData();
+    formData.append('profilePicture', file);
+    return api.post<{ profilePictureUrl: string; user: User }>(`/users/${id}/profile-picture`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   
   delete: (id: string) =>
     api.delete(`/users/${id}`),
