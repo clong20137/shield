@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { calendarService, CalendarEntry, userService, reportService, ReportRow, SystemStatistics, User } from '../services/api';
+import { authService, calendarService, CalendarEntry, userService, reportService, ReportRow, SystemStatistics, User } from '../services/api';
 import { StatisticsCard } from '../components/StatisticsCard';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>;
@@ -85,8 +85,24 @@ function DashboardCalendar() {
   const [entryForm, setEntryForm] = useState<CalendarEntryForm>(() =>
     createDefaultEntryForm(formatDateKey(new Date())),
   );
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [districtFilter, setDistrictFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [isCalendarLoading, setIsCalendarLoading] = useState(true);
   const [calendarError, setCalendarError] = useState<string | null>(null);
+
+  const getAuditActor = async () => {
+    try {
+      const response = await authService.getSession();
+      const account = response.data.account;
+      return {
+        actorId: account?.id,
+        actorName: account?.displayName || account?.email,
+      };
+    } catch {
+      return {};
+    }
+  };
 
   useEffect(() => {
     loadCalendarEntries();
@@ -109,6 +125,7 @@ function DashboardCalendar() {
   const openDay = (dateKey: string) => {
     setSelectedDate(dateKey);
     setEntryForm(createDefaultEntryForm(dateKey));
+    setEditingEntryId(null);
   };
 
   const closeModal = () => {
@@ -134,11 +151,23 @@ function DashboardCalendar() {
 
     setCalendarError(null);
     try {
-      const response = await calendarService.create({
+      const actor = await getAuditActor();
+      const payload = {
         ...entryForm,
         dutyHours: hours.toFixed(2).replace(/\.?0+$/, ''),
-      });
-      setEntries((currentEntries) => [response.data, ...currentEntries]);
+        ...actor,
+      };
+
+      if (editingEntryId) {
+        const response = await calendarService.update(editingEntryId, payload);
+        setEntries((currentEntries) =>
+          currentEntries.map((entry) => (entry.id === editingEntryId ? response.data : entry)),
+        );
+        setEditingEntryId(null);
+      } else {
+        const response = await calendarService.create(payload);
+        setEntries((currentEntries) => [response.data, ...currentEntries]);
+      }
       setEntryForm(createDefaultEntryForm(entryForm.date));
     } catch (err) {
       console.error('Failed to save calendar entry:', err);
@@ -147,9 +176,14 @@ function DashboardCalendar() {
   };
 
   const deleteEntry = async (entryId: string) => {
+    if (!window.confirm('Delete this calendar entry?')) {
+      return;
+    }
+
     setCalendarError(null);
     try {
-      await calendarService.delete(entryId);
+      const actor = await getAuditActor();
+      await calendarService.delete(entryId, actor);
       setEntries((currentEntries) => currentEntries.filter((entry) => entry.id !== entryId));
     } catch (err) {
       console.error('Failed to delete calendar entry:', err);
@@ -157,8 +191,26 @@ function DashboardCalendar() {
     }
   };
 
+  const editEntry = (entry: CalendarEntry) => {
+    setEditingEntryId(entry.id);
+    setEntryForm({
+      category: entry.category,
+      date: entry.date,
+      dutyHours: entry.dutyHours,
+      districtWorked: entry.districtWorked,
+      specialStatus: entry.specialStatus,
+      color: entry.color,
+    });
+  };
+
+  const visibleEntries = entries.filter((entry) => {
+    const matchesDistrict = !districtFilter || entry.districtWorked === districtFilter;
+    const matchesStatus = !statusFilter || entry.specialStatus === statusFilter;
+    return matchesDistrict && matchesStatus;
+  });
+
   const selectedEntries = selectedDate
-    ? entries.filter((entry) => entry.date === selectedDate)
+    ? visibleEntries.filter((entry) => entry.date === selectedDate)
     : [];
 
   const monthStart = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
@@ -197,6 +249,17 @@ function DashboardCalendar() {
         </div>
       </div>
 
+      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+        <select value={districtFilter} onChange={(event) => setDistrictFilter(event.target.value)} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
+          <option value="">All Districts</option>
+          {districtOptions.map((district) => <option key={district}>{district}</option>)}
+        </select>
+        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
+          <option value="">All Special Status</option>
+          {specialStatusOptions.map((status) => <option key={status}>{status}</option>)}
+        </select>
+      </div>
+
       {calendarError && <div className="error">{calendarError}</div>}
       {isCalendarLoading && <div className="loading">Loading calendar entries...</div>}
 
@@ -213,7 +276,7 @@ function DashboardCalendar() {
           }
 
           const dateKey = formatDateKey(date);
-          const dayEntries = entries.filter((entry) => entry.date === dateKey);
+          const dayEntries = visibleEntries.filter((entry) => entry.date === dateKey);
           const isToday = dateKey === todayKey;
 
           return (
@@ -264,7 +327,7 @@ function DashboardCalendar() {
               <div>
                 <h2>{getReadableDate(selectedDate)}</h2>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Add duty details for this calendar day.
+                  {editingEntryId ? 'Edit duty details for this calendar day.' : 'Add duty details for this calendar day.'}
                 </p>
               </div>
               <button type="button" onClick={closeModal} className="btn-secondary">
@@ -367,8 +430,16 @@ function DashboardCalendar() {
 
               <div className="md:col-span-2">
                 <button type="submit" className="btn-primary">
-                  Add Calendar Entry
+                  {editingEntryId ? 'Save Calendar Entry' : 'Add Calendar Entry'}
                 </button>
+                {editingEntryId && (
+                  <button type="button" onClick={() => {
+                    setEditingEntryId(null);
+                    setEntryForm(createDefaultEntryForm(selectedDate));
+                  }} className="btn-secondary ml-2">
+                    Cancel Edit
+                  </button>
+                )}
               </div>
             </form>
 
@@ -399,9 +470,14 @@ function DashboardCalendar() {
                           </p>
                         </div>
                       </div>
-                      <button type="button" onClick={() => deleteEntry(entry.id)} className="btn-danger">
-                        Delete
-                      </button>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => editEntry(entry)} className="btn-secondary">
+                          Edit
+                        </button>
+                        <button type="button" onClick={() => deleteEntry(entry.id)} className="btn-danger">
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

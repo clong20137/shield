@@ -104,6 +104,42 @@ export class CalendarEntryModel {
     }
   }
 
+  static async updateEntry(id: string, entry: CalendarEntryInput): Promise<CalendarEntry | null> {
+    const conn = await pool.getConnection();
+    try {
+      await conn.query<ResultSetHeader>(
+        `UPDATE calendar_entries SET
+          \`category\` = ?,
+          \`entryDate\` = ?,
+          \`dutyHours\` = ?,
+          \`districtWorked\` = ?,
+          \`specialStatus\` = ?,
+          \`color\` = ?,
+          \`updatedAt\` = ?
+        WHERE \`id\` = ?`,
+        [
+          entry.category,
+          entry.date,
+          Number(entry.dutyHours),
+          entry.districtWorked,
+          entry.specialStatus,
+          entry.color,
+          new Date(),
+          id,
+        ]
+      );
+
+      const [rows] = await conn.query<CalendarEntryRow[]>(
+        'SELECT * FROM calendar_entries WHERE `id` = ? LIMIT 1',
+        [id]
+      );
+
+      return rows[0] ? toCalendarEntry(rows[0]) : null;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async deleteEntry(id: string): Promise<boolean> {
     const conn = await pool.getConnection();
     try {

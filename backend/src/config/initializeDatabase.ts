@@ -161,6 +161,22 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`actorId\` VARCHAR(36),
+      \`actorName\` VARCHAR(150),
+      \`action\` VARCHAR(100) NOT NULL,
+      \`entityType\` VARCHAR(100) NOT NULL,
+      \`entityId\` VARCHAR(100),
+      \`details\` TEXT,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX \`idx_audit_actor\` (\`actorId\`),
+      INDEX \`idx_audit_entity\` (\`entityType\`, \`entityId\`),
+      INDEX \`idx_audit_created\` (\`createdAt\`)
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS user_messages (
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`senderAccountId\` VARCHAR(36) NOT NULL,

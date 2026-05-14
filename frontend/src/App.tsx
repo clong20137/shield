@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { BarChart3, Bell, ChevronLeft, ChevronRight, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Search, Settings, Shield, Sun, UserCircle, UserPlus } from 'lucide-react';
+import { BarChart3, Bell, ChevronLeft, ChevronRight, ClipboardList, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Search, Settings, Shield, Sun, UserCircle, UserPlus } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -9,6 +9,7 @@ import DeviceManagementPage from './pages/DeviceManagementPage';
 import PermissionsPage from './pages/PermissionsPage';
 import MessageInboxPage from './pages/MessageInboxPage';
 import CreateUserPage from './pages/CreateUserPage';
+import AuditLogPage from './pages/AuditLogPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { AuthAccount, authService, clearAuthToken, messageService, setAuthToken, userService, User } from './services/api';
 
@@ -587,6 +588,7 @@ function App() {
               {isAdministrator && (
                 <>
                   <SidebarLink to="/users/create" label="Create User" compact={isSidebarCollapsed} icon={UserPlus} />
+                  <SidebarLink to="/audit" label="Audit Log" compact={isSidebarCollapsed} icon={ClipboardList} />
                   <SidebarLink to="/permissions" label="Permissions" compact={isSidebarCollapsed} icon={LockKeyhole} />
                 </>
               )}
@@ -680,6 +682,9 @@ function App() {
                 <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
                 {currentUser && isAdministrator && (
                   <Route path="/users/create" element={<CreateUserPage onToast={showToast} />} />
+                )}
+                {currentUser && isAdministrator && (
+                  <Route path="/audit" element={<AuditLogPage />} />
                 )}
                 <Route path="/reports" element={<ReportsPage />} />
                 {currentUser && isAdministrator && (

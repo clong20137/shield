@@ -132,6 +132,17 @@ export interface CalendarEntry {
   updatedAt: string;
 }
 
+export interface AuditLog {
+  id: string;
+  actorId: string | null;
+  actorName: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  details: string | null;
+  createdAt: string;
+}
+
 export interface DeviceRecord {
   id: string;
   type: 'Cell Phone' | 'MiFi Device' | 'Computer' | 'Radio';
@@ -245,8 +256,16 @@ export const calendarService = {
   create: (entry: Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>) =>
     api.post<CalendarEntry>('/calendar', entry),
 
+  update: (id: string, entry: Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>) =>
+    api.put<CalendarEntry>(`/calendar/${id}`, entry),
+
   delete: (id: string) =>
     api.delete(`/calendar/${id}`),
+};
+
+export const auditService = {
+  getAll: (limit = 100) =>
+    api.get<AuditLog[]>('/audit', { params: { limit } }),
 };
 
 export const deviceService = {

@@ -10,6 +10,7 @@ import reportRoutes from './routes/reportRoutes';
 import calendarRoutes from './routes/calendarRoutes';
 import deviceRoutes from './routes/deviceRoutes';
 import messageRoutes from './routes/messageRoutes';
+import auditRoutes from './routes/auditRoutes';
 
 dotenv.config();
 
@@ -29,6 +30,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/audit', auditRoutes);
 
 app.use((error: Error, req: Request, res: Response, next: express.NextFunction) => {
   if (error instanceof multer.MulterError) {

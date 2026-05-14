@@ -5,6 +5,7 @@ const router = Router();
 
 router.get('/', CalendarController.listEntries);
 router.post('/', CalendarController.createEntry);
+router.put('/:id', CalendarController.updateEntry);
 router.delete('/:id', CalendarController.deleteEntry);
 
 export default router;
