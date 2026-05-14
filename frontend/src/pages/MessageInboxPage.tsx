@@ -344,19 +344,19 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
                       ))}
                     </div>
                   )}
-                  <div className="flex items-end gap-2 rounded-full border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                  <div className="flex h-14 items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 dark:border-gray-700 dark:bg-gray-950">
                     <button
                       type="button"
                       onClick={() => {
                         setEmojiTarget('reply');
                         setIsEmojiPickerOpen(true);
                       }}
-                      className="flex h-10 w-10 items-center justify-center rounded-full text-xl hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg hover:bg-gray-100 dark:hover:bg-gray-800"
                       aria-label="Add emoji"
                     >
                       {emojiButton}
                     </button>
-                    <label className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800" title="Attach files">
+                    <label className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800" title="Attach files">
                       <Paperclip size={18} />
                       <input
                         type="file"
@@ -369,9 +369,10 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
                       value={replyBody}
                       onChange={(event) => setReplyBody(event.target.value)}
                       placeholder="Type a reply"
-                      className="max-h-32 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none"
+                      rows={1}
+                      className="h-8 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm leading-5 outline-none"
                     />
-                    <button type="submit" className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600" disabled={isSending} aria-label="Send reply">
+                    <button type="submit" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600" disabled={isSending} aria-label="Send reply">
                       <Send size={17} />
                     </button>
                   </div>

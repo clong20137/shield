@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { BarChart3, Bell, ChevronLeft, ChevronRight, ClipboardList, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Search, Shield, Sun, UserCircle, UserPlus, X } from 'lucide-react';
+import { BarChart3, Bell, ChevronLeft, ChevronRight, ClipboardList, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Search, Settings, Shield, Sun, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -649,15 +649,11 @@ function App() {
                 <button
                   type="button"
                   onClick={() => setIsAccountMenuOpen((value) => !value)}
-                  className="flex h-10 w-10 items-center justify-center overflow-hidden rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                  className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
                   aria-label="Open account menu"
                   title="Account"
                 >
-                  {currentUser?.profilePictureUrl ? (
-                    <img src={currentUser.profilePictureUrl} alt={currentUser.displayName} className="h-full w-full object-cover" />
-                  ) : (
-                    <UserCircle size={20} />
-                  )}
+                  <Settings size={18} />
                 </button>
 
                 {isNotificationsOpen && (

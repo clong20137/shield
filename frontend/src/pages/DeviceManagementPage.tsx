@@ -146,6 +146,13 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   };
 
   const deleteDevice = async (deviceId: string) => {
+    const device = devices.find((item) => item.id === deviceId);
+    const label = device?.assetTag || 'this device';
+
+    if (!window.confirm(`Delete ${label}? This cannot be undone.`)) {
+      return;
+    }
+
     try {
       await deviceService.delete(deviceId);
       setDevices((currentDevices) => currentDevices.filter((device) => device.id !== deviceId));
