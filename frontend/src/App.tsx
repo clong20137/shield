@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react';
-import { BarChart3, Bell, ChevronLeft, ChevronRight, ClipboardList, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Search, Settings, Shield, Sun, UserCircle, UserPlus, X } from 'lucide-react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { BarChart3, Bell, ChevronLeft, ChevronRight, ClipboardList, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Search, Settings, Shield, SlidersHorizontal, Sun, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -15,6 +15,26 @@ import { AuthAccount, authService, clearAuthToken, messageService, setAuthToken,
 
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
+const MESSAGE_PREFERENCES_KEY = 'shield_message_preferences';
+
+interface MessagePreferences {
+  receiveMessages: boolean;
+  playMessageSound: boolean;
+}
+
+const defaultMessagePreferences: MessagePreferences = {
+  receiveMessages: true,
+  playMessageSound: true,
+};
+
+function loadMessagePreferences(): MessagePreferences {
+  try {
+    const storedPreferences = window.localStorage.getItem(MESSAGE_PREFERENCES_KEY);
+    return storedPreferences ? { ...defaultMessagePreferences, ...JSON.parse(storedPreferences) } : defaultMessagePreferences;
+  } catch {
+    return defaultMessagePreferences;
+  }
+}
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (
@@ -396,13 +416,23 @@ function GlobalSearch({ compact }: { compact: boolean }) {
   );
 }
 
-function HeaderMessagesButton({ currentUser }: { currentUser: AuthAccount | null }) {
+function HeaderMessagesButton({
+  currentUser,
+  preferences,
+  onUnreadIncrease,
+}: {
+  currentUser: AuthAccount | null;
+  preferences: MessagePreferences;
+  onUnreadIncrease: () => void;
+}) {
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
+  const previousUnreadCount = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUser || !preferences.receiveMessages) {
       setUnreadCount(0);
+      previousUnreadCount.current = null;
       return;
     }
 
@@ -412,7 +442,12 @@ function HeaderMessagesButton({ currentUser }: { currentUser: AuthAccount | null
       try {
         const response = await messageService.getInbox(currentUser.id);
         if (isMounted) {
-          setUnreadCount(response.data.filter((message) => !message.isRead).length);
+          const nextUnreadCount = response.data.filter((message) => !message.isRead).length;
+          if (previousUnreadCount.current !== null && nextUnreadCount > previousUnreadCount.current) {
+            onUnreadIncrease();
+          }
+          previousUnreadCount.current = nextUnreadCount;
+          setUnreadCount(nextUnreadCount);
         }
       } catch (err) {
         console.error('Failed to load unread messages:', err);
@@ -428,7 +463,7 @@ function HeaderMessagesButton({ currentUser }: { currentUser: AuthAccount | null
       window.clearInterval(interval);
       window.removeEventListener('shield:messages-updated', loadUnreadCount);
     };
-  }, [currentUser]);
+  }, [currentUser, onUnreadIncrease, preferences.receiveMessages]);
 
   return (
     <button
@@ -459,6 +494,8 @@ function App() {
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
+  const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
 
   const showToast = (type: ToastType, message: string) => {
     const id = Date.now();
@@ -480,6 +517,36 @@ function App() {
     document.documentElement.classList.toggle('dark', theme === 'dark');
     window.localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MESSAGE_PREFERENCES_KEY, JSON.stringify(messagePreferences));
+  }, [messagePreferences]);
+
+  const playMessagePing = () => {
+    if (!messagePreferences.receiveMessages || !messagePreferences.playMessageSound) {
+      return;
+    }
+
+    try {
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) return;
+
+      const audioContext = new AudioContextClass();
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.18, audioContext.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.22);
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.24);
+    } catch (err) {
+      console.error('Failed to play message ping:', err);
+    }
+  };
 
   useEffect(() => {
     authService.getSession()
@@ -637,7 +704,7 @@ function App() {
                     </span>
                   )}
                 </button>
-                <HeaderMessagesButton currentUser={currentUser} />
+                <HeaderMessagesButton currentUser={currentUser} preferences={messagePreferences} onUnreadIncrease={playMessagePing} />
                 <button
                   type="button"
                   onClick={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
@@ -699,6 +766,16 @@ function App() {
                       className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
                     >
                       <UserCircle size={16} /> Account Settings
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPreferencesOpen(true);
+                        setIsAccountMenuOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                    >
+                      <SlidersHorizontal size={16} /> Preferences
                     </button>
                     <button
                       type="button"
@@ -765,6 +842,60 @@ function App() {
                   onToast={showToast}
                   getErrorMessage={getErrorMessage}
                 />
+              </div>
+            </div>
+          )}
+          {isPreferencesOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+                <div className="mb-5 flex items-center justify-between">
+                  <h2>Preferences</h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsPreferencesOpen(false)}
+                    className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                    aria-label="Close preferences"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
+                    <span>
+                      <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Receive messages</span>
+                      <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Show message badges and message notifications.</span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={messagePreferences.receiveMessages}
+                      onChange={(event) =>
+                        setMessagePreferences((preferences) => ({
+                          ...preferences,
+                          receiveMessages: event.target.checked,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
+                    <span>
+                      <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Message ping sound</span>
+                      <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Play a short sound when new unread messages arrive.</span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={messagePreferences.playMessageSound}
+                      disabled={!messagePreferences.receiveMessages}
+                      onChange={(event) =>
+                        setMessagePreferences((preferences) => ({
+                          ...preferences,
+                          playMessageSound: event.target.checked,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
               </div>
             </div>
           )}

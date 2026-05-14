@@ -100,7 +100,7 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [recipientQuery, setRecipientQuery] = useState('');
   const [recipientResults, setRecipientResults] = useState<User[]>([]);
-  const [selectedRecipient, setSelectedRecipient] = useState<User | null>(null);
+  const [selectedRecipients, setSelectedRecipients] = useState<User[]>([]);
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
   const [composeAttachments, setComposeAttachments] = useState<File[]>([]);
@@ -135,7 +135,7 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
   }, [currentUser.id]);
 
   useEffect(() => {
-    if (!isComposeOpen || recipientQuery.trim().length < 2 || selectedRecipient) {
+    if (!isComposeOpen || recipientQuery.trim().length < 2) {
       setRecipientResults([]);
       return;
     }
@@ -146,7 +146,11 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
       try {
         const response = await userService.search(recipientQuery);
         if (isMounted) {
-          setRecipientResults(response.data.slice(0, 8));
+          setRecipientResults(
+            response.data
+              .filter((user: User) => !selectedRecipients.some((recipient) => recipient.id === user.id))
+              .slice(0, 8),
+          );
         }
       } catch (err) {
         console.error(err);
@@ -161,7 +165,7 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
       isMounted = false;
       window.clearTimeout(timer);
     };
-  }, [isComposeOpen, recipientQuery, selectedRecipient]);
+  }, [isComposeOpen, recipientQuery, selectedRecipients]);
 
   const threads = useMemo<MessageThread[]>(() => {
     const threadMap = new Map<string, MessageThread>();
@@ -290,21 +294,25 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
   const sendNewMessage = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!selectedRecipient || !composeSubject.trim() || !composeBody.trim()) {
-      onToast('error', 'Choose a recipient and enter a subject and message.');
+    if (selectedRecipients.length === 0 || !composeSubject.trim() || !composeBody.trim()) {
+      onToast('error', 'Choose at least one recipient and enter a subject and message.');
       return;
     }
 
     setIsSending(true);
     try {
-      await messageService.send({
-        senderAccountId: currentUser.id,
-        recipientUserId: selectedRecipient.id,
-        subject: composeSubject,
-        body: withAttachmentSummary(composeBody, composeAttachments),
-      });
-      setSelectedThreadId(selectedRecipient.id);
-      setSelectedRecipient(null);
+      await Promise.all(
+        selectedRecipients.map((recipient) =>
+          messageService.send({
+            senderAccountId: currentUser.id,
+            recipientUserId: recipient.id,
+            subject: composeSubject,
+            body: withAttachmentSummary(composeBody, composeAttachments),
+          }),
+        ),
+      );
+      setSelectedThreadId(selectedRecipients[0].id);
+      setSelectedRecipients([]);
       setRecipientQuery('');
       setComposeSubject('');
       setComposeBody('');
@@ -606,16 +614,32 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
 
             <label className="mb-4 block">
               <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">To</span>
+              {selectedRecipients.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {selectedRecipients.map((recipient) => (
+                    <span key={recipient.id} className="inline-flex items-center gap-2 rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">
+                      {recipient.firstName} {recipient.lastName}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRecipients((recipients) => recipients.filter((item) => item.id !== recipient.id))}
+                        className="text-accent hover:text-danger"
+                        aria-label={`Remove ${recipient.firstName} ${recipient.lastName}`}
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
               <input
-                value={selectedRecipient ? `${selectedRecipient.firstName} ${selectedRecipient.lastName}` : recipientQuery}
+                value={recipientQuery}
                 onChange={(event) => {
-                  setSelectedRecipient(null);
                   setRecipientQuery(event.target.value);
                 }}
-                placeholder="Search users by name, email, PE, badge..."
+                placeholder="Search and add users by name, email, PE, badge..."
                 className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
               />
-              {(recipientResults.length > 0 || isRecipientSearching) && !selectedRecipient && (
+              {(recipientResults.length > 0 || isRecipientSearching) && (
                 <div className="mt-2 overflow-hidden rounded border border-gray-200 bg-white shadow dark:border-gray-700 dark:bg-gray-950">
                   {isRecipientSearching ? (
                     <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>
@@ -625,7 +649,7 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
                         key={user.id}
                         type="button"
                         onClick={() => {
-                          setSelectedRecipient(user);
+                          setSelectedRecipients((recipients) => [...recipients, user]);
                           setRecipientQuery('');
                           setRecipientResults([]);
                         }}
