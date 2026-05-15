@@ -481,30 +481,29 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
             <div className="empty-state">Select a conversation to view it.</div>
           ) : (
             <>
-              <div className="border-b border-gray-200 p-5 dark:border-gray-800">
-                <div className="flex flex-col items-center text-center">
+              <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+                <div className="flex items-center justify-center gap-3 text-center">
                   {selectedThread.contactProfilePictureUrl ? (
                     <img
                       src={selectedThread.contactProfilePictureUrl}
                       alt={selectedThread.contactName}
-                      className="h-20 w-20 rounded-full border border-gray-200 object-cover shadow-sm dark:border-gray-700"
+                      className="h-12 w-12 rounded-full border border-gray-200 object-cover shadow-sm dark:border-gray-700"
                     />
                   ) : (
-                    <div className="flex h-20 w-20 items-center justify-center rounded-full border border-gray-200 bg-accent/10 text-xl font-bold text-accent shadow-sm dark:border-gray-700">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-accent/10 text-sm font-bold text-accent shadow-sm dark:border-gray-700">
                       {getInitials(selectedThread.contactName)}
                     </div>
                   )}
-                  <h2 className="mt-3">{selectedThread.contactName}</h2>
-                  <p className="mt-1 text-sm font-semibold text-gray-600 dark:text-gray-300">
-                    {selectedThread.contactRank || 'No rank listed'}
-                  </p>
-                  <p className="mt-1 text-xs text-gray-400">
-                    Last online {formatMessageTime(selectedThread.latestMessage.createdAt)}
-                  </p>
+                  <div className="min-w-0 text-left">
+                    <h2 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">{selectedThread.contactName}</h2>
+                    <p className="truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
+                      {selectedThread.contactRank || 'No rank listed'} - Last active {formatMessageTime(selectedThread.latestMessage.createdAt)}
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex-1 space-y-4 overflow-y-auto bg-gray-50 p-5 dark:bg-gray-950">
+              <div className="flex-1 space-y-4 overflow-y-auto bg-gray-50 p-4 dark:bg-gray-950">
                 {selectedThread.messages.map((message, index) => {
                   const isMine = message.senderAccountId === currentUser.id;
                   const previousMessage = selectedThread.messages[index - 1];

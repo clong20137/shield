@@ -560,8 +560,8 @@ function QuickLaunchTray({
   };
 
   return (
-    <section className={`pointer-events-none fixed bottom-0 right-0 z-30 border-t border-gray-200 bg-white/95 px-6 py-4 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-all duration-200 dark:border-gray-800 dark:bg-gray-950/95 ${isSidebarCollapsed ? 'left-20' : 'left-72'}`}>
-      <div className="pointer-events-auto mx-auto max-w-6xl">
+    <section className={`pointer-events-none fixed bottom-5 right-6 z-30 transition-all duration-200 ${isSidebarCollapsed ? 'left-24' : 'left-[19.5rem]'}`}>
+      <div className="pointer-events-auto mx-auto max-w-6xl rounded-2xl border border-gray-200 bg-white/85 p-4 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/80">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Quick Launch</h3>
         </div>
@@ -984,7 +984,7 @@ function App() {
               </div>
             </header>
 
-            <main className="flex-1 overflow-y-auto px-6 pb-44 pt-8 dark:bg-gray-950">
+            <main className="flex-1 overflow-y-auto px-6 pb-48 pt-8 dark:bg-gray-950">
               <div className="min-h-[calc(100vh-12rem)]">
                 <Routes>
                   <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
@@ -1023,11 +1023,11 @@ function App() {
           </div>
           {isMessagesModalOpen && currentUser && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-              <div className="flex h-[92vh] w-full max-w-7xl flex-col rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
-                <div className="mb-4 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
+              <div className="flex h-[94vh] w-full max-w-7xl flex-col rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900">
+                <div className="mb-3 flex items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Messages</h2>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Conversations update automatically.</p>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Messages</h2>
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Conversations update automatically.</p>
                   </div>
                   <button
                     type="button"
