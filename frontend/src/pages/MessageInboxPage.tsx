@@ -6,6 +6,7 @@ import { AuthAccount, messageService, userService, User, UserMessage } from '../
 interface MessageInboxPageProps {
   currentUser: AuthAccount;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
+  isModalView?: boolean;
 }
 
 interface MessageThread {
@@ -87,7 +88,7 @@ function normalizeSubject(subject: string): string {
   return subject.replace(/^(re:\s*)+/iu, '').trim() || 'Message';
 }
 
-function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
+function MessageInboxPage({ currentUser, onToast, isModalView = false }: MessageInboxPageProps) {
   const [inboxMessages, setInboxMessages] = useState<UserMessage[]>([]);
   const [sentMessages, setSentMessages] = useState<UserMessage[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
@@ -381,7 +382,8 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
   };
 
   return (
-    <div>
+    <div className={isModalView ? 'flex h-full min-h-0 flex-col' : ''}>
+      {!isModalView && (
       <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1>Messages</h1>
@@ -390,8 +392,9 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
           </p>
         </div>
       </div>
+      )}
 
-      <div className="mb-5">
+      <div className={isModalView ? 'mb-4 shrink-0' : 'mb-5'}>
         <input
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
@@ -400,7 +403,13 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
         />
       </div>
 
-      <div className="grid h-[calc(100vh-230px)] min-h-[620px] grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+      <div
+        className={
+          isModalView
+            ? 'grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-[380px_minmax(0,1fr)]'
+            : 'grid h-[calc(100vh-230px)] min-h-[620px] grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]'
+        }
+      >
         <section className="relative flex min-h-0 flex-col overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
           {isLoading ? (
             <div className="loading">Loading conversations...</div>

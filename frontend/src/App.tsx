@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { BarChart3, Bell, ChevronLeft, ChevronRight, ClipboardList, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Search, Settings, Shield, SlidersHorizontal, Sun, UserCircle, UserPlus, X } from 'lucide-react';
+import { BarChart3, Bell, ChevronLeft, ChevronRight, ClipboardList, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Search, Settings, Shield, SlidersHorizontal, Sun, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -16,10 +16,22 @@ import { AuthAccount, authService, clearAuthToken, messageService, setAuthToken,
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
 const MESSAGE_PREFERENCES_KEY = 'shield_message_preferences';
+const QUICK_LAUNCH_KEY = 'shield_quick_launch';
+const QUICK_LAUNCH_SLOT_COUNT = 5;
 
 interface MessagePreferences {
   receiveMessages: boolean;
   playMessageSound: boolean;
+}
+
+type QuickLaunchAppId = 'dashboard' | 'messages' | 'devices' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
+
+interface QuickLaunchApp {
+  id: QuickLaunchAppId;
+  label: string;
+  path?: string;
+  adminOnly?: boolean;
+  icon: LucideIcon;
 }
 
 const defaultMessagePreferences: MessagePreferences = {
@@ -27,12 +39,40 @@ const defaultMessagePreferences: MessagePreferences = {
   playMessageSound: true,
 };
 
+const quickLaunchApps: QuickLaunchApp[] = [
+  { id: 'dashboard', label: 'Dashboard', path: '/', icon: LayoutDashboard },
+  { id: 'messages', label: 'Messages', icon: Mail },
+  { id: 'devices', label: 'Devices', path: '/devices', icon: Laptop },
+  { id: 'search', label: 'Search Users', path: '/search', icon: Search },
+  { id: 'reports', label: 'Reports', path: '/reports', icon: BarChart3 },
+  { id: 'create-user', label: 'Create User', path: '/users/create', adminOnly: true, icon: UserPlus },
+  { id: 'audit', label: 'Audit Log', path: '/audit', adminOnly: true, icon: ClipboardList },
+  { id: 'permissions', label: 'Permissions', path: '/permissions', adminOnly: true, icon: LockKeyhole },
+];
+
 function loadMessagePreferences(): MessagePreferences {
   try {
     const storedPreferences = window.localStorage.getItem(MESSAGE_PREFERENCES_KEY);
     return storedPreferences ? { ...defaultMessagePreferences, ...JSON.parse(storedPreferences) } : defaultMessagePreferences;
   } catch {
     return defaultMessagePreferences;
+  }
+}
+
+function loadQuickLaunchSlots(): Array<QuickLaunchAppId | null> {
+  try {
+    const storedSlots = window.localStorage.getItem(QUICK_LAUNCH_KEY);
+    const parsedSlots = storedSlots ? JSON.parse(storedSlots) : [];
+    if (!Array.isArray(parsedSlots)) {
+      return Array.from({ length: QUICK_LAUNCH_SLOT_COUNT }, () => null);
+    }
+
+    return Array.from({ length: QUICK_LAUNCH_SLOT_COUNT }, (_, index) => {
+      const appId = parsedSlots[index];
+      return quickLaunchApps.some((app) => app.id === appId) ? appId : null;
+    });
+  } catch {
+    return Array.from({ length: QUICK_LAUNCH_SLOT_COUNT }, () => null);
   }
 }
 
@@ -420,12 +460,13 @@ function HeaderMessagesButton({
   currentUser,
   preferences,
   onUnreadIncrease,
+  onOpenMessages,
 }: {
   currentUser: AuthAccount | null;
   preferences: MessagePreferences;
   onUnreadIncrease: () => void;
+  onOpenMessages: () => void;
 }) {
-  const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
   const previousUnreadCount = useRef<number | null>(null);
 
@@ -468,7 +509,7 @@ function HeaderMessagesButton({
   return (
     <button
       type="button"
-      onClick={() => navigate('/messages')}
+      onClick={onOpenMessages}
       className="relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
       aria-label="Open messages"
       title="Messages"
@@ -483,6 +524,138 @@ function HeaderMessagesButton({
   );
 }
 
+function QuickLaunchTray({
+  isAdministrator,
+  onOpenMessages,
+}: {
+  isAdministrator: boolean;
+  onOpenMessages: () => void;
+}) {
+  const navigate = useNavigate();
+  const [slots, setSlots] = useState<Array<QuickLaunchAppId | null>>(() => loadQuickLaunchSlots());
+  const [editingSlot, setEditingSlot] = useState<number | null>(null);
+  const availableApps = quickLaunchApps.filter((app) => !app.adminOnly || isAdministrator);
+
+  useEffect(() => {
+    window.localStorage.setItem(QUICK_LAUNCH_KEY, JSON.stringify(slots));
+  }, [slots]);
+
+  const openApp = (app: QuickLaunchApp) => {
+    if (app.id === 'messages') {
+      onOpenMessages();
+      return;
+    }
+
+    if (app.path) {
+      navigate(app.path);
+    }
+  };
+
+  const assignSlot = (appId: QuickLaunchAppId | null) => {
+    if (editingSlot === null) return;
+    setSlots((currentSlots) => currentSlots.map((slot, index) => (index === editingSlot ? appId : slot)));
+    setEditingSlot(null);
+  };
+
+  return (
+    <section className="mt-8 shrink-0 border-t border-gray-200 pt-5 dark:border-gray-800">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Quick Launch</h3>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {slots.map((appId, index) => {
+          const app = availableApps.find((item) => item.id === appId) || null;
+          const Icon = app?.icon;
+
+          return (
+            <div key={`quick-launch-${index}`} className="relative">
+              <button
+                type="button"
+                onClick={() => (app ? openApp(app) : setEditingSlot(index))}
+                className={`flex h-24 w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-sm font-bold transition ${
+                  app
+                    ? 'border-gray-200 bg-white text-primary-500 shadow-sm hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100'
+                    : 'border-gray-300 bg-white/60 text-gray-400 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900/60'
+                }`}
+              >
+                {Icon ? <Icon size={24} /> : <Plus size={26} />}
+                <span>{app?.label || 'Add App'}</span>
+              </button>
+
+              {app && (
+                <button
+                  type="button"
+                  onClick={() => setEditingSlot(index)}
+                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-gray-500 shadow-sm hover:bg-gray-200 hover:text-primary-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  aria-label={`Change ${app.label} shortcut`}
+                  title="Change shortcut"
+                >
+                  <Plus size={14} />
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {editingSlot !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Choose App</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Select what this quick-launch box should open.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingSlot(null)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                aria-label="Close quick launch picker"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {availableApps.map((app) => {
+                const Icon = app.icon;
+                return (
+                  <button
+                    key={app.id}
+                    type="button"
+                    onClick={() => assignSlot(app.id)}
+                    className="flex items-center gap-3 rounded border border-gray-200 px-4 py-3 text-left text-sm font-bold text-gray-800 hover:border-accent hover:text-accent dark:border-gray-800 dark:text-gray-100 dark:hover:border-accent"
+                  >
+                    <Icon size={18} />
+                    {app.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => assignSlot(null)}
+              className="mt-4 text-sm font-semibold text-gray-500 hover:text-danger dark:text-gray-400"
+            >
+              Clear this box
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function MessagesRouteRedirect({ onOpenMessages }: { onOpenMessages: () => void }) {
+  useEffect(() => {
+    onOpenMessages();
+  }, [onOpenMessages]);
+
+  return <Navigate to="/" replace />;
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthAccount | null>(null);
@@ -495,6 +668,7 @@ function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
+  const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
 
   const showToast = (type: ToastType, message: string) => {
@@ -713,7 +887,12 @@ function App() {
                     </span>
                   )}
                 </button>
-                <HeaderMessagesButton currentUser={currentUser} preferences={messagePreferences} onUnreadIncrease={playMessagePing} />
+                <HeaderMessagesButton
+                  currentUser={currentUser}
+                  preferences={messagePreferences}
+                  onUnreadIncrease={playMessagePing}
+                  onOpenMessages={() => setIsMessagesModalOpen(true)}
+                />
                 <button
                   type="button"
                   onClick={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
@@ -802,35 +981,61 @@ function App() {
             </header>
 
             <main className="flex-1 overflow-y-auto px-6 py-8 dark:bg-gray-950">
-              <Routes>
-                <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
-                {currentUser && <Route path="/messages" element={<MessageInboxPage currentUser={currentUser} onToast={showToast} />} />}
-                <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
-                <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
-                {currentUser && isAdministrator && (
-                  <Route path="/users/create" element={<CreateUserPage onToast={showToast} />} />
-                )}
-                {currentUser && isAdministrator && (
-                  <Route path="/audit" element={<AuditLogPage />} />
-                )}
-                <Route path="/reports" element={<ReportsPage />} />
-                {currentUser && isAdministrator && (
-                  <Route
-                    path="/permissions"
-                    element={
-                      <PermissionsPage
-                        account={currentUser}
-                        onAccountUpdate={handleAccountUpdate}
-                        onToast={showToast}
-                        getErrorMessage={getErrorMessage}
-                      />
-                    }
-                  />
-                )}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
+              <div className="min-h-[calc(100vh-12rem)]">
+                <Routes>
+                  <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
+                  {currentUser && <Route path="/messages" element={<MessagesRouteRedirect onOpenMessages={() => setIsMessagesModalOpen(true)} />} />}
+                  <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
+                  <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
+                  {currentUser && isAdministrator && (
+                    <Route path="/users/create" element={<CreateUserPage onToast={showToast} />} />
+                  )}
+                  {currentUser && isAdministrator && (
+                    <Route path="/audit" element={<AuditLogPage />} />
+                  )}
+                  <Route path="/reports" element={<ReportsPage />} />
+                  {currentUser && isAdministrator && (
+                    <Route
+                      path="/permissions"
+                      element={
+                        <PermissionsPage
+                          account={currentUser}
+                          onAccountUpdate={handleAccountUpdate}
+                          onToast={showToast}
+                          getErrorMessage={getErrorMessage}
+                        />
+                      }
+                    />
+                  )}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </div>
+              <QuickLaunchTray isAdministrator={isAdministrator} onOpenMessages={() => setIsMessagesModalOpen(true)} />
             </main>
           </div>
+          {isMessagesModalOpen && currentUser && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+              <div className="flex h-[92vh] w-full max-w-7xl flex-col rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+                <div className="mb-4 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Messages</h2>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Conversations update automatically.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsMessagesModalOpen(false)}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                    aria-label="Close messages"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1">
+                  <MessageInboxPage currentUser={currentUser} onToast={showToast} isModalView />
+                </div>
+              </div>
+            </div>
+          )}
           {isProfileModalOpen && currentUser && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
               <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
