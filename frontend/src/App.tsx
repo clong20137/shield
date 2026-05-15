@@ -521,7 +521,7 @@ function QuickLaunchTray({
   return (
     <section className={`fixed bottom-5 right-6 z-30 transition-all duration-200 ${isSidebarCollapsed ? 'left-24' : 'left-[19.5rem]'}`}>
       <div className="mx-auto w-fit max-w-full rounded-2xl border border-gray-200 bg-white/85 p-3 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/80">
-        <div className="flex max-w-full items-center gap-2 overflow-x-auto">
+        <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
         {slots.map((appId, index) => {
           const app = availableApps.find((item) => item.id === appId) || null;
           const Icon = app?.icon;

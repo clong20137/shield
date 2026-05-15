@@ -256,10 +256,51 @@ export async function initializeDatabase() {
       \`status\` VARCHAR(50) NOT NULL DEFAULT 'Available',
       \`location\` VARCHAR(150),
       \`notes\` TEXT,
+      \`phoneNumber\` VARCHAR(50),
+      \`imei\` VARCHAR(100),
+      \`simNumber\` VARCHAR(100),
+      \`radioId\` VARCHAR(100),
+      \`hostname\` VARCHAR(150),
+      \`routerId\` VARCHAR(150),
+      \`warrantyExpiration\` DATE,
+      \`replacementDueDate\` DATE,
+      \`maintenanceDueDate\` DATE,
+      \`lastServiceDate\` DATE,
+      \`purchaseDate\` DATE,
+      \`condition\` VARCHAR(50) NOT NULL DEFAULT 'Good',
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX \`idx_devices_type\` (\`type\`),
       INDEX \`idx_devices_status\` (\`status\`)
+    )
+  `);
+
+  await ensureColumn('devices', 'phoneNumber', '`phoneNumber` VARCHAR(50)');
+  await ensureColumn('devices', 'imei', '`imei` VARCHAR(100)');
+  await ensureColumn('devices', 'simNumber', '`simNumber` VARCHAR(100)');
+  await ensureColumn('devices', 'radioId', '`radioId` VARCHAR(100)');
+  await ensureColumn('devices', 'hostname', '`hostname` VARCHAR(150)');
+  await ensureColumn('devices', 'routerId', '`routerId` VARCHAR(150)');
+  await ensureColumn('devices', 'warrantyExpiration', '`warrantyExpiration` DATE');
+  await ensureColumn('devices', 'replacementDueDate', '`replacementDueDate` DATE');
+  await ensureColumn('devices', 'maintenanceDueDate', '`maintenanceDueDate` DATE');
+  await ensureColumn('devices', 'lastServiceDate', '`lastServiceDate` DATE');
+  await ensureColumn('devices', 'purchaseDate', '`purchaseDate` DATE');
+  await ensureColumn('devices', 'condition', "`condition` VARCHAR(50) NOT NULL DEFAULT 'Good'");
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS device_events (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`deviceId\` VARCHAR(36) NOT NULL,
+      \`action\` VARCHAR(100) NOT NULL,
+      \`actorId\` VARCHAR(36),
+      \`actorName\` VARCHAR(150),
+      \`assignedTo\` VARCHAR(150),
+      \`status\` VARCHAR(50),
+      \`notes\` TEXT,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX \`idx_device_events_device\` (\`deviceId\`),
+      INDEX \`idx_device_events_created\` (\`createdAt\`)
     )
   `);
 }

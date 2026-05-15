@@ -23,7 +23,31 @@ export class DeviceController {
 
   static async createDevice(req: Request, res: Response) {
     try {
-      const { type, assetTag, makeModel, serialNumber, assignedTo, status, location, notes } = req.body;
+      const {
+        type,
+        assetTag,
+        makeModel,
+        serialNumber,
+        assignedTo,
+        status,
+        location,
+        notes,
+        phoneNumber,
+        imei,
+        simNumber,
+        radioId,
+        hostname,
+        routerId,
+        warrantyExpiration,
+        replacementDueDate,
+        maintenanceDueDate,
+        lastServiceDate,
+        purchaseDate,
+        condition,
+        actorId,
+        actorName,
+        eventNotes,
+      } = req.body;
 
       if (!type || !assetTag || !makeModel) {
         return res.status(400).json({ error: 'Device type, asset tag, and make/model are required' });
@@ -38,6 +62,22 @@ export class DeviceController {
         status: status || 'Available',
         location: location || '',
         notes: notes || '',
+        phoneNumber: phoneNumber || '',
+        imei: imei || '',
+        simNumber: simNumber || '',
+        radioId: radioId || '',
+        hostname: hostname || '',
+        routerId: routerId || '',
+        warrantyExpiration: warrantyExpiration || '',
+        replacementDueDate: replacementDueDate || '',
+        maintenanceDueDate: maintenanceDueDate || '',
+        lastServiceDate: lastServiceDate || '',
+        purchaseDate: purchaseDate || '',
+        condition: condition || 'Good',
+      }, {
+        actorId,
+        actorName,
+        notes: eventNotes,
       });
 
       res.status(201).json(device);
@@ -53,7 +93,32 @@ export class DeviceController {
 
   static async updateDevice(req: Request, res: Response) {
     try {
-      const { type, assetTag, makeModel, serialNumber, assignedTo, status, location, notes } = req.body;
+      const {
+        type,
+        assetTag,
+        makeModel,
+        serialNumber,
+        assignedTo,
+        status,
+        location,
+        notes,
+        phoneNumber,
+        imei,
+        simNumber,
+        radioId,
+        hostname,
+        routerId,
+        warrantyExpiration,
+        replacementDueDate,
+        maintenanceDueDate,
+        lastServiceDate,
+        purchaseDate,
+        condition,
+        actorId,
+        actorName,
+        eventAction,
+        eventNotes,
+      } = req.body;
 
       if (!type || !assetTag || !makeModel) {
         return res.status(400).json({ error: 'Device type, asset tag, and make/model are required' });
@@ -68,6 +133,25 @@ export class DeviceController {
         status: status || 'Available',
         location: location || '',
         notes: notes || '',
+        phoneNumber: phoneNumber || '',
+        imei: imei || '',
+        simNumber: simNumber || '',
+        radioId: radioId || '',
+        hostname: hostname || '',
+        routerId: routerId || '',
+        warrantyExpiration: warrantyExpiration || '',
+        replacementDueDate: replacementDueDate || '',
+        maintenanceDueDate: maintenanceDueDate || '',
+        lastServiceDate: lastServiceDate || '',
+        purchaseDate: purchaseDate || '',
+        condition: condition || 'Good',
+      }, {
+        action: eventAction || 'Updated',
+        actorId,
+        actorName,
+        assignedTo,
+        status,
+        notes: eventNotes,
       });
 
       if (!device) {
@@ -87,7 +171,11 @@ export class DeviceController {
 
   static async deleteDevice(req: Request, res: Response) {
     try {
-      const deleted = await DeviceModel.deleteDevice(req.params.id);
+      const deleted = await DeviceModel.deleteDevice(req.params.id, {
+        actorId: req.body?.actorId,
+        actorName: req.body?.actorName,
+        notes: req.body?.eventNotes,
+      });
 
       if (!deleted) {
         return res.status(404).json({ error: 'Device not found' });
@@ -97,6 +185,40 @@ export class DeviceController {
     } catch (error) {
       console.error('Device delete error:', error);
       res.status(500).json({ error: 'Failed to delete device' });
+    }
+  }
+
+  static async listDeviceEvents(req: Request, res: Response) {
+    try {
+      const events = await DeviceModel.listEvents(req.params.id);
+      res.json(events);
+    } catch (error) {
+      console.error('Device events error:', error);
+      res.status(500).json({ error: 'Failed to load device history' });
+    }
+  }
+
+  static async addDeviceEvent(req: Request, res: Response) {
+    try {
+      const { action, actorId, actorName, assignedTo, status, notes } = req.body;
+
+      if (!action) {
+        return res.status(400).json({ error: 'Action is required' });
+      }
+
+      const event = await DeviceModel.createEvent(req.params.id, {
+        action,
+        actorId,
+        actorName,
+        assignedTo,
+        status,
+        notes,
+      });
+
+      res.status(201).json(event);
+    } catch (error) {
+      console.error('Device event create error:', error);
+      res.status(500).json({ error: 'Failed to add device history event' });
     }
   }
 }

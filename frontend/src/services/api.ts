@@ -163,11 +163,35 @@ export interface DeviceRecord {
   makeModel: string;
   serialNumber: string;
   assignedTo: string;
-  status: 'Available' | 'Assigned' | 'Maintenance' | 'Retired';
+  status: 'Available' | 'Assigned' | 'Maintenance' | 'Retired' | 'Damaged' | 'Lost';
   location: string;
   notes: string;
+  phoneNumber: string;
+  imei: string;
+  simNumber: string;
+  radioId: string;
+  hostname: string;
+  routerId: string;
+  warrantyExpiration: string;
+  replacementDueDate: string;
+  maintenanceDueDate: string;
+  lastServiceDate: string;
+  purchaseDate: string;
+  condition: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DeviceEvent {
+  id: string;
+  deviceId: string;
+  action: string;
+  actorId: string | null;
+  actorName: string | null;
+  assignedTo: string;
+  status: string;
+  notes: string;
+  createdAt: string;
 }
 
 export interface UserMessage {
@@ -306,14 +330,20 @@ export const deviceService = {
   getAll: () =>
     api.get<DeviceRecord[]>('/devices'),
 
-  create: (device: Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'>) =>
+  create: (device: Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'> & { actorId?: string; actorName?: string; eventNotes?: string }) =>
     api.post<DeviceRecord>('/devices', device),
 
-  update: (id: string, device: Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'>) =>
+  update: (id: string, device: Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'> & { actorId?: string; actorName?: string; eventAction?: string; eventNotes?: string }) =>
     api.put<DeviceRecord>(`/devices/${id}`, device),
 
-  delete: (id: string) =>
-    api.delete(`/devices/${id}`),
+  getHistory: (id: string) =>
+    api.get<DeviceEvent[]>(`/devices/${id}/history`),
+
+  addHistory: (id: string, event: Pick<DeviceEvent, 'action'> & Partial<Pick<DeviceEvent, 'assignedTo' | 'status' | 'notes'>> & { actorId?: string; actorName?: string }) =>
+    api.post<DeviceEvent>(`/devices/${id}/history`, event),
+
+  delete: (id: string, actor?: { actorId?: string; actorName?: string; eventNotes?: string }) =>
+    api.delete(`/devices/${id}`, { data: actor }),
 };
 
 export const messageService = {
