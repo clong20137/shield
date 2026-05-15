@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { BarChart3, Bell, ChevronLeft, ChevronRight, ClipboardList, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Search, Settings, Shield, SlidersHorizontal, Sun, UserCircle, UserPlus, X } from 'lucide-react';
-import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
 import DashboardPage from './pages/DashboardPage';
@@ -485,17 +485,28 @@ function QuickLaunchTray({
   isAdministrator,
   isSidebarCollapsed,
   badgeCounts,
+  activeModalApp,
   onOpenMessages,
 }: {
   isAdministrator: boolean;
   isSidebarCollapsed: boolean;
   badgeCounts: Partial<Record<QuickLaunchAppId, number>>;
+  activeModalApp: QuickLaunchAppId | null;
   onOpenMessages: () => void;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [slots, setSlots] = useState<Array<QuickLaunchAppId | null>>(() => loadQuickLaunchSlots());
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
   const availableApps = quickLaunchApps.filter((app) => !app.adminOnly || isAdministrator);
+
+  const isAppActive = (app: QuickLaunchApp) => {
+    if (app.id === activeModalApp) {
+      return true;
+    }
+
+    return Boolean(app.path && location.pathname === app.path);
+  };
 
   useEffect(() => {
     window.localStorage.setItem(QUICK_LAUNCH_KEY, JSON.stringify(slots));
@@ -508,7 +519,7 @@ function QuickLaunchTray({
     }
 
     if (app.path) {
-      navigate(app.path);
+      navigate(location.pathname === app.path ? '/' : app.path);
     }
   };
 
@@ -526,6 +537,7 @@ function QuickLaunchTray({
           const app = availableApps.find((item) => item.id === appId) || null;
           const Icon = app?.icon;
           const badgeCount = app ? badgeCounts[app.id] || 0 : 0;
+          const isActive = app ? isAppActive(app) : false;
 
           return (
             <div key={`quick-launch-${index}`} className="relative">
@@ -534,7 +546,7 @@ function QuickLaunchTray({
                 onClick={() => (app ? openApp(app) : setEditingSlot(index))}
                 className={`flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-[10px] font-bold transition ${
                   app
-                    ? 'border-gray-200 bg-white text-primary-500 shadow-sm hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100'
+                    ? `${isActive ? 'translate-y-[-3px] border-accent bg-accent/10 text-accent shadow-md' : 'border-gray-200 bg-white text-primary-500 shadow-sm'} hover:-translate-y-1 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100`
                     : 'border-gray-300 bg-white/60 text-gray-400 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900/60'
                 }`}
                 title={app?.label || 'Add App'}
@@ -542,6 +554,10 @@ function QuickLaunchTray({
                 {Icon ? <Icon size={20} /> : <Plus size={22} />}
                 <span className="max-w-14 truncate">{app?.label || 'Add'}</span>
               </button>
+
+              {isActive && (
+                <span className="absolute -bottom-2 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-accent shadow" />
+              )}
 
               {badgeCount > 0 && (
                 <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white shadow">
@@ -894,7 +910,7 @@ function App() {
                 </button>
                 <HeaderMessagesButton
                   unreadCount={messageUnreadCount}
-                  onOpenMessages={() => setIsMessagesModalOpen(true)}
+                  onOpenMessages={() => setIsMessagesModalOpen((value) => !value)}
                 />
                 <button
                   type="button"
@@ -1017,7 +1033,8 @@ function App() {
                 isAdministrator={isAdministrator}
                 isSidebarCollapsed={isSidebarCollapsed}
                 badgeCounts={{ messages: messageUnreadCount }}
-                onOpenMessages={() => setIsMessagesModalOpen(true)}
+                activeModalApp={isMessagesModalOpen ? 'messages' : null}
+                onOpenMessages={() => setIsMessagesModalOpen((value) => !value)}
               />
             </main>
           </div>
