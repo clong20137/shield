@@ -612,8 +612,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       </div>
 
       {isComposeOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <form onSubmit={sendNewMessage} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <form onSubmit={sendNewMessage} className="modal-window max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2>New Message</h2>

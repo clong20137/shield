@@ -583,8 +583,8 @@ function QuickLaunchTray({
       </div>
 
       {editingSlot !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="modal-window w-full max-w-lg rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Choose App</h2>
@@ -1039,8 +1039,8 @@ function App() {
             </main>
           </div>
           {isMessagesModalOpen && currentUser && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-              <div className="flex h-[94vh] w-full max-w-7xl flex-col rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900">
+            <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+              <div className="modal-window flex h-[94vh] w-full max-w-7xl flex-col rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900">
                 <div className="mb-3 flex items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Messages</h2>
@@ -1062,8 +1062,8 @@ function App() {
             </div>
           )}
           {isProfileModalOpen && currentUser && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-              <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="modal-window max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
                 <div className="mb-6 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Account Settings</h2>
@@ -1088,8 +1088,8 @@ function App() {
             </div>
           )}
           {isPreferencesOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-              <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="modal-window w-full max-w-md rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
                 <div className="mb-5 flex items-center justify-between">
                   <h2>Preferences</h2>
                   <button
