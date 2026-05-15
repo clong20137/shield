@@ -113,6 +113,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
   const [composeBody, setComposeBody] = useState('');
   const [composeAttachments, setComposeAttachments] = useState<File[]>([]);
   const [isRecipientSearching, setIsRecipientSearching] = useState(false);
+  const [threadPendingDelete, setThreadPendingDelete] = useState<MessageThread | null>(null);
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
   const emojiButtonLabel = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
 
@@ -361,10 +362,6 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
   };
 
   const deleteThread = async (thread: MessageThread) => {
-    if (!window.confirm(`Delete the conversation with ${thread.contactName}?`)) {
-      return;
-    }
-
     try {
       await Promise.all(thread.messages.map((message) => messageService.delete(message.id, currentUser.id)));
       setInboxMessages((messages) => messages.filter((message) => !thread.messages.some((item) => item.id === message.id)));
@@ -373,6 +370,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
         const nextThread = threads.find((item) => item.id !== thread.id);
         setSelectedThreadId(nextThread?.id ?? null);
       }
+      setThreadPendingDelete(null);
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
       onToast('success', 'Conversation deleted.');
     } catch (err) {
@@ -473,7 +471,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                   </button>
                   <button
                     type="button"
-                    onClick={() => deleteThread(thread)}
+                    onClick={() => setThreadPendingDelete(thread)}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-danger dark:hover:bg-red-950"
                     aria-label="Delete conversation"
                     title="Delete conversation"
@@ -544,13 +542,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                         </div>
                       )}
                       <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`group max-w-[78%] ${isMine ? 'text-right' : 'text-left'}`}>
-                          <div className={`rounded-2xl px-4 py-3 shadow-sm ${
+                        <div className={`group flex max-w-[78%] flex-col ${isMine ? 'items-end text-right' : 'items-start text-left'}`}>
+                          <div className={`inline-block w-fit max-w-full rounded-2xl px-4 py-3 shadow-sm ${
                             isMine
                               ? 'rounded-br bg-accent text-white'
                               : 'rounded-bl bg-white text-gray-800 dark:bg-gray-900 dark:text-gray-100'
                           }`}>
-                            <p className="w-fit max-w-full whitespace-pre-wrap text-left text-sm leading-6">{message.body}</p>
+                            <p className="whitespace-pre-wrap text-left text-sm leading-6">{message.body}</p>
                           </div>
                           <div className={`mt-1 flex items-center gap-2 text-xs font-semibold text-gray-400 ${isMine ? 'justify-end' : 'justify-start'}`}>
                             <span>{formatMessageTime(message.createdAt)}</span>
@@ -748,6 +746,37 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
               {isSending ? 'Sending...' : 'Send Message'}
             </button>
           </form>
+        </div>
+      )}
+
+      {threadPendingDelete && (
+        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
+          <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Conversation</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Delete the conversation with {threadPendingDelete.contactName}?
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setThreadPendingDelete(null)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                aria-label="Close delete confirmation"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setThreadPendingDelete(null)} className="btn-secondary">
+                Cancel
+              </button>
+              <button type="button" onClick={() => deleteThread(threadPendingDelete)} className="btn-danger">
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

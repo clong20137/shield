@@ -1069,7 +1069,7 @@ function App() {
           </div>
           {isMessagesModalOpen && currentUser && (
             <div className={getModalBackdropClass(closingModal === 'messages', 'bg-black/60')}>
-              <div className={getModalWindowClass(closingModal === 'messages', 'flex h-[94vh] w-full max-w-7xl flex-col rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900')}>
+              <div className={getModalWindowClass(closingModal === 'messages', 'flex h-[94vh] w-full max-w-6xl flex-col rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900')}>
                 <div className="mb-3 flex items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Messages</h2>
