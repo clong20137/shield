@@ -561,12 +561,8 @@ function QuickLaunchTray({
 
   return (
     <section className={`pointer-events-none fixed bottom-5 right-6 z-30 transition-all duration-200 ${isSidebarCollapsed ? 'left-24' : 'left-[19.5rem]'}`}>
-      <div className="pointer-events-auto mx-auto max-w-6xl rounded-2xl border border-gray-200 bg-white/85 p-4 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/80">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Quick Launch</h3>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="pointer-events-auto mx-auto w-fit max-w-full rounded-2xl border border-gray-200 bg-white/85 p-3 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/80">
+        <div className="flex max-w-full items-center gap-2 overflow-x-auto">
         {slots.map((appId, index) => {
           const app = availableApps.find((item) => item.id === appId) || null;
           const Icon = app?.icon;
@@ -576,25 +572,26 @@ function QuickLaunchTray({
               <button
                 type="button"
                 onClick={() => (app ? openApp(app) : setEditingSlot(index))}
-                className={`flex h-24 w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-sm font-bold transition ${
+                className={`flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-[10px] font-bold transition ${
                   app
                     ? 'border-gray-200 bg-white text-primary-500 shadow-sm hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100'
                     : 'border-gray-300 bg-white/60 text-gray-400 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900/60'
                 }`}
+                title={app?.label || 'Add App'}
               >
-                {Icon ? <Icon size={24} /> : <Plus size={26} />}
-                <span>{app?.label || 'Add App'}</span>
+                {Icon ? <Icon size={20} /> : <Plus size={22} />}
+                <span className="max-w-14 truncate">{app?.label || 'Add'}</span>
               </button>
 
               {app && (
                 <button
                   type="button"
                   onClick={() => setEditingSlot(index)}
-                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-gray-500 shadow-sm hover:bg-gray-200 hover:text-primary-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-gray-500 shadow-sm hover:bg-gray-200 hover:text-primary-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                   aria-label={`Change ${app.label} shortcut`}
                   title="Change shortcut"
                 >
-                  <Plus size={14} />
+                  <Plus size={11} />
                 </button>
               )}
             </div>
