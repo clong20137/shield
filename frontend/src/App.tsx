@@ -17,7 +17,7 @@ const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
 const MESSAGE_PREFERENCES_KEY = 'shield_message_preferences';
 const QUICK_LAUNCH_KEY = 'shield_quick_launch';
-const QUICK_LAUNCH_SLOT_COUNT = 5;
+const QUICK_LAUNCH_SLOT_COUNT = 8;
 
 interface MessagePreferences {
   receiveMessages: boolean;
@@ -457,55 +457,12 @@ function GlobalSearch({ compact }: { compact: boolean }) {
 }
 
 function HeaderMessagesButton({
-  currentUser,
-  preferences,
-  onUnreadIncrease,
+  unreadCount,
   onOpenMessages,
 }: {
-  currentUser: AuthAccount | null;
-  preferences: MessagePreferences;
-  onUnreadIncrease: () => void;
+  unreadCount: number;
   onOpenMessages: () => void;
 }) {
-  const [unreadCount, setUnreadCount] = useState(0);
-  const previousUnreadCount = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!currentUser || !preferences.receiveMessages) {
-      setUnreadCount(0);
-      previousUnreadCount.current = null;
-      return;
-    }
-
-    let isMounted = true;
-
-    const loadUnreadCount = async () => {
-      try {
-        const response = await messageService.getInbox(currentUser.id);
-        if (isMounted) {
-          const nextUnreadCount = response.data.filter((message) => !message.isRead).length;
-          if (previousUnreadCount.current !== null && nextUnreadCount > previousUnreadCount.current) {
-            onUnreadIncrease();
-          }
-          previousUnreadCount.current = nextUnreadCount;
-          setUnreadCount(nextUnreadCount);
-        }
-      } catch (err) {
-        console.error('Failed to load unread messages:', err);
-      }
-    };
-
-    loadUnreadCount();
-    const interval = window.setInterval(loadUnreadCount, 30000);
-    window.addEventListener('shield:messages-updated', loadUnreadCount);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(interval);
-      window.removeEventListener('shield:messages-updated', loadUnreadCount);
-    };
-  }, [currentUser, onUnreadIncrease, preferences.receiveMessages]);
-
   return (
     <button
       type="button"
@@ -527,10 +484,12 @@ function HeaderMessagesButton({
 function QuickLaunchTray({
   isAdministrator,
   isSidebarCollapsed,
+  badgeCounts,
   onOpenMessages,
 }: {
   isAdministrator: boolean;
   isSidebarCollapsed: boolean;
+  badgeCounts: Partial<Record<QuickLaunchAppId, number>>;
   onOpenMessages: () => void;
 }) {
   const navigate = useNavigate();
@@ -566,6 +525,7 @@ function QuickLaunchTray({
         {slots.map((appId, index) => {
           const app = availableApps.find((item) => item.id === appId) || null;
           const Icon = app?.icon;
+          const badgeCount = app ? badgeCounts[app.id] || 0 : 0;
 
           return (
             <div key={`quick-launch-${index}`} className="relative">
@@ -583,11 +543,17 @@ function QuickLaunchTray({
                 <span className="max-w-14 truncate">{app?.label || 'Add'}</span>
               </button>
 
+              {badgeCount > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white shadow">
+                  {badgeCount > 9 ? '9+' : badgeCount}
+                </span>
+              )}
+
               {app && (
                 <button
                   type="button"
                   onClick={() => setEditingSlot(index)}
-                  className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-gray-500 shadow-sm hover:bg-gray-200 hover:text-primary-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-gray-500 shadow-sm hover:bg-gray-200 hover:text-primary-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                   aria-label={`Change ${app.label} shortcut`}
                   title="Change shortcut"
                 >
@@ -670,6 +636,8 @@ function App() {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
+  const [messageUnreadCount, setMessageUnreadCount] = useState(0);
+  const previousMessageUnreadCount = useRef<number | null>(null);
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
 
   const showToast = (type: ToastType, message: string) => {
@@ -731,6 +699,42 @@ function App() {
       console.error('Failed to play message ping:', err);
     }
   };
+
+  useEffect(() => {
+    if (!currentUser || !messagePreferences.receiveMessages) {
+      setMessageUnreadCount(0);
+      previousMessageUnreadCount.current = null;
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadUnreadCount = async () => {
+      try {
+        const response = await messageService.getInbox(currentUser.id);
+        if (!isMounted) return;
+
+        const nextUnreadCount = response.data.filter((message) => !message.isRead).length;
+        if (previousMessageUnreadCount.current !== null && nextUnreadCount > previousMessageUnreadCount.current) {
+          playMessagePing();
+        }
+        previousMessageUnreadCount.current = nextUnreadCount;
+        setMessageUnreadCount(nextUnreadCount);
+      } catch (err) {
+        console.error('Failed to load unread messages:', err);
+      }
+    };
+
+    loadUnreadCount();
+    const interval = window.setInterval(loadUnreadCount, 30000);
+    window.addEventListener('shield:messages-updated', loadUnreadCount);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+      window.removeEventListener('shield:messages-updated', loadUnreadCount);
+    };
+  }, [currentUser, messagePreferences.receiveMessages]);
 
   useEffect(() => {
     authService.getSession()
@@ -889,9 +893,7 @@ function App() {
                   )}
                 </button>
                 <HeaderMessagesButton
-                  currentUser={currentUser}
-                  preferences={messagePreferences}
-                  onUnreadIncrease={playMessagePing}
+                  unreadCount={messageUnreadCount}
                   onOpenMessages={() => setIsMessagesModalOpen(true)}
                 />
                 <button
@@ -1014,6 +1016,7 @@ function App() {
               <QuickLaunchTray
                 isAdministrator={isAdministrator}
                 isSidebarCollapsed={isSidebarCollapsed}
+                badgeCounts={{ messages: messageUnreadCount }}
                 onOpenMessages={() => setIsMessagesModalOpen(true)}
               />
             </main>
