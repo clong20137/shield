@@ -10,18 +10,36 @@ function getAuditActor(req: Request) {
   };
 }
 
+async function getCalendarAccountId(req: Request, requestedAccountId?: string): Promise<string | null> {
+  const sessionAccount = await getSessionAccount(req);
+
+  if (!sessionAccount) {
+    return null;
+  }
+
+  if (requestedAccountId && requestedAccountId !== sessionAccount.id) {
+    throw Object.assign(new Error('Calendar account mismatch'), { statusCode: 403 });
+  }
+
+  return sessionAccount.id;
+}
+
 export class CalendarController {
   static async listEntries(req: Request, res: Response) {
     try {
-      const sessionAccount = await getSessionAccount(req);
-      const accountId = sessionAccount?.id || (typeof req.query.accountId === 'string' ? req.query.accountId : '');
+      const requestedAccountId = typeof req.query.accountId === 'string' ? req.query.accountId : undefined;
+      const accountId = await getCalendarAccountId(req, requestedAccountId);
       if (!accountId) {
-        return res.status(400).json({ error: 'Account is required' });
+        return res.status(401).json({ error: 'Sign in to view your calendar' });
       }
 
       const entries = await CalendarEntryModel.listEntries(accountId);
       res.json(entries);
     } catch (error) {
+      if (typeof error === 'object' && error !== null && (error as { statusCode?: number }).statusCode === 403) {
+        return res.status(403).json({ error: 'Calendar account mismatch' });
+      }
+
       console.error('Calendar list error:', error);
       res.status(500).json({ error: 'Failed to load calendar entries' });
     }
@@ -38,12 +56,11 @@ export class CalendarController {
         specialStatus?: string;
         color?: string;
       };
-      const sessionAccount = await getSessionAccount(req);
-      const accountId = sessionAccount?.id || requestedAccountId;
+      const accountId = await getCalendarAccountId(req, requestedAccountId);
       const hours = Number(dutyHours);
 
       if (!accountId || !date || Number.isNaN(hours) || hours < 0 || !districtWorked) {
-        return res.status(400).json({ error: 'Account, date, duty hours, and district worked are required' });
+        return res.status(accountId ? 400 : 401).json({ error: accountId ? 'Date, duty hours, and district worked are required' : 'Sign in to update your calendar' });
       }
 
       const entry = await CalendarEntryModel.createEntry({
@@ -67,6 +84,10 @@ export class CalendarController {
 
       res.status(201).json(entry);
     } catch (error) {
+      if (typeof error === 'object' && error !== null && (error as { statusCode?: number }).statusCode === 403) {
+        return res.status(403).json({ error: 'Calendar account mismatch' });
+      }
+
       console.error('Calendar create error:', error);
       res.status(500).json({ error: 'Failed to create calendar entry' });
     }
@@ -83,12 +104,11 @@ export class CalendarController {
         specialStatus?: string;
         color?: string;
       };
-      const sessionAccount = await getSessionAccount(req);
-      const accountId = sessionAccount?.id || requestedAccountId;
+      const accountId = await getCalendarAccountId(req, requestedAccountId);
       const hours = Number(dutyHours);
 
       if (!accountId || !date || Number.isNaN(hours) || hours < 0 || !districtWorked) {
-        return res.status(400).json({ error: 'Account, date, duty hours, and district worked are required' });
+        return res.status(accountId ? 400 : 401).json({ error: accountId ? 'Date, duty hours, and district worked are required' : 'Sign in to update your calendar' });
       }
 
       const entry = await CalendarEntryModel.updateEntry(req.params.id, {
@@ -116,6 +136,10 @@ export class CalendarController {
 
       res.json(entry);
     } catch (error) {
+      if (typeof error === 'object' && error !== null && (error as { statusCode?: number }).statusCode === 403) {
+        return res.status(403).json({ error: 'Calendar account mismatch' });
+      }
+
       console.error('Calendar update error:', error);
       res.status(500).json({ error: 'Failed to update calendar entry' });
     }
@@ -123,10 +147,10 @@ export class CalendarController {
 
   static async deleteEntry(req: Request, res: Response) {
     try {
-      const sessionAccount = await getSessionAccount(req);
-      const accountId = sessionAccount?.id || (typeof req.body?.accountId === 'string' ? req.body.accountId : '');
+      const requestedAccountId = typeof req.body?.accountId === 'string' ? req.body.accountId : undefined;
+      const accountId = await getCalendarAccountId(req, requestedAccountId);
       if (!accountId) {
-        return res.status(400).json({ error: 'Account is required' });
+        return res.status(401).json({ error: 'Sign in to update your calendar' });
       }
 
       const deleted = await CalendarEntryModel.deleteEntry(req.params.id, accountId);
@@ -146,6 +170,10 @@ export class CalendarController {
 
       res.json({ message: 'Calendar entry deleted successfully' });
     } catch (error) {
+      if (typeof error === 'object' && error !== null && (error as { statusCode?: number }).statusCode === 403) {
+        return res.status(403).json({ error: 'Calendar account mismatch' });
+      }
+
       console.error('Calendar delete error:', error);
       res.status(500).json({ error: 'Failed to delete calendar entry' });
     }

@@ -74,6 +74,19 @@ const getReadableDate = (dateKey: string) => {
   });
 };
 
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error === 'string'
+  ) {
+    return (error as { response: { data: { error: string } } }).response.data.error;
+  }
+
+  return fallback;
+}
+
 function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const today = new Date();
@@ -106,7 +119,7 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
       setEntries(response.data);
     } catch (err) {
       console.error('Failed to load calendar entries:', err);
-      setCalendarError('Failed to load calendar entries.');
+      setCalendarError(getApiErrorMessage(err, 'Failed to load calendar entries.'));
     } finally {
       setIsCalendarLoading(false);
     }
@@ -156,6 +169,11 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
     });
   };
 
+  const goToToday = () => {
+    const today = new Date();
+    setCalendarMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+  };
+
   const saveEntry = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -187,7 +205,7 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
       setEntryForm(createDefaultEntryForm(entryForm.date));
     } catch (err) {
       console.error('Failed to save calendar entry:', err);
-      setCalendarError('Failed to save calendar entry.');
+      setCalendarError(getApiErrorMessage(err, 'Failed to save calendar entry.'));
     }
   };
 
@@ -199,7 +217,7 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
       setEntryPendingDelete(null);
     } catch (err) {
       console.error('Failed to delete calendar entry:', err);
-      setCalendarError('Failed to delete calendar entry.');
+      setCalendarError(getApiErrorMessage(err, 'Failed to delete calendar entry.'));
     }
   };
 
@@ -238,6 +256,9 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
     return new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), dayNumber);
   });
   const todayKey = formatDateKey(new Date());
+  const monthKey = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}`;
+  const monthEntries = visibleEntries.filter((entry) => entry.date.startsWith(monthKey));
+  const monthDutyHours = monthEntries.reduce((total, entry) => total + (Number(entry.dutyHours) || 0), 0);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -258,10 +279,13 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
           <button type="button" onClick={() => changeMonth(1)} className="btn-secondary">
             Next
           </button>
+          <button type="button" onClick={goToToday} className="btn-secondary">
+            Today
+          </button>
         </div>
       </div>
 
-      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
         <select value={districtFilter} onChange={(event) => setDistrictFilter(event.target.value)} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
           <option value="">All Districts</option>
           {districtOptions.map((district) => <option key={district}>{district}</option>)}
@@ -270,6 +294,31 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
           <option value="">All Special Status</option>
           {specialStatusOptions.map((status) => <option key={status}>{status}</option>)}
         </select>
+        <button
+          type="button"
+          onClick={() => {
+            setDistrictFilter('');
+            setStatusFilter('');
+          }}
+          className="btn-secondary"
+        >
+          Clear Filters
+        </button>
+      </div>
+
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-950">
+          <p className="text-xs font-bold uppercase text-gray-400">This Month</p>
+          <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{monthEntries.length}</p>
+        </div>
+        <div className="rounded border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-950">
+          <p className="text-xs font-bold uppercase text-gray-400">Duty Hours</p>
+          <p className="mt-1 text-2xl font-bold text-accent">{monthDutyHours.toFixed(2).replace(/\.?0+$/u, '')}</p>
+        </div>
+        <div className="rounded border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-950">
+          <p className="text-xs font-bold uppercase text-gray-400">Visible Entries</p>
+          <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{visibleEntries.length}</p>
+        </div>
       </div>
 
       {calendarError && <div className="error">{calendarError}</div>}
@@ -344,8 +393,13 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
                   {editingEntryId ? 'Edit duty details for this calendar day.' : 'Add duty details for this calendar day.'}
                 </p>
               </div>
-              <button type="button" onClick={() => setSelectedDate(null)} className="btn-secondary">
-                Close
+              <button
+                type="button"
+                onClick={() => setSelectedDate(null)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                aria-label="Close calendar day"
+              >
+                X
               </button>
             </div>
 
@@ -425,22 +479,26 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
                 </select>
               </label>
 
-              <label className="block">
-                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Color Code</span>
-                <select
-                  value={entryForm.color}
-                  onChange={(event) =>
-                    setEntryForm((currentForm) => ({ ...currentForm, color: event.target.value }))
-                  }
-                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-                >
+              <div className="block">
+                <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Color Code</span>
+                <div className="flex flex-wrap gap-2">
                   {entryColors.map((color) => (
-                    <option key={color.value} value={color.value}>
+                    <button
+                      key={color.value}
+                      type="button"
+                      onClick={() => setEntryForm((currentForm) => ({ ...currentForm, color: color.value }))}
+                      className={`flex h-9 min-w-24 items-center gap-2 rounded border px-3 text-sm font-semibold ${
+                        entryForm.color === color.value
+                          ? 'border-primary-500 bg-gray-50 dark:bg-gray-950'
+                          : 'border-gray-200 dark:border-gray-800'
+                      }`}
+                    >
+                      <span className="h-4 w-4 rounded-full" style={{ backgroundColor: color.value }} />
                       {color.label}
-                    </option>
+                    </button>
                   ))}
-                </select>
-              </label>
+                </div>
+              </div>
 
               <div className="md:col-span-2">
                 <button type="submit" className="btn-primary">
