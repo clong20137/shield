@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { User } from '../services/api';
 
 interface UserTableProps {
@@ -18,6 +18,8 @@ export const UserTable: React.FC<UserTableProps> = ({
   onDelete,
   canEdit = false,
 }) => {
+  const [userPendingDelete, setUserPendingDelete] = useState<User | null>(null);
+
   if (loading) {
     return <div className="loading">Loading users...</div>;
   }
@@ -27,6 +29,7 @@ export const UserTable: React.FC<UserTableProps> = ({
   }
 
   return (
+    <>
     <div className="bg-white rounded-lg shadow overflow-hidden dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
@@ -79,9 +82,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                       className="btn btn-danger text-xs"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (window.confirm(`Delete ${user.firstName} ${user.lastName}?`)) {
-                          onDelete?.(user.id);
-                        }
+                        setUserPendingDelete(user);
                       }}
                     >
                       Delete
@@ -94,5 +95,31 @@ export const UserTable: React.FC<UserTableProps> = ({
         </table>
       </div>
     </div>
+    {userPendingDelete && (
+      <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+        <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete User</h2>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            Delete {userPendingDelete.firstName} {userPendingDelete.lastName}?
+          </p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button type="button" onClick={() => setUserPendingDelete(null)} className="btn-secondary">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onDelete?.(userPendingDelete.id);
+                setUserPendingDelete(null);
+              }}
+              className="btn-danger"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };

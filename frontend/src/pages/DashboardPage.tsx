@@ -184,10 +184,6 @@ export function DashboardCalendar() {
   };
 
   const deleteEntry = async (entryId: string) => {
-    if (!window.confirm('Delete this calendar entry?')) {
-      return;
-    }
-
     setCalendarError(null);
     try {
       const actor = await getAuditActor();
@@ -557,6 +553,7 @@ function DashboardNews({
   const [postForm, setPostForm] = useState<DashboardPostForm>(defaultPostForm);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isSavingPost, setIsSavingPost] = useState(false);
+  const [postPendingDelete, setPostPendingDelete] = useState<DashboardPost | null>(null);
   const [postError, setPostError] = useState<string | null>(null);
   const isAdministrator = currentUser?.role === 'administrator';
 
@@ -609,15 +606,16 @@ function DashboardNews({
     }
   };
 
-  const deletePost = async (postId: string) => {
-    if (!currentUser || !window.confirm('Delete this dashboard post?')) {
+  const deletePost = async (post: DashboardPost) => {
+    if (!currentUser) {
       return;
     }
 
     setPostError(null);
     try {
-      await dashboardPostService.delete(postId, currentUser.id);
-      setPosts((currentPosts) => currentPosts.filter((post) => post.id !== postId));
+      await dashboardPostService.delete(post.id, currentUser.id);
+      setPosts((currentPosts) => currentPosts.filter((currentPost) => currentPost.id !== post.id));
+      setPostPendingDelete(null);
     } catch (err) {
       console.error('Failed to delete dashboard post:', err);
       setPostError('Failed to delete update.');
@@ -689,7 +687,7 @@ function DashboardNews({
                   <h3 className="mt-3 text-base">{post.title}</h3>
                 </div>
                 {isAdministrator && (
-                  <button type="button" onClick={() => deletePost(post.id)} className="btn-danger">
+                  <button type="button" onClick={() => setPostPendingDelete(post)} className="btn-danger">
                     Delete
                   </button>
                 )}
@@ -700,6 +698,24 @@ function DashboardNews({
               </p>
             </article>
           ))}
+        </div>
+      )}
+      {postPendingDelete && (
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Post</h2>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Delete “{postPendingDelete.title}” from Updates & News?
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setPostPendingDelete(null)} className="btn-secondary">
+                Cancel
+              </button>
+              <button type="button" onClick={() => deletePost(postPendingDelete)} className="btn-danger">
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </section>

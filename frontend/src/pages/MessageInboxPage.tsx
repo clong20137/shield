@@ -125,6 +125,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
   const [composeBody, setComposeBody] = useState('');
   const [composeAttachments, setComposeAttachments] = useState<File[]>([]);
   const [isRecipientSearching, setIsRecipientSearching] = useState(false);
+  const [messagePendingDelete, setMessagePendingDelete] = useState<UserMessage | null>(null);
   const [threadPendingDelete, setThreadPendingDelete] = useState<MessageThread | null>(null);
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
   const emojiButtonLabel = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
@@ -297,6 +298,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
         return;
       }
 
+      if (messagePendingDelete) {
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        setMessagePendingDelete(null);
+        return;
+      }
+
       if (isComposeOpen) {
         event.stopPropagation();
         event.stopImmediatePropagation();
@@ -308,7 +316,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isComposeOpen, isEmojiPickerOpen, threadPendingDelete]);
+  }, [isComposeOpen, isEmojiPickerOpen, messagePendingDelete, threadPendingDelete]);
 
   const withAttachmentSummary = (body: string, files: File[]) => {
     if (files.length === 0) {
@@ -388,14 +396,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
   };
 
   const deleteMessage = async (message: UserMessage) => {
-    if (!window.confirm('Delete this message from your mailbox?')) {
-      return;
-    }
-
     try {
       await messageService.delete(message.id, currentUser.id);
       setInboxMessages((messages) => messages.filter((item) => item.id !== message.id));
       setSentMessages((messages) => messages.filter((item) => item.id !== message.id));
+      setMessagePendingDelete(null);
       await loadMessages(false);
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
       onToast('success', 'Message deleted.');
@@ -604,7 +609,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                             )}
                             <button
                               type="button"
-                              onClick={() => deleteMessage(message)}
+                              onClick={() => setMessagePendingDelete(message)}
                               className="opacity-0 transition group-hover:opacity-100 hover:text-danger"
                               aria-label="Delete message"
                               title="Delete"
@@ -808,6 +813,27 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                 Cancel
               </button>
               <button type="button" onClick={() => deleteThread(threadPendingDelete)} className="btn-danger">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {messagePendingDelete && (
+        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
+          <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+            <div className="mb-4">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Message</h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Delete this message from your mailbox?
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setMessagePendingDelete(null)} className="btn-secondary">
+                Cancel
+              </button>
+              <button type="button" onClick={() => deleteMessage(messagePendingDelete)} className="btn-danger">
                 Delete
               </button>
             </div>

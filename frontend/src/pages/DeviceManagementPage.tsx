@@ -120,6 +120,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt');
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [detailDevice, setDetailDevice] = useState<DeviceRecord | null>(null);
+  const [devicePendingDelete, setDevicePendingDelete] = useState<DeviceRecord | null>(null);
   const [deviceHistory, setDeviceHistory] = useState<DeviceEvent[]>([]);
   const [eventNotes, setEventNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -311,22 +312,18 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     }
   };
 
-  const deleteDevice = async (deviceId: string) => {
+  const deleteDevice = async (device: DeviceRecord) => {
     if (!canManageDevices) return;
 
-    const device = devices.find((item) => item.id === deviceId);
-    const label = device?.assetTag || 'this device';
-
-    if (!window.confirm(`Delete ${label}? This cannot be undone.`)) {
-      return;
-    }
+    const label = device.assetTag || 'this device';
 
     try {
-      await deviceService.delete(deviceId, { ...actor, eventNotes: `Deleted ${label}.` });
-      setDevices((currentDevices) => currentDevices.filter((device) => device.id !== deviceId));
-      setSelectedDevices((ids) => ids.filter((id) => id !== deviceId));
+      await deviceService.delete(device.id, { ...actor, eventNotes: `Deleted ${label}.` });
+      setDevices((currentDevices) => currentDevices.filter((currentDevice) => currentDevice.id !== device.id));
+      setSelectedDevices((ids) => ids.filter((id) => id !== device.id));
+      setDevicePendingDelete(null);
 
-      if (editingId === deviceId) {
+      if (editingId === device.id) {
         setEditingId(null);
         setForm(defaultDeviceForm);
       }
@@ -596,7 +593,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                         <div className="flex gap-2">
                           <button type="button" onClick={() => loadDeviceHistory(device)} className="btn-secondary" aria-label="View device" title="View"><Eye size={15} /></button>
                           {canManageDevices && <button type="button" onClick={() => editDevice(device)} className="btn-secondary" aria-label="Edit device" title="Edit"><Pencil size={15} /></button>}
-                          {canManageDevices && <button type="button" onClick={() => deleteDevice(device.id)} className="btn-danger" aria-label="Delete device" title="Delete"><Trash2 size={15} /></button>}
+                          {canManageDevices && <button type="button" onClick={() => setDevicePendingDelete(device)} className="btn-danger" aria-label="Delete device" title="Delete"><Trash2 size={15} /></button>}
                         </div>
                       </td>
                     </tr>
@@ -683,6 +680,25 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                   )}
                 </div>
               </aside>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {devicePendingDelete && (
+        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
+          <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Device</h2>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Delete {devicePendingDelete.assetTag || 'this device'}? This cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setDevicePendingDelete(null)} className="btn-secondary">
+                Cancel
+              </button>
+              <button type="button" onClick={() => deleteDevice(devicePendingDelete)} className="btn-danger">
+                Delete
+              </button>
             </div>
           </div>
         </div>
