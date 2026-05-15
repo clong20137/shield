@@ -12,7 +12,12 @@ function getAuditActor(req: Request) {
 export class CalendarController {
   static async listEntries(req: Request, res: Response) {
     try {
-      const entries = await CalendarEntryModel.listEntries();
+      const accountId = typeof req.query.accountId === 'string' ? req.query.accountId : '';
+      if (!accountId) {
+        return res.status(400).json({ error: 'Account is required' });
+      }
+
+      const entries = await CalendarEntryModel.listEntries(accountId);
       res.json(entries);
     } catch (error) {
       console.error('Calendar list error:', error);
@@ -22,7 +27,8 @@ export class CalendarController {
 
   static async createEntry(req: Request, res: Response) {
     try {
-      const { category, date, dutyHours, districtWorked, specialStatus, color } = req.body as {
+      const { accountId, category, date, dutyHours, districtWorked, specialStatus, color } = req.body as {
+        accountId?: string;
         category?: string;
         date?: string;
         dutyHours?: string | number;
@@ -32,11 +38,12 @@ export class CalendarController {
       };
       const hours = Number(dutyHours);
 
-      if (!date || Number.isNaN(hours) || hours < 0 || !districtWorked) {
-        return res.status(400).json({ error: 'Date, duty hours, and district worked are required' });
+      if (!accountId || !date || Number.isNaN(hours) || hours < 0 || !districtWorked) {
+        return res.status(400).json({ error: 'Account, date, duty hours, and district worked are required' });
       }
 
       const entry = await CalendarEntryModel.createEntry({
+        ownerAccountId: accountId,
         category: category || 'General Information',
         date,
         dutyHours: String(hours),
@@ -63,7 +70,8 @@ export class CalendarController {
 
   static async updateEntry(req: Request, res: Response) {
     try {
-      const { category, date, dutyHours, districtWorked, specialStatus, color } = req.body as {
+      const { accountId, category, date, dutyHours, districtWorked, specialStatus, color } = req.body as {
+        accountId?: string;
         category?: string;
         date?: string;
         dutyHours?: string | number;
@@ -73,11 +81,12 @@ export class CalendarController {
       };
       const hours = Number(dutyHours);
 
-      if (!date || Number.isNaN(hours) || hours < 0 || !districtWorked) {
-        return res.status(400).json({ error: 'Date, duty hours, and district worked are required' });
+      if (!accountId || !date || Number.isNaN(hours) || hours < 0 || !districtWorked) {
+        return res.status(400).json({ error: 'Account, date, duty hours, and district worked are required' });
       }
 
       const entry = await CalendarEntryModel.updateEntry(req.params.id, {
+        ownerAccountId: accountId,
         category: category || 'General Information',
         date,
         dutyHours: String(hours),
@@ -108,7 +117,12 @@ export class CalendarController {
 
   static async deleteEntry(req: Request, res: Response) {
     try {
-      const deleted = await CalendarEntryModel.deleteEntry(req.params.id);
+      const accountId = typeof req.body?.accountId === 'string' ? req.body.accountId : '';
+      if (!accountId) {
+        return res.status(400).json({ error: 'Account is required' });
+      }
+
+      const deleted = await CalendarEntryModel.deleteEntry(req.params.id, accountId);
 
       if (!deleted) {
         return res.status(404).json({ error: 'Calendar entry not found' });

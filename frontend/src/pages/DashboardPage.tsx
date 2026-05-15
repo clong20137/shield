@@ -82,7 +82,7 @@ const getReadableDate = (dateKey: string) => {
   });
 };
 
-function DashboardCalendar() {
+export function DashboardCalendar() {
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -119,7 +119,7 @@ function DashboardCalendar() {
     setIsCalendarLoading(true);
     setCalendarError(null);
     try {
-      const response = await calendarService.getAll();
+      const response = await calendarService.getAll('');
       setEntries(response.data);
     } catch (err) {
       console.error('Failed to load calendar entries:', err);
@@ -162,6 +162,7 @@ function DashboardCalendar() {
       const payload = {
         ...entryForm,
         dutyHours: hours.toFixed(2).replace(/\.?0+$/, ''),
+        accountId: '',
         ...actor,
       };
 
@@ -190,7 +191,7 @@ function DashboardCalendar() {
     setCalendarError(null);
     try {
       const actor = await getAuditActor();
-      await calendarService.delete(entryId, actor);
+      await calendarService.delete(entryId, { ...actor, accountId: '' });
       setEntries((currentEntries) => currentEntries.filter((entry) => entry.id !== entryId));
     } catch (err) {
       console.error('Failed to delete calendar entry:', err);
@@ -796,8 +797,6 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
         <ReportBarChart title="Users by District" labelKey="district" data={districtReport} />
         <ReportBarChart title="Employment Type" labelKey="employmentType" data={employmentReport} />
       </div>
-
-      <DashboardCalendar />
 
       <div className="bg-white rounded-lg p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
         <h2 className="mb-6">Recent Users</h2>

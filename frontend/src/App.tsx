@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { BarChart3, Bell, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Search, Settings, Shield, SlidersHorizontal, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
+import { BarChart3, Bell, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Search, Settings, Shield, SlidersHorizontal, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -10,6 +10,7 @@ import PermissionsPage from './pages/PermissionsPage';
 import MessageInboxPage from './pages/MessageInboxPage';
 import CreateUserPage from './pages/CreateUserPage';
 import AuditLogPage from './pages/AuditLogPage';
+import CalendarPage from './pages/CalendarPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { AuthAccount, authService, clearAuthToken, messageService, setAuthToken, userService, User } from './services/api';
 
@@ -25,7 +26,7 @@ interface MessagePreferences {
   playMessageSound: boolean;
 }
 
-type QuickLaunchAppId = 'dashboard' | 'messages' | 'devices' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
+type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
 type QuickLaunchExternalSlot = {
   type: 'external';
   label: string;
@@ -49,6 +50,7 @@ const defaultMessagePreferences: MessagePreferences = {
 const quickLaunchApps: QuickLaunchApp[] = [
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: LayoutDashboard },
   { id: 'messages', label: 'Messages', icon: Mail },
+  { id: 'calendar', label: 'Calendar', icon: CalendarDays },
   { id: 'devices', label: 'Devices', path: '/devices', icon: Laptop },
   { id: 'search', label: 'Search Users', path: '/search', icon: Search },
   { id: 'reports', label: 'Reports', path: '/reports', icon: BarChart3 },
@@ -517,6 +519,7 @@ function QuickLaunchTray({
   badgeCounts,
   activeModalApp,
   onOpenMessages,
+  onOpenCalendar,
   onOpenCreateUser,
 }: {
   isAdministrator: boolean;
@@ -524,12 +527,14 @@ function QuickLaunchTray({
   badgeCounts: Partial<Record<QuickLaunchAppId, number>>;
   activeModalApp: QuickLaunchAppId | null;
   onOpenMessages: () => void;
+  onOpenCalendar: () => void;
   onOpenCreateUser: () => void;
 }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [slots, setSlots] = useState<QuickLaunchSlot[]>(() => loadQuickLaunchSlots());
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
+  const [draggingSlot, setDraggingSlot] = useState<number | null>(null);
   const [externalLabel, setExternalLabel] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
   const availableApps = quickLaunchApps.filter((app) => !app.adminOnly || isAdministrator);
@@ -576,6 +581,11 @@ function QuickLaunchTray({
       return;
     }
 
+    if (app.id === 'calendar') {
+      onOpenCalendar();
+      return;
+    }
+
     if (app.id === 'create-user') {
       onOpenCreateUser();
       return;
@@ -605,6 +615,17 @@ function QuickLaunchTray({
     });
   };
 
+  const moveSlot = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+
+    setSlots((currentSlots) => {
+      const nextSlots = [...currentSlots];
+      const [movedSlot] = nextSlots.splice(fromIndex, 1);
+      nextSlots.splice(toIndex, 0, movedSlot);
+      return nextSlots;
+    });
+  };
+
   return (
     <section className={`fixed bottom-5 right-6 z-30 transition-all duration-200 ${isSidebarCollapsed ? 'left-24' : 'left-[19.5rem]'}`}>
       <div className="mx-auto w-fit max-w-full rounded-2xl border border-gray-200 bg-white/85 p-3 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/80">
@@ -618,13 +639,41 @@ function QuickLaunchTray({
           const isActive = app ? isAppActive(app) : false;
 
           return (
-            <div key={`quick-launch-${index}`} className="relative">
+            <div
+              key={`quick-launch-${index}`}
+              className="relative"
+              draggable={Boolean(slot)}
+              onDragStart={(event) => {
+                if (!slot) {
+                  event.preventDefault();
+                  return;
+                }
+
+                setDraggingSlot(index);
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', String(index));
+              }}
+              onDragOver={(event) => {
+                if (draggingSlot === null || draggingSlot === index) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                const sourceIndex = Number(event.dataTransfer.getData('text/plain'));
+                if (!Number.isNaN(sourceIndex)) {
+                  moveSlot(sourceIndex, index);
+                }
+                setDraggingSlot(null);
+              }}
+              onDragEnd={() => setDraggingSlot(null)}
+            >
               <button
                 type="button"
                 onClick={() => (slot ? openSlot(slot) : setEditingSlot(index))}
                 className={`flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-[10px] font-bold transition ${
                   slot
-                    ? `${isActive ? 'translate-y-[-3px] border-accent bg-accent/10 text-accent shadow-md' : 'border-gray-200 bg-white text-primary-500 shadow-sm'} hover:-translate-y-1 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100`
+                    ? `${draggingSlot === index ? 'scale-95 opacity-50' : ''} ${isActive ? 'translate-y-[-3px] border-accent bg-accent/10 text-accent shadow-md' : 'border-gray-200 bg-white text-primary-500 shadow-sm'} cursor-grab active:cursor-grabbing hover:-translate-y-1 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100`
                     : 'border-gray-300 bg-white/60 text-gray-400 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900/60'
                 }`}
                 title={label || 'Add App'}
@@ -744,6 +793,14 @@ function MessagesRouteRedirect({ onOpenMessages }: { onOpenMessages: () => void 
   return <Navigate to="/" replace />;
 }
 
+function CalendarRouteRedirect({ onOpenCalendar }: { onOpenCalendar: () => void }) {
+  useEffect(() => {
+    onOpenCalendar();
+  }, [onOpenCalendar]);
+
+  return <Navigate to="/" replace />;
+}
+
 function CreateUserRouteRedirect({ onOpenCreateUser }: { onOpenCreateUser: () => void }) {
   useEffect(() => {
     onOpenCreateUser();
@@ -773,8 +830,9 @@ function App() {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
-  const [closingModal, setClosingModal] = useState<'messages' | 'profile' | 'preferences' | 'createUser' | null>(null);
+  const [closingModal, setClosingModal] = useState<'messages' | 'calendar' | 'profile' | 'preferences' | 'createUser' | null>(null);
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const previousMessageUnreadCount = useRef<number | null>(null);
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
@@ -946,10 +1004,11 @@ function App() {
 
   const isAdministrator = currentUser?.role === 'administrator';
 
-  const closeModal = (modal: 'messages' | 'profile' | 'preferences' | 'createUser') => {
+  const closeModal = (modal: 'messages' | 'calendar' | 'profile' | 'preferences' | 'createUser') => {
     setClosingModal(modal);
     window.setTimeout(() => {
       if (modal === 'messages') setIsMessagesModalOpen(false);
+      if (modal === 'calendar') setIsCalendarModalOpen(false);
       if (modal === 'profile') setIsProfileModalOpen(false);
       if (modal === 'preferences') setIsPreferencesOpen(false);
       if (modal === 'createUser') setIsCreateUserModalOpen(false);
@@ -964,6 +1023,15 @@ function App() {
     }
 
     setIsMessagesModalOpen(true);
+  };
+
+  const toggleCalendarModal = () => {
+    if (isCalendarModalOpen) {
+      closeModal('calendar');
+      return;
+    }
+
+    setIsCalendarModalOpen(true);
   };
 
   const toggleCreateUserModal = () => {
@@ -1026,6 +1094,11 @@ function App() {
         return;
       }
 
+      if (isCalendarModalOpen) {
+        closeModal('calendar');
+        return;
+      }
+
       if (isProfileModalOpen) {
         closeModal('profile');
         return;
@@ -1039,7 +1112,7 @@ function App() {
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isAccountMenuOpen, isCreateUserModalOpen, isMessagesModalOpen, isNotificationsOpen, isPreferencesOpen, isProfileModalOpen]);
+  }, [isAccountMenuOpen, isCalendarModalOpen, isCreateUserModalOpen, isMessagesModalOpen, isNotificationsOpen, isPreferencesOpen, isProfileModalOpen]);
 
   return (
     <Router>
@@ -1121,6 +1194,7 @@ function App() {
 
             <nav className="flex flex-1 flex-col gap-2 px-3 py-3">
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
+              <SidebarLink to="/calendar" label="Calendar" compact={isSidebarCollapsed} icon={CalendarDays} />
               <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
               {isAdministrator && (
@@ -1255,6 +1329,7 @@ function App() {
                 <Routes>
                   <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
                   {currentUser && <Route path="/messages" element={<MessagesRouteRedirect onOpenMessages={() => setIsMessagesModalOpen(true)} />} />}
+                  {currentUser && <Route path="/calendar" element={<CalendarRouteRedirect onOpenCalendar={() => setIsCalendarModalOpen(true)} />} />}
                   <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
                   <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
                   {currentUser && isAdministrator && (
@@ -1284,8 +1359,9 @@ function App() {
                 isAdministrator={isAdministrator}
                 isSidebarCollapsed={isSidebarCollapsed}
                 badgeCounts={{ messages: messageUnreadCount }}
-                activeModalApp={isMessagesModalOpen ? 'messages' : isCreateUserModalOpen ? 'create-user' : null}
+                activeModalApp={isMessagesModalOpen ? 'messages' : isCalendarModalOpen ? 'calendar' : isCreateUserModalOpen ? 'create-user' : null}
                 onOpenMessages={toggleMessagesModal}
+                onOpenCalendar={toggleCalendarModal}
                 onOpenCreateUser={toggleCreateUserModal}
               />
             </main>
@@ -1309,6 +1385,29 @@ function App() {
                 </div>
                 <div className="min-h-0 flex-1">
                   <MessageInboxPage currentUser={currentUser} onToast={showToast} isModalView />
+                </div>
+              </div>
+            </div>
+          )}
+          {isCalendarModalOpen && currentUser && (
+            <div className={getModalBackdropClass(closingModal === 'calendar', 'bg-black/60')}>
+              <div className={getModalWindowClass(closingModal === 'calendar', 'flex h-[94vh] w-full max-w-6xl flex-col rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900')}>
+                <div className="mb-3 flex items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Calendar</h2>
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Personal calendar entries are separated by account.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => closeModal('calendar')}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                    aria-label="Close calendar"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1">
+                  <CalendarPage currentUser={currentUser} />
                 </div>
               </div>
             </div>

@@ -137,6 +137,7 @@ export interface TwoFactorSetupResponse {
 
 export interface CalendarEntry {
   id: string;
+  ownerAccountId?: string;
   category: 'General Information';
   date: string;
   dutyHours: string;
@@ -313,16 +314,16 @@ export const reportService = {
 };
 
 export const calendarService = {
-  getAll: () =>
-    api.get<CalendarEntry[]>('/calendar'),
+  getAll: (accountId: string) =>
+    api.get<CalendarEntry[]>('/calendar', { params: { accountId } }),
 
-  create: (entry: Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'> & { actorId?: string; actorName?: string }) =>
+  create: (entry: Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'> & { accountId: string; actorId?: string; actorName?: string }) =>
     api.post<CalendarEntry>('/calendar', entry),
 
-  update: (id: string, entry: Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'> & { actorId?: string; actorName?: string }) =>
+  update: (id: string, entry: Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'> & { accountId: string; actorId?: string; actorName?: string }) =>
     api.put<CalendarEntry>(`/calendar/${id}`, entry),
 
-  delete: (id: string, actor?: { actorId?: string; actorName?: string }) =>
+  delete: (id: string, actor?: { accountId?: string; actorId?: string; actorName?: string }) =>
     api.delete(`/calendar/${id}`, { data: actor }),
 };
 

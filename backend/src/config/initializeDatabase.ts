@@ -237,6 +237,7 @@ export async function initializeDatabase() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS calendar_entries (
       \`id\` VARCHAR(36) PRIMARY KEY,
+      \`ownerAccountId\` VARCHAR(36),
       \`category\` VARCHAR(100) NOT NULL DEFAULT 'General Information',
       \`entryDate\` DATE NOT NULL,
       \`dutyHours\` DECIMAL(6,2) NOT NULL,
@@ -245,9 +246,11 @@ export async function initializeDatabase() {
       \`color\` VARCHAR(20) NOT NULL DEFAULT '#9C865C',
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX \`idx_calendar_owner\` (\`ownerAccountId\`),
       INDEX \`idx_calendar_entry_date\` (\`entryDate\`)
     )
   `);
+  await ensureColumn('calendar_entries', 'ownerAccountId', '`ownerAccountId` VARCHAR(36)');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS devices (

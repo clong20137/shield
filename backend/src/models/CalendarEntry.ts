@@ -4,6 +4,7 @@ import pool from '../config/database';
 
 export interface CalendarEntry {
   id: string;
+  ownerAccountId: string;
   category: string;
   date: string;
   dutyHours: string;
@@ -16,6 +17,7 @@ export interface CalendarEntry {
 
 interface CalendarEntryRow extends RowDataPacket {
   id: string;
+  ownerAccountId: string;
   category: string;
   entryDate: Date | string;
   dutyHours: number | string;
@@ -43,6 +45,7 @@ function formatDate(value: Date | string): string {
 function toCalendarEntry(row: CalendarEntryRow): CalendarEntry {
   return {
     id: row.id,
+    ownerAccountId: row.ownerAccountId,
     category: row.category,
     date: formatDate(row.entryDate),
     dutyHours: String(row.dutyHours).replace(/\.?0+$/u, ''),
@@ -55,11 +58,12 @@ function toCalendarEntry(row: CalendarEntryRow): CalendarEntry {
 }
 
 export class CalendarEntryModel {
-  static async listEntries(): Promise<CalendarEntry[]> {
+  static async listEntries(ownerAccountId: string): Promise<CalendarEntry[]> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<CalendarEntryRow[]>(
-        'SELECT * FROM calendar_entries ORDER BY `entryDate` DESC, `updatedAt` DESC'
+        'SELECT * FROM calendar_entries WHERE `ownerAccountId` = ? ORDER BY `entryDate` DESC, `updatedAt` DESC',
+        [ownerAccountId]
       );
 
       return rows.map(toCalendarEntry);
@@ -76,11 +80,12 @@ export class CalendarEntryModel {
 
       await conn.query<ResultSetHeader>(
         `INSERT INTO calendar_entries (
-          \`id\`, \`category\`, \`entryDate\`, \`dutyHours\`, \`districtWorked\`,
+          \`id\`, \`ownerAccountId\`, \`category\`, \`entryDate\`, \`dutyHours\`, \`districtWorked\`,
           \`specialStatus\`, \`color\`, \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
+          entry.ownerAccountId,
           entry.category,
           entry.date,
           Number(entry.dutyHours),
@@ -116,7 +121,7 @@ export class CalendarEntryModel {
           \`specialStatus\` = ?,
           \`color\` = ?,
           \`updatedAt\` = ?
-        WHERE \`id\` = ?`,
+        WHERE \`id\` = ? AND \`ownerAccountId\` = ?`,
         [
           entry.category,
           entry.date,
@@ -126,12 +131,13 @@ export class CalendarEntryModel {
           entry.color,
           new Date(),
           id,
+          entry.ownerAccountId,
         ]
       );
 
       const [rows] = await conn.query<CalendarEntryRow[]>(
-        'SELECT * FROM calendar_entries WHERE `id` = ? LIMIT 1',
-        [id]
+        'SELECT * FROM calendar_entries WHERE `id` = ? AND `ownerAccountId` = ? LIMIT 1',
+        [id, entry.ownerAccountId]
       );
 
       return rows[0] ? toCalendarEntry(rows[0]) : null;
@@ -140,12 +146,12 @@ export class CalendarEntryModel {
     }
   }
 
-  static async deleteEntry(id: string): Promise<boolean> {
+  static async deleteEntry(id: string, ownerAccountId: string): Promise<boolean> {
     const conn = await pool.getConnection();
     try {
       const [result] = await conn.query<ResultSetHeader>(
-        'DELETE FROM calendar_entries WHERE `id` = ?',
-        [id]
+        'DELETE FROM calendar_entries WHERE `id` = ? AND `ownerAccountId` = ?',
+        [id, ownerAccountId]
       );
 
       return result.affectedRows > 0;
