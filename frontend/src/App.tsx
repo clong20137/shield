@@ -526,9 +526,11 @@ function HeaderMessagesButton({
 
 function QuickLaunchTray({
   isAdministrator,
+  isSidebarCollapsed,
   onOpenMessages,
 }: {
   isAdministrator: boolean;
+  isSidebarCollapsed: boolean;
   onOpenMessages: () => void;
 }) {
   const navigate = useNavigate();
@@ -558,12 +560,13 @@ function QuickLaunchTray({
   };
 
   return (
-    <section className="mt-8 shrink-0 border-t border-gray-200 pt-5 dark:border-gray-800">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Quick Launch</h3>
-      </div>
+    <section className={`pointer-events-none fixed bottom-0 right-0 z-30 border-t border-gray-200 bg-white/95 px-6 py-4 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-all duration-200 dark:border-gray-800 dark:bg-gray-950/95 ${isSidebarCollapsed ? 'left-20' : 'left-72'}`}>
+      <div className="pointer-events-auto mx-auto max-w-6xl">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Quick Launch</h3>
+        </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {slots.map((appId, index) => {
           const app = availableApps.find((item) => item.id === appId) || null;
           const Icon = app?.icon;
@@ -597,6 +600,7 @@ function QuickLaunchTray({
             </div>
           );
         })}
+        </div>
       </div>
 
       {editingSlot !== null && (
@@ -980,7 +984,7 @@ function App() {
               </div>
             </header>
 
-            <main className="flex-1 overflow-y-auto px-6 py-8 dark:bg-gray-950">
+            <main className="flex-1 overflow-y-auto px-6 pb-44 pt-8 dark:bg-gray-950">
               <div className="min-h-[calc(100vh-12rem)]">
                 <Routes>
                   <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
@@ -1010,7 +1014,11 @@ function App() {
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </div>
-              <QuickLaunchTray isAdministrator={isAdministrator} onOpenMessages={() => setIsMessagesModalOpen(true)} />
+              <QuickLaunchTray
+                isAdministrator={isAdministrator}
+                isSidebarCollapsed={isSidebarCollapsed}
+                onOpenMessages={() => setIsMessagesModalOpen(true)}
+              />
             </main>
           </div>
           {isMessagesModalOpen && currentUser && (
