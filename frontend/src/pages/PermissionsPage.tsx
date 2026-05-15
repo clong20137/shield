@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Plus, X } from 'lucide-react';
 import { AuthAccount, AuthRole, authService } from '../services/api';
 
 interface PermissionsPageProps {
@@ -29,6 +30,8 @@ function PermissionsPage({
   const [roles, setRoles] = useState<AuthRole[]>([]);
   const [newRoleName, setNewRoleName] = useState('');
   const [newRolePermissions, setNewRolePermissions] = useState<string[]>(['users:view']);
+  const [isCreateRoleModalOpen, setIsCreateRoleModalOpen] = useState(false);
+  const [isSavingRole, setIsSavingRole] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingAccountId, setSavingAccountId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +63,18 @@ function PermissionsPage({
     return () => window.clearInterval(interval);
   }, [account.id]);
 
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isCreateRoleModalOpen) {
+        setIsCreateRoleModalOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isCreateRoleModalOpen]);
+
   const updateRole = async (targetAccount: AuthAccount, role: string) => {
     setSavingAccountId(targetAccount.id);
     setError(null);
@@ -89,23 +104,29 @@ function PermissionsPage({
     }
   };
 
-  const createRole = async () => {
+  const createRole = async (event?: React.FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+
     if (!newRoleName.trim()) {
       onToast('error', 'Role name is required.');
       return;
     }
 
+    setIsSavingRole(true);
     setError(null);
     try {
       const response = await authService.createRole(account.id, newRoleName, newRolePermissions);
       setRoles((currentRoles) => [...currentRoles, response.data].sort((a, b) => a.name.localeCompare(b.name)));
       setNewRoleName('');
       setNewRolePermissions(['users:view']);
+      setIsCreateRoleModalOpen(false);
       onToast('success', 'Role created.');
     } catch (err) {
       const message = getErrorMessage(err, 'Failed to create role.');
       setError(message);
       onToast('error', message);
+    } finally {
+      setIsSavingRole(false);
     }
   };
 
@@ -114,13 +135,17 @@ function PermissionsPage({
 
   return (
     <div>
-      <div className="mb-8">
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1>Permissions</h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
             Manage account access levels for administrators and users.
           </p>
         </div>
+        <button type="button" onClick={() => setIsCreateRoleModalOpen(true)} className="btn-primary">
+          <Plus size={16} />
+          Create Role
+        </button>
       </div>
 
       {error && <div className="error">{error}</div>}
@@ -141,47 +166,6 @@ function PermissionsPage({
       </div>
 
       <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-        <div className="mb-8 rounded border border-gray-200 p-4 dark:border-gray-800">
-          <h2 className="mb-4 text-xl">Create Role</h2>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)_auto]">
-            <label>
-              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Role Name</span>
-              <input
-                value={newRoleName}
-                onChange={(event) => setNewRoleName(event.target.value)}
-                placeholder="supervisor"
-                className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-              />
-            </label>
-            <div>
-              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Permissions</span>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {permissionOptions.map((permission) => (
-                  <label key={permission.key} className="flex items-center gap-2 rounded border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
-                    <input
-                      type="checkbox"
-                      checked={newRolePermissions.includes(permission.key)}
-                      onChange={(event) => {
-                        setNewRolePermissions((currentPermissions) =>
-                          event.target.checked
-                            ? [...currentPermissions, permission.key]
-                            : currentPermissions.filter((item) => item !== permission.key),
-                        );
-                      }}
-                    />
-                    {permission.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="flex items-end">
-              <button type="button" onClick={createRole} className="btn-primary">
-                Create Role
-              </button>
-            </div>
-          </div>
-        </div>
-
         <h2 className="mb-5">Account Roles</h2>
         {loading ? (
           <div className="loading">Loading accounts...</div>
@@ -229,6 +213,69 @@ function PermissionsPage({
           </div>
         )}
       </section>
+
+      {isCreateRoleModalOpen && (
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form onSubmit={createRole} className="modal-window w-full max-w-3xl rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Create Role</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Define a role name and choose its permissions.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateRoleModalOpen(false)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                aria-label="Close create role"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <label className="mb-4 block">
+              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Role Name</span>
+              <input
+                value={newRoleName}
+                onChange={(event) => setNewRoleName(event.target.value)}
+                placeholder="supervisor"
+                className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                autoFocus
+              />
+            </label>
+
+            <div>
+              <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Permissions</span>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {permissionOptions.map((permission) => (
+                  <label key={permission.key} className="flex items-center gap-2 rounded border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
+                    <input
+                      type="checkbox"
+                      checked={newRolePermissions.includes(permission.key)}
+                      onChange={(event) => {
+                        setNewRolePermissions((currentPermissions) =>
+                          event.target.checked
+                            ? [...currentPermissions, permission.key]
+                            : currentPermissions.filter((item) => item !== permission.key),
+                        );
+                      }}
+                    />
+                    {permission.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-800">
+              <button type="button" onClick={() => setIsCreateRoleModalOpen(false)} className="btn-secondary">
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={isSavingRole}>
+                {isSavingRole ? 'Creating...' : 'Create Role'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
