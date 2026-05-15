@@ -1,5 +1,5 @@
 import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Ban, CheckCircle2, Download, Eye, FileText, Laptop, Pencil, Plus, Printer, QrCode, RefreshCw, Radio, Router, Smartphone, Trash2, Upload, Wifi, Wrench, X } from 'lucide-react';
+import { AlertTriangle, Ban, CheckCircle2, Download, Eye, FileText, Laptop, Pencil, Plus, Printer, QrCode, Radio, Router, Smartphone, Trash2, Upload, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, deviceService, DeviceEvent, DeviceRecord } from '../services/api';
 
 type DeviceType = DeviceRecord['type'];
@@ -129,8 +129,14 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const actor = { actorId: currentUser?.id, actorName: currentUser?.displayName || currentUser?.email };
 
   useEffect(() => {
-    loadDevices();
+    loadDevices(true);
     loadRegisteredUsers();
+
+    const interval = window.setInterval(() => {
+      loadDevices(false);
+    }, 30000);
+
+    return () => window.clearInterval(interval);
   }, []);
 
   const loadRegisteredUsers = async () => {
@@ -148,8 +154,10 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     }
   };
 
-  const loadDevices = async () => {
-    setLoading(true);
+  const loadDevices = async (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const response = await deviceService.getAll();
@@ -339,7 +347,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       'location',
       'phoneNumber',
       'imei',
-      'simNumber',
+      'iccid',
       'radioId',
       'hostname',
       'routerId',
@@ -351,7 +359,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       'condition',
       'notes',
     ];
-    const rows = filteredDevices.map((device) => headers.map((header) => escapeCsv(device[header as keyof DeviceRecord])).join(','));
+    const rows = filteredDevices.map((device) =>
+      headers.map((header) => escapeCsv(header === 'iccid' ? device.simNumber : device[header as keyof DeviceRecord])).join(','),
+    );
     const blob = new Blob([[headers.join(','), ...rows].join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -377,8 +387,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           const values = parseCsvLine(line);
           const nextForm = { ...defaultDeviceForm };
           headers.forEach((header, index) => {
-            if (header in nextForm) {
-              (nextForm as Record<string, string>)[header] = values[index] || '';
+            const normalizedHeader = header === 'iccid' ? 'simNumber' : header;
+            if (normalizedHeader in nextForm) {
+              (nextForm as Record<string, string>)[normalizedHeader] = values[index] || '';
             }
           });
           return deviceService.create({ ...nextForm, ...actor, eventNotes: 'Imported from CSV.' });
@@ -428,9 +439,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           <div className="rounded bg-accent/10 px-4 py-2 text-sm font-bold text-accent">
             {devices.length} total devices
           </div>
-          <button type="button" onClick={loadDevices} className="btn-secondary" title="Refresh devices" aria-label="Refresh devices">
-            <RefreshCw size={16} />
-          </button>
           <button type="button" onClick={exportCsv} className="btn-secondary" title="Export CSV" aria-label="Export CSV">
             <Download size={16} />
           </button>
@@ -491,7 +499,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             <TextField label="Location" value={form.location} onChange={(value) => setForm((current) => ({ ...current, location: value }))} />
             <TextField label="Phone Number" value={form.phoneNumber} onChange={(value) => setForm((current) => ({ ...current, phoneNumber: value }))} />
             <TextField label="IMEI" value={form.imei} onChange={(value) => setForm((current) => ({ ...current, imei: value }))} />
-            <TextField label="SIM Number" value={form.simNumber} onChange={(value) => setForm((current) => ({ ...current, simNumber: value }))} />
+            <TextField label="ICCID" value={form.simNumber} onChange={(value) => setForm((current) => ({ ...current, simNumber: value }))} />
             <TextField label="Radio ID" value={form.radioId} onChange={(value) => setForm((current) => ({ ...current, radioId: value }))} />
             <TextField label="Hostname" value={form.hostname} onChange={(value) => setForm((current) => ({ ...current, hostname: value }))} />
             <TextField label="Router ID" value={form.routerId} onChange={(value) => setForm((current) => ({ ...current, routerId: value }))} />
@@ -621,7 +629,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                   <Detail label="Serial" value={detailDevice.serialNumber || 'N/A'} />
                   <Detail label="Phone" value={detailDevice.phoneNumber || 'N/A'} />
                   <Detail label="IMEI" value={detailDevice.imei || 'N/A'} />
-                  <Detail label="SIM" value={detailDevice.simNumber || 'N/A'} />
+                  <Detail label="ICCID" value={detailDevice.simNumber || 'N/A'} />
                   <Detail label="Radio ID" value={detailDevice.radioId || 'N/A'} />
                   <Detail label="Hostname" value={detailDevice.hostname || 'N/A'} />
                   <Detail label="Router ID" value={detailDevice.routerId || 'N/A'} />

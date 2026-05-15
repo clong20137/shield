@@ -11,10 +11,15 @@ const ReportsPage: React.FC = () => {
 
   useEffect(() => {
     loadReports();
+    const interval = window.setInterval(() => loadReports(false), 30000);
+
+    return () => window.clearInterval(interval);
   }, []);
 
-  const loadReports = async () => {
-    setLoading(true);
+  const loadReports = async (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const [rankRes, districtRes, employmentRes, statsRes] = await Promise.all([
@@ -147,10 +152,6 @@ const ReportsPage: React.FC = () => {
           </div>
         </div>
       </div>
-
-      <button onClick={loadReports} className="btn-primary">
-        Refresh Reports
-      </button>
     </div>
   );
 };

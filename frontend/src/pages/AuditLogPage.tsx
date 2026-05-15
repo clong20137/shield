@@ -6,8 +6,10 @@ function AuditLogPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadLogs = async () => {
-    setLoading(true);
+  const loadLogs = async (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const response = await auditService.getAll(200);
@@ -22,16 +24,18 @@ function AuditLogPage() {
 
   useEffect(() => {
     loadLogs();
+    const interval = window.setInterval(() => loadLogs(false), 30000);
+
+    return () => window.clearInterval(interval);
   }, []);
 
   return (
     <div>
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
+      <div className="mb-8">
         <div>
           <h1>Audit Log</h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Review administrative activity.</p>
         </div>
-        <button type="button" onClick={loadLogs} className="btn-secondary">Refresh Logs</button>
       </div>
 
       {error && <div className="error">{error}</div>}

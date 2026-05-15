@@ -277,6 +277,39 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
     window.dispatchEvent(new CustomEvent('shield:messages-updated'));
   }, [currentUser.id, selectedThread]);
 
+  useEffect(() => {
+    const handleEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      if (isEmojiPickerOpen) {
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        setIsEmojiPickerOpen(false);
+        return;
+      }
+
+      if (threadPendingDelete) {
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        setThreadPendingDelete(null);
+        return;
+      }
+
+      if (isComposeOpen) {
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        setIsComposeOpen(false);
+        setIsEmojiPickerOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isComposeOpen, isEmojiPickerOpen, threadPendingDelete]);
+
   const withAttachmentSummary = (body: string, files: File[]) => {
     if (files.length === 0) {
       return body;

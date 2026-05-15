@@ -33,8 +33,10 @@ function PermissionsPage({
   const [savingAccountId, setSavingAccountId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const loadAccounts = async () => {
-    setLoading(true);
+  const loadAccounts = async (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -53,6 +55,9 @@ function PermissionsPage({
 
   useEffect(() => {
     loadAccounts();
+    const interval = window.setInterval(() => loadAccounts(false), 30000);
+
+    return () => window.clearInterval(interval);
   }, [account.id]);
 
   const updateRole = async (targetAccount: AuthAccount, role: string) => {
@@ -109,16 +114,13 @@ function PermissionsPage({
 
   return (
     <div>
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
+      <div className="mb-8">
         <div>
           <h1>Permissions</h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
             Manage account access levels for administrators and users.
           </p>
         </div>
-        <button type="button" onClick={loadAccounts} className="btn-secondary">
-          Refresh Accounts
-        </button>
       </div>
 
       {error && <div className="error">{error}</div>}

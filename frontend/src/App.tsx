@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { BarChart3, Bell, ChevronLeft, ChevronRight, ClipboardList, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Search, Settings, Shield, SlidersHorizontal, Sun, UserCircle, UserPlus, X } from 'lucide-react';
+import { BarChart3, Bell, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Search, Settings, Shield, SlidersHorizontal, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -26,6 +26,12 @@ interface MessagePreferences {
 }
 
 type QuickLaunchAppId = 'dashboard' | 'messages' | 'devices' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
+type QuickLaunchExternalSlot = {
+  type: 'external';
+  label: string;
+  url: string;
+};
+type QuickLaunchSlot = QuickLaunchAppId | QuickLaunchExternalSlot | null;
 
 interface QuickLaunchApp {
   id: QuickLaunchAppId;
@@ -60,7 +66,11 @@ function loadMessagePreferences(): MessagePreferences {
   }
 }
 
-function loadQuickLaunchSlots(): Array<QuickLaunchAppId | null> {
+function isExternalQuickLaunchSlot(slot: QuickLaunchSlot): slot is QuickLaunchExternalSlot {
+  return typeof slot === 'object' && slot !== null && slot.type === 'external';
+}
+
+function loadQuickLaunchSlots(): QuickLaunchSlot[] {
   try {
     const storedSlots = window.localStorage.getItem(QUICK_LAUNCH_KEY);
     const parsedSlots = storedSlots ? JSON.parse(storedSlots) : [];
@@ -69,8 +79,27 @@ function loadQuickLaunchSlots(): Array<QuickLaunchAppId | null> {
     }
 
     return Array.from({ length: QUICK_LAUNCH_SLOT_COUNT }, (_, index) => {
-      const appId = parsedSlots[index];
-      return quickLaunchApps.some((app) => app.id === appId) ? appId : null;
+      const slot = parsedSlots[index];
+
+      if (quickLaunchApps.some((app) => app.id === slot)) {
+        return slot as QuickLaunchAppId;
+      }
+
+      if (
+        typeof slot === 'object' &&
+        slot !== null &&
+        slot.type === 'external' &&
+        typeof slot.label === 'string' &&
+        typeof slot.url === 'string'
+      ) {
+        return {
+          type: 'external',
+          label: slot.label,
+          url: slot.url,
+        };
+      }
+
+      return null;
     });
   } catch {
     return Array.from({ length: QUICK_LAUNCH_SLOT_COUNT }, () => null);
@@ -499,8 +528,10 @@ function QuickLaunchTray({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [slots, setSlots] = useState<Array<QuickLaunchAppId | null>>(() => loadQuickLaunchSlots());
+  const [slots, setSlots] = useState<QuickLaunchSlot[]>(() => loadQuickLaunchSlots());
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
+  const [externalLabel, setExternalLabel] = useState('');
+  const [externalUrl, setExternalUrl] = useState('');
   const availableApps = quickLaunchApps.filter((app) => !app.adminOnly || isAdministrator);
 
   const isAppActive = (app: QuickLaunchApp) => {
@@ -515,7 +546,31 @@ function QuickLaunchTray({
     window.localStorage.setItem(QUICK_LAUNCH_KEY, JSON.stringify(slots));
   }, [slots]);
 
-  const openApp = (app: QuickLaunchApp) => {
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && editingSlot !== null) {
+        event.stopImmediatePropagation();
+        setEditingSlot(null);
+        setExternalLabel('');
+        setExternalUrl('');
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [editingSlot]);
+
+  const openSlot = (slot: NonNullable<QuickLaunchSlot>) => {
+    if (isExternalQuickLaunchSlot(slot)) {
+      const url = /^https?:\/\//iu.test(slot.url) ? slot.url : `https://${slot.url}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    const app = availableApps.find((item) => item.id === slot);
+    if (!app) return;
+
     if (app.id === 'messages') {
       onOpenMessages();
       return;
@@ -531,19 +586,34 @@ function QuickLaunchTray({
     }
   };
 
-  const assignSlot = (appId: QuickLaunchAppId | null) => {
+  const assignSlot = (slot: QuickLaunchSlot) => {
     if (editingSlot === null) return;
-    setSlots((currentSlots) => currentSlots.map((slot, index) => (index === editingSlot ? appId : slot)));
+    setSlots((currentSlots) => currentSlots.map((currentSlot, index) => (index === editingSlot ? slot : currentSlot)));
     setEditingSlot(null);
+    setExternalLabel('');
+    setExternalUrl('');
+  };
+
+  const assignExternalSlot = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!externalLabel.trim() || !externalUrl.trim()) return;
+
+    assignSlot({
+      type: 'external',
+      label: externalLabel.trim(),
+      url: externalUrl.trim(),
+    });
   };
 
   return (
     <section className={`fixed bottom-5 right-6 z-30 transition-all duration-200 ${isSidebarCollapsed ? 'left-24' : 'left-[19.5rem]'}`}>
       <div className="mx-auto w-fit max-w-full rounded-2xl border border-gray-200 bg-white/85 p-3 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/80">
         <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
-        {slots.map((appId, index) => {
-          const app = availableApps.find((item) => item.id === appId) || null;
-          const Icon = app?.icon;
+        {slots.map((slot, index) => {
+          const app = typeof slot === 'string' ? availableApps.find((item) => item.id === slot) || null : null;
+          const isExternal = isExternalQuickLaunchSlot(slot);
+          const Icon = app?.icon || (isExternal ? ExternalLink : null);
+          const label = app?.label || (isExternal ? slot.label : 'Add');
           const badgeCount = app ? badgeCounts[app.id] || 0 : 0;
           const isActive = app ? isAppActive(app) : false;
 
@@ -551,16 +621,16 @@ function QuickLaunchTray({
             <div key={`quick-launch-${index}`} className="relative">
               <button
                 type="button"
-                onClick={() => (app ? openApp(app) : setEditingSlot(index))}
+                onClick={() => (slot ? openSlot(slot) : setEditingSlot(index))}
                 className={`flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-[10px] font-bold transition ${
-                  app
+                  slot
                     ? `${isActive ? 'translate-y-[-3px] border-accent bg-accent/10 text-accent shadow-md' : 'border-gray-200 bg-white text-primary-500 shadow-sm'} hover:-translate-y-1 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100`
                     : 'border-gray-300 bg-white/60 text-gray-400 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900/60'
                 }`}
-                title={app?.label || 'Add App'}
+                title={label || 'Add App'}
               >
                 {Icon ? <Icon size={20} /> : <Plus size={22} />}
-                <span className="max-w-14 truncate">{app?.label || 'Add'}</span>
+                <span className="max-w-14 truncate">{label}</span>
               </button>
 
               {isActive && (
@@ -573,12 +643,12 @@ function QuickLaunchTray({
                 </span>
               )}
 
-              {app && (
+              {slot && (
                 <button
                   type="button"
                   onClick={() => setEditingSlot(index)}
                   className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-gray-500 shadow-sm hover:bg-gray-200 hover:text-primary-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                  aria-label={`Change ${app.label} shortcut`}
+                  aria-label={`Change ${label} shortcut`}
                   title="Change shortcut"
                 >
                   <Plus size={11} />
@@ -600,7 +670,11 @@ function QuickLaunchTray({
               </div>
               <button
                 type="button"
-                onClick={() => setEditingSlot(null)}
+                onClick={() => {
+                  setEditingSlot(null);
+                  setExternalLabel('');
+                  setExternalUrl('');
+                }}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
                 aria-label="Close quick launch picker"
               >
@@ -623,15 +697,38 @@ function QuickLaunchTray({
                   </button>
                 );
               })}
+              <form onSubmit={assignExternalSlot} className="rounded border border-gray-200 p-3 dark:border-gray-800 sm:col-span-2">
+                <div className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-800 dark:text-gray-100">
+                  <Link size={18} />
+                  External Site
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]">
+                  <input
+                    value={externalLabel}
+                    onChange={(event) => setExternalLabel(event.target.value)}
+                    placeholder="Name"
+                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                  />
+                  <input
+                    value={externalUrl}
+                    onChange={(event) => setExternalUrl(event.target.value)}
+                    placeholder="https://example.com"
+                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                  />
+                  <button type="submit" className="btn-primary" aria-label="Add external site">
+                    <Plus size={16} />
+                  </button>
+                </div>
+              </form>
+              <button
+                type="button"
+                onClick={() => assignSlot(null)}
+                className="flex items-center gap-3 rounded border border-danger px-4 py-3 text-left text-sm font-bold text-danger hover:bg-red-50 dark:hover:bg-red-950"
+              >
+                <Trash2 size={18} />
+                Clear this box
+              </button>
             </div>
-
-            <button
-              type="button"
-              onClick={() => assignSlot(null)}
-              className="mt-4 text-sm font-semibold text-gray-500 hover:text-danger dark:text-gray-400"
-            >
-              Clear this box
-            </button>
           </div>
         </div>
       )}
@@ -902,6 +999,47 @@ function App() {
       showToast('error', 'Failed to update message preferences.');
     }
   };
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      if (isNotificationsOpen) {
+        setIsNotificationsOpen(false);
+        return;
+      }
+
+      if (isAccountMenuOpen) {
+        setIsAccountMenuOpen(false);
+        return;
+      }
+
+      if (isPreferencesOpen) {
+        closeModal('preferences');
+        return;
+      }
+
+      if (isCreateUserModalOpen) {
+        closeModal('createUser');
+        return;
+      }
+
+      if (isProfileModalOpen) {
+        closeModal('profile');
+        return;
+      }
+
+      if (isMessagesModalOpen) {
+        closeModal('messages');
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isAccountMenuOpen, isCreateUserModalOpen, isMessagesModalOpen, isNotificationsOpen, isPreferencesOpen, isProfileModalOpen]);
 
   return (
     <Router>

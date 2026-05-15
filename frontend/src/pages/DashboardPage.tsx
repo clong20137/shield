@@ -559,8 +559,10 @@ function DashboardNews({
   const [postError, setPostError] = useState<string | null>(null);
   const isAdministrator = currentUser?.role === 'administrator';
 
-  const loadPosts = async () => {
-    setIsLoadingPosts(true);
+  const loadPosts = async (showLoading = true) => {
+    if (showLoading) {
+      setIsLoadingPosts(true);
+    }
     setPostError(null);
     try {
       const response = await dashboardPostService.getAll(8);
@@ -575,6 +577,9 @@ function DashboardNews({
 
   useEffect(() => {
     loadPosts();
+    const interval = window.setInterval(() => loadPosts(false), 30000);
+
+    return () => window.clearInterval(interval);
   }, []);
 
   const createPost = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -620,14 +625,11 @@ function DashboardNews({
 
   return (
     <section className="mb-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <div className="mb-5">
         <div>
           <h2>Updates & News</h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Administrative posts for everyone using SHIELD.</p>
         </div>
-        <button type="button" onClick={loadPosts} className="btn-secondary">
-          Refresh Posts
-        </button>
       </div>
 
       {postError && <div className="error">{postError}</div>}
@@ -769,16 +771,13 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
 
   return (
     <div>
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
+      <div className="mb-8">
         <div>
           <h1>Dashboard</h1>
           {lastUpdated && (
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Live data refreshed at {lastUpdated}</p>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Live data updated at {lastUpdated}</p>
           )}
         </div>
-        <button type="button" onClick={() => loadDashboard()} className="btn-secondary">
-          Refresh Data
-        </button>
       </div>
 
       {error && <div className="error">{error}</div>}
