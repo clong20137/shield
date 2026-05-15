@@ -1,7 +1,7 @@
 import QRCode from 'qrcode';
-import { FormEvent, useEffect, useState } from 'react';
-import { KeyRound, QrCode, ShieldCheck, UserCircle } from 'lucide-react';
-import { AuthAccount, TwoFactorSetupResponse, authService } from '../services/api';
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
+import { Camera, KeyRound, QrCode, ShieldCheck, UserCircle } from 'lucide-react';
+import { AuthAccount, TwoFactorSetupResponse, authService, userService } from '../services/api';
 
 interface AccountSettingsPageProps {
   account: AuthAccount;
@@ -36,6 +36,8 @@ export function AccountSettingsPage({
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [isPasswordSaving, setIsPasswordSaving] = useState(false);
   const [isTwoFactorSaving, setIsTwoFactorSaving] = useState(false);
+  const [isProfilePictureSaving, setIsProfilePictureSaving] = useState(false);
+  const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -103,6 +105,24 @@ export function AccountSettingsPage({
     }
   };
 
+  const handleProfilePictureChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsProfilePictureSaving(true);
+
+    try {
+      const response = await userService.uploadProfilePicture(account.id, file);
+      onAccountUpdate({ ...account, profilePictureUrl: response.data.profilePictureUrl });
+      onToast('success', 'Profile picture updated.');
+    } catch (error) {
+      onToast('error', getErrorMessage(error, 'Failed to update profile picture.'));
+    } finally {
+      setIsProfilePictureSaving(false);
+      event.target.value = '';
+    }
+  };
+
   const handleEnableTwoFactor = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsTwoFactorSaving(true);
@@ -145,20 +165,41 @@ export function AccountSettingsPage({
       <section className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-4">
-            {account.profilePictureUrl ? (
-              <img
-                src={account.profilePictureUrl}
-                alt={account.displayName}
-                className="h-14 w-14 shrink-0 rounded-full border border-gray-200 bg-white object-cover dark:border-gray-700"
-              />
-            ) : (
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-base font-bold text-accent dark:border-gray-700 dark:bg-gray-900">
-                {getAccountInitials(account) || <UserCircle size={28} />}
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => profilePictureInputRef.current?.click()}
+              className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white text-accent dark:border-gray-700 dark:bg-gray-900"
+              aria-label="Update profile picture"
+              title="Update profile picture"
+              disabled={isProfilePictureSaving}
+            >
+              {account.profilePictureUrl ? (
+                <img
+                  src={account.profilePictureUrl}
+                  alt={account.displayName}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center text-base font-bold">
+                  {getAccountInitials(account) || <UserCircle size={28} />}
+                </span>
+              )}
+              <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-white opacity-0 transition group-hover:opacity-100">
+                <Camera size={18} />
+              </span>
+            </button>
+            <input
+              ref={profilePictureInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleProfilePictureChange}
+            />
             <div className="min-w-0">
               <h3 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">{account.displayName}</h3>
-              <p className="truncate text-sm text-gray-500 dark:text-gray-400">{account.email}</p>
+              <p className="truncate text-sm text-gray-500 dark:text-gray-400">
+                {isProfilePictureSaving ? 'Updating profile picture...' : account.email}
+              </p>
             </div>
           </div>
 
