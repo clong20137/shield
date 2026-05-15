@@ -16,13 +16,32 @@ function isDuplicateEmailError(error: unknown): boolean {
   );
 }
 
-async function isAdministrator(accountId?: string): Promise<boolean> {
+async function canManageRoles(accountId?: string): Promise<boolean> {
   if (!accountId) {
     return false;
   }
 
   const account = await AuthAccountModel.getAccountById(accountId);
-  return account?.role === 'administrator';
+  if (account?.role === 'administrator') {
+    return true;
+  }
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(accountId);
+  return permissions.includes('roles:manage');
+}
+
+async function canListAccounts(accountId?: string): Promise<boolean> {
+  if (!accountId) {
+    return false;
+  }
+
+  const account = await AuthAccountModel.getAccountById(accountId);
+  if (account?.role === 'administrator') {
+    return true;
+  }
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(accountId);
+  return permissions.includes('roles:manage') || permissions.includes('devices:manage');
 }
 
 export class AuthController {
@@ -215,8 +234,8 @@ export class AuthController {
     try {
       const requesterId = typeof req.query.requesterId === 'string' ? req.query.requesterId : undefined;
 
-      if (!(await isAdministrator(requesterId))) {
-        return res.status(403).json({ error: 'Administrator permission required' });
+      if (!(await canListAccounts(requesterId))) {
+        return res.status(403).json({ error: 'Account list permission required' });
       }
 
       const accounts = await AuthAccountModel.listAccounts();
@@ -235,8 +254,8 @@ export class AuthController {
       };
       const { accountId } = req.params;
 
-      if (!(await isAdministrator(requesterId))) {
-        return res.status(403).json({ error: 'Administrator permission required' });
+      if (!(await canManageRoles(requesterId))) {
+        return res.status(403).json({ error: 'Role management permission required' });
       }
 
       if (!role || !(await AuthAccountModel.roleExists(role))) {
@@ -294,8 +313,8 @@ export class AuthController {
     try {
       const requesterId = typeof req.query.requesterId === 'string' ? req.query.requesterId : undefined;
 
-      if (!(await isAdministrator(requesterId))) {
-        return res.status(403).json({ error: 'Administrator permission required' });
+      if (!(await canManageRoles(requesterId))) {
+        return res.status(403).json({ error: 'Role management permission required' });
       }
 
       const roles = await AuthAccountModel.listRoles();
@@ -314,8 +333,8 @@ export class AuthController {
         permissions?: string[];
       };
 
-      if (!(await isAdministrator(requesterId))) {
-        return res.status(403).json({ error: 'Administrator permission required' });
+      if (!(await canManageRoles(requesterId))) {
+        return res.status(403).json({ error: 'Role management permission required' });
       }
 
       if (!name?.trim()) {

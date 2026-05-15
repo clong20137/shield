@@ -18,6 +18,7 @@ const permissionOptions = [
   { key: 'audit:view', label: 'View audit log' },
   { key: 'roles:manage', label: 'Manage roles' },
   { key: 'messages:send', label: 'Send messages' },
+  { key: 'dashboard:manage', label: 'Manage dashboard posts' },
 ];
 
 function PermissionsPage({

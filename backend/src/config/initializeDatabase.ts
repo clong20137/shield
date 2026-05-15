@@ -178,7 +178,7 @@ export async function initializeDatabase() {
   await pool.query(`
     INSERT IGNORE INTO roles (\`id\`, \`name\`, \`permissions\`)
     VALUES
-      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","devices:manage","calendar:manage","audit:view","roles:manage","messages:send"]'),
+      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","devices:manage","calendar:manage","audit:view","roles:manage","messages:send","dashboard:manage"]'),
       ('role-user', 'user', '["users:view","calendar:manage","messages:send"]')
   `);
 

@@ -474,6 +474,34 @@ export class AuthAccountModel {
     }
   }
 
+  static async getPermissionsForAccount(accountId: string): Promise<string[]> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<RowDataPacket[]>(
+        `SELECT r.\`permissions\`
+        FROM users u
+        LEFT JOIN roles r ON r.\`name\` = u.\`role\`
+        WHERE u.\`id\` = ? AND u.\`passwordHash\` IS NOT NULL
+        LIMIT 1`,
+        [accountId]
+      );
+
+      const rawPermissions = rows[0]?.permissions;
+      if (typeof rawPermissions !== 'string') {
+        return [];
+      }
+
+      try {
+        const permissions = JSON.parse(rawPermissions);
+        return Array.isArray(permissions) ? permissions.filter((permission): permission is string => typeof permission === 'string') : [];
+      } catch {
+        return [];
+      }
+    } finally {
+      conn.release();
+    }
+  }
+
   static async updateRole(accountId: string, role: string): Promise<AuthAccount | null> {
     const conn = await pool.getConnection();
     try {

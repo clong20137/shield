@@ -8,7 +8,12 @@ async function isAdministrator(accountId?: string): Promise<boolean> {
   }
 
   const account = await AuthAccountModel.getAccountById(accountId);
-  return account?.role === 'administrator';
+  if (account?.role === 'administrator') {
+    return true;
+  }
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(accountId);
+  return permissions.includes('dashboard:manage');
 }
 
 export class DashboardPostController {
