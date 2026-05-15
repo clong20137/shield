@@ -56,6 +56,7 @@ export interface User {
   residentialAddress: string;
   mailingAddress: string;
   role: string;
+  receivesMessages: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -109,6 +110,7 @@ export interface AuthAccount {
   displayName: string;
   profilePictureUrl: string;
   role: string;
+  receivesMessages: boolean;
   twoFactorEnabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -259,6 +261,9 @@ export const authService = {
 
   createRole: (requesterId: string, name: string, permissions: string[]) =>
     api.post<AuthRole>('/auth/roles', { requesterId, name, permissions }),
+
+  updateMessagePreferences: (accountId: string, receiveMessages: boolean) =>
+    api.put<AuthResponse>(`/auth/accounts/${accountId}/message-preferences`, { receiveMessages }),
 };
 
 export const userService = {

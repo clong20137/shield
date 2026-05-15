@@ -263,6 +263,33 @@ export class AuthController {
     }
   }
 
+  static async updateMessagePreferences(req: Request, res: Response) {
+    try {
+      const { receiveMessages } = req.body as { receiveMessages?: boolean };
+      const { accountId } = req.params;
+      const sessionAccount = await getSessionAccount(req);
+
+      if (!sessionAccount || sessionAccount.id !== accountId) {
+        return res.status(403).json({ error: 'You can only update your own message preferences' });
+      }
+
+      if (typeof receiveMessages !== 'boolean') {
+        return res.status(400).json({ error: 'Message preference is required' });
+      }
+
+      const account = await AuthAccountModel.updateMessagePreferences(accountId, receiveMessages);
+
+      if (!account) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+
+      res.json({ account });
+    } catch (error) {
+      console.error('Update message preferences error:', error);
+      res.status(500).json({ error: 'Failed to update message preferences' });
+    }
+  }
+
   static async listRoles(req: Request, res: Response) {
     try {
       const requesterId = typeof req.query.requesterId === 'string' ? req.query.requesterId : undefined;

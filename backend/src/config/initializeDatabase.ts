@@ -44,6 +44,7 @@ export async function initializeDatabase() {
       \`displayName\` VARCHAR(100),
       \`passwordHash\` VARCHAR(255),
       \`role\` VARCHAR(100) NOT NULL DEFAULT 'user',
+      \`receivesMessages\` BOOLEAN DEFAULT 1,
       \`twoFactorSecret\` VARCHAR(64),
       \`twoFactorEnabled\` BOOLEAN DEFAULT 0,
       \`peNumber\` VARCHAR(50) UNIQUE,
@@ -85,6 +86,7 @@ export async function initializeDatabase() {
   await ensureColumn('users', 'passwordHash', '`passwordHash` VARCHAR(255)');
   await ensureColumn('users', 'role', "`role` VARCHAR(100) NOT NULL DEFAULT 'user'");
   await pool.query("ALTER TABLE `users` MODIFY COLUMN `role` VARCHAR(100) NOT NULL DEFAULT 'user'");
+  await ensureColumn('users', 'receivesMessages', '`receivesMessages` BOOLEAN DEFAULT 1');
   await ensureColumn('users', 'twoFactorSecret', '`twoFactorSecret` VARCHAR(64)');
   await ensureColumn('users', 'twoFactorEnabled', '`twoFactorEnabled` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'peopleSoftId', '`peopleSoftId` VARCHAR(50)');
@@ -107,6 +109,7 @@ export async function initializeDatabase() {
         u.displayName = COALESCE(NULLIF(u.displayName, ''), a.displayName),
         u.passwordHash = COALESCE(u.passwordHash, a.passwordHash),
         u.role = COALESCE(NULLIF(u.role, ''), a.role, 'user'),
+        u.receivesMessages = COALESCE(u.receivesMessages, 1),
         u.twoFactorSecret = COALESCE(u.twoFactorSecret, a.twoFactorSecret),
         u.twoFactorEnabled = CASE
           WHEN u.twoFactorEnabled = 1 THEN 1
@@ -117,7 +120,7 @@ export async function initializeDatabase() {
     await pool.query(`
       INSERT INTO users (
         \`id\`, \`firstName\`, \`lastName\`, \`email\`, \`displayName\`, \`passwordHash\`, \`role\`,
-        \`twoFactorSecret\`, \`twoFactorEnabled\`, \`isActive\`, \`employmentType\`, \`status\`,
+        \`receivesMessages\`, \`twoFactorSecret\`, \`twoFactorEnabled\`, \`isActive\`, \`employmentType\`, \`status\`,
         \`createdAt\`, \`updatedAt\`
       )
       SELECT
@@ -132,6 +135,7 @@ export async function initializeDatabase() {
         a.\`displayName\`,
         a.\`passwordHash\`,
         COALESCE(a.\`role\`, 'user'),
+        1,
         a.\`twoFactorSecret\`,
         COALESCE(a.\`twoFactorEnabled\`, 0),
         1,

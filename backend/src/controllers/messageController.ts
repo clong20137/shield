@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { AuthAccountModel } from '../models/AuthAccount';
 import { UserMessageModel } from '../models/UserMessage';
 
 export class MessageController {
@@ -13,6 +14,15 @@ export class MessageController {
 
       if (!senderAccountId || !recipientUserId || !subject?.trim() || !body?.trim()) {
         return res.status(400).json({ error: 'Sender, recipient, subject, and message are required' });
+      }
+
+      const recipient = await AuthAccountModel.getAccountById(recipientUserId);
+      if (!recipient) {
+        return res.status(404).json({ error: 'Recipient is not registered for messaging' });
+      }
+
+      if (!recipient.receivesMessages) {
+        return res.status(403).json({ error: `${recipient.displayName} is not receiving messages` });
       }
 
       const message = await UserMessageModel.createMessage({

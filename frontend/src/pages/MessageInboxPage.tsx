@@ -95,6 +95,19 @@ function normalizeSubject(subject: string): string {
   return subject.replace(/^(re:\s*)+/iu, '').trim() || 'Message';
 }
 
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error === 'string'
+  ) {
+    return (error as { response: { data: { error: string } } }).response.data.error;
+  }
+
+  return fallback;
+}
+
 function MessageInboxPage({ currentUser, onToast, isModalView = false }: MessageInboxPageProps) {
   const [inboxMessages, setInboxMessages] = useState<UserMessage[]>([]);
   const [sentMessages, setSentMessages] = useState<UserMessage[]>([]);
@@ -109,7 +122,6 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
   const [recipientQuery, setRecipientQuery] = useState('');
   const [recipientResults, setRecipientResults] = useState<User[]>([]);
   const [selectedRecipients, setSelectedRecipients] = useState<User[]>([]);
-  const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
   const [composeAttachments, setComposeAttachments] = useState<File[]>([]);
   const [isRecipientSearching, setIsRecipientSearching] = useState(false);
@@ -299,7 +311,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
     } catch (err) {
       console.error(err);
-      onToast('error', 'Failed to send message.');
+      onToast('error', getApiErrorMessage(err, 'Failed to send message.'));
     } finally {
       setIsSending(false);
     }
@@ -308,8 +320,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
   const sendNewMessage = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (selectedRecipients.length === 0 || !composeSubject.trim() || !composeBody.trim()) {
-      onToast('error', 'Choose at least one recipient and enter a subject and message.');
+    if (selectedRecipients.length === 0 || !composeBody.trim()) {
+      onToast('error', 'Choose at least one recipient and enter a message.');
       return;
     }
 
@@ -320,7 +332,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
           messageService.send({
             senderAccountId: currentUser.id,
             recipientUserId: recipient.id,
-            subject: composeSubject,
+            subject: 'Message',
             body: withAttachmentSummary(composeBody, composeAttachments),
           }),
         ),
@@ -328,7 +340,6 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       setSelectedThreadId(selectedRecipients[0].id);
       setSelectedRecipients([]);
       setRecipientQuery('');
-      setComposeSubject('');
       setComposeBody('');
       setComposeAttachments([]);
       setIsComposeOpen(false);
@@ -337,7 +348,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
     } catch (err) {
       console.error(err);
-      onToast('error', 'Failed to send message.');
+      onToast('error', getApiErrorMessage(err, 'Failed to send message.'));
     } finally {
       setIsSending(false);
     }
@@ -627,7 +638,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2>New Message</h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Search for a user and start a conversation.</p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Type a name and start a conversation.</p>
               </div>
               <button
                 type="button"
@@ -666,7 +677,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                 onChange={(event) => {
                   setRecipientQuery(event.target.value);
                 }}
-                placeholder="Search and add users by name, email, PE, badge..."
+                placeholder="Type a name to send a message..."
                 className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
               />
               {(recipientResults.length > 0 || isRecipientSearching) && (
@@ -692,15 +703,6 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                   )}
                 </div>
               )}
-            </label>
-
-            <label className="mb-4 block">
-              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Subject</span>
-              <input
-                value={composeSubject}
-                onChange={(event) => setComposeSubject(event.target.value)}
-                className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-              />
             </label>
 
             <label className="mb-4 block">

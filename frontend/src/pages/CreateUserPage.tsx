@@ -4,6 +4,8 @@ import { CreateUserPayload, User, userService } from '../services/api';
 
 interface CreateUserPageProps {
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
+  isModalView?: boolean;
+  onCreated?: (user: User) => void;
 }
 
 const districtOptions = [
@@ -85,10 +87,11 @@ const emptyUserForm: UserForm = {
   residentialAddress: '',
   mailingAddress: '',
   role: 'user',
+  receivesMessages: true,
   password: '',
 };
 
-function CreateUserPage({ onToast }: CreateUserPageProps) {
+function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserPageProps) {
   const [form, setForm] = useState<UserForm>(emptyUserForm);
   const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -126,7 +129,11 @@ function CreateUserPage({ onToast }: CreateUserPageProps) {
     try {
       const response = await userService.create(form);
       onToast('success', 'User created.');
-      navigate(`/search?userId=${encodeURIComponent(response.data.id)}&q=${encodeURIComponent(`${response.data.firstName} ${response.data.lastName}`)}`);
+      if (onCreated) {
+        onCreated(response.data);
+      } else {
+        navigate(`/search?userId=${encodeURIComponent(response.data.id)}&q=${encodeURIComponent(`${response.data.firstName} ${response.data.lastName}`)}`);
+      }
     } catch (err) {
       console.error(err);
       onToast('error', 'Failed to create user. Check for duplicate PE, badge, or public safety ID.');
@@ -137,12 +144,14 @@ function CreateUserPage({ onToast }: CreateUserPageProps) {
 
   return (
     <div>
+      {!isModalView && (
       <div className="mb-8">
         <h1>Create User</h1>
         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Add a new personnel profile.</p>
       </div>
+      )}
 
-      <form onSubmit={handleSubmit} className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+      <form onSubmit={handleSubmit} className={isModalView ? '' : 'rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800'}>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">First Name</span>

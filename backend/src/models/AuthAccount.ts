@@ -9,6 +9,7 @@ export interface AuthAccount {
   displayName: string;
   profilePictureUrl: string;
   role: string;
+  receivesMessages: boolean;
   twoFactorEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -30,6 +31,7 @@ interface AuthAccountRow extends RowDataPacket {
   displayName: string | null;
   profilePictureUrl: string | null;
   role: string;
+  receivesMessages: boolean | number;
   passwordHash: string | null;
   twoFactorSecret: string | null;
   twoFactorEnabled: boolean | number;
@@ -148,6 +150,7 @@ function toPublicAccount(account: AuthAccountRow): AuthAccount {
     displayName: account.displayName || fallbackName || account.email,
     profilePictureUrl: account.profilePictureUrl || '',
     role: account.role || 'user',
+    receivesMessages: account.receivesMessages !== false && account.receivesMessages !== 0,
     twoFactorEnabled: Boolean(account.twoFactorEnabled),
     createdAt: account.createdAt,
     updatedAt: account.updatedAt,
@@ -216,6 +219,7 @@ export class AuthAccountModel {
           displayName: displayName.trim(),
           profilePictureUrl: existingUser.profilePictureUrl || '',
           role,
+          receivesMessages: existingUser.receivesMessages !== false && existingUser.receivesMessages !== 0,
           twoFactorEnabled: Boolean(existingUser.twoFactorEnabled),
           createdAt: existingUser.createdAt,
           updatedAt: now,
@@ -238,6 +242,7 @@ export class AuthAccountModel {
         displayName: displayName.trim(),
         profilePictureUrl: '',
         role,
+        receivesMessages: true,
         twoFactorEnabled: false,
         createdAt: now,
         updatedAt: now,
@@ -475,6 +480,26 @@ export class AuthAccountModel {
       await conn.query<ResultSetHeader>(
         'UPDATE users SET `role` = ?, `updatedAt` = ? WHERE `id` = ?',
         [role, new Date(), accountId]
+      );
+
+      const [rows] = await conn.query<AuthAccountRow[]>(
+        'SELECT * FROM users WHERE `id` = ? AND `passwordHash` IS NOT NULL LIMIT 1',
+        [accountId]
+      );
+      const account = rows[0];
+
+      return account ? toPublicAccount(account) : null;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async updateMessagePreferences(accountId: string, receiveMessages: boolean): Promise<AuthAccount | null> {
+    const conn = await pool.getConnection();
+    try {
+      await conn.query<ResultSetHeader>(
+        'UPDATE users SET `receivesMessages` = ?, `updatedAt` = ? WHERE `id` = ? AND `passwordHash` IS NOT NULL',
+        [receiveMessages ? 1 : 0, new Date(), accountId]
       );
 
       const [rows] = await conn.query<AuthAccountRow[]>(

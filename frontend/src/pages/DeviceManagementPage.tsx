@@ -428,15 +428,15 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           <div className="rounded bg-accent/10 px-4 py-2 text-sm font-bold text-accent">
             {devices.length} total devices
           </div>
-          <button type="button" onClick={loadDevices} className="btn-secondary" title="Refresh devices">
-            <RefreshCw size={16} /> Refresh
+          <button type="button" onClick={loadDevices} className="btn-secondary" title="Refresh devices" aria-label="Refresh devices">
+            <RefreshCw size={16} />
           </button>
-          <button type="button" onClick={exportCsv} className="btn-secondary">
-            <Download size={16} /> Export CSV
+          <button type="button" onClick={exportCsv} className="btn-secondary" title="Export CSV" aria-label="Export CSV">
+            <Download size={16} />
           </button>
           {canManageDevices && (
-            <label className="btn-secondary cursor-pointer">
-              <Upload size={16} /> Import CSV
+            <label className="btn-secondary cursor-pointer" title="Import CSV" aria-label="Import CSV">
+              <Upload size={16} />
               <input type="file" accept=".csv" className="hidden" onChange={importCsv} />
             </label>
           )}

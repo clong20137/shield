@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   `displayName` VARCHAR(100),
   `passwordHash` VARCHAR(255),
   `role` VARCHAR(20) NOT NULL DEFAULT 'user',
+  `receivesMessages` BOOLEAN DEFAULT 1,
   `twoFactorSecret` VARCHAR(64),
   `twoFactorEnabled` BOOLEAN DEFAULT 0,
   `peNumber` VARCHAR(50) UNIQUE,

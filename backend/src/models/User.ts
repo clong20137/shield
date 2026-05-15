@@ -32,6 +32,7 @@ export interface User {
   residentialAddress: string;
   mailingAddress: string;
   role: string;
+  receivesMessages: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -68,6 +69,7 @@ export class UserModel {
     'maritalStatus',
     'residentialAddress',
     'mailingAddress',
+    'receivesMessages',
   ] as const;
 
   private static readonly columnNames: Record<typeof UserModel.editableFields[number], string> = {
@@ -97,6 +99,7 @@ export class UserModel {
     maritalStatus: '`maritalStatus`',
     residentialAddress: '`residentialAddress`',
     mailingAddress: '`mailingAddress`',
+    receivesMessages: '`receivesMessages`',
   };
 
   private static blankToNull(value: string): string | null {
@@ -236,8 +239,8 @@ export class UserModel {
           \`radioNumber\`, \`personalPhoneNumber\`, \`departmentPhoneNumber\`, \`assignedTo\`, \`district\`, \`rank\`,
           \`isActive\`, \`employmentType\`, \`typeDetails\`, \`status\`, \`supervisor\`, \`specialtyCertifications\`,
           \`publicSafetyId\`, \`race\`, \`sex\`, \`maritalStatus\`, \`residentialAddress\`, \`mailingAddress\`,
-          \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          \`receivesMessages\`, \`createdAt\`, \`updatedAt\`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           user.firstName,
@@ -269,6 +272,7 @@ export class UserModel {
           user.maritalStatus,
           user.residentialAddress,
           user.mailingAddress,
+          user.receivesMessages === false ? 0 : 1,
           now,
           now,
         ]

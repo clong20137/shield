@@ -488,12 +488,14 @@ function QuickLaunchTray({
   badgeCounts,
   activeModalApp,
   onOpenMessages,
+  onOpenCreateUser,
 }: {
   isAdministrator: boolean;
   isSidebarCollapsed: boolean;
   badgeCounts: Partial<Record<QuickLaunchAppId, number>>;
   activeModalApp: QuickLaunchAppId | null;
   onOpenMessages: () => void;
+  onOpenCreateUser: () => void;
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -516,6 +518,11 @@ function QuickLaunchTray({
   const openApp = (app: QuickLaunchApp) => {
     if (app.id === 'messages') {
       onOpenMessages();
+      return;
+    }
+
+    if (app.id === 'create-user') {
+      onOpenCreateUser();
       return;
     }
 
@@ -640,6 +647,14 @@ function MessagesRouteRedirect({ onOpenMessages }: { onOpenMessages: () => void 
   return <Navigate to="/" replace />;
 }
 
+function CreateUserRouteRedirect({ onOpenCreateUser }: { onOpenCreateUser: () => void }) {
+  useEffect(() => {
+    onOpenCreateUser();
+  }, [onOpenCreateUser]);
+
+  return <Navigate to="/" replace />;
+}
+
 function getModalBackdropClass(isClosing: boolean, tint = 'bg-black/50') {
   return `${isClosing ? 'modal-backdrop-exit' : 'modal-backdrop'} fixed inset-0 z-50 flex items-center justify-center ${tint} p-4`;
 }
@@ -661,9 +676,11 @@ function App() {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
-  const [closingModal, setClosingModal] = useState<'messages' | 'profile' | 'preferences' | null>(null);
+  const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
+  const [closingModal, setClosingModal] = useState<'messages' | 'profile' | 'preferences' | 'createUser' | null>(null);
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const previousMessageUnreadCount = useRef<number | null>(null);
+  const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
 
   const showToast = (type: ToastType, message: string) => {
@@ -690,6 +707,33 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(MESSAGE_PREFERENCES_KEY, JSON.stringify(messagePreferences));
   }, [messagePreferences]);
+
+  useEffect(() => {
+    if (!isNotificationsOpen) {
+      return;
+    }
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!notificationsMenuRef.current?.contains(event.target as Node)) {
+        setIsNotificationsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [isNotificationsOpen]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    setMessagePreferences((preferences) => ({
+      ...preferences,
+      receiveMessages: currentUser.receivesMessages !== false,
+    }));
+  }, [currentUser?.id, currentUser?.receivesMessages]);
 
   const playMessagePing = () => {
     if (!messagePreferences.receiveMessages || !messagePreferences.playMessageSound) {
@@ -805,12 +849,13 @@ function App() {
 
   const isAdministrator = currentUser?.role === 'administrator';
 
-  const closeModal = (modal: 'messages' | 'profile' | 'preferences') => {
+  const closeModal = (modal: 'messages' | 'profile' | 'preferences' | 'createUser') => {
     setClosingModal(modal);
     window.setTimeout(() => {
       if (modal === 'messages') setIsMessagesModalOpen(false);
       if (modal === 'profile') setIsProfileModalOpen(false);
       if (modal === 'preferences') setIsPreferencesOpen(false);
+      if (modal === 'createUser') setIsCreateUserModalOpen(false);
       setClosingModal(null);
     }, MODAL_CLOSE_MS);
   };
@@ -824,6 +869,40 @@ function App() {
     setIsMessagesModalOpen(true);
   };
 
+  const toggleCreateUserModal = () => {
+    if (isCreateUserModalOpen) {
+      closeModal('createUser');
+      return;
+    }
+
+    setIsCreateUserModalOpen(true);
+  };
+
+  const handleReceiveMessagesChange = async (receiveMessages: boolean) => {
+    const previousPreferences = messagePreferences;
+    setMessagePreferences((preferences) => ({
+      ...preferences,
+      receiveMessages,
+      playMessageSound: receiveMessages ? preferences.playMessageSound : false,
+    }));
+
+    if (!currentUser) {
+      return;
+    }
+
+    try {
+      const response = await authService.updateMessagePreferences(currentUser.id, receiveMessages);
+      if (response.data.account) {
+        handleAccountUpdate(response.data.account);
+      }
+      showToast('success', receiveMessages ? 'Messages enabled.' : 'Messages disabled.');
+    } catch (err) {
+      console.error(err);
+      setMessagePreferences(previousPreferences);
+      showToast('error', 'Failed to update message preferences.');
+    }
+  };
+
   return (
     <Router>
       <ToastHost toasts={toasts} />
@@ -833,16 +912,17 @@ function App() {
         <LoginSplash onLogin={handleLogin} onToast={showToast} />
       ) : (
         <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
-          <aside className={`shield-sidebar relative flex h-screen shrink-0 flex-col overflow-y-auto bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
+          <aside className={`relative h-screen shrink-0 overflow-visible bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed((value) => !value)}
-              className="absolute -right-4 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-primary-500 shadow-lg hover:bg-gray-50"
+              className="absolute -right-5 top-1/2 z-30 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-primary-500 shadow-lg hover:bg-gray-50"
               aria-label={isSidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
             >
               {isSidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
             </button>
 
+            <div className="shield-sidebar flex h-screen flex-col overflow-y-auto overflow-x-hidden">
             <div className="flex h-20 shrink-0 items-center border-b border-white/10 px-4 dark:border-gray-800">
               {!isSidebarCollapsed && (
                 <div className="flex items-center gap-3">
@@ -915,6 +995,7 @@ function App() {
             </nav>
 
             <div className="shrink-0 border-t border-white/10 p-3" />
+            </div>
           </aside>
 
           <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
@@ -924,19 +1005,50 @@ function App() {
                 <h2 className="text-2xl font-bold text-primary-500">Agency Workspace</h2>
               </div>
               <div className="relative flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsNotificationsOpen((value) => !value)}
-                  className="relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
-                  aria-label="Open notifications"
-                >
-                  <Bell size={18} />
-                  {notifications.length > 0 && (
-                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
-                      {notifications.length > 9 ? '9+' : notifications.length}
-                    </span>
+                <div ref={notificationsMenuRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsNotificationsOpen((value) => !value)}
+                    className="relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                    aria-label="Open notifications"
+                  >
+                    <Bell size={18} />
+                    {notifications.length > 0 && (
+                      <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
+                        {notifications.length > 9 ? '9+' : notifications.length}
+                      </span>
+                    )}
+                  </button>
+
+                  {isNotificationsOpen && (
+                    <div className="absolute right-0 top-12 z-40 w-80 rounded border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                      <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                        <h3 className="text-base font-bold text-primary-500 dark:text-blue-100">Notifications</h3>
+                        <button
+                          type="button"
+                          onClick={() => setNotifications([])}
+                          className="text-xs font-semibold text-gray-500 hover:text-primary-500 dark:text-gray-400"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="max-h-96 overflow-y-auto p-2">
+                        {notifications.length === 0 ? (
+                          <div className="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                            No notifications yet
+                          </div>
+                        ) : (
+                          notifications.map((notification) => (
+                            <div key={notification.id} className="rounded px-3 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800">
+                              <p className="font-semibold text-gray-800 dark:text-gray-100">{notification.message}</p>
+                              <p className="mt-1 text-xs uppercase text-gray-400">{notification.type}</p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
                   )}
-                </button>
+                </div>
                 <HeaderMessagesButton
                   unreadCount={messageUnreadCount}
                   onOpenMessages={toggleMessagesModal}
@@ -959,34 +1071,6 @@ function App() {
                   <Settings size={18} />
                 </button>
 
-                {isNotificationsOpen && (
-                  <div className="absolute right-0 top-12 z-40 w-80 rounded border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
-                    <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                      <h3 className="text-base font-bold text-primary-500 dark:text-blue-100">Notifications</h3>
-                      <button
-                        type="button"
-                        onClick={() => setNotifications([])}
-                        className="text-xs font-semibold text-gray-500 hover:text-primary-500 dark:text-gray-400"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                    <div className="max-h-96 overflow-y-auto p-2">
-                      {notifications.length === 0 ? (
-                        <div className="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                          No notifications yet
-                        </div>
-                      ) : (
-                        notifications.map((notification) => (
-                          <div key={notification.id} className="rounded px-3 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800">
-                            <p className="font-semibold text-gray-800 dark:text-gray-100">{notification.message}</p>
-                            <p className="mt-1 text-xs uppercase text-gray-400">{notification.type}</p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
                 {isAccountMenuOpen && (
                   <div className="absolute right-0 top-12 z-40 w-64 rounded border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
                     <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
@@ -1036,7 +1120,7 @@ function App() {
                   <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
                   <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
                   {currentUser && isAdministrator && (
-                    <Route path="/users/create" element={<CreateUserPage onToast={showToast} />} />
+                    <Route path="/users/create" element={<CreateUserRouteRedirect onOpenCreateUser={() => setIsCreateUserModalOpen(true)} />} />
                   )}
                   {currentUser && isAdministrator && (
                     <Route path="/audit" element={<AuditLogPage />} />
@@ -1062,8 +1146,9 @@ function App() {
                 isAdministrator={isAdministrator}
                 isSidebarCollapsed={isSidebarCollapsed}
                 badgeCounts={{ messages: messageUnreadCount }}
-                activeModalApp={isMessagesModalOpen ? 'messages' : null}
+                activeModalApp={isMessagesModalOpen ? 'messages' : isCreateUserModalOpen ? 'create-user' : null}
                 onOpenMessages={toggleMessagesModal}
+                onOpenCreateUser={toggleCreateUserModal}
               />
             </main>
           </div>
@@ -1116,6 +1201,33 @@ function App() {
               </div>
             </div>
           )}
+          {isCreateUserModalOpen && currentUser && (
+            <div className={getModalBackdropClass(closingModal === 'createUser')}>
+              <div className={getModalWindowClass(closingModal === 'createUser', 'flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900')}>
+                <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Create User</h2>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Add a personnel profile and optional login password.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => closeModal('createUser')}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                    aria-label="Close create user"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                  <CreateUserPage
+                    onToast={showToast}
+                    isModalView
+                    onCreated={() => closeModal('createUser')}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
           {isPreferencesOpen && (
             <div className={getModalBackdropClass(closingModal === 'preferences')}>
               <div className={getModalWindowClass(closingModal === 'preferences', 'w-full max-w-md rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900')}>
@@ -1140,12 +1252,7 @@ function App() {
                     <input
                       type="checkbox"
                       checked={messagePreferences.receiveMessages}
-                      onChange={(event) =>
-                        setMessagePreferences((preferences) => ({
-                          ...preferences,
-                          receiveMessages: event.target.checked,
-                        }))
-                      }
+                      onChange={(event) => handleReceiveMessagesChange(event.target.checked)}
                     />
                   </label>
 
