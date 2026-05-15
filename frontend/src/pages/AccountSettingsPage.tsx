@@ -141,23 +141,23 @@ export function AccountSettingsPage({
   };
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-lg border border-gray-200 bg-gray-50 p-5 dark:border-gray-800 dark:bg-gray-950">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4">
+      <section className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-4">
             {account.profilePictureUrl ? (
               <img
                 src={account.profilePictureUrl}
                 alt={account.displayName}
-                className="h-16 w-16 shrink-0 rounded-full border border-gray-200 bg-white object-cover dark:border-gray-700"
+                className="h-14 w-14 shrink-0 rounded-full border border-gray-200 bg-white object-cover dark:border-gray-700"
               />
             ) : (
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-lg font-bold text-accent dark:border-gray-700 dark:bg-gray-900">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-base font-bold text-accent dark:border-gray-700 dark:bg-gray-900">
                 {getAccountInitials(account) || <UserCircle size={28} />}
               </div>
             )}
             <div className="min-w-0">
-              <h3 className="truncate text-xl font-bold text-gray-900 dark:text-gray-100">{account.displayName}</h3>
+              <h3 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">{account.displayName}</h3>
               <p className="truncate text-sm text-gray-500 dark:text-gray-400">{account.email}</p>
             </div>
           </div>
@@ -179,9 +179,9 @@ export function AccountSettingsPage({
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <section className="rounded-lg border border-gray-200 p-5 dark:border-gray-800">
-          <div className="mb-5 flex items-start gap-3">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+          <div className="mb-3 flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">
               <KeyRound size={19} />
             </div>
@@ -191,14 +191,14 @@ export function AccountSettingsPage({
             </div>
           </div>
 
-          <form onSubmit={handlePasswordChange} className="space-y-4">
+          <form onSubmit={handlePasswordChange} className="space-y-3">
             <label className="block">
               <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Current password</span>
               <input
                 type="password"
                 value={currentPassword}
                 onChange={(event) => setCurrentPassword(event.target.value)}
-                className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+                className="w-full rounded border-2 border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
                 autoComplete="current-password"
               />
             </label>
@@ -209,7 +209,7 @@ export function AccountSettingsPage({
                 type="password"
                 value={newPassword}
                 onChange={(event) => setNewPassword(event.target.value)}
-                className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+                className="w-full rounded border-2 border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
                 autoComplete="new-password"
               />
             </label>
@@ -220,7 +220,7 @@ export function AccountSettingsPage({
                 type="password"
                 value={confirmNewPassword}
                 onChange={(event) => setConfirmNewPassword(event.target.value)}
-                className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+                className="w-full rounded border-2 border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
                 autoComplete="new-password"
               />
             </label>
@@ -231,8 +231,8 @@ export function AccountSettingsPage({
           </form>
         </section>
 
-        <section className="rounded-lg border border-gray-200 p-5 dark:border-gray-800">
-          <div className="mb-5 flex items-start gap-3">
+        <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+          <div className="mb-3 flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">
               <ShieldCheck size={19} />
             </div>

@@ -18,6 +18,7 @@ const THEME_KEY = 'shield_theme';
 const MESSAGE_PREFERENCES_KEY = 'shield_message_preferences';
 const QUICK_LAUNCH_KEY = 'shield_quick_launch';
 const QUICK_LAUNCH_SLOT_COUNT = 8;
+const MODAL_CLOSE_MS = 220;
 
 interface MessagePreferences {
   receiveMessages: boolean;
@@ -639,6 +640,14 @@ function MessagesRouteRedirect({ onOpenMessages }: { onOpenMessages: () => void 
   return <Navigate to="/" replace />;
 }
 
+function getModalBackdropClass(isClosing: boolean, tint = 'bg-black/50') {
+  return `${isClosing ? 'modal-backdrop-exit' : 'modal-backdrop'} fixed inset-0 z-50 flex items-center justify-center ${tint} p-4`;
+}
+
+function getModalWindowClass(isClosing: boolean, className: string) {
+  return `${isClosing ? 'modal-window-exit' : 'modal-window'} ${className}`;
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthAccount | null>(null);
@@ -652,6 +661,7 @@ function App() {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
+  const [closingModal, setClosingModal] = useState<'messages' | 'profile' | 'preferences' | null>(null);
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const previousMessageUnreadCount = useRef<number | null>(null);
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
@@ -795,6 +805,25 @@ function App() {
 
   const isAdministrator = currentUser?.role === 'administrator';
 
+  const closeModal = (modal: 'messages' | 'profile' | 'preferences') => {
+    setClosingModal(modal);
+    window.setTimeout(() => {
+      if (modal === 'messages') setIsMessagesModalOpen(false);
+      if (modal === 'profile') setIsProfileModalOpen(false);
+      if (modal === 'preferences') setIsPreferencesOpen(false);
+      setClosingModal(null);
+    }, MODAL_CLOSE_MS);
+  };
+
+  const toggleMessagesModal = () => {
+    if (isMessagesModalOpen) {
+      closeModal('messages');
+      return;
+    }
+
+    setIsMessagesModalOpen(true);
+  };
+
   return (
     <Router>
       <ToastHost toasts={toasts} />
@@ -910,7 +939,7 @@ function App() {
                 </button>
                 <HeaderMessagesButton
                   unreadCount={messageUnreadCount}
-                  onOpenMessages={() => setIsMessagesModalOpen((value) => !value)}
+                  onOpenMessages={toggleMessagesModal}
                 />
                 <button
                   type="button"
@@ -1034,13 +1063,13 @@ function App() {
                 isSidebarCollapsed={isSidebarCollapsed}
                 badgeCounts={{ messages: messageUnreadCount }}
                 activeModalApp={isMessagesModalOpen ? 'messages' : null}
-                onOpenMessages={() => setIsMessagesModalOpen((value) => !value)}
+                onOpenMessages={toggleMessagesModal}
               />
             </main>
           </div>
           {isMessagesModalOpen && currentUser && (
-            <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-              <div className="modal-window flex h-[94vh] w-full max-w-7xl flex-col rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900">
+            <div className={getModalBackdropClass(closingModal === 'messages', 'bg-black/60')}>
+              <div className={getModalWindowClass(closingModal === 'messages', 'flex h-[94vh] w-full max-w-7xl flex-col rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900')}>
                 <div className="mb-3 flex items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Messages</h2>
@@ -1048,7 +1077,7 @@ function App() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setIsMessagesModalOpen(false)}
+                    onClick={() => closeModal('messages')}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
                     aria-label="Close messages"
                   >
@@ -1062,8 +1091,8 @@ function App() {
             </div>
           )}
           {isProfileModalOpen && currentUser && (
-            <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-              <div className="modal-window max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <div className={getModalBackdropClass(closingModal === 'profile')}>
+              <div className={getModalWindowClass(closingModal === 'profile', 'w-full max-w-5xl rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900')}>
                 <div className="mb-6 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Account Settings</h2>
@@ -1071,7 +1100,7 @@ function App() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setIsProfileModalOpen(false)}
+                    onClick={() => closeModal('profile')}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
                     aria-label="Close profile settings"
                   >
@@ -1088,13 +1117,13 @@ function App() {
             </div>
           )}
           {isPreferencesOpen && (
-            <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-              <div className="modal-window w-full max-w-md rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <div className={getModalBackdropClass(closingModal === 'preferences')}>
+              <div className={getModalWindowClass(closingModal === 'preferences', 'w-full max-w-md rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900')}>
                 <div className="mb-5 flex items-center justify-between">
                   <h2>Preferences</h2>
                   <button
                     type="button"
-                    onClick={() => setIsPreferencesOpen(false)}
+                    onClick={() => closeModal('preferences')}
                     className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
                     aria-label="Close preferences"
                   >

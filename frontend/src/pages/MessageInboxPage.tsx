@@ -401,14 +401,16 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       </div>
       )}
 
-      <div className={isModalView ? 'mb-4 w-full max-w-[380px] shrink-0' : 'mb-5'}>
-        <input
-          value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
-          placeholder="Search conversations"
-          className="w-full max-w-md rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-        />
-      </div>
+      {!isModalView && (
+        <div className="mb-5">
+          <input
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Search conversations"
+            className="w-full max-w-md rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+          />
+        </div>
+      )}
 
       <div
         className={
@@ -418,6 +420,16 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
         }
       >
         <section className="relative flex min-h-0 flex-col overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+          {isModalView && (
+            <div className="border-b border-gray-200 p-3 dark:border-gray-800">
+              <input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search conversations"
+                className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+              />
+            </div>
+          )}
           {isLoading ? (
             <div className="loading">Loading conversations...</div>
           ) : filteredThreads.length === 0 ? (
