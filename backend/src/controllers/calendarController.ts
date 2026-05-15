@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { CalendarEntryModel } from '../models/CalendarEntry';
 import { AuditLogModel } from '../models/AuditLog';
+import { getSessionAccount } from '../middleware/authSession';
 
 function getAuditActor(req: Request) {
   return {
@@ -12,7 +13,8 @@ function getAuditActor(req: Request) {
 export class CalendarController {
   static async listEntries(req: Request, res: Response) {
     try {
-      const accountId = typeof req.query.accountId === 'string' ? req.query.accountId : '';
+      const sessionAccount = await getSessionAccount(req);
+      const accountId = sessionAccount?.id || (typeof req.query.accountId === 'string' ? req.query.accountId : '');
       if (!accountId) {
         return res.status(400).json({ error: 'Account is required' });
       }
@@ -27,7 +29,7 @@ export class CalendarController {
 
   static async createEntry(req: Request, res: Response) {
     try {
-      const { accountId, category, date, dutyHours, districtWorked, specialStatus, color } = req.body as {
+      const { accountId: requestedAccountId, category, date, dutyHours, districtWorked, specialStatus, color } = req.body as {
         accountId?: string;
         category?: string;
         date?: string;
@@ -36,6 +38,8 @@ export class CalendarController {
         specialStatus?: string;
         color?: string;
       };
+      const sessionAccount = await getSessionAccount(req);
+      const accountId = sessionAccount?.id || requestedAccountId;
       const hours = Number(dutyHours);
 
       if (!accountId || !date || Number.isNaN(hours) || hours < 0 || !districtWorked) {
@@ -70,7 +74,7 @@ export class CalendarController {
 
   static async updateEntry(req: Request, res: Response) {
     try {
-      const { accountId, category, date, dutyHours, districtWorked, specialStatus, color } = req.body as {
+      const { accountId: requestedAccountId, category, date, dutyHours, districtWorked, specialStatus, color } = req.body as {
         accountId?: string;
         category?: string;
         date?: string;
@@ -79,6 +83,8 @@ export class CalendarController {
         specialStatus?: string;
         color?: string;
       };
+      const sessionAccount = await getSessionAccount(req);
+      const accountId = sessionAccount?.id || requestedAccountId;
       const hours = Number(dutyHours);
 
       if (!accountId || !date || Number.isNaN(hours) || hours < 0 || !districtWorked) {
@@ -117,7 +123,8 @@ export class CalendarController {
 
   static async deleteEntry(req: Request, res: Response) {
     try {
-      const accountId = typeof req.body?.accountId === 'string' ? req.body.accountId : '';
+      const sessionAccount = await getSessionAccount(req);
+      const accountId = sessionAccount?.id || (typeof req.body?.accountId === 'string' ? req.body.accountId : '');
       if (!accountId) {
         return res.status(400).json({ error: 'Account is required' });
       }

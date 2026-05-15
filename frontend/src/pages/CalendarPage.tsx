@@ -87,6 +87,7 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [districtFilter, setDistrictFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [entryPendingDelete, setEntryPendingDelete] = useState<CalendarEntry | null>(null);
   const [isCalendarLoading, setIsCalendarLoading] = useState(true);
   const [calendarError, setCalendarError] = useState<string | null>(null);
 
@@ -120,7 +121,17 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && selectedDate) {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      if (entryPendingDelete) {
+        event.stopPropagation();
+        setEntryPendingDelete(null);
+        return;
+      }
+
+      if (selectedDate) {
         event.stopPropagation();
         setSelectedDate(null);
       }
@@ -129,7 +140,7 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [selectedDate]);
+  }, [entryPendingDelete, selectedDate]);
 
   const openDay = (dateKey: string) => {
     setSelectedDate(dateKey);
@@ -180,15 +191,12 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
     }
   };
 
-  const deleteEntry = async (entryId: string) => {
-    if (!window.confirm('Delete this calendar entry?')) {
-      return;
-    }
-
+  const deleteEntry = async (entry: CalendarEntry) => {
     setCalendarError(null);
     try {
-      await calendarService.delete(entryId, { ...actor, accountId: currentUser.id });
-      setEntries((currentEntries) => currentEntries.filter((entry) => entry.id !== entryId));
+      await calendarService.delete(entry.id, { ...actor, accountId: currentUser.id });
+      setEntries((currentEntries) => currentEntries.filter((currentEntry) => currentEntry.id !== entry.id));
+      setEntryPendingDelete(null);
     } catch (err) {
       console.error('Failed to delete calendar entry:', err);
       setCalendarError('Failed to delete calendar entry.');
@@ -480,7 +488,7 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
                         <button type="button" onClick={() => editEntry(entry)} className="btn-secondary">
                           Edit
                         </button>
-                        <button type="button" onClick={() => deleteEntry(entry.id)} className="btn-danger">
+                        <button type="button" onClick={() => setEntryPendingDelete(entry)} className="btn-danger">
                           Delete
                         </button>
                       </div>
@@ -488,6 +496,27 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {entryPendingDelete && (
+        <div className="modal-backdrop fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4">
+          <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+            <div className="mb-4">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Entry</h2>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                Delete {entryPendingDelete.dutyHours} hours for {entryPendingDelete.districtWorked} on {getReadableDate(entryPendingDelete.date)}?
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setEntryPendingDelete(null)} className="btn-secondary">
+                Cancel
+              </button>
+              <button type="button" onClick={() => deleteEntry(entryPendingDelete)} className="btn-danger">
+                Delete
+              </button>
             </div>
           </div>
         </div>

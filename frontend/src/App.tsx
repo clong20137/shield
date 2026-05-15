@@ -72,9 +72,13 @@ function isExternalQuickLaunchSlot(slot: QuickLaunchSlot): slot is QuickLaunchEx
   return typeof slot === 'object' && slot !== null && slot.type === 'external';
 }
 
-function loadQuickLaunchSlots(): QuickLaunchSlot[] {
+function getQuickLaunchStorageKey(accountId: string): string {
+  return `${QUICK_LAUNCH_KEY}_${accountId}`;
+}
+
+function loadQuickLaunchSlots(storageKey: string): QuickLaunchSlot[] {
   try {
-    const storedSlots = window.localStorage.getItem(QUICK_LAUNCH_KEY);
+    const storedSlots = window.localStorage.getItem(storageKey);
     const parsedSlots = storedSlots ? JSON.parse(storedSlots) : [];
     if (!Array.isArray(parsedSlots)) {
       return Array.from({ length: QUICK_LAUNCH_SLOT_COUNT }, () => null);
@@ -518,6 +522,7 @@ function QuickLaunchTray({
   isSidebarCollapsed,
   badgeCounts,
   activeModalApp,
+  storageKey,
   onOpenMessages,
   onOpenCalendar,
   onOpenCreateUser,
@@ -526,13 +531,14 @@ function QuickLaunchTray({
   isSidebarCollapsed: boolean;
   badgeCounts: Partial<Record<QuickLaunchAppId, number>>;
   activeModalApp: QuickLaunchAppId | null;
+  storageKey: string;
   onOpenMessages: () => void;
   onOpenCalendar: () => void;
   onOpenCreateUser: () => void;
 }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [slots, setSlots] = useState<QuickLaunchSlot[]>(() => loadQuickLaunchSlots());
+  const [slots, setSlots] = useState<QuickLaunchSlot[]>(() => loadQuickLaunchSlots(storageKey));
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
   const [draggingSlot, setDraggingSlot] = useState<number | null>(null);
   const [externalLabel, setExternalLabel] = useState('');
@@ -548,8 +554,12 @@ function QuickLaunchTray({
   };
 
   useEffect(() => {
-    window.localStorage.setItem(QUICK_LAUNCH_KEY, JSON.stringify(slots));
-  }, [slots]);
+    setSlots(loadQuickLaunchSlots(storageKey));
+  }, [storageKey]);
+
+  useEffect(() => {
+    window.localStorage.setItem(storageKey, JSON.stringify(slots));
+  }, [slots, storageKey]);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -1360,6 +1370,7 @@ function App() {
                 isSidebarCollapsed={isSidebarCollapsed}
                 badgeCounts={{ messages: messageUnreadCount }}
                 activeModalApp={isMessagesModalOpen ? 'messages' : isCalendarModalOpen ? 'calendar' : isCreateUserModalOpen ? 'create-user' : null}
+                storageKey={getQuickLaunchStorageKey(currentUser?.id || 'anonymous')}
                 onOpenMessages={toggleMessagesModal}
                 onOpenCalendar={toggleCalendarModal}
                 onOpenCreateUser={toggleCreateUserModal}
