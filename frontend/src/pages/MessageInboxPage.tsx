@@ -38,6 +38,13 @@ function formatMessageTime(value: string): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+function getPresenceLabel(value: string): string {
+  const lastActivityTime = new Date(value).getTime();
+  const isActive = Date.now() - lastActivityTime <= 5 * 60 * 1000;
+
+  return isActive ? 'Active' : `Last online ${formatMessageTime(value)}`;
+}
+
 function getThreadId(message: UserMessage, currentUserId: string): string {
   return message.senderAccountId === currentUserId ? message.recipientUserId : message.senderAccountId;
 }
@@ -394,7 +401,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       </div>
       )}
 
-      <div className={isModalView ? 'mb-4 shrink-0' : 'mb-5'}>
+      <div className={isModalView ? 'mb-4 w-full max-w-[380px] shrink-0' : 'mb-5'}>
         <input
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
@@ -497,7 +504,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                   <div className="min-w-0 text-left">
                     <h2 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">{selectedThread.contactName}</h2>
                     <p className="truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
-                      {selectedThread.contactRank || 'No rank listed'} - Last active {formatMessageTime(selectedThread.latestMessage.createdAt)}
+                      {selectedThread.contactRank || 'No rank listed'} - {getPresenceLabel(selectedThread.latestMessage.createdAt)}
                     </p>
                   </div>
                 </div>
