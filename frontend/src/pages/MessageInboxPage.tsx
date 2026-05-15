@@ -1,4 +1,4 @@
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, CheckCheck, Paperclip, Plus, Send, Trash2, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, messageService, userService, User, UserMessage } from '../services/api';
@@ -105,6 +105,7 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
   const [composeBody, setComposeBody] = useState('');
   const [composeAttachments, setComposeAttachments] = useState<File[]>([]);
   const [isRecipientSearching, setIsRecipientSearching] = useState(false);
+  const latestMessageRef = useRef<HTMLDivElement | null>(null);
   const emojiButtonLabel = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
 
   const loadMessages = async (showLoading = false) => {
@@ -227,6 +228,10 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
       setSelectedThreadId(threads[0].id);
     }
   }, [selectedThreadId, threads]);
+
+  useEffect(() => {
+    latestMessageRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+  }, [selectedThreadId, selectedThread?.messages.length]);
 
   useEffect(() => {
     if (!selectedThread) return;
@@ -499,7 +504,7 @@ function MessageInboxPage({ currentUser, onToast }: MessageInboxPageProps) {
                     new Date(message.createdAt).getTime() - new Date(previousMessage.createdAt).getTime() > 10 * 60 * 1000;
 
                   return (
-                    <div key={message.id}>
+                    <div key={message.id} ref={index === selectedThread.messages.length - 1 ? latestMessageRef : undefined}>
                       {showTimestamp && (
                         <div className="mb-3 text-center text-xs font-semibold text-gray-400">
                           {new Date(message.createdAt).toLocaleString(undefined, {

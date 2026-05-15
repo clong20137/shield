@@ -532,17 +532,26 @@ function App() {
       if (!AudioContextClass) return;
 
       const audioContext = new AudioContextClass();
-      const oscillator = audioContext.createOscillator();
+      const firstTone = audioContext.createOscillator();
+      const secondTone = audioContext.createOscillator();
       const gain = audioContext.createGain();
-      oscillator.type = 'sine';
-      oscillator.frequency.value = 880;
+      firstTone.type = 'triangle';
+      secondTone.type = 'sine';
+      firstTone.frequency.value = 659.25;
+      secondTone.frequency.value = 987.77;
       gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.18, audioContext.currentTime + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.22);
-      oscillator.connect(gain);
+      gain.gain.exponentialRampToValueAtTime(0.12, audioContext.currentTime + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.14);
+      gain.gain.setValueAtTime(0.0001, audioContext.currentTime + 0.16);
+      gain.gain.exponentialRampToValueAtTime(0.1, audioContext.currentTime + 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.36);
+      firstTone.connect(gain);
+      secondTone.connect(gain);
       gain.connect(audioContext.destination);
-      oscillator.start();
-      oscillator.stop(audioContext.currentTime + 0.24);
+      firstTone.start(audioContext.currentTime);
+      firstTone.stop(audioContext.currentTime + 0.14);
+      secondTone.start(audioContext.currentTime + 0.16);
+      secondTone.stop(audioContext.currentTime + 0.36);
     } catch (err) {
       console.error('Failed to play message ping:', err);
     }
@@ -824,13 +833,16 @@ function App() {
           </div>
           {isProfileModalOpen && currentUser && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-              <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
-                <div className="mb-5 flex items-center justify-between">
-                  <h2>Profile Settings</h2>
+              <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+                <div className="mb-6 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Account Settings</h2>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage your profile security and sign-in options.</p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setIsProfileModalOpen(false)}
-                    className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
                     aria-label="Close profile settings"
                   >
                     <X size={20} />
