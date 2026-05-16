@@ -862,6 +862,26 @@ function CreateUserRouteRedirect({ onOpenCreateUser }: { onOpenCreateUser: () =>
   return <Navigate to="/" replace />;
 }
 
+function NotFoundPage() {
+  return (
+    <div className="flex min-h-[calc(100vh-12rem)] items-center justify-center">
+      <section className="w-full max-w-xl rounded-lg border border-gray-200 bg-white p-8 text-center shadow dark:border-gray-800 dark:bg-gray-900">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 text-accent">
+          <Search size={28} />
+        </div>
+        <p className="text-sm font-bold uppercase tracking-[0.18em] text-accent">404</p>
+        <h1 className="mt-2 text-3xl font-bold text-primary-500 dark:text-blue-100">Page Not Found</h1>
+        <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-gray-500 dark:text-gray-400">
+          This page does not exist in SHIELD, or it may have moved.
+        </p>
+        <NavLink to="/" className="btn-primary mt-6 inline-flex">
+          Back to Dashboard
+        </NavLink>
+      </section>
+    </div>
+  );
+}
+
 function getModalBackdropClass(isClosing: boolean, tint = 'bg-black/50') {
   return `${isClosing ? 'modal-backdrop-exit' : 'modal-backdrop'} fixed inset-0 z-50 flex items-center justify-center ${tint} p-4`;
 }
@@ -2016,7 +2036,7 @@ function App() {
                       }
                     />
                   )}
-                  <Route path="*" element={<Navigate to="/" replace />} />
+                  <Route path="*" element={<NotFoundPage />} />
                 </Routes>
               </div>
               <QuickLaunchTray

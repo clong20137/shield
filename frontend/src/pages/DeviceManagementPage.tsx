@@ -114,6 +114,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [registeredUsers, setRegisteredUsers] = useState<AuthAccount[]>([]);
   const [form, setForm] = useState<DeviceForm>(defaultDeviceForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isDeviceFormOpen, setIsDeviceFormOpen] = useState(false);
   const [filter, setFilter] = useState<DeviceType | 'All'>('All');
   const [statusFilter, setStatusFilter] = useState<DeviceStatus | 'All'>('All');
   const [query, setQuery] = useState('');
@@ -259,6 +260,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
 
       setForm(defaultDeviceForm);
       setEventNotes('');
+      setIsDeviceFormOpen(false);
     } catch (err) {
       console.error('Failed to save device:', err);
       setError('Failed to save device. Check for duplicate asset tags and try again.');
@@ -268,6 +270,21 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const editDevice = (device: DeviceRecord) => {
     setEditingId(device.id);
     setForm(toDeviceForm(device));
+    setEventNotes('');
+    setIsDeviceFormOpen(true);
+  };
+
+  const openAddDeviceModal = () => {
+    setEditingId(null);
+    setForm(defaultDeviceForm);
+    setEventNotes('');
+    setIsDeviceFormOpen(true);
+  };
+
+  const closeDeviceFormModal = () => {
+    setIsDeviceFormOpen(false);
+    setEditingId(null);
+    setForm(defaultDeviceForm);
     setEventNotes('');
   };
 
@@ -325,6 +342,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
 
       if (editingId === device.id) {
         setEditingId(null);
+        setIsDeviceFormOpen(false);
         setForm(defaultDeviceForm);
       }
     } catch (err) {
@@ -440,6 +458,11 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             <Download size={16} />
           </button>
           {canManageDevices && (
+            <button type="button" onClick={openAddDeviceModal} className="btn-primary" title="Add Device" aria-label="Add Device">
+              <Plus size={16} />
+            </button>
+          )}
+          {canManageDevices && (
             <label className="btn-secondary cursor-pointer" title="Import CSV" aria-label="Import CSV">
               <Upload size={16} />
               <input type="file" accept=".csv" className="hidden" onChange={importCsv} />
@@ -464,62 +487,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           </button>
         ))}
       </div>
-
-      {canManageDevices && (
-        <section className="mb-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-          <h2 className="mb-5">{editingId ? 'Edit Device' : 'Add Device'}</h2>
-          <form onSubmit={saveDevice} className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-            <Field label="Device Type">
-              <select value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as DeviceType }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
-                {deviceTypes.map((type) => <option key={type}>{type}</option>)}
-              </select>
-            </Field>
-            <TextField label="Asset Tag" value={form.assetTag} required onChange={(value) => setForm((current) => ({ ...current, assetTag: value }))} />
-            <TextField label="Make / Model" value={form.makeModel} required onChange={(value) => setForm((current) => ({ ...current, makeModel: value }))} />
-            <TextField label="Serial Number" value={form.serialNumber} onChange={(value) => setForm((current) => ({ ...current, serialNumber: value }))} />
-            <Field label="Assigned To">
-              <select value={form.assignedTo} onChange={(event) => setForm((current) => ({ ...current, assignedTo: event.target.value, status: event.target.value ? 'Assigned' : 'Available' }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
-                <option value="">Unassigned</option>
-                {registeredUsers.map((user) => <option key={user.id} value={user.email}>{user.displayName} ({user.email})</option>)}
-              </select>
-            </Field>
-            <Field label="Status">
-              <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as DeviceStatus }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
-                {deviceStatuses.map((status) => <option key={status}>{status}</option>)}
-              </select>
-            </Field>
-            <Field label="Condition">
-              <select value={form.condition} onChange={(event) => setForm((current) => ({ ...current, condition: event.target.value }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
-                {deviceConditions.map((condition) => <option key={condition}>{condition}</option>)}
-              </select>
-            </Field>
-            <TextField label="Location" value={form.location} onChange={(value) => setForm((current) => ({ ...current, location: value }))} />
-            <TextField label="Phone Number" value={form.phoneNumber} onChange={(value) => setForm((current) => ({ ...current, phoneNumber: value }))} />
-            <TextField label="IMEI" value={form.imei} onChange={(value) => setForm((current) => ({ ...current, imei: value }))} />
-            <TextField label="ICCID" value={form.simNumber} onChange={(value) => setForm((current) => ({ ...current, simNumber: value }))} />
-            <TextField label="Radio ID" value={form.radioId} onChange={(value) => setForm((current) => ({ ...current, radioId: value }))} />
-            <TextField label="Hostname" value={form.hostname} onChange={(value) => setForm((current) => ({ ...current, hostname: value }))} />
-            <TextField label="Router ID" value={form.routerId} onChange={(value) => setForm((current) => ({ ...current, routerId: value }))} />
-            <DateField label="Purchase Date" value={form.purchaseDate} onChange={(value) => setForm((current) => ({ ...current, purchaseDate: value }))} />
-            <DateField label="Warranty Expiration" value={form.warrantyExpiration} onChange={(value) => setForm((current) => ({ ...current, warrantyExpiration: value }))} />
-            <DateField label="Replacement Due" value={form.replacementDueDate} onChange={(value) => setForm((current) => ({ ...current, replacementDueDate: value }))} />
-            <DateField label="Maintenance Due" value={form.maintenanceDueDate} onChange={(value) => setForm((current) => ({ ...current, maintenanceDueDate: value }))} />
-            <DateField label="Last Service" value={form.lastServiceDate} onChange={(value) => setForm((current) => ({ ...current, lastServiceDate: value }))} />
-            <label className="block lg:col-span-2">
-              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Event Note</span>
-              <input value={eventNotes} onChange={(event) => setEventNotes(event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
-            </label>
-            <label className="block lg:col-span-4">
-              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Device Notes</span>
-              <textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} className="min-h-20 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
-            </label>
-            <div className="flex flex-wrap gap-3 lg:col-span-4">
-              <button type="submit" className="btn-primary">{editingId ? <Pencil size={16} /> : <Plus size={16} />}{editingId ? 'Save Device' : 'Add Device'}</button>
-              {editingId && <button type="button" onClick={() => { setEditingId(null); setForm(defaultDeviceForm); }} className="btn-secondary"><X size={16} /> Cancel</button>}
-            </div>
-          </form>
-        </section>
-      )}
 
       <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -604,6 +571,88 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           </div>
         )}
       </section>
+
+      {canManageDevices && isDeviceFormOpen && (
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="modal-window flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
+              <div>
+                <h2>{editingId ? 'Edit Device' : 'Add Device'}</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Track assignment, identifiers, lifecycle dates, and device condition.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeDeviceFormModal}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                aria-label="Close device form"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={saveDevice} className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+                <Field label="Device Type">
+                  <select value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as DeviceType }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                    {deviceTypes.map((type) => <option key={type}>{type}</option>)}
+                  </select>
+                </Field>
+                <TextField label="Asset Tag" value={form.assetTag} required onChange={(value) => setForm((current) => ({ ...current, assetTag: value }))} />
+                <TextField label="Make / Model" value={form.makeModel} required onChange={(value) => setForm((current) => ({ ...current, makeModel: value }))} />
+                <TextField label="Serial Number" value={form.serialNumber} onChange={(value) => setForm((current) => ({ ...current, serialNumber: value }))} />
+                <Field label="Assigned To">
+                  <select value={form.assignedTo} onChange={(event) => setForm((current) => ({ ...current, assignedTo: event.target.value, status: event.target.value ? 'Assigned' : 'Available' }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                    <option value="">Unassigned</option>
+                    {registeredUsers.map((user) => <option key={user.id} value={user.email}>{user.displayName} ({user.email})</option>)}
+                  </select>
+                </Field>
+                <Field label="Status">
+                  <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as DeviceStatus }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                    {deviceStatuses.map((status) => <option key={status}>{status}</option>)}
+                  </select>
+                </Field>
+                <Field label="Condition">
+                  <select value={form.condition} onChange={(event) => setForm((current) => ({ ...current, condition: event.target.value }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                    {deviceConditions.map((condition) => <option key={condition}>{condition}</option>)}
+                  </select>
+                </Field>
+                <TextField label="Location" value={form.location} onChange={(value) => setForm((current) => ({ ...current, location: value }))} />
+                <TextField label="Phone Number" value={form.phoneNumber} onChange={(value) => setForm((current) => ({ ...current, phoneNumber: value }))} />
+                <TextField label="IMEI" value={form.imei} onChange={(value) => setForm((current) => ({ ...current, imei: value }))} />
+                <TextField label="ICCID" value={form.simNumber} onChange={(value) => setForm((current) => ({ ...current, simNumber: value }))} />
+                <TextField label="Radio ID" value={form.radioId} onChange={(value) => setForm((current) => ({ ...current, radioId: value }))} />
+                <TextField label="Hostname" value={form.hostname} onChange={(value) => setForm((current) => ({ ...current, hostname: value }))} />
+                <TextField label="Router ID" value={form.routerId} onChange={(value) => setForm((current) => ({ ...current, routerId: value }))} />
+                <DateField label="Purchase Date" value={form.purchaseDate} onChange={(value) => setForm((current) => ({ ...current, purchaseDate: value }))} />
+                <DateField label="Warranty Expiration" value={form.warrantyExpiration} onChange={(value) => setForm((current) => ({ ...current, warrantyExpiration: value }))} />
+                <DateField label="Replacement Due" value={form.replacementDueDate} onChange={(value) => setForm((current) => ({ ...current, replacementDueDate: value }))} />
+                <DateField label="Maintenance Due" value={form.maintenanceDueDate} onChange={(value) => setForm((current) => ({ ...current, maintenanceDueDate: value }))} />
+                <DateField label="Last Service" value={form.lastServiceDate} onChange={(value) => setForm((current) => ({ ...current, lastServiceDate: value }))} />
+                <label className="block lg:col-span-2">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Event Note</span>
+                  <input value={eventNotes} onChange={(event) => setEventNotes(event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="block lg:col-span-4">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Device Notes</span>
+                  <textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} className="min-h-24 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+              </div>
+
+              <div className="mt-5 flex flex-wrap justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-800">
+                <button type="button" onClick={closeDeviceFormModal} className="btn-secondary">
+                  <X size={16} /> Cancel
+                </button>
+                <button type="submit" className="btn-primary">
+                  {editingId ? <Pencil size={16} /> : <Plus size={16} />}
+                  {editingId ? 'Save Device' : 'Add Device'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {detailDevice && (
         <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

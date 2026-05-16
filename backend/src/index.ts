@@ -44,6 +44,9 @@ app.use('/api/mileage', mileageRoutes);
 app.use('/api/quick-launch', quickLaunchRoutes);
 app.use('/api/events', eventRoutes);
 
+const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
+app.use(express.static(frontendDistPath));
+
 app.use((error: Error, req: Request, res: Response, next: express.NextFunction) => {
   if (error instanceof multer.MulterError) {
     return res.status(400).json({ error: error.message });
@@ -59,6 +62,14 @@ app.use((error: Error, req: Request, res: Response, next: express.NextFunction) 
 // Health check
 app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'Server is running' });
+});
+
+app.get('*', (req: Request, res: Response) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API route not found' });
+  }
+
+  res.sendFile(path.join(frontendDistPath, 'index.html'));
 });
 
 // Start server
