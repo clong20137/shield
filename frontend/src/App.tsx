@@ -416,6 +416,7 @@ function GlobalSearch({ compact }: { compact: boolean }) {
   if (compact) {
     return (
       <button
+        data-onboarding-target="global-search"
         type="button"
         onClick={() => navigate('/search')}
         className="mx-auto flex h-11 w-11 items-center justify-center rounded bg-white/10 text-white hover:bg-white/20"
@@ -427,7 +428,7 @@ function GlobalSearch({ compact }: { compact: boolean }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="relative flex gap-2">
+    <form data-onboarding-target="global-search" onSubmit={handleSubmit} className="relative flex gap-2">
       <div className="relative min-w-0 flex-1">
         <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-blue-100" size={18} />
         <input
@@ -637,7 +638,7 @@ function QuickLaunchTray({
   };
 
   return (
-    <section className={`fixed bottom-5 right-6 z-30 transition-all duration-200 ${isSidebarCollapsed ? 'left-24' : 'left-[19.5rem]'}`}>
+    <section data-onboarding-target="quick-launch" className={`fixed bottom-5 right-6 z-30 transition-all duration-200 ${isSidebarCollapsed ? 'left-24' : 'left-[19.5rem]'}`}>
       <div className="mx-auto w-fit max-w-full rounded-2xl border border-gray-200 bg-white/85 p-3 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/80">
         <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
         {slots.map((slot, index) => {
@@ -827,95 +828,168 @@ function getModalWindowClass(isClosing: boolean, className: string) {
   return `${isClosing ? 'modal-window-exit' : 'modal-window'} ${className}`;
 }
 
+interface OnboardingStep {
+  target: string;
+  eyebrow: string;
+  title: string;
+  body: string;
+}
+
+const onboardingSteps: OnboardingStep[] = [
+  {
+    target: 'workspace',
+    eyebrow: 'Start Here',
+    title: 'Your daily workspace',
+    body: 'The dashboard is the first stop for live user totals, updates, news, and the main work happening across SHIELD.',
+  },
+  {
+    target: 'global-search',
+    eyebrow: 'Search',
+    title: 'Find users quickly',
+    body: 'Search by name, email, PE number, badge, district, or other user details. Results appear live while you type.',
+  },
+  {
+    target: 'profile-card',
+    eyebrow: 'Profile',
+    title: 'Open your profile',
+    body: 'Click your profile picture to update your photo, review your account, change your password, or set up authenticator app 2FA.',
+  },
+  {
+    target: 'navigation',
+    eyebrow: 'Navigation',
+    title: 'Move through the system',
+    body: 'Use the left navigation for dashboard, calendar, devices, reports, and admin tools based on your permissions.',
+  },
+  {
+    target: 'header-actions',
+    eyebrow: 'Alerts',
+    title: 'Messages, notifications, and preferences',
+    body: 'The top-right controls keep messages, notifications, theme, account settings, preferences, and sign out close at hand.',
+  },
+  {
+    target: 'quick-launch',
+    eyebrow: 'Quick Launch',
+    title: 'Customize your dock',
+    body: 'Pin apps or external links here, drag to reorder them, and watch badges for items like unread messages.',
+  },
+];
+
 function FirstLoginGuide({
   account,
   onFinish,
   onLater,
-  onOpenProfile,
-  onOpenCalendar,
-  onOpenMessages,
 }: {
   account: AuthAccount;
   onFinish: () => void;
   onLater: () => void;
-  onOpenProfile: () => void;
-  onOpenCalendar: () => void;
-  onOpenMessages: () => void;
 }) {
-  const guideItems = [
-    {
-      title: 'Find people fast',
-      body: 'Use global search to find users by name, email, PE number, badge, district, and other profile details.',
-      icon: Search,
-    },
-    {
-      title: 'Manage your account',
-      body: 'Open account settings to update your picture, change your password, and set up authenticator app 2FA.',
-      icon: Settings,
-    },
-    {
-      title: 'Use your personal tools',
-      body: 'Calendar entries and quick launch apps are tied to your login, so your setup stays separate from other users.',
-      icon: CalendarDays,
-    },
-    {
-      title: 'Stay connected',
-      body: 'Messages, notifications, dashboard updates, and device records keep daily work in one workspace.',
-      icon: Mail,
-    },
-  ];
+  const [stepIndex, setStepIndex] = useState(0);
+  const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const step = onboardingSteps[stepIndex];
+
+  useEffect(() => {
+    let frame = 0;
+
+    const measureTarget = () => {
+      const target = document.querySelector(`[data-onboarding-target="${step.target}"]`);
+      if (!target) {
+        setTargetRect(null);
+        return;
+      }
+
+      setTargetRect(target.getBoundingClientRect());
+    };
+
+    const scrollToTarget = () => {
+      const target = document.querySelector(`[data-onboarding-target="${step.target}"]`);
+      target?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+      window.setTimeout(measureTarget, 220);
+    };
+
+    frame = window.requestAnimationFrame(scrollToTarget);
+    window.addEventListener('resize', measureTarget);
+    window.addEventListener('scroll', measureTarget, true);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', measureTarget);
+      window.removeEventListener('scroll', measureTarget, true);
+    };
+  }, [step.target]);
+
+  const padding = 10;
+  const safeRect = targetRect
+    ? {
+        top: Math.max(8, targetRect.top - padding),
+        left: Math.max(8, targetRect.left - padding),
+        width: Math.min(window.innerWidth - Math.max(8, targetRect.left - padding) - 8, targetRect.width + padding * 2),
+        height: Math.min(window.innerHeight - Math.max(8, targetRect.top - padding) - 8, targetRect.height + padding * 2),
+      }
+    : null;
+  const tooltipWidth = 360;
+  const tooltipLeft = safeRect
+    ? Math.min(Math.max(16, safeRect.left + safeRect.width + 18), window.innerWidth - tooltipWidth - 16)
+    : Math.max(16, (window.innerWidth - tooltipWidth) / 2);
+  const tooltipTop = safeRect
+    ? Math.min(Math.max(16, safeRect.top), window.innerHeight - 320)
+    : Math.max(16, (window.innerHeight - 320) / 2);
+
+  const isLastStep = stepIndex === onboardingSteps.length - 1;
 
   return (
-    <div className="modal-backdrop fixed inset-0 z-[90] flex items-center justify-center bg-black/55 p-4">
-      <div className="modal-window w-full max-w-4xl overflow-hidden rounded-lg bg-white shadow-2xl dark:bg-gray-900">
-        <div className="bg-primary-500 px-6 py-5 text-white">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-100">First Login Guide</p>
-              <h2 className="mt-2 text-3xl font-bold">Welcome to SHIELD, {account.displayName || account.email}</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-50">
-                Here are the core areas you will use most. This guide appears on first login and is saved to your account once completed.
-              </p>
-            </div>
-            <div className="hidden h-16 w-16 shrink-0 items-center justify-center rounded bg-white/15 sm:flex">
-              <Shield size={34} />
-            </div>
+    <div className="fixed inset-0 z-[90] pointer-events-auto">
+      {safeRect ? (
+        <>
+          <div className="absolute left-0 right-0 top-0 bg-black/55 backdrop-blur-sm" style={{ height: safeRect.top }} />
+          <div className="absolute left-0 bg-black/55 backdrop-blur-sm" style={{ top: safeRect.top, width: safeRect.left, height: safeRect.height }} />
+          <div className="absolute bg-black/55 backdrop-blur-sm" style={{ left: safeRect.left + safeRect.width, right: 0, top: safeRect.top, height: safeRect.height }} />
+          <div className="absolute bottom-0 left-0 right-0 bg-black/55 backdrop-blur-sm" style={{ top: safeRect.top + safeRect.height }} />
+          <div
+            className="absolute rounded-xl border-2 border-accent shadow-[0_0_0_9999px_rgba(0,0,0,0.02),0_0_30px_rgba(156,134,92,0.55)]"
+            style={{ top: safeRect.top, left: safeRect.left, width: safeRect.width, height: safeRect.height }}
+          />
+        </>
+      ) : (
+        <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" />
+      )}
+
+      <div
+        className="pointer-events-auto fixed w-[calc(100vw-2rem)] max-w-[360px] rounded-lg border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-900"
+        style={{ left: tooltipLeft, top: tooltipTop }}
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">{step.eyebrow}</p>
+            <h2 className="mt-1 text-xl font-bold text-gray-900 dark:text-gray-100">{step.title}</h2>
+          </div>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-primary-500 text-white">
+            <Shield size={20} />
           </div>
         </div>
+        <p className="text-sm leading-6 text-gray-600 dark:text-gray-400">{step.body}</p>
+        <p className="mt-3 text-xs text-gray-500 dark:text-gray-500">
+          Signed in as {account.displayName || account.email}
+        </p>
 
-        <div className="grid gap-4 p-6 sm:grid-cols-2">
-          {guideItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div key={item.title} className="rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded bg-accent/10 text-accent">
-                  <Icon size={20} />
-                </div>
-                <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">{item.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">{item.body}</p>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="border-t border-gray-200 px-6 py-4 dark:border-gray-800">
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={onOpenProfile} className="rounded border border-gray-300 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
-              Open Account Settings
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <span className="text-xs font-bold uppercase tracking-[0.16em] text-gray-400">
+            {stepIndex + 1} / {onboardingSteps.length}
+          </span>
+          <div className="flex gap-2">
+            <button type="button" onClick={onLater} className="rounded px-3 py-2 text-sm font-bold text-gray-500 hover:text-primary-500 dark:text-gray-400">
+              Later
             </button>
-            <button type="button" onClick={onOpenCalendar} className="rounded border border-gray-300 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
-              Open Calendar
-            </button>
-            <button type="button" onClick={onOpenMessages} className="rounded border border-gray-300 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
-              Open Messages
-            </button>
-          </div>
-          <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
-            <button type="button" onClick={onLater} className="rounded px-4 py-2 text-sm font-bold text-gray-500 hover:text-primary-500 dark:text-gray-400">
-              Remind me later
-            </button>
-            <button type="button" onClick={onFinish} className="btn-primary px-5 py-2">
-              Finish guide
+            {stepIndex > 0 && (
+              <button type="button" onClick={() => setStepIndex((index) => index - 1)} className="btn-secondary px-3 py-2">
+                Back
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => (isLastStep ? onFinish() : setStepIndex((index) => index + 1))}
+              className="btn-primary px-4 py-2"
+            >
+              {isLastStep ? 'Finish' : 'Next'}
             </button>
           </div>
         </div>
@@ -1212,21 +1286,6 @@ function App() {
     }
   };
 
-  const openProfileFromGuide = () => {
-    setIsFirstLoginGuideOpen(false);
-    setIsProfileModalOpen(true);
-  };
-
-  const openCalendarFromGuide = () => {
-    setIsFirstLoginGuideOpen(false);
-    setIsCalendarModalOpen(true);
-  };
-
-  const openMessagesFromGuide = () => {
-    setIsFirstLoginGuideOpen(false);
-    setIsMessagesModalOpen(true);
-  };
-
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') {
@@ -1323,6 +1382,7 @@ function App() {
 
             <div className={isSidebarCollapsed ? 'px-3 py-3' : 'px-4 py-3'}>
               <button
+                data-onboarding-target="profile-card"
                 type="button"
                 onClick={() => setIsProfileModalOpen(true)}
                 className={`w-full overflow-hidden rounded bg-white/10 text-left transition hover:bg-white/15 ${isSidebarCollapsed ? 'p-1.5' : 'p-3'}`}
@@ -1356,7 +1416,7 @@ function App() {
               </button>
             </div>
 
-            <nav className="flex flex-1 flex-col gap-2 px-3 py-3">
+            <nav data-onboarding-target="navigation" className="flex flex-1 flex-col gap-2 px-3 py-3">
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
               <SidebarLink to="/calendar" label="Calendar" compact={isSidebarCollapsed} icon={CalendarDays} />
               <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />
@@ -1380,7 +1440,7 @@ function App() {
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Internal System</p>
                 <h2 className="text-2xl font-bold text-primary-500">Agency Workspace</h2>
               </div>
-              <div className="relative flex items-center gap-3">
+              <div data-onboarding-target="header-actions" className="relative flex items-center gap-3">
                 <div ref={notificationsMenuRef} className="relative">
                   <button
                     type="button"
@@ -1489,7 +1549,7 @@ function App() {
             </header>
 
             <main className="flex-1 overflow-y-auto px-6 pb-48 pt-8 dark:bg-gray-950">
-              <div className="min-h-[calc(100vh-12rem)]">
+              <div data-onboarding-target="workspace" className="min-h-[calc(100vh-12rem)]">
                 <Routes>
                   <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
                   {currentUser && <Route path="/messages" element={<MessagesRouteRedirect onOpenMessages={() => setIsMessagesModalOpen(true)} />} />}
@@ -1684,9 +1744,6 @@ function App() {
               account={currentUser}
               onFinish={finishFirstLoginGuide}
               onLater={() => setIsFirstLoginGuideOpen(false)}
-              onOpenProfile={openProfileFromGuide}
-              onOpenCalendar={openCalendarFromGuide}
-              onOpenMessages={openMessagesFromGuide}
             />
           )}
         </div>
