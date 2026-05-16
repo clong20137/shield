@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Plus, X } from 'lucide-react';
-import { AuthAccount, AuthRole, authService } from '../services/api';
+import { AuthAccount, AuthInvite, AuthRole, RegistrationSettings, authService } from '../services/api';
 
 interface PermissionsPageProps {
   account: AuthAccount;
@@ -34,6 +34,12 @@ function PermissionsPage({
   const [newRolePermissions, setNewRolePermissions] = useState<string[]>(['users:view']);
   const [isCreateRoleModalOpen, setIsCreateRoleModalOpen] = useState(false);
   const [isSavingRole, setIsSavingRole] = useState(false);
+  const [registrationSettings, setRegistrationSettings] = useState<RegistrationSettings>({ mode: 'public', appBaseUrl: window.location.origin });
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [invites, setInvites] = useState<AuthInvite[]>([]);
+  const [latestInvite, setLatestInvite] = useState<AuthInvite | null>(null);
+  const [isSavingRegistration, setIsSavingRegistration] = useState(false);
+  const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingAccountId, setSavingAccountId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,8 +53,12 @@ function PermissionsPage({
     try {
       const response = await authService.getAccounts(account.id);
       const rolesResponse = await authService.getRoles(account.id);
+      const registrationResponse = await authService.getRegistrationSettings();
+      const invitesResponse = await authService.listInvites();
       setAccounts(response.data);
       setRoles(rolesResponse.data);
+      setRegistrationSettings(registrationResponse.data);
+      setInvites(invitesResponse.data);
     } catch (err) {
       const message = getErrorMessage(err, 'Failed to load accounts.');
       setError(message);
@@ -137,6 +147,49 @@ function PermissionsPage({
     }
   };
 
+  const saveRegistrationSettings = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSavingRegistration(true);
+    setError(null);
+
+    try {
+      const response = await authService.updateRegistrationSettings(registrationSettings);
+      setRegistrationSettings(response.data);
+      onToast('success', 'Registration settings saved.');
+    } catch (err) {
+      const message = getErrorMessage(err, 'Failed to save registration settings.');
+      setError(message);
+      onToast('error', message);
+    } finally {
+      setIsSavingRegistration(false);
+    }
+  };
+
+  const createInvite = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!inviteEmail.trim()) {
+      onToast('error', 'Enter an email to invite.');
+      return;
+    }
+
+    setIsSendingInvite(true);
+    setError(null);
+    try {
+      const response = await authService.createInvite(inviteEmail, account.id);
+      setLatestInvite(response.data);
+      setInvites((items) => [response.data, ...items]);
+      setInviteEmail('');
+      onToast('success', 'Invite link created.');
+    } catch (err) {
+      const message = getErrorMessage(err, 'Failed to create invite.');
+      setError(message);
+      onToast('error', message);
+    } finally {
+      setIsSendingInvite(false);
+    }
+  };
+
   const administratorCount = accounts.filter((item) => item.role === 'administrator').length;
   const standardCount = accounts.filter((item) => item.role === 'user').length;
 
@@ -213,6 +266,95 @@ function PermissionsPage({
                     <td className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400">
                       {new Date(item.updatedAt).toLocaleString()}
                     </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="mt-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+        <div className="mb-5">
+          <h2>Registration Access</h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Control public registration or create secure invite links for new accounts.
+          </p>
+        </div>
+
+        <form onSubmit={saveRegistrationSettings} className="grid grid-cols-1 gap-4 lg:grid-cols-[220px_minmax(0,1fr)_auto]">
+          <label>
+            <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Registration Mode</span>
+            <select
+              value={registrationSettings.mode}
+              onChange={(event) => setRegistrationSettings((settings) => ({ ...settings, mode: event.target.value as RegistrationSettings['mode'] }))}
+              className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+            >
+              <option value="public">Public</option>
+              <option value="invite-only">Invite Only</option>
+              <option value="disabled">Disabled</option>
+            </select>
+          </label>
+          <label>
+            <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">App URL for Invites</span>
+            <input
+              value={registrationSettings.appBaseUrl}
+              onChange={(event) => setRegistrationSettings((settings) => ({ ...settings, appBaseUrl: event.target.value }))}
+              className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+              placeholder="https://shield.example.gov"
+            />
+          </label>
+          <button type="submit" className="btn-primary self-end" disabled={isSavingRegistration}>
+            {isSavingRegistration ? 'Saving...' : 'Save'}
+          </button>
+        </form>
+
+        <form onSubmit={createInvite} className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+          <input
+            type="email"
+            value={inviteEmail}
+            onChange={(event) => setInviteEmail(event.target.value)}
+            className="rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+            placeholder="person@example.gov"
+          />
+          <button type="submit" className="btn-secondary" disabled={isSendingInvite}>
+            {isSendingInvite ? 'Creating...' : 'Create Invite'}
+          </button>
+        </form>
+
+        {latestInvite?.inviteUrl && (
+          <div className="mt-4 rounded border border-accent/30 bg-accent/10 p-3">
+            <p className="text-sm font-bold text-primary-500 dark:text-blue-100">Invite link ready for {latestInvite.email}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <input readOnly value={latestInvite.inviteUrl} className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
+              <a
+                href={`mailto:${encodeURIComponent(latestInvite.email)}?subject=${encodeURIComponent('Your SHIELD invite')}&body=${encodeURIComponent(`Use this secure link to create your SHIELD login:\n\n${latestInvite.inviteUrl}`)}`}
+                className="btn-primary"
+              >
+                Email Invite
+              </a>
+            </div>
+          </div>
+        )}
+
+        {invites.length > 0 && (
+          <div className="mt-5 overflow-x-auto">
+            <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                  <th className="px-3 py-3">Email</th>
+                  <th className="px-3 py-3">Invited By</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3">Expires</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invites.map((invite) => (
+                  <tr key={invite.id} className="border-b border-gray-100 dark:border-gray-800">
+                    <td className="px-3 py-3 font-semibold">{invite.email}</td>
+                    <td className="px-3 py-3">{invite.invitedByName || 'System'}</td>
+                    <td className="px-3 py-3">{invite.acceptedAt ? 'Accepted' : new Date(invite.expiresAt).getTime() < Date.now() ? 'Expired' : 'Pending'}</td>
+                    <td className="px-3 py-3 text-gray-500 dark:text-gray-400">{new Date(invite.expiresAt).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>

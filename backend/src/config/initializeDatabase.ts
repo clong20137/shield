@@ -305,6 +305,28 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    INSERT IGNORE INTO system_settings (\`settingKey\`, \`settingValue\`)
+    VALUES
+      ('registrationMode', 'public'),
+      ('appBaseUrl', 'http://localhost:3000')
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS auth_invites (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`email\` VARCHAR(255) NOT NULL,
+      \`tokenHash\` VARCHAR(128) NOT NULL UNIQUE,
+      \`invitedBy\` VARCHAR(36),
+      \`invitedByName\` VARCHAR(150),
+      \`acceptedAt\` TIMESTAMP NULL,
+      \`expiresAt\` TIMESTAMP NOT NULL,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX \`idx_auth_invites_email\` (\`email\`),
+      INDEX \`idx_auth_invites_token\` (\`tokenHash\`)
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS quick_launch_slots (
       \`accountId\` VARCHAR(36) PRIMARY KEY,
       \`slots\` JSON,

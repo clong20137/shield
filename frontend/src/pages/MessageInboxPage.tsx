@@ -15,6 +15,7 @@ interface MessageThread {
   contactEmail: string;
   contactRank: string;
   contactProfilePictureUrl: string;
+  contactReceivesMessages: boolean;
   subject: string;
   latestMessage: UserMessage;
   messages: UserMessage[];
@@ -71,6 +72,12 @@ function getContactProfilePicture(message: UserMessage, currentUserId: string): 
   return message.senderAccountId === currentUserId
     ? message.recipientProfilePictureUrl || ''
     : message.senderProfilePictureUrl || '';
+}
+
+function getContactReceivesMessages(message: UserMessage, currentUserId: string): boolean {
+  return message.senderAccountId === currentUserId
+    ? message.recipientReceivesMessages !== false
+    : message.senderReceivesMessages !== false;
 }
 
 function getInitials(name: string): string {
@@ -217,6 +224,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
           contactEmail: getContactEmail(message, currentUser.id),
           contactRank: getContactRank(message, currentUser.id),
           contactProfilePictureUrl: getContactProfilePicture(message, currentUser.id),
+          contactReceivesMessages: getContactReceivesMessages(message, currentUser.id),
           subject,
           latestMessage: message,
           messages: [message],
@@ -253,6 +261,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
   }, [searchTerm, threads]);
 
   const selectedThread = threads.find((thread) => thread.id === selectedThreadId) || null;
+  const selectedThreadAcceptsMessages = selectedThread?.contactReceivesMessages !== false;
 
   useEffect(() => {
     if (!selectedThreadId && threads.length > 0) {
@@ -347,6 +356,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       return;
     }
 
+    if (selectedThread.contactReceivesMessages === false) {
+      onToast('error', `${selectedThread.contactName} is not accepting messages right now.`);
+      return;
+    }
+
     setIsSending(true);
     try {
       await messageService.send({
@@ -372,6 +386,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
 
     if (selectedRecipients.length === 0 || !composeBody.trim()) {
       onToast('error', 'Choose at least one recipient and enter a message.');
+      return;
+    }
+
+    const blockedRecipients = selectedRecipients.filter((recipient) => recipient.receivesMessages === false);
+    if (blockedRecipients.length > 0) {
+      onToast('error', `${blockedRecipients.map((recipient) => `${recipient.firstName} ${recipient.lastName}`.trim() || recipient.email).join(', ')} not accepting messages.`);
       return;
     }
 
@@ -571,9 +591,14 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                   )}
                   <div className="min-w-0 text-left">
                     <h2 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">{selectedThread.contactName}</h2>
-                    <p className="truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
+                <p className="truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
                       {selectedThread.contactRank || 'No rank listed'} - {getPresenceLabel(selectedThread.latestMessage.createdAt)}
                     </p>
+                    {!selectedThreadAcceptsMessages && (
+                      <p className="mt-1 text-xs font-bold text-danger">
+                        Not accepting messages
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -634,6 +659,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
               </div>
 
               <form onSubmit={sendReply} className="border-t border-gray-200 p-4 dark:border-gray-800">
+                {!selectedThreadAcceptsMessages && (
+                  <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-danger dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+                    {selectedThread.contactName} is not accepting messages right now.
+                  </div>
+                )}
                 {replyAttachments.length > 0 && (
                   <div className="mb-2 flex flex-wrap gap-2">
                     {replyAttachments.map((file) => (
@@ -665,11 +695,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                     value={replyBody}
                     onChange={(event) => setReplyBody(event.target.value)}
                     onKeyDown={handleReplyKeyDown}
-                    placeholder="Message"
+                    placeholder={selectedThreadAcceptsMessages ? 'Message' : 'Messages are disabled for this user'}
+                    disabled={!selectedThreadAcceptsMessages}
                     rows={1}
                     className="h-8 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm leading-5 outline-none"
                   />
-                  <button type="submit" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600" disabled={isSending} aria-label="Send message">
+                  <button type="submit" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50" disabled={isSending || !selectedThreadAcceptsMessages} aria-label="Send message">
                     <Send size={17} />
                   </button>
                 </div>
@@ -705,8 +736,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
               {selectedRecipients.length > 0 && (
                 <div className="mb-2 flex flex-wrap gap-2">
                   {selectedRecipients.map((recipient) => (
-                    <span key={recipient.id} className="inline-flex items-center gap-2 rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">
+                    <span key={recipient.id} className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${recipient.receivesMessages === false ? 'bg-red-100 text-danger dark:bg-red-950 dark:text-red-200' : 'bg-accent/10 text-accent'}`}>
                       {recipient.firstName} {recipient.lastName}
+                      {recipient.receivesMessages === false && ' - Not accepting messages'}
                       <button
                         type="button"
                         onClick={() => setSelectedRecipients((recipients) => recipients.filter((item) => item.id !== recipient.id))}
@@ -736,15 +768,19 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                       <button
                         key={user.id}
                         type="button"
+                        disabled={user.receivesMessages === false}
                         onClick={() => {
                           setSelectedRecipients((recipients) => [...recipients, user]);
                           setRecipientQuery('');
                           setRecipientResults([]);
                         }}
-                        className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                        className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-red-50 disabled:text-danger dark:hover:bg-gray-800 dark:disabled:bg-red-950"
                       >
                         <span className="font-semibold">{user.firstName} {user.lastName}</span>
                         <span className="ml-2 text-gray-500">{user.email || user.peNumber}</span>
+                        {user.receivesMessages === false && (
+                          <span className="ml-2 text-xs font-bold text-danger">Not accepting messages</span>
+                        )}
                       </button>
                     ))
                   )}

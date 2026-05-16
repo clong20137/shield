@@ -183,6 +183,18 @@ function splitDisplayName(displayName: string): { firstName: string; lastName: s
 }
 
 export class AuthAccountModel {
+  static async countAccounts(): Promise<number> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<RowDataPacket[]>(
+        'SELECT COUNT(*) as count FROM users WHERE `passwordHash` IS NOT NULL'
+      );
+      return Number(rows[0]?.count) || 0;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async createAccount(email: string, password: string, displayName: string): Promise<AuthAccount> {
     const conn = await pool.getConnection();
     try {

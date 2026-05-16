@@ -6,6 +6,34 @@ interface SettingRow extends RowDataPacket {
 }
 
 export class SystemSettingModel {
+  static async getString(key: string, fallback: string): Promise<string> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<SettingRow[]>(
+        'SELECT `settingValue` FROM system_settings WHERE `settingKey` = ? LIMIT 1',
+        [key]
+      );
+      return rows[0]?.settingValue || fallback;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async setString(key: string, value: string): Promise<string> {
+    const conn = await pool.getConnection();
+    try {
+      await conn.query<ResultSetHeader>(
+        `INSERT INTO system_settings (\`settingKey\`, \`settingValue\`, \`updatedAt\`)
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE \`settingValue\` = VALUES(\`settingValue\`), \`updatedAt\` = VALUES(\`updatedAt\`)`,
+        [key, value, new Date()]
+      );
+      return value;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async getNumber(key: string, fallback: number): Promise<number> {
     const conn = await pool.getConnection();
     try {

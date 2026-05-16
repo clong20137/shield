@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { AuthAccountModel } from '../models/AuthAccount';
+import { AuthInviteModel } from '../models/AuthInvite';
 import { AuthSessionModel } from '../models/AuthSession';
+import { SystemSettingModel } from '../models/SystemSetting';
 import { getBearerToken, getSessionAccount } from '../middleware/authSession';
 import { broadcastAppEvent } from '../services/appEvents';
 
@@ -45,13 +47,53 @@ async function canListAccounts(accountId?: string): Promise<boolean> {
   return permissions.includes('roles:manage') || permissions.includes('devices:manage');
 }
 
+const registrationModes = ['public', 'invite-only', 'disabled'] as const;
+type RegistrationMode = typeof registrationModes[number];
+
+function normalizeRegistrationMode(value: string): RegistrationMode {
+  return registrationModes.includes(value as RegistrationMode) ? value as RegistrationMode : 'public';
+}
+
+async function getRegistrationMode(): Promise<RegistrationMode> {
+  return normalizeRegistrationMode(await SystemSettingModel.getString('registrationMode', 'public'));
+}
+
+async function getAppBaseUrl(req: Request): Promise<string> {
+  const configured = await SystemSettingModel.getString('appBaseUrl', '');
+  if (configured) {
+    return configured.replace(/\/+$/u, '');
+  }
+
+  const origin = req.get('origin');
+  if (origin) {
+    return origin.replace(/\/+$/u, '');
+  }
+
+  return `${req.protocol}://${req.get('host')}`.replace(/\/+$/u, '');
+}
+
+function publicInvite(invite: Awaited<ReturnType<typeof AuthInviteModel.create>>, inviteUrl?: string) {
+  return {
+    id: invite.id,
+    email: invite.email,
+    invitedBy: invite.invitedBy,
+    invitedByName: invite.invitedByName,
+    token: invite.token,
+    inviteUrl,
+    acceptedAt: invite.acceptedAt,
+    expiresAt: invite.expiresAt,
+    createdAt: invite.createdAt,
+  };
+}
+
 export class AuthController {
   static async register(req: Request, res: Response) {
     try {
-      const { email, password, displayName } = req.body as {
+      const { email, password, displayName, inviteToken } = req.body as {
         email?: string;
         password?: string;
         displayName?: string;
+        inviteToken?: string;
       };
 
       if (!email || !password || !displayName) {
@@ -66,7 +108,31 @@ export class AuthController {
         return res.status(400).json({ error: 'Password must be at least 8 characters' });
       }
 
+      const accountCount = await AuthAccountModel.countAccounts();
+      const registrationMode = await getRegistrationMode();
+      let inviteId: string | null = null;
+
+      if (accountCount > 0 && registrationMode === 'disabled') {
+        return res.status(403).json({ error: 'Public registration is disabled' });
+      }
+
+      if (accountCount > 0 && registrationMode === 'invite-only') {
+        if (!inviteToken) {
+          return res.status(403).json({ error: 'An invitation link is required to register' });
+        }
+
+        const invite = await AuthInviteModel.getValidInvite(inviteToken);
+        if (!invite || invite.email.toLowerCase() !== email.trim().toLowerCase()) {
+          return res.status(403).json({ error: 'Invitation link is invalid or expired' });
+        }
+
+        inviteId = invite.id;
+      }
+
       const account = await AuthAccountModel.createAccount(email, password, displayName);
+      if (inviteId) {
+        await AuthInviteModel.markAccepted(inviteId);
+      }
       const token = await AuthSessionModel.createSession(account.id);
       broadcastAppEvent({ type: 'user-updated', entityId: account.id });
       broadcastAppEvent({ type: 'dashboard-updated', entityId: account.id });
@@ -246,6 +312,84 @@ export class AuthController {
     } catch (error) {
       console.error('List accounts error:', error);
       res.status(500).json({ error: 'Failed to load accounts' });
+    }
+  }
+
+  static async getRegistrationSettings(req: Request, res: Response) {
+    try {
+      res.json({
+        mode: await getRegistrationMode(),
+        appBaseUrl: await getAppBaseUrl(req),
+      });
+    } catch (error) {
+      console.error('Get registration settings error:', error);
+      res.status(500).json({ error: 'Failed to load registration settings' });
+    }
+  }
+
+  static async updateRegistrationSettings(req: Request, res: Response) {
+    try {
+      const { mode, appBaseUrl } = req.body as { mode?: string; appBaseUrl?: string };
+      const normalizedMode = normalizeRegistrationMode(mode || '');
+      const normalizedUrl = (appBaseUrl || '').trim().replace(/\/+$/u, '');
+
+      if (normalizedUrl && !/^https?:\/\//iu.test(normalizedUrl)) {
+        return res.status(400).json({ error: 'App URL must start with http:// or https://' });
+      }
+
+      await SystemSettingModel.setString('registrationMode', normalizedMode);
+      if (normalizedUrl) {
+        await SystemSettingModel.setString('appBaseUrl', normalizedUrl);
+      }
+
+      broadcastAppEvent({ type: 'permission-updated' });
+      res.json({ mode: normalizedMode, appBaseUrl: normalizedUrl });
+    } catch (error) {
+      console.error('Update registration settings error:', error);
+      res.status(500).json({ error: 'Failed to update registration settings' });
+    }
+  }
+
+  static async listInvites(req: Request, res: Response) {
+    try {
+      const invites = await AuthInviteModel.list();
+      res.json(invites.map((invite) => ({
+        id: invite.id,
+        email: invite.email,
+        invitedBy: invite.invitedBy,
+        invitedByName: invite.invitedByName,
+        acceptedAt: invite.acceptedAt,
+        expiresAt: invite.expiresAt,
+        createdAt: invite.createdAt,
+      })));
+    } catch (error) {
+      console.error('List invites error:', error);
+      res.status(500).json({ error: 'Failed to load invites' });
+    }
+  }
+
+  static async createInvite(req: Request, res: Response) {
+    try {
+      const { email } = req.body as { email?: string; requesterId?: string };
+      const account = await getSessionAccount(req);
+
+      if (!email || !isValidEmail(email)) {
+        return res.status(400).json({ error: 'Enter a valid invite email' });
+      }
+
+      const appBaseUrl = await getAppBaseUrl(req);
+      const invite = await AuthInviteModel.create(
+        email,
+        account?.id || null,
+        account?.displayName || account?.email || null,
+      );
+      const inviteUrl = `${appBaseUrl}/?invite=${encodeURIComponent(invite.token)}`;
+
+      console.log(`SHIELD invite for ${email}: ${inviteUrl}`);
+      res.status(201).json(publicInvite(invite, inviteUrl));
+    } catch (error) {
+      console.error('Create invite error:', error);
+      res.status(500).json({ error: 'Failed to create invite' });
     }
   }
 

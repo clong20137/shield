@@ -139,6 +139,25 @@ export interface AuthRole {
   updatedAt: string;
 }
 
+export type RegistrationMode = 'public' | 'invite-only' | 'disabled';
+
+export interface RegistrationSettings {
+  mode: RegistrationMode;
+  appBaseUrl: string;
+}
+
+export interface AuthInvite {
+  id: string;
+  email: string;
+  invitedBy: string | null;
+  invitedByName: string | null;
+  token?: string;
+  inviteUrl?: string;
+  acceptedAt: string | null;
+  expiresAt: string;
+  createdAt: string;
+}
+
 export interface AuthResponse {
   account?: AuthAccount;
   requiresTwoFactor?: boolean;
@@ -229,6 +248,8 @@ export interface UserMessage {
   recipientEmail?: string;
   recipientRank?: string;
   recipientProfilePictureUrl?: string;
+  senderReceivesMessages?: boolean;
+  recipientReceivesMessages?: boolean;
 }
 
 export interface DashboardPost {
@@ -290,8 +311,8 @@ export interface QuickLaunchResponse {
 }
 
 export const authService = {
-  register: (email: string, password: string, displayName: string) =>
-    api.post<AuthResponse>('/auth/register', { email, password, displayName }),
+  register: (email: string, password: string, displayName: string, inviteToken?: string) =>
+    api.post<AuthResponse>('/auth/register', { email, password, displayName, inviteToken }),
 
   login: (email: string, password: string, twoFactorCode?: string) =>
     api.post<AuthResponse>('/auth/login', { email, password, twoFactorCode }),
@@ -325,6 +346,18 @@ export const authService = {
 
   createRole: (requesterId: string, name: string, permissions: string[]) =>
     api.post<AuthRole>('/auth/roles', { requesterId, name, permissions }),
+
+  getRegistrationSettings: () =>
+    api.get<RegistrationSettings>('/auth/registration-settings'),
+
+  updateRegistrationSettings: (settings: RegistrationSettings) =>
+    api.put<RegistrationSettings>('/auth/registration-settings', settings),
+
+  createInvite: (email: string, requesterId: string) =>
+    api.post<AuthInvite>('/auth/invites', { email, requesterId }),
+
+  listInvites: () =>
+    api.get<AuthInvite[]>('/auth/invites'),
 
   updateMessagePreferences: (accountId: string, receiveMessages: boolean) =>
     api.put<AuthResponse>(`/auth/accounts/${accountId}/message-preferences`, { receiveMessages }),

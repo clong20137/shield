@@ -12,7 +12,7 @@ import CreateUserPage from './pages/CreateUserPage';
 import AuditLogPage from './pages/AuditLogPage';
 import CalendarPage from './pages/CalendarPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, clearAuthToken, getAppEventsUrl, getMessageEventsUrl, messageService, notificationService, quickLaunchService, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, clearAuthToken, getAppEventsUrl, getMessageEventsUrl, messageService, notificationService, quickLaunchService, RegistrationSettings, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
@@ -139,9 +139,24 @@ function LoginSplash({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [registrationSettings, setRegistrationSettings] = useState<RegistrationSettings | null>(null);
+  const [inviteToken] = useState(() => new URLSearchParams(window.location.search).get('invite') || '');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
+
+  useEffect(() => {
+    authService.getRegistrationSettings()
+      .then((response) => {
+        setRegistrationSettings(response.data);
+        if (inviteToken && response.data.mode !== 'disabled') {
+          setMode('register');
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load registration settings:', err);
+      });
+  }, [inviteToken]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -172,7 +187,7 @@ function LoginSplash({
     try {
       const response =
         mode === 'register'
-          ? await authService.register(email, password, displayName)
+          ? await authService.register(email, password, displayName, inviteToken || undefined)
           : await authService.login(email, password, requiresTwoFactor ? twoFactorCode : undefined);
 
       if (response.data.requiresTwoFactor) {
@@ -194,6 +209,10 @@ function LoginSplash({
       setIsSubmitting(false);
     }
   };
+
+  const canRegister =
+    registrationSettings?.mode === 'public' ||
+    (registrationSettings?.mode === 'invite-only' && Boolean(inviteToken));
 
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
@@ -219,11 +238,21 @@ function LoginSplash({
                 {mode === 'register' ? 'Create login' : 'Sign in'}
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {mode === 'register' ? 'Create an email and password login.' : 'Use your email and password to continue.'}
+                {mode === 'register'
+                  ? inviteToken
+                    ? 'Create your login from this secure invite.'
+                    : 'Create an email and password login.'
+                  : 'Use your email and password to continue.'}
               </p>
             </div>
 
             {error && <div className="error">{error}</div>}
+            {mode === 'register' && registrationSettings?.mode === 'invite-only' && !inviteToken && (
+              <div className="error">Registration is invite-only. Use your secure invite link to create an account.</div>
+            )}
+            {mode === 'register' && registrationSettings?.mode === 'disabled' && (
+              <div className="error">Public registration is currently disabled.</div>
+            )}
 
             <label className="mb-4 block">
               <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Email</span>
@@ -286,23 +315,25 @@ function LoginSplash({
               </label>
             )}
 
-            <button type="submit" className="btn-primary w-full py-3" disabled={isSubmitting}>
+            <button type="submit" className="btn-primary w-full py-3" disabled={isSubmitting || (mode === 'register' && !canRegister)}>
               {isSubmitting ? 'Working...' : mode === 'register' ? 'Create login' : 'Sign in'}
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setMode((value) => (value === 'login' ? 'register' : 'login'));
-                setConfirmPassword('');
-                setTwoFactorCode('');
-                setRequiresTwoFactor(false);
-                setError(null);
-              }}
-              className="mt-4 w-full text-sm font-semibold text-primary-500 hover:text-primary-700"
-            >
-              {mode === 'register' ? 'Already have a login? Sign in' : 'Need a login? Create one'}
-            </button>
+            {(mode === 'register' || registrationSettings?.mode === 'public' || inviteToken) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMode((value) => (value === 'login' ? 'register' : 'login'));
+                  setConfirmPassword('');
+                  setTwoFactorCode('');
+                  setRequiresTwoFactor(false);
+                  setError(null);
+                }}
+                className="mt-4 w-full text-sm font-semibold text-primary-500 hover:text-primary-700"
+              >
+                {mode === 'register' ? 'Already have a login? Sign in' : 'Need a login? Create one'}
+              </button>
+            )}
           </form>
         </section>
       </div>
