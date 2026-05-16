@@ -503,6 +503,7 @@ function HeaderMessagesButton({
 }) {
   return (
     <button
+      data-onboarding-control="messages"
       type="button"
       onClick={onOpenMessages}
       className="relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
@@ -1016,6 +1017,7 @@ interface OnboardingStep {
   eyebrow: string;
   title: string;
   body: string;
+  placement?: 'right' | 'below';
 }
 
 const onboardingSteps: OnboardingStep[] = [
@@ -1048,14 +1050,30 @@ const onboardingSteps: OnboardingStep[] = [
     eyebrow: 'Alerts',
     title: 'Messages, notifications, and preferences',
     body: 'The top-right controls keep messages, notifications, theme, account settings, preferences, and sign out close at hand.',
+    placement: 'below',
   },
   {
     target: 'quick-launch',
     eyebrow: 'Quick Launch',
     title: 'Customize your dock',
-    body: 'Pin apps or external links here, drag to reorder them, and watch badges for items like unread messages.',
+    body: 'Click an empty box or the small plus on an app to choose what it opens. Drag apps left or right to reorder the dock, and watch badges for items like unread messages.',
+    placement: 'right',
   },
 ];
+
+const headerControlLabels: Record<string, string> = {
+  notifications: 'Notifications',
+  messages: 'Messages',
+  theme: 'Light/Dark',
+  settings: 'Settings',
+  bugs: 'Bugs',
+};
+
+interface OnboardingControlRect {
+  key: string;
+  label: string;
+  rect: DOMRect;
+}
 
 function FirstLoginGuide({
   account,
@@ -1068,6 +1086,7 @@ function FirstLoginGuide({
 }) {
   const [stepIndex, setStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const [controlRects, setControlRects] = useState<OnboardingControlRect[]>([]);
   const [animationKey, setAnimationKey] = useState(0);
   const step = onboardingSteps[stepIndex];
 
@@ -1083,10 +1102,26 @@ function FirstLoginGuide({
       const target = document.querySelector(`[data-onboarding-target="${step.target}"]`);
       if (!target) {
         setTargetRect(null);
+        setControlRects([]);
         return;
       }
 
       setTargetRect(target.getBoundingClientRect());
+      if (step.target === 'header-actions') {
+        const controls = Array.from(document.querySelectorAll<HTMLElement>('[data-onboarding-control]'))
+          .map((control) => {
+            const key = control.dataset.onboardingControl || '';
+            return {
+              key,
+              label: headerControlLabels[key] || key,
+              rect: control.getBoundingClientRect(),
+            };
+          })
+          .filter((control) => control.label);
+        setControlRects(controls);
+      } else {
+        setControlRects([]);
+      }
     };
 
     const scrollToTarget = () => {
@@ -1117,7 +1152,7 @@ function FirstLoginGuide({
     : null;
   const tooltipWidth = 360;
   const tooltipHeightEstimate = 280;
-  const shouldPlaceTooltipBelow = step.target === 'header-actions';
+  const shouldPlaceTooltipBelow = step.placement === 'below';
   const tooltipLeft = safeRect
     ? shouldPlaceTooltipBelow
       ? Math.min(Math.max(16, safeRect.left + safeRect.width / 2 - tooltipWidth / 2), window.innerWidth - tooltipWidth - 16)
@@ -1125,7 +1160,7 @@ function FirstLoginGuide({
     : Math.max(16, (window.innerWidth - tooltipWidth) / 2);
   const tooltipTop = safeRect
     ? shouldPlaceTooltipBelow
-      ? Math.min(Math.max(16, safeRect.top + safeRect.height + 18), window.innerHeight - tooltipHeightEstimate - 16)
+      ? Math.min(Math.max(16, safeRect.top + safeRect.height + (step.target === 'header-actions' ? 56 : 18)), window.innerHeight - tooltipHeightEstimate - 16)
       : Math.min(Math.max(16, safeRect.top), window.innerHeight - tooltipHeightEstimate - 16)
     : Math.max(16, (window.innerHeight - tooltipHeightEstimate) / 2);
 
@@ -1135,15 +1170,48 @@ function FirstLoginGuide({
     <div className="fixed inset-0 z-[90] pointer-events-auto">
       {safeRect ? (
         <>
-          <div className="absolute left-0 right-0 top-0 bg-black/55 backdrop-blur-sm" style={{ height: safeRect.top }} />
-          <div className="absolute left-0 bg-black/55 backdrop-blur-sm" style={{ top: safeRect.top, width: safeRect.left, height: safeRect.height }} />
-          <div className="absolute bg-black/55 backdrop-blur-sm" style={{ left: safeRect.left + safeRect.width, right: 0, top: safeRect.top, height: safeRect.height }} />
-          <div className="absolute bottom-0 left-0 right-0 bg-black/55 backdrop-blur-sm" style={{ top: safeRect.top + safeRect.height }} />
+          <div className="absolute left-0 right-0 top-0 bg-black/55 backdrop-blur-sm transition-all duration-300 ease-out" style={{ height: safeRect.top }} />
+          <div className="absolute left-0 bg-black/55 backdrop-blur-sm transition-all duration-300 ease-out" style={{ top: safeRect.top, width: safeRect.left, height: safeRect.height }} />
+          <div className="absolute bg-black/55 backdrop-blur-sm transition-all duration-300 ease-out" style={{ left: safeRect.left + safeRect.width, right: 0, top: safeRect.top, height: safeRect.height }} />
+          <div className="absolute bottom-0 left-0 right-0 bg-black/55 backdrop-blur-sm transition-all duration-300 ease-out" style={{ top: safeRect.top + safeRect.height }} />
           <div
-            key={`spotlight-${animationKey}`}
-            className="onboarding-spotlight absolute rounded-xl border-2 border-accent"
+            className="onboarding-spotlight absolute rounded-xl border-2 border-accent transition-all duration-300 ease-out"
             style={{ top: safeRect.top, left: safeRect.left, width: safeRect.width, height: safeRect.height }}
           />
+          {step.target === 'header-actions' && controlRects.map((control) => (
+            <div
+              key={control.key}
+              className="onboarding-control-label pointer-events-none fixed rounded-full border border-accent/40 bg-white px-2.5 py-1 text-[11px] font-bold text-accent shadow-lg dark:bg-gray-900"
+              style={{
+                left: Math.min(Math.max(8, control.rect.left + control.rect.width / 2 - 42), window.innerWidth - 92),
+                top: Math.min(control.rect.bottom + 8, window.innerHeight - 34),
+              }}
+            >
+              {control.label}
+            </div>
+          ))}
+          {step.target === 'quick-launch' && (
+            <>
+              <div
+                className="onboarding-control-label pointer-events-none fixed rounded-full border border-accent/40 bg-white px-3 py-1.5 text-xs font-bold text-accent shadow-lg dark:bg-gray-900"
+                style={{
+                  left: Math.max(16, safeRect.left + 12),
+                  top: Math.max(16, safeRect.top - 44),
+                }}
+              >
+                Click a blank spot to add an app
+              </div>
+              <div
+                className="onboarding-control-label pointer-events-none fixed rounded-full border border-accent/40 bg-white px-3 py-1.5 text-xs font-bold text-accent shadow-lg dark:bg-gray-900"
+                style={{
+                  left: Math.min(Math.max(16, safeRect.left + safeRect.width - 190), window.innerWidth - 206),
+                  top: Math.max(16, safeRect.top - 44),
+                }}
+              >
+                Drag icons to reorder
+              </div>
+            </>
+          )}
         </>
       ) : (
         <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" />
@@ -1761,6 +1829,7 @@ function App() {
               <div data-onboarding-target="header-actions" className="relative flex items-center gap-3">
                 <div ref={notificationsMenuRef} className="relative">
                   <button
+                    data-onboarding-control="notifications"
                     type="button"
                     onClick={() => setIsNotificationsOpen((value) => !value)}
                     className="relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
@@ -1832,6 +1901,7 @@ function App() {
                   onOpenMessages={toggleMessagesModal}
                 />
                 <button
+                  data-onboarding-control="theme"
                   type="button"
                   onClick={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
                   className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
@@ -1840,6 +1910,7 @@ function App() {
                   {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
                 </button>
                 <button
+                  data-onboarding-control="settings"
                   type="button"
                   onClick={() => setIsAccountMenuOpen((value) => !value)}
                   className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
@@ -1850,6 +1921,7 @@ function App() {
                 </button>
                 {isAdministrator && (
                   <button
+                    data-onboarding-control="bugs"
                     type="button"
                     onClick={() => setIsBugTrackerOpen(true)}
                     className="relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
