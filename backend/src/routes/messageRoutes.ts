@@ -4,6 +4,7 @@ import { requirePermission, requireSelfOrPermission } from '../middleware/permis
 
 const router = Router();
 
+router.get('/events', MessageController.streamEvents);
 router.post('/', requirePermission('messages:send'), requireSelfOrPermission((req) => req.body?.senderAccountId, 'roles:manage'), MessageController.createMessage);
 router.get('/inbox/:accountId', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), MessageController.listInbox);
 router.get('/sent/:accountId', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), MessageController.listSent);

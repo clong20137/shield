@@ -166,6 +166,33 @@ export class UserMessageModel {
     }
   }
 
+  static async getById(messageId: string): Promise<UserMessage | null> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<UserMessageRow[]>(
+        `SELECT m.*,
+          COALESCE(s.displayName, CONCAT(s.firstName, ' ', s.lastName), s.email) as senderName,
+          s.email as senderEmail,
+          s.rank as senderRank,
+          s.profilePictureUrl as senderProfilePictureUrl,
+          COALESCE(r.displayName, CONCAT(r.firstName, ' ', r.lastName), r.email) as recipientName,
+          r.email as recipientEmail,
+          r.rank as recipientRank,
+          r.profilePictureUrl as recipientProfilePictureUrl
+        FROM user_messages m
+        LEFT JOIN users s ON s.id = m.senderAccountId
+        LEFT JOIN users r ON r.id = m.recipientUserId
+        WHERE m.id = ?
+        LIMIT 1`,
+        [messageId]
+      );
+
+      return rows[0] ? toUserMessage(rows[0]) : null;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async markRead(messageId: string, recipientUserId: string): Promise<boolean> {
     const conn = await pool.getConnection();
     try {

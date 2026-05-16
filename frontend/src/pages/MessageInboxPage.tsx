@@ -1,7 +1,7 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, CheckCheck, Paperclip, Plus, Send, Trash2, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
-import { AuthAccount, messageService, userService, User, UserMessage } from '../services/api';
+import { AuthAccount, getMessageEventsUrl, messageService, userService, User, UserMessage } from '../services/api';
 
 interface MessageInboxPageProps {
   currentUser: AuthAccount;
@@ -152,9 +152,18 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
 
   useEffect(() => {
     loadMessages(true);
-    const interval = window.setInterval(() => loadMessages(false), 5000);
+    const eventsUrl = getMessageEventsUrl();
+    const eventSource = eventsUrl ? new EventSource(eventsUrl) : null;
+    const handleRealtimeMessageUpdate = () => loadMessages(false);
+    eventSource?.addEventListener('message-created', handleRealtimeMessageUpdate);
+    eventSource?.addEventListener('message-read', handleRealtimeMessageUpdate);
+    eventSource?.addEventListener('message-archived', handleRealtimeMessageUpdate);
+    eventSource?.addEventListener('message-deleted', handleRealtimeMessageUpdate);
+    eventSource?.addEventListener('error', (event) => {
+      console.error('Message realtime connection error:', event);
+    });
 
-    return () => window.clearInterval(interval);
+    return () => eventSource?.close();
   }, [currentUser.id]);
 
   useEffect(() => {

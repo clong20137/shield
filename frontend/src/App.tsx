@@ -12,7 +12,7 @@ import CreateUserPage from './pages/CreateUserPage';
 import AuditLogPage from './pages/AuditLogPage';
 import CalendarPage from './pages/CalendarPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
-import { AuthAccount, authService, clearAuthToken, messageService, setAuthToken, userService, User } from './services/api';
+import { AuthAccount, authService, clearAuthToken, getMessageEventsUrl, messageService, setAuthToken, userService, User } from './services/api';
 
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
@@ -1065,13 +1065,23 @@ function App() {
     };
 
     loadUnreadCount();
-    const interval = window.setInterval(loadUnreadCount, 30000);
     window.addEventListener('shield:messages-updated', loadUnreadCount);
+
+    const eventsUrl = getMessageEventsUrl();
+    const eventSource = eventsUrl ? new EventSource(eventsUrl) : null;
+    const handleRealtimeMessageUpdate = () => loadUnreadCount();
+    eventSource?.addEventListener('message-created', handleRealtimeMessageUpdate);
+    eventSource?.addEventListener('message-read', handleRealtimeMessageUpdate);
+    eventSource?.addEventListener('message-archived', handleRealtimeMessageUpdate);
+    eventSource?.addEventListener('message-deleted', handleRealtimeMessageUpdate);
+    eventSource?.addEventListener('error', (event) => {
+      console.error('Message realtime connection error:', event);
+    });
 
     return () => {
       isMounted = false;
-      window.clearInterval(interval);
       window.removeEventListener('shield:messages-updated', loadUnreadCount);
+      eventSource?.close();
     };
   }, [currentUser, messagePreferences.receiveMessages]);
 

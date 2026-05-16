@@ -1,8 +1,26 @@
 import { Request, Response } from 'express';
 import { AuthAccountModel } from '../models/AuthAccount';
+import { AuthSessionModel } from '../models/AuthSession';
 import { UserMessageModel } from '../models/UserMessage';
+import { addMessageEventClient, broadcastMessageEvent } from '../services/messageEvents';
 
 export class MessageController {
+  static async streamEvents(req: Request, res: Response) {
+    try {
+      const token = typeof req.query.token === 'string' ? req.query.token : '';
+      const account = token ? await AuthSessionModel.getAccountForToken(token) : null;
+
+      if (!account) {
+        return res.status(401).json({ error: 'Session expired or invalid' });
+      }
+
+      addMessageEventClient(account.id, res);
+    } catch (error) {
+      console.error('Message events error:', error);
+      res.status(500).json({ error: 'Failed to start message updates' });
+    }
+  }
+
   static async createMessage(req: Request, res: Response) {
     try {
       const { senderAccountId, recipientUserId, subject, body } = req.body as {
@@ -30,6 +48,13 @@ export class MessageController {
         recipientUserId,
         subject: subject.trim(),
         body: body.trim(),
+      });
+
+      const enrichedMessage = await UserMessageModel.getById(message.id);
+      broadcastMessageEvent([senderAccountId, recipientUserId], {
+        type: 'message-created',
+        message: enrichedMessage || message,
+        actorAccountId: senderAccountId,
       });
 
       res.status(201).json(message);
@@ -83,6 +108,17 @@ export class MessageController {
         return res.status(404).json({ error: 'Message not found' });
       }
 
+      const message = await UserMessageModel.getById(req.params.id);
+      broadcastMessageEvent(
+        message ? [message.senderAccountId, message.recipientUserId] : [recipientUserId],
+        {
+          type: 'message-read',
+          ...(message ? { message } : {}),
+          messageId: req.params.id,
+          actorAccountId: recipientUserId,
+        }
+      );
+
       res.json({ message: 'Message marked read' });
     } catch (error) {
       console.error('Mark message read error:', error);
@@ -104,6 +140,17 @@ export class MessageController {
         return res.status(404).json({ error: 'Message not found' });
       }
 
+      const message = await UserMessageModel.getById(req.params.id);
+      broadcastMessageEvent(
+        message ? [message.senderAccountId, message.recipientUserId] : [recipientUserId],
+        {
+          type: 'message-archived',
+          ...(message ? { message } : {}),
+          messageId: req.params.id,
+          actorAccountId: recipientUserId,
+        }
+      );
+
       res.json({ message: 'Message archived' });
     } catch (error) {
       console.error('Archive message error:', error);
@@ -124,6 +171,17 @@ export class MessageController {
       if (!updated) {
         return res.status(404).json({ error: 'Message not found' });
       }
+
+      const message = await UserMessageModel.getById(req.params.id);
+      broadcastMessageEvent(
+        message ? [message.senderAccountId, message.recipientUserId] : [accountId],
+        {
+          type: 'message-deleted',
+          ...(message ? { message } : {}),
+          messageId: req.params.id,
+          actorAccountId: accountId,
+        }
+      );
 
       res.json({ message: 'Message deleted' });
     } catch (error) {

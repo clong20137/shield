@@ -27,6 +27,15 @@ export function clearAuthToken() {
   window.localStorage.removeItem(AUTH_TOKEN_KEY);
 }
 
+export function getAuthToken(): string | null {
+  return window.localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function getMessageEventsUrl(): string | null {
+  const token = getAuthToken();
+  return token ? `${API_BASE_URL}/messages/events?token=${encodeURIComponent(token)}` : null;
+}
+
 export interface User {
   id: string;
   firstName: string;
