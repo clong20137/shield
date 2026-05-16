@@ -47,7 +47,7 @@ export class CalendarController {
 
   static async createEntry(req: Request, res: Response) {
     try {
-      const { accountId: requestedAccountId, category, date, dutyHours, districtWorked, specialStatus, color } = req.body as {
+      const { accountId: requestedAccountId, category, date, dutyHours, districtWorked, specialStatus, color, details } = req.body as {
         accountId?: string;
         category?: string;
         date?: string;
@@ -55,6 +55,7 @@ export class CalendarController {
         districtWorked?: string;
         specialStatus?: string;
         color?: string;
+        details?: Record<string, string>;
       };
       const accountId = await getCalendarAccountId(req, requestedAccountId);
       const hours = Number(dutyHours);
@@ -71,6 +72,7 @@ export class CalendarController {
         districtWorked,
         specialStatus: specialStatus || 'None',
         color: color || '#9C865C',
+        details: details && typeof details === 'object' ? details : {},
       });
 
       const actor = getAuditActor(req);
@@ -95,7 +97,7 @@ export class CalendarController {
 
   static async updateEntry(req: Request, res: Response) {
     try {
-      const { accountId: requestedAccountId, category, date, dutyHours, districtWorked, specialStatus, color } = req.body as {
+      const { accountId: requestedAccountId, category, date, dutyHours, districtWorked, specialStatus, color, details } = req.body as {
         accountId?: string;
         category?: string;
         date?: string;
@@ -103,6 +105,7 @@ export class CalendarController {
         districtWorked?: string;
         specialStatus?: string;
         color?: string;
+        details?: Record<string, string>;
       };
       const accountId = await getCalendarAccountId(req, requestedAccountId);
       const hours = Number(dutyHours);
@@ -119,6 +122,7 @@ export class CalendarController {
         districtWorked,
         specialStatus: specialStatus || 'None',
         color: color || '#9C865C',
+        details: details && typeof details === 'object' ? details : {},
       });
 
       if (!entry) {

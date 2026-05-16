@@ -44,6 +44,137 @@ const entryColors = [
   { label: 'Purple', value: '#7C3AED' },
 ];
 
+const trooperDailySections = [
+  {
+    title: 'Regular Duty',
+    fields: [
+      ['regularDutyStartTime', 'Start Time'],
+      ['regularDutyEndTime', 'End Time'],
+      ['splitStartTime', 'Split Start Time'],
+      ['splitEndTime', 'Split End Time'],
+      ['secondSplitStartTime', '2nd Split Start Time'],
+      ['secondSplitEndTime', '2nd Split End Time'],
+      ['thirdSplitStartTime', '3rd Split Start Time'],
+      ['thirdSplitEndTime', '3rd Split End Time'],
+      ['regularDutyMiles', 'Regular Duty Miles'],
+    ],
+  },
+  {
+    title: 'Attendance Hours',
+    fields: [
+      ['regularDutyHours', 'Regular Duty Hrs'],
+      ['regularDaysOff', 'Regular Days Off'],
+      ['compHoursUsed', 'Comp Hrs Used'],
+      ['personalLeaveHours', 'Personal Leave Hrs'],
+      ['vacationHours', 'Vacation Hrs'],
+      ['holidayHours', 'Holiday Hrs'],
+      ['compOtHoursEarned', 'Comp/OT Hrs Earned'],
+      ['injuryIllnessHours', 'Injury/Illness Hrs'],
+    ],
+  },
+  {
+    title: 'Duty Hours',
+    fields: [
+      ['patrolHours', 'Patrol Hrs'],
+      ['crashInvestHours', 'Crash Invest. Hrs'],
+      ['trafficCourtHours', 'Traffic Court Hrs'],
+      ['incidentReportHours', 'Incident Report Hrs'],
+      ['criminalInvestHours', 'Criminal Invest. Hrs'],
+      ['criminalCourtHours', 'Criminal Court Hrs'],
+      ['mealBreakHours', 'Meal Break Hrs'],
+    ],
+  },
+  {
+    title: 'Traffic Activity',
+    fields: [
+      ['policeServices', 'Police Services'],
+      ['suspensions', 'Suspensions'],
+      ['crashesInvestigated', 'Crashes Investigated'],
+      ['crashCitations', 'Crash Citations'],
+      ['seatBeltCitations', 'Seat Belt Citations'],
+      ['childRestraintCitations', 'Child Restraint Citations'],
+      ['under10kTruckCitations', 'Under 10K Truck Citations'],
+    ],
+  },
+  {
+    title: 'OWI Offense Activity',
+    fields: [
+      ['owiDefendants', 'OWI Defendants'],
+      ['pbt', 'PBT'],
+      ['certifiedBreathTests', 'Certified Breath Tests'],
+      ['refusals', 'Refusals'],
+      ['owiMisdemeanors', 'OWI Misdemeanors'],
+      ['owiFelonies', 'OWI Felonies'],
+      ['owiControlledSubstances', 'OWI Controlled Substances'],
+      ['underAgeOwi', 'Under Age OWI'],
+      ['dreTests', 'DRE Tests'],
+      ['sfstTests', 'SFST Tests'],
+      ['openContainers', 'Open Containers'],
+      ['otherOwiViolations', 'Other OWI Violations'],
+    ],
+  },
+  {
+    title: '10K Truck Activity',
+    fields: [
+      ['movingCitations', 'Moving Citations'],
+      ['nonMovingCitations', 'Non Moving Citations'],
+      ['warnings', 'Warnings'],
+      ['trucksInspected', 'Trucks Inspected'],
+      ['outOfServices', 'Out of Services'],
+      ['mcsapViolations', 'MCSAP Violations'],
+    ],
+  },
+  {
+    title: 'Level 1-3 Regular Duty Inspections',
+    fields: [
+      ['trucksMeasured', 'Trucks Measured'],
+      ['inspectionOutOfServices', 'Out of Services'],
+      ['owGrossCitations', 'OW Gross Citations'],
+      ['owAxleCitations', 'OW Axle Citations'],
+      ['owBridgeCitations', 'OW Bridge Citations'],
+      ['portWeighed', 'Port Weighed'],
+      ['owLoadAdjustments', 'OW Load Adjustments'],
+      ['owVehicleOffLoaded', 'OW Vehicle Off Loaded'],
+    ],
+  },
+  {
+    title: 'Criminal Activity',
+    fields: [
+      ['criminalDefendants', 'Criminal Defendants'],
+      ['totalCriminalArrests', 'Total Criminal Arrests'],
+      ['totalFelonyArrests', 'Total Felony Arrests'],
+      ['criminalActivityReports', 'Criminal Activity Reports'],
+      ['stolenVehiclesRecovered', 'Stolen Vehicles Recovered'],
+      ['gunsSeized', 'Guns Seized'],
+      ['amountUscSeized', 'Amount of USC Seized'],
+      ['htiInteractions', 'HTI Interactions'],
+      ['htiArrests', 'HTI Arrests'],
+      ['htiRescues', 'HTI Rescues'],
+    ],
+  },
+  {
+    title: 'Drug Activity',
+    fields: [
+      ['heroinArrests', 'Heroin Arrests'],
+      ['heroinDefendants', 'Heroin Defendants'],
+      ['cocaineArrests', 'Cocaine Arrests'],
+      ['cocaineDefendants', 'Cocaine Defendants'],
+      ['marijuanaArrests', 'Marijuana Arrests'],
+      ['marijuanaDefendants', 'Marijuana Defendants'],
+      ['totalPlantsSeized', 'Total Plants Seized'],
+      ['totalWeightSeizedGrams', 'Total Weight Seized(in Grams)'],
+      ['methamphetamineArrests', 'Methamphetamine Arrests'],
+      ['methamphetamineDefendants', 'Methamphetamine Defendants'],
+      ['prescriptionArrests', 'Prescription Arrests'],
+      ['prescriptionDefendants', 'Prescription Defendants'],
+      ['otherDrugArrests', 'Other Drug Arrests'],
+      ['otherDrugDefendants', 'Other Drug Defendants'],
+      ['totalDrugArrests', 'Total Drug Arrests'],
+      ['totalDrugDefendants', 'Total Drug Defendants'],
+    ],
+  },
+] as const;
+
 const createDefaultEntryForm = (date: string): CalendarEntryForm => ({
   category: 'General Information',
   date,
@@ -51,6 +182,7 @@ const createDefaultEntryForm = (date: string): CalendarEntryForm => ({
   districtWorked: districtOptions[0],
   specialStatus: specialStatusOptions[0],
   color: entryColors[0].value,
+  details: {},
 });
 
 const formatDateKey = (date: Date) => {
@@ -230,7 +362,18 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
       districtWorked: entry.districtWorked,
       specialStatus: entry.specialStatus,
       color: entry.color,
+      details: entry.details || {},
     });
+  };
+
+  const updateDailyDetail = (key: string, value: string) => {
+    setEntryForm((currentForm) => ({
+      ...currentForm,
+      details: {
+        ...(currentForm.details || {}),
+        [key]: value,
+      },
+    }));
   };
 
   const visibleEntries = entries.filter((entry) => {
@@ -385,7 +528,7 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
 
       {selectedDate && (
         <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
-          <div className="modal-window max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+          <div className="modal-window max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2>{getReadableDate(selectedDate)}</h2>
@@ -417,6 +560,7 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
                   className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
                 >
                   <option>General Information</option>
+                  <option>Trooper Daily</option>
                 </select>
               </label>
 
@@ -499,6 +643,54 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
                   ))}
                 </div>
               </div>
+
+              {entryForm.category === 'Trooper Daily' && (
+                <div className="md:col-span-2">
+                  <div className="mb-4 rounded border border-accent/30 bg-accent/5 p-4 text-sm text-gray-700 dark:text-gray-300">
+                    Trooper Daily activity is saved with this calendar date and remains separate for your account.
+                  </div>
+
+                  <div className="space-y-4">
+                    {trooperDailySections.map((section) => (
+                      <section key={section.title} className="overflow-hidden rounded border border-gray-200 dark:border-gray-800">
+                        <div className="bg-primary-500 px-4 py-3 text-center text-base font-bold text-white">
+                          {section.title}
+                        </div>
+                        <div className="grid grid-cols-1 gap-x-5 gap-y-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+                          {section.fields.map(([key, label]) => (
+                            <label key={key} className="block">
+                              <span className="mb-1 block text-center text-sm font-semibold text-gray-700 dark:text-gray-300">{label}</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                inputMode="decimal"
+                                value={entryForm.details?.[key] || ''}
+                                onChange={(event) => updateDailyDetail(key, event.target.value)}
+                                className="w-full rounded-full border border-gray-300 bg-white px-3 py-1.5 text-center text-sm dark:border-gray-700 dark:bg-gray-950"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </section>
+                    ))}
+
+                    <section className="overflow-hidden rounded border border-gray-200 dark:border-gray-800">
+                      <div className="bg-primary-500 px-4 py-3 text-center text-base font-bold text-white">
+                        Narrative
+                      </div>
+                      <div className="p-4">
+                        <textarea
+                          value={entryForm.details?.narrative || ''}
+                          onChange={(event) => updateDailyDetail('narrative', event.target.value)}
+                          placeholder="Type a narrative here"
+                          className="min-h-56 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                        />
+                      </div>
+                    </section>
+                  </div>
+                </div>
+              )}
 
               <div className="md:col-span-2">
                 <button type="submit" className="btn-primary">

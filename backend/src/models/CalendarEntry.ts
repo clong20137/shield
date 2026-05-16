@@ -11,6 +11,7 @@ export interface CalendarEntry {
   districtWorked: string;
   specialStatus: string;
   color: string;
+  details: Record<string, string>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,6 +25,7 @@ interface CalendarEntryRow extends RowDataPacket {
   districtWorked: string;
   specialStatus: string;
   color: string;
+  details: string | Record<string, string> | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +45,8 @@ function formatDate(value: Date | string): string {
 }
 
 function toCalendarEntry(row: CalendarEntryRow): CalendarEntry {
+  const details = typeof row.details === 'string' ? JSON.parse(row.details || '{}') : row.details || {};
+
   return {
     id: row.id,
     ownerAccountId: row.ownerAccountId,
@@ -52,6 +56,7 @@ function toCalendarEntry(row: CalendarEntryRow): CalendarEntry {
     districtWorked: row.districtWorked,
     specialStatus: row.specialStatus,
     color: row.color,
+    details,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -81,8 +86,8 @@ export class CalendarEntryModel {
       await conn.query<ResultSetHeader>(
         `INSERT INTO calendar_entries (
           \`id\`, \`ownerAccountId\`, \`category\`, \`entryDate\`, \`dutyHours\`, \`districtWorked\`,
-          \`specialStatus\`, \`color\`, \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          \`specialStatus\`, \`color\`, \`details\`, \`createdAt\`, \`updatedAt\`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           entry.ownerAccountId,
@@ -92,6 +97,7 @@ export class CalendarEntryModel {
           entry.districtWorked,
           entry.specialStatus,
           entry.color,
+          JSON.stringify(entry.details || {}),
           now,
           now,
         ]
@@ -120,6 +126,7 @@ export class CalendarEntryModel {
           \`districtWorked\` = ?,
           \`specialStatus\` = ?,
           \`color\` = ?,
+          \`details\` = ?,
           \`updatedAt\` = ?
         WHERE \`id\` = ? AND \`ownerAccountId\` = ?`,
         [
@@ -129,6 +136,7 @@ export class CalendarEntryModel {
           entry.districtWorked,
           entry.specialStatus,
           entry.color,
+          JSON.stringify(entry.details || {}),
           new Date(),
           id,
           entry.ownerAccountId,

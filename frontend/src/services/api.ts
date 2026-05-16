@@ -148,12 +148,13 @@ export interface TwoFactorSetupResponse {
 export interface CalendarEntry {
   id: string;
   ownerAccountId?: string;
-  category: 'General Information';
+  category: 'General Information' | 'Trooper Daily';
   date: string;
   dutyHours: string;
   districtWorked: string;
   specialStatus: string;
   color: string;
+  details: Record<string, string>;
   createdAt: string;
   updatedAt: string;
 }
