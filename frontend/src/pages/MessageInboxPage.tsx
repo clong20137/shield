@@ -491,11 +491,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       <div
         className={
           isModalView
-            ? 'grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-[380px_minmax(0,1fr)]'
-            : 'grid h-[calc(100vh-230px)] min-h-[620px] grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]'
+            ? 'grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-[340px_minmax(0,1fr)]'
+            : 'grid min-h-[70vh] grid-cols-1 gap-4 xl:h-[calc(100vh-230px)] xl:grid-cols-[380px_minmax(0,1fr)]'
         }
       >
-        <section className="relative flex min-h-0 flex-col overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+        <section className="relative flex max-h-[34vh] min-h-0 flex-col overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 xl:max-h-none">
           {isModalView && (
             <div className="border-b border-gray-200 p-3 dark:border-gray-800">
               <input
@@ -603,7 +603,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                 </div>
               </div>
 
-              <div className="flex-1 space-y-4 overflow-y-auto bg-gray-50 p-4 dark:bg-gray-950">
+              <div className="flex-1 space-y-4 overflow-y-auto bg-gray-50 p-3 dark:bg-gray-950 sm:p-4">
                 {selectedThread.messages.map((message, index) => {
                   const isMine = message.senderAccountId === currentUser.id;
                   const previousMessage = selectedThread.messages[index - 1];
@@ -625,7 +625,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                         </div>
                       )}
                       <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`group flex max-w-[78%] flex-col ${isMine ? 'items-end text-right' : 'items-start text-left'}`}>
+                        <div className={`group flex max-w-[90%] flex-col sm:max-w-[78%] ${isMine ? 'items-end text-right' : 'items-start text-left'}`}>
                           <div className={`inline-block w-fit max-w-full rounded-2xl px-4 py-3 shadow-sm ${
                             isMine
                               ? 'rounded-br bg-accent text-white'
@@ -658,7 +658,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                 })}
               </div>
 
-              <form onSubmit={sendReply} className="border-t border-gray-200 p-4 dark:border-gray-800">
+              <form onSubmit={sendReply} className="border-t border-gray-200 p-3 dark:border-gray-800 sm:p-4">
                 {!selectedThreadAcceptsMessages && (
                   <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-danger dark:border-red-900 dark:bg-red-950 dark:text-red-200">
                     {selectedThread.contactName} is not accepting messages right now.
@@ -711,8 +711,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       </div>
 
       {isComposeOpen && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <form onSubmit={sendNewMessage} className="modal-window max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <form onSubmit={sendNewMessage} className="modal-window max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-4 shadow-xl dark:bg-gray-900 sm:p-6">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2>New Message</h2>
@@ -835,7 +835,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       )}
 
       {threadPendingDelete && (
-        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
+        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/45">
           <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
@@ -866,7 +866,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       )}
 
       {messagePendingDelete && (
-        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
+        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/45">
           <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <div className="mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Message</h2>

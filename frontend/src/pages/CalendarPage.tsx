@@ -495,7 +495,7 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
             Personal duty information for {currentUser.displayName || currentUser.email}.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => changeMonth(-1)} className="btn-secondary">
             Previous
           </button>
@@ -560,7 +560,7 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
         <div className="mt-2 grid grid-cols-7 gap-2">
           {calendarCells.map((date, index) => {
             if (!date) {
-              return <div key={`empty-${index}`} className="min-h-24 rounded border border-transparent" />;
+              return <div key={`empty-${index}`} className="min-h-16 rounded border border-transparent sm:min-h-24" />;
             }
 
             const dateKey = formatDateKey(date);
@@ -572,21 +572,21 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
                 key={dateKey}
                 type="button"
                 onClick={() => openDay(dateKey)}
-                className={`min-h-24 rounded border bg-gray-50 p-2 text-left transition hover:border-accent hover:bg-accent/5 dark:bg-gray-950 ${
+                className={`min-h-16 rounded border bg-gray-50 p-1 text-left transition hover:border-accent hover:bg-accent/5 dark:bg-gray-950 sm:min-h-24 sm:p-2 ${
                   isToday
                     ? 'border-accent ring-2 ring-accent/20'
                     : 'border-gray-200 dark:border-gray-800'
                 }`}
               >
-                <div className="mb-2 flex items-center justify-between">
+                <div className="mb-1 flex items-center justify-between sm:mb-2">
                   <span className="font-bold text-gray-800 dark:text-gray-100">{date.getDate()}</span>
                   {dayEntries.length > 0 && (
-                    <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-bold text-accent">
+                    <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-bold text-accent sm:px-2 sm:text-xs">
                       {dayEntries.length}
                     </span>
                   )}
                 </div>
-                <div className="space-y-1">
+                <div className="hidden space-y-1 sm:block">
                   {dayEntries.slice(0, 3).map((entry) => (
                     <div
                       key={entry.id}
@@ -603,6 +603,13 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
                     </div>
                   )}
                 </div>
+                {dayEntries.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1 sm:hidden">
+                    {dayEntries.slice(0, 4).map((entry) => (
+                      <span key={entry.id} className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                    ))}
+                  </div>
+                )}
               </button>
             );
           })}
@@ -610,8 +617,8 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
       </div>
 
       {selectedDate && (
-        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
-          <div className="modal-window max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/50">
+          <div className="modal-window max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-5">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Trooper Daily</p>
@@ -845,7 +852,7 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
       )}
 
       {entryPendingDelete && (
-        <div className="modal-backdrop fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4">
+        <div className="modal-backdrop fixed inset-0 z-[80] flex items-center justify-center bg-black/45">
           <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <div className="mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Entry</h2>

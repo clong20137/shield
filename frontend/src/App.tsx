@@ -711,9 +711,9 @@ function QuickLaunchTray({
   };
 
   return (
-    <section className={`fixed bottom-5 right-6 z-30 transition-all duration-200 ${isSidebarCollapsed ? 'left-24' : 'left-[19.5rem]'}`}>
-      <div data-onboarding-target="quick-launch" className="mx-auto w-fit max-w-full rounded-2xl border border-gray-200 bg-white/85 p-3 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/80">
-        <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
+    <section className={`fixed bottom-3 left-3 right-3 z-30 transition-all duration-200 sm:bottom-5 sm:right-6 ${isSidebarCollapsed ? 'sm:left-24' : 'sm:left-[19.5rem]'}`}>
+      <div data-onboarding-target="quick-launch" className="mx-auto w-fit max-w-full rounded-2xl border border-gray-200 bg-white/85 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/80 sm:p-3">
+        <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 sm:gap-2">
         {slots.map((slot, index) => {
           const app = typeof slot === 'string' ? availableApps.find((item) => item.id === slot) || null : null;
           const isExternal = isExternalQuickLaunchSlot(slot);
@@ -755,7 +755,7 @@ function QuickLaunchTray({
               <button
                 type="button"
                 onClick={() => (slot ? openSlot(slot) : setEditingSlot(index))}
-                className={`flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-[10px] font-bold transition ${
+                className={`flex h-12 w-12 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-[10px] font-bold transition sm:h-16 sm:w-16 ${
                   slot
                     ? `${draggingSlot === index ? 'scale-95 opacity-50' : ''} ${isActive ? 'translate-y-[-3px] border-accent bg-accent/10 text-accent shadow-md' : 'border-gray-200 bg-white text-primary-500 shadow-sm'} cursor-grab active:cursor-grabbing hover:-translate-y-1 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100`
                     : 'border-gray-300 bg-white/60 text-gray-400 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900/60'
@@ -763,7 +763,7 @@ function QuickLaunchTray({
                 title={label || 'Add App'}
               >
                 {Icon ? <Icon size={20} /> : <Plus size={22} />}
-                <span className="max-w-14 truncate">{label}</span>
+                <span className="hidden max-w-14 truncate sm:block">{label}</span>
               </button>
 
               {isActive && (
@@ -794,8 +794,8 @@ function QuickLaunchTray({
       </div>
 
       {editingSlot !== null && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="modal-window w-full max-w-lg rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="modal-window w-full max-w-lg overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-6">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Choose App</h2>
@@ -914,7 +914,7 @@ function NotFoundPage() {
 }
 
 function getModalBackdropClass(isClosing: boolean, tint = 'bg-black/50') {
-  return `${isClosing ? 'modal-backdrop-exit' : 'modal-backdrop'} fixed inset-0 z-50 flex items-center justify-center ${tint} p-4`;
+  return `${isClosing ? 'modal-backdrop-exit' : 'modal-backdrop'} fixed inset-0 z-50 flex items-center justify-center ${tint}`;
 }
 
 function getModalWindowClass(isClosing: boolean, className: string) {
@@ -1334,6 +1334,19 @@ function App() {
   const [isBugTrackerOpen, setIsBugTrackerOpen] = useState(false);
   const [isFirstLoginGuideOpen, setIsFirstLoginGuideOpen] = useState(false);
   const [closingModal, setClosingModal] = useState<'messages' | 'calendar' | 'profile' | 'preferences' | 'createUser' | 'reportBug' | 'bugTracker' | null>(null);
+
+  useEffect(() => {
+    const collapseSidebarOnMobile = () => {
+      if (window.innerWidth < 768) {
+        setIsSidebarCollapsed(true);
+      }
+    };
+
+    collapseSidebarOnMobile();
+    window.addEventListener('resize', collapseSidebarOnMobile);
+
+    return () => window.removeEventListener('resize', collapseSidebarOnMobile);
+  }, []);
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const [bugReports, setBugReports] = useState<BugReport[]>([]);
   const previousMessageUnreadCount = useRef<number | null>(null);
@@ -1787,7 +1800,7 @@ function App() {
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed((value) => !value)}
-              className="absolute -right-5 top-1/2 z-30 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-primary-500 shadow-lg hover:bg-gray-50"
+              className="absolute -right-5 top-1/2 z-30 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-primary-500 shadow-lg hover:bg-gray-50 md:flex"
               aria-label={isSidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
             >
               {isSidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
@@ -1872,12 +1885,12 @@ function App() {
           </aside>
 
           <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
-            <header className="flex h-20 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <header className="flex min-h-20 shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-3 py-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:px-6">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Internal System</p>
-                <h2 className="text-2xl font-bold text-primary-500">Agency Workspace</h2>
+                <p className="hidden text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 sm:block">Internal System</p>
+                <h2 className="text-xl font-bold text-primary-500 sm:text-2xl">Agency Workspace</h2>
               </div>
-              <div data-onboarding-target="header-actions" className="relative flex items-center gap-3">
+              <div data-onboarding-target="header-actions" className="relative flex items-center gap-2 sm:gap-3">
                 <div ref={notificationsMenuRef} className="relative">
                   <button
                     data-onboarding-control="notifications"
@@ -1895,7 +1908,7 @@ function App() {
                   </button>
 
                   {isNotificationsOpen && (
-                    <div className="absolute right-0 top-12 z-40 w-80 rounded border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                    <div className="absolute right-0 top-12 z-40 w-[calc(100vw-6.5rem)] max-w-80 rounded border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 sm:w-80">
                       <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                         <h3 className="text-base font-bold text-primary-500 dark:text-blue-100">Notifications</h3>
                         <button
@@ -1989,7 +2002,7 @@ function App() {
                 )}
 
                 {isAccountMenuOpen && (
-                  <div className="absolute right-0 top-12 z-40 w-64 rounded border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                  <div className="absolute right-0 top-12 z-40 w-[calc(100vw-6.5rem)] max-w-64 rounded border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 sm:w-64">
                     <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                       <p className="truncate text-sm font-bold text-gray-800 dark:text-gray-100">{currentUser?.displayName}</p>
                       <p className="truncate text-xs text-gray-500 dark:text-gray-400">{currentUser?.email}</p>
@@ -2039,7 +2052,7 @@ function App() {
               </div>
             </header>
 
-            <main className="flex-1 overflow-y-auto px-6 pb-48 pt-8 dark:bg-gray-950">
+            <main className="flex-1 overflow-y-auto px-3 pb-36 pt-5 dark:bg-gray-950 sm:px-6 sm:pb-48 sm:pt-8">
               <div data-onboarding-target="workspace" className="min-h-[calc(100vh-12rem)]">
                 <Routes>
                   <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
@@ -2085,7 +2098,7 @@ function App() {
           </div>
           {isMessagesModalOpen && currentUser && (
             <div className={getModalBackdropClass(closingModal === 'messages', 'bg-black/60')}>
-              <div className={getModalWindowClass(closingModal === 'messages', 'flex h-[94vh] w-full max-w-6xl flex-col rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900')}>
+              <div className={getModalWindowClass(closingModal === 'messages', 'flex h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:p-4')}>
                 <div className="mb-3 flex items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Messages</h2>
@@ -2108,7 +2121,7 @@ function App() {
           )}
           {isCalendarModalOpen && currentUser && (
             <div className={getModalBackdropClass(closingModal === 'calendar', 'bg-black/60')}>
-              <div className={getModalWindowClass(closingModal === 'calendar', 'flex h-[94vh] w-full max-w-6xl flex-col rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900')}>
+              <div className={getModalWindowClass(closingModal === 'calendar', 'flex h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:p-4')}>
                 <div className="mb-3 flex items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Calendar</h2>
@@ -2131,8 +2144,8 @@ function App() {
           )}
           {isProfileModalOpen && currentUser && (
             <div className={getModalBackdropClass(closingModal === 'profile')}>
-              <div className={getModalWindowClass(closingModal === 'profile', 'w-full max-w-5xl rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900')}>
-                <div className="mb-6 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
+              <div className={getModalWindowClass(closingModal === 'profile', 'flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-5')}>
+                <div className="mb-4 flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Account Settings</h2>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage your profile security and sign-in options.</p>
@@ -2146,18 +2159,20 @@ function App() {
                     <X size={20} />
                   </button>
                 </div>
-                <AccountSettingsPage
-                  account={currentUser}
-                  onAccountUpdate={handleAccountUpdate}
-                  onToast={showToast}
-                  getErrorMessage={getErrorMessage}
-                />
+                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                  <AccountSettingsPage
+                    account={currentUser}
+                    onAccountUpdate={handleAccountUpdate}
+                    onToast={showToast}
+                    getErrorMessage={getErrorMessage}
+                  />
+                </div>
               </div>
             </div>
           )}
           {isCreateUserModalOpen && currentUser && (
             <div className={getModalBackdropClass(closingModal === 'createUser')}>
-              <div className={getModalWindowClass(closingModal === 'createUser', 'flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900')}>
+              <div className={getModalWindowClass(closingModal === 'createUser', 'flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-5')}>
                 <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Create User</h2>
@@ -2184,7 +2199,7 @@ function App() {
           )}
           {isPreferencesOpen && (
             <div className={getModalBackdropClass(closingModal === 'preferences')}>
-              <div className={getModalWindowClass(closingModal === 'preferences', 'w-full max-w-md rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900')}>
+              <div className={getModalWindowClass(closingModal === 'preferences', 'w-full max-w-md overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-6')}>
                 <div className="mb-5 flex items-center justify-between">
                   <h2>Preferences</h2>
                   <button
@@ -2233,7 +2248,7 @@ function App() {
           )}
           {isReportBugOpen && (
             <div className={getModalBackdropClass(closingModal === 'reportBug')}>
-              <div className={getModalWindowClass(closingModal === 'reportBug', 'w-full max-w-2xl rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900')}>
+              <div className={getModalWindowClass(closingModal === 'reportBug', 'w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-6')}>
                 <div className="mb-5 flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Report a Bug</h2>
@@ -2258,7 +2273,7 @@ function App() {
           )}
           {isBugTrackerOpen && isAdministrator && (
             <div className={getModalBackdropClass(closingModal === 'bugTracker', 'bg-black/60')}>
-              <div className={getModalWindowClass(closingModal === 'bugTracker', 'flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900')}>
+              <div className={getModalWindowClass(closingModal === 'bugTracker', 'flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-5')}>
                 <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Bug Tracker</h2>

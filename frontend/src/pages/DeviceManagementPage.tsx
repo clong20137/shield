@@ -474,7 +474,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       {error && <div className="error">{error}</div>}
       {loading && <div className="loading">Loading device inventory...</div>}
 
-      <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+      <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
         {statusCounts.map((item) => (
           <button
             key={item.status}
@@ -491,16 +491,16 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <h2>Inventory</h2>
-          <div className="flex flex-wrap gap-3">
-            <select value={filter} onChange={(event) => setFilter(event.target.value as DeviceType | 'All')} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
+          <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-auto lg:grid-cols-4">
+            <select value={filter} onChange={(event) => setFilter(event.target.value as DeviceType | 'All')} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
               <option>All</option>
               {deviceTypes.map((type) => <option key={type}>{type}</option>)}
             </select>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as DeviceStatus | 'All')} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as DeviceStatus | 'All')} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
               <option>All</option>
               {deviceStatuses.map((status) => <option key={status}>{status}</option>)}
             </select>
-            <select value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
+            <select value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
               <option value="assetTag">Asset Tag</option>
               <option value="type">Type</option>
               <option value="status">Status</option>
@@ -508,7 +508,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               <option value="maintenanceDueDate">Maintenance Due</option>
               <option value="replacementDueDate">Replacement Due</option>
             </select>
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search inventory" className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search inventory" className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
           </div>
         </div>
 
@@ -524,7 +524,38 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         {filteredDevices.length === 0 ? (
           <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No devices match this view.</div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="space-y-3 lg:hidden">
+            {filteredDevices.map((device) => {
+              const DeviceIcon = deviceIconMap[device.type];
+              return (
+                <article key={device.id} className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 font-bold text-gray-900 dark:text-gray-100">
+                        <DeviceIcon size={18} className="shrink-0 text-accent" />
+                        <span className="truncate">{device.assetTag}</span>
+                      </div>
+                      <p className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">{device.type} - {device.makeModel}</p>
+                    </div>
+                    <StatusBadge status={device.status} />
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                    <Detail label="Assigned" value={device.assignedTo || 'Unassigned'} />
+                    <Detail label="Condition" value={device.condition || 'Good'} />
+                    <Detail label="Maintenance" value={formatDate(device.maintenanceDueDate)} />
+                    <Detail label="Replacement" value={formatDate(device.replacementDueDate)} />
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => loadDeviceHistory(device)} className="btn-secondary" aria-label="View device" title="View"><Eye size={15} /></button>
+                    {canManageDevices && <button type="button" onClick={() => editDevice(device)} className="btn-secondary" aria-label="Edit device" title="Edit"><Pencil size={15} /></button>}
+                    {canManageDevices && <button type="button" onClick={() => setDevicePendingDelete(device)} className="btn-danger" aria-label="Delete device" title="Delete"><Trash2 size={15} /></button>}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          <div className="hidden overflow-x-auto lg:block">
             <table className="w-full min-w-[1180px] border-collapse text-left">
               <thead>
                 <tr className="border-b border-gray-200 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
@@ -569,12 +600,13 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               </tbody>
             </table>
           </div>
+          </>
         )}
       </section>
 
       {canManageDevices && isDeviceFormOpen && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="modal-window flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="modal-window flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-6">
             <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
               <div>
                 <h2>{editingId ? 'Edit Device' : 'Add Device'}</h2>
@@ -593,7 +625,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             </div>
 
             <form onSubmit={saveDevice} className="min-h-0 flex-1 overflow-y-auto pr-1">
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Field label="Device Type">
                   <select value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as DeviceType }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
                     {deviceTypes.map((type) => <option key={type}>{type}</option>)}
@@ -655,8 +687,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       )}
 
       {detailDevice && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="modal-window max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="modal-window max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-6">
             <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
               <div>
                 <h2>{detailDevice.assetTag}</h2>
@@ -735,7 +767,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       )}
 
       {devicePendingDelete && (
-        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
+        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/45">
           <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Device</h2>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
