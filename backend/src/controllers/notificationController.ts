@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { getSessionAccount } from '../middleware/authSession';
 import { UserNotificationModel } from '../models/UserNotification';
+import { broadcastAccountEvent } from '../services/appEvents';
 
 export class NotificationController {
   static async list(req: Request, res: Response) {
@@ -26,6 +27,7 @@ export class NotificationController {
       }
 
       await UserNotificationModel.markRead(req.params.id, account.id);
+      broadcastAccountEvent(account.id, { type: 'notification-updated', entityId: req.params.id });
       res.json({ message: 'Notification marked read' });
     } catch (error) {
       console.error('Mark notification read error:', error);

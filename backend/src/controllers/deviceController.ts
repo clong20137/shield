@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { DeviceModel } from '../models/Device';
+import { broadcastAppEvent } from '../services/appEvents';
 
 function isDuplicateAssetTagError(error: unknown): boolean {
   return (
@@ -80,6 +81,7 @@ export class DeviceController {
         notes: eventNotes,
       });
 
+      broadcastAppEvent({ type: 'device-updated', entityId: device.id });
       res.status(201).json(device);
     } catch (error) {
       if (isDuplicateAssetTagError(error)) {
@@ -158,6 +160,7 @@ export class DeviceController {
         return res.status(404).json({ error: 'Device not found' });
       }
 
+      broadcastAppEvent({ type: 'device-updated', entityId: device.id });
       res.json(device);
     } catch (error) {
       if (isDuplicateAssetTagError(error)) {
@@ -181,6 +184,7 @@ export class DeviceController {
         return res.status(404).json({ error: 'Device not found' });
       }
 
+      broadcastAppEvent({ type: 'device-updated', entityId: req.params.id });
       res.json({ message: 'Device deleted successfully' });
     } catch (error) {
       console.error('Device delete error:', error);
@@ -215,6 +219,7 @@ export class DeviceController {
         notes,
       });
 
+      broadcastAppEvent({ type: 'device-updated', entityId: req.params.id });
       res.status(201).json(event);
     } catch (error) {
       console.error('Device event create error:', error);

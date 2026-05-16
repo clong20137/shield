@@ -1,6 +1,7 @@
 import { RowDataPacket } from 'mysql2';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database';
+import { broadcastAppEvent } from '../services/appEvents';
 
 export interface AuditLog {
   id: string;
@@ -25,6 +26,7 @@ export class AuditLogModel {
         ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [uuidv4(), log.actorId, log.actorName, log.action, log.entityType, log.entityId, log.details]
       );
+      broadcastAppEvent({ type: 'audit-updated', entityId: log.entityId || undefined });
     } finally {
       conn.release();
     }

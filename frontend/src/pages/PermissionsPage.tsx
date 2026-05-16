@@ -60,9 +60,14 @@ function PermissionsPage({
 
   useEffect(() => {
     loadAccounts();
-    const interval = window.setInterval(() => loadAccounts(false), 30000);
+    const handlePermissionsUpdate = () => loadAccounts(false);
 
-    return () => window.clearInterval(interval);
+    window.addEventListener('shield:permission-updated', handlePermissionsUpdate);
+    window.addEventListener('shield:user-updated', handlePermissionsUpdate);
+    return () => {
+      window.removeEventListener('shield:permission-updated', handlePermissionsUpdate);
+      window.removeEventListener('shield:user-updated', handlePermissionsUpdate);
+    };
   }, [account.id]);
 
   useEffect(() => {

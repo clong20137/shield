@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { BarChart3, Bell, Bug, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Search, Settings, Shield, SlidersHorizontal, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
@@ -12,7 +12,7 @@ import CreateUserPage from './pages/CreateUserPage';
 import AuditLogPage from './pages/AuditLogPage';
 import CalendarPage from './pages/CalendarPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, clearAuthToken, getMessageEventsUrl, messageService, notificationService, setAuthToken, UserNotification, userService, User } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, clearAuthToken, getAppEventsUrl, getMessageEventsUrl, messageService, notificationService, quickLaunchService, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
@@ -27,11 +27,7 @@ interface MessagePreferences {
 }
 
 type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
-type QuickLaunchExternalSlot = {
-  type: 'external';
-  label: string;
-  url: string;
-};
+type QuickLaunchExternalSlot = ApiQuickLaunchExternalSlot;
 type QuickLaunchSlot = QuickLaunchAppId | QuickLaunchExternalSlot | null;
 
 interface QuickLaunchApp {
@@ -76,39 +72,44 @@ function getQuickLaunchStorageKey(accountId: string): string {
   return `${QUICK_LAUNCH_KEY}_${accountId}`;
 }
 
-function loadQuickLaunchSlots(storageKey: string): QuickLaunchSlot[] {
-  try {
-    const storedSlots = window.localStorage.getItem(storageKey);
-    const parsedSlots = storedSlots ? JSON.parse(storedSlots) : [];
-    if (!Array.isArray(parsedSlots)) {
-      return Array.from({ length: QUICK_LAUNCH_SLOT_COUNT }, () => null);
+function getEmptyQuickLaunchSlots(): QuickLaunchSlot[] {
+  return Array.from({ length: QUICK_LAUNCH_SLOT_COUNT }, () => null);
+}
+
+function normalizeQuickLaunchSlots(rawSlots: unknown): QuickLaunchSlot[] {
+  const parsedSlots = Array.isArray(rawSlots) ? rawSlots : [];
+
+  return Array.from({ length: QUICK_LAUNCH_SLOT_COUNT }, (_, index) => {
+    const slot = parsedSlots[index];
+
+    if (quickLaunchApps.some((app) => app.id === slot)) {
+      return slot as QuickLaunchAppId;
     }
 
-    return Array.from({ length: QUICK_LAUNCH_SLOT_COUNT }, (_, index) => {
-      const slot = parsedSlots[index];
+    if (
+      typeof slot === 'object' &&
+      slot !== null &&
+      (slot as { type?: unknown }).type === 'external' &&
+      typeof (slot as { label?: unknown }).label === 'string' &&
+      typeof (slot as { url?: unknown }).url === 'string'
+    ) {
+      return {
+        type: 'external',
+        label: (slot as { label: string }).label,
+        url: (slot as { url: string }).url,
+      };
+    }
 
-      if (quickLaunchApps.some((app) => app.id === slot)) {
-        return slot as QuickLaunchAppId;
-      }
+    return null;
+  });
+}
 
-      if (
-        typeof slot === 'object' &&
-        slot !== null &&
-        slot.type === 'external' &&
-        typeof slot.label === 'string' &&
-        typeof slot.url === 'string'
-      ) {
-        return {
-          type: 'external',
-          label: slot.label,
-          url: slot.url,
-        };
-      }
-
-      return null;
-    });
+function loadLegacyQuickLaunchSlots(storageKey: string): QuickLaunchSlot[] {
+  try {
+    const storedSlots = window.localStorage.getItem(storageKey);
+    return normalizeQuickLaunchSlots(storedSlots ? JSON.parse(storedSlots) : []);
   } catch {
-    return Array.from({ length: QUICK_LAUNCH_SLOT_COUNT }, () => null);
+    return getEmptyQuickLaunchSlots();
   }
 }
 
@@ -524,6 +525,7 @@ function QuickLaunchTray({
   badgeCounts,
   activeModalApp,
   storageKey,
+  accountId,
   onOpenMessages,
   onOpenCalendar,
   onOpenCreateUser,
@@ -533,13 +535,14 @@ function QuickLaunchTray({
   badgeCounts: Partial<Record<QuickLaunchAppId, number>>;
   activeModalApp: QuickLaunchAppId | null;
   storageKey: string;
+  accountId?: string;
   onOpenMessages: () => void;
   onOpenCalendar: () => void;
   onOpenCreateUser: () => void;
 }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [slots, setSlots] = useState<QuickLaunchSlot[]>(() => loadQuickLaunchSlots(storageKey));
+  const [slots, setSlots] = useState<QuickLaunchSlot[]>(getEmptyQuickLaunchSlots);
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
   const [draggingSlot, setDraggingSlot] = useState<number | null>(null);
   const [externalLabel, setExternalLabel] = useState('');
@@ -554,13 +557,52 @@ function QuickLaunchTray({
     return Boolean(app.path && location.pathname === app.path);
   };
 
-  useEffect(() => {
-    setSlots(loadQuickLaunchSlots(storageKey));
-  }, [storageKey]);
+  const saveQuickLaunchSlots = useCallback(async (nextSlots: QuickLaunchSlot[]) => {
+    const normalizedSlots = normalizeQuickLaunchSlots(nextSlots);
+    setSlots(normalizedSlots);
+
+    try {
+      await quickLaunchService.save(normalizedSlots as ApiQuickLaunchSlot[]);
+    } catch (err) {
+      console.error('Failed to save quick launch:', err);
+    }
+  }, []);
+
+  const loadQuickLaunchFromDatabase = useCallback(async () => {
+    if (!accountId) {
+      setSlots(getEmptyQuickLaunchSlots());
+      return;
+    }
+
+    try {
+      const response = await quickLaunchService.get();
+      const databaseSlots = normalizeQuickLaunchSlots(response.data.slots);
+      const hasDatabaseSlots = databaseSlots.some(Boolean);
+
+      if (!hasDatabaseSlots) {
+        const legacySlots = loadLegacyQuickLaunchSlots(storageKey);
+        if (legacySlots.some(Boolean)) {
+          setSlots(legacySlots);
+          await quickLaunchService.save(legacySlots as ApiQuickLaunchSlot[]);
+          return;
+        }
+      }
+
+      setSlots(databaseSlots);
+    } catch (err) {
+      console.error('Failed to load quick launch:', err);
+      setSlots(loadLegacyQuickLaunchSlots(storageKey));
+    }
+  }, [accountId, storageKey]);
 
   useEffect(() => {
-    window.localStorage.setItem(storageKey, JSON.stringify(slots));
-  }, [slots, storageKey]);
+    loadQuickLaunchFromDatabase();
+  }, [loadQuickLaunchFromDatabase]);
+
+  useEffect(() => {
+    window.addEventListener('shield:quick-launch-updated', loadQuickLaunchFromDatabase);
+    return () => window.removeEventListener('shield:quick-launch-updated', loadQuickLaunchFromDatabase);
+  }, [loadQuickLaunchFromDatabase]);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -609,7 +651,8 @@ function QuickLaunchTray({
 
   const assignSlot = (slot: QuickLaunchSlot) => {
     if (editingSlot === null) return;
-    setSlots((currentSlots) => currentSlots.map((currentSlot, index) => (index === editingSlot ? slot : currentSlot)));
+    const nextSlots = slots.map((currentSlot, index) => (index === editingSlot ? slot : currentSlot));
+    void saveQuickLaunchSlots(nextSlots);
     setEditingSlot(null);
     setExternalLabel('');
     setExternalUrl('');
@@ -629,12 +672,10 @@ function QuickLaunchTray({
   const moveSlot = (fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex) return;
 
-    setSlots((currentSlots) => {
-      const nextSlots = [...currentSlots];
-      const [movedSlot] = nextSlots.splice(fromIndex, 1);
-      nextSlots.splice(toIndex, 0, movedSlot);
-      return nextSlots;
-    });
+    const nextSlots = [...slots];
+    const [movedSlot] = nextSlots.splice(fromIndex, 1);
+    nextSlots.splice(toIndex, 0, movedSlot);
+    void saveQuickLaunchSlots(nextSlots);
   };
 
   return (
@@ -1232,25 +1273,23 @@ function App() {
     }));
   }, [currentUser?.id, currentUser?.receivesMessages]);
 
-  useEffect(() => {
+  const loadUserNotifications = useCallback(async () => {
     if (!currentUser) {
       setUserNotifications([]);
       return;
     }
 
-    const loadUserNotifications = async () => {
-      try {
-        const response = await notificationService.getAll();
-        setUserNotifications(response.data);
-      } catch (err) {
-        console.error('Failed to load notifications:', err);
-      }
-    };
+    try {
+      const response = await notificationService.getAll();
+      setUserNotifications(response.data);
+    } catch (err) {
+      console.error('Failed to load notifications:', err);
+    }
+  }, [currentUser]);
 
-    loadUserNotifications();
-    const interval = window.setInterval(loadUserNotifications, 30000);
-    return () => window.clearInterval(interval);
-  }, [currentUser?.id]);
+  useEffect(() => {
+    void loadUserNotifications();
+  }, [loadUserNotifications]);
 
   useEffect(() => {
     if (currentUser && !currentUser.hasCompletedOnboarding) {
@@ -1384,7 +1423,7 @@ function App() {
   const openBugCount = bugReports.filter((report) => report.status === 'New' || report.status === 'Pending').length;
   const unreadNotificationCount = userNotifications.filter((notification) => !notification.isRead).length;
 
-  const loadBugReports = async () => {
+  const loadBugReports = useCallback(async () => {
     if (!isAdministrator) return;
     try {
       const response = await bugReportService.getAll();
@@ -1392,7 +1431,7 @@ function App() {
     } catch (err) {
       console.error('Failed to load bug reports:', err);
     }
-  };
+  }, [isAdministrator]);
 
   useEffect(() => {
     if (!isAdministrator) {
@@ -1400,10 +1439,49 @@ function App() {
       return;
     }
 
-    loadBugReports();
-    const interval = window.setInterval(loadBugReports, 30000);
-    return () => window.clearInterval(interval);
-  }, [isAdministrator]);
+    void loadBugReports();
+  }, [isAdministrator, loadBugReports]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    const eventsUrl = getAppEventsUrl();
+    const eventSource = eventsUrl ? new EventSource(eventsUrl) : null;
+    if (!eventSource) {
+      return;
+    }
+
+    const dispatchAppUpdate = (name: string) => {
+      window.dispatchEvent(new CustomEvent(`shield:${name}`));
+    };
+    const handleNotificationUpdate = () => {
+      void loadUserNotifications();
+      dispatchAppUpdate('notification-updated');
+    };
+    const handleBugUpdate = () => {
+      void loadBugReports();
+      dispatchAppUpdate('bug-updated');
+    };
+
+    eventSource.addEventListener('notification-created', handleNotificationUpdate);
+    eventSource.addEventListener('notification-updated', handleNotificationUpdate);
+    eventSource.addEventListener('audit-updated', () => dispatchAppUpdate('audit-updated'));
+    eventSource.addEventListener('bug-updated', handleBugUpdate);
+    eventSource.addEventListener('calendar-updated', () => dispatchAppUpdate('calendar-updated'));
+    eventSource.addEventListener('dashboard-updated', () => dispatchAppUpdate('dashboard-updated'));
+    eventSource.addEventListener('device-updated', () => dispatchAppUpdate('device-updated'));
+    eventSource.addEventListener('mileage-updated', () => dispatchAppUpdate('mileage-updated'));
+    eventSource.addEventListener('permission-updated', () => dispatchAppUpdate('permission-updated'));
+    eventSource.addEventListener('quick-launch-updated', () => dispatchAppUpdate('quick-launch-updated'));
+    eventSource.addEventListener('user-updated', () => dispatchAppUpdate('user-updated'));
+    eventSource.addEventListener('error', (event) => {
+      console.error('Application realtime connection error:', event);
+    });
+
+    return () => eventSource.close();
+  }, [currentUser, loadBugReports, loadUserNotifications]);
 
   const closeModal = (modal: 'messages' | 'calendar' | 'profile' | 'preferences' | 'createUser' | 'reportBug' | 'bugTracker') => {
     setClosingModal(modal);
@@ -1875,6 +1953,7 @@ function App() {
                 badgeCounts={{ messages: messageUnreadCount }}
                 activeModalApp={isMessagesModalOpen ? 'messages' : isCalendarModalOpen ? 'calendar' : isCreateUserModalOpen ? 'create-user' : null}
                 storageKey={getQuickLaunchStorageKey(currentUser?.id || 'anonymous')}
+                accountId={currentUser?.id}
                 onOpenMessages={toggleMessagesModal}
                 onOpenCalendar={toggleCalendarModal}
                 onOpenCreateUser={toggleCreateUserModal}

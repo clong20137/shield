@@ -325,9 +325,10 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
 
   useEffect(() => {
     loadCalendarEntries();
-    const interval = window.setInterval(() => loadCalendarEntries(false), 30000);
+    const handleCalendarUpdate = () => loadCalendarEntries(false);
 
-    return () => window.clearInterval(interval);
+    window.addEventListener('shield:calendar-updated', handleCalendarUpdate);
+    return () => window.removeEventListener('shield:calendar-updated', handleCalendarUpdate);
   }, [currentUser.id]);
 
   useEffect(() => {

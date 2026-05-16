@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { User, UserModel } from '../models/User';
+import { broadcastAppEvent } from '../services/appEvents';
 
 export class UserController {
   static async searchUsers(req: Request, res: Response) {
@@ -76,6 +77,8 @@ export class UserController {
       }
 
       const user = await UserModel.createUser(req.body);
+      broadcastAppEvent({ type: 'user-updated', entityId: user.id });
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: user.id });
       res.status(201).json(user);
     } catch (error) {
       console.error('Create user error:', error);
@@ -92,6 +95,8 @@ export class UserController {
         return res.status(404).json({ error: 'User not found' });
       }
 
+      broadcastAppEvent({ type: 'user-updated', entityId: id });
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: id });
       res.json({ message: 'User updated successfully' });
     } catch (error) {
       console.error('Update user error:', error);
@@ -108,6 +113,8 @@ export class UserController {
         return res.status(404).json({ error: 'User not found' });
       }
 
+      broadcastAppEvent({ type: 'user-updated', entityId: id });
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: id });
       res.json({ message: 'User deleted successfully' });
     } catch (error) {
       console.error('Delete user error:', error);
@@ -135,6 +142,7 @@ export class UserController {
         return res.status(404).json({ error: 'User not found' });
       }
 
+      broadcastAppEvent({ type: 'user-updated', entityId: req.params.id });
       res.json({ profilePictureUrl, user });
     } catch (error) {
       console.error('Profile picture upload error:', error);
@@ -155,6 +163,7 @@ export class UserController {
         return res.status(404).json({ error: 'User not found' });
       }
 
+      broadcastAppEvent({ type: 'user-updated', entityId: req.params.id });
       res.json({ profilePictureUrl: '', user });
     } catch (error) {
       console.error('Profile picture remove error:', error);

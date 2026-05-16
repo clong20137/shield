@@ -11,9 +11,14 @@ const ReportsPage: React.FC = () => {
 
   useEffect(() => {
     loadReports();
-    const interval = window.setInterval(() => loadReports(false), 30000);
+    const handleReportsUpdate = () => loadReports(false);
 
-    return () => window.clearInterval(interval);
+    window.addEventListener('shield:user-updated', handleReportsUpdate);
+    window.addEventListener('shield:dashboard-updated', handleReportsUpdate);
+    return () => {
+      window.removeEventListener('shield:user-updated', handleReportsUpdate);
+      window.removeEventListener('shield:dashboard-updated', handleReportsUpdate);
+    };
   }, []);
 
   const loadReports = async (showLoading = true) => {

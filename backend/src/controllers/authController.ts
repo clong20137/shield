@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { AuthSessionModel } from '../models/AuthSession';
 import { getBearerToken, getSessionAccount } from '../middleware/authSession';
+import { broadcastAppEvent } from '../services/appEvents';
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -67,6 +68,8 @@ export class AuthController {
 
       const account = await AuthAccountModel.createAccount(email, password, displayName);
       const token = await AuthSessionModel.createSession(account.id);
+      broadcastAppEvent({ type: 'user-updated', entityId: account.id });
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: account.id });
       res.status(201).json({ account, token });
     } catch (error) {
       if (isDuplicateEmailError(error)) {
@@ -275,6 +278,8 @@ export class AuthController {
       }
 
       const account = await AuthAccountModel.updateRole(accountId, role);
+      broadcastAppEvent({ type: 'permission-updated', entityId: accountId });
+      broadcastAppEvent({ type: 'user-updated', entityId: accountId });
       res.json({ account });
     } catch (error) {
       console.error('Update account role error:', error);
@@ -302,6 +307,7 @@ export class AuthController {
         return res.status(404).json({ error: 'Account not found' });
       }
 
+      broadcastAppEvent({ type: 'user-updated', entityId: accountId });
       res.json({ account });
     } catch (error) {
       console.error('Update message preferences error:', error);
@@ -364,6 +370,7 @@ export class AuthController {
       }
 
       const role = await AuthAccountModel.createRole(name, Array.isArray(permissions) ? permissions : []);
+      broadcastAppEvent({ type: 'permission-updated', entityId: role.id });
       res.status(201).json(role);
     } catch (error) {
       if (isDuplicateEmailError(error)) {

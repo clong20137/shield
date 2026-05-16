@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { CalendarEntryModel } from '../models/CalendarEntry';
 import { AuditLogModel } from '../models/AuditLog';
 import { getSessionAccount } from '../middleware/authSession';
+import { broadcastAccountEvent } from '../services/appEvents';
 
 function getAuditActor(req: Request) {
   return {
@@ -84,6 +85,7 @@ export class CalendarController {
         details: JSON.stringify(entry),
       });
 
+      broadcastAccountEvent(accountId, { type: 'calendar-updated', entityId: entry.id });
       res.status(201).json(entry);
     } catch (error) {
       if (typeof error === 'object' && error !== null && (error as { statusCode?: number }).statusCode === 403) {
@@ -138,6 +140,7 @@ export class CalendarController {
         details: JSON.stringify(entry),
       });
 
+      broadcastAccountEvent(accountId, { type: 'calendar-updated', entityId: entry.id });
       res.json(entry);
     } catch (error) {
       if (typeof error === 'object' && error !== null && (error as { statusCode?: number }).statusCode === 403) {
@@ -172,6 +175,7 @@ export class CalendarController {
         details: null,
       });
 
+      broadcastAccountEvent(accountId, { type: 'calendar-updated', entityId: req.params.id });
       res.json({ message: 'Calendar entry deleted successfully' });
     } catch (error) {
       if (typeof error === 'object' && error !== null && (error as { statusCode?: number }).statusCode === 403) {

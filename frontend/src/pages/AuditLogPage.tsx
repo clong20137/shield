@@ -24,9 +24,10 @@ function AuditLogPage() {
 
   useEffect(() => {
     loadLogs();
-    const interval = window.setInterval(() => loadLogs(false), 30000);
+    const handleAuditUpdate = () => loadLogs(false);
 
-    return () => window.clearInterval(interval);
+    window.addEventListener('shield:audit-updated', handleAuditUpdate);
+    return () => window.removeEventListener('shield:audit-updated', handleAuditUpdate);
   }, []);
 
   return (

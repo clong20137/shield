@@ -577,9 +577,10 @@ function DashboardNews({
 
   useEffect(() => {
     loadPosts();
-    const interval = window.setInterval(() => loadPosts(false), 30000);
+    const handleDashboardUpdate = () => loadPosts(false);
 
-    return () => window.clearInterval(interval);
+    window.addEventListener('shield:dashboard-updated', handleDashboardUpdate);
+    return () => window.removeEventListener('shield:dashboard-updated', handleDashboardUpdate);
   }, []);
 
   const createPost = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -742,12 +743,18 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
     }
 
     loadDashboard();
-
-    const refreshInterval = window.setInterval(() => {
+    const handleDashboardUpdate = () => {
       loadDashboard(false);
-    }, 30000);
+    };
 
-    return () => window.clearInterval(refreshInterval);
+    window.addEventListener('shield:dashboard-updated', handleDashboardUpdate);
+    window.addEventListener('shield:device-updated', handleDashboardUpdate);
+    window.addEventListener('shield:calendar-updated', handleDashboardUpdate);
+    return () => {
+      window.removeEventListener('shield:dashboard-updated', handleDashboardUpdate);
+      window.removeEventListener('shield:device-updated', handleDashboardUpdate);
+      window.removeEventListener('shield:calendar-updated', handleDashboardUpdate);
+    };
   }, [isAdministrator]);
 
   const loadDashboard = async (showLoading = true) => {

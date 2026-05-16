@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { CalendarEntryModel } from '../models/CalendarEntry';
 import { SystemSettingModel } from '../models/SystemSetting';
 import { getSessionAccount } from '../middleware/authSession';
+import { broadcastAppEvent } from '../services/appEvents';
 
 const MILEAGE_SETTING = 'mileageMilestone';
 
@@ -34,6 +35,7 @@ export class MileageController {
       }
 
       const saved = await SystemSettingModel.setNumber(MILEAGE_SETTING, value);
+      broadcastAppEvent({ type: 'mileage-updated' });
       res.json({ milestone: saved });
     } catch (error) {
       console.error('Mileage milestone error:', error);

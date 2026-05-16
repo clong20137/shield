@@ -3,6 +3,7 @@ import { AuditLogModel } from '../models/AuditLog';
 import { BugReportModel, BugReportPriority, BugReportStatus } from '../models/BugReport';
 import { getSessionAccount } from '../middleware/authSession';
 import { UserNotificationModel } from '../models/UserNotification';
+import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents';
 
 const statuses: BugReportStatus[] = ['New', 'Pending', 'Fixed', 'Closed'];
 const priorities: BugReportPriority[] = ['Low', 'Normal', 'High', 'Critical'];
@@ -45,6 +46,7 @@ export class BugReportController {
         details: JSON.stringify(report),
       });
 
+      broadcastAppEvent({ type: 'bug-updated', entityId: report.id });
       res.status(201).json(report);
     } catch (error) {
       console.error('Create bug report error:', error);
@@ -85,6 +87,7 @@ export class BugReportController {
           entityType: 'bug_report',
           entityId: report.id,
         });
+        broadcastAccountEvent(report.reporterId, { type: 'notification-created', entityId: report.id });
       }
 
       await AuditLogModel.create({
@@ -96,6 +99,7 @@ export class BugReportController {
         details: JSON.stringify({ status, adminNotes: adminNotes || '' }),
       });
 
+      broadcastAppEvent({ type: 'bug-updated', entityId: report.id });
       res.json(report);
     } catch (error) {
       console.error('Update bug report error:', error);

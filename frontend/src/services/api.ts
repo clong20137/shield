@@ -36,6 +36,11 @@ export function getMessageEventsUrl(): string | null {
   return token ? `${API_BASE_URL}/messages/events?token=${encodeURIComponent(token)}` : null;
 }
 
+export function getAppEventsUrl(): string | null {
+  const token = getAuthToken();
+  return token ? `${API_BASE_URL}/events?token=${encodeURIComponent(token)}` : null;
+}
+
 export interface User {
   id: string;
   firstName: string;
@@ -272,6 +277,18 @@ export interface MileageSummary {
   milestone: number;
 }
 
+export type QuickLaunchExternalSlot = {
+  type: 'external';
+  label: string;
+  url: string;
+};
+
+export type QuickLaunchSlot = string | QuickLaunchExternalSlot | null;
+
+export interface QuickLaunchResponse {
+  slots: QuickLaunchSlot[];
+}
+
 export const authService = {
   register: (email: string, password: string, displayName: string) =>
     api.post<AuthResponse>('/auth/register', { email, password, displayName }),
@@ -452,6 +469,14 @@ export const notificationService = {
 
   markRead: (id: string) =>
     api.put(`/notifications/${id}/read`),
+};
+
+export const quickLaunchService = {
+  get: () =>
+    api.get<QuickLaunchResponse>('/quick-launch'),
+
+  save: (slots: QuickLaunchSlot[]) =>
+    api.put<QuickLaunchResponse>('/quick-launch', { slots }),
 };
 
 export const mileageService = {

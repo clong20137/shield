@@ -132,12 +132,12 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   useEffect(() => {
     loadDevices(true);
     loadRegisteredUsers();
-
-    const interval = window.setInterval(() => {
+    const handleDeviceUpdate = () => {
       loadDevices(false);
-    }, 30000);
+    };
 
-    return () => window.clearInterval(interval);
+    window.addEventListener('shield:device-updated', handleDeviceUpdate);
+    return () => window.removeEventListener('shield:device-updated', handleDeviceUpdate);
   }, []);
 
   const loadRegisteredUsers = async () => {

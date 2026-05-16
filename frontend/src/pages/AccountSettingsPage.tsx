@@ -72,14 +72,25 @@ export function AccountSettingsPage({
   }, [onToast, twoFactorSetup]);
 
   useEffect(() => {
-    mileageService.getSummary()
-      .then((response) => {
-        setMileageSummary(response.data);
-        setMilestoneInput(String(response.data.milestone));
-      })
-      .catch((error) => {
-        console.error('Failed to load mileage summary:', error);
-      });
+    const loadMileageSummary = () => {
+      mileageService.getSummary()
+        .then((response) => {
+          setMileageSummary(response.data);
+          setMilestoneInput(String(response.data.milestone));
+        })
+        .catch((error) => {
+          console.error('Failed to load mileage summary:', error);
+        });
+    };
+
+    loadMileageSummary();
+    window.addEventListener('shield:calendar-updated', loadMileageSummary);
+    window.addEventListener('shield:mileage-updated', loadMileageSummary);
+
+    return () => {
+      window.removeEventListener('shield:calendar-updated', loadMileageSummary);
+      window.removeEventListener('shield:mileage-updated', loadMileageSummary);
+    };
   }, []);
 
   const handlePasswordChange = async (event: FormEvent<HTMLFormElement>) => {

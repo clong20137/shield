@@ -1,12 +1,17 @@
 import { Response } from 'express';
 
 export type AppEventType =
+  | 'audit-updated'
   | 'bug-updated'
   | 'calendar-updated'
   | 'dashboard-updated'
   | 'device-updated'
+  | 'permission-updated'
   | 'notification-created'
-  | 'quick-launch-updated';
+  | 'notification-updated'
+  | 'mileage-updated'
+  | 'quick-launch-updated'
+  | 'user-updated';
 
 interface AppEventPayload {
   type: AppEventType;
