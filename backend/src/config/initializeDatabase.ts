@@ -305,6 +305,14 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS quick_launch_slots (
+      \`accountId\` VARCHAR(36) PRIMARY KEY,
+      \`slots\` JSON,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS devices (
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`type\` VARCHAR(50) NOT NULL,

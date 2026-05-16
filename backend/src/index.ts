@@ -15,6 +15,8 @@ import dashboardPostRoutes from './routes/dashboardPostRoutes';
 import bugReportRoutes from './routes/bugReportRoutes';
 import notificationRoutes from './routes/notificationRoutes';
 import mileageRoutes from './routes/mileageRoutes';
+import quickLaunchRoutes from './routes/quickLaunchRoutes';
+import eventRoutes from './routes/eventRoutes';
 
 dotenv.config();
 
@@ -39,6 +41,8 @@ app.use('/api/dashboard-posts', dashboardPostRoutes);
 app.use('/api/bugs', bugReportRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/mileage', mileageRoutes);
+app.use('/api/quick-launch', quickLaunchRoutes);
+app.use('/api/events', eventRoutes);
 
 app.use((error: Error, req: Request, res: Response, next: express.NextFunction) => {
   if (error instanceof multer.MulterError) {

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { DashboardPostModel } from '../models/DashboardPost';
+import { broadcastAppEvent } from '../services/appEvents';
 
 async function isAdministrator(accountId?: string): Promise<boolean> {
   if (!accountId) {
@@ -55,6 +56,7 @@ export class DashboardPostController {
         authorName,
       });
 
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: post.id });
       res.status(201).json(post);
     } catch (error) {
       console.error('Dashboard post create error:', error);
@@ -76,6 +78,7 @@ export class DashboardPostController {
         return res.status(404).json({ error: 'Dashboard post not found' });
       }
 
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: req.params.id });
       res.json({ message: 'Dashboard post deleted' });
     } catch (error) {
       console.error('Dashboard post delete error:', error);
