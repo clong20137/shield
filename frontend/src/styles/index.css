@@ -94,6 +94,40 @@
   }
 }
 
+@keyframes onboarding-pulse {
+  0% {
+    opacity: 0.85;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(156, 134, 92, 0.55), 0 0 28px rgba(156, 134, 92, 0.5);
+  }
+
+  70% {
+    opacity: 1;
+    transform: scale(1.012);
+    box-shadow: 0 0 0 14px rgba(156, 134, 92, 0), 0 0 34px rgba(156, 134, 92, 0.72);
+  }
+
+  100% {
+    opacity: 0.85;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(156, 134, 92, 0), 0 0 28px rgba(156, 134, 92, 0.5);
+  }
+}
+
+@keyframes onboarding-step-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+    filter: blur(4px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
 @layer base {
   body {
     @apply font-sans text-gray-800 bg-gray-50 dark:bg-gray-950 dark:text-gray-100;
@@ -180,6 +214,16 @@
   .modal-window-exit {
     transform-origin: bottom center;
     animation: modal-window-exit 220ms cubic-bezier(0.4, 0, 0.7, 0.2) both;
+    will-change: transform, opacity, filter;
+  }
+
+  .onboarding-spotlight {
+    animation: onboarding-pulse 1.65s ease-in-out infinite;
+    will-change: transform, box-shadow, opacity;
+  }
+
+  .onboarding-tip {
+    animation: onboarding-step-enter 220ms ease-out both;
     will-change: transform, opacity, filter;
   }
 

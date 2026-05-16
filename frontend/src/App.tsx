@@ -885,7 +885,13 @@ function FirstLoginGuide({
 }) {
   const [stepIndex, setStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const [animationKey, setAnimationKey] = useState(0);
   const step = onboardingSteps[stepIndex];
+
+  const goToStep = (nextIndex: number) => {
+    setAnimationKey((key) => key + 1);
+    setStepIndex(nextIndex);
+  };
 
   useEffect(() => {
     let frame = 0;
@@ -945,7 +951,8 @@ function FirstLoginGuide({
           <div className="absolute bg-black/55 backdrop-blur-sm" style={{ left: safeRect.left + safeRect.width, right: 0, top: safeRect.top, height: safeRect.height }} />
           <div className="absolute bottom-0 left-0 right-0 bg-black/55 backdrop-blur-sm" style={{ top: safeRect.top + safeRect.height }} />
           <div
-            className="absolute rounded-xl border-2 border-accent shadow-[0_0_0_9999px_rgba(0,0,0,0.02),0_0_30px_rgba(156,134,92,0.55)]"
+            key={`spotlight-${animationKey}`}
+            className="onboarding-spotlight absolute rounded-xl border-2 border-accent"
             style={{ top: safeRect.top, left: safeRect.left, width: safeRect.width, height: safeRect.height }}
           />
         </>
@@ -954,6 +961,7 @@ function FirstLoginGuide({
       )}
 
       <div
+        key={`tip-${animationKey}`}
         className="pointer-events-auto fixed w-[calc(100vw-2rem)] max-w-[360px] rounded-lg border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-900"
         style={{ left: tooltipLeft, top: tooltipTop }}
       >
@@ -980,13 +988,13 @@ function FirstLoginGuide({
               Later
             </button>
             {stepIndex > 0 && (
-              <button type="button" onClick={() => setStepIndex((index) => index - 1)} className="btn-secondary px-3 py-2">
+              <button type="button" onClick={() => goToStep(stepIndex - 1)} className="btn-secondary px-3 py-2">
                 Back
               </button>
             )}
             <button
               type="button"
-              onClick={() => (isLastStep ? onFinish() : setStepIndex((index) => index + 1))}
+              onClick={() => (isLastStep ? onFinish() : goToStep(stepIndex + 1))}
               className="btn-primary px-4 py-2"
             >
               {isLastStep ? 'Finish' : 'Next'}
