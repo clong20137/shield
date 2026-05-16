@@ -175,8 +175,39 @@ const trooperDailySections = [
   },
 ] as const;
 
+const timeDetailFields = new Set([
+  'regularDutyStartTime',
+  'regularDutyEndTime',
+  'splitStartTime',
+  'splitEndTime',
+  'secondSplitStartTime',
+  'secondSplitEndTime',
+  'thirdSplitStartTime',
+  'thirdSplitEndTime',
+]);
+
+const attendanceHourFields = [
+  'regularDutyHours',
+  'compHoursUsed',
+  'personalLeaveHours',
+  'vacationHours',
+  'holidayHours',
+  'compOtHoursEarned',
+  'injuryIllnessHours',
+];
+
+const dutyActivityHourFields = [
+  'patrolHours',
+  'crashInvestHours',
+  'trafficCourtHours',
+  'incidentReportHours',
+  'criminalInvestHours',
+  'criminalCourtHours',
+  'mealBreakHours',
+];
+
 const createDefaultEntryForm = (date: string): CalendarEntryForm => ({
-  category: 'General Information',
+  category: 'Trooper Daily',
   date,
   dutyHours: '',
   districtWorked: districtOptions[0],
@@ -217,6 +248,41 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
   }
 
   return fallback;
+}
+
+function parseNumericDetail(details: Record<string, string>, key: string): number {
+  const value = Number(details[key]);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function parseTimeToMinutes(value?: string): number | null {
+  if (!value || !/^\d{2}:\d{2}$/u.test(value)) {
+    return null;
+  }
+
+  const [hours, minutes] = value.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+function calculateTimeRangeHours(details: Record<string, string>, startKey: string, endKey: string): number {
+  const start = parseTimeToMinutes(details[startKey]);
+  const end = parseTimeToMinutes(details[endKey]);
+
+  if (start === null || end === null) {
+    return 0;
+  }
+
+  const minutes = end >= start ? end - start : end + 24 * 60 - start;
+  return minutes / 60;
+}
+
+function formatHours(value: number): string {
+  return value.toFixed(2).replace(/\.?0+$/u, '');
+}
+
+function getDifferenceLabel(firstValue: number, secondValue: number): string {
+  const difference = Math.abs(firstValue - secondValue);
+  return difference <= 0.01 ? 'Matches' : `${formatHours(difference)} hr off`;
 }
 
 function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
@@ -356,7 +422,7 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
   const editEntry = (entry: CalendarEntry) => {
     setEditingEntryId(entry.id);
     setEntryForm({
-      category: entry.category,
+      category: 'Trooper Daily',
       date: entry.date,
       dutyHours: entry.dutyHours,
       districtWorked: entry.districtWorked,
@@ -402,6 +468,22 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
   const monthKey = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}`;
   const monthEntries = visibleEntries.filter((entry) => entry.date.startsWith(monthKey));
   const monthDutyHours = monthEntries.reduce((total, entry) => total + (Number(entry.dutyHours) || 0), 0);
+  const reportedDutyHours = Number(entryForm.dutyHours) || 0;
+  const entryDetails = entryForm.details || {};
+  const calculatedShiftHours =
+    calculateTimeRangeHours(entryDetails, 'regularDutyStartTime', 'regularDutyEndTime') +
+    calculateTimeRangeHours(entryDetails, 'splitStartTime', 'splitEndTime') +
+    calculateTimeRangeHours(entryDetails, 'secondSplitStartTime', 'secondSplitEndTime') +
+    calculateTimeRangeHours(entryDetails, 'thirdSplitStartTime', 'thirdSplitEndTime');
+  const attendanceHours = attendanceHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
+  const dutyActivityHours = dutyActivityHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
+  const hasShiftTime = calculatedShiftHours > 0;
+  const hasReportedHours = reportedDutyHours > 0;
+  const hasHourMismatch =
+    hasReportedHours &&
+    ((hasShiftTime && Math.abs(calculatedShiftHours - reportedDutyHours) > 0.01) ||
+      (attendanceHours > 0 && Math.abs(attendanceHours - reportedDutyHours) > 0.01) ||
+      (dutyActivityHours > 0 && Math.abs(dutyActivityHours - reportedDutyHours) > 0.01));
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -528,12 +610,13 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
 
       {selectedDate && (
         <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
-          <div className="modal-window max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+          <div className="modal-window max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Trooper Daily</p>
                 <h2>{getReadableDate(selectedDate)}</h2>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {editingEntryId ? 'Edit duty details for this calendar day.' : 'Add duty details for this calendar day.'}
+                  {editingEntryId ? 'Edit this daily activity report.' : 'Complete the daily activity report for this date.'}
                 </p>
               </div>
               <button
@@ -547,23 +630,6 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
             </div>
 
             <form onSubmit={saveEntry} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <label className="block">
-                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Section</span>
-                <select
-                  value={entryForm.category}
-                  onChange={(event) =>
-                    setEntryForm((currentForm) => ({
-                      ...currentForm,
-                      category: event.target.value as CalendarEntry['category'],
-                    }))
-                  }
-                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-                >
-                  <option>General Information</option>
-                  <option>Trooper Daily</option>
-                </select>
-              </label>
-
               <label className="block">
                 <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Date</span>
                 <input
@@ -644,53 +710,79 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
                 </div>
               </div>
 
-              {entryForm.category === 'Trooper Daily' && (
-                <div className="md:col-span-2">
-                  <div className="mb-4 rounded border border-accent/30 bg-accent/5 p-4 text-sm text-gray-700 dark:text-gray-300">
-                    Trooper Daily activity is saved with this calendar date and remains separate for your account.
+              <div className="md:col-span-2">
+                <div className={`mb-4 grid grid-cols-1 gap-3 rounded-lg border p-4 md:grid-cols-4 ${
+                  hasHourMismatch ? 'border-danger/40 bg-red-50 dark:bg-red-950/30' : 'border-accent/30 bg-accent/5'
+                }`}>
+                  <div>
+                    <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Reported</p>
+                    <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{formatHours(reportedDutyHours || 0)} hrs</p>
                   </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Shift Time</p>
+                    <p className="mt-1 text-2xl font-bold text-accent">{formatHours(calculatedShiftHours)} hrs</p>
+                    <p className="text-xs font-semibold text-gray-500">{getDifferenceLabel(reportedDutyHours, calculatedShiftHours)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Attendance</p>
+                    <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{formatHours(attendanceHours)} hrs</p>
+                    <p className="text-xs font-semibold text-gray-500">{getDifferenceLabel(reportedDutyHours, attendanceHours)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Duty Activity</p>
+                    <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{formatHours(dutyActivityHours)} hrs</p>
+                    <p className="text-xs font-semibold text-gray-500">{getDifferenceLabel(reportedDutyHours, dutyActivityHours)}</p>
+                  </div>
+                  {hasHourMismatch && (
+                    <p className="text-sm font-semibold text-danger md:col-span-4">
+                      Hours do not match the reported duty hours. Review shift times, attendance hours, and duty activity hours before submitting.
+                    </p>
+                  )}
+                </div>
 
-                  <div className="space-y-4">
-                    {trooperDailySections.map((section) => (
-                      <section key={section.title} className="overflow-hidden rounded border border-gray-200 dark:border-gray-800">
-                        <div className="bg-primary-500 px-4 py-3 text-center text-base font-bold text-white">
-                          {section.title}
-                        </div>
-                        <div className="grid grid-cols-1 gap-x-5 gap-y-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
-                          {section.fields.map(([key, label]) => (
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                  {trooperDailySections.map((section) => (
+                    <section key={section.title} className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950">
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">{section.title}</h3>
+                        <span className="h-1.5 w-10 rounded-full bg-accent" />
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {section.fields.map(([key, label]) => {
+                          const isTimeField = timeDetailFields.has(key);
+                          return (
                             <label key={key} className="block">
-                              <span className="mb-1 block text-center text-sm font-semibold text-gray-700 dark:text-gray-300">{label}</span>
+                              <span className="mb-1 block text-xs font-bold uppercase text-gray-500 dark:text-gray-400">{label}</span>
                               <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                inputMode="decimal"
+                                type={isTimeField ? 'time' : 'number'}
+                                min={isTimeField ? undefined : '0'}
+                                step={isTimeField ? undefined : '0.01'}
+                                inputMode={isTimeField ? undefined : 'decimal'}
                                 value={entryForm.details?.[key] || ''}
                                 onChange={(event) => updateDailyDetail(key, event.target.value)}
-                                className="w-full rounded-full border border-gray-300 bg-white px-3 py-1.5 text-center text-sm dark:border-gray-700 dark:bg-gray-950"
+                                className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
                               />
                             </label>
-                          ))}
-                        </div>
-                      </section>
-                    ))}
-
-                    <section className="overflow-hidden rounded border border-gray-200 dark:border-gray-800">
-                      <div className="bg-primary-500 px-4 py-3 text-center text-base font-bold text-white">
-                        Narrative
-                      </div>
-                      <div className="p-4">
-                        <textarea
-                          value={entryForm.details?.narrative || ''}
-                          onChange={(event) => updateDailyDetail('narrative', event.target.value)}
-                          placeholder="Type a narrative here"
-                          className="min-h-56 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-                        />
+                          );
+                        })}
                       </div>
                     </section>
-                  </div>
+                  ))}
+
+                  <section className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950 xl:col-span-2">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Narrative</h3>
+                      <span className="h-1.5 w-10 rounded-full bg-accent" />
+                    </div>
+                    <textarea
+                      value={entryForm.details?.narrative || ''}
+                      onChange={(event) => updateDailyDetail('narrative', event.target.value)}
+                      placeholder="Type a narrative here"
+                      className="min-h-40 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                    />
+                  </section>
                 </div>
-              )}
+              </div>
 
               <div className="md:col-span-2">
                 <button type="submit" className="btn-primary">
