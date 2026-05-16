@@ -19,6 +19,7 @@ const permissionOptions = [
   { key: 'roles:manage', label: 'Manage roles' },
   { key: 'messages:send', label: 'Send messages' },
   { key: 'dashboard:manage', label: 'Manage dashboard posts' },
+  { key: 'bugs:manage', label: 'Manage bug tracker' },
 ];
 
 function PermissionsPage({

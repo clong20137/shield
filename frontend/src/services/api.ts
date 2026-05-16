@@ -237,6 +237,24 @@ export interface DashboardPost {
   updatedAt: string;
 }
 
+export type BugReportStatus = 'New' | 'Pending' | 'Fixed' | 'Closed';
+export type BugReportPriority = 'Low' | 'Normal' | 'High' | 'Critical';
+
+export interface BugReport {
+  id: string;
+  reporterId: string | null;
+  reporterName: string | null;
+  reporterEmail: string | null;
+  title: string;
+  description: string;
+  location: string;
+  priority: BugReportPriority;
+  status: BugReportStatus;
+  adminNotes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const authService = {
   register: (email: string, password: string, displayName: string) =>
     api.post<AuthResponse>('/auth/register', { email, password, displayName }),
@@ -398,6 +416,17 @@ export const dashboardPostService = {
 
   delete: (id: string, requesterId: string) =>
     api.delete(`/dashboard-posts/${id}`, { data: { requesterId } }),
+};
+
+export const bugReportService = {
+  create: (report: Pick<BugReport, 'title' | 'description' | 'location' | 'priority'>) =>
+    api.post<BugReport>('/bugs', report),
+
+  getAll: () =>
+    api.get<BugReport[]>('/bugs'),
+
+  updateStatus: (id: string, status: BugReportStatus, adminNotes: string) =>
+    api.put<BugReport>(`/bugs/${id}/status`, { status, adminNotes }),
 };
 
 export default api;

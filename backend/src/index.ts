@@ -12,6 +12,7 @@ import deviceRoutes from './routes/deviceRoutes';
 import messageRoutes from './routes/messageRoutes';
 import auditRoutes from './routes/auditRoutes';
 import dashboardPostRoutes from './routes/dashboardPostRoutes';
+import bugReportRoutes from './routes/bugReportRoutes';
 
 dotenv.config();
 
@@ -33,6 +34,7 @@ app.use('/api/devices', deviceRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/dashboard-posts', dashboardPostRoutes);
+app.use('/api/bugs', bugReportRoutes);
 
 app.use((error: Error, req: Request, res: Response, next: express.NextFunction) => {
   if (error instanceof multer.MulterError) {

@@ -180,7 +180,7 @@ export async function initializeDatabase() {
   await pool.query(`
     INSERT IGNORE INTO roles (\`id\`, \`name\`, \`permissions\`)
     VALUES
-      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","devices:manage","calendar:manage","audit:view","roles:manage","messages:send","dashboard:manage"]'),
+      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","devices:manage","calendar:manage","audit:view","roles:manage","messages:send","dashboard:manage","bugs:manage"]'),
       ('role-user', 'user', '["users:view","calendar:manage","messages:send"]')
   `);
 
@@ -255,6 +255,25 @@ export async function initializeDatabase() {
   `);
   await ensureColumn('calendar_entries', 'ownerAccountId', '`ownerAccountId` VARCHAR(36)');
   await ensureColumn('calendar_entries', 'details', '`details` JSON');
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bug_reports (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`reporterId\` VARCHAR(36),
+      \`reporterName\` VARCHAR(150),
+      \`reporterEmail\` VARCHAR(255),
+      \`title\` VARCHAR(200) NOT NULL,
+      \`description\` TEXT NOT NULL,
+      \`location\` VARCHAR(200),
+      \`priority\` VARCHAR(30) NOT NULL DEFAULT 'Normal',
+      \`status\` VARCHAR(30) NOT NULL DEFAULT 'New',
+      \`adminNotes\` TEXT,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX \`idx_bug_reports_status\` (\`status\`),
+      INDEX \`idx_bug_reports_created\` (\`createdAt\`)
+    )
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS devices (

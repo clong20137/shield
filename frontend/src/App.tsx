@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { BarChart3, Bell, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Search, Settings, Shield, SlidersHorizontal, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
+import { BarChart3, Bell, Bug, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Search, Settings, Shield, SlidersHorizontal, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -12,7 +12,7 @@ import CreateUserPage from './pages/CreateUserPage';
 import AuditLogPage from './pages/AuditLogPage';
 import CalendarPage from './pages/CalendarPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
-import { AuthAccount, authService, clearAuthToken, getMessageEventsUrl, messageService, setAuthToken, userService, User } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, clearAuthToken, getMessageEventsUrl, messageService, setAuthToken, userService, User } from './services/api';
 
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
@@ -828,6 +828,148 @@ function getModalWindowClass(isClosing: boolean, className: string) {
   return `${isClosing ? 'modal-window-exit' : 'modal-window'} ${className}`;
 }
 
+function ReportBugModal({
+  onClose,
+  onToast,
+  onSubmitted,
+}: {
+  onClose: () => void;
+  onToast: (type: ToastType, message: string) => void;
+  onSubmitted: () => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [location, setLocation] = useState('');
+  const [priority, setPriority] = useState<BugReportPriority>('Normal');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const submitBug = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!title.trim() || !description.trim()) {
+      onToast('error', 'Bug title and description are required.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await bugReportService.create({ title, description, location, priority });
+      onToast('success', 'Bug report submitted.');
+      onSubmitted();
+      onClose();
+    } catch (err) {
+      console.error(err);
+      onToast('error', getErrorMessage(err, 'Failed to submit bug report.'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submitBug} className="space-y-4">
+      <label className="block">
+        <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Title</span>
+        <input value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Where did it happen?</span>
+        <input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Messages, Calendar, Devices, etc." className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Priority</span>
+        <select value={priority} onChange={(event) => setPriority(event.target.value as BugReportPriority)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+          {['Low', 'Normal', 'High', 'Critical'].map((item) => <option key={item}>{item}</option>)}
+        </select>
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">What happened?</span>
+        <textarea value={description} onChange={(event) => setDescription(event.target.value)} className="min-h-36 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+      </label>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+        <button type="submit" className="btn-primary" disabled={isSubmitting}>{isSubmitting ? 'Submitting...' : 'Submit Bug'}</button>
+      </div>
+    </form>
+  );
+}
+
+function BugTrackerModal({
+  reports,
+  onStatusChange,
+}: {
+  reports: BugReport[];
+  onStatusChange: (report: BugReport, status: BugReportStatus, adminNotes: string) => void;
+}) {
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(reports[0]?.id || null);
+  const selectedReport = reports.find((report) => report.id === selectedReportId) || reports[0] || null;
+  const [status, setStatus] = useState<BugReportStatus>(selectedReport?.status || 'New');
+  const [adminNotes, setAdminNotes] = useState(selectedReport?.adminNotes || '');
+
+  useEffect(() => {
+    if (!selectedReport) return;
+    setStatus(selectedReport.status);
+    setAdminNotes(selectedReport.adminNotes || '');
+  }, [selectedReport?.id]);
+
+  return (
+    <div className="grid min-h-[520px] grid-cols-1 gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
+      <section className="min-h-0 overflow-y-auto rounded border border-gray-200 dark:border-gray-800">
+        {reports.length === 0 ? (
+          <div className="empty-state">No bug reports found.</div>
+        ) : (
+          reports.map((report) => (
+            <button
+              key={report.id}
+              type="button"
+              onClick={() => setSelectedReportId(report.id)}
+              className={`block w-full border-b border-gray-200 px-4 py-3 text-left last:border-b-0 dark:border-gray-800 ${selectedReport?.id === report.id ? 'bg-accent/10' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <p className="line-clamp-1 font-bold text-gray-900 dark:text-gray-100">{report.title}</p>
+                <span className="shrink-0 rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-600 dark:bg-gray-800 dark:text-gray-300">{report.status}</span>
+              </div>
+              <p className="mt-1 line-clamp-1 text-sm text-gray-500 dark:text-gray-400">{report.location || 'No location'} - {report.priority}</p>
+              <p className="mt-1 text-xs text-gray-400">{new Date(report.createdAt).toLocaleString()}</p>
+            </button>
+          ))
+        )}
+      </section>
+      <section className="rounded border border-gray-200 p-4 dark:border-gray-800">
+        {!selectedReport ? (
+          <div className="empty-state">Select a bug report.</div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">{selectedReport.title}</h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Reported by {selectedReport.reporterName || selectedReport.reporterEmail || 'Unknown'} on {new Date(selectedReport.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <span className="rounded bg-accent/10 px-3 py-1 text-sm font-bold text-accent">{selectedReport.priority}</span>
+              </div>
+              <p className="mt-3 rounded bg-gray-50 p-3 text-sm leading-6 text-gray-700 dark:bg-gray-950 dark:text-gray-300">{selectedReport.description}</p>
+            </div>
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Status</span>
+              <select value={status} onChange={(event) => setStatus(event.target.value as BugReportStatus)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                {['New', 'Pending', 'Fixed', 'Closed'].map((item) => <option key={item}>{item}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Admin notes</span>
+              <textarea value={adminNotes} onChange={(event) => setAdminNotes(event.target.value)} className="min-h-32 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+            </label>
+            <button type="button" onClick={() => onStatusChange(selectedReport, status, adminNotes)} className="btn-primary">
+              Save Bug Status
+            </button>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 interface OnboardingStep {
   target: string;
   eyebrow: string;
@@ -1027,9 +1169,12 @@ function App() {
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
+  const [isReportBugOpen, setIsReportBugOpen] = useState(false);
+  const [isBugTrackerOpen, setIsBugTrackerOpen] = useState(false);
   const [isFirstLoginGuideOpen, setIsFirstLoginGuideOpen] = useState(false);
-  const [closingModal, setClosingModal] = useState<'messages' | 'calendar' | 'profile' | 'preferences' | 'createUser' | null>(null);
+  const [closingModal, setClosingModal] = useState<'messages' | 'calendar' | 'profile' | 'preferences' | 'createUser' | 'reportBug' | 'bugTracker' | null>(null);
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
+  const [bugReports, setBugReports] = useState<BugReport[]>([]);
   const previousMessageUnreadCount = useRef<number | null>(null);
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
@@ -1215,8 +1360,30 @@ function App() {
   };
 
   const isAdministrator = currentUser?.role === 'administrator';
+  const openBugCount = bugReports.filter((report) => report.status === 'New' || report.status === 'Pending').length;
 
-  const closeModal = (modal: 'messages' | 'calendar' | 'profile' | 'preferences' | 'createUser') => {
+  const loadBugReports = async () => {
+    if (!isAdministrator) return;
+    try {
+      const response = await bugReportService.getAll();
+      setBugReports(response.data);
+    } catch (err) {
+      console.error('Failed to load bug reports:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!isAdministrator) {
+      setBugReports([]);
+      return;
+    }
+
+    loadBugReports();
+    const interval = window.setInterval(loadBugReports, 30000);
+    return () => window.clearInterval(interval);
+  }, [isAdministrator]);
+
+  const closeModal = (modal: 'messages' | 'calendar' | 'profile' | 'preferences' | 'createUser' | 'reportBug' | 'bugTracker') => {
     setClosingModal(modal);
     window.setTimeout(() => {
       if (modal === 'messages') setIsMessagesModalOpen(false);
@@ -1224,6 +1391,8 @@ function App() {
       if (modal === 'profile') setIsProfileModalOpen(false);
       if (modal === 'preferences') setIsPreferencesOpen(false);
       if (modal === 'createUser') setIsCreateUserModalOpen(false);
+      if (modal === 'reportBug') setIsReportBugOpen(false);
+      if (modal === 'bugTracker') setIsBugTrackerOpen(false);
       setClosingModal(null);
     }, MODAL_CLOSE_MS);
   };
@@ -1280,6 +1449,22 @@ function App() {
     }
   };
 
+  const openBugTrackerFromNotification = () => {
+    setIsNotificationsOpen(false);
+    setIsBugTrackerOpen(true);
+  };
+
+  const updateBugStatus = async (report: BugReport, status: BugReportStatus, adminNotes: string) => {
+    try {
+      const response = await bugReportService.updateStatus(report.id, status, adminNotes);
+      setBugReports((reports) => reports.map((item) => (item.id === report.id ? response.data : item)));
+      showToast('success', 'Bug report updated.');
+    } catch (err) {
+      console.error(err);
+      showToast('error', getErrorMessage(err, 'Failed to update bug report.'));
+    }
+  };
+
   const finishFirstLoginGuide = async () => {
     if (!currentUser) {
       setIsFirstLoginGuideOpen(false);
@@ -1326,6 +1511,16 @@ function App() {
         return;
       }
 
+      if (isBugTrackerOpen) {
+        closeModal('bugTracker');
+        return;
+      }
+
+      if (isReportBugOpen) {
+        closeModal('reportBug');
+        return;
+      }
+
       if (isCreateUserModalOpen) {
         closeModal('createUser');
         return;
@@ -1349,7 +1544,7 @@ function App() {
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isAccountMenuOpen, isCalendarModalOpen, isCreateUserModalOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isPreferencesOpen, isProfileModalOpen]);
+  }, [isAccountMenuOpen, isBugTrackerOpen, isCalendarModalOpen, isCreateUserModalOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isPreferencesOpen, isProfileModalOpen, isReportBugOpen]);
 
   return (
     <Router>
@@ -1463,9 +1658,9 @@ function App() {
                     aria-label="Open notifications"
                   >
                     <Bell size={18} />
-                    {notifications.length > 0 && (
+                    {(notifications.length + (isAdministrator ? openBugCount : 0)) > 0 && (
                       <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
-                        {notifications.length > 9 ? '9+' : notifications.length}
+                        {notifications.length + (isAdministrator ? openBugCount : 0) > 9 ? '9+' : notifications.length + (isAdministrator ? openBugCount : 0)}
                       </span>
                     )}
                   </button>
@@ -1483,17 +1678,29 @@ function App() {
                         </button>
                       </div>
                       <div className="max-h-96 overflow-y-auto p-2">
-                        {notifications.length === 0 ? (
+                        {notifications.length === 0 && !(isAdministrator && openBugCount > 0) ? (
                           <div className="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                             No notifications yet
                           </div>
                         ) : (
-                          notifications.map((notification) => (
-                            <div key={notification.id} className="rounded px-3 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800">
-                              <p className="font-semibold text-gray-800 dark:text-gray-100">{notification.message}</p>
-                              <p className="mt-1 text-xs uppercase text-gray-400">{notification.type}</p>
-                            </div>
-                          ))
+                          <>
+                            {isAdministrator && openBugCount > 0 && (
+                              <button
+                                type="button"
+                                onClick={openBugTrackerFromNotification}
+                                className="mb-2 block w-full rounded border border-accent/30 bg-accent/10 px-3 py-3 text-left text-sm hover:bg-accent/15"
+                              >
+                                <p className="font-bold text-primary-500 dark:text-blue-100">{openBugCount} bug report{openBugCount === 1 ? '' : 's'} need review</p>
+                                <p className="mt-1 text-xs uppercase text-accent">Open Bug Tracker</p>
+                              </button>
+                            )}
+                            {notifications.map((notification) => (
+                              <div key={notification.id} className="rounded px-3 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800">
+                                <p className="font-semibold text-gray-800 dark:text-gray-100">{notification.message}</p>
+                                <p className="mt-1 text-xs uppercase text-gray-400">{notification.type}</p>
+                              </div>
+                            ))}
+                          </>
                         )}
                       </div>
                     </div>
@@ -1520,6 +1727,22 @@ function App() {
                 >
                   <Settings size={18} />
                 </button>
+                {isAdministrator && (
+                  <button
+                    type="button"
+                    onClick={() => setIsBugTrackerOpen(true)}
+                    className="relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                    aria-label="Open bug tracker"
+                    title="Bug Tracker"
+                  >
+                    <Bug size={18} />
+                    {openBugCount > 0 && (
+                      <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
+                        {openBugCount > 9 ? '9+' : openBugCount}
+                      </span>
+                    )}
+                  </button>
+                )}
 
                 {isAccountMenuOpen && (
                   <div className="absolute right-0 top-12 z-40 w-64 rounded border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
@@ -1546,6 +1769,16 @@ function App() {
                       className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
                     >
                       <SlidersHorizontal size={16} /> Preferences
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsReportBugOpen(true);
+                        setIsAccountMenuOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                    >
+                      <Bug size={16} /> Report a Bug
                     </button>
                     <button
                       type="button"
@@ -1749,6 +1982,54 @@ function App() {
                       }
                     />
                   </label>
+                </div>
+              </div>
+            </div>
+          )}
+          {isReportBugOpen && (
+            <div className={getModalBackdropClass(closingModal === 'reportBug')}>
+              <div className={getModalWindowClass(closingModal === 'reportBug', 'w-full max-w-2xl rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900')}>
+                <div className="mb-5 flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Report a Bug</h2>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Tell admins what broke and where it happened.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => closeModal('reportBug')}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                    aria-label="Close report bug"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <ReportBugModal
+                  onClose={() => closeModal('reportBug')}
+                  onToast={showToast}
+                  onSubmitted={loadBugReports}
+                />
+              </div>
+            </div>
+          )}
+          {isBugTrackerOpen && isAdministrator && (
+            <div className={getModalBackdropClass(closingModal === 'bugTracker', 'bg-black/60')}>
+              <div className={getModalWindowClass(closingModal === 'bugTracker', 'flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900')}>
+                <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Bug Tracker</h2>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Review submitted bugs and update their status.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => closeModal('bugTracker')}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                    aria-label="Close bug tracker"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  <BugTrackerModal reports={bugReports} onStatusChange={updateBugStatus} />
                 </div>
               </div>
             </div>
