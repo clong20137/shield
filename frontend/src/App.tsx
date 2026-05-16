@@ -638,8 +638,8 @@ function QuickLaunchTray({
   };
 
   return (
-    <section data-onboarding-target="quick-launch" className={`fixed bottom-5 right-6 z-30 transition-all duration-200 ${isSidebarCollapsed ? 'left-24' : 'left-[19.5rem]'}`}>
-      <div className="mx-auto w-fit max-w-full rounded-2xl border border-gray-200 bg-white/85 p-3 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/80">
+    <section className={`fixed bottom-5 right-6 z-30 transition-all duration-200 ${isSidebarCollapsed ? 'left-24' : 'left-[19.5rem]'}`}>
+      <div data-onboarding-target="quick-launch" className="mx-auto w-fit max-w-full rounded-2xl border border-gray-200 bg-white/85 p-3 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/80">
         <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
         {slots.map((slot, index) => {
           const app = typeof slot === 'string' ? availableApps.find((item) => item.id === slot) || null : null;
@@ -933,12 +933,18 @@ function FirstLoginGuide({
       }
     : null;
   const tooltipWidth = 360;
+  const tooltipHeightEstimate = 280;
+  const shouldPlaceTooltipBelow = step.target === 'header-actions';
   const tooltipLeft = safeRect
-    ? Math.min(Math.max(16, safeRect.left + safeRect.width + 18), window.innerWidth - tooltipWidth - 16)
+    ? shouldPlaceTooltipBelow
+      ? Math.min(Math.max(16, safeRect.left + safeRect.width / 2 - tooltipWidth / 2), window.innerWidth - tooltipWidth - 16)
+      : Math.min(Math.max(16, safeRect.left + safeRect.width + 18), window.innerWidth - tooltipWidth - 16)
     : Math.max(16, (window.innerWidth - tooltipWidth) / 2);
   const tooltipTop = safeRect
-    ? Math.min(Math.max(16, safeRect.top), window.innerHeight - 320)
-    : Math.max(16, (window.innerHeight - 320) / 2);
+    ? shouldPlaceTooltipBelow
+      ? Math.min(Math.max(16, safeRect.top + safeRect.height + 18), window.innerHeight - tooltipHeightEstimate - 16)
+      : Math.min(Math.max(16, safeRect.top), window.innerHeight - tooltipHeightEstimate - 16)
+    : Math.max(16, (window.innerHeight - tooltipHeightEstimate) / 2);
 
   const isLastStep = stepIndex === onboardingSteps.length - 1;
 
