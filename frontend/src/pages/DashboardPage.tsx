@@ -733,8 +733,14 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const isAdministrator = currentUser?.role === 'administrator';
 
   useEffect(() => {
+    if (!isAdministrator) {
+      setLoading(false);
+      return;
+    }
+
     loadDashboard();
 
     const refreshInterval = window.setInterval(() => {
@@ -742,7 +748,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
     }, 30000);
 
     return () => window.clearInterval(refreshInterval);
-  }, []);
+  }, [isAdministrator]);
 
   const loadDashboard = async (showLoading = true) => {
     if (showLoading) {
@@ -774,6 +780,17 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
 
   if (loading) {
     return <div className="loading">Loading dashboard...</div>;
+  }
+
+  if (!isAdministrator) {
+    return (
+      <div>
+        <div className="mb-8">
+          <h1>Dashboard</h1>
+        </div>
+        <DashboardNews currentUser={currentUser} />
+      </div>
+    );
   }
 
   const statItems = stats

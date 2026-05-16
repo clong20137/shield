@@ -276,6 +276,35 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_notifications (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`userId\` VARCHAR(36) NOT NULL,
+      \`type\` VARCHAR(50) NOT NULL,
+      \`title\` VARCHAR(200) NOT NULL,
+      \`message\` TEXT NOT NULL,
+      \`entityType\` VARCHAR(100),
+      \`entityId\` VARCHAR(100),
+      \`isRead\` BOOLEAN DEFAULT 0,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX \`idx_user_notifications_user\` (\`userId\`),
+      INDEX \`idx_user_notifications_read\` (\`isRead\`)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS system_settings (
+      \`settingKey\` VARCHAR(100) PRIMARY KEY,
+      \`settingValue\` TEXT,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+
+  await pool.query(`
+    INSERT IGNORE INTO system_settings (\`settingKey\`, \`settingValue\`)
+    VALUES ('mileageMilestone', '1000')
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS devices (
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`type\` VARCHAR(50) NOT NULL,

@@ -12,7 +12,7 @@ import CreateUserPage from './pages/CreateUserPage';
 import AuditLogPage from './pages/AuditLogPage';
 import CalendarPage from './pages/CalendarPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, clearAuthToken, getMessageEventsUrl, messageService, setAuthToken, userService, User } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, clearAuthToken, getMessageEventsUrl, messageService, notificationService, setAuthToken, UserNotification, userService, User } from './services/api';
 
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
@@ -1161,6 +1161,7 @@ function App() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [notifications, setNotifications] = useState<ToastMessage[]>([]);
+  const [userNotifications, setUserNotifications] = useState<UserNotification[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -1230,6 +1231,26 @@ function App() {
       receiveMessages: currentUser.receivesMessages !== false,
     }));
   }, [currentUser?.id, currentUser?.receivesMessages]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setUserNotifications([]);
+      return;
+    }
+
+    const loadUserNotifications = async () => {
+      try {
+        const response = await notificationService.getAll();
+        setUserNotifications(response.data);
+      } catch (err) {
+        console.error('Failed to load notifications:', err);
+      }
+    };
+
+    loadUserNotifications();
+    const interval = window.setInterval(loadUserNotifications, 30000);
+    return () => window.clearInterval(interval);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (currentUser && !currentUser.hasCompletedOnboarding) {
@@ -1361,6 +1382,7 @@ function App() {
 
   const isAdministrator = currentUser?.role === 'administrator';
   const openBugCount = bugReports.filter((report) => report.status === 'New' || report.status === 'Pending').length;
+  const unreadNotificationCount = userNotifications.filter((notification) => !notification.isRead).length;
 
   const loadBugReports = async () => {
     if (!isAdministrator) return;
@@ -1452,6 +1474,15 @@ function App() {
   const openBugTrackerFromNotification = () => {
     setIsNotificationsOpen(false);
     setIsBugTrackerOpen(true);
+  };
+
+  const markNotificationRead = async (notification: UserNotification) => {
+    setUserNotifications((items) => items.map((item) => (item.id === notification.id ? { ...item, isRead: true } : item)));
+    try {
+      await notificationService.markRead(notification.id);
+    } catch (err) {
+      console.error('Failed to mark notification read:', err);
+    }
   };
 
   const updateBugStatus = async (report: BugReport, status: BugReportStatus, adminNotes: string) => {
@@ -1658,9 +1689,9 @@ function App() {
                     aria-label="Open notifications"
                   >
                     <Bell size={18} />
-                    {(notifications.length + (isAdministrator ? openBugCount : 0)) > 0 && (
+                    {(notifications.length + unreadNotificationCount + (isAdministrator ? openBugCount : 0)) > 0 && (
                       <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
-                        {notifications.length + (isAdministrator ? openBugCount : 0) > 9 ? '9+' : notifications.length + (isAdministrator ? openBugCount : 0)}
+                        {notifications.length + unreadNotificationCount + (isAdministrator ? openBugCount : 0) > 9 ? '9+' : notifications.length + unreadNotificationCount + (isAdministrator ? openBugCount : 0)}
                       </span>
                     )}
                   </button>
@@ -1678,7 +1709,7 @@ function App() {
                         </button>
                       </div>
                       <div className="max-h-96 overflow-y-auto p-2">
-                        {notifications.length === 0 && !(isAdministrator && openBugCount > 0) ? (
+                        {notifications.length === 0 && userNotifications.length === 0 && !(isAdministrator && openBugCount > 0) ? (
                           <div className="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                             No notifications yet
                           </div>
@@ -1694,6 +1725,18 @@ function App() {
                                 <p className="mt-1 text-xs uppercase text-accent">Open Bug Tracker</p>
                               </button>
                             )}
+                            {userNotifications.map((notification) => (
+                              <button
+                                key={notification.id}
+                                type="button"
+                                onClick={() => markNotificationRead(notification)}
+                                className={`mb-1 block w-full rounded px-3 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${notification.isRead ? '' : 'bg-accent/10'}`}
+                              >
+                                <p className="font-semibold text-gray-800 dark:text-gray-100">{notification.title}</p>
+                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{notification.message}</p>
+                                <p className="mt-1 text-xs uppercase text-gray-400">{new Date(notification.createdAt).toLocaleString()}</p>
+                              </button>
+                            ))}
                             {notifications.map((notification) => (
                               <div key={notification.id} className="rounded px-3 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800">
                                 <p className="font-semibold text-gray-800 dark:text-gray-100">{notification.message}</p>

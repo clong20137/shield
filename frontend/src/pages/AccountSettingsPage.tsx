@@ -1,7 +1,7 @@
 import QRCode from 'qrcode';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { Camera, KeyRound, QrCode, ShieldCheck, UserCircle } from 'lucide-react';
-import { AuthAccount, TwoFactorSetupResponse, authService, userService } from '../services/api';
+import { AuthAccount, MileageSummary, TwoFactorSetupResponse, authService, mileageService, userService } from '../services/api';
 
 interface AccountSettingsPageProps {
   account: AuthAccount;
@@ -37,6 +37,9 @@ export function AccountSettingsPage({
   const [isPasswordSaving, setIsPasswordSaving] = useState(false);
   const [isTwoFactorSaving, setIsTwoFactorSaving] = useState(false);
   const [isProfilePictureSaving, setIsProfilePictureSaving] = useState(false);
+  const [mileageSummary, setMileageSummary] = useState<MileageSummary | null>(null);
+  const [milestoneInput, setMilestoneInput] = useState('');
+  const [isMilestoneSaving, setIsMilestoneSaving] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -67,6 +70,17 @@ export function AccountSettingsPage({
       isMounted = false;
     };
   }, [onToast, twoFactorSetup]);
+
+  useEffect(() => {
+    mileageService.getSummary()
+      .then((response) => {
+        setMileageSummary(response.data);
+        setMilestoneInput(String(response.data.milestone));
+      })
+      .catch((error) => {
+        console.error('Failed to load mileage summary:', error);
+      });
+  }, []);
 
   const handlePasswordChange = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -160,6 +174,31 @@ export function AccountSettingsPage({
     }
   };
 
+  const saveMileageMilestone = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const milestone = Number(milestoneInput);
+
+    if (!Number.isFinite(milestone) || milestone <= 0) {
+      onToast('error', 'Mileage milestone must be greater than zero.');
+      return;
+    }
+
+    setIsMilestoneSaving(true);
+    try {
+      const response = await mileageService.updateMilestone(milestone);
+      setMileageSummary((summary) => ({ mileage: summary?.mileage || 0, milestone: response.data.milestone }));
+      onToast('success', 'Mileage milestone updated.');
+    } catch (error) {
+      onToast('error', getErrorMessage(error, 'Failed to update mileage milestone.'));
+    } finally {
+      setIsMilestoneSaving(false);
+    }
+  };
+
+  const mileage = mileageSummary?.mileage || 0;
+  const milestone = mileageSummary?.milestone || 1000;
+  const mileagePercent = Math.min((mileage / milestone) * 100, 100);
+
   return (
     <div className="space-y-4">
       <section className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
@@ -218,6 +257,43 @@ export function AccountSettingsPage({
             </span>
           </div>
         </div>
+      </section>
+
+      <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Mileage Progress</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Recorded from Regular Duty Miles in Trooper Daily entries.</p>
+          </div>
+          <span className="rounded bg-accent/10 px-3 py-1 text-sm font-bold text-accent">
+            {mileage.toFixed(1).replace(/\.0$/u, '')} / {milestone.toFixed(0)} miles
+          </span>
+        </div>
+        <div className="h-4 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+          <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${mileagePercent}%` }} />
+        </div>
+        <p className="mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
+          {mileage >= milestone ? 'Milestone reached.' : `${(milestone - mileage).toFixed(1).replace(/\.0$/u, '')} miles remaining.`}
+        </p>
+
+        {account.role === 'administrator' && (
+          <form onSubmit={saveMileageMilestone} className="mt-4 flex flex-wrap items-end gap-3">
+            <label>
+              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Admin mileage milestone</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={milestoneInput}
+                onChange={(event) => setMilestoneInput(event.target.value)}
+                className="w-48 rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+              />
+            </label>
+            <button type="submit" className="btn-primary" disabled={isMilestoneSaving}>
+              {isMilestoneSaving ? 'Saving...' : 'Save Milestone'}
+            </button>
+          </form>
+        )}
       </section>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">

@@ -255,6 +255,23 @@ export interface BugReport {
   updatedAt: string;
 }
 
+export interface UserNotification {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  entityType: string | null;
+  entityId: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface MileageSummary {
+  mileage: number;
+  milestone: number;
+}
+
 export const authService = {
   register: (email: string, password: string, displayName: string) =>
     api.post<AuthResponse>('/auth/register', { email, password, displayName }),
@@ -427,6 +444,22 @@ export const bugReportService = {
 
   updateStatus: (id: string, status: BugReportStatus, adminNotes: string) =>
     api.put<BugReport>(`/bugs/${id}/status`, { status, adminNotes }),
+};
+
+export const notificationService = {
+  getAll: () =>
+    api.get<UserNotification[]>('/notifications'),
+
+  markRead: (id: string) =>
+    api.put(`/notifications/${id}/read`),
+};
+
+export const mileageService = {
+  getSummary: () =>
+    api.get<MileageSummary>('/mileage/summary'),
+
+  updateMilestone: (milestone: number) =>
+    api.put<{ milestone: number }>('/mileage/milestone', { milestone }),
 };
 
 export default api;

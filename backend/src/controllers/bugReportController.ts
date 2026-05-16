@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AuditLogModel } from '../models/AuditLog';
 import { BugReportModel, BugReportPriority, BugReportStatus } from '../models/BugReport';
 import { getSessionAccount } from '../middleware/authSession';
+import { UserNotificationModel } from '../models/UserNotification';
 
 const statuses: BugReportStatus[] = ['New', 'Pending', 'Fixed', 'Closed'];
 const priorities: BugReportPriority[] = ['Low', 'Normal', 'High', 'Critical'];
@@ -73,6 +74,17 @@ export class BugReportController {
       const report = await BugReportModel.updateStatus(req.params.id, status, adminNotes || '');
       if (!report) {
         return res.status(404).json({ error: 'Bug report not found' });
+      }
+
+      if (report.reporterId) {
+        await UserNotificationModel.create({
+          userId: report.reporterId,
+          type: 'bug',
+          title: `Bug report ${status.toLowerCase()}`,
+          message: `"${report.title}" was marked ${status}.${adminNotes ? ` ${adminNotes}` : ''}`,
+          entityType: 'bug_report',
+          entityId: report.id,
+        });
       }
 
       await AuditLogModel.create({
