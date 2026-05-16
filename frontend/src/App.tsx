@@ -827,6 +827,103 @@ function getModalWindowClass(isClosing: boolean, className: string) {
   return `${isClosing ? 'modal-window-exit' : 'modal-window'} ${className}`;
 }
 
+function FirstLoginGuide({
+  account,
+  onFinish,
+  onLater,
+  onOpenProfile,
+  onOpenCalendar,
+  onOpenMessages,
+}: {
+  account: AuthAccount;
+  onFinish: () => void;
+  onLater: () => void;
+  onOpenProfile: () => void;
+  onOpenCalendar: () => void;
+  onOpenMessages: () => void;
+}) {
+  const guideItems = [
+    {
+      title: 'Find people fast',
+      body: 'Use global search to find users by name, email, PE number, badge, district, and other profile details.',
+      icon: Search,
+    },
+    {
+      title: 'Manage your account',
+      body: 'Open account settings to update your picture, change your password, and set up authenticator app 2FA.',
+      icon: Settings,
+    },
+    {
+      title: 'Use your personal tools',
+      body: 'Calendar entries and quick launch apps are tied to your login, so your setup stays separate from other users.',
+      icon: CalendarDays,
+    },
+    {
+      title: 'Stay connected',
+      body: 'Messages, notifications, dashboard updates, and device records keep daily work in one workspace.',
+      icon: Mail,
+    },
+  ];
+
+  return (
+    <div className="modal-backdrop fixed inset-0 z-[90] flex items-center justify-center bg-black/55 p-4">
+      <div className="modal-window w-full max-w-4xl overflow-hidden rounded-lg bg-white shadow-2xl dark:bg-gray-900">
+        <div className="bg-primary-500 px-6 py-5 text-white">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-100">First Login Guide</p>
+              <h2 className="mt-2 text-3xl font-bold">Welcome to SHIELD, {account.displayName || account.email}</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-50">
+                Here are the core areas you will use most. This guide appears on first login and is saved to your account once completed.
+              </p>
+            </div>
+            <div className="hidden h-16 w-16 shrink-0 items-center justify-center rounded bg-white/15 sm:flex">
+              <Shield size={34} />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 p-6 sm:grid-cols-2">
+          {guideItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div key={item.title} className="rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded bg-accent/10 text-accent">
+                  <Icon size={20} />
+                </div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">{item.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">{item.body}</p>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="border-t border-gray-200 px-6 py-4 dark:border-gray-800">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={onOpenProfile} className="rounded border border-gray-300 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+              Open Account Settings
+            </button>
+            <button type="button" onClick={onOpenCalendar} className="rounded border border-gray-300 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+              Open Calendar
+            </button>
+            <button type="button" onClick={onOpenMessages} className="rounded border border-gray-300 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+              Open Messages
+            </button>
+          </div>
+          <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+            <button type="button" onClick={onLater} className="rounded px-4 py-2 text-sm font-bold text-gray-500 hover:text-primary-500 dark:text-gray-400">
+              Remind me later
+            </button>
+            <button type="button" onClick={onFinish} className="btn-primary px-5 py-2">
+              Finish guide
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthAccount | null>(null);
@@ -842,6 +939,7 @@ function App() {
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
+  const [isFirstLoginGuideOpen, setIsFirstLoginGuideOpen] = useState(false);
   const [closingModal, setClosingModal] = useState<'messages' | 'calendar' | 'profile' | 'preferences' | 'createUser' | null>(null);
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const previousMessageUnreadCount = useRef<number | null>(null);
@@ -899,6 +997,12 @@ function App() {
       receiveMessages: currentUser.receivesMessages !== false,
     }));
   }, [currentUser?.id, currentUser?.receivesMessages]);
+
+  useEffect(() => {
+    if (currentUser && !currentUser.hasCompletedOnboarding) {
+      setIsFirstLoginGuideOpen(true);
+    }
+  }, [currentUser?.id, currentUser?.hasCompletedOnboarding]);
 
   const playMessagePing = () => {
     if (!messagePreferences.receiveMessages || !messagePreferences.playMessageSound) {
@@ -1078,9 +1182,49 @@ function App() {
     }
   };
 
+  const finishFirstLoginGuide = async () => {
+    if (!currentUser) {
+      setIsFirstLoginGuideOpen(false);
+      return;
+    }
+
+    setIsFirstLoginGuideOpen(false);
+
+    try {
+      const response = await authService.completeOnboarding(currentUser.id);
+      if (response.data.account) {
+        handleAccountUpdate(response.data.account);
+      }
+      showToast('success', 'First login guide completed.');
+    } catch (err) {
+      console.error(err);
+      showToast('error', 'Failed to save guide completion.');
+    }
+  };
+
+  const openProfileFromGuide = () => {
+    setIsFirstLoginGuideOpen(false);
+    setIsProfileModalOpen(true);
+  };
+
+  const openCalendarFromGuide = () => {
+    setIsFirstLoginGuideOpen(false);
+    setIsCalendarModalOpen(true);
+  };
+
+  const openMessagesFromGuide = () => {
+    setIsFirstLoginGuideOpen(false);
+    setIsMessagesModalOpen(true);
+  };
+
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') {
+        return;
+      }
+
+      if (isFirstLoginGuideOpen) {
+        setIsFirstLoginGuideOpen(false);
         return;
       }
 
@@ -1122,7 +1266,7 @@ function App() {
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isAccountMenuOpen, isCalendarModalOpen, isCreateUserModalOpen, isMessagesModalOpen, isNotificationsOpen, isPreferencesOpen, isProfileModalOpen]);
+  }, [isAccountMenuOpen, isCalendarModalOpen, isCreateUserModalOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isPreferencesOpen, isProfileModalOpen]);
 
   return (
     <Router>
@@ -1524,6 +1668,16 @@ function App() {
                 </div>
               </div>
             </div>
+          )}
+          {isFirstLoginGuideOpen && currentUser && (
+            <FirstLoginGuide
+              account={currentUser}
+              onFinish={finishFirstLoginGuide}
+              onLater={() => setIsFirstLoginGuideOpen(false)}
+              onOpenProfile={openProfileFromGuide}
+              onOpenCalendar={openCalendarFromGuide}
+              onOpenMessages={openMessagesFromGuide}
+            />
           )}
         </div>
       )}

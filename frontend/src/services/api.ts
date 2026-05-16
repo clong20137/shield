@@ -111,6 +111,7 @@ export interface AuthAccount {
   profilePictureUrl: string;
   role: string;
   receivesMessages: boolean;
+  hasCompletedOnboarding: boolean;
   twoFactorEnabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -265,6 +266,9 @@ export const authService = {
 
   updateMessagePreferences: (accountId: string, receiveMessages: boolean) =>
     api.put<AuthResponse>(`/auth/accounts/${accountId}/message-preferences`, { receiveMessages }),
+
+  completeOnboarding: (accountId: string) =>
+    api.put<AuthResponse>(`/auth/accounts/${accountId}/onboarding-complete`),
 };
 
 export const userService = {

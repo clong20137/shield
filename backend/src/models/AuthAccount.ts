@@ -10,6 +10,7 @@ export interface AuthAccount {
   profilePictureUrl: string;
   role: string;
   receivesMessages: boolean;
+  hasCompletedOnboarding: boolean;
   twoFactorEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -32,6 +33,7 @@ interface AuthAccountRow extends RowDataPacket {
   profilePictureUrl: string | null;
   role: string;
   receivesMessages: boolean | number;
+  hasCompletedOnboarding: boolean | number;
   passwordHash: string | null;
   twoFactorSecret: string | null;
   twoFactorEnabled: boolean | number;
@@ -151,6 +153,7 @@ function toPublicAccount(account: AuthAccountRow): AuthAccount {
     profilePictureUrl: account.profilePictureUrl || '',
     role: account.role || 'user',
     receivesMessages: account.receivesMessages !== false && account.receivesMessages !== 0,
+    hasCompletedOnboarding: Boolean(account.hasCompletedOnboarding),
     twoFactorEnabled: Boolean(account.twoFactorEnabled),
     createdAt: account.createdAt,
     updatedAt: account.updatedAt,
@@ -220,6 +223,7 @@ export class AuthAccountModel {
           profilePictureUrl: existingUser.profilePictureUrl || '',
           role,
           receivesMessages: existingUser.receivesMessages !== false && existingUser.receivesMessages !== 0,
+          hasCompletedOnboarding: Boolean(existingUser.hasCompletedOnboarding),
           twoFactorEnabled: Boolean(existingUser.twoFactorEnabled),
           createdAt: existingUser.createdAt,
           updatedAt: now,
@@ -243,6 +247,7 @@ export class AuthAccountModel {
         profilePictureUrl: '',
         role,
         receivesMessages: true,
+        hasCompletedOnboarding: false,
         twoFactorEnabled: false,
         createdAt: now,
         updatedAt: now,
@@ -528,6 +533,26 @@ export class AuthAccountModel {
       await conn.query<ResultSetHeader>(
         'UPDATE users SET `receivesMessages` = ?, `updatedAt` = ? WHERE `id` = ? AND `passwordHash` IS NOT NULL',
         [receiveMessages ? 1 : 0, new Date(), accountId]
+      );
+
+      const [rows] = await conn.query<AuthAccountRow[]>(
+        'SELECT * FROM users WHERE `id` = ? AND `passwordHash` IS NOT NULL LIMIT 1',
+        [accountId]
+      );
+      const account = rows[0];
+
+      return account ? toPublicAccount(account) : null;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async completeOnboarding(accountId: string): Promise<AuthAccount | null> {
+    const conn = await pool.getConnection();
+    try {
+      await conn.query<ResultSetHeader>(
+        'UPDATE users SET `hasCompletedOnboarding` = 1, `updatedAt` = ? WHERE `id` = ? AND `passwordHash` IS NOT NULL',
+        [new Date(), accountId]
       );
 
       const [rows] = await conn.query<AuthAccountRow[]>(

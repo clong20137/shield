@@ -45,6 +45,7 @@ export async function initializeDatabase() {
       \`passwordHash\` VARCHAR(255),
       \`role\` VARCHAR(100) NOT NULL DEFAULT 'user',
       \`receivesMessages\` BOOLEAN DEFAULT 1,
+      \`hasCompletedOnboarding\` BOOLEAN DEFAULT 0,
       \`twoFactorSecret\` VARCHAR(64),
       \`twoFactorEnabled\` BOOLEAN DEFAULT 0,
       \`peNumber\` VARCHAR(50) UNIQUE,
@@ -87,6 +88,7 @@ export async function initializeDatabase() {
   await ensureColumn('users', 'role', "`role` VARCHAR(100) NOT NULL DEFAULT 'user'");
   await pool.query("ALTER TABLE `users` MODIFY COLUMN `role` VARCHAR(100) NOT NULL DEFAULT 'user'");
   await ensureColumn('users', 'receivesMessages', '`receivesMessages` BOOLEAN DEFAULT 1');
+  await ensureColumn('users', 'hasCompletedOnboarding', '`hasCompletedOnboarding` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'twoFactorSecret', '`twoFactorSecret` VARCHAR(64)');
   await ensureColumn('users', 'twoFactorEnabled', '`twoFactorEnabled` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'peopleSoftId', '`peopleSoftId` VARCHAR(50)');

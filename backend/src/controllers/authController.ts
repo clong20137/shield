@@ -309,6 +309,28 @@ export class AuthController {
     }
   }
 
+  static async completeOnboarding(req: Request, res: Response) {
+    try {
+      const { accountId } = req.params;
+      const sessionAccount = await getSessionAccount(req);
+
+      if (!sessionAccount || sessionAccount.id !== accountId) {
+        return res.status(403).json({ error: 'You can only complete your own guide' });
+      }
+
+      const account = await AuthAccountModel.completeOnboarding(accountId);
+
+      if (!account) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+
+      res.json({ account });
+    } catch (error) {
+      console.error('Complete onboarding error:', error);
+      res.status(500).json({ error: 'Failed to complete guide' });
+    }
+  }
+
   static async listRoles(req: Request, res: Response) {
     try {
       const requesterId = typeof req.query.requesterId === 'string' ? req.query.requesterId : undefined;
