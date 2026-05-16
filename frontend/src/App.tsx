@@ -113,6 +113,14 @@ function loadLegacyQuickLaunchSlots(storageKey: string): QuickLaunchSlot[] {
   }
 }
 
+function saveLegacyQuickLaunchSlots(storageKey: string, slots: QuickLaunchSlot[]) {
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(normalizeQuickLaunchSlots(slots)));
+  } catch {
+    // Local storage is only a fallback for quick launch preferences.
+  }
+}
+
 function getErrorMessage(error: unknown, fallback: string): string {
   if (
     typeof error === 'object' &&
@@ -577,6 +585,7 @@ function QuickLaunchTray({
   const [slots, setSlots] = useState<QuickLaunchSlot[]>(getEmptyQuickLaunchSlots);
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
   const [draggingSlot, setDraggingSlot] = useState<number | null>(null);
+  const didDragSlotRef = useRef(false);
   const [externalLabel, setExternalLabel] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
   const availableApps = quickLaunchApps.filter((app) => !app.adminOnly || isAdministrator);
@@ -592,13 +601,17 @@ function QuickLaunchTray({
   const saveQuickLaunchSlots = useCallback(async (nextSlots: QuickLaunchSlot[]) => {
     const normalizedSlots = normalizeQuickLaunchSlots(nextSlots);
     setSlots(normalizedSlots);
+    saveLegacyQuickLaunchSlots(storageKey, normalizedSlots);
 
     try {
-      await quickLaunchService.save(normalizedSlots as ApiQuickLaunchSlot[]);
+      const response = await quickLaunchService.save(normalizedSlots as ApiQuickLaunchSlot[]);
+      const savedSlots = normalizeQuickLaunchSlots(response.data.slots);
+      setSlots(savedSlots);
+      saveLegacyQuickLaunchSlots(storageKey, savedSlots);
     } catch (err) {
       console.error('Failed to save quick launch:', err);
     }
-  }, []);
+  }, [storageKey]);
 
   const loadQuickLaunchFromDatabase = useCallback(async () => {
     if (!accountId) {
@@ -615,12 +628,17 @@ function QuickLaunchTray({
         const legacySlots = loadLegacyQuickLaunchSlots(storageKey);
         if (legacySlots.some(Boolean)) {
           setSlots(legacySlots);
-          await quickLaunchService.save(legacySlots as ApiQuickLaunchSlot[]);
+          try {
+            await quickLaunchService.save(legacySlots as ApiQuickLaunchSlot[]);
+          } catch (saveError) {
+            console.error('Failed to migrate quick launch slots:', saveError);
+          }
           return;
         }
       }
 
       setSlots(databaseSlots);
+      saveLegacyQuickLaunchSlots(storageKey, databaseSlots);
     } catch (err) {
       console.error('Failed to load quick launch:', err);
       setSlots(loadLegacyQuickLaunchSlots(storageKey));
@@ -733,6 +751,7 @@ function QuickLaunchTray({
                   return;
                 }
 
+                didDragSlotRef.current = true;
                 setDraggingSlot(index);
                 event.dataTransfer.effectAllowed = 'move';
                 event.dataTransfer.setData('text/plain', String(index));
@@ -750,11 +769,37 @@ function QuickLaunchTray({
                 }
                 setDraggingSlot(null);
               }}
-              onDragEnd={() => setDraggingSlot(null)}
+              onDragEnd={() => {
+                setDraggingSlot(null);
+                window.setTimeout(() => {
+                  didDragSlotRef.current = false;
+                }, 0);
+              }}
             >
               <button
                 type="button"
-                onClick={() => (slot ? openSlot(slot) : setEditingSlot(index))}
+                draggable={Boolean(slot)}
+                onClick={() => {
+                  if (didDragSlotRef.current) {
+                    return;
+                  }
+                  if (slot) {
+                    openSlot(slot);
+                    return;
+                  }
+                  setEditingSlot(index);
+                }}
+                onDragStart={(event) => {
+                  if (!slot) {
+                    event.preventDefault();
+                    return;
+                  }
+
+                  didDragSlotRef.current = true;
+                  setDraggingSlot(index);
+                  event.dataTransfer.effectAllowed = 'move';
+                  event.dataTransfer.setData('text/plain', String(index));
+                }}
                 className={`flex h-12 w-12 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-[10px] font-bold transition sm:h-16 sm:w-16 ${
                   slot
                     ? `${draggingSlot === index ? 'scale-95 opacity-50' : ''} ${isActive ? 'translate-y-[-3px] border-accent bg-accent/10 text-accent shadow-md' : 'border-gray-200 bg-white text-primary-500 shadow-sm'} cursor-grab active:cursor-grabbing hover:-translate-y-1 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100`
@@ -2144,10 +2189,10 @@ function App() {
           )}
           {isProfileModalOpen && currentUser && (
             <div className={getModalBackdropClass(closingModal === 'profile')}>
-              <div className={getModalWindowClass(closingModal === 'profile', 'flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-5')}>
-                <div className="mb-4 flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
+              <div className={getModalWindowClass(closingModal === 'profile', 'flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:p-4')}>
+                <div className="mb-3 flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Account Settings</h2>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 sm:text-2xl">Account Settings</h2>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage your profile security and sign-in options.</p>
                   </div>
                   <button

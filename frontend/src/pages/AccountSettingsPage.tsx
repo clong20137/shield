@@ -257,8 +257,8 @@ export function AccountSettingsPage({
   const mileagePercent = Math.min((mileage / milestone) * 100, 100);
 
   return (
-    <div className="space-y-4">
-      <section className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
+    <div className="space-y-3 pb-1">
+      <section className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950 sm:p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-4">
             <button
@@ -316,7 +316,7 @@ export function AccountSettingsPage({
         </div>
       </section>
 
-      <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+      <section className="rounded-lg border border-gray-200 p-3 dark:border-gray-800 sm:p-4">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Mileage Progress</h3>
@@ -334,7 +334,7 @@ export function AccountSettingsPage({
         </p>
 
         {account.role === 'administrator' && (
-          <form onSubmit={saveMileageMilestone} className="mt-4 flex flex-wrap items-end gap-3">
+          <form onSubmit={saveMileageMilestone} className="mt-3 flex flex-wrap items-end gap-3">
             <label>
               <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Admin mileage milestone</span>
               <input
@@ -353,8 +353,8 @@ export function AccountSettingsPage({
         )}
       </section>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+        <section className="rounded-lg border border-gray-200 p-3 dark:border-gray-800 sm:p-4">
           <div className="mb-3 flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">
               <KeyRound size={19} />
@@ -405,7 +405,7 @@ export function AccountSettingsPage({
           </form>
         </section>
 
-        <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+        <section className="rounded-lg border border-gray-200 p-3 dark:border-gray-800 sm:p-4">
           <div className="mb-3 flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">
               <ShieldCheck size={19} />
@@ -430,9 +430,9 @@ export function AccountSettingsPage({
           {!account.twoFactorEnabled && twoFactorSetup && (
             <form onSubmit={handleEnableTwoFactor} className="space-y-4">
               <div className="grid grid-cols-1 gap-4 rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
-                <div className="flex items-center justify-center rounded border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                <div className="flex items-center justify-center rounded border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 sm:p-4">
                   {qrCodeDataUrl ? (
-                    <img src={qrCodeDataUrl} alt="Authenticator setup QR code" className="h-56 w-56" />
+                    <img src={qrCodeDataUrl} alt="Authenticator setup QR code" className="h-44 w-44 sm:h-56 sm:w-56" />
                   ) : (
                     <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                       <QrCode size={18} /> Generating QR code...
@@ -488,7 +488,7 @@ export function AccountSettingsPage({
         </section>
       </div>
 
-      <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+      <section className="rounded-lg border border-gray-200 p-3 dark:border-gray-800 sm:p-4">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">

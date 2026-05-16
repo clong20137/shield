@@ -11,7 +11,7 @@ export type QuickLaunchSlot =
   | null;
 
 interface QuickLaunchRow extends RowDataPacket {
-  slots: string | null;
+  slots: string | QuickLaunchSlot[] | null;
 }
 
 export class QuickLaunchModel {
@@ -24,6 +24,10 @@ export class QuickLaunchModel {
       );
       const rawSlots = rows[0]?.slots;
       if (!rawSlots) return [];
+
+      if (Array.isArray(rawSlots)) {
+        return rawSlots;
+      }
 
       try {
         const parsed = JSON.parse(rawSlots);
