@@ -1,7 +1,7 @@
 import QRCode from 'qrcode';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
-import { Camera, KeyRound, QrCode, ShieldCheck, UserCircle } from 'lucide-react';
-import { AuthAccount, MileageSummary, TwoFactorSetupResponse, authService, mileageService, userService } from '../services/api';
+import { Camera, KeyRound, LogOut, QrCode, ShieldCheck, UserCircle, X } from 'lucide-react';
+import { AuthAccount, AuthSession, MileageSummary, TwoFactorSetupResponse, authService, mileageService, userService } from '../services/api';
 
 interface AccountSettingsPageProps {
   account: AuthAccount;
@@ -37,6 +37,9 @@ export function AccountSettingsPage({
   const [isPasswordSaving, setIsPasswordSaving] = useState(false);
   const [isTwoFactorSaving, setIsTwoFactorSaving] = useState(false);
   const [isProfilePictureSaving, setIsProfilePictureSaving] = useState(false);
+  const [sessions, setSessions] = useState<AuthSession[]>([]);
+  const [isSessionsLoading, setIsSessionsLoading] = useState(false);
+  const [isRevokingSessions, setIsRevokingSessions] = useState(false);
   const [mileageSummary, setMileageSummary] = useState<MileageSummary | null>(null);
   const [milestoneInput, setMilestoneInput] = useState('');
   const [isMilestoneSaving, setIsMilestoneSaving] = useState(false);
@@ -92,6 +95,49 @@ export function AccountSettingsPage({
       window.removeEventListener('shield:mileage-updated', loadMileageSummary);
     };
   }, []);
+
+  const loadSessions = async () => {
+    setIsSessionsLoading(true);
+    try {
+      const response = await authService.getSessions();
+      setSessions(response.data);
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+      onToast('error', getErrorMessage(error, 'Failed to load sessions.'));
+    } finally {
+      setIsSessionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSessions();
+  }, []);
+
+  const revokeSession = async (sessionId: string) => {
+    setIsRevokingSessions(true);
+    try {
+      await authService.revokeSession(sessionId);
+      setSessions((items) => items.filter((session) => session.id !== sessionId));
+      onToast('success', 'Session revoked.');
+    } catch (error) {
+      onToast('error', getErrorMessage(error, 'Failed to revoke session.'));
+    } finally {
+      setIsRevokingSessions(false);
+    }
+  };
+
+  const revokeOtherSessions = async () => {
+    setIsRevokingSessions(true);
+    try {
+      const response = await authService.revokeOtherSessions();
+      await loadSessions();
+      onToast('success', `${response.data.revokedCount} session${response.data.revokedCount === 1 ? '' : 's'} revoked.`);
+    } catch (error) {
+      onToast('error', getErrorMessage(error, 'Failed to revoke other sessions.'));
+    } finally {
+      setIsRevokingSessions(false);
+    }
+  };
 
   const handlePasswordChange = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -441,6 +487,56 @@ export function AccountSettingsPage({
           )}
         </section>
       </div>
+
+      <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">
+              <LogOut size={19} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Active Sessions</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Review sign-ins and revoke sessions you no longer use.</p>
+            </div>
+          </div>
+          <button type="button" onClick={revokeOtherSessions} className="btn-danger" disabled={isRevokingSessions || sessions.filter((session) => !session.isCurrent).length === 0}>
+            Revoke Others
+          </button>
+        </div>
+
+        {isSessionsLoading ? (
+          <div className="loading">Loading sessions...</div>
+        ) : sessions.length === 0 ? (
+          <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No active sessions found.</div>
+        ) : (
+          <div className="space-y-2">
+            {sessions.map((session) => (
+              <div key={session.id} className="flex flex-wrap items-center justify-between gap-3 rounded border border-gray-200 p-3 dark:border-gray-800">
+                <div>
+                  <p className="text-sm font-bold text-gray-800 dark:text-gray-100">
+                    {session.isCurrent ? 'Current session' : 'Signed-in session'}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Created {new Date(session.createdAt).toLocaleString()} - Expires {new Date(session.expiresAt).toLocaleString()}
+                  </p>
+                </div>
+                {!session.isCurrent && (
+                  <button
+                    type="button"
+                    onClick={() => revokeSession(session.id)}
+                    className="flex h-9 w-9 items-center justify-center rounded border border-red-200 text-danger hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950"
+                    aria-label="Revoke session"
+                    title="Revoke session"
+                    disabled={isRevokingSessions}
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

@@ -115,4 +115,17 @@ export class AuthInviteModel {
       conn.release();
     }
   }
+
+  static async cleanupExpiredInvites(): Promise<number> {
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>(
+        'DELETE FROM auth_invites WHERE `acceptedAt` IS NOT NULL OR `expiresAt` <= ?',
+        [new Date()]
+      );
+      return result.affectedRows;
+    } finally {
+      conn.release();
+    }
+  }
 }

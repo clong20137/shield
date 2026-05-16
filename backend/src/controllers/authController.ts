@@ -10,6 +10,18 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function isStrongPassword(password: string): boolean {
+  return password.length >= 8 && /[A-Z]/u.test(password) && /[a-z]/u.test(password) && /\d/u.test(password);
+}
+
+function normalizeEmailInput(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function sanitizeDisplayName(displayName: string): string {
+  return displayName.trim().replace(/\s+/gu, ' ').slice(0, 100);
+}
+
 function isDuplicateEmailError(error: unknown): boolean {
   return (
     typeof error === 'object' &&
@@ -100,12 +112,19 @@ export class AuthController {
         return res.status(400).json({ error: 'Email, password, and display name are required' });
       }
 
-      if (!isValidEmail(email)) {
+      const cleanEmail = normalizeEmailInput(email);
+      const cleanDisplayName = sanitizeDisplayName(displayName);
+
+      if (!isValidEmail(cleanEmail)) {
         return res.status(400).json({ error: 'Enter a valid email address' });
       }
 
-      if (password.length < 8) {
-        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      if (cleanDisplayName.length < 2) {
+        return res.status(400).json({ error: 'Display name must be at least 2 characters' });
+      }
+
+      if (!isStrongPassword(password)) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters and include uppercase, lowercase, and a number' });
       }
 
       const accountCount = await AuthAccountModel.countAccounts();
@@ -122,14 +141,14 @@ export class AuthController {
         }
 
         const invite = await AuthInviteModel.getValidInvite(inviteToken);
-        if (!invite || invite.email.toLowerCase() !== email.trim().toLowerCase()) {
+        if (!invite || invite.email.toLowerCase() !== cleanEmail) {
           return res.status(403).json({ error: 'Invitation link is invalid or expired' });
         }
 
         inviteId = invite.id;
       }
 
-      const account = await AuthAccountModel.createAccount(email, password, displayName);
+      const account = await AuthAccountModel.createAccount(cleanEmail, password, cleanDisplayName);
       if (inviteId) {
         await AuthInviteModel.markAccepted(inviteId);
       }
@@ -159,7 +178,11 @@ export class AuthController {
         return res.status(400).json({ error: 'Email and password are required' });
       }
 
-      const result = await AuthAccountModel.verifyLogin(email, password, twoFactorCode);
+      if (!isValidEmail(normalizeEmailInput(email))) {
+        return res.status(400).json({ error: 'Enter a valid email address' });
+      }
+
+      const result = await AuthAccountModel.verifyLogin(normalizeEmailInput(email), password, twoFactorCode);
 
       if (result.requiresTwoFactor) {
         return res.status(202).json({ requiresTwoFactor: true });
@@ -189,8 +212,8 @@ export class AuthController {
         return res.status(400).json({ error: 'Account, current password, and new password are required' });
       }
 
-      if (newPassword.length < 8) {
-        return res.status(400).json({ error: 'New password must be at least 8 characters' });
+      if (!isStrongPassword(newPassword)) {
+        return res.status(400).json({ error: 'New password must be at least 8 characters and include uppercase, lowercase, and a number' });
       }
 
       const changed = await AuthAccountModel.changePassword(accountId, currentPassword, newPassword);
@@ -233,6 +256,58 @@ export class AuthController {
     } catch (error) {
       console.error('Logout error:', error);
       res.status(500).json({ error: 'Failed to sign out' });
+    }
+  }
+
+  static async listSessions(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      const token = getBearerToken(req);
+
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const sessions = await AuthSessionModel.listActiveSessions(account.id, token || undefined);
+      res.json(sessions);
+    } catch (error) {
+      console.error('List sessions error:', error);
+      res.status(500).json({ error: 'Failed to load sessions' });
+    }
+  }
+
+  static async revokeSession(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const revoked = await AuthSessionModel.revokeSession(req.params.sessionId, account.id);
+      if (!revoked) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      res.json({ message: 'Session revoked' });
+    } catch (error) {
+      console.error('Revoke session error:', error);
+      res.status(500).json({ error: 'Failed to revoke session' });
+    }
+  }
+
+  static async revokeOtherSessions(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      const token = getBearerToken(req);
+      if (!account || !token) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const revokedCount = await AuthSessionModel.revokeOtherSessions(account.id, token);
+      res.json({ revokedCount });
+    } catch (error) {
+      console.error('Revoke other sessions error:', error);
+      res.status(500).json({ error: 'Failed to revoke other sessions' });
     }
   }
 
@@ -373,19 +448,20 @@ export class AuthController {
       const { email } = req.body as { email?: string; requesterId?: string };
       const account = await getSessionAccount(req);
 
-      if (!email || !isValidEmail(email)) {
+      const cleanEmail = email ? normalizeEmailInput(email) : '';
+      if (!cleanEmail || !isValidEmail(cleanEmail)) {
         return res.status(400).json({ error: 'Enter a valid invite email' });
       }
 
       const appBaseUrl = await getAppBaseUrl(req);
       const invite = await AuthInviteModel.create(
-        email,
+        cleanEmail,
         account?.id || null,
         account?.displayName || account?.email || null,
       );
       const inviteUrl = `${appBaseUrl}/?invite=${encodeURIComponent(invite.token)}`;
 
-      console.log(`SHIELD invite for ${email}: ${inviteUrl}`);
+      console.log(`SHIELD invite for ${cleanEmail}: ${inviteUrl}`);
       res.status(201).json(publicInvite(invite, inviteUrl));
     } catch (error) {
       console.error('Create invite error:', error);

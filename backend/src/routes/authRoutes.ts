@@ -1,17 +1,23 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/authController';
 import { requireAnyPermission, requirePermission, requireSelfOrPermission } from '../middleware/permissions';
+import { rateLimit } from '../middleware/rateLimit';
 
 const router = Router();
+const authLimiter = rateLimit({ keyPrefix: 'auth', windowMs: 15 * 60 * 1000, max: 30, message: 'Too many auth attempts. Try again later.' });
+const inviteLimiter = rateLimit({ keyPrefix: 'invite', windowMs: 15 * 60 * 1000, max: 20, message: 'Too many invite attempts. Try again later.' });
 
-router.post('/register', AuthController.register);
-router.post('/login', AuthController.login);
+router.post('/register', authLimiter, AuthController.register);
+router.post('/login', authLimiter, AuthController.login);
 router.get('/session', AuthController.getSession);
 router.post('/logout', AuthController.logout);
 router.get('/registration-settings', AuthController.getRegistrationSettings);
 router.put('/registration-settings', requirePermission('roles:manage'), AuthController.updateRegistrationSettings);
 router.get('/invites', requirePermission('roles:manage'), AuthController.listInvites);
-router.post('/invites', requirePermission('roles:manage'), AuthController.createInvite);
+router.post('/invites', inviteLimiter, requirePermission('roles:manage'), AuthController.createInvite);
+router.get('/sessions', AuthController.listSessions);
+router.delete('/sessions/:sessionId', AuthController.revokeSession);
+router.post('/sessions/revoke-others', AuthController.revokeOtherSessions);
 router.post('/change-password', requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.changePassword);
 router.post('/2fa/setup', requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.setupTwoFactor);
 router.post('/2fa/enable', requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.enableTwoFactor);

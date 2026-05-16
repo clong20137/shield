@@ -17,6 +17,7 @@ import notificationRoutes from './routes/notificationRoutes';
 import mileageRoutes from './routes/mileageRoutes';
 import quickLaunchRoutes from './routes/quickLaunchRoutes';
 import eventRoutes from './routes/eventRoutes';
+import { startSecurityCleanupJob } from './services/securityCleanup';
 
 dotenv.config();
 
@@ -75,6 +76,7 @@ app.get('*', (req: Request, res: Response) => {
 // Start server
 initializeDatabase()
   .then(() => {
+    startSecurityCleanupJob();
     app.listen(PORT, () => {
       console.log(`Shield backend running on port ${PORT}`);
     });

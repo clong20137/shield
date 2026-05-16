@@ -158,6 +158,15 @@ export interface AuthInvite {
   createdAt: string;
 }
 
+export interface AuthSession {
+  id: string;
+  userId: string;
+  expiresAt: string;
+  createdAt: string;
+  revokedAt: string | null;
+  isCurrent?: boolean;
+}
+
 export interface AuthResponse {
   account?: AuthAccount;
   requiresTwoFactor?: boolean;
@@ -322,6 +331,15 @@ export const authService = {
 
   logout: () =>
     api.post('/auth/logout'),
+
+  getSessions: () =>
+    api.get<AuthSession[]>('/auth/sessions'),
+
+  revokeSession: (sessionId: string) =>
+    api.delete(`/auth/sessions/${sessionId}`),
+
+  revokeOtherSessions: () =>
+    api.post<{ revokedCount: number }>('/auth/sessions/revoke-others'),
 
   changePassword: (accountId: string, currentPassword: string, newPassword: string) =>
     api.post('/auth/change-password', { accountId, currentPassword, newPassword }),
