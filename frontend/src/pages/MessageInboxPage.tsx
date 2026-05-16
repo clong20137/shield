@@ -827,8 +827,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
               </label>
             </div>
 
-            <button type="submit" className="btn-primary" disabled={isSending}>
-              {isSending ? 'Sending...' : 'Send Message'}
+            <button type="submit" className="btn-primary" disabled={isSending} aria-label="Send message" title={isSending ? 'Sending' : 'Send Message'}>
+              <Send size={16} />
             </button>
           </form>
         </div>
@@ -854,11 +854,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
               </button>
             </div>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setThreadPendingDelete(null)} className="btn-secondary">
-                Cancel
+              <button type="button" onClick={() => setThreadPendingDelete(null)} className="btn-secondary" aria-label="Cancel delete conversation" title="Cancel">
+                <X size={16} />
               </button>
-              <button type="button" onClick={() => deleteThread(threadPendingDelete)} className="btn-danger">
-                Delete
+              <button type="button" onClick={() => deleteThread(threadPendingDelete)} className="btn-danger" aria-label="Delete conversation" title="Delete">
+                <Trash2 size={16} />
               </button>
             </div>
           </div>
@@ -875,11 +875,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
               </p>
             </div>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setMessagePendingDelete(null)} className="btn-secondary">
-                Cancel
+              <button type="button" onClick={() => setMessagePendingDelete(null)} className="btn-secondary" aria-label="Cancel delete message" title="Cancel">
+                <X size={16} />
               </button>
-              <button type="button" onClick={() => deleteMessage(messagePendingDelete)} className="btn-danger">
-                Delete
+              <button type="button" onClick={() => deleteMessage(messagePendingDelete)} className="btn-danger" aria-label="Delete message" title="Delete">
+                <Trash2 size={16} />
               </button>
             </div>
           </div>

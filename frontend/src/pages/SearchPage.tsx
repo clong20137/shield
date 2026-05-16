@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, X } from 'lucide-react';
+import { Camera, Save, Send, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { useSearchParams } from 'react-router-dom';
 import { AuthAccount, messageService, userService, User, UserFilters } from '../services/api';
@@ -446,11 +446,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
             </div>
 
             <div className="flex flex-wrap gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-800">
-              <button type="submit" className="btn-primary" disabled={isSavingUser}>
-                {isSavingUser ? 'Saving...' : 'Save User'}
+              <button type="submit" className="btn-primary" disabled={isSavingUser} aria-label="Save user" title={isSavingUser ? 'Saving' : 'Save User'}>
+                <Save size={16} />
               </button>
-              <button type="button" onClick={() => setEditingUser(null)} className="btn-secondary">
-                Cancel
+              <button type="button" onClick={() => setEditingUser(null)} className="btn-secondary" aria-label="Cancel edit user" title="Cancel">
+                <X size={16} />
               </button>
             </div>
           </form>
@@ -467,8 +467,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                   To {messageRecipient.firstName} {messageRecipient.lastName}
                 </p>
               </div>
-              <button type="button" onClick={() => setMessageRecipient(null)} className="btn-secondary">
-                Close
+              <button type="button" onClick={() => setMessageRecipient(null)} className="btn-secondary" aria-label="Close message modal" title="Close">
+                <X size={16} />
               </button>
             </div>
             <label className="mb-4 block">
@@ -497,8 +497,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                 </div>
               )}
             </div>
-            <button type="submit" className="btn-primary" disabled={isSendingMessage}>
-              {isSendingMessage ? 'Sending...' : 'Send Message'}
+            <button type="submit" className="btn-primary" disabled={isSendingMessage} aria-label="Send message" title={isSendingMessage ? 'Sending' : 'Send Message'}>
+              <Send size={16} />
             </button>
           </form>
         </div>

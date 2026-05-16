@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { BarChart3, Bell, Bug, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Search, Settings, Shield, SlidersHorizontal, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
+import { BarChart3, Bell, Bug, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Save, Search, Settings, Shield, SlidersHorizontal, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -1023,8 +1023,8 @@ function ReportBugModal({
         <textarea value={description} onChange={(event) => setDescription(event.target.value)} className="min-h-36 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
       </label>
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
-        <button type="submit" className="btn-primary" disabled={isSubmitting}>{isSubmitting ? 'Submitting...' : 'Submit Bug'}</button>
+        <button type="button" onClick={onClose} className="btn-secondary" aria-label="Cancel bug report" title="Cancel"><X size={16} /></button>
+        <button type="submit" className="btn-primary" disabled={isSubmitting} aria-label="Submit bug report" title={isSubmitting ? 'Submitting' : 'Submit Bug'}><Bug size={16} /></button>
       </div>
     </form>
   );
@@ -1098,8 +1098,8 @@ function BugTrackerModal({
               <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Admin notes</span>
               <textarea value={adminNotes} onChange={(event) => setAdminNotes(event.target.value)} className="min-h-32 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
             </label>
-            <button type="button" onClick={() => onStatusChange(selectedReport, status, adminNotes)} className="btn-primary">
-              Save Bug Status
+            <button type="button" onClick={() => onStatusChange(selectedReport, status, adminNotes)} className="btn-primary" aria-label="Save bug status" title="Save Bug Status">
+              <Save size={16} />
             </button>
           </div>
         )}

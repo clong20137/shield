@@ -1,5 +1,5 @@
 import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Ban, CheckCircle2, Download, Eye, FileText, Laptop, Pencil, Plus, Printer, QrCode, Radio, Router, Smartphone, Trash2, Upload, Wifi, Wrench, X } from 'lucide-react';
+import { AlertTriangle, Ban, CheckCircle2, Download, Eye, FileText, Laptop, Pencil, Plus, Printer, QrCode, Radio, Router, Save, Smartphone, Trash2, Upload, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, deviceService, DeviceEvent, DeviceRecord } from '../services/api';
 
 type DeviceType = DeviceRecord['type'];
@@ -515,9 +515,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         {selectedDevices.length > 0 && canManageDevices && (
           <div className="mb-4 flex flex-wrap items-center gap-3 rounded bg-gray-50 p-3 dark:bg-gray-950">
             <span className="text-sm font-bold">{selectedDevices.length} selected</span>
-            <button type="button" onClick={() => bulkStatusUpdate('Maintenance')} className="btn-secondary"><Wrench size={16} /> Maintenance</button>
-            <button type="button" onClick={() => bulkStatusUpdate('Retired')} className="btn-secondary"><Ban size={16} /> Retire</button>
-            <button type="button" onClick={() => setSelectedDevices([])} className="btn-secondary"><X size={16} /> Clear</button>
+            <button type="button" onClick={() => bulkStatusUpdate('Maintenance')} className="btn-secondary" aria-label="Move selected to maintenance" title="Maintenance"><Wrench size={16} /></button>
+            <button type="button" onClick={() => bulkStatusUpdate('Retired')} className="btn-secondary" aria-label="Retire selected devices" title="Retire"><Ban size={16} /></button>
+            <button type="button" onClick={() => setSelectedDevices([])} className="btn-secondary" aria-label="Clear selected devices" title="Clear"><X size={16} /></button>
           </div>
         )}
 
@@ -673,12 +673,11 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               </div>
 
               <div className="mt-5 flex flex-wrap justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-800">
-                <button type="button" onClick={closeDeviceFormModal} className="btn-secondary">
-                  <X size={16} /> Cancel
+                <button type="button" onClick={closeDeviceFormModal} className="btn-secondary" aria-label="Cancel device form" title="Cancel">
+                  <X size={16} />
                 </button>
-                <button type="submit" className="btn-primary">
-                  {editingId ? <Pencil size={16} /> : <Plus size={16} />}
-                  {editingId ? 'Save Device' : 'Add Device'}
+                <button type="submit" className="btn-primary" aria-label={editingId ? 'Save device' : 'Add device'} title={editingId ? 'Save Device' : 'Add Device'}>
+                  {editingId ? <Save size={16} /> : <Plus size={16} />}
                 </button>
               </div>
             </form>
@@ -722,16 +721,16 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                     <div className="text-sm text-gray-500 dark:text-gray-400">
                       <p className="font-bold text-gray-800 dark:text-gray-100">{detailDevice.assetTag}</p>
                       <p>Use this asset tag for printable labels or scanner lookup.</p>
-                      <button type="button" onClick={() => window.print()} className="btn-secondary mt-3"><Printer size={16} /> Print Label</button>
+                      <button type="button" onClick={() => window.print()} className="btn-secondary mt-3" aria-label="Print label" title="Print Label"><Printer size={16} /></button>
                     </div>
                   </div>
                 </div>
                 {canManageDevices && (
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Available', 'Checked In')} className="btn-secondary"><CheckCircle2 size={16} /> Check In</button>
-                    <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Maintenance', 'Maintenance')} className="btn-secondary"><Wrench size={16} /> Maintenance</button>
-                    <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Damaged', 'Marked Damaged')} className="btn-secondary"><AlertTriangle size={16} /> Damaged</button>
-                    <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Lost', 'Marked Lost')} className="btn-danger"><Ban size={16} /> Lost</button>
+                    <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Available', 'Checked In')} className="btn-secondary" aria-label="Check in device" title="Check In"><CheckCircle2 size={16} /></button>
+                    <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Maintenance', 'Maintenance')} className="btn-secondary" aria-label="Move device to maintenance" title="Maintenance"><Wrench size={16} /></button>
+                    <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Damaged', 'Marked Damaged')} className="btn-secondary" aria-label="Mark device damaged" title="Damaged"><AlertTriangle size={16} /></button>
+                    <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Lost', 'Marked Lost')} className="btn-danger" aria-label="Mark device lost" title="Lost"><Ban size={16} /></button>
                   </div>
                 )}
               </div>
@@ -741,7 +740,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 {canManageDevices && (
                   <div className="mb-4 rounded border border-gray-200 p-3 dark:border-gray-800">
                     <textarea value={eventNotes} onChange={(event) => setEventNotes(event.target.value)} placeholder="Add a note or reason" className="mb-2 min-h-20 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
-                    <button type="button" onClick={addHistoryNote} className="btn-primary"><FileText size={16} /> Add Note</button>
+                    <button type="button" onClick={addHistoryNote} className="btn-primary" aria-label="Add history note" title="Add Note"><FileText size={16} /></button>
                   </div>
                 )}
                 <div className="space-y-3">
@@ -774,11 +773,11 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               Delete {devicePendingDelete.assetTag || 'this device'}? This cannot be undone.
             </p>
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setDevicePendingDelete(null)} className="btn-secondary">
-                Cancel
+              <button type="button" onClick={() => setDevicePendingDelete(null)} className="btn-secondary" aria-label="Cancel device deletion" title="Cancel">
+                <X size={16} />
               </button>
-              <button type="button" onClick={() => deleteDevice(devicePendingDelete)} className="btn-danger">
-                Delete
+              <button type="button" onClick={() => deleteDevice(devicePendingDelete)} className="btn-danger" aria-label="Delete device" title="Delete">
+                <Trash2 size={16} />
               </button>
             </div>
           </div>

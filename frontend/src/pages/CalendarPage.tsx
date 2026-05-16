@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { CalendarClock, ChevronLeft, ChevronRight, Pencil, Save, Trash2, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, calendarService } from '../services/api';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>;
@@ -496,17 +497,17 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => changeMonth(-1)} className="btn-secondary">
-            Previous
+          <button type="button" onClick={() => changeMonth(-1)} className="btn-secondary" aria-label="Previous month" title="Previous">
+            <ChevronLeft size={16} />
           </button>
           <div className="min-w-40 text-center font-bold text-gray-700 dark:text-gray-200">
             {getMonthLabel(calendarMonth)}
           </div>
-          <button type="button" onClick={() => changeMonth(1)} className="btn-secondary">
-            Next
+          <button type="button" onClick={() => changeMonth(1)} className="btn-secondary" aria-label="Next month" title="Next">
+            <ChevronRight size={16} />
           </button>
-          <button type="button" onClick={goToToday} className="btn-secondary">
-            Today
+          <button type="button" onClick={goToToday} className="btn-secondary" aria-label="Go to today" title="Today">
+            <CalendarClock size={16} />
           </button>
         </div>
       </div>
@@ -526,9 +527,11 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
             setDistrictFilter('');
             setStatusFilter('');
           }}
+          aria-label="Clear calendar filters"
+          title="Clear Filters"
           className="btn-secondary"
         >
-          Clear Filters
+          <X size={16} />
         </button>
       </div>
 
@@ -633,7 +636,7 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
                 aria-label="Close calendar day"
               >
-                X
+                <X size={20} />
               </button>
             </div>
 
@@ -793,15 +796,15 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
               </div>
 
               <div className="md:col-span-2">
-                <button type="submit" className="btn-primary">
-                  {editingEntryId ? 'Save Calendar Entry' : 'Add Calendar Entry'}
+                <button type="submit" className="btn-primary" aria-label={editingEntryId ? 'Save calendar entry' : 'Add calendar entry'} title={editingEntryId ? 'Save Entry' : 'Add Entry'}>
+                  {editingEntryId ? <Save size={16} /> : <CalendarClock size={16} />}
                 </button>
                 {editingEntryId && (
                   <button type="button" onClick={() => {
                     setEditingEntryId(null);
                     setEntryForm(createDefaultEntryForm(selectedDate));
-                  }} className="btn-secondary ml-2">
-                    Cancel Edit
+                  }} className="btn-secondary ml-2" aria-label="Cancel edit" title="Cancel Edit">
+                    <X size={16} />
                   </button>
                 )}
               </div>
@@ -835,11 +838,11 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <button type="button" onClick={() => editEntry(entry)} className="btn-secondary">
-                          Edit
+                        <button type="button" onClick={() => editEntry(entry)} className="btn-secondary" aria-label="Edit entry" title="Edit">
+                          <Pencil size={16} />
                         </button>
-                        <button type="button" onClick={() => setEntryPendingDelete(entry)} className="btn-danger">
-                          Delete
+                        <button type="button" onClick={() => setEntryPendingDelete(entry)} className="btn-danger" aria-label="Delete entry" title="Delete">
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </div>
@@ -861,11 +864,11 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
               </p>
             </div>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setEntryPendingDelete(null)} className="btn-secondary">
-                Cancel
+              <button type="button" onClick={() => setEntryPendingDelete(null)} className="btn-secondary" aria-label="Cancel delete" title="Cancel">
+                <X size={16} />
               </button>
-              <button type="button" onClick={() => deleteEntry(entryPendingDelete)} className="btn-danger">
-                Delete
+              <button type="button" onClick={() => deleteEntry(entryPendingDelete)} className="btn-danger" aria-label="Delete entry" title="Delete">
+                <Trash2 size={16} />
               </button>
             </div>
           </div>

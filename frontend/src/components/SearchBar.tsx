@@ -1,4 +1,5 @@
 import React from 'react';
+import { SlidersHorizontal, Search } from 'lucide-react';
 import { UserFilters } from '../services/api';
 
 interface SearchBarProps {
@@ -84,15 +85,17 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           placeholder={placeholder}
           className="flex-1 px-4 py-3 border-2 border-gray-300 rounded focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 text-sm dark:border-gray-700 dark:bg-gray-950"
         />
-        <button type="submit" className="btn-primary">
-          Search
+        <button type="submit" className="btn-primary" aria-label="Search users" title="Search">
+          <Search size={16} />
         </button>
         <button
           type="button"
           className="btn-secondary"
           onClick={() => setShowFilters(!showFilters)}
+          aria-label="Toggle filters"
+          title="Filters"
         >
-          Filters
+          <SlidersHorizontal size={16} />
         </button>
       </form>
 

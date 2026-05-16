@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Mail, Plus, Save, X } from 'lucide-react';
 import { AuthAccount, AuthInvite, AuthRole, RegistrationSettings, authService } from '../services/api';
 
 interface PermissionsPageProps {
@@ -202,9 +202,8 @@ function PermissionsPage({
             Manage account access levels for administrators and users.
           </p>
         </div>
-        <button type="button" onClick={() => setIsCreateRoleModalOpen(true)} className="btn-primary">
+        <button type="button" onClick={() => setIsCreateRoleModalOpen(true)} className="btn-primary" aria-label="Create role" title="Create Role">
           <Plus size={16} />
-          Create Role
         </button>
       </div>
 
@@ -304,8 +303,8 @@ function PermissionsPage({
               placeholder="https://shield.example.gov"
             />
           </label>
-          <button type="submit" className="btn-primary self-end" disabled={isSavingRegistration}>
-            {isSavingRegistration ? 'Saving...' : 'Save'}
+          <button type="submit" className="btn-primary self-end" disabled={isSavingRegistration} aria-label="Save registration settings" title={isSavingRegistration ? 'Saving' : 'Save'}>
+            <Save size={16} />
           </button>
         </form>
 
@@ -317,8 +316,8 @@ function PermissionsPage({
             className="rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
             placeholder="person@example.gov"
           />
-          <button type="submit" className="btn-secondary" disabled={isSendingInvite}>
-            {isSendingInvite ? 'Creating...' : 'Create Invite'}
+          <button type="submit" className="btn-secondary" disabled={isSendingInvite} aria-label="Create invite" title={isSendingInvite ? 'Creating' : 'Create Invite'}>
+            <Plus size={16} />
           </button>
         </form>
 
@@ -330,8 +329,10 @@ function PermissionsPage({
               <a
                 href={`mailto:${encodeURIComponent(latestInvite.email)}?subject=${encodeURIComponent('Your SHIELD invite')}&body=${encodeURIComponent(`Use this secure link to create your SHIELD login:\n\n${latestInvite.inviteUrl}`)}`}
                 className="btn-primary"
+                aria-label="Email invite"
+                title="Email Invite"
               >
-                Email Invite
+                <Mail size={16} />
               </a>
             </div>
           </div>
@@ -415,11 +416,11 @@ function PermissionsPage({
             </div>
 
             <div className="mt-6 flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-800">
-              <button type="button" onClick={() => setIsCreateRoleModalOpen(false)} className="btn-secondary">
-                Cancel
+              <button type="button" onClick={() => setIsCreateRoleModalOpen(false)} className="btn-secondary" aria-label="Cancel create role" title="Cancel">
+                <X size={16} />
               </button>
-              <button type="submit" className="btn-primary" disabled={isSavingRole}>
-                {isSavingRole ? 'Creating...' : 'Create Role'}
+              <button type="submit" className="btn-primary" disabled={isSavingRole} aria-label="Create role" title={isSavingRole ? 'Creating' : 'Create Role'}>
+                <Plus size={16} />
               </button>
             </div>
           </form>

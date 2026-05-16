@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { RotateCcw, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CreateUserPayload, User, userService } from '../services/api';
 
@@ -253,11 +254,11 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
         </datalist>
 
         <div className="mt-5 flex flex-wrap gap-3 border-t border-gray-200 pt-5 dark:border-gray-800">
-          <button type="submit" className="btn-primary" disabled={isSaving}>
-            {isSaving ? 'Creating...' : 'Create User'}
+          <button type="submit" className="btn-primary" disabled={isSaving} aria-label="Create user" title={isSaving ? 'Creating' : 'Create User'}>
+            <UserPlus size={16} />
           </button>
-          <button type="button" onClick={() => setForm(emptyUserForm)} className="btn-secondary">
-            Reset
+          <button type="button" onClick={() => setForm(emptyUserForm)} className="btn-secondary" aria-label="Reset create user form" title="Reset">
+            <RotateCcw size={16} />
           </button>
         </div>
       </form>

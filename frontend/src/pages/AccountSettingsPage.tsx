@@ -1,6 +1,6 @@
 import QRCode from 'qrcode';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
-import { Camera, KeyRound, LogOut, QrCode, ShieldCheck, UserCircle, X } from 'lucide-react';
+import { Camera, KeyRound, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, X } from 'lucide-react';
 import { AuthAccount, AuthSession, MileageSummary, TwoFactorSetupResponse, authService, mileageService, userService } from '../services/api';
 
 interface AccountSettingsPageProps {
@@ -346,8 +346,8 @@ export function AccountSettingsPage({
                 className="w-48 rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
               />
             </label>
-            <button type="submit" className="btn-primary" disabled={isMilestoneSaving}>
-              {isMilestoneSaving ? 'Saving...' : 'Save Milestone'}
+            <button type="submit" className="btn-primary" disabled={isMilestoneSaving} aria-label="Save mileage milestone" title={isMilestoneSaving ? 'Saving' : 'Save Milestone'}>
+              <Save size={16} />
             </button>
           </form>
         )}
@@ -399,8 +399,8 @@ export function AccountSettingsPage({
               />
             </label>
 
-            <button type="submit" className="btn-primary" disabled={isPasswordSaving}>
-              {isPasswordSaving ? 'Saving...' : 'Update Password'}
+            <button type="submit" className="btn-primary" disabled={isPasswordSaving} aria-label="Update password" title={isPasswordSaving ? 'Saving' : 'Update Password'}>
+              <Save size={16} />
             </button>
           </form>
         </section>
@@ -421,8 +421,8 @@ export function AccountSettingsPage({
               <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
                 Add an authenticator app to require a one-time code during sign in.
               </p>
-              <button type="button" className="btn-primary" onClick={handleSetupTwoFactor} disabled={isTwoFactorSaving}>
-                {isTwoFactorSaving ? 'Starting...' : 'Set Up Authenticator App'}
+              <button type="button" className="btn-primary" onClick={handleSetupTwoFactor} disabled={isTwoFactorSaving} aria-label="Set up authenticator app" title={isTwoFactorSaving ? 'Starting' : 'Set Up Authenticator App'}>
+                <Smartphone size={16} />
               </button>
             </div>
           )}
@@ -457,8 +457,8 @@ export function AccountSettingsPage({
                 />
               </label>
 
-              <button type="submit" className="btn-primary" disabled={isTwoFactorSaving}>
-                {isTwoFactorSaving ? 'Verifying...' : 'Enable 2FA'}
+              <button type="submit" className="btn-primary" disabled={isTwoFactorSaving} aria-label="Enable two-factor authentication" title={isTwoFactorSaving ? 'Verifying' : 'Enable 2FA'}>
+                <ShieldCheck size={16} />
               </button>
             </form>
           )}
@@ -480,8 +480,8 @@ export function AccountSettingsPage({
                 />
               </label>
 
-              <button type="submit" className="btn-danger" disabled={isTwoFactorSaving}>
-                {isTwoFactorSaving ? 'Disabling...' : 'Disable 2FA'}
+              <button type="submit" className="btn-danger" disabled={isTwoFactorSaving} aria-label="Disable two-factor authentication" title={isTwoFactorSaving ? 'Disabling' : 'Disable 2FA'}>
+                <X size={16} />
               </button>
             </form>
           )}
@@ -499,8 +499,8 @@ export function AccountSettingsPage({
               <p className="text-sm text-gray-500 dark:text-gray-400">Review sign-ins and revoke sessions you no longer use.</p>
             </div>
           </div>
-          <button type="button" onClick={revokeOtherSessions} className="btn-danger" disabled={isRevokingSessions || sessions.filter((session) => !session.isCurrent).length === 0}>
-            Revoke Others
+          <button type="button" onClick={revokeOtherSessions} className="btn-danger" disabled={isRevokingSessions || sessions.filter((session) => !session.isCurrent).length === 0} aria-label="Revoke other sessions" title="Revoke Others">
+            <LogOut size={16} />
           </button>
         </div>
 

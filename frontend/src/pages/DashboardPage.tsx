@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, Pencil, Plus, Save, Send, Trash2, X } from 'lucide-react';
 import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, userService, reportService, ReportRow, SystemStatistics, User } from '../services/api';
 import { StatisticsCard } from '../components/StatisticsCard';
 
@@ -243,14 +244,14 @@ export function DashboardCalendar() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => changeMonth(-1)} className="btn-secondary">
-            Previous
+          <button type="button" onClick={() => changeMonth(-1)} className="btn-secondary" aria-label="Previous month" title="Previous">
+            <ChevronLeft size={16} />
           </button>
           <div className="min-w-40 text-center font-bold text-gray-700 dark:text-gray-200">
             {getMonthLabel(calendarMonth)}
           </div>
-          <button type="button" onClick={() => changeMonth(1)} className="btn-secondary">
-            Next
+          <button type="button" onClick={() => changeMonth(1)} className="btn-secondary" aria-label="Next month" title="Next">
+            <ChevronRight size={16} />
           </button>
         </div>
       </div>
@@ -336,8 +337,8 @@ export function DashboardCalendar() {
                   {editingEntryId ? 'Edit duty details for this calendar day.' : 'Add duty details for this calendar day.'}
                 </p>
               </div>
-              <button type="button" onClick={closeModal} className="btn-secondary">
-                Close
+              <button type="button" onClick={closeModal} className="btn-secondary" aria-label="Close calendar modal" title="Close">
+                <X size={16} />
               </button>
             </div>
 
@@ -435,15 +436,15 @@ export function DashboardCalendar() {
               </label>
 
               <div className="md:col-span-2">
-                <button type="submit" className="btn-primary">
-                  {editingEntryId ? 'Save Calendar Entry' : 'Add Calendar Entry'}
+                <button type="submit" className="btn-primary" aria-label={editingEntryId ? 'Save calendar entry' : 'Add calendar entry'} title={editingEntryId ? 'Save Entry' : 'Add Entry'}>
+                  {editingEntryId ? <Save size={16} /> : <Plus size={16} />}
                 </button>
                 {editingEntryId && (
                   <button type="button" onClick={() => {
                     setEditingEntryId(null);
                     setEntryForm(createDefaultEntryForm(selectedDate));
-                  }} className="btn-secondary ml-2">
-                    Cancel Edit
+                  }} className="btn-secondary ml-2" aria-label="Cancel edit" title="Cancel Edit">
+                    <X size={16} />
                   </button>
                 )}
               </div>
@@ -477,11 +478,11 @@ export function DashboardCalendar() {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <button type="button" onClick={() => editEntry(entry)} className="btn-secondary">
-                          Edit
+                        <button type="button" onClick={() => editEntry(entry)} className="btn-secondary" aria-label="Edit entry" title="Edit">
+                          <Pencil size={16} />
                         </button>
-                        <button type="button" onClick={() => deleteEntry(entry.id)} className="btn-danger">
-                          Delete
+                        <button type="button" onClick={() => deleteEntry(entry.id)} className="btn-danger" aria-label="Delete entry" title="Delete">
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </div>
@@ -669,8 +670,8 @@ function DashboardNews({
             </label>
           </div>
           <div className="mt-4">
-            <button type="submit" className="btn-primary" disabled={isSavingPost}>
-              {isSavingPost ? 'Publishing...' : 'Publish Post'}
+            <button type="submit" className="btn-primary" disabled={isSavingPost} aria-label="Publish post" title={isSavingPost ? 'Publishing' : 'Publish Post'}>
+              <Send size={16} />
             </button>
           </div>
         </form>
@@ -690,8 +691,8 @@ function DashboardNews({
                   <h3 className="mt-3 text-base">{post.title}</h3>
                 </div>
                 {isAdministrator && (
-                  <button type="button" onClick={() => setPostPendingDelete(post)} className="btn-danger">
-                    Delete
+                  <button type="button" onClick={() => setPostPendingDelete(post)} className="btn-danger" aria-label="Delete post" title="Delete">
+                    <Trash2 size={16} />
                   </button>
                 )}
               </div>
@@ -711,11 +712,11 @@ function DashboardNews({
               Delete “{postPendingDelete.title}” from Updates & News?
             </p>
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setPostPendingDelete(null)} className="btn-secondary">
-                Cancel
+              <button type="button" onClick={() => setPostPendingDelete(null)} className="btn-secondary" aria-label="Cancel delete post" title="Cancel">
+                <X size={16} />
               </button>
-              <button type="button" onClick={() => deletePost(postPendingDelete)} className="btn-danger">
-                Delete
+              <button type="button" onClick={() => deletePost(postPendingDelete)} className="btn-danger" aria-label="Delete post" title="Delete">
+                <Trash2 size={16} />
               </button>
             </div>
           </div>

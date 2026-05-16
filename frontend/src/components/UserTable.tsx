@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Pencil, Trash2, X } from 'lucide-react';
 import { User } from '../services/api';
 
 interface UserTableProps {
@@ -71,21 +72,25 @@ export const UserTable: React.FC<UserTableProps> = ({
                   <td className="px-4 py-3 flex gap-2">
                     <button
                       className="btn btn-primary text-xs"
+                      aria-label={`Edit ${user.firstName} ${user.lastName}`}
+                      title="Edit"
                       onClick={(e) => {
                         e.stopPropagation();
                         onEdit?.(user);
                       }}
                     >
-                      Edit
+                      <Pencil size={14} />
                     </button>
                     <button
                       className="btn btn-danger text-xs"
+                      aria-label={`Delete ${user.firstName} ${user.lastName}`}
+                      title="Delete"
                       onClick={(e) => {
                         e.stopPropagation();
                         setUserPendingDelete(user);
                       }}
                     >
-                      Delete
+                      <Trash2 size={14} />
                     </button>
                   </td>
                 )}
@@ -103,8 +108,8 @@ export const UserTable: React.FC<UserTableProps> = ({
             Delete {userPendingDelete.firstName} {userPendingDelete.lastName}?
           </p>
           <div className="mt-5 flex justify-end gap-2">
-            <button type="button" onClick={() => setUserPendingDelete(null)} className="btn-secondary">
-              Cancel
+            <button type="button" onClick={() => setUserPendingDelete(null)} className="btn-secondary" aria-label="Cancel delete user" title="Cancel">
+              <X size={16} />
             </button>
             <button
               type="button"
@@ -113,8 +118,10 @@ export const UserTable: React.FC<UserTableProps> = ({
                 setUserPendingDelete(null);
               }}
               className="btn-danger"
+              aria-label="Delete user"
+              title="Delete"
             >
-              Delete
+              <Trash2 size={16} />
             </button>
           </div>
         </div>

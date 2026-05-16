@@ -1,5 +1,5 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { Mail, Pencil, X } from 'lucide-react';
 import { User } from '../services/api';
 
 interface UserDetailProps {
@@ -110,16 +110,16 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
       </div>
 
       <div className="flex gap-2 px-5 py-4 border-t-2 border-gray-300">
-        <button className="btn-secondary" onClick={() => onMessage?.(user)}>
-          Send Message
+        <button className="btn-secondary" onClick={() => onMessage?.(user)} aria-label="Send message" title="Send Message">
+          <Mail size={16} />
         </button>
         {canEdit && (
-          <button className="btn-primary" onClick={() => onEdit?.(user)}>
-            Edit User
+          <button className="btn-primary" onClick={() => onEdit?.(user)} aria-label="Edit user" title="Edit User">
+            <Pencil size={16} />
           </button>
         )}
-        <button className="btn bg-gray-400 text-gray-800 hover:bg-gray-500" onClick={onClose}>
-          Close
+        <button className="btn bg-gray-400 text-gray-800 hover:bg-gray-500" onClick={onClose} aria-label="Close user detail" title="Close">
+          <X size={16} />
         </button>
       </div>
     </div>
