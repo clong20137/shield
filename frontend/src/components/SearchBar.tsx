@@ -1,6 +1,7 @@
 import React from 'react';
 import { SlidersHorizontal, Search } from 'lucide-react';
 import { UserFilters } from '../services/api';
+import { rankOptions } from '../constants/ranks';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
@@ -107,11 +108,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
           >
             <option value="">All Ranks</option>
-            <option value="Officer">Officer</option>
-            <option value="Detective">Detective</option>
-            <option value="Sergeant">Sergeant</option>
-            <option value="Lieutenant">Lieutenant</option>
-            <option value="Captain">Captain</option>
+            {rankOptions.filter(Boolean).map((rank) => (
+              <option key={rank} value={rank}>{rank}</option>
+            ))}
           </select>
 
           <select

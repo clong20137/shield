@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { RotateCcw, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CreateUserPayload, User, userService } from '../services/api';
+import { rankOptions } from '../constants/ranks';
 
 interface CreateUserPageProps {
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
@@ -198,7 +199,9 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Rank</span>
-            <input value={form.rank} onChange={(event) => updateField('rank', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+            <select value={form.rank} onChange={(event) => updateField('rank', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+              {rankOptions.map((rank) => <option key={rank || 'none'} value={rank}>{rank || 'Select'}</option>)}
+            </select>
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Badge Number</span>

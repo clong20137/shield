@@ -1,13 +1,7 @@
 import { ShieldCheck } from 'lucide-react';
+import { leadershipRanks } from '../constants/ranks';
 
-const importantRanks = new Map<string, string>([
-  ['sergeant', 'Sergeant'],
-  ['first sergeant', 'First Sergeant'],
-  ['lieutenant', 'Lieutenant'],
-  ['captain', 'Captain'],
-  ['colonel', 'Colonel'],
-  ['superintendent', 'Superintendent'],
-]);
+const importantRanks = new Map(leadershipRanks.map((rank) => [rank.toLowerCase(), rank]));
 
 function normalizeRank(rank?: string | null): string {
   return (rank || '').trim().replace(/\s+/gu, ' ').toLowerCase();

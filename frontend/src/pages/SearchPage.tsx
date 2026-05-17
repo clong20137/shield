@@ -6,6 +6,7 @@ import { AuthAccount, messageService, userService, User, UserFilters } from '../
 import { SearchBar } from '../components/SearchBar';
 import { UserTable } from '../components/UserTable';
 import { UserDetail } from '../components/UserDetail';
+import { rankOptions } from '../constants/ranks';
 
 interface SearchPageProps {
   currentUser: AuthAccount | null;
@@ -402,6 +403,12 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">District</span>
                   <input value={String(editForm.district || '')} onChange={(event) => updateEditField('district', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Rank</span>
+                  <select value={String(editForm.rank || '')} onChange={(event) => updateEditField('rank', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                    {rankOptions.map((rank) => <option key={rank || 'none'} value={rank}>{rank || 'Select'}</option>)}
+                  </select>
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Badge Number</span>
