@@ -86,6 +86,19 @@ app.use('/api/performance-evaluations', performanceEvaluationRoutes);
 const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
 app.use(express.static(frontendDistPath));
 
+// Health check
+app.get('/health', (req: Request, res: Response) => {
+  res.json({ status: 'Server is running' });
+});
+
+app.get('/api/*', (req: Request, res: Response) => {
+  res.status(404).json({ error: 'API route not found' });
+});
+
+app.get('*', (req: Request, res: Response) => {
+  res.sendFile(path.join(frontendDistPath, 'index.html'));
+});
+
 app.use((error: Error, req: Request, res: Response, next: express.NextFunction) => {
   if (error instanceof multer.MulterError) {
     return res.status(400).json({ error: error.message });
@@ -101,19 +114,6 @@ app.use((error: Error, req: Request, res: Response, next: express.NextFunction) 
 
   console.error('Unhandled request error:', error);
   res.status(500).json({ error: 'Internal server error' });
-});
-
-// Health check
-app.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'Server is running' });
-});
-
-app.get('*', (req: Request, res: Response) => {
-  if (req.path.startsWith('/api/')) {
-    return res.status(404).json({ error: 'API route not found' });
-  }
-
-  res.sendFile(path.join(frontendDistPath, 'index.html'));
 });
 
 // Start server

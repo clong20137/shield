@@ -34,22 +34,6 @@ const reactionOptions: Array<{
   { key: 'thanks', label: 'Thanks', Icon: Heart },
 ];
 
-const indianaCountyRows = [
-  ['Lake', 'Porter', 'LaPorte', 'St. Joseph', 'Elkhart', 'LaGrange', 'Steuben'],
-  ['Newton', 'Jasper', 'Starke', 'Marshall', 'Kosciusko', 'Noble', 'DeKalb'],
-  ['Benton', 'White', 'Pulaski', 'Fulton', 'Miami', 'Wabash', 'Huntington', 'Allen'],
-  ['Warren', 'Tippecanoe', 'Carroll', 'Cass', 'Howard', 'Grant', 'Blackford', 'Wells', 'Adams'],
-  ['Vermillion', 'Fountain', 'Montgomery', 'Clinton', 'Tipton', 'Madison', 'Delaware', 'Jay'],
-  ['Vigo', 'Parke', 'Putnam', 'Boone', 'Hamilton', 'Hancock', 'Henry', 'Randolph'],
-  ['Clay', 'Owen', 'Morgan', 'Hendricks', 'Marion', 'Shelby', 'Rush', 'Fayette', 'Union', 'Wayne'],
-  ['Sullivan', 'Greene', 'Monroe', 'Brown', 'Johnson', 'Bartholomew', 'Decatur', 'Franklin'],
-  ['Knox', 'Daviess', 'Martin', 'Lawrence', 'Jackson', 'Jennings', 'Ripley', 'Dearborn', 'Ohio', 'Switzerland'],
-  ['Gibson', 'Pike', 'Dubois', 'Orange', 'Washington', 'Scott', 'Jefferson'],
-  ['Posey', 'Vanderburgh', 'Warrick', 'Spencer', 'Perry', 'Crawford', 'Harrison', 'Floyd', 'Clark'],
-];
-
-const indianaCountyCount = indianaCountyRows.reduce((total, row) => total + row.length, 0);
-
 const createDefaultEntryForm = (date: string): CalendarEntryForm => ({
   category: 'General Information',
   date,
@@ -803,72 +787,6 @@ function SystemOverview({ stats }: { stats: SystemStatistics }) {
   );
 }
 
-function IndianaCountyMap() {
-  const [selectedCounty, setSelectedCounty] = useState('Marion');
-
-  return (
-    <section className="mb-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2>Indiana County Map</h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Interactive county view for quick statewide reference.
-          </p>
-        </div>
-        <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold uppercase text-accent">
-          {indianaCountyCount} Counties
-        </span>
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_260px]">
-        <div className="overflow-x-auto rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
-          <div className="min-w-[760px] space-y-1" aria-label="Interactive Indiana counties">
-            {indianaCountyRows.map((row, rowIndex) => (
-              <div
-                key={`county-row-${rowIndex}`}
-                className="flex justify-center gap-1"
-                style={{ paddingLeft: `${Math.abs(5 - rowIndex) * 14}px` }}
-              >
-                {row.map((county) => {
-                  const isSelected = selectedCounty === county;
-
-                  return (
-                    <button
-                      key={county}
-                      type="button"
-                      onClick={() => setSelectedCounty(county)}
-                      className={`h-10 min-w-20 rounded border px-2 text-xs font-semibold transition ${
-                        isSelected
-                          ? 'border-accent bg-accent text-white shadow'
-                          : 'border-gray-200 bg-white text-gray-700 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                      }`}
-                      aria-pressed={isSelected}
-                      title={`${county} County`}
-                    >
-                      {county}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded border border-gray-200 p-4 dark:border-gray-800">
-          <div className="mb-3 flex h-11 w-11 items-center justify-center rounded bg-accent/10 text-accent">
-            <MapPinned size={21} />
-          </div>
-          <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Selected County</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">{selectedCounty}</p>
-          <p className="mt-3 text-sm leading-6 text-gray-500 dark:text-gray-400">
-            This panel can be expanded later to show users, devices, reports, or district activity by county.
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUser }) => {
   const [stats, setStats] = useState<SystemStatistics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -944,8 +862,6 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
       {error && <div className="error">{error}</div>}
 
       {stats && <SystemOverview stats={stats} />}
-
-      <IndianaCountyMap />
 
       <DashboardNews currentUser={currentUser} />
     </div>
