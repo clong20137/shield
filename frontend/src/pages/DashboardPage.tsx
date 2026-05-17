@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Pencil, Plus, Save, Send, Trash2, X } from 'lucide-react';
-import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, userService, reportService, ReportRow, SystemStatistics, User } from '../services/api';
-import { StatisticsCard } from '../components/StatisticsCard';
+import { AlertCircle, ChevronLeft, ChevronRight, Heart, KeyRound, LucideIcon, MapPinned, Pencil, PartyPopper, Plus, Save, Send, ShieldCheck, ThumbsUp, Trash2, UserCheck, Users, UserX, X } from 'lucide-react';
+import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, reportService, SystemStatistics } from '../services/api';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>;
 type DashboardPostForm = Pick<DashboardPost, 'title' | 'body' | 'category'>;
@@ -52,6 +51,17 @@ const defaultPostForm: DashboardPostForm = {
   body: '',
   category: 'Update',
 };
+
+const reactionOptions: Array<{
+  key: DashboardReaction;
+  label: string;
+  Icon: LucideIcon;
+}> = [
+  { key: 'like', label: 'Like', Icon: ThumbsUp },
+  { key: 'celebrate', label: 'Celebrate', Icon: PartyPopper },
+  { key: 'important', label: 'Important', Icon: AlertCircle },
+  { key: 'thanks', label: 'Thanks', Icon: Heart },
+];
 
 const createDefaultEntryForm = (date: string): CalendarEntryForm => ({
   category: 'General Information',
@@ -497,56 +507,6 @@ export function DashboardCalendar() {
   );
 }
 
-function ReportBarChart({
-  title,
-  labelKey,
-  data,
-}: {
-  title: string;
-  labelKey: keyof Pick<ReportRow, 'rank' | 'district' | 'employmentType'>;
-  data: ReportRow[];
-}) {
-  const maxCount = Math.max(...data.map((item) => Number(item.count) || 0), 1);
-  const topItems = data.slice(0, 6);
-
-  return (
-    <div className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-      <div className="mb-5 flex items-center justify-between">
-        <h2 className="text-xl">{title}</h2>
-        <span className="rounded bg-accent/10 px-3 py-1 text-xs font-bold uppercase text-accent">
-          Live
-        </span>
-      </div>
-      <div className="space-y-4">
-        {topItems.length === 0 ? (
-          <div className="empty-state">No report data</div>
-        ) : (
-          topItems.map((item, index) => {
-            const label = item[labelKey] || 'Unassigned';
-            const count = Number(item.count) || 0;
-            const percentage = Math.max((count / maxCount) * 100, 3);
-
-            return (
-              <div key={`${label}-${index}`}>
-                <div className="mb-1 flex justify-between text-sm">
-                  <span className="font-semibold text-gray-700 dark:text-gray-300">{label}</span>
-                  <span className="text-gray-500 dark:text-gray-400">{count}</span>
-                </div>
-                <div className="h-3 rounded bg-gray-100 dark:bg-gray-800">
-                  <div
-                    className="h-3 rounded bg-primary-500"
-                    style={{ width: `${percentage}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
-}
-
 function DashboardNews({
   currentUser,
 }: {
@@ -556,6 +516,7 @@ function DashboardNews({
   const [postForm, setPostForm] = useState<DashboardPostForm>(defaultPostForm);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isSavingPost, setIsSavingPost] = useState(false);
+  const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [postPendingDelete, setPostPendingDelete] = useState<DashboardPost | null>(null);
   const [postError, setPostError] = useState<string | null>(null);
   const isAdministrator = currentUser?.role === 'administrator';
@@ -602,6 +563,7 @@ function DashboardNews({
       });
       setPosts((currentPosts) => [response.data, ...currentPosts]);
       setPostForm(defaultPostForm);
+      setIsCreatePostOpen(false);
     } catch (err) {
       console.error('Failed to create dashboard post:', err);
       setPostError('Failed to publish update.');
@@ -626,56 +588,41 @@ function DashboardNews({
     }
   };
 
+  const reactToPost = async (post: DashboardPost, reaction: DashboardReaction) => {
+    const nextReaction = post.myReaction === reaction ? null : reaction;
+    setPostError(null);
+    try {
+      const response = await dashboardPostService.react(post.id, nextReaction);
+      setPosts((currentPosts) =>
+        currentPosts.map((currentPost) => (currentPost.id === post.id ? response.data : currentPost)),
+      );
+    } catch (err) {
+      console.error('Failed to update dashboard post reaction:', err);
+      setPostError('Failed to update reaction.');
+    }
+  };
+
   return (
     <section className="mb-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-      <div className="mb-5">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2>Updates & News</h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Administrative posts for everyone using SHIELD.</p>
         </div>
+        {isAdministrator && (
+          <button
+            type="button"
+            onClick={() => setIsCreatePostOpen(true)}
+            className="btn-primary"
+            aria-label="Create update or news post"
+            title="Create Update"
+          >
+            <Plus size={16} />
+          </button>
+        )}
       </div>
 
       {postError && <div className="error">{postError}</div>}
-
-      {isAdministrator && (
-        <form onSubmit={createPost} className="mb-6 rounded border border-gray-200 p-4 dark:border-gray-800">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[160px_minmax(0,1fr)]">
-            <label>
-              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Type</span>
-              <select
-                value={postForm.category}
-                onChange={(event) => setPostForm((form) => ({ ...form, category: event.target.value as DashboardPost['category'] }))}
-                className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-              >
-                <option>Update</option>
-                <option>News</option>
-                <option>Alert</option>
-              </select>
-            </label>
-            <label>
-              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Title</span>
-              <input
-                value={postForm.title}
-                onChange={(event) => setPostForm((form) => ({ ...form, title: event.target.value }))}
-                className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-              />
-            </label>
-            <label className="lg:col-span-2">
-              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Post</span>
-              <textarea
-                value={postForm.body}
-                onChange={(event) => setPostForm((form) => ({ ...form, body: event.target.value }))}
-                className="min-h-24 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-              />
-            </label>
-          </div>
-          <div className="mt-4">
-            <button type="submit" className="btn-primary" disabled={isSavingPost} aria-label="Publish post" title={isSavingPost ? 'Publishing' : 'Publish Post'}>
-              <Send size={16} />
-            </button>
-          </div>
-        </form>
-      )}
 
       {isLoadingPosts ? (
         <div className="loading">Loading updates...</div>
@@ -697,6 +644,30 @@ function DashboardNews({
                 )}
               </div>
               <p className="whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300">{post.body}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {reactionOptions.map(({ key, label, Icon }) => {
+                  const isActive = post.myReaction === key;
+                  const count = post.reactions?.[key] || 0;
+
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => reactToPost(post, key)}
+                      className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-sm font-semibold transition ${
+                        isActive
+                          ? 'border-accent bg-accent/10 text-accent'
+                          : 'border-gray-200 text-gray-600 hover:border-accent hover:text-accent dark:border-gray-800 dark:text-gray-300'
+                      }`}
+                      aria-label={`${label} reaction`}
+                      title={label}
+                    >
+                      <Icon size={16} />
+                      <span>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
               <p className="mt-4 text-xs text-gray-400">
                 Posted by {post.authorName || 'Administrator'} on {new Date(post.createdAt).toLocaleString()}
               </p>
@@ -704,12 +675,70 @@ function DashboardNews({
           ))}
         </div>
       )}
+      {isCreatePostOpen && (
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="modal-window w-full max-w-xl rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Create Update</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Publish news, updates, or alerts to the dashboard.
+                </p>
+              </div>
+              <button type="button" onClick={() => setIsCreatePostOpen(false)} className="icon-close-button" aria-label="Close create update modal" title="Close">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={createPost} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-[150px_minmax(0,1fr)]">
+                <label>
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Type</span>
+                  <select
+                    value={postForm.category}
+                    onChange={(event) => setPostForm((form) => ({ ...form, category: event.target.value as DashboardPost['category'] }))}
+                    className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                  >
+                    <option>Update</option>
+                    <option>News</option>
+                    <option>Alert</option>
+                  </select>
+                </label>
+                <label>
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Title</span>
+                  <input
+                    value={postForm.title}
+                    onChange={(event) => setPostForm((form) => ({ ...form, title: event.target.value }))}
+                    className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                  />
+                </label>
+              </div>
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Post</span>
+                <textarea
+                  value={postForm.body}
+                  onChange={(event) => setPostForm((form) => ({ ...form, body: event.target.value }))}
+                  className="min-h-32 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                />
+              </label>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setIsCreatePostOpen(false)} className="btn-secondary" aria-label="Cancel create update" title="Cancel">
+                  <X size={16} />
+                </button>
+                <button type="submit" className="btn-primary" disabled={isSavingPost} aria-label="Publish post" title={isSavingPost ? 'Publishing' : 'Publish Post'}>
+                  <Send size={16} />
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {postPendingDelete && (
         <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
           <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Post</h2>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Delete “{postPendingDelete.title}” from Updates & News?
+              Delete "{postPendingDelete.title}" from Updates & News?
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setPostPendingDelete(null)} className="btn-secondary" aria-label="Cancel delete post" title="Cancel">
@@ -726,12 +755,69 @@ function DashboardNews({
   );
 }
 
+function SystemOverview({ stats }: { stats: SystemStatistics }) {
+  const activePercentage = stats.totalUsers
+    ? Math.round((Number(stats.activeUsers || 0) / Number(stats.totalUsers || 1)) * 100)
+    : 0;
+  const overviewItems = [
+    { label: 'Total Users', value: stats.totalUsers || 0, Icon: Users },
+    { label: 'Active Users', value: stats.activeUsers || 0, Icon: UserCheck },
+    { label: 'Inactive Users', value: stats.inactiveUsers || 0, Icon: UserX },
+    { label: 'Login Accounts', value: stats.totalAccounts || 0, Icon: KeyRound },
+  ];
+
+  return (
+    <section className="mb-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2>System Overview</h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Live account health and access summary.
+          </p>
+        </div>
+        <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold uppercase text-accent">
+          {activePercentage}% Active
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {overviewItems.map(({ label, value, Icon }) => (
+          <div key={label} className="rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
+            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded bg-accent/10 text-accent">
+              <Icon size={19} />
+            </div>
+            <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">{label}</p>
+            <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-gray-100">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="rounded border border-gray-200 p-4 dark:border-gray-800">
+          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-200">
+            <ShieldCheck size={17} className="text-accent" />
+            Administrator Access
+          </div>
+          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.administratorAccounts || 0}</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {stats.standardAccounts || 0} standard user accounts
+          </p>
+        </div>
+        <div className="rounded border border-gray-200 p-4 dark:border-gray-800">
+          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-200">
+            <MapPinned size={17} className="text-accent" />
+            Coverage
+          </div>
+          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalDistricts || 0}</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Districts represented in user profiles</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUser }) => {
   const [stats, setStats] = useState<SystemStatistics | null>(null);
-  const [recentUsers, setRecentUsers] = useState<User[]>([]);
-  const [rankReport, setRankReport] = useState<ReportRow[]>([]);
-  const [districtReport, setDistrictReport] = useState<ReportRow[]>([]);
-  const [employmentReport, setEmploymentReport] = useState<ReportRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
@@ -764,19 +850,9 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
     }
     setError(null);
     try {
-      const [statsRes, usersRes, rankRes, districtRes, employmentRes] = await Promise.all([
-        reportService.getStatistics(),
-        userService.getAll(1, 10),
-        reportService.getByRank(),
-        reportService.getByDistrict(),
-        reportService.getByEmploymentType(),
-      ]);
+      const statsRes = await reportService.getStatistics();
 
       setStats(statsRes.data);
-      setRecentUsers(usersRes.data.data);
-      setRankReport(rankRes.data);
-      setDistrictReport(districtRes.data);
-      setEmploymentReport(employmentRes.data);
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
       setError('Failed to load dashboard data. Check that the backend is running and MySQL is available.');
@@ -801,18 +877,6 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
     );
   }
 
-  const statItems = stats
-    ? [
-        { label: 'Total Users', value: stats.totalUsers || 0, icon: 'Users' },
-        { label: 'Active Users', value: stats.activeUsers || 0, icon: 'On' },
-        { label: 'Inactive Users', value: stats.inactiveUsers || 0, icon: 'Off' },
-        { label: 'Districts', value: stats.totalDistricts || 0, icon: 'Map' },
-        { label: 'Login Accounts', value: stats.totalAccounts || 0, icon: 'Accounts' },
-        { label: 'Administrators', value: stats.administratorAccounts || 0, icon: 'Admin' },
-        { label: 'Standard Users', value: stats.standardAccounts || 0, icon: 'User' },
-      ]
-    : [];
-
   return (
     <div>
       <div className="mb-8">
@@ -826,58 +890,9 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
 
       {error && <div className="error">{error}</div>}
 
-      {stats && (
-        <StatisticsCard
-          stats={statItems}
-          title="System Overview"
-        />
-      )}
+      {stats && <SystemOverview stats={stats} />}
 
       <DashboardNews currentUser={currentUser} />
-
-      <div className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <ReportBarChart title="Users by Rank" labelKey="rank" data={rankReport} />
-        <ReportBarChart title="Users by District" labelKey="district" data={districtReport} />
-        <ReportBarChart title="Employment Type" labelKey="employmentType" data={employmentReport} />
-      </div>
-
-      <div className="bg-white rounded-lg p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-        <h2 className="mb-6">Recent Users</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {recentUsers.map((user) => (
-            <div
-              key={user.id}
-              className="bg-gradient-to-br from-gray-50 to-white border border-gray-300 rounded-lg p-5 transition hover:shadow-lg hover:-translate-y-1 dark:from-gray-800 dark:to-gray-900 dark:border-gray-700"
-            >
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <h3 className="text-primary-500 m-0 mb-2 text-base font-bold">
-                    {user.firstName} {user.lastName}
-                  </h3>
-                  <p className="m-0 mb-1 text-sm text-gray-600 font-semibold dark:text-gray-300">
-                    Badge: {user.badgeNumber}
-                  </p>
-                  <p className="m-0 mb-1 text-sm text-secondary-500">
-                    Rank: {user.rank}
-                  </p>
-                  <p className="m-0 text-sm text-accent">
-                    District: {user.district}
-                  </p>
-                </div>
-                <div>
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                    user.isActive
-                      ? 'bg-green-100 text-success'
-                      : 'bg-red-100 text-danger'
-                  }`}>
-                    {user.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 };

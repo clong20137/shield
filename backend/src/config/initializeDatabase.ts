@@ -216,6 +216,20 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS dashboard_post_reactions (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`postId\` VARCHAR(36) NOT NULL,
+      \`userId\` VARCHAR(36) NOT NULL,
+      \`reaction\` VARCHAR(30) NOT NULL,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY \`uniq_dashboard_post_reaction\` (\`postId\`, \`userId\`),
+      INDEX \`idx_dashboard_post_reactions_post\` (\`postId\`),
+      INDEX \`idx_dashboard_post_reactions_user\` (\`userId\`)
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS user_messages (
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`senderAccountId\` VARCHAR(36) NOT NULL,

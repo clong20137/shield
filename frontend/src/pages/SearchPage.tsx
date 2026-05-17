@@ -400,6 +400,17 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                     {['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Administrative Duty', 'Inactive'].map((status) => <option key={status}>{status}</option>)}
                   </select>
                 </label>
+                <label className="flex items-center justify-between gap-4 rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                  <span>
+                    <span className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Account active</span>
+                    <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Turn off to lock login access without deleting the user.</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={editForm.isActive !== false}
+                    onChange={(event) => updateEditField('isActive', event.target.checked)}
+                  />
+                </label>
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">District</span>
                   <input value={String(editForm.district || '')} onChange={(event) => updateEditField('district', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />

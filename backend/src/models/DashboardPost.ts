@@ -9,11 +9,23 @@ export interface DashboardPost {
   category: string;
   authorId: string | null;
   authorName: string | null;
+  reactions: Record<string, number>;
+  myReaction?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
 interface DashboardPostRow extends RowDataPacket, DashboardPost {}
+interface DashboardPostReactionCountRow extends RowDataPacket {
+  postId: string;
+  reaction: string;
+  count: number;
+}
+
+interface DashboardPostViewerReactionRow extends RowDataPacket {
+  postId: string;
+  reaction: string;
+}
 
 export interface DashboardPostInput {
   title: string;
@@ -24,7 +36,52 @@ export interface DashboardPostInput {
 }
 
 export class DashboardPostModel {
-  static async listPosts(limit = 10): Promise<DashboardPost[]> {
+  private static async hydrateReactions(posts: DashboardPost[], viewerId?: string): Promise<DashboardPost[]> {
+    if (posts.length === 0) {
+      return posts;
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      const postIds = posts.map((post) => post.id);
+      const placeholders = postIds.map(() => '?').join(', ');
+      const [reactionRows] = await conn.query<DashboardPostReactionCountRow[]>(
+        `SELECT \`postId\`, \`reaction\`, COUNT(*) as count
+         FROM dashboard_post_reactions
+         WHERE \`postId\` IN (${placeholders})
+         GROUP BY \`postId\`, \`reaction\``,
+        postIds,
+      );
+
+      const reactionCounts = new Map<string, Record<string, number>>();
+      reactionRows.forEach((row) => {
+        const counts = reactionCounts.get(row.postId) || {};
+        counts[row.reaction] = Number(row.count) || 0;
+        reactionCounts.set(row.postId, counts);
+      });
+
+      const viewerReactions = new Map<string, string>();
+      if (viewerId) {
+        const [viewerRows] = await conn.query<DashboardPostViewerReactionRow[]>(
+          `SELECT \`postId\`, \`reaction\`
+           FROM dashboard_post_reactions
+           WHERE \`userId\` = ? AND \`postId\` IN (${placeholders})`,
+          [viewerId, ...postIds],
+        );
+        viewerRows.forEach((row) => viewerReactions.set(row.postId, row.reaction));
+      }
+
+      return posts.map((post) => ({
+        ...post,
+        reactions: reactionCounts.get(post.id) || {},
+        myReaction: viewerReactions.get(post.id) || null,
+      }));
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async listPosts(limit = 10, viewerId?: string): Promise<DashboardPost[]> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<DashboardPostRow[]>(
@@ -32,7 +89,32 @@ export class DashboardPostModel {
         [limit],
       );
 
-      return rows;
+      return DashboardPostModel.hydrateReactions(
+        rows.map((row) => ({ ...row, reactions: {}, myReaction: null })),
+        viewerId,
+      );
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async getPost(id: string, viewerId?: string): Promise<DashboardPost | null> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<DashboardPostRow[]>(
+        'SELECT * FROM dashboard_posts WHERE `id` = ? LIMIT 1',
+        [id],
+      );
+
+      if (rows.length === 0) {
+        return null;
+      }
+
+      const [post] = await DashboardPostModel.hydrateReactions(
+        [{ ...rows[0], reactions: {}, myReaction: null }],
+        viewerId,
+      );
+      return post;
     } finally {
       conn.release();
     }
@@ -67,6 +149,8 @@ export class DashboardPostModel {
         category: input.category || 'Update',
         authorId: input.authorId || null,
         authorName: input.authorName || null,
+        reactions: {},
+        myReaction: null,
         createdAt: now,
         updatedAt: now,
       };
@@ -78,8 +162,43 @@ export class DashboardPostModel {
   static async deletePost(id: string): Promise<boolean> {
     const conn = await pool.getConnection();
     try {
+      await conn.query<ResultSetHeader>('DELETE FROM dashboard_post_reactions WHERE `postId` = ?', [id]);
       const [result] = await conn.query<ResultSetHeader>('DELETE FROM dashboard_posts WHERE `id` = ?', [id]);
       return result.affectedRows > 0;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async setReaction(postId: string, userId: string, reaction: string | null): Promise<DashboardPost | null> {
+    const conn = await pool.getConnection();
+    try {
+      const [postRows] = await conn.query<RowDataPacket[]>(
+        'SELECT `id` FROM dashboard_posts WHERE `id` = ? LIMIT 1',
+        [postId],
+      );
+
+      if (postRows.length === 0) {
+        return null;
+      }
+
+      if (!reaction) {
+        await conn.query<ResultSetHeader>(
+          'DELETE FROM dashboard_post_reactions WHERE `postId` = ? AND `userId` = ?',
+          [postId, userId],
+        );
+      } else {
+        const now = new Date();
+        await conn.query<ResultSetHeader>(
+          `INSERT INTO dashboard_post_reactions (
+            \`id\`, \`postId\`, \`userId\`, \`reaction\`, \`createdAt\`, \`updatedAt\`
+          ) VALUES (?, ?, ?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE \`reaction\` = VALUES(\`reaction\`), \`updatedAt\` = VALUES(\`updatedAt\`)`,
+          [uuidv4(), postId, userId, reaction, now, now],
+        );
+      }
+
+      return DashboardPostModel.getPost(postId, userId);
     } finally {
       conn.release();
     }

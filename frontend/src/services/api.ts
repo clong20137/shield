@@ -124,6 +124,7 @@ export interface AuthAccount {
   displayName: string;
   profilePictureUrl: string;
   role: string;
+  isActive: boolean;
   receivesMessages: boolean;
   hasCompletedOnboarding: boolean;
   twoFactorEnabled: boolean;
@@ -269,9 +270,13 @@ export interface DashboardPost {
   category: 'Update' | 'News' | 'Alert';
   authorId: string | null;
   authorName: string | null;
+  reactions: Record<string, number>;
+  myReaction?: DashboardReaction | null;
   createdAt: string;
   updatedAt: string;
 }
+
+export type DashboardReaction = 'like' | 'celebrate' | 'important' | 'thanks';
 
 export type BugReportStatus = 'New' | 'Pending' | 'Fixed' | 'Closed';
 export type BugReportPriority = 'Low' | 'Normal' | 'High' | 'Critical';
@@ -544,6 +549,9 @@ export const dashboardPostService = {
 
   delete: (id: string, requesterId?: string) =>
     api.delete(`/dashboard-posts/${id}`, { data: { requesterId } }),
+
+  react: (id: string, reaction: DashboardReaction | null) =>
+    api.put<DashboardPost>(`/dashboard-posts/${id}/reaction`, { reaction }),
 };
 
 export const bugReportService = {

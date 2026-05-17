@@ -5,13 +5,15 @@ import { broadcastAppEvent } from '../services/appEvents';
 import { cleanMultiline, cleanString, isOneOf } from '../utils/validation';
 
 const dashboardCategories = ['Update', 'News', 'Alert'] as const;
+const dashboardReactions = ['like', 'celebrate', 'important', 'thanks'] as const;
 
 export class DashboardPostController {
   static async listPosts(req: Request, res: Response) {
     try {
+      const account = await getSessionAccount(req);
       const requestedLimit = Number(req.query.limit) || 10;
       const limit = Math.min(Math.max(requestedLimit, 1), 50);
-      const posts = await DashboardPostModel.listPosts(limit);
+      const posts = await DashboardPostModel.listPosts(limit, account?.id);
       res.json(posts);
     } catch (error) {
       console.error('Dashboard posts list error:', error);
@@ -51,6 +53,35 @@ export class DashboardPostController {
     } catch (error) {
       console.error('Dashboard post create error:', error);
       res.status(500).json({ error: 'Failed to create dashboard post' });
+    }
+  }
+
+  static async setReaction(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const reaction = req.body?.reaction === null
+        ? null
+        : cleanString(req.body?.reaction, 30);
+
+      if (reaction && !isOneOf(reaction, dashboardReactions)) {
+        return res.status(400).json({ error: 'Choose a valid reaction' });
+      }
+
+      const post = await DashboardPostModel.setReaction(req.params.id, account.id, reaction || null);
+
+      if (!post) {
+        return res.status(404).json({ error: 'Dashboard post not found' });
+      }
+
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: post.id });
+      res.json(post);
+    } catch (error) {
+      console.error('Dashboard post reaction error:', error);
+      res.status(500).json({ error: 'Failed to update reaction' });
     }
   }
 

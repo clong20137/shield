@@ -9,6 +9,7 @@ export interface AuthAccount {
   displayName: string;
   profilePictureUrl: string;
   role: string;
+  isActive: boolean;
   receivesMessages: boolean;
   hasCompletedOnboarding: boolean;
   twoFactorEnabled: boolean;
@@ -32,6 +33,7 @@ interface AuthAccountRow extends RowDataPacket {
   displayName: string | null;
   profilePictureUrl: string | null;
   role: string;
+  isActive: boolean | number;
   receivesMessages: boolean | number;
   hasCompletedOnboarding: boolean | number;
   passwordHash: string | null;
@@ -152,6 +154,7 @@ function toPublicAccount(account: AuthAccountRow): AuthAccount {
     displayName: account.displayName || fallbackName || account.email,
     profilePictureUrl: account.profilePictureUrl || '',
     role: account.role || 'user',
+    isActive: account.isActive !== false && account.isActive !== 0,
     receivesMessages: account.receivesMessages !== false && account.receivesMessages !== 0,
     hasCompletedOnboarding: Boolean(account.hasCompletedOnboarding),
     twoFactorEnabled: Boolean(account.twoFactorEnabled),
@@ -234,6 +237,7 @@ export class AuthAccountModel {
           displayName: displayName.trim(),
           profilePictureUrl: existingUser.profilePictureUrl || '',
           role,
+          isActive: existingUser.isActive !== false && existingUser.isActive !== 0,
           receivesMessages: existingUser.receivesMessages !== false && existingUser.receivesMessages !== 0,
           hasCompletedOnboarding: Boolean(existingUser.hasCompletedOnboarding),
           twoFactorEnabled: Boolean(existingUser.twoFactorEnabled),
@@ -258,6 +262,7 @@ export class AuthAccountModel {
         displayName: displayName.trim(),
         profilePictureUrl: '',
         role,
+        isActive: true,
         receivesMessages: true,
         hasCompletedOnboarding: false,
         twoFactorEnabled: false,
@@ -283,6 +288,10 @@ export class AuthAccountModel {
         return { account: null, requiresTwoFactor: false };
       }
 
+      if (account.isActive === false || account.isActive === 0) {
+        return { account: null, requiresTwoFactor: false };
+      }
+
       if (account.twoFactorEnabled && account.twoFactorSecret) {
         if (!twoFactorCode) {
           return { account: null, requiresTwoFactor: true };
@@ -303,7 +312,7 @@ export class AuthAccountModel {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<AuthAccountRow[]>(
-        'SELECT * FROM users WHERE `id` = ? AND `passwordHash` IS NOT NULL LIMIT 1',
+        'SELECT * FROM users WHERE `id` = ? AND `passwordHash` IS NOT NULL AND `isActive` = 1 LIMIT 1',
         [accountId]
       );
       const account = rows[0];
@@ -454,7 +463,7 @@ export class AuthAccountModel {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<AuthAccountRow[]>(
-        'SELECT * FROM users WHERE LOWER(`email`) = ? AND `passwordHash` IS NOT NULL LIMIT 1',
+        'SELECT * FROM users WHERE LOWER(`email`) = ? AND `passwordHash` IS NOT NULL AND `isActive` = 1 LIMIT 1',
         [normalizeEmail(email)]
       );
       const account = rows[0];

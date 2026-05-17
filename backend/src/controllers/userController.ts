@@ -4,6 +4,7 @@ import { User, UserModel } from '../models/User';
 import { broadcastAppEvent } from '../services/appEvents';
 import { getSessionAccount } from '../middleware/authSession';
 import { AuthAccountModel } from '../models/AuthAccount';
+import { AuthSessionModel } from '../models/AuthSession';
 import { cleanMultiline, cleanString, isOneOf, isStrongPassword, isValidEmail, isValidPhone, normalizeEmail, normalizePhone } from '../utils/validation';
 import { isSafeUploadedImage } from '../middleware/profileUpload';
 
@@ -247,6 +248,10 @@ export class UserController {
         return res.status(400).json({ error: validation.error || 'Invalid user data' });
       }
 
+      if (sessionAccount?.id === id && validation.value.isActive === false) {
+        return res.status(400).json({ error: 'You cannot deactivate your own account' });
+      }
+
       const success = await UserModel.updateUser(id, validation.value);
 
       if (!success) {
@@ -255,6 +260,11 @@ export class UserController {
 
       broadcastAppEvent({ type: 'user-updated', entityId: id });
       broadcastAppEvent({ type: 'dashboard-updated', entityId: id });
+
+      if (validation.value.isActive === false) {
+        await AuthSessionModel.revokeAllSessions(id);
+      }
+
       res.json({ message: 'User updated successfully' });
     } catch (error) {
       if (isDuplicateUserError(error)) {
