@@ -148,4 +148,5 @@ npm install
 
 ### CORS errors
 - Frontend is using proxy in `vite.config.ts`
-- Backend has CORS enabled in `src/index.ts`
+- Backend allows all origins only when `ALLOWED_ORIGINS` is blank
+- For stricter local testing, set `ALLOWED_ORIGINS=http://localhost:3000`

@@ -25,8 +25,8 @@ DB_PORT=3306
 PORT=5000
 NODE_ENV=production
 
-# CORS (if applicable)
-CORS_ORIGIN=https://yourdomain.com
+# CORS
+ALLOWED_ORIGINS=https://yourdomain.com
 ```
 
 ## Backend Deployment

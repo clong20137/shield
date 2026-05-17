@@ -1,4 +1,4 @@
-import { Request } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import { AuthSessionModel } from '../models/AuthSession';
 
 export function getBearerToken(req: Request): string | null {
@@ -19,4 +19,21 @@ export async function getSessionAccount(req: Request) {
   }
 
   return AuthSessionModel.getAccountForToken(token);
+}
+
+export function requireAuthenticated() {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const account = await getSessionAccount(req);
+
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      return next();
+    } catch (error) {
+      console.error('Authentication check error:', error);
+      return res.status(500).json({ error: 'Failed to verify session' });
+    }
+  };
 }

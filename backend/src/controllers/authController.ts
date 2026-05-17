@@ -31,31 +31,29 @@ function isDuplicateEmailError(error: unknown): boolean {
   );
 }
 
-async function canManageRoles(accountId?: string): Promise<boolean> {
-  if (!accountId) {
+async function canManageRoles(account?: { id: string; role: string } | null): Promise<boolean> {
+  if (!account) {
     return false;
   }
 
-  const account = await AuthAccountModel.getAccountById(accountId);
-  if (account?.role === 'administrator') {
+  if (account.role === 'administrator') {
     return true;
   }
 
-  const permissions = await AuthAccountModel.getPermissionsForAccount(accountId);
+  const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
   return permissions.includes('roles:manage');
 }
 
-async function canListAccounts(accountId?: string): Promise<boolean> {
-  if (!accountId) {
+async function canListAccounts(account?: { id: string; role: string } | null): Promise<boolean> {
+  if (!account) {
     return false;
   }
 
-  const account = await AuthAccountModel.getAccountById(accountId);
-  if (account?.role === 'administrator') {
+  if (account.role === 'administrator') {
     return true;
   }
 
-  const permissions = await AuthAccountModel.getPermissionsForAccount(accountId);
+  const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
   return permissions.includes('roles:manage') || permissions.includes('devices:manage');
 }
 
@@ -376,9 +374,9 @@ export class AuthController {
 
   static async listAccounts(req: Request, res: Response) {
     try {
-      const requesterId = typeof req.query.requesterId === 'string' ? req.query.requesterId : undefined;
+      const requester = await getSessionAccount(req);
 
-      if (!(await canListAccounts(requesterId))) {
+      if (!(await canListAccounts(requester))) {
         return res.status(403).json({ error: 'Account list permission required' });
       }
 
@@ -471,13 +469,11 @@ export class AuthController {
 
   static async updateRole(req: Request, res: Response) {
     try {
-      const { requesterId, role } = req.body as {
-        requesterId?: string;
-        role?: string;
-      };
+      const { role } = req.body as { role?: string };
       const { accountId } = req.params;
+      const requester = await getSessionAccount(req);
 
-      if (!(await canManageRoles(requesterId))) {
+      if (!(await canManageRoles(requester))) {
         return res.status(403).json({ error: 'Role management permission required' });
       }
 
@@ -559,9 +555,9 @@ export class AuthController {
 
   static async listRoles(req: Request, res: Response) {
     try {
-      const requesterId = typeof req.query.requesterId === 'string' ? req.query.requesterId : undefined;
+      const requester = await getSessionAccount(req);
 
-      if (!(await canManageRoles(requesterId))) {
+      if (!(await canManageRoles(requester))) {
         return res.status(403).json({ error: 'Role management permission required' });
       }
 
@@ -575,13 +571,13 @@ export class AuthController {
 
   static async createRole(req: Request, res: Response) {
     try {
-      const { requesterId, name, permissions } = req.body as {
-        requesterId?: string;
+      const { name, permissions } = req.body as {
         name?: string;
         permissions?: string[];
       };
+      const requester = await getSessionAccount(req);
 
-      if (!(await canManageRoles(requesterId))) {
+      if (!(await canManageRoles(requester))) {
         return res.status(403).json({ error: 'Role management permission required' });
       }
 

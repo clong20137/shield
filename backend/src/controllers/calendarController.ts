@@ -4,14 +4,14 @@ import { AuditLogModel } from '../models/AuditLog';
 import { getSessionAccount } from '../middleware/authSession';
 import { broadcastAccountEvent } from '../services/appEvents';
 
-function getAuditActor(req: Request) {
+function getAuditActor(account: { id: string; displayName: string; email: string } | null) {
   return {
-    actorId: typeof req.body?.actorId === 'string' ? req.body.actorId : null,
-    actorName: typeof req.body?.actorName === 'string' ? req.body.actorName : null,
+    actorId: account?.id || null,
+    actorName: account?.displayName || account?.email || null,
   };
 }
 
-async function getCalendarAccountId(req: Request, requestedAccountId?: string): Promise<string | null> {
+async function getCalendarAccount(req: Request, requestedAccountId?: string) {
   const sessionAccount = await getSessionAccount(req);
 
   if (!sessionAccount) {
@@ -22,19 +22,19 @@ async function getCalendarAccountId(req: Request, requestedAccountId?: string): 
     throw Object.assign(new Error('Calendar account mismatch'), { statusCode: 403 });
   }
 
-  return sessionAccount.id;
+  return sessionAccount;
 }
 
 export class CalendarController {
   static async listEntries(req: Request, res: Response) {
     try {
       const requestedAccountId = typeof req.query.accountId === 'string' ? req.query.accountId : undefined;
-      const accountId = await getCalendarAccountId(req, requestedAccountId);
-      if (!accountId) {
+      const account = await getCalendarAccount(req, requestedAccountId);
+      if (!account) {
         return res.status(401).json({ error: 'Sign in to view your calendar' });
       }
 
-      const entries = await CalendarEntryModel.listEntries(accountId);
+      const entries = await CalendarEntryModel.listEntries(account.id);
       res.json(entries);
     } catch (error) {
       if (typeof error === 'object' && error !== null && (error as { statusCode?: number }).statusCode === 403) {
@@ -58,7 +58,8 @@ export class CalendarController {
         color?: string;
         details?: Record<string, string>;
       };
-      const accountId = await getCalendarAccountId(req, requestedAccountId);
+      const account = await getCalendarAccount(req, requestedAccountId);
+      const accountId = account?.id;
       const hours = Number(dutyHours);
 
       if (!accountId || !date || Number.isNaN(hours) || hours < 0 || !districtWorked) {
@@ -76,7 +77,7 @@ export class CalendarController {
         details: details && typeof details === 'object' ? details : {},
       });
 
-      const actor = getAuditActor(req);
+      const actor = getAuditActor(account);
       await AuditLogModel.create({
         ...actor,
         action: 'created',
@@ -109,7 +110,8 @@ export class CalendarController {
         color?: string;
         details?: Record<string, string>;
       };
-      const accountId = await getCalendarAccountId(req, requestedAccountId);
+      const account = await getCalendarAccount(req, requestedAccountId);
+      const accountId = account?.id;
       const hours = Number(dutyHours);
 
       if (!accountId || !date || Number.isNaN(hours) || hours < 0 || !districtWorked) {
@@ -131,7 +133,7 @@ export class CalendarController {
         return res.status(404).json({ error: 'Calendar entry not found' });
       }
 
-      const actor = getAuditActor(req);
+      const actor = getAuditActor(account);
       await AuditLogModel.create({
         ...actor,
         action: 'updated',
@@ -155,7 +157,8 @@ export class CalendarController {
   static async deleteEntry(req: Request, res: Response) {
     try {
       const requestedAccountId = typeof req.body?.accountId === 'string' ? req.body.accountId : undefined;
-      const accountId = await getCalendarAccountId(req, requestedAccountId);
+      const account = await getCalendarAccount(req, requestedAccountId);
+      const accountId = account?.id;
       if (!accountId) {
         return res.status(401).json({ error: 'Sign in to update your calendar' });
       }
@@ -166,7 +169,7 @@ export class CalendarController {
         return res.status(404).json({ error: 'Calendar entry not found' });
       }
 
-      const actor = getAuditActor(req);
+      const actor = getAuditActor(account);
       await AuditLogModel.create({
         ...actor,
         action: 'deleted',

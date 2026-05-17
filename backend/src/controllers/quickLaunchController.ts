@@ -4,12 +4,33 @@ import { QuickLaunchModel, QuickLaunchSlot } from '../models/QuickLaunch';
 import { broadcastAccountEvent } from '../services/appEvents';
 
 const SLOT_COUNT = 8;
+const allowedAppIds = new Set([
+  'dashboard',
+  'messages',
+  'calendar',
+  'devices',
+  'calculator',
+  'search',
+  'reports',
+  'create-user',
+  'audit',
+  'permissions',
+]);
+
+function sanitizeExternalUrl(url: string): string | null {
+  try {
+    const parsedUrl = new URL(url.trim());
+    return ['http:', 'https:'].includes(parsedUrl.protocol) ? parsedUrl.toString() : null;
+  } catch {
+    return null;
+  }
+}
 
 function normalizeSlots(slots: unknown): QuickLaunchSlot[] {
   const parsedSlots = Array.isArray(slots) ? slots : [];
   return Array.from({ length: SLOT_COUNT }, (_, index) => {
     const slot = parsedSlots[index];
-    if (typeof slot === 'string') return slot;
+    if (typeof slot === 'string') return allowedAppIds.has(slot) ? slot : null;
     if (
       typeof slot === 'object' &&
       slot !== null &&
@@ -17,10 +38,13 @@ function normalizeSlots(slots: unknown): QuickLaunchSlot[] {
       typeof (slot as { label?: unknown }).label === 'string' &&
       typeof (slot as { url?: unknown }).url === 'string'
     ) {
+      const url = sanitizeExternalUrl((slot as { url: string }).url);
+      if (!url) return null;
+
       return {
         type: 'external',
-        label: (slot as { label: string }).label,
-        url: (slot as { url: string }).url,
+        label: (slot as { label: string }).label.trim().slice(0, 60),
+        url,
       };
     }
     return null;

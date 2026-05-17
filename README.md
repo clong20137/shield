@@ -108,7 +108,10 @@ DB_NAME=shield
 DB_PORT=3306
 PORT=5000
 NODE_ENV=development
+ALLOWED_ORIGINS=http://localhost:3000
 ```
+
+`ALLOWED_ORIGINS` is a comma-separated list of trusted frontend origins. Leave it blank only for local testing.
 
 5. Create the database and tables:
 ```bash

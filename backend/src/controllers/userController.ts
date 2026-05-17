@@ -1,6 +1,25 @@
 import { Request, Response } from 'express';
 import { User, UserModel } from '../models/User';
 import { broadcastAppEvent } from '../services/appEvents';
+import { getSessionAccount } from '../middleware/authSession';
+import { AuthAccountModel } from '../models/AuthAccount';
+
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email);
+}
+
+function isStrongPassword(password: string): boolean {
+  return password.length >= 8 && /[A-Z]/u.test(password) && /[a-z]/u.test(password) && /\d/u.test(password);
+}
+
+async function canManageRoles(req: Request): Promise<boolean> {
+  const account = await getSessionAccount(req);
+  if (!account) return false;
+  if (account.role === 'administrator') return true;
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
+  return permissions.includes('roles:manage');
+}
 
 export class UserController {
   static async searchUsers(req: Request, res: Response) {
@@ -70,10 +89,22 @@ export class UserController {
 
   static async createUser(req: Request, res: Response) {
     try {
-      const { password } = req.body as { password?: string };
+      const { password, email, role } = req.body as { password?: string; email?: string; role?: string };
 
-      if (password && password.length < 8) {
-        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      if (email && !isValidEmail(email.trim().toLowerCase())) {
+        return res.status(400).json({ error: 'Enter a valid email address' });
+      }
+
+      if (password && !isStrongPassword(password)) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters and include uppercase, lowercase, and a number' });
+      }
+
+      if (role && role !== 'user' && !(await canManageRoles(req))) {
+        return res.status(403).json({ error: 'Role management permission required to assign that role' });
+      }
+
+      if (role && !(await AuthAccountModel.roleExists(role))) {
+        return res.status(400).json({ error: 'Choose an existing role' });
       }
 
       const user = await UserModel.createUser(req.body);
@@ -89,6 +120,11 @@ export class UserController {
   static async updateUser(req: Request, res: Response) {
     try {
       const { id } = req.params;
+
+      if (typeof req.body?.email === 'string' && req.body.email && !isValidEmail(req.body.email.trim().toLowerCase())) {
+        return res.status(400).json({ error: 'Enter a valid email address' });
+      }
+
       const success = await UserModel.updateUser(id, req.body);
 
       if (!success) {
