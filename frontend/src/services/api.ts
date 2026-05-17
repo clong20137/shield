@@ -319,6 +319,39 @@ export interface QuickLaunchResponse {
   slots: QuickLaunchSlot[];
 }
 
+export type PerformanceEvaluationStatus = 'Sent' | 'Signed';
+
+export interface PerformanceEvaluation {
+  id: string;
+  employeeAccountId: string;
+  employeeName: string;
+  employeeEmail: string;
+  supervisorAccountId: string;
+  supervisorName: string;
+  evaluationPeriod: string;
+  positionTitle: string;
+  district: string;
+  ratings: Record<string, string>;
+  strengths: string;
+  improvements: string;
+  goals: string;
+  supervisorComments: string;
+  employeeComments: string;
+  status: PerformanceEvaluationStatus;
+  supervisorSignature: string;
+  supervisorSignedAt: string | null;
+  employeeSignature: string;
+  employeeSignedAt: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreatePerformanceEvaluationPayload = Pick<
+  PerformanceEvaluation,
+  'employeeAccountId' | 'evaluationPeriod' | 'positionTitle' | 'district' | 'ratings' | 'strengths' | 'improvements' | 'goals' | 'supervisorComments'
+>;
+
 export const authService = {
   register: (email: string, password: string, displayName: string, inviteToken?: string) =>
     api.post<AuthResponse>('/auth/register', { email, password, displayName, inviteToken }),
@@ -536,6 +569,17 @@ export const mileageService = {
 
   updateMilestone: (milestone: number) =>
     api.put<{ milestone: number }>('/mileage/milestone', { milestone }),
+};
+
+export const performanceEvaluationService = {
+  getAll: () =>
+    api.get<PerformanceEvaluation[]>('/performance-evaluations'),
+
+  create: (evaluation: CreatePerformanceEvaluationPayload) =>
+    api.post<PerformanceEvaluation>('/performance-evaluations', evaluation),
+
+  sign: (id: string, signature: string, employeeComments: string) =>
+    api.post<PerformanceEvaluation>(`/performance-evaluations/${id}/sign`, { signature, employeeComments }),
 };
 
 export default api;

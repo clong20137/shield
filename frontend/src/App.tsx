@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { BarChart3, Bell, Bug, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Save, Search, Settings, Shield, SlidersHorizontal, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
+import { BarChart3, Bell, Bug, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, FileSignature, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Save, Search, Settings, Shield, SlidersHorizontal, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -11,6 +11,7 @@ import MessageInboxPage from './pages/MessageInboxPage';
 import CreateUserPage from './pages/CreateUserPage';
 import AuditLogPage from './pages/AuditLogPage';
 import CalendarPage from './pages/CalendarPage';
+import PerformanceEvaluationsPage from './pages/PerformanceEvaluationsPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, clearAuthToken, getAppEventsUrl, getMessageEventsUrl, messageService, notificationService, quickLaunchService, RegistrationSettings, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
@@ -26,7 +27,7 @@ interface MessagePreferences {
   playMessageSound: boolean;
 }
 
-type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
+type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'evaluations' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
 type QuickLaunchExternalSlot = ApiQuickLaunchExternalSlot;
 type QuickLaunchSlot = QuickLaunchAppId | QuickLaunchExternalSlot | null;
 
@@ -48,6 +49,7 @@ const quickLaunchApps: QuickLaunchApp[] = [
   { id: 'messages', label: 'Messages', icon: Mail },
   { id: 'calendar', label: 'Calendar', icon: CalendarDays },
   { id: 'devices', label: 'Devices', path: '/devices', icon: Laptop },
+  { id: 'evaluations', label: 'Evaluations', path: '/evaluations', icon: FileSignature },
   { id: 'search', label: 'Search Users', path: '/search', icon: Search },
   { id: 'reports', label: 'Reports', path: '/reports', icon: BarChart3 },
   { id: 'create-user', label: 'Create User', path: '/users/create', adminOnly: true, icon: UserPlus },
@@ -1650,6 +1652,7 @@ function App() {
     eventSource.addEventListener('dashboard-updated', () => dispatchAppUpdate('dashboard-updated'));
     eventSource.addEventListener('device-updated', () => dispatchAppUpdate('device-updated'));
     eventSource.addEventListener('mileage-updated', () => dispatchAppUpdate('mileage-updated'));
+    eventSource.addEventListener('performance-evaluation-updated', () => dispatchAppUpdate('performance-evaluation-updated'));
     eventSource.addEventListener('permission-updated', () => dispatchAppUpdate('permission-updated'));
     eventSource.addEventListener('quick-launch-updated', () => dispatchAppUpdate('quick-launch-updated'));
     eventSource.addEventListener('user-updated', () => dispatchAppUpdate('user-updated'));
@@ -1915,6 +1918,7 @@ function App() {
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
               <SidebarLink to="/calendar" label="Calendar" compact={isSidebarCollapsed} icon={CalendarDays} />
               <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />
+              <SidebarLink to="/evaluations" label="Evaluations" compact={isSidebarCollapsed} icon={FileSignature} />
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
               {isAdministrator && (
                 <>
@@ -2104,6 +2108,12 @@ function App() {
                   {currentUser && <Route path="/messages" element={<MessagesRouteRedirect onOpenMessages={() => setIsMessagesModalOpen(true)} />} />}
                   {currentUser && <Route path="/calendar" element={<CalendarRouteRedirect onOpenCalendar={() => setIsCalendarModalOpen(true)} />} />}
                   <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
+                  {currentUser && (
+                    <Route
+                      path="/evaluations"
+                      element={<PerformanceEvaluationsPage currentUser={currentUser} onToast={showToast} getErrorMessage={getErrorMessage} />}
+                    />
+                  )}
                   <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
                   {currentUser && isAdministrator && (
                     <Route path="/users/create" element={<CreateUserRouteRedirect onOpenCreateUser={() => setIsCreateUserModalOpen(true)} />} />

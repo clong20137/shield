@@ -17,6 +17,7 @@ import notificationRoutes from './routes/notificationRoutes';
 import mileageRoutes from './routes/mileageRoutes';
 import quickLaunchRoutes from './routes/quickLaunchRoutes';
 import eventRoutes from './routes/eventRoutes';
+import performanceEvaluationRoutes from './routes/performanceEvaluationRoutes';
 import { startSecurityCleanupJob } from './services/securityCleanup';
 
 dotenv.config();
@@ -44,6 +45,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/mileage', mileageRoutes);
 app.use('/api/quick-launch', quickLaunchRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/performance-evaluations', performanceEvaluationRoutes);
 
 const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
 app.use(express.static(frontendDistPath));

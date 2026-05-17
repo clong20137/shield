@@ -335,6 +335,37 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS performance_evaluations (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`employeeAccountId\` VARCHAR(36) NOT NULL,
+      \`employeeName\` VARCHAR(150) NOT NULL,
+      \`employeeEmail\` VARCHAR(255) NOT NULL,
+      \`supervisorAccountId\` VARCHAR(36) NOT NULL,
+      \`supervisorName\` VARCHAR(150) NOT NULL,
+      \`evaluationPeriod\` VARCHAR(150) NOT NULL,
+      \`positionTitle\` VARCHAR(150),
+      \`district\` VARCHAR(150),
+      \`ratings\` JSON,
+      \`strengths\` TEXT,
+      \`improvements\` TEXT,
+      \`goals\` TEXT,
+      \`supervisorComments\` TEXT,
+      \`employeeComments\` TEXT,
+      \`status\` VARCHAR(30) NOT NULL DEFAULT 'Sent',
+      \`supervisorSignature\` VARCHAR(150),
+      \`supervisorSignedAt\` TIMESTAMP NULL,
+      \`employeeSignature\` VARCHAR(150),
+      \`employeeSignedAt\` TIMESTAMP NULL,
+      \`sentAt\` TIMESTAMP NULL,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX \`idx_performance_employee\` (\`employeeAccountId\`),
+      INDEX \`idx_performance_supervisor\` (\`supervisorAccountId\`),
+      INDEX \`idx_performance_status\` (\`status\`)
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS devices (
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`type\` VARCHAR(50) NOT NULL,
