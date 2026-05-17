@@ -495,7 +495,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
             : 'grid min-h-[70vh] grid-cols-1 gap-4 xl:h-[calc(100vh-230px)] xl:grid-cols-[380px_minmax(0,1fr)]'
         }
       >
-        <section className="relative flex max-h-[34vh] min-h-0 flex-col overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 xl:max-h-none">
+        <section className="relative flex max-h-[34vh] min-h-[14rem] flex-col overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 xl:max-h-none">
           {isModalView && (
             <div className="border-b border-gray-200 p-3 dark:border-gray-800">
               <input
@@ -522,7 +522,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                   <button
                     type="button"
                     onClick={() => setSelectedThreadId(thread.id)}
-                    className="min-w-0 flex-1 text-left"
+                    className="min-h-11 min-w-0 flex-1 text-left"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -644,7 +644,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                             <button
                               type="button"
                               onClick={() => setMessagePendingDelete(message)}
-                              className="opacity-0 transition group-hover:opacity-100 hover:text-danger"
+                              className="flex h-7 w-7 items-center justify-center rounded-full opacity-100 transition hover:bg-red-50 hover:text-danger dark:hover:bg-red-950 sm:opacity-0 sm:group-hover:opacity-100"
                               aria-label="Delete message"
                               title="Delete"
                             >
@@ -673,16 +673,16 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                     ))}
                   </div>
                 )}
-                <div className="flex h-14 items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 dark:border-gray-700 dark:bg-gray-950">
+                <div className="flex min-h-14 items-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 sm:rounded-full sm:py-1.5">
                   <button
                     type="button"
                     onClick={() => setIsEmojiPickerOpen(true)}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg hover:bg-gray-100 dark:hover:bg-gray-800 sm:h-8 sm:w-8"
                     aria-label="Add emoji"
                   >
                     {emojiButtonLabel}
                   </button>
-                  <label className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800" title="Attach files">
+                  <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800 sm:h-8 sm:w-8" title="Attach files">
                     <Paperclip size={18} />
                     <input
                       type="file"
@@ -698,9 +698,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                     placeholder={selectedThreadAcceptsMessages ? 'Message' : 'Messages are disabled for this user'}
                     disabled={!selectedThreadAcceptsMessages}
                     rows={1}
-                    className="h-8 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm leading-5 outline-none"
+                    className="min-h-10 flex-1 resize-none bg-transparent px-1 py-2 text-sm leading-5 outline-none sm:min-h-8 sm:py-1.5"
                   />
-                  <button type="submit" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50" disabled={isSending || !selectedThreadAcceptsMessages} aria-label="Send message">
+                  <button type="submit" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9" disabled={isSending || !selectedThreadAcceptsMessages} aria-label="Send message">
                     <Send size={17} />
                   </button>
                 </div>
@@ -711,8 +711,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       </div>
 
       {isComposeOpen && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <form onSubmit={sendNewMessage} className="modal-window max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-4 shadow-xl dark:bg-gray-900 sm:p-6">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center">
+          <form onSubmit={sendNewMessage} className="modal-window max-h-[96dvh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-4 shadow-xl dark:bg-gray-900 sm:max-h-[92vh] sm:p-6">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2>New Message</h2>
@@ -836,7 +836,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       )}
 
       {threadPendingDelete && (
-        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/45">
+        <div className="modal-backdrop fixed inset-0 z-[70] flex items-end justify-center bg-black/45 sm:items-center">
           <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
@@ -868,7 +868,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       )}
 
       {messagePendingDelete && (
-        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/45">
+        <div className="modal-backdrop fixed inset-0 z-[70] flex items-end justify-center bg-black/45 sm:items-center">
           <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <div className="mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Message</h2>
@@ -890,7 +890,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
 
       {isEmojiPickerOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onClick={() => setIsEmojiPickerOpen(false)}>
-          <div className="max-h-[90vh] overflow-auto rounded-lg bg-white p-2 shadow-xl" onClick={(event) => event.stopPropagation()}>
+          <div className="max-h-[80dvh] max-w-[calc(100vw-1rem)] overflow-auto rounded-lg bg-white p-2 shadow-xl sm:max-h-[90vh]" onClick={(event) => event.stopPropagation()}>
             <EmojiPicker onEmojiClick={isComposeOpen ? (emojiData) => setComposeBody((body) => `${body}${emojiData.emoji}`) : addEmojiToReply} />
           </div>
         </div>

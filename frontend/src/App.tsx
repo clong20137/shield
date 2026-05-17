@@ -985,11 +985,11 @@ function QuickLaunchTray({
                 <button
                   type="button"
                   onClick={() => setEditingSlot(index)}
-                  className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-gray-500 shadow-sm hover:bg-gray-200 hover:text-primary-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  className="absolute -bottom-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-gray-500 shadow-sm hover:bg-gray-200 hover:text-primary-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                   aria-label={`Change ${label} shortcut`}
                   title="Change shortcut"
                 >
-                  <Plus size={11} />
+                  <Plus size={13} />
                 </button>
               )}
             </div>
@@ -999,7 +999,7 @@ function QuickLaunchTray({
       </div>
 
       {editingSlot !== null && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center">
           <div className="modal-window w-full max-w-lg overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-6">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
@@ -1119,7 +1119,7 @@ function NotFoundPage() {
 }
 
 function getModalBackdropClass(isClosing: boolean, tint = 'bg-black/50') {
-  return `${isClosing ? 'modal-backdrop-exit' : 'modal-backdrop'} fixed inset-0 z-50 flex items-center justify-center ${tint}`;
+  return `${isClosing ? 'modal-backdrop-exit' : 'modal-backdrop'} fixed inset-0 z-50 flex items-end justify-center sm:items-center ${tint}`;
 }
 
 function getModalWindowClass(isClosing: boolean, className: string) {
@@ -2300,7 +2300,7 @@ function App() {
           </div>
           {isMessagesModalOpen && currentUser && (
             <div className={getModalBackdropClass(closingModal === 'messages', 'bg-black/60')}>
-              <div className={getModalWindowClass(closingModal === 'messages', 'flex h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:p-4')}>
+              <div className={getModalWindowClass(closingModal === 'messages', 'flex h-[96dvh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:h-[94vh] sm:p-4')}>
                 <div className="mb-3 flex items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Messages</h2>
@@ -2323,7 +2323,7 @@ function App() {
           )}
           {isCalendarModalOpen && currentUser && (
             <div className={getModalBackdropClass(closingModal === 'calendar', 'bg-black/60')}>
-              <div className={getModalWindowClass(closingModal === 'calendar', 'flex h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:p-4')}>
+              <div className={getModalWindowClass(closingModal === 'calendar', 'flex h-[96dvh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:h-[94vh] sm:p-4')}>
                 <div className="mb-3 flex items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Calendar</h2>
@@ -2346,7 +2346,7 @@ function App() {
           )}
           {isProfileModalOpen && currentUser && (
             <div className={getModalBackdropClass(closingModal === 'profile')}>
-              <div className={getModalWindowClass(closingModal === 'profile', 'flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:p-4')}>
+              <div className={getModalWindowClass(closingModal === 'profile', 'flex h-[96dvh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:h-auto sm:max-h-[88vh] sm:p-4')}>
                 <div className="mb-3 flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 sm:text-2xl">Account Settings</h2>
@@ -2383,7 +2383,7 @@ function App() {
           )}
           {isCreateUserModalOpen && currentUser && (
             <div className={getModalBackdropClass(closingModal === 'createUser')}>
-              <div className={getModalWindowClass(closingModal === 'createUser', 'flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-5')}>
+              <div className={getModalWindowClass(closingModal === 'createUser', 'flex h-[96dvh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:h-auto sm:max-h-[92vh] sm:p-5')}>
                 <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Create User</h2>
@@ -2413,7 +2413,7 @@ function App() {
           )}
           {isReportBugOpen && (
             <div className={getModalBackdropClass(closingModal === 'reportBug')}>
-              <div className={getModalWindowClass(closingModal === 'reportBug', 'w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-6')}>
+              <div className={getModalWindowClass(closingModal === 'reportBug', 'max-h-[96dvh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-6')}>
                 <div className="mb-5 flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Report a Bug</h2>
@@ -2438,7 +2438,7 @@ function App() {
           )}
           {isBugTrackerOpen && isAdministrator && (
             <div className={getModalBackdropClass(closingModal === 'bugTracker', 'bg-black/60')}>
-              <div className={getModalWindowClass(closingModal === 'bugTracker', 'flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-5')}>
+              <div className={getModalWindowClass(closingModal === 'bugTracker', 'flex h-[96dvh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:h-auto sm:max-h-[92vh] sm:p-5')}>
                 <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Bug Tracker</h2>

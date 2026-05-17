@@ -620,8 +620,8 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
       </div>
 
       {selectedDate && (
-        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/50">
-          <div className="modal-window max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-5">
+        <div className="modal-backdrop fixed inset-0 z-[70] flex items-end justify-center bg-black/50 sm:items-center">
+          <div className="modal-window max-h-[96dvh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:max-h-[92vh] sm:p-5">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Trooper Daily</p>
@@ -856,7 +856,7 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
       )}
 
       {entryPendingDelete && (
-        <div className="modal-backdrop fixed inset-0 z-[80] flex items-center justify-center bg-black/45">
+        <div className="modal-backdrop fixed inset-0 z-[80] flex items-end justify-center bg-black/45 sm:items-center">
           <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <div className="mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Entry</h2>
