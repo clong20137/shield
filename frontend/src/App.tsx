@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { BarChart3, Bell, Bug, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, FileSignature, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Save, Search, Settings, Shield, SlidersHorizontal, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
+import { BarChart3, Bell, Bug, Calculator, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, FileSignature, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Save, Search, Settings, Shield, SlidersHorizontal, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -27,7 +27,7 @@ interface MessagePreferences {
   playMessageSound: boolean;
 }
 
-type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'evaluations' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
+type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
 type QuickLaunchExternalSlot = ApiQuickLaunchExternalSlot;
 type QuickLaunchSlot = QuickLaunchAppId | QuickLaunchExternalSlot | null;
 
@@ -49,7 +49,6 @@ const quickLaunchApps: QuickLaunchApp[] = [
   { id: 'messages', label: 'Messages', icon: Mail },
   { id: 'calendar', label: 'Calendar', icon: CalendarDays },
   { id: 'devices', label: 'Devices', path: '/devices', icon: Laptop },
-  { id: 'evaluations', label: 'Evaluations', path: '/evaluations', icon: FileSignature },
   { id: 'search', label: 'Search Users', path: '/search', icon: Search },
   { id: 'reports', label: 'Reports', path: '/reports', icon: BarChart3 },
   { id: 'create-user', label: 'Create User', path: '/users/create', adminOnly: true, icon: UserPlus },
@@ -558,6 +557,79 @@ function HeaderMessagesButton({
         </span>
       )}
     </button>
+  );
+}
+
+function CalculatorModal({ onClose }: { onClose: () => void }) {
+  const [display, setDisplay] = useState('0');
+  const buttons = ['7', '8', '9', '/', '4', '5', '6', '*', '1', '2', '3', '-', '0', '.', 'C', '+'];
+
+  const appendValue = (value: string) => {
+    if (value === 'C') {
+      setDisplay('0');
+      return;
+    }
+
+    setDisplay((current) => (current === '0' ? value : `${current}${value}`));
+  };
+
+  const calculate = () => {
+    if (!/^[\d+\-*/. ()]+$/u.test(display)) {
+      setDisplay('Error');
+      return;
+    }
+
+    try {
+      const result = Function(`"use strict"; return (${display})`)();
+      setDisplay(Number.isFinite(result) ? String(Number(result.toFixed(8))) : 'Error');
+    } catch {
+      setDisplay('Error');
+    }
+  };
+
+  return (
+    <div className={getModalBackdropClass(false, 'bg-black/50')}>
+      <div className="modal-window w-full max-w-sm rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900">
+        <div className="mb-4 flex items-center justify-between border-b border-gray-200 pb-3 dark:border-gray-800">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Calculator</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Quick utility calculator.</p>
+          </div>
+          <button type="button" onClick={onClose} className="icon-close-button" aria-label="Close calculator" title="Close">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="mb-3 min-h-16 rounded border border-gray-200 bg-gray-50 px-4 py-3 text-right text-3xl font-bold text-gray-900 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100">
+          {display}
+        </div>
+
+        <div className="grid grid-cols-4 gap-2">
+          {buttons.map((button) => (
+            <button
+              key={button}
+              type="button"
+              onClick={() => appendValue(button)}
+              className={`flex h-12 items-center justify-center rounded border text-lg font-bold transition ${
+                ['/', '*', '-', '+'].includes(button)
+                  ? 'border-accent bg-accent/10 text-accent hover:bg-accent/15'
+                  : button === 'C'
+                    ? 'border-red-200 bg-red-50 text-danger hover:bg-red-100 dark:border-red-900 dark:bg-red-950'
+                    : 'border-gray-200 bg-white text-primary-500 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:text-blue-100'
+              }`}
+            >
+              {button === '*' ? 'x' : button}
+            </button>
+          ))}
+          <button type="button" onClick={() => setDisplay((current) => current.slice(0, -1) || '0')} className="flex h-12 items-center justify-center rounded border border-gray-200 bg-white text-lg font-bold text-primary-500 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:text-blue-100">
+            DEL
+          </button>
+          <button type="button" onClick={calculate} className="col-span-3 flex h-12 items-center justify-center rounded bg-primary-500 text-lg font-bold text-white hover:bg-primary-600">
+            =
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1374,6 +1446,7 @@ function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
@@ -1795,6 +1868,11 @@ function App() {
         return;
       }
 
+      if (isCalculatorOpen) {
+        setIsCalculatorOpen(false);
+        return;
+      }
+
       if (isPreferencesOpen) {
         closeModal('preferences');
         return;
@@ -1833,7 +1911,7 @@ function App() {
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isAccountMenuOpen, isBugTrackerOpen, isCalendarModalOpen, isCreateUserModalOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isPreferencesOpen, isProfileModalOpen, isReportBugOpen]);
+  }, [isAccountMenuOpen, isBugTrackerOpen, isCalculatorOpen, isCalendarModalOpen, isCreateUserModalOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isPreferencesOpen, isProfileModalOpen, isReportBugOpen]);
 
   return (
     <Router>
@@ -1918,7 +1996,6 @@ function App() {
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
               <SidebarLink to="/calendar" label="Calendar" compact={isSidebarCollapsed} icon={CalendarDays} />
               <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />
-              <SidebarLink to="/evaluations" label="Evaluations" compact={isSidebarCollapsed} icon={FileSignature} />
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
               {isAdministrator && (
                 <>
@@ -2075,6 +2152,23 @@ function App() {
                       className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
                     >
                       <SlidersHorizontal size={16} /> Preferences
+                    </button>
+                    <NavLink
+                      to="/evaluations"
+                      onClick={() => setIsAccountMenuOpen(false)}
+                      className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                    >
+                      <FileSignature size={16} /> Performance Evaluations
+                    </NavLink>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCalculatorOpen(true);
+                        setIsAccountMenuOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                    >
+                      <Calculator size={16} /> Calculator
                     </button>
                     <button
                       type="button"
@@ -2300,6 +2394,9 @@ function App() {
                 </div>
               </div>
             </div>
+          )}
+          {isCalculatorOpen && (
+            <CalculatorModal onClose={() => setIsCalculatorOpen(false)} />
           )}
           {isReportBugOpen && (
             <div className={getModalBackdropClass(closingModal === 'reportBug')}>
