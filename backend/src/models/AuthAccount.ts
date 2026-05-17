@@ -166,6 +166,7 @@ function toPublicAccount(account: AuthAccountRow): AuthAccount {
 export interface LoginResult {
   account: AuthAccount | null;
   requiresTwoFactor: boolean;
+  failureReason?: 'inactive' | 'maintenance';
 }
 
 function splitDisplayName(displayName: string): { firstName: string; lastName: string } {
@@ -274,7 +275,12 @@ export class AuthAccountModel {
     }
   }
 
-  static async verifyLogin(email: string, password: string, twoFactorCode?: string): Promise<LoginResult> {
+  static async verifyLogin(
+    email: string,
+    password: string,
+    twoFactorCode?: string,
+    options?: { maintenanceMode?: boolean },
+  ): Promise<LoginResult> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<AuthAccountRow[]>(
@@ -289,7 +295,11 @@ export class AuthAccountModel {
       }
 
       if (account.isActive === false || account.isActive === 0) {
-        return { account: null, requiresTwoFactor: false };
+        return { account: null, requiresTwoFactor: false, failureReason: 'inactive' };
+      }
+
+      if (options?.maintenanceMode && account.role !== 'administrator') {
+        return { account: null, requiresTwoFactor: false, failureReason: 'maintenance' };
       }
 
       if (account.twoFactorEnabled && account.twoFactorSecret) {

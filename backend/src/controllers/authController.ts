@@ -206,7 +206,21 @@ export class AuthController {
         return res.status(400).json({ error: 'Enter a valid email address' });
       }
 
-      const result = await AuthAccountModel.verifyLogin(normalizeEmail(email), password, cleanTotpCode(twoFactorCode));
+      const maintenanceMode = await SystemSettingModel.getString('maintenanceMode', 'false') === 'true';
+      const result = await AuthAccountModel.verifyLogin(
+        normalizeEmail(email),
+        password,
+        cleanTotpCode(twoFactorCode),
+        { maintenanceMode },
+      );
+
+      if (result.failureReason === 'inactive') {
+        return res.status(403).json({ error: 'This account is inactive. Contact an administrator to restore access.' });
+      }
+
+      if (result.failureReason === 'maintenance') {
+        return res.status(503).json({ error: 'SHIELD is in maintenance mode. Only administrators can sign in right now.' });
+      }
 
       if (result.requiresTwoFactor) {
         return res.status(202).json({ requiresTwoFactor: true });
@@ -214,10 +228,6 @@ export class AuthController {
 
       if (!result.account) {
         return res.status(401).json({ error: 'Invalid email or password' });
-      }
-
-      if (result.account.role !== 'administrator' && await SystemSettingModel.getString('maintenanceMode', 'false') === 'true') {
-        return res.status(503).json({ error: 'SHIELD is in maintenance mode. Only administrators can sign in right now.' });
       }
 
       const token = await AuthSessionModel.createSession(result.account.id);
