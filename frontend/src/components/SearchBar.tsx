@@ -2,6 +2,7 @@ import React from 'react';
 import { SlidersHorizontal, Search } from 'lucide-react';
 import { UserFilters } from '../services/api';
 import { rankOptions } from '../constants/ranks';
+import { districtOptions } from '../constants/districts';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
@@ -16,35 +17,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   placeholder = 'Search by name, PE #, Badge #, or ID...',
   initialQuery = '',
 }) => {
-  const districtOptions = [
-    'Area 1',
-    'Toll Road',
-    'Lowell',
-    'Lafayette',
-    'Peru',
-    'Area 2',
-    'Fort Wayne',
-    'Bremen',
-    'Area 3',
-    'Bloomington',
-    'Jasper',
-    'Evansville',
-    'Area 4',
-    'Versailles',
-    'Sellersburg',
-    'Area 5',
-    'Pendleton',
-    'Indianapolis',
-    'Putnamville',
-    'Headquarters',
-    'North Zone',
-    'South Zone',
-    'Central Zone',
-    'Laboratory',
-    'Polygraph',
-    'CSI Section',
-    'Digital Forensics Unit',
-  ];
   const employmentTypes = ['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inactive', 'Other', 'CPS'];
   const [query, setQuery] = React.useState(initialQuery);
   const [showFilters, setShowFilters] = React.useState(false);

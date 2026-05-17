@@ -1,38 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { CalendarClock, ChevronLeft, ChevronRight, Pencil, Save, Trash2, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, calendarService } from '../services/api';
+import { districtOptions } from '../constants/districts';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>;
-
-const districtOptions = [
-  'Area 1',
-  'Toll Road',
-  'Lowell',
-  'Lafayette',
-  'Peru',
-  'Area 2',
-  'Fort Wayne',
-  'Bremen',
-  'Area 3',
-  'Bloomington',
-  'Jasper',
-  'Evansville',
-  'Area 4',
-  'Versailles',
-  'Sellersburg',
-  'Area 5',
-  'Pendleton',
-  'Indianapolis',
-  'Putnamville',
-  'Headquarters',
-  'North Zone',
-  'South Zone',
-  'Central Zone',
-  'Laboratory',
-  'Polygraph',
-  'CSI Section',
-  'Digital Forensics Unit',
-];
 
 const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty'];
 

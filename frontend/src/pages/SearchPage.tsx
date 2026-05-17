@@ -7,6 +7,7 @@ import { SearchBar } from '../components/SearchBar';
 import { UserTable } from '../components/UserTable';
 import { UserDetail } from '../components/UserDetail';
 import { rankOptions } from '../constants/ranks';
+import { districtOptions } from '../constants/districts';
 
 interface SearchPageProps {
   currentUser: AuthAccount | null;
@@ -413,7 +414,10 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">District</span>
-                  <input value={String(editForm.district || '')} onChange={(event) => updateEditField('district', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  <select value={String(editForm.district || '')} onChange={(event) => updateEditField('district', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                    <option value="">Select</option>
+                    {districtOptions.map((district) => <option key={district}>{district}</option>)}
+                  </select>
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Rank</span>

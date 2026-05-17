@@ -3,42 +3,13 @@ import { RotateCcw, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CreateUserPayload, User, userService } from '../services/api';
 import { rankOptions } from '../constants/ranks';
+import { districtOptions } from '../constants/districts';
 
 interface CreateUserPageProps {
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
   isModalView?: boolean;
   onCreated?: (user: User) => void;
 }
-
-const districtOptions = [
-  'Area 1',
-  'Toll Road',
-  'Lowell',
-  'Lafayette',
-  'Peru',
-  'Area 2',
-  'Fort Wayne',
-  'Bremen',
-  'Area 3',
-  'Bloomington',
-  'Jasper',
-  'Evansville',
-  'Area 4',
-  'Versailles',
-  'Sellersburg',
-  'Area 5',
-  'Pendleton',
-  'Indianapolis',
-  'Putnamville',
-  'Headquarters',
-  'North Zone',
-  'South Zone',
-  'Central Zone',
-  'Laboratory',
-  'Polygraph',
-  'CSI Section',
-  'Digital Forensics Unit',
-];
 
 const employmentTypes = ['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inactive', 'Other', 'CPS'];
 const statusOptions = ['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Administrative Duty', 'Inactive'];
