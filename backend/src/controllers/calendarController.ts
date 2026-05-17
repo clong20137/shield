@@ -3,6 +3,39 @@ import { CalendarEntryModel } from '../models/CalendarEntry';
 import { AuditLogModel } from '../models/AuditLog';
 import { getSessionAccount } from '../middleware/authSession';
 import { broadcastAccountEvent } from '../services/appEvents';
+import { cleanRecord, cleanString, isOneOf, isValidHexColor, isValidIsoDate } from '../utils/validation';
+
+const calendarCategories = ['General Information', 'Trooper Daily'] as const;
+const districtOptions = [
+  'Area 1',
+  'Toll Road',
+  'Lowell',
+  'Lafayette',
+  'Peru',
+  'Area 2',
+  'Fort Wayne',
+  'Bremen',
+  'Area 3',
+  'Bloomington',
+  'Jasper',
+  'Evansville',
+  'Area 4',
+  'Versailles',
+  'Sellersburg',
+  'Area 5',
+  'Pendleton',
+  'Indianapolis',
+  'Putnamville',
+  'Headquarters',
+  'North Zone',
+  'South Zone',
+  'Central Zone',
+  'Laboratory',
+  'Polygraph',
+  'CSI Section',
+  'Digital Forensics Unit',
+] as const;
+const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty'] as const;
 
 function getAuditActor(account: { id: string; displayName: string; email: string } | null) {
   return {
@@ -23,6 +56,51 @@ async function getCalendarAccount(req: Request, requestedAccountId?: string) {
   }
 
   return sessionAccount;
+}
+
+function validateCalendarEntryPayload(body: Record<string, unknown>) {
+  const category = cleanString(body.category, 80) || 'General Information';
+  const date = cleanString(body.date, 20);
+  const districtWorked = cleanString(body.districtWorked, 100);
+  const specialStatus = cleanString(body.specialStatus, 80) || 'None';
+  const color = cleanString(body.color, 20) || '#9C865C';
+  const hours = Number(body.dutyHours);
+
+  if (!isOneOf(category, calendarCategories)) {
+    return { error: 'Choose a valid calendar entry type' };
+  }
+
+  if (!date || !isValidIsoDate(date)) {
+    return { error: 'Calendar date must use YYYY-MM-DD format' };
+  }
+
+  if (!Number.isFinite(hours) || hours < 0 || hours > 24) {
+    return { error: 'Duty hours must be between 0 and 24' };
+  }
+
+  if (!districtWorked || !isOneOf(districtWorked, districtOptions)) {
+    return { error: 'Choose a valid district worked' };
+  }
+
+  if (!isOneOf(specialStatus, specialStatusOptions)) {
+    return { error: 'Choose a valid special status' };
+  }
+
+  if (!isValidHexColor(color)) {
+    return { error: 'Choose a valid calendar color' };
+  }
+
+  return {
+    value: {
+      category,
+      date,
+      dutyHours: String(hours),
+      districtWorked,
+      specialStatus,
+      color,
+      details: cleanRecord(body.details, 160, 1000),
+    },
+  };
 }
 
 export class CalendarController {
@@ -48,33 +126,22 @@ export class CalendarController {
 
   static async createEntry(req: Request, res: Response) {
     try {
-      const { accountId: requestedAccountId, category, date, dutyHours, districtWorked, specialStatus, color, details } = req.body as {
-        accountId?: string;
-        category?: string;
-        date?: string;
-        dutyHours?: string | number;
-        districtWorked?: string;
-        specialStatus?: string;
-        color?: string;
-        details?: Record<string, string>;
-      };
+      const requestedAccountId = cleanString(req.body?.accountId, 36) || undefined;
       const account = await getCalendarAccount(req, requestedAccountId);
       const accountId = account?.id;
-      const hours = Number(dutyHours);
 
-      if (!accountId || !date || Number.isNaN(hours) || hours < 0 || !districtWorked) {
-        return res.status(accountId ? 400 : 401).json({ error: accountId ? 'Date, duty hours, and district worked are required' : 'Sign in to update your calendar' });
+      if (!accountId) {
+        return res.status(401).json({ error: 'Sign in to update your calendar' });
+      }
+
+      const validation = validateCalendarEntryPayload(req.body);
+      if (validation.error || !validation.value) {
+        return res.status(400).json({ error: validation.error || 'Invalid calendar entry' });
       }
 
       const entry = await CalendarEntryModel.createEntry({
         ownerAccountId: accountId,
-        category: category || 'General Information',
-        date,
-        dutyHours: String(hours),
-        districtWorked,
-        specialStatus: specialStatus || 'None',
-        color: color || '#9C865C',
-        details: details && typeof details === 'object' ? details : {},
+        ...validation.value,
       });
 
       const actor = getAuditActor(account);
@@ -100,33 +167,22 @@ export class CalendarController {
 
   static async updateEntry(req: Request, res: Response) {
     try {
-      const { accountId: requestedAccountId, category, date, dutyHours, districtWorked, specialStatus, color, details } = req.body as {
-        accountId?: string;
-        category?: string;
-        date?: string;
-        dutyHours?: string | number;
-        districtWorked?: string;
-        specialStatus?: string;
-        color?: string;
-        details?: Record<string, string>;
-      };
+      const requestedAccountId = cleanString(req.body?.accountId, 36) || undefined;
       const account = await getCalendarAccount(req, requestedAccountId);
       const accountId = account?.id;
-      const hours = Number(dutyHours);
 
-      if (!accountId || !date || Number.isNaN(hours) || hours < 0 || !districtWorked) {
-        return res.status(accountId ? 400 : 401).json({ error: accountId ? 'Date, duty hours, and district worked are required' : 'Sign in to update your calendar' });
+      if (!accountId) {
+        return res.status(401).json({ error: 'Sign in to update your calendar' });
+      }
+
+      const validation = validateCalendarEntryPayload(req.body);
+      if (validation.error || !validation.value) {
+        return res.status(400).json({ error: validation.error || 'Invalid calendar entry' });
       }
 
       const entry = await CalendarEntryModel.updateEntry(req.params.id, {
         ownerAccountId: accountId,
-        category: category || 'General Information',
-        date,
-        dutyHours: String(hours),
-        districtWorked,
-        specialStatus: specialStatus || 'None',
-        color: color || '#9C865C',
-        details: details && typeof details === 'object' ? details : {},
+        ...validation.value,
       });
 
       if (!entry) {

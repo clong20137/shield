@@ -3,11 +3,13 @@ import { AuthAccountModel } from '../models/AuthAccount';
 import { AuthSessionModel } from '../models/AuthSession';
 import { UserMessageModel } from '../models/UserMessage';
 import { addMessageEventClient, broadcastMessageEvent } from '../services/messageEvents';
+import { cleanMultiline, cleanString } from '../utils/validation';
+import { isWellFormedSessionToken } from '../middleware/authSession';
 
 export class MessageController {
   static async streamEvents(req: Request, res: Response) {
     try {
-      const token = typeof req.query.token === 'string' ? req.query.token : '';
+      const token = typeof req.query.token === 'string' && isWellFormedSessionToken(req.query.token) ? req.query.token : '';
       const account = token ? await AuthSessionModel.getAccountForToken(token) : null;
 
       if (!account) {
@@ -23,15 +25,21 @@ export class MessageController {
 
   static async createMessage(req: Request, res: Response) {
     try {
-      const { senderAccountId, recipientUserId, subject, body } = req.body as {
-        senderAccountId?: string;
-        recipientUserId?: string;
-        subject?: string;
-        body?: string;
-      };
+      const senderAccountId = cleanString(req.body?.senderAccountId, 36);
+      const recipientUserId = cleanString(req.body?.recipientUserId, 36);
+      const subject = cleanString(req.body?.subject, 180) || 'Message';
+      const body = cleanMultiline(req.body?.body, 5000);
 
-      if (!senderAccountId || !recipientUserId || !subject?.trim() || !body?.trim()) {
-        return res.status(400).json({ error: 'Sender, recipient, subject, and message are required' });
+      if (!senderAccountId) {
+        return res.status(400).json({ error: 'Sender is required' });
+      }
+
+      if (!recipientUserId) {
+        return res.status(400).json({ error: 'Recipient is required' });
+      }
+
+      if (!body) {
+        return res.status(400).json({ error: 'Message is required' });
       }
 
       const recipient = await AuthAccountModel.getAccountById(recipientUserId);
@@ -46,8 +54,8 @@ export class MessageController {
       const message = await UserMessageModel.createMessage({
         senderAccountId,
         recipientUserId,
-        subject: subject.trim(),
-        body: body.trim(),
+        subject,
+        body,
       });
 
       const enrichedMessage = await UserMessageModel.getById(message.id);
@@ -66,7 +74,12 @@ export class MessageController {
 
   static async listMessagesForUser(req: Request, res: Response) {
     try {
-      const messages = await UserMessageModel.listMessagesForUser(req.params.userId);
+      const accountId = cleanString(req.params.userId, 36);
+      if (!accountId) {
+        return res.status(400).json({ error: 'Account is required' });
+      }
+
+      const messages = await UserMessageModel.listMessagesForUser(accountId);
       res.json(messages);
     } catch (error) {
       console.error('List messages error:', error);
@@ -76,7 +89,12 @@ export class MessageController {
 
   static async listInbox(req: Request, res: Response) {
     try {
-      const messages = await UserMessageModel.listInbox(req.params.accountId);
+      const accountId = cleanString(req.params.accountId, 36);
+      if (!accountId) {
+        return res.status(400).json({ error: 'Account is required' });
+      }
+
+      const messages = await UserMessageModel.listInbox(accountId);
       res.json(messages);
     } catch (error) {
       console.error('List inbox error:', error);
@@ -86,7 +104,12 @@ export class MessageController {
 
   static async listSent(req: Request, res: Response) {
     try {
-      const messages = await UserMessageModel.listSent(req.params.accountId);
+      const accountId = cleanString(req.params.accountId, 36);
+      if (!accountId) {
+        return res.status(400).json({ error: 'Account is required' });
+      }
+
+      const messages = await UserMessageModel.listSent(accountId);
       res.json(messages);
     } catch (error) {
       console.error('List sent messages error:', error);
@@ -96,7 +119,7 @@ export class MessageController {
 
   static async markRead(req: Request, res: Response) {
     try {
-      const { recipientUserId } = req.body as { recipientUserId?: string };
+      const recipientUserId = cleanString(req.body?.recipientUserId, 36);
 
       if (!recipientUserId) {
         return res.status(400).json({ error: 'Recipient is required' });
@@ -128,7 +151,7 @@ export class MessageController {
 
   static async archiveMessage(req: Request, res: Response) {
     try {
-      const { recipientUserId } = req.body as { recipientUserId?: string };
+      const recipientUserId = cleanString(req.body?.recipientUserId, 36);
 
       if (!recipientUserId) {
         return res.status(400).json({ error: 'Recipient is required' });
@@ -160,7 +183,7 @@ export class MessageController {
 
   static async deleteMessage(req: Request, res: Response) {
     try {
-      const { accountId } = req.body as { accountId?: string };
+      const accountId = cleanString(req.body?.accountId, 36);
 
       if (!accountId) {
         return res.status(400).json({ error: 'Account is required' });

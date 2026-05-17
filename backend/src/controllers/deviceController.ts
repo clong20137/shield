@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { DeviceModel } from '../models/Device';
 import { broadcastAppEvent } from '../services/appEvents';
 import { getSessionAccount } from '../middleware/authSession';
+import { cleanMultiline, cleanString, isOneOf, isValidIsoDate, isValidPhone, normalizePhone } from '../utils/validation';
 
 function isDuplicateAssetTagError(error: unknown): boolean {
   return (
@@ -10,6 +11,72 @@ function isDuplicateAssetTagError(error: unknown): boolean {
     'code' in error &&
     (error as { code?: string }).code === 'ER_DUP_ENTRY'
   );
+}
+
+const deviceTypes = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio', 'Cradlepoint'] as const;
+const deviceStatuses = ['Available', 'Assigned', 'Maintenance', 'Retired', 'Damaged', 'Lost'] as const;
+const deviceConditions = ['New', 'Good', 'Fair', 'Poor', 'Damaged'] as const;
+
+function validateDevicePayload(body: Record<string, unknown>) {
+  const type = cleanString(body.type, 50);
+  const assetTag = cleanString(body.assetTag, 100);
+  const makeModel = cleanString(body.makeModel, 150);
+  const status = cleanString(body.status, 50) || 'Available';
+  const condition = cleanString(body.condition, 50) || 'Good';
+  const phoneNumber = normalizePhone(body.phoneNumber);
+  const dateFields = ['warrantyExpiration', 'replacementDueDate', 'maintenanceDueDate', 'lastServiceDate', 'purchaseDate'] as const;
+  const dates = Object.fromEntries(dateFields.map((field) => [field, cleanString(body[field], 20)])) as Record<typeof dateFields[number], string>;
+
+  if (!type || !assetTag || !makeModel) {
+    return { error: 'Device type, asset tag, and make/model are required' };
+  }
+
+  if (!isOneOf(type, deviceTypes)) {
+    return { error: 'Choose a valid device type' };
+  }
+
+  if (!isOneOf(status, deviceStatuses)) {
+    return { error: 'Choose a valid device status' };
+  }
+
+  if (!isOneOf(condition, deviceConditions)) {
+    return { error: 'Choose a valid device condition' };
+  }
+
+  if (!isValidPhone(phoneNumber)) {
+    return { error: 'Device phone number must be a valid 10-digit phone number' };
+  }
+
+  for (const field of dateFields) {
+    if (dates[field] && !isValidIsoDate(dates[field])) {
+      return { error: `${field} must use YYYY-MM-DD format` };
+    }
+  }
+
+  return {
+    value: {
+      type,
+      assetTag,
+      makeModel,
+      serialNumber: cleanString(body.serialNumber, 150),
+      assignedTo: cleanString(body.assignedTo, 150),
+      status,
+      location: cleanString(body.location, 150),
+      notes: cleanMultiline(body.notes, 5000),
+      phoneNumber,
+      imei: cleanString(body.imei, 100),
+      simNumber: cleanString(body.simNumber, 100),
+      radioId: cleanString(body.radioId, 100),
+      hostname: cleanString(body.hostname, 150),
+      routerId: cleanString(body.routerId, 150),
+      warrantyExpiration: dates.warrantyExpiration,
+      replacementDueDate: dates.replacementDueDate,
+      maintenanceDueDate: dates.maintenanceDueDate,
+      lastServiceDate: dates.lastServiceDate,
+      purchaseDate: dates.purchaseDate,
+      condition,
+    },
+  };
 }
 
 export class DeviceController {
@@ -40,61 +107,17 @@ export class DeviceController {
 
   static async createDevice(req: Request, res: Response) {
     try {
-      const {
-        type,
-        assetTag,
-        makeModel,
-        serialNumber,
-        assignedTo,
-        status,
-        location,
-        notes,
-        phoneNumber,
-        imei,
-        simNumber,
-        radioId,
-        hostname,
-        routerId,
-        warrantyExpiration,
-        replacementDueDate,
-        maintenanceDueDate,
-        lastServiceDate,
-        purchaseDate,
-        condition,
-        actorId,
-        actorName,
-        eventNotes,
-      } = req.body;
+      const { actorId, actorName, eventNotes } = req.body;
+      const validation = validateDevicePayload(req.body);
 
-      if (!type || !assetTag || !makeModel) {
-        return res.status(400).json({ error: 'Device type, asset tag, and make/model are required' });
+      if (validation.error || !validation.value) {
+        return res.status(400).json({ error: validation.error || 'Invalid device data' });
       }
 
-      const device = await DeviceModel.createDevice({
-        type,
-        assetTag,
-        makeModel,
-        serialNumber: serialNumber || '',
-        assignedTo: assignedTo || '',
-        status: status || 'Available',
-        location: location || '',
-        notes: notes || '',
-        phoneNumber: phoneNumber || '',
-        imei: imei || '',
-        simNumber: simNumber || '',
-        radioId: radioId || '',
-        hostname: hostname || '',
-        routerId: routerId || '',
-        warrantyExpiration: warrantyExpiration || '',
-        replacementDueDate: replacementDueDate || '',
-        maintenanceDueDate: maintenanceDueDate || '',
-        lastServiceDate: lastServiceDate || '',
-        purchaseDate: purchaseDate || '',
-        condition: condition || 'Good',
-      }, {
-        actorId,
-        actorName,
-        notes: eventNotes,
+      const device = await DeviceModel.createDevice(validation.value, {
+        actorId: cleanString(actorId, 36),
+        actorName: cleanString(actorName, 150),
+        notes: cleanMultiline(eventNotes, 2000),
       });
 
       broadcastAppEvent({ type: 'device-updated', entityId: device.id });
@@ -111,65 +134,20 @@ export class DeviceController {
 
   static async updateDevice(req: Request, res: Response) {
     try {
-      const {
-        type,
-        assetTag,
-        makeModel,
-        serialNumber,
-        assignedTo,
-        status,
-        location,
-        notes,
-        phoneNumber,
-        imei,
-        simNumber,
-        radioId,
-        hostname,
-        routerId,
-        warrantyExpiration,
-        replacementDueDate,
-        maintenanceDueDate,
-        lastServiceDate,
-        purchaseDate,
-        condition,
-        actorId,
-        actorName,
-        eventAction,
-        eventNotes,
-      } = req.body;
+      const { actorId, actorName, eventAction, eventNotes } = req.body;
+      const validation = validateDevicePayload(req.body);
 
-      if (!type || !assetTag || !makeModel) {
-        return res.status(400).json({ error: 'Device type, asset tag, and make/model are required' });
+      if (validation.error || !validation.value) {
+        return res.status(400).json({ error: validation.error || 'Invalid device data' });
       }
 
-      const device = await DeviceModel.updateDevice(req.params.id, {
-        type,
-        assetTag,
-        makeModel,
-        serialNumber: serialNumber || '',
-        assignedTo: assignedTo || '',
-        status: status || 'Available',
-        location: location || '',
-        notes: notes || '',
-        phoneNumber: phoneNumber || '',
-        imei: imei || '',
-        simNumber: simNumber || '',
-        radioId: radioId || '',
-        hostname: hostname || '',
-        routerId: routerId || '',
-        warrantyExpiration: warrantyExpiration || '',
-        replacementDueDate: replacementDueDate || '',
-        maintenanceDueDate: maintenanceDueDate || '',
-        lastServiceDate: lastServiceDate || '',
-        purchaseDate: purchaseDate || '',
-        condition: condition || 'Good',
-      }, {
-        action: eventAction || 'Updated',
-        actorId,
-        actorName,
-        assignedTo,
-        status,
-        notes: eventNotes,
+      const device = await DeviceModel.updateDevice(req.params.id, validation.value, {
+        action: cleanString(eventAction, 100) || 'Updated',
+        actorId: cleanString(actorId, 36),
+        actorName: cleanString(actorName, 150),
+        assignedTo: validation.value.assignedTo,
+        status: validation.value.status,
+        notes: cleanMultiline(eventNotes, 2000),
       });
 
       if (!device) {
@@ -191,9 +169,9 @@ export class DeviceController {
   static async deleteDevice(req: Request, res: Response) {
     try {
       const deleted = await DeviceModel.deleteDevice(req.params.id, {
-        actorId: req.body?.actorId,
-        actorName: req.body?.actorName,
-        notes: req.body?.eventNotes,
+        actorId: cleanString(req.body?.actorId, 36),
+        actorName: cleanString(req.body?.actorName, 150),
+        notes: cleanMultiline(req.body?.eventNotes, 2000),
       });
 
       if (!deleted) {
@@ -221,18 +199,24 @@ export class DeviceController {
   static async addDeviceEvent(req: Request, res: Response) {
     try {
       const { action, actorId, actorName, assignedTo, status, notes } = req.body;
+      const cleanAction = cleanString(action, 100);
+      const cleanStatus = cleanString(status, 50);
 
-      if (!action) {
+      if (!cleanAction) {
         return res.status(400).json({ error: 'Action is required' });
       }
 
+      if (cleanStatus && !isOneOf(cleanStatus, deviceStatuses)) {
+        return res.status(400).json({ error: 'Choose a valid device status' });
+      }
+
       const event = await DeviceModel.createEvent(req.params.id, {
-        action,
-        actorId,
-        actorName,
-        assignedTo,
-        status,
-        notes,
+        action: cleanAction,
+        actorId: cleanString(actorId, 36),
+        actorName: cleanString(actorName, 150),
+        assignedTo: cleanString(assignedTo, 150),
+        status: cleanStatus,
+        notes: cleanMultiline(notes, 2000),
       });
 
       broadcastAppEvent({ type: 'device-updated', entityId: req.params.id });

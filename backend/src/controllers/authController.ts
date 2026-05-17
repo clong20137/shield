@@ -7,22 +7,20 @@ import { SystemSettingModel } from '../models/SystemSetting';
 import { getBearerToken, getSessionAccount } from '../middleware/authSession';
 import { broadcastAppEvent } from '../services/appEvents';
 import { sendEmail } from '../services/emailService';
+import { cleanString, isOneOf, isStrongPassword, isValidEmail, normalizeEmail } from '../utils/validation';
 
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function isStrongPassword(password: string): boolean {
-  return password.length >= 8 && /[A-Z]/u.test(password) && /[a-z]/u.test(password) && /\d/u.test(password);
-}
-
-function normalizeEmailInput(email: string): string {
-  return email.trim().toLowerCase();
-}
-
-function sanitizeDisplayName(displayName: string): string {
-  return displayName.trim().replace(/\s+/gu, ' ').slice(0, 100);
-}
+const allowedPermissions = [
+  'users:view',
+  'users:create',
+  'users:edit',
+  'devices:manage',
+  'calendar:manage',
+  'audit:view',
+  'roles:manage',
+  'messages:send',
+  'dashboard:manage',
+  'bugs:manage',
+] as const;
 
 function isDuplicateEmailError(error: unknown): boolean {
   return (
@@ -71,17 +69,43 @@ async function getRegistrationMode(): Promise<RegistrationMode> {
 }
 
 async function getAppBaseUrl(req: Request): Promise<string> {
-  const configured = await SystemSettingModel.getString('appBaseUrl', '');
+  const configured = (await SystemSettingModel.getString('appBaseUrl', '')) || process.env.APP_BASE_URL || '';
   if (configured) {
     return configured.replace(/\/+$/u, '');
   }
 
   const origin = req.get('origin');
-  if (origin) {
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((allowedOrigin) => allowedOrigin.trim().replace(/\/+$/u, ''))
+    .filter(Boolean);
+
+  if (origin && allowedOrigins.includes(origin.replace(/\/+$/u, ''))) {
     return origin.replace(/\/+$/u, '');
   }
 
+  if (allowedOrigins[0]) {
+    return allowedOrigins[0];
+  }
+
   return `${req.protocol}://${req.get('host')}`.replace(/\/+$/u, '');
+}
+
+function cleanTotpCode(value: unknown): string {
+  return cleanString(value, 20).replace(/\s/gu, '');
+}
+
+function cleanRoleName(value: unknown): string {
+  return cleanString(value, 40).toLowerCase().replace(/[^a-z0-9-]/gu, '-').replace(/-+/gu, '-').replace(/^-|-$/gu, '');
+}
+
+function normalizePermissions(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(value)]
+    .filter((permission): permission is typeof allowedPermissions[number] => typeof permission === 'string' && isOneOf(permission, allowedPermissions));
 }
 
 function publicInvite(invite: Awaited<ReturnType<typeof AuthInviteModel.create>>, inviteUrl?: string) {
@@ -112,8 +136,8 @@ export class AuthController {
         return res.status(400).json({ error: 'Email, password, and display name are required' });
       }
 
-      const cleanEmail = normalizeEmailInput(email);
-      const cleanDisplayName = sanitizeDisplayName(displayName);
+      const cleanEmail = normalizeEmail(email);
+      const cleanDisplayName = cleanString(displayName, 100);
 
       if (!isValidEmail(cleanEmail)) {
         return res.status(400).json({ error: 'Enter a valid email address' });
@@ -178,11 +202,11 @@ export class AuthController {
         return res.status(400).json({ error: 'Email and password are required' });
       }
 
-      if (!isValidEmail(normalizeEmailInput(email))) {
+      if (!isValidEmail(normalizeEmail(email))) {
         return res.status(400).json({ error: 'Enter a valid email address' });
       }
 
-      const result = await AuthAccountModel.verifyLogin(normalizeEmailInput(email), password, twoFactorCode);
+      const result = await AuthAccountModel.verifyLogin(normalizeEmail(email), password, cleanTotpCode(twoFactorCode));
 
       if (result.requiresTwoFactor) {
         return res.status(202).json({ requiresTwoFactor: true });
@@ -203,7 +227,7 @@ export class AuthController {
   static async requestPasswordReset(req: Request, res: Response) {
     try {
       const { email } = req.body as { email?: string };
-      const cleanEmail = email ? normalizeEmailInput(email) : '';
+      const cleanEmail = normalizeEmail(email);
 
       if (!cleanEmail || !isValidEmail(cleanEmail)) {
         return res.status(400).json({ error: 'Enter a valid email address' });
@@ -228,7 +252,7 @@ export class AuthController {
           ].join('\n'),
         });
 
-        if (!didSend) {
+        if (!didSend && process.env.ALLOW_CONSOLE_RESET_LINKS === 'true') {
           console.log(`SHIELD password reset for ${account.email}: ${resetUrl}`);
         }
       }
@@ -243,8 +267,9 @@ export class AuthController {
   static async resetPassword(req: Request, res: Response) {
     try {
       const { token, password } = req.body as { token?: string; password?: string };
+      const cleanToken = cleanString(token, 200);
 
-      if (!token || !password) {
+      if (!cleanToken || !password) {
         return res.status(400).json({ error: 'Reset token and new password are required' });
       }
 
@@ -252,7 +277,7 @@ export class AuthController {
         return res.status(400).json({ error: 'Password must be at least 8 characters and include uppercase, lowercase, and a number' });
       }
 
-      const reset = await AuthPasswordResetModel.getValidReset(token);
+      const reset = await AuthPasswordResetModel.getValidReset(cleanToken);
       if (!reset) {
         return res.status(400).json({ error: 'Password reset link is invalid or expired' });
       }
@@ -280,7 +305,9 @@ export class AuthController {
         newPassword?: string;
       };
 
-      if (!accountId || !currentPassword || !newPassword) {
+      const cleanAccountId = cleanString(accountId, 36);
+
+      if (!cleanAccountId || !currentPassword || !newPassword) {
         return res.status(400).json({ error: 'Account, current password, and new password are required' });
       }
 
@@ -288,7 +315,7 @@ export class AuthController {
         return res.status(400).json({ error: 'New password must be at least 8 characters and include uppercase, lowercase, and a number' });
       }
 
-      const changed = await AuthAccountModel.changePassword(accountId, currentPassword, newPassword);
+      const changed = await AuthAccountModel.changePassword(cleanAccountId, currentPassword, newPassword);
 
       if (!changed) {
         return res.status(401).json({ error: 'Current password is incorrect' });
@@ -386,12 +413,13 @@ export class AuthController {
   static async setupTwoFactor(req: Request, res: Response) {
     try {
       const { accountId } = req.body as { accountId?: string };
+      const cleanAccountId = cleanString(accountId, 36);
 
-      if (!accountId) {
+      if (!cleanAccountId) {
         return res.status(400).json({ error: 'Account is required' });
       }
 
-      const setup = await AuthAccountModel.createTwoFactorSetup(accountId);
+      const setup = await AuthAccountModel.createTwoFactorSetup(cleanAccountId);
 
       if (!setup) {
         return res.status(404).json({ error: 'Account not found' });
@@ -407,12 +435,14 @@ export class AuthController {
   static async enableTwoFactor(req: Request, res: Response) {
     try {
       const { accountId, code } = req.body as { accountId?: string; code?: string };
+      const cleanAccountId = cleanString(accountId, 36);
+      const cleanCode = cleanTotpCode(code);
 
-      if (!accountId || !code) {
+      if (!cleanAccountId || !cleanCode) {
         return res.status(400).json({ error: 'Account and verification code are required' });
       }
 
-      const account = await AuthAccountModel.enableTwoFactor(accountId, code);
+      const account = await AuthAccountModel.enableTwoFactor(cleanAccountId, cleanCode);
 
       if (!account) {
         return res.status(400).json({ error: 'Invalid verification code' });
@@ -428,12 +458,13 @@ export class AuthController {
   static async disableTwoFactor(req: Request, res: Response) {
     try {
       const { accountId, password } = req.body as { accountId?: string; password?: string };
+      const cleanAccountId = cleanString(accountId, 36);
 
-      if (!accountId || !password) {
+      if (!cleanAccountId || !password) {
         return res.status(400).json({ error: 'Account and password are required' });
       }
 
-      const account = await AuthAccountModel.disableTwoFactor(accountId, password);
+      const account = await AuthAccountModel.disableTwoFactor(cleanAccountId, password);
 
       if (!account) {
         return res.status(401).json({ error: 'Password is incorrect' });
@@ -477,8 +508,8 @@ export class AuthController {
   static async updateRegistrationSettings(req: Request, res: Response) {
     try {
       const { mode, appBaseUrl } = req.body as { mode?: string; appBaseUrl?: string };
-      const normalizedMode = normalizeRegistrationMode(mode || '');
-      const normalizedUrl = (appBaseUrl || '').trim().replace(/\/+$/u, '');
+      const normalizedMode = normalizeRegistrationMode(cleanString(mode, 40));
+      const normalizedUrl = cleanString(appBaseUrl, 300).replace(/\/+$/u, '');
 
       if (normalizedUrl && !/^https?:\/\//iu.test(normalizedUrl)) {
         return res.status(400).json({ error: 'App URL must start with http:// or https://' });
@@ -520,7 +551,7 @@ export class AuthController {
       const { email } = req.body as { email?: string; requesterId?: string };
       const account = await getSessionAccount(req);
 
-      const cleanEmail = email ? normalizeEmailInput(email) : '';
+      const cleanEmail = normalizeEmail(email);
       if (!cleanEmail || !isValidEmail(cleanEmail)) {
         return res.status(400).json({ error: 'Enter a valid invite email' });
       }
@@ -546,12 +577,13 @@ export class AuthController {
       const { role } = req.body as { role?: string };
       const { accountId } = req.params;
       const requester = await getSessionAccount(req);
+      const cleanRole = cleanRoleName(role);
 
       if (!(await canManageRoles(requester))) {
         return res.status(403).json({ error: 'Role management permission required' });
       }
 
-      if (!role || !(await AuthAccountModel.roleExists(role))) {
+      if (!cleanRole || !(await AuthAccountModel.roleExists(cleanRole))) {
         return res.status(400).json({ error: 'Choose an existing role' });
       }
 
@@ -563,11 +595,11 @@ export class AuthController {
         return res.status(404).json({ error: 'Account not found' });
       }
 
-      if (targetAccount.role === 'administrator' && role !== 'administrator' && administratorCount <= 1) {
+      if (targetAccount.role === 'administrator' && cleanRole !== 'administrator' && administratorCount <= 1) {
         return res.status(400).json({ error: 'At least one administrator account is required' });
       }
 
-      const account = await AuthAccountModel.updateRole(accountId, role);
+      const account = await AuthAccountModel.updateRole(accountId, cleanRole);
       broadcastAppEvent({ type: 'permission-updated', entityId: accountId });
       broadcastAppEvent({ type: 'user-updated', entityId: accountId });
       res.json({ account });
@@ -655,11 +687,14 @@ export class AuthController {
         return res.status(403).json({ error: 'Role management permission required' });
       }
 
-      if (!name?.trim()) {
+      const cleanName = cleanRoleName(name);
+      const cleanPermissions = normalizePermissions(permissions);
+
+      if (!cleanName) {
         return res.status(400).json({ error: 'Role name is required' });
       }
 
-      const role = await AuthAccountModel.createRole(name, Array.isArray(permissions) ? permissions : []);
+      const role = await AuthAccountModel.createRole(cleanName, cleanPermissions);
       broadcastAppEvent({ type: 'permission-updated', entityId: role.id });
       res.status(201).json(role);
     } catch (error) {

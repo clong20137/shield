@@ -17,7 +17,8 @@ const buckets = new Map<string, RateLimitRecord>();
 function getClientKey(req: Request, keyPrefix: string): string {
   const forwardedFor = req.headers['x-forwarded-for'];
   const forwardedIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor?.split(',')[0];
-  return `${keyPrefix}:${forwardedIp || req.ip || req.socket.remoteAddress || 'unknown'}`;
+  const trustedProxyEnabled = process.env.TRUST_PROXY === 'true';
+  return `${keyPrefix}:${trustedProxyEnabled ? forwardedIp || req.ip || req.socket.remoteAddress || 'unknown' : req.ip || req.socket.remoteAddress || 'unknown'}`;
 }
 
 export function rateLimit(options: RateLimitOptions) {

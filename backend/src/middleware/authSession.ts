@@ -8,7 +8,16 @@ export function getBearerToken(req: Request): string | null {
     return null;
   }
 
-  return header.slice('Bearer '.length).trim() || null;
+  const token = header.slice('Bearer '.length).trim();
+  if (!isWellFormedSessionToken(token)) {
+    return null;
+  }
+
+  return token;
+}
+
+export function isWellFormedSessionToken(token: string): boolean {
+  return /^[A-Za-z0-9_-]{32,160}$/u.test(token);
 }
 
 export async function getSessionAccount(req: Request) {
