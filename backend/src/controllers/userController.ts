@@ -11,6 +11,14 @@ const employmentTypes = ['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inact
 const userStatuses = ['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Administrative Duty', 'Inactive'] as const;
 const sexOptions = ['Male', 'Female'] as const;
 const maritalStatuses = ['Single', 'Married', 'Divorced', 'Widowed'] as const;
+const selfEditableFields = new Set([
+  'profilePictureUrl',
+  'personalPhoneNumber',
+  'departmentPhoneNumber',
+  'residentialAddress',
+  'mailingAddress',
+  'maritalStatus',
+]);
 
 async function canManageRoles(req: Request): Promise<boolean> {
   const account = await getSessionAccount(req);
@@ -31,76 +39,97 @@ function isDuplicateUserError(error: unknown): boolean {
 }
 
 function validateUserPayload(body: Record<string, unknown>, isCreate: boolean): { value?: Record<string, unknown>; error?: string } {
+  const has = (field: string) => Object.prototype.hasOwnProperty.call(body, field);
   const firstName = cleanString(body.firstName, 100);
   const lastName = cleanString(body.lastName, 100);
   const email = normalizeEmail(body.email);
   const employmentType = cleanString(body.employmentType, 100);
-  const status = cleanString(body.status, 100) || 'Active';
+  const status = cleanString(body.status, 100);
   const sex = cleanString(body.sex, 20);
   const maritalStatus = cleanString(body.maritalStatus, 30);
   const personalPhoneNumber = normalizePhone(body.personalPhoneNumber);
   const departmentPhoneNumber = normalizePhone(body.departmentPhoneNumber);
 
-  if (isCreate && (!firstName || !lastName)) {
+  if ((isCreate || has('firstName') || has('lastName')) && (!firstName || !lastName)) {
     return { error: 'First and last name are required' };
   }
 
-  if (email && !isValidEmail(email)) {
+  if (has('email') && email && !isValidEmail(email)) {
     return { error: 'Enter a valid email address' };
   }
 
-  if (employmentType && !isOneOf(employmentType, employmentTypes)) {
+  if (has('employmentType') && employmentType && !isOneOf(employmentType, employmentTypes)) {
     return { error: 'Choose a valid employee type' };
   }
 
-  if (status && !isOneOf(status, userStatuses)) {
+  if (has('status') && status && !isOneOf(status, userStatuses)) {
     return { error: 'Choose a valid status' };
   }
 
-  if (sex && !isOneOf(sex, sexOptions)) {
+  if (has('sex') && sex && !isOneOf(sex, sexOptions)) {
     return { error: 'Sex must be Male or Female' };
   }
 
-  if (maritalStatus && !isOneOf(maritalStatus, maritalStatuses)) {
+  if (has('maritalStatus') && maritalStatus && !isOneOf(maritalStatus, maritalStatuses)) {
     return { error: 'Choose a valid marital status' };
   }
 
-  if (!isValidPhone(personalPhoneNumber) || !isValidPhone(departmentPhoneNumber)) {
+  if ((has('personalPhoneNumber') && !isValidPhone(personalPhoneNumber)) || (has('departmentPhoneNumber') && !isValidPhone(departmentPhoneNumber))) {
     return { error: 'Phone numbers must be valid 10-digit phone numbers' };
   }
 
-  return {
-    value: {
-      ...body,
-      firstName,
-      lastName,
-      email,
-      profilePictureUrl: cleanString(body.profilePictureUrl, 500),
-      peNumber: cleanString(body.peNumber, 50),
-      peopleSoftId: cleanString(body.peopleSoftId, 50),
-      carNumber: cleanString(body.carNumber, 50),
-      badgeNumber: cleanString(body.badgeNumber, 50),
-      radioNumber: cleanString(body.radioNumber, 50),
-      personalPhoneNumber,
-      departmentPhoneNumber,
-      assignedTo: cleanString(body.assignedTo, 150),
-      district: cleanString(body.district, 100),
-      rank: cleanString(body.rank, 100),
-      isActive: body.isActive !== false,
-      employmentType: employmentType || 'Other',
-      typeDetails: cleanString(body.typeDetails, 100),
-      status,
-      supervisor: cleanString(body.supervisor, 150),
-      specialtyCertifications: cleanMultiline(body.specialtyCertifications, 2000),
-      publicSafetyId: cleanString(body.publicSafetyId, 50),
-      race: cleanString(body.race, 50),
-      sex,
-      maritalStatus,
-      residentialAddress: cleanMultiline(body.residentialAddress, 1000),
-      mailingAddress: cleanMultiline(body.mailingAddress, 1000),
-      receivesMessages: body.receivesMessages !== false,
-    },
+  const cleaned: Record<string, unknown> = {};
+  const setCleanString = (field: string, maxLength: number) => {
+    if (isCreate || has(field)) cleaned[field] = cleanString(body[field], maxLength);
   };
+  const setCleanMultiline = (field: string, maxLength: number) => {
+    if (isCreate || has(field)) cleaned[field] = cleanMultiline(body[field], maxLength);
+  };
+
+  setCleanString('firstName', 100);
+  setCleanString('lastName', 100);
+  if (isCreate || has('email')) cleaned.email = email;
+  setCleanString('profilePictureUrl', 500);
+  setCleanString('peNumber', 50);
+  setCleanString('peopleSoftId', 50);
+  setCleanString('carNumber', 50);
+  setCleanString('badgeNumber', 50);
+  setCleanString('radioNumber', 50);
+  if (isCreate || has('personalPhoneNumber')) cleaned.personalPhoneNumber = personalPhoneNumber;
+  if (isCreate || has('departmentPhoneNumber')) cleaned.departmentPhoneNumber = departmentPhoneNumber;
+  setCleanString('assignedTo', 150);
+  setCleanString('district', 100);
+  setCleanString('rank', 100);
+  if (isCreate || has('isActive')) cleaned.isActive = body.isActive !== false;
+  if (isCreate || has('employmentType')) cleaned.employmentType = employmentType || 'Other';
+  setCleanString('typeDetails', 100);
+  if (isCreate || has('status')) cleaned.status = status || 'Active';
+  setCleanString('supervisor', 150);
+  setCleanMultiline('specialtyCertifications', 2000);
+  setCleanString('publicSafetyId', 50);
+  setCleanString('race', 50);
+  if (isCreate || has('sex')) cleaned.sex = sex;
+  if (isCreate || has('maritalStatus')) cleaned.maritalStatus = maritalStatus;
+  setCleanMultiline('residentialAddress', 1000);
+  setCleanMultiline('mailingAddress', 1000);
+  if (isCreate || has('receivesMessages')) cleaned.receivesMessages = body.receivesMessages !== false;
+
+  return {
+    value: cleaned,
+  };
+}
+
+async function canEditProtectedUserFields(req: Request): Promise<boolean> {
+  const account = await getSessionAccount(req);
+  if (!account) return false;
+  if (account.role === 'administrator') return true;
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
+  return permissions.includes('users:edit');
+}
+
+function includesProtectedSelfUpdate(body: Record<string, unknown>): boolean {
+  return Object.keys(body).some((key) => !selfEditableFields.has(key));
 }
 
 export class UserController {
@@ -207,6 +236,11 @@ export class UserController {
   static async updateUser(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const sessionAccount = await getSessionAccount(req);
+
+      if (sessionAccount?.id === id && !(await canEditProtectedUserFields(req)) && includesProtectedSelfUpdate(req.body)) {
+        return res.status(403).json({ error: 'User management permission required to edit personnel fields' });
+      }
 
       const validation = validateUserPayload(req.body, false);
       if (validation.error || !validation.value) {

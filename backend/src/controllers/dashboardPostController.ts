@@ -1,21 +1,10 @@
 import { Request, Response } from 'express';
-import { AuthAccountModel } from '../models/AuthAccount';
+import { getSessionAccount } from '../middleware/authSession';
 import { DashboardPostModel } from '../models/DashboardPost';
 import { broadcastAppEvent } from '../services/appEvents';
+import { cleanMultiline, cleanString, isOneOf } from '../utils/validation';
 
-async function isAdministrator(accountId?: string): Promise<boolean> {
-  if (!accountId) {
-    return false;
-  }
-
-  const account = await AuthAccountModel.getAccountById(accountId);
-  if (account?.role === 'administrator') {
-    return true;
-  }
-
-  const permissions = await AuthAccountModel.getPermissionsForAccount(accountId);
-  return permissions.includes('dashboard:manage');
-}
+const dashboardCategories = ['Update', 'News', 'Alert'] as const;
 
 export class DashboardPostController {
   static async listPosts(req: Request, res: Response) {
@@ -32,28 +21,29 @@ export class DashboardPostController {
 
   static async createPost(req: Request, res: Response) {
     try {
-      const { requesterId, title, body, category, authorName } = req.body as {
-        requesterId?: string;
-        title?: string;
-        body?: string;
-        category?: string;
-        authorName?: string;
-      };
-
-      if (!(await isAdministrator(requesterId))) {
-        return res.status(403).json({ error: 'Administrator permission required' });
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
       }
 
-      if (!title?.trim() || !body?.trim()) {
+      const title = cleanString(req.body?.title, 160);
+      const body = cleanMultiline(req.body?.body, 5000);
+      const category = cleanString(req.body?.category, 40) || 'Update';
+
+      if (!title || !body) {
         return res.status(400).json({ error: 'Title and body are required' });
+      }
+
+      if (!isOneOf(category, dashboardCategories)) {
+        return res.status(400).json({ error: 'Choose a valid post category' });
       }
 
       const post = await DashboardPostModel.createPost({
         title,
         body,
-        category: category || 'Update',
-        authorId: requesterId,
-        authorName,
+        category,
+        authorId: account.id,
+        authorName: account.displayName || account.email,
       });
 
       broadcastAppEvent({ type: 'dashboard-updated', entityId: post.id });
@@ -66,10 +56,9 @@ export class DashboardPostController {
 
   static async deletePost(req: Request, res: Response) {
     try {
-      const requesterId = typeof req.body.requesterId === 'string' ? req.body.requesterId : undefined;
-
-      if (!(await isAdministrator(requesterId))) {
-        return res.status(403).json({ error: 'Administrator permission required' });
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
       }
 
       const deleted = await DashboardPostModel.deletePost(req.params.id);
