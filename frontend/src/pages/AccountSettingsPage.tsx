@@ -1,7 +1,9 @@
 import QRCode from 'qrcode';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
-import { Camera, Download, KeyRound, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, X } from 'lucide-react';
-import { AuthAccount, AuthSession, PerformanceEvaluation, TwoFactorSetupResponse, authService, performanceEvaluationService, userService } from '../services/api';
+import { Link } from 'react-router-dom';
+import { Camera, Download, ExternalLink, KeyRound, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, X } from 'lucide-react';
+import { AuthAccount, AuthSession, TwoFactorSetupResponse, authService, performanceEvaluationService, userService } from '../services/api';
+import { downloadPerformanceEvaluationPdf } from '../utils/performanceEvaluationPdf';
 
 interface AccountSettingsPageProps {
   account: AuthAccount;
@@ -11,6 +13,7 @@ interface AccountSettingsPageProps {
   };
   onReceiveMessagesChange: (receiveMessages: boolean) => void;
   onMessageSoundChange: (playMessageSound: boolean) => void;
+  onOpenEvaluations?: () => void;
   onAccountUpdate: (account: AuthAccount) => void;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
   getErrorMessage: (error: unknown, fallback: string) => string;
@@ -32,6 +35,7 @@ export function AccountSettingsPage({
   messagePreferences,
   onReceiveMessagesChange,
   onMessageSoundChange,
+  onOpenEvaluations,
   onAccountUpdate,
   onToast,
   getErrorMessage,
@@ -216,121 +220,6 @@ export function AccountSettingsPage({
     }
   };
 
-  const downloadFile = (filename: string, contents: string, type: string) => {
-    const blob = new Blob([contents], { type });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const escapePdfText = (value: unknown) =>
-    String(value ?? '')
-      .replace(/\\/gu, '\\\\')
-      .replace(/\(/gu, '\\(')
-      .replace(/\)/gu, '\\)')
-      .replace(/\r?\n/gu, ' ');
-
-  const wrapPdfText = (label: string, value: unknown, maxLength = 86) => {
-    const text = `${label}: ${String(value ?? 'Not recorded')}`;
-    const words = text.split(/\s+/u);
-    const lines: string[] = [];
-    let line = '';
-
-    words.forEach((word) => {
-      const nextLine = line ? `${line} ${word}` : word;
-      if (nextLine.length > maxLength && line) {
-        lines.push(line);
-        line = word;
-      } else {
-        line = nextLine;
-      }
-    });
-
-    if (line) {
-      lines.push(line);
-    }
-
-    return lines;
-  };
-
-  const createPerformanceEvaluationPdf = (evaluations: PerformanceEvaluation[]) => {
-    const lines = evaluations.length > 0
-      ? evaluations.flatMap((evaluation, index) => [
-          `Performance Evaluation ${index + 1}`,
-          ...wrapPdfText('Employee', evaluation.employeeName),
-          ...wrapPdfText('Employee Email', evaluation.employeeEmail),
-          ...wrapPdfText('Supervisor', evaluation.supervisorName),
-          ...wrapPdfText('Period', evaluation.evaluationPeriod),
-          ...wrapPdfText('Position', evaluation.positionTitle),
-          ...wrapPdfText('District', evaluation.district),
-          ...wrapPdfText('Status', evaluation.status),
-          ...wrapPdfText('Sent', evaluation.sentAt ? new Date(evaluation.sentAt).toLocaleString() : ''),
-          ...wrapPdfText('Employee Signed', evaluation.employeeSignedAt ? new Date(evaluation.employeeSignedAt).toLocaleString() : ''),
-          ...wrapPdfText('Supervisor Signature', evaluation.supervisorSignature),
-          ...wrapPdfText('Employee Signature', evaluation.employeeSignature),
-          ...wrapPdfText('Strengths', evaluation.strengths),
-          ...wrapPdfText('Improvements', evaluation.improvements),
-          ...wrapPdfText('Goals', evaluation.goals),
-          ...wrapPdfText('Supervisor Comments', evaluation.supervisorComments),
-          ...wrapPdfText('Employee Comments', evaluation.employeeComments),
-          '',
-        ])
-      : ['Performance Evaluations', 'No performance evaluations were found for this account.'];
-    const pages: string[][] = [];
-    const pageSize = 42;
-
-    for (let index = 0; index < lines.length; index += pageSize) {
-      pages.push(lines.slice(index, index + pageSize));
-    }
-
-    const objects: string[] = [];
-    const addObject = (content: string) => {
-      objects.push(content);
-      return objects.length;
-    };
-    const catalogId = addObject('<< /Type /Catalog /Pages 2 0 R >>');
-    const pagesId = addObject('');
-    const fontId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
-    const pageObjectIds: number[] = [];
-
-    pages.forEach((pageLines) => {
-      const stream = [
-        'BT',
-        '/F1 11 Tf',
-        '50 760 Td',
-        ...pageLines.flatMap((line, index) => [
-          index === 0 ? '' : '0 -16 Td',
-          `(${escapePdfText(line)}) Tj`,
-        ]).filter(Boolean),
-        'ET',
-      ].join('\n');
-      const contentId = addObject(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
-      const pageId = addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`);
-      pageObjectIds.push(pageId);
-    });
-
-    objects[pagesId - 1] = `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageObjectIds.length} >>`;
-    void catalogId;
-
-    let pdf = '%PDF-1.4\n';
-    const offsets = [0];
-    objects.forEach((object, index) => {
-      offsets.push(pdf.length);
-      pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
-    });
-    const xrefOffset = pdf.length;
-    pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-    offsets.slice(1).forEach((offset) => {
-      pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
-    });
-    pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
-
-    return pdf;
-  };
-
   const downloadPerformanceEvaluations = async () => {
     try {
       const response = await performanceEvaluationService.getAll();
@@ -338,7 +227,7 @@ export function AccountSettingsPage({
         (evaluation) => evaluation.employeeAccountId === account.id || evaluation.supervisorAccountId === account.id,
       );
 
-      downloadFile('shield-performance-evaluations.pdf', createPerformanceEvaluationPdf(evaluations), 'application/pdf');
+      downloadPerformanceEvaluationPdf(evaluations);
     } catch (error) {
       onToast('error', getErrorMessage(error, 'Failed to download performance reports.'));
     }
@@ -625,6 +514,9 @@ export function AccountSettingsPage({
               <p className="font-bold text-gray-900 dark:text-gray-100">Performance Evaluations</p>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Download evaluations you sent or received.</p>
               <div className="mt-3 flex gap-2">
+                <Link to="/evaluations" onClick={onOpenEvaluations} className="btn-secondary" aria-label="Open performance evaluations" title="Open Evaluations">
+                  <ExternalLink size={16} />
+                </Link>
                 <button type="button" onClick={downloadPerformanceEvaluations} className="btn-primary" aria-label="Download performance evaluations PDF" title="Download PDF">
                   <Download size={16} />
                 </button>

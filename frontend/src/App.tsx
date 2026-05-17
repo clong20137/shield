@@ -2294,6 +2294,7 @@ function App() {
                         playMessageSound,
                       }))
                     }
+                    onOpenEvaluations={() => closeModal('profile')}
                     onAccountUpdate={handleAccountUpdate}
                     onToast={showToast}
                     getErrorMessage={getErrorMessage}

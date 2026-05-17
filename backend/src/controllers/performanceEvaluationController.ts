@@ -153,4 +153,50 @@ export class PerformanceEvaluationController {
       res.status(500).json({ error: 'Failed to sign performance evaluation' });
     }
   }
+
+  static async remind(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const existing = await PerformanceEvaluationModel.getById(req.params.id);
+      if (!existing || existing.status !== 'Sent') {
+        return res.status(404).json({ error: 'Unsigned evaluation not found' });
+      }
+
+      if (existing.supervisorAccountId !== account.id && !isSupervisor(account)) {
+        return res.status(403).json({ error: 'Supervisor access required' });
+      }
+
+      await UserNotificationModel.create({
+        userId: existing.employeeAccountId,
+        type: 'performance-evaluation',
+        title: 'Performance Evaluation Reminder',
+        message: `${account.displayName || account.email} reminded you to review and sign your performance evaluation for ${existing.evaluationPeriod}.`,
+        entityType: 'performance_evaluation',
+        entityId: existing.id,
+      });
+
+      await AuditLogModel.create({
+        actorId: account.id,
+        actorName: account.displayName || account.email,
+        action: 'Sent performance evaluation reminder',
+        entityType: 'performance_evaluation',
+        entityId: existing.id,
+        details: `Reminder sent to ${existing.employeeName}`,
+      });
+
+      const evaluation = await PerformanceEvaluationModel.updateSentAt(existing.id);
+      broadcastAccountEvent(existing.employeeAccountId, { type: 'notification-created', entityId: existing.id });
+      broadcastAccountEvent(existing.employeeAccountId, { type: 'performance-evaluation-updated', entityId: existing.id });
+      broadcastAccountEvent(account.id, { type: 'performance-evaluation-updated', entityId: existing.id });
+      broadcastAppEvent({ type: 'performance-evaluation-updated', entityId: existing.id });
+      res.json(evaluation || existing);
+    } catch (error) {
+      console.error('Remind performance evaluation error:', error);
+      res.status(500).json({ error: 'Failed to send evaluation reminder' });
+    }
+  }
 }

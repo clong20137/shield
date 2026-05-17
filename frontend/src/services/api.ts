@@ -580,6 +580,9 @@ export const performanceEvaluationService = {
 
   sign: (id: string, signature: string, employeeComments: string) =>
     api.post<PerformanceEvaluation>(`/performance-evaluations/${id}/sign`, { signature, employeeComments }),
+
+  remind: (id: string) =>
+    api.post<PerformanceEvaluation>(`/performance-evaluations/${id}/remind`),
 };
 
 export default api;

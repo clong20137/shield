@@ -217,4 +217,18 @@ export class PerformanceEvaluationModel {
       conn.release();
     }
   }
+
+  static async updateSentAt(id: string): Promise<PerformanceEvaluation | null> {
+    const conn = await pool.getConnection();
+    try {
+      await conn.query<ResultSetHeader>(
+        'UPDATE performance_evaluations SET `sentAt` = ?, `updatedAt` = ? WHERE `id` = ? AND `status` = ?',
+        [new Date(), new Date(), id, 'Sent']
+      );
+
+      return this.getById(id);
+    } finally {
+      conn.release();
+    }
+  }
 }

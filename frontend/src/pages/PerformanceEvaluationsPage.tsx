@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, FileSignature, Plus, Save, Send, X } from 'lucide-react';
+import { BellRing, CheckCircle2, Download, FileSignature, Plus, Save, Search, Send, X } from 'lucide-react';
 import { AuthAccount, PerformanceEvaluation, performanceEvaluationService, authService } from '../services/api';
+import { downloadPerformanceEvaluationPdf } from '../utils/performanceEvaluationPdf';
 
 interface PerformanceEvaluationsPageProps {
   currentUser: AuthAccount;
@@ -47,19 +48,23 @@ function EvaluationDetail({
   evaluation,
   currentUser,
   onSigned,
+  onReminded,
   onToast,
   getErrorMessage,
 }: {
   evaluation: PerformanceEvaluation;
   currentUser: AuthAccount;
   onSigned: (evaluation: PerformanceEvaluation) => void;
+  onReminded: (evaluation: PerformanceEvaluation) => void;
   onToast: PerformanceEvaluationsPageProps['onToast'];
   getErrorMessage: PerformanceEvaluationsPageProps['getErrorMessage'];
 }) {
   const [employeeComments, setEmployeeComments] = useState(evaluation.employeeComments || '');
   const [signature, setSignature] = useState(currentUser.displayName || currentUser.email);
   const [isSigning, setIsSigning] = useState(false);
+  const [isReminding, setIsReminding] = useState(false);
   const canSign = evaluation.employeeAccountId === currentUser.id && evaluation.status === 'Sent';
+  const canRemind = evaluation.status === 'Sent' && (evaluation.supervisorAccountId === currentUser.id || currentUser.role === 'administrator' || currentUser.role === 'supervisor');
 
   const signEvaluation = async () => {
     if (!signature.trim()) {
@@ -79,6 +84,19 @@ function EvaluationDetail({
     }
   };
 
+  const remindEmployee = async () => {
+    setIsReminding(true);
+    try {
+      const response = await performanceEvaluationService.remind(evaluation.id);
+      onReminded(response.data);
+      onToast('success', 'Reminder sent to employee.');
+    } catch (error) {
+      onToast('error', getErrorMessage(error, 'Failed to send reminder.'));
+    } finally {
+      setIsReminding(false);
+    }
+  };
+
   return (
     <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 pb-4 dark:border-gray-800">
@@ -89,9 +107,25 @@ function EvaluationDetail({
             {evaluation.evaluationPeriod} - {evaluation.positionTitle || 'No position listed'}
           </p>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${getStatusTone(evaluation.status)}`}>
-          {evaluation.status}
-        </span>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => downloadPerformanceEvaluationPdf([evaluation], `performance-evaluation-${evaluation.employeeName.replace(/\s+/gu, '-').toLowerCase()}-${evaluation.evaluationPeriod.replace(/\s+/gu, '-').toLowerCase()}.pdf`)}
+            className="btn-secondary"
+            aria-label="Download evaluation PDF"
+            title="Download PDF"
+          >
+            <Download size={16} />
+          </button>
+          {canRemind && (
+            <button type="button" onClick={remindEmployee} className="btn-secondary" disabled={isReminding} aria-label="Send reminder" title="Send Reminder">
+              <BellRing size={16} />
+            </button>
+          )}
+          <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${getStatusTone(evaluation.status)}`}>
+            {evaluation.status}
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -179,10 +213,37 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage }: P
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | PerformanceEvaluation['status']>('all');
+  const [periodFilter, setPeriodFilter] = useState('all');
   const [form, setForm] = useState(emptyForm);
   const isSupervisor = currentUser.role === 'administrator' || currentUser.role === 'supervisor';
 
-  const selectedEvaluation = evaluations.find((evaluation) => evaluation.id === selectedId) || evaluations[0] || null;
+  const periodOptions = useMemo(
+    () => Array.from(new Set(evaluations.map((evaluation) => evaluation.evaluationPeriod).filter(Boolean))).sort().reverse(),
+    [evaluations],
+  );
+  const filteredEvaluations = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+
+    return evaluations.filter((evaluation) => {
+      const matchesStatus = statusFilter === 'all' || evaluation.status === statusFilter;
+      const matchesPeriod = periodFilter === 'all' || evaluation.evaluationPeriod === periodFilter;
+      const haystack = [
+        evaluation.employeeName,
+        evaluation.employeeEmail,
+        evaluation.supervisorName,
+        evaluation.evaluationPeriod,
+        evaluation.positionTitle,
+        evaluation.district,
+        evaluation.status,
+      ].join(' ').toLowerCase();
+
+      return matchesStatus && matchesPeriod && (!query || haystack.includes(query));
+    });
+  }, [evaluations, periodFilter, searchTerm, statusFilter]);
+
+  const selectedEvaluation = filteredEvaluations.find((evaluation) => evaluation.id === selectedId) || filteredEvaluations[0] || null;
 
   const loadEvaluations = async (showLoading = false) => {
     if (showLoading) setIsLoading(true);
@@ -217,6 +278,7 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage }: P
 
   const sentCount = useMemo(() => evaluations.filter((evaluation) => evaluation.status === 'Sent').length, [evaluations]);
   const signedCount = evaluations.length - sentCount;
+  const completionPercent = evaluations.length === 0 ? 0 : Math.round((signedCount / evaluations.length) * 100);
 
   const createEvaluation = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -245,6 +307,10 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage }: P
     setSelectedId(nextEvaluation.id);
   };
 
+  const downloadVisibleEvaluations = () => {
+    downloadPerformanceEvaluationPdf(filteredEvaluations, 'shield-performance-evaluations-filtered.pdf');
+  };
+
   return (
     <div>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
@@ -261,7 +327,7 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage }: P
         )}
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-4">
         <div className="rounded border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
           <p className="text-xs font-bold uppercase text-gray-400">Total</p>
           <p className="mt-1 text-3xl font-bold text-primary-500 dark:text-blue-100">{evaluations.length}</p>
@@ -274,16 +340,63 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage }: P
           <p className="text-xs font-bold uppercase text-gray-400">Signed</p>
           <p className="mt-1 text-3xl font-bold text-primary-500 dark:text-blue-100">{signedCount}</p>
         </div>
+        <div className="rounded border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+          <p className="text-xs font-bold uppercase text-gray-400">Completion</p>
+          <p className="mt-1 text-3xl font-bold text-primary-500 dark:text-blue-100">{completionPercent}%</p>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+            <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${completionPercent}%` }} />
+          </div>
+        </div>
       </div>
+
+      <section className="mb-4 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px_auto]">
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              className="w-full rounded border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-gray-700 dark:bg-gray-950"
+              placeholder="Search employee, email, supervisor, period, district..."
+            />
+          </label>
+          <select
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+            className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+            aria-label="Filter evaluation status"
+          >
+            <option value="all">All statuses</option>
+            <option value="Sent">Awaiting signature</option>
+            <option value="Signed">Signed</option>
+          </select>
+          <select
+            value={periodFilter}
+            onChange={(event) => setPeriodFilter(event.target.value)}
+            className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+            aria-label="Filter evaluation period"
+          >
+            <option value="all">All periods</option>
+            {periodOptions.map((period) => (
+              <option key={period} value={period}>{period}</option>
+            ))}
+          </select>
+          <button type="button" onClick={downloadVisibleEvaluations} className="btn-secondary" aria-label="Download filtered evaluations PDF" title="Download Filtered PDF">
+            <Download size={16} />
+          </button>
+        </div>
+      </section>
 
       {isLoading ? (
         <div className="loading">Loading evaluations...</div>
       ) : evaluations.length === 0 ? (
         <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No performance evaluations yet.</div>
+      ) : filteredEvaluations.length === 0 ? (
+        <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No evaluations match those filters.</div>
       ) : (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
           <section className="space-y-2">
-            {evaluations.map((evaluation) => (
+            {filteredEvaluations.map((evaluation) => (
               <button
                 key={evaluation.id}
                 type="button"
@@ -311,6 +424,7 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage }: P
               evaluation={selectedEvaluation}
               currentUser={currentUser}
               onSigned={updateEvaluation}
+              onReminded={updateEvaluation}
               onToast={onToast}
               getErrorMessage={getErrorMessage}
             />
