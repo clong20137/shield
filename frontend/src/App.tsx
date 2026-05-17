@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { BarChart3, Bell, Bug, Calculator, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, FileSignature, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
+import { BarChart3, Bell, Bug, Calculator, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -1453,7 +1453,6 @@ function App() {
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
-  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
@@ -1461,7 +1460,7 @@ function App() {
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
   const [isBugTrackerOpen, setIsBugTrackerOpen] = useState(false);
   const [isFirstLoginGuideOpen, setIsFirstLoginGuideOpen] = useState(false);
-  const [closingModal, setClosingModal] = useState<'messages' | 'calendar' | 'profile' | 'preferences' | 'createUser' | 'reportBug' | 'bugTracker' | null>(null);
+  const [closingModal, setClosingModal] = useState<'messages' | 'calendar' | 'profile' | 'createUser' | 'reportBug' | 'bugTracker' | null>(null);
 
   useEffect(() => {
     const collapseSidebarOnMobile = () => {
@@ -1744,13 +1743,12 @@ function App() {
     return () => eventSource.close();
   }, [currentUser, loadBugReports, loadUserNotifications]);
 
-  const closeModal = (modal: 'messages' | 'calendar' | 'profile' | 'preferences' | 'createUser' | 'reportBug' | 'bugTracker') => {
+  const closeModal = (modal: 'messages' | 'calendar' | 'profile' | 'createUser' | 'reportBug' | 'bugTracker') => {
     setClosingModal(modal);
     window.setTimeout(() => {
       if (modal === 'messages') setIsMessagesModalOpen(false);
       if (modal === 'calendar') setIsCalendarModalOpen(false);
       if (modal === 'profile') setIsProfileModalOpen(false);
-      if (modal === 'preferences') setIsPreferencesOpen(false);
       if (modal === 'createUser') setIsCreateUserModalOpen(false);
       if (modal === 'reportBug') setIsReportBugOpen(false);
       if (modal === 'bugTracker') setIsBugTrackerOpen(false);
@@ -1881,11 +1879,6 @@ function App() {
         return;
       }
 
-      if (isPreferencesOpen) {
-        closeModal('preferences');
-        return;
-      }
-
       if (isBugTrackerOpen) {
         closeModal('bugTracker');
         return;
@@ -1919,7 +1912,7 @@ function App() {
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isAccountMenuOpen, isBugTrackerOpen, isCalculatorOpen, isCalendarModalOpen, isCreateUserModalOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isPreferencesOpen, isProfileModalOpen, isReportBugOpen]);
+  }, [isAccountMenuOpen, isBugTrackerOpen, isCalculatorOpen, isCalendarModalOpen, isCreateUserModalOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isProfileModalOpen, isReportBugOpen]);
 
   return (
     <Router>
@@ -2151,13 +2144,6 @@ function App() {
                     >
                       <UserCircle size={16} /> Account Settings
                     </button>
-                    <NavLink
-                      to="/evaluations"
-                      onClick={() => setIsAccountMenuOpen(false)}
-                      className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
-                    >
-                      <FileSignature size={16} /> Performance Evaluations
-                    </NavLink>
                     <button
                       type="button"
                       onClick={() => {
@@ -2339,55 +2325,6 @@ function App() {
                     isModalView
                     onCreated={() => closeModal('createUser')}
                   />
-                </div>
-              </div>
-            </div>
-          )}
-          {isPreferencesOpen && (
-            <div className={getModalBackdropClass(closingModal === 'preferences')}>
-              <div className={getModalWindowClass(closingModal === 'preferences', 'w-full max-w-md overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-6')}>
-                <div className="mb-5 flex items-center justify-between">
-                  <h2>Preferences</h2>
-                  <button
-                    type="button"
-                    onClick={() => closeModal('preferences')}
-                    className="icon-close-button"
-                    aria-label="Close preferences"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
-                    <span>
-                      <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Receive messages</span>
-                      <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Show message badges and message notifications.</span>
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={messagePreferences.receiveMessages}
-                      onChange={(event) => handleReceiveMessagesChange(event.target.checked)}
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
-                    <span>
-                      <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Message ping sound</span>
-                      <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Play a short sound when new unread messages arrive.</span>
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={messagePreferences.playMessageSound}
-                      disabled={!messagePreferences.receiveMessages}
-                      onChange={(event) =>
-                        setMessagePreferences((preferences) => ({
-                          ...preferences,
-                          playMessageSound: event.target.checked,
-                        }))
-                      }
-                    />
-                  </label>
                 </div>
               </div>
             </div>

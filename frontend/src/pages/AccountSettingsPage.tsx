@@ -1,7 +1,7 @@
 import QRCode from 'qrcode';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { Camera, Download, KeyRound, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, X } from 'lucide-react';
-import { AuthAccount, AuthSession, MileageSummary, PerformanceEvaluation, TwoFactorSetupResponse, authService, mileageService, performanceEvaluationService, userService } from '../services/api';
+import { AuthAccount, AuthSession, PerformanceEvaluation, TwoFactorSetupResponse, authService, performanceEvaluationService, userService } from '../services/api';
 
 interface AccountSettingsPageProps {
   account: AuthAccount;
@@ -49,9 +49,6 @@ export function AccountSettingsPage({
   const [sessions, setSessions] = useState<AuthSession[]>([]);
   const [isSessionsLoading, setIsSessionsLoading] = useState(false);
   const [isRevokingSessions, setIsRevokingSessions] = useState(false);
-  const [mileageSummary, setMileageSummary] = useState<MileageSummary | null>(null);
-  const [milestoneInput, setMilestoneInput] = useState('');
-  const [isMilestoneSaving, setIsMilestoneSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'reports' | 'preferences'>('general');
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -83,28 +80,6 @@ export function AccountSettingsPage({
       isMounted = false;
     };
   }, [onToast, twoFactorSetup]);
-
-  useEffect(() => {
-    const loadMileageSummary = () => {
-      mileageService.getSummary()
-        .then((response) => {
-          setMileageSummary(response.data);
-          setMilestoneInput(String(response.data.milestone));
-        })
-        .catch((error) => {
-          console.error('Failed to load mileage summary:', error);
-        });
-    };
-
-    loadMileageSummary();
-    window.addEventListener('shield:calendar-updated', loadMileageSummary);
-    window.addEventListener('shield:mileage-updated', loadMileageSummary);
-
-    return () => {
-      window.removeEventListener('shield:calendar-updated', loadMileageSummary);
-      window.removeEventListener('shield:mileage-updated', loadMileageSummary);
-    };
-  }, []);
 
   const loadSessions = async () => {
     setIsSessionsLoading(true);
@@ -241,31 +216,6 @@ export function AccountSettingsPage({
     }
   };
 
-  const saveMileageMilestone = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const milestone = Number(milestoneInput);
-
-    if (!Number.isFinite(milestone) || milestone <= 0) {
-      onToast('error', 'Mileage milestone must be greater than zero.');
-      return;
-    }
-
-    setIsMilestoneSaving(true);
-    try {
-      const response = await mileageService.updateMilestone(milestone);
-      setMileageSummary((summary) => ({ mileage: summary?.mileage || 0, milestone: response.data.milestone }));
-      onToast('success', 'Mileage milestone updated.');
-    } catch (error) {
-      onToast('error', getErrorMessage(error, 'Failed to update mileage milestone.'));
-    } finally {
-      setIsMilestoneSaving(false);
-    }
-  };
-
-  const mileage = mileageSummary?.mileage || 0;
-  const milestone = mileageSummary?.milestone || 1000;
-  const mileagePercent = Math.min((mileage / milestone) * 100, 100);
-
   const downloadFile = (filename: string, contents: string, type: string) => {
     const blob = new Blob([contents], { type });
     const url = URL.createObjectURL(blob);
@@ -276,35 +226,119 @@ export function AccountSettingsPage({
     URL.revokeObjectURL(url);
   };
 
-  const downloadPerformanceEvaluations = async (format: 'json' | 'csv') => {
+  const escapePdfText = (value: unknown) =>
+    String(value ?? '')
+      .replace(/\\/gu, '\\\\')
+      .replace(/\(/gu, '\\(')
+      .replace(/\)/gu, '\\)')
+      .replace(/\r?\n/gu, ' ');
+
+  const wrapPdfText = (label: string, value: unknown, maxLength = 86) => {
+    const text = `${label}: ${String(value ?? 'Not recorded')}`;
+    const words = text.split(/\s+/u);
+    const lines: string[] = [];
+    let line = '';
+
+    words.forEach((word) => {
+      const nextLine = line ? `${line} ${word}` : word;
+      if (nextLine.length > maxLength && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = nextLine;
+      }
+    });
+
+    if (line) {
+      lines.push(line);
+    }
+
+    return lines;
+  };
+
+  const createPerformanceEvaluationPdf = (evaluations: PerformanceEvaluation[]) => {
+    const lines = evaluations.length > 0
+      ? evaluations.flatMap((evaluation, index) => [
+          `Performance Evaluation ${index + 1}`,
+          ...wrapPdfText('Employee', evaluation.employeeName),
+          ...wrapPdfText('Employee Email', evaluation.employeeEmail),
+          ...wrapPdfText('Supervisor', evaluation.supervisorName),
+          ...wrapPdfText('Period', evaluation.evaluationPeriod),
+          ...wrapPdfText('Position', evaluation.positionTitle),
+          ...wrapPdfText('District', evaluation.district),
+          ...wrapPdfText('Status', evaluation.status),
+          ...wrapPdfText('Sent', evaluation.sentAt ? new Date(evaluation.sentAt).toLocaleString() : ''),
+          ...wrapPdfText('Employee Signed', evaluation.employeeSignedAt ? new Date(evaluation.employeeSignedAt).toLocaleString() : ''),
+          ...wrapPdfText('Supervisor Signature', evaluation.supervisorSignature),
+          ...wrapPdfText('Employee Signature', evaluation.employeeSignature),
+          ...wrapPdfText('Strengths', evaluation.strengths),
+          ...wrapPdfText('Improvements', evaluation.improvements),
+          ...wrapPdfText('Goals', evaluation.goals),
+          ...wrapPdfText('Supervisor Comments', evaluation.supervisorComments),
+          ...wrapPdfText('Employee Comments', evaluation.employeeComments),
+          '',
+        ])
+      : ['Performance Evaluations', 'No performance evaluations were found for this account.'];
+    const pages: string[][] = [];
+    const pageSize = 42;
+
+    for (let index = 0; index < lines.length; index += pageSize) {
+      pages.push(lines.slice(index, index + pageSize));
+    }
+
+    const objects: string[] = [];
+    const addObject = (content: string) => {
+      objects.push(content);
+      return objects.length;
+    };
+    const catalogId = addObject('<< /Type /Catalog /Pages 2 0 R >>');
+    const pagesId = addObject('');
+    const fontId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+    const pageObjectIds: number[] = [];
+
+    pages.forEach((pageLines) => {
+      const stream = [
+        'BT',
+        '/F1 11 Tf',
+        '50 760 Td',
+        ...pageLines.flatMap((line, index) => [
+          index === 0 ? '' : '0 -16 Td',
+          `(${escapePdfText(line)}) Tj`,
+        ]).filter(Boolean),
+        'ET',
+      ].join('\n');
+      const contentId = addObject(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+      const pageId = addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`);
+      pageObjectIds.push(pageId);
+    });
+
+    objects[pagesId - 1] = `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageObjectIds.length} >>`;
+    void catalogId;
+
+    let pdf = '%PDF-1.4\n';
+    const offsets = [0];
+    objects.forEach((object, index) => {
+      offsets.push(pdf.length);
+      pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+    });
+    const xrefOffset = pdf.length;
+    pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+    offsets.slice(1).forEach((offset) => {
+      pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+    });
+    pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+
+    return pdf;
+  };
+
+  const downloadPerformanceEvaluations = async () => {
     try {
       const response = await performanceEvaluationService.getAll();
       const evaluations = response.data.filter(
         (evaluation) => evaluation.employeeAccountId === account.id || evaluation.supervisorAccountId === account.id,
       );
 
-      if (format === 'json') {
-        downloadFile('shield-performance-evaluations.json', JSON.stringify(evaluations, null, 2), 'application/json');
-        return;
-      }
-
-      const headers: Array<keyof PerformanceEvaluation> = [
-        'employeeName',
-        'employeeEmail',
-        'supervisorName',
-        'evaluationPeriod',
-        'positionTitle',
-        'district',
-        'status',
-        'sentAt',
-        'employeeSignedAt',
-      ];
-      const escapeCsv = (value: unknown) => {
-        const text = String(value ?? '');
-        return /[",\n]/u.test(text) ? `"${text.replace(/"/gu, '""')}"` : text;
-      };
-      const rows = evaluations.map((evaluation) => headers.map((header) => escapeCsv(evaluation[header])).join(','));
-      downloadFile('shield-performance-evaluations.csv', [headers.join(','), ...rows].join('\n'), 'text/csv');
+      downloadFile('shield-performance-evaluations.pdf', createPerformanceEvaluationPdf(evaluations), 'application/pdf');
     } catch (error) {
       onToast('error', getErrorMessage(error, 'Failed to download performance reports.'));
     }
@@ -391,43 +425,6 @@ export function AccountSettingsPage({
             </span>
           </div>
         </div>
-      </section>
-
-      <section className="rounded-lg border border-gray-200 p-3 dark:border-gray-800 sm:p-4">
-        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Mileage Progress</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Recorded from Regular Duty Miles in Trooper Daily entries.</p>
-          </div>
-          <span className="rounded bg-accent/10 px-3 py-1 text-sm font-bold text-accent">
-            {mileage.toFixed(1).replace(/\.0$/u, '')} / {milestone.toFixed(0)} miles
-          </span>
-        </div>
-        <div className="h-4 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-          <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${mileagePercent}%` }} />
-        </div>
-        <p className="mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
-          {mileage >= milestone ? 'Milestone reached.' : `${(milestone - mileage).toFixed(1).replace(/\.0$/u, '')} miles remaining.`}
-        </p>
-
-        {account.role === 'administrator' && (
-          <form onSubmit={saveMileageMilestone} className="mt-3 flex flex-wrap items-end gap-3">
-            <label>
-              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Admin mileage milestone</span>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={milestoneInput}
-                onChange={(event) => setMilestoneInput(event.target.value)}
-                className="w-48 rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-              />
-            </label>
-            <button type="submit" className="btn-primary" disabled={isMilestoneSaving} aria-label="Save mileage milestone" title={isMilestoneSaving ? 'Saving' : 'Save Milestone'}>
-              <Save size={16} />
-            </button>
-          </form>
-        )}
       </section>
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
@@ -628,10 +625,7 @@ export function AccountSettingsPage({
               <p className="font-bold text-gray-900 dark:text-gray-100">Performance Evaluations</p>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Download evaluations you sent or received.</p>
               <div className="mt-3 flex gap-2">
-                <button type="button" onClick={() => downloadPerformanceEvaluations('csv')} className="btn-secondary" aria-label="Download performance evaluations CSV" title="Download CSV">
-                  <Download size={16} />
-                </button>
-                <button type="button" onClick={() => downloadPerformanceEvaluations('json')} className="btn-primary" aria-label="Download performance evaluations JSON" title="Download JSON">
+                <button type="button" onClick={downloadPerformanceEvaluations} className="btn-primary" aria-label="Download performance evaluations PDF" title="Download PDF">
                   <Download size={16} />
                 </button>
               </div>
