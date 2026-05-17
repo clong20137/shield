@@ -359,6 +359,12 @@ export const authService = {
   login: (email: string, password: string, twoFactorCode?: string) =>
     api.post<AuthResponse>('/auth/login', { email, password, twoFactorCode }),
 
+  requestPasswordReset: (email: string) =>
+    api.post<{ message: string }>('/auth/password-reset/request', { email }),
+
+  resetPassword: (token: string, password: string) =>
+    api.post<{ message: string }>('/auth/password-reset/confirm', { token, password }),
+
   getSession: () =>
     api.get<AuthResponse>('/auth/session'),
 

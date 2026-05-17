@@ -27,6 +27,14 @@ NODE_ENV=production
 
 # CORS
 ALLOWED_ORIGINS=https://yourdomain.com
+
+# Email / password reset
+SMTP_HOST=smtp.your-provider.com
+SMTP_PORT=587
+SMTP_USER=your_smtp_user
+SMTP_PASSWORD=your_smtp_password
+SMTP_FROM=shield@yourdomain.com
+SMTP_SECURE=false
 ```
 
 ## Backend Deployment

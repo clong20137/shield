@@ -327,6 +327,21 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS auth_password_resets (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`userId\` VARCHAR(36) NOT NULL,
+      \`email\` VARCHAR(255) NOT NULL,
+      \`tokenHash\` VARCHAR(128) NOT NULL UNIQUE,
+      \`usedAt\` TIMESTAMP NULL,
+      \`expiresAt\` TIMESTAMP NOT NULL,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX \`idx_password_resets_user\` (\`userId\`),
+      INDEX \`idx_password_resets_token\` (\`tokenHash\`),
+      INDEX \`idx_password_resets_email\` (\`email\`)
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS quick_launch_slots (
       \`accountId\` VARCHAR(36) PRIMARY KEY,
       \`slots\` JSON,

@@ -143,7 +143,7 @@ function LoginSplash({
   onLogin: (account: AuthAccount) => void;
   onToast: (type: ToastType, message: string) => void;
 }) {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -151,6 +151,7 @@ function LoginSplash({
   const [displayName, setDisplayName] = useState('');
   const [registrationSettings, setRegistrationSettings] = useState<RegistrationSettings | null>(null);
   const [inviteToken] = useState(() => new URLSearchParams(window.location.search).get('invite') || '');
+  const [resetToken] = useState(() => new URLSearchParams(window.location.search).get('reset') || '');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
@@ -162,14 +163,66 @@ function LoginSplash({
         if (inviteToken && response.data.mode !== 'disabled') {
           setMode('register');
         }
+        if (resetToken) {
+          setMode('reset');
+        }
       })
       .catch((err) => {
         console.error('Failed to load registration settings:', err);
       });
-  }, [inviteToken]);
+  }, [inviteToken, resetToken]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (mode === 'forgot') {
+      if (!email.trim()) {
+        setError('Enter your email address.');
+        return;
+      }
+
+      setIsSubmitting(true);
+      setError(null);
+
+      try {
+        const response = await authService.requestPasswordReset(email);
+        onToast('success', response.data.message);
+        setMode('login');
+      } catch (err) {
+        const message = getErrorMessage(err, 'Failed to request password reset.');
+        setError(message);
+        onToast('error', message);
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    if (mode === 'reset') {
+      if (!password.trim() || password !== confirmPassword) {
+        setError(password.trim() ? 'Passwords do not match.' : 'Enter a new password.');
+        return;
+      }
+
+      setIsSubmitting(true);
+      setError(null);
+
+      try {
+        const response = await authService.resetPassword(resetToken, password);
+        onToast('success', response.data.message);
+        setPassword('');
+        setConfirmPassword('');
+        setMode('login');
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } catch (err) {
+        const message = getErrorMessage(err, 'Failed to reset password.');
+        setError(message);
+        onToast('error', message);
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
 
     if (!email.trim() || !password.trim()) {
       setError('Enter your email and password.');
@@ -245,14 +298,18 @@ function LoginSplash({
           <form onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-6 shadow-lg dark:border-gray-800 dark:bg-gray-900">
             <div className="mb-6">
               <h2 className="mb-2 text-2xl font-bold text-primary-500">
-                {mode === 'register' ? 'Create login' : 'Sign in'}
+                {mode === 'register' ? 'Create login' : mode === 'forgot' ? 'Reset password' : mode === 'reset' ? 'Set new password' : 'Sign in'}
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 {mode === 'register'
                   ? inviteToken
                     ? 'Create your login from this secure invite.'
                     : 'Create an email and password login.'
-                  : 'Use your email and password to continue.'}
+                  : mode === 'forgot'
+                    ? 'Enter your email and we will send a secure reset link.'
+                    : mode === 'reset'
+                      ? 'Choose a new password for your SHIELD login.'
+                      : 'Use your email and password to continue.'}
               </p>
             </div>
 
@@ -264,17 +321,19 @@ function LoginSplash({
               <div className="error">Public registration is currently disabled.</div>
             )}
 
-            <label className="mb-4 block">
-              <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Email</span>
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
-                autoComplete="email"
-                autoFocus
-              />
-            </label>
+            {mode !== 'reset' && (
+              <label className="mb-4 block">
+                <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Email</span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+                  autoComplete="email"
+                  autoFocus
+                />
+              </label>
+            )}
 
             {mode === 'register' && (
               <label className="mb-4 block">
@@ -288,6 +347,7 @@ function LoginSplash({
               </label>
             )}
 
+            {mode !== 'forgot' && (
             <label className="mb-6 block">
               <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Password</span>
               <input
@@ -295,11 +355,12 @@ function LoginSplash({
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
-                autoComplete="current-password"
+                autoComplete={mode === 'reset' || mode === 'register' ? 'new-password' : 'current-password'}
               />
             </label>
+            )}
 
-            {mode === 'register' && (
+            {(mode === 'register' || mode === 'reset') && (
               <label className="mb-6 block">
                 <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Confirm password</span>
                 <input
@@ -326,10 +387,27 @@ function LoginSplash({
             )}
 
             <button type="submit" className="btn-primary w-full py-3" disabled={isSubmitting || (mode === 'register' && !canRegister)}>
-              {isSubmitting ? 'Working...' : mode === 'register' ? 'Create login' : 'Sign in'}
+              {isSubmitting ? 'Working...' : mode === 'register' ? 'Create login' : mode === 'forgot' ? 'Send reset link' : mode === 'reset' ? 'Set password' : 'Sign in'}
             </button>
 
-            {(mode === 'register' || registrationSettings?.mode === 'public' || inviteToken) && (
+            {mode === 'login' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('forgot');
+                  setPassword('');
+                  setConfirmPassword('');
+                  setTwoFactorCode('');
+                  setRequiresTwoFactor(false);
+                  setError(null);
+                }}
+                className="mt-4 w-full text-sm font-semibold text-gray-500 hover:text-primary-500 dark:text-gray-400"
+              >
+                Forgot password?
+              </button>
+            )}
+
+            {(mode === 'register' || mode === 'forgot' || mode === 'reset' || registrationSettings?.mode === 'public' || inviteToken) && (
               <button
                 type="button"
                 onClick={() => {
@@ -341,7 +419,7 @@ function LoginSplash({
                 }}
                 className="mt-4 w-full text-sm font-semibold text-primary-500 hover:text-primary-700"
               >
-                {mode === 'register' ? 'Already have a login? Sign in' : 'Need a login? Create one'}
+                {mode === 'register' || mode === 'forgot' || mode === 'reset' ? 'Back to sign in' : 'Need a login? Create one'}
               </button>
             )}
           </form>

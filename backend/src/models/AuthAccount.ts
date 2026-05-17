@@ -323,6 +323,20 @@ export class AuthAccountModel {
     }
   }
 
+  static async resetPassword(accountId: string, newPassword: string): Promise<boolean> {
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>(
+        'UPDATE users SET `passwordHash` = ?, `updatedAt` = ? WHERE `id` = ? AND `passwordHash` IS NOT NULL',
+        [hashPassword(newPassword), new Date(), accountId]
+      );
+
+      return result.affectedRows > 0;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async createTwoFactorSetup(accountId: string): Promise<{ secret: string; otpauthUrl: string } | null> {
     const conn = await pool.getConnection();
     try {
@@ -427,6 +441,21 @@ export class AuthAccountModel {
       const [rows] = await conn.query<AuthAccountRow[]>(
         'SELECT * FROM users WHERE `id` = ? AND `passwordHash` IS NOT NULL LIMIT 1',
         [accountId]
+      );
+      const account = rows[0];
+
+      return account ? toPublicAccount(account) : null;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async getAccountByEmail(email: string): Promise<AuthAccount | null> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<AuthAccountRow[]>(
+        'SELECT * FROM users WHERE LOWER(`email`) = ? AND `passwordHash` IS NOT NULL LIMIT 1',
+        [normalizeEmail(email)]
       );
       const account = rows[0];
 

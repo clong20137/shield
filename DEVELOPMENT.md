@@ -150,3 +150,7 @@ npm install
 - Frontend is using proxy in `vite.config.ts`
 - Backend allows all origins only when `ALLOWED_ORIGINS` is blank
 - For stricter local testing, set `ALLOWED_ORIGINS=http://localhost:3000`
+
+### Password reset emails
+- Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM` to send real reset emails
+- Without SMTP settings, reset links are printed in the backend console for local development

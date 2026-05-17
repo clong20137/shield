@@ -129,6 +129,19 @@ export class AuthSessionModel {
     }
   }
 
+  static async revokeAllSessions(userId: string): Promise<number> {
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>(
+        'UPDATE user_sessions SET `revokedAt` = ? WHERE `userId` = ? AND `revokedAt` IS NULL',
+        [new Date(), userId]
+      );
+      return result.affectedRows;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async revokeToken(token: string): Promise<void> {
     const conn = await pool.getConnection();
     try {

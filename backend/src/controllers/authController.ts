@@ -1,10 +1,12 @@
 import { Request, Response } from 'express';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { AuthInviteModel } from '../models/AuthInvite';
+import { AuthPasswordResetModel } from '../models/AuthPasswordReset';
 import { AuthSessionModel } from '../models/AuthSession';
 import { SystemSettingModel } from '../models/SystemSetting';
 import { getBearerToken, getSessionAccount } from '../middleware/authSession';
 import { broadcastAppEvent } from '../services/appEvents';
+import { sendEmail } from '../services/emailService';
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -195,6 +197,78 @@ export class AuthController {
     } catch (error) {
       console.error('Login error:', error);
       res.status(500).json({ error: 'Failed to sign in' });
+    }
+  }
+
+  static async requestPasswordReset(req: Request, res: Response) {
+    try {
+      const { email } = req.body as { email?: string };
+      const cleanEmail = email ? normalizeEmailInput(email) : '';
+
+      if (!cleanEmail || !isValidEmail(cleanEmail)) {
+        return res.status(400).json({ error: 'Enter a valid email address' });
+      }
+
+      const account = await AuthAccountModel.getAccountByEmail(cleanEmail);
+      if (account) {
+        const reset = await AuthPasswordResetModel.create(account.id, account.email);
+        const appBaseUrl = await getAppBaseUrl(req);
+        const resetUrl = `${appBaseUrl}/?reset=${encodeURIComponent(reset.token)}`;
+        const didSend = await sendEmail({
+          to: account.email,
+          subject: 'Reset your SHIELD password',
+          text: [
+            `Hello ${account.displayName || account.email},`,
+            '',
+            'Use the secure link below to reset your SHIELD password. This link expires in 1 hour.',
+            '',
+            resetUrl,
+            '',
+            'If you did not request this reset, you can ignore this message.',
+          ].join('\n'),
+        });
+
+        if (!didSend) {
+          console.log(`SHIELD password reset for ${account.email}: ${resetUrl}`);
+        }
+      }
+
+      res.json({ message: 'If that email has a SHIELD login, a reset link has been sent.' });
+    } catch (error) {
+      console.error('Request password reset error:', error);
+      res.status(500).json({ error: 'Failed to request password reset' });
+    }
+  }
+
+  static async resetPassword(req: Request, res: Response) {
+    try {
+      const { token, password } = req.body as { token?: string; password?: string };
+
+      if (!token || !password) {
+        return res.status(400).json({ error: 'Reset token and new password are required' });
+      }
+
+      if (!isStrongPassword(password)) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters and include uppercase, lowercase, and a number' });
+      }
+
+      const reset = await AuthPasswordResetModel.getValidReset(token);
+      if (!reset) {
+        return res.status(400).json({ error: 'Password reset link is invalid or expired' });
+      }
+
+      const updated = await AuthAccountModel.resetPassword(reset.userId, password);
+      if (!updated) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+
+      await AuthPasswordResetModel.markUsed(reset.id);
+      await AuthSessionModel.revokeAllSessions(reset.userId);
+      broadcastAppEvent({ type: 'user-updated', entityId: reset.userId });
+      res.json({ message: 'Password reset successfully. Sign in with your new password.' });
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ error: 'Failed to reset password' });
     }
   }
 

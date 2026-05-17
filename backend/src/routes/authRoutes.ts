@@ -6,9 +6,12 @@ import { rateLimit } from '../middleware/rateLimit';
 const router = Router();
 const authLimiter = rateLimit({ keyPrefix: 'auth', windowMs: 15 * 60 * 1000, max: 30, message: 'Too many auth attempts. Try again later.' });
 const inviteLimiter = rateLimit({ keyPrefix: 'invite', windowMs: 15 * 60 * 1000, max: 20, message: 'Too many invite attempts. Try again later.' });
+const passwordResetLimiter = rateLimit({ keyPrefix: 'password-reset', windowMs: 15 * 60 * 1000, max: 10, message: 'Too many password reset attempts. Try again later.' });
 
 router.post('/register', authLimiter, AuthController.register);
 router.post('/login', authLimiter, AuthController.login);
+router.post('/password-reset/request', passwordResetLimiter, AuthController.requestPasswordReset);
+router.post('/password-reset/confirm', passwordResetLimiter, AuthController.resetPassword);
 router.get('/session', AuthController.getSession);
 router.post('/logout', AuthController.logout);
 router.get('/registration-settings', AuthController.getRegistrationSettings);

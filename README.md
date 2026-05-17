@@ -109,9 +109,16 @@ DB_PORT=3306
 PORT=5000
 NODE_ENV=development
 ALLOWED_ORIGINS=http://localhost:3000
+SMTP_HOST=smtp.your-provider.com
+SMTP_PORT=587
+SMTP_USER=your_smtp_user
+SMTP_PASSWORD=your_smtp_password
+SMTP_FROM=shield@yourdomain.com
+SMTP_SECURE=false
 ```
 
 `ALLOWED_ORIGINS` is a comma-separated list of trusted frontend origins. Leave it blank only for local testing.
+Password reset emails use the SMTP settings above. If SMTP is not configured, reset links are printed to the backend console for local development.
 
 5. Create the database and tables:
 ```bash
