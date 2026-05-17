@@ -853,7 +853,7 @@ function QuickLaunchTray({
                   setExternalLabel('');
                   setExternalUrl('');
                 }}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                className="icon-close-button"
                 aria-label="Close quick launch picker"
               >
                 <X size={20} />
@@ -2152,7 +2152,7 @@ function App() {
                   <button
                     type="button"
                     onClick={() => closeModal('messages')}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                    className="icon-close-button"
                     aria-label="Close messages"
                   >
                     <X size={20} />
@@ -2175,7 +2175,7 @@ function App() {
                   <button
                     type="button"
                     onClick={() => closeModal('calendar')}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                    className="icon-close-button"
                     aria-label="Close calendar"
                   >
                     <X size={20} />
@@ -2198,7 +2198,7 @@ function App() {
                   <button
                     type="button"
                     onClick={() => closeModal('profile')}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                    className="icon-close-button"
                     aria-label="Close profile settings"
                   >
                     <X size={20} />
@@ -2226,7 +2226,7 @@ function App() {
                   <button
                     type="button"
                     onClick={() => closeModal('createUser')}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                    className="icon-close-button"
                     aria-label="Close create user"
                   >
                     <X size={20} />
@@ -2250,7 +2250,7 @@ function App() {
                   <button
                     type="button"
                     onClick={() => closeModal('preferences')}
-                    className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                    className="icon-close-button"
                     aria-label="Close preferences"
                   >
                     <X size={20} />
@@ -2302,7 +2302,7 @@ function App() {
                   <button
                     type="button"
                     onClick={() => closeModal('reportBug')}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                    className="icon-close-button"
                     aria-label="Close report bug"
                   >
                     <X size={20} />
@@ -2327,7 +2327,7 @@ function App() {
                   <button
                     type="button"
                     onClick={() => closeModal('bugTracker')}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                    className="icon-close-button"
                     aria-label="Close bug tracker"
                   >
                     <X size={20} />

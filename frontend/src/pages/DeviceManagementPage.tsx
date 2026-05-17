@@ -617,8 +617,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               <button
                 type="button"
                 onClick={closeDeviceFormModal}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                className="icon-close-button"
                 aria-label="Close device form"
+                title="Close"
               >
                 <X size={20} />
               </button>
@@ -693,7 +694,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <h2>{detailDevice.assetTag}</h2>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{detailDevice.type} - {detailDevice.makeModel}</p>
               </div>
-              <button type="button" onClick={() => setDetailDevice(null)} className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800" aria-label="Close device details"><X size={20} /></button>
+              <button type="button" onClick={() => setDetailDevice(null)} className="icon-close-button" aria-label="Close device details" title="Close"><X size={20} /></button>
             </div>
 
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">

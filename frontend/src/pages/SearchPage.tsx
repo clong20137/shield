@@ -313,10 +313,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
               <button
                 type="button"
                 onClick={() => setEditingUser(null)}
-                className="flex h-10 w-10 items-center justify-center rounded border border-white/20 bg-white/10 hover:bg-white/20"
+                className="icon-close-button border-white/20 bg-white/10 text-white hover:bg-white/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
                 aria-label="Close edit user modal"
+                title="Close"
               >
-                <X size={22} />
+                <X size={20} />
               </button>
             </div>
 
@@ -467,8 +468,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                   To {messageRecipient.firstName} {messageRecipient.lastName}
                 </p>
               </div>
-              <button type="button" onClick={() => setMessageRecipient(null)} className="btn-secondary" aria-label="Close message modal" title="Close">
-                <X size={16} />
+              <button type="button" onClick={() => setMessageRecipient(null)} className="icon-close-button" aria-label="Close message modal" title="Close">
+                <X size={20} />
               </button>
             </div>
             <label className="mb-4 block">

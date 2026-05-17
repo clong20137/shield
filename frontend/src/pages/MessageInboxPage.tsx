@@ -724,8 +724,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                   setIsComposeOpen(false);
                   setIsEmojiPickerOpen(false);
                 }}
-                className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                className="icon-close-button"
                 aria-label="Close compose message"
+                title="Close"
               >
                 <X size={20} />
               </button>
@@ -847,8 +848,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
               <button
                 type="button"
                 onClick={() => setThreadPendingDelete(null)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                className="icon-close-button h-9 w-9"
                 aria-label="Close delete confirmation"
+                title="Close"
               >
                 <X size={18} />
               </button>

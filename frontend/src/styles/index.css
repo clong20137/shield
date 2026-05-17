@@ -179,6 +179,10 @@
     @apply btn bg-success text-white hover:bg-green-700 hover:-translate-y-0.5 hover:shadow-lg;
   }
 
+  .icon-close-button {
+    @apply flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-blue-100 dark:hover:bg-gray-800;
+  }
+
   .container {
     @apply max-w-6xl mx-auto px-5;
   }

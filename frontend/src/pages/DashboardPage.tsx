@@ -337,8 +337,8 @@ export function DashboardCalendar() {
                   {editingEntryId ? 'Edit duty details for this calendar day.' : 'Add duty details for this calendar day.'}
                 </p>
               </div>
-              <button type="button" onClick={closeModal} className="btn-secondary" aria-label="Close calendar modal" title="Close">
-                <X size={16} />
+              <button type="button" onClick={closeModal} className="icon-close-button" aria-label="Close calendar modal" title="Close">
+                <X size={20} />
               </button>
             </div>
 

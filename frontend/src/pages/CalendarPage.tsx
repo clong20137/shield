@@ -633,8 +633,9 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
               <button
                 type="button"
                 onClick={() => setSelectedDate(null)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-gray-200 text-primary-500 hover:bg-gray-50 dark:border-gray-700 dark:text-blue-100 dark:hover:bg-gray-800"
+                className="icon-close-button"
                 aria-label="Close calendar day"
+                title="Close"
               >
                 <X size={20} />
               </button>
