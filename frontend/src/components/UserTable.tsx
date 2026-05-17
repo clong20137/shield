@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Pencil, Trash2, X } from 'lucide-react';
 import { User } from '../services/api';
+import { RankBadge, isImportantRank } from './RankBadge';
 
 interface UserTableProps {
   users: User[];
@@ -40,6 +41,7 @@ export const UserTable: React.FC<UserTableProps> = ({
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">First Name</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">PE #</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Badge #</th>
+              <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Rank</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Employee Type</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">District</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Status</th>
@@ -51,12 +53,19 @@ export const UserTable: React.FC<UserTableProps> = ({
               <tr
                 key={user.id}
                 onClick={() => onUserSelect?.(user)}
-                className="border-b border-gray-300 hover:bg-gray-50 transition cursor-pointer dark:border-gray-800 dark:hover:bg-gray-800"
+                className={`border-b border-gray-300 transition cursor-pointer dark:border-gray-800 ${
+                  isImportantRank(user.rank)
+                    ? 'bg-accent/5 hover:bg-accent/10 dark:bg-accent/10 dark:hover:bg-accent/15'
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
               >
                 <td className="px-4 py-3">{user.lastName}</td>
                 <td className="px-4 py-3">{user.firstName}</td>
                 <td className="px-4 py-3">{user.peNumber}</td>
                 <td className="px-4 py-3">{user.badgeNumber}</td>
+                <td className="px-4 py-3">
+                  <RankBadge rank={user.rank} compact subtle />
+                </td>
                 <td className="px-4 py-3">{user.employmentType}</td>
                 <td className="px-4 py-3">{user.district}</td>
                 <td className="px-4 py-3">

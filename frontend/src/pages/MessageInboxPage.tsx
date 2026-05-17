@@ -2,6 +2,7 @@ import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from '
 import { Check, CheckCheck, Paperclip, Plus, Send, Trash2, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, getMessageEventsUrl, messageService, userService, User, UserMessage } from '../services/api';
+import { RankBadge } from '../components/RankBadge';
 
 interface MessageInboxPageProps {
   currentUser: AuthAccount;
@@ -591,9 +592,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                   )}
                   <div className="min-w-0 text-left">
                     <h2 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">{selectedThread.contactName}</h2>
-                <p className="truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
-                      {selectedThread.contactRank || 'No rank listed'} - {getPresenceLabel(selectedThread.latestMessage.createdAt)}
-                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <RankBadge rank={selectedThread.contactRank} compact subtle />
+                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                        {getPresenceLabel(selectedThread.latestMessage.createdAt)}
+                      </span>
+                    </div>
                     {!selectedThreadAcceptsMessages && (
                       <p className="mt-1 text-xs font-bold text-danger">
                         Not accepting messages

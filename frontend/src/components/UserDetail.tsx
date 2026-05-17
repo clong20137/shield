@@ -1,6 +1,7 @@
 import React from 'react';
 import { Mail, Pencil, X } from 'lucide-react';
 import { User } from '../services/api';
+import { RankBadge } from './RankBadge';
 
 interface UserDetailProps {
   user: User;
@@ -54,7 +55,10 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           )}
           <div>
             <h2 className="text-2xl font-bold m-0 text-white">{user.firstName} {user.lastName}</h2>
-            <p className="mt-1 text-sm text-blue-100">{user.email || 'No email on file'}</p>
+            <div className="mt-2">
+              <RankBadge rank={user.rank} />
+            </div>
+            <p className="mt-2 text-sm text-blue-100">{user.email || 'No email on file'}</p>
             <p className="mt-1 text-sm text-blue-100">PE {user.peNumber || 'N/A'} - {user.district || 'No district'}</p>
           </div>
         </div>
@@ -91,7 +95,12 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           <DetailRow label="Employee Type" value={user.employmentType} />
           <DetailRow label="Status" value={user.status} />
           <DetailRow label="District" value={user.district} />
-          <DetailRow label="Rank" value={user.rank} />
+          <div className="flex justify-between gap-4 border-b border-gray-200 py-2 dark:border-gray-800">
+            <span className="font-semibold text-gray-700 dark:text-gray-300">Rank:</span>
+            <span className="max-w-[60%] text-right">
+              <RankBadge rank={user.rank} compact />
+            </span>
+          </div>
           <DetailRow label="Assigned To" value={user.assignedTo} />
           <DetailRow label="Supervisor" value={user.supervisor} />
           <DetailRow label="Active" value={user.isActive} />

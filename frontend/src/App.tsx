@@ -11,6 +11,7 @@ import MessageInboxPage from './pages/MessageInboxPage';
 import CalendarPage from './pages/CalendarPage';
 import PerformanceEvaluationsPage from './pages/PerformanceEvaluationsPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
+import { RankBadge } from './components/RankBadge';
 import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, clearAuthToken, getAppEventsUrl, getMessageEventsUrl, messageService, notificationService, quickLaunchService, RegistrationSettings, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SESSION_KEY = 'shield_session';
@@ -595,9 +596,7 @@ function GlobalSearch({ compact }: { compact: boolean }) {
                         {user.email || `PE ${user.peNumber || 'N/A'}`} - {user.district || 'No district'}
                       </p>
                   </div>
-                  <span className="shrink-0 rounded bg-accent/10 px-2 py-1 text-xs font-bold text-accent">
-                    {user.rank || 'User'}
-                  </span>
+                  <RankBadge rank={user.rank} compact subtle />
                 </button>
               ))}
             </div>
