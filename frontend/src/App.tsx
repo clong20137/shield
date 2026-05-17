@@ -48,7 +48,7 @@ const quickLaunchApps: QuickLaunchApp[] = [
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: LayoutDashboard },
   { id: 'messages', label: 'Messages', icon: Mail },
   { id: 'calendar', label: 'Calendar', icon: CalendarDays },
-  { id: 'devices', label: 'Devices', path: '/devices', icon: Laptop },
+  { id: 'devices', label: 'Devices', path: '/devices', adminOnly: true, icon: Laptop },
   { id: 'calculator', label: 'Calculator', icon: Calculator },
   { id: 'search', label: 'Search Users', path: '/search', icon: Search },
   { id: 'reports', label: 'Reports', path: '/reports', icon: BarChart3 },
@@ -2074,7 +2074,7 @@ function App() {
             <nav data-onboarding-target="navigation" className="flex flex-1 flex-col gap-2 px-3 py-3">
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
               <SidebarLink to="/calendar" label="Calendar" compact={isSidebarCollapsed} icon={CalendarDays} />
-              <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />
+              {isAdministrator && <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />}
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
               {isAdministrator && (
                 <>

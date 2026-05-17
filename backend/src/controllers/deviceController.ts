@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { DeviceModel } from '../models/Device';
 import { broadcastAppEvent } from '../services/appEvents';
+import { getSessionAccount } from '../middleware/authSession';
 
 function isDuplicateAssetTagError(error: unknown): boolean {
   return (
@@ -12,6 +13,21 @@ function isDuplicateAssetTagError(error: unknown): boolean {
 }
 
 export class DeviceController {
+  static async listAssignedDevices(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const devices = await DeviceModel.listAssignedDevices(account);
+      res.json(devices);
+    } catch (error) {
+      console.error('Assigned device list error:', error);
+      res.status(500).json({ error: 'Failed to load assigned devices' });
+    }
+  }
+
   static async listDevices(req: Request, res: Response) {
     try {
       const devices = await DeviceModel.listDevices();

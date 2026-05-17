@@ -1,8 +1,8 @@
 import QRCode from 'qrcode';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Camera, Download, ExternalLink, KeyRound, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, X } from 'lucide-react';
-import { AuthAccount, AuthSession, TwoFactorSetupResponse, authService, performanceEvaluationService, userService } from '../services/api';
+import { Camera, Download, ExternalLink, KeyRound, Laptop, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, X } from 'lucide-react';
+import { AuthAccount, AuthSession, DeviceRecord, TwoFactorSetupResponse, authService, deviceService, performanceEvaluationService, userService } from '../services/api';
 import { downloadPerformanceEvaluationPdf } from '../utils/performanceEvaluationPdf';
 
 interface AccountSettingsPageProps {
@@ -51,9 +51,11 @@ export function AccountSettingsPage({
   const [isTwoFactorSaving, setIsTwoFactorSaving] = useState(false);
   const [isProfilePictureSaving, setIsProfilePictureSaving] = useState(false);
   const [sessions, setSessions] = useState<AuthSession[]>([]);
+  const [assignedDevices, setAssignedDevices] = useState<DeviceRecord[]>([]);
   const [isSessionsLoading, setIsSessionsLoading] = useState(false);
+  const [isAssignedDevicesLoading, setIsAssignedDevicesLoading] = useState(false);
   const [isRevokingSessions, setIsRevokingSessions] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'reports' | 'preferences'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'devices' | 'reports' | 'preferences'>('general');
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -101,6 +103,17 @@ export function AccountSettingsPage({
   useEffect(() => {
     loadSessions();
   }, []);
+
+  useEffect(() => {
+    setIsAssignedDevicesLoading(true);
+    deviceService.getAssignedToMe()
+      .then((response) => setAssignedDevices(response.data))
+      .catch((error) => {
+        console.error('Failed to load assigned devices:', error);
+        onToast('error', getErrorMessage(error, 'Failed to load assigned devices.'));
+      })
+      .finally(() => setIsAssignedDevicesLoading(false));
+  }, [getErrorMessage, onToast]);
 
   const revokeSession = async (sessionId: string) => {
     setIsRevokingSessions(true);
@@ -238,6 +251,7 @@ export function AccountSettingsPage({
       <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-3 dark:border-gray-800">
         {[
           ['general', 'General'],
+          ['devices', 'Devices'],
           ['reports', 'Reports & Data'],
           ['preferences', 'Preferences'],
         ].map(([id, label]) => (
@@ -523,6 +537,58 @@ export function AccountSettingsPage({
               </div>
             </div>
           </div>
+        </section>
+      )}
+
+      {activeTab === 'devices' && (
+        <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+          <div className="mb-4 flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">
+              <Laptop size={19} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Assigned Devices</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Devices currently assigned to your SHIELD account.</p>
+            </div>
+          </div>
+
+          {isAssignedDevicesLoading ? (
+            <div className="loading">Loading assigned devices...</div>
+          ) : assignedDevices.length === 0 ? (
+            <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No devices are assigned to you.</div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {assignedDevices.map((device) => (
+                <article key={device.id} className="rounded border border-gray-200 p-3 dark:border-gray-800">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-gray-900 dark:text-gray-100">{device.assetTag}</p>
+                      <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{device.type} - {device.makeModel}</p>
+                    </div>
+                    <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold text-accent">{device.status}</span>
+                  </div>
+                  <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="text-xs font-bold uppercase text-gray-400">Serial</dt>
+                      <dd className="truncate text-gray-700 dark:text-gray-200">{device.serialNumber || 'N/A'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-bold uppercase text-gray-400">Location</dt>
+                      <dd className="truncate text-gray-700 dark:text-gray-200">{device.location || 'N/A'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-bold uppercase text-gray-400">Phone</dt>
+                      <dd className="truncate text-gray-700 dark:text-gray-200">{device.phoneNumber || 'N/A'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-bold uppercase text-gray-400">Replacement Due</dt>
+                      <dd className="truncate text-gray-700 dark:text-gray-200">{device.replacementDueDate || 'N/A'}</dd>
+                    </div>
+                  </dl>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       )}
 

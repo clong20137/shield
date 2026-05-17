@@ -121,6 +121,23 @@ export class DeviceModel {
     }
   }
 
+  static async listAssignedDevices(account: { email: string; displayName: string }): Promise<Device[]> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<DeviceRow[]>(
+        `SELECT ${deviceColumns}
+        FROM devices
+        WHERE LOWER(\`assignedTo\`) IN (?, ?)
+        ORDER BY \`updatedAt\` DESC, \`assetTag\``,
+        [account.email.toLowerCase(), account.displayName.toLowerCase()]
+      );
+
+      return rows;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async getDevice(id: string): Promise<Device | null> {
     const conn = await pool.getConnection();
     try {

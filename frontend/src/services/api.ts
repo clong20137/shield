@@ -492,6 +492,9 @@ export const deviceService = {
   getAll: () =>
     api.get<DeviceRecord[]>('/devices'),
 
+  getAssignedToMe: () =>
+    api.get<DeviceRecord[]>('/devices/assigned/me'),
+
   create: (device: Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'> & { actorId?: string; actorName?: string; eventNotes?: string }) =>
     api.post<DeviceRecord>('/devices', device),
 
