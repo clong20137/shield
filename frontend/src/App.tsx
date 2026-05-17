@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { BarChart3, Bell, Bug, Calculator, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, FileSignature, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Save, Search, Settings, Shield, SlidersHorizontal, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
+import { BarChart3, Bell, Bug, Calculator, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, FileSignature, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -27,7 +27,7 @@ interface MessagePreferences {
   playMessageSound: boolean;
 }
 
-type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
+type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'calculator' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
 type QuickLaunchExternalSlot = ApiQuickLaunchExternalSlot;
 type QuickLaunchSlot = QuickLaunchAppId | QuickLaunchExternalSlot | null;
 
@@ -49,6 +49,7 @@ const quickLaunchApps: QuickLaunchApp[] = [
   { id: 'messages', label: 'Messages', icon: Mail },
   { id: 'calendar', label: 'Calendar', icon: CalendarDays },
   { id: 'devices', label: 'Devices', path: '/devices', icon: Laptop },
+  { id: 'calculator', label: 'Calculator', icon: Calculator },
   { id: 'search', label: 'Search Users', path: '/search', icon: Search },
   { id: 'reports', label: 'Reports', path: '/reports', icon: BarChart3 },
   { id: 'create-user', label: 'Create User', path: '/users/create', adminOnly: true, icon: UserPlus },
@@ -642,6 +643,7 @@ function QuickLaunchTray({
   accountId,
   onOpenMessages,
   onOpenCalendar,
+  onOpenCalculator,
   onOpenCreateUser,
 }: {
   isAdministrator: boolean;
@@ -652,6 +654,7 @@ function QuickLaunchTray({
   accountId?: string;
   onOpenMessages: () => void;
   onOpenCalendar: () => void;
+  onOpenCalculator: () => void;
   onOpenCreateUser: () => void;
 }) {
   const navigate = useNavigate();
@@ -760,6 +763,11 @@ function QuickLaunchTray({
 
     if (app.id === 'calendar') {
       onOpenCalendar();
+      return;
+    }
+
+    if (app.id === 'calculator') {
+      onOpenCalculator();
       return;
     }
 
@@ -2143,16 +2151,6 @@ function App() {
                     >
                       <UserCircle size={16} /> Account Settings
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsPreferencesOpen(true);
-                        setIsAccountMenuOpen(false);
-                      }}
-                      className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
-                    >
-                      <SlidersHorizontal size={16} /> Preferences
-                    </button>
                     <NavLink
                       to="/evaluations"
                       onClick={() => setIsAccountMenuOpen(false)}
@@ -2160,16 +2158,6 @@ function App() {
                     >
                       <FileSignature size={16} /> Performance Evaluations
                     </NavLink>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsCalculatorOpen(true);
-                        setIsAccountMenuOpen(false);
-                      }}
-                      className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
-                    >
-                      <Calculator size={16} /> Calculator
-                    </button>
                     <button
                       type="button"
                       onClick={() => {
@@ -2236,11 +2224,12 @@ function App() {
                 isAdministrator={isAdministrator}
                 isSidebarCollapsed={isSidebarCollapsed}
                 badgeCounts={{ messages: messageUnreadCount }}
-                activeModalApp={isMessagesModalOpen ? 'messages' : isCalendarModalOpen ? 'calendar' : isCreateUserModalOpen ? 'create-user' : null}
+                activeModalApp={isMessagesModalOpen ? 'messages' : isCalendarModalOpen ? 'calendar' : isCalculatorOpen ? 'calculator' : isCreateUserModalOpen ? 'create-user' : null}
                 storageKey={getQuickLaunchStorageKey(currentUser?.id || 'anonymous')}
                 accountId={currentUser?.id}
                 onOpenMessages={toggleMessagesModal}
                 onOpenCalendar={toggleCalendarModal}
+                onOpenCalculator={() => setIsCalculatorOpen(true)}
                 onOpenCreateUser={toggleCreateUserModal}
               />
             </main>
@@ -2311,6 +2300,14 @@ function App() {
                 <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                   <AccountSettingsPage
                     account={currentUser}
+                    messagePreferences={messagePreferences}
+                    onReceiveMessagesChange={handleReceiveMessagesChange}
+                    onMessageSoundChange={(playMessageSound) =>
+                      setMessagePreferences((preferences) => ({
+                        ...preferences,
+                        playMessageSound,
+                      }))
+                    }
                     onAccountUpdate={handleAccountUpdate}
                     onToast={showToast}
                     getErrorMessage={getErrorMessage}

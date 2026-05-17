@@ -1,10 +1,16 @@
 import QRCode from 'qrcode';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
-import { Camera, KeyRound, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, X } from 'lucide-react';
-import { AuthAccount, AuthSession, MileageSummary, TwoFactorSetupResponse, authService, mileageService, userService } from '../services/api';
+import { Camera, Download, KeyRound, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, X } from 'lucide-react';
+import { AuthAccount, AuthSession, MileageSummary, PerformanceEvaluation, TwoFactorSetupResponse, authService, mileageService, performanceEvaluationService, userService } from '../services/api';
 
 interface AccountSettingsPageProps {
   account: AuthAccount;
+  messagePreferences: {
+    receiveMessages: boolean;
+    playMessageSound: boolean;
+  };
+  onReceiveMessagesChange: (receiveMessages: boolean) => void;
+  onMessageSoundChange: (playMessageSound: boolean) => void;
   onAccountUpdate: (account: AuthAccount) => void;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
   getErrorMessage: (error: unknown, fallback: string) => string;
@@ -23,6 +29,9 @@ function getAccountInitials(account: AuthAccount): string {
 
 export function AccountSettingsPage({
   account,
+  messagePreferences,
+  onReceiveMessagesChange,
+  onMessageSoundChange,
   onAccountUpdate,
   onToast,
   getErrorMessage,
@@ -43,6 +52,7 @@ export function AccountSettingsPage({
   const [mileageSummary, setMileageSummary] = useState<MileageSummary | null>(null);
   const [milestoneInput, setMilestoneInput] = useState('');
   const [isMilestoneSaving, setIsMilestoneSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<'general' | 'reports' | 'preferences'>('general');
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -256,8 +266,75 @@ export function AccountSettingsPage({
   const milestone = mileageSummary?.milestone || 1000;
   const mileagePercent = Math.min((mileage / milestone) * 100, 100);
 
+  const downloadFile = (filename: string, contents: string, type: string) => {
+    const blob = new Blob([contents], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadPerformanceEvaluations = async (format: 'json' | 'csv') => {
+    try {
+      const response = await performanceEvaluationService.getAll();
+      const evaluations = response.data.filter(
+        (evaluation) => evaluation.employeeAccountId === account.id || evaluation.supervisorAccountId === account.id,
+      );
+
+      if (format === 'json') {
+        downloadFile('shield-performance-evaluations.json', JSON.stringify(evaluations, null, 2), 'application/json');
+        return;
+      }
+
+      const headers: Array<keyof PerformanceEvaluation> = [
+        'employeeName',
+        'employeeEmail',
+        'supervisorName',
+        'evaluationPeriod',
+        'positionTitle',
+        'district',
+        'status',
+        'sentAt',
+        'employeeSignedAt',
+      ];
+      const escapeCsv = (value: unknown) => {
+        const text = String(value ?? '');
+        return /[",\n]/u.test(text) ? `"${text.replace(/"/gu, '""')}"` : text;
+      };
+      const rows = evaluations.map((evaluation) => headers.map((header) => escapeCsv(evaluation[header])).join(','));
+      downloadFile('shield-performance-evaluations.csv', [headers.join(','), ...rows].join('\n'), 'text/csv');
+    } catch (error) {
+      onToast('error', getErrorMessage(error, 'Failed to download performance reports.'));
+    }
+  };
+
   return (
     <div className="space-y-3 pb-1">
+      <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-3 dark:border-gray-800">
+        {[
+          ['general', 'General'],
+          ['reports', 'Reports & Data'],
+          ['preferences', 'Preferences'],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setActiveTab(id as typeof activeTab)}
+            className={`rounded px-3 py-2 text-sm font-bold transition ${
+              activeTab === id
+                ? 'bg-primary-500 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'general' && (
+      <>
       <section className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950 sm:p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-4">
@@ -537,6 +614,61 @@ export function AccountSettingsPage({
           </div>
         )}
       </section>
+      </>
+      )}
+
+      {activeTab === 'reports' && (
+        <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Reports & Data</h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Download account-related records for review or offline files.
+          </p>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded border border-gray-200 p-3 dark:border-gray-800">
+              <p className="font-bold text-gray-900 dark:text-gray-100">Performance Evaluations</p>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Download evaluations you sent or received.</p>
+              <div className="mt-3 flex gap-2">
+                <button type="button" onClick={() => downloadPerformanceEvaluations('csv')} className="btn-secondary" aria-label="Download performance evaluations CSV" title="Download CSV">
+                  <Download size={16} />
+                </button>
+                <button type="button" onClick={() => downloadPerformanceEvaluations('json')} className="btn-primary" aria-label="Download performance evaluations JSON" title="Download JSON">
+                  <Download size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {activeTab === 'preferences' && (
+        <section className="space-y-3 rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Preferences</h3>
+          <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
+            <span>
+              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Receive messages</span>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Show message badges and message notifications.</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={messagePreferences.receiveMessages}
+              onChange={(event) => onReceiveMessagesChange(event.target.checked)}
+            />
+          </label>
+
+          <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
+            <span>
+              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Message ping sound</span>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Play a short sound when new unread messages arrive.</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={messagePreferences.playMessageSound}
+              disabled={!messagePreferences.receiveMessages}
+              onChange={(event) => onMessageSoundChange(event.target.checked)}
+            />
+          </label>
+        </section>
+      )}
     </div>
   );
 }
