@@ -144,6 +144,7 @@ export type RegistrationMode = 'public' | 'invite-only' | 'disabled';
 export interface RegistrationSettings {
   mode: RegistrationMode;
   appBaseUrl: string;
+  maintenanceMode: boolean;
 }
 
 export interface AuthInvite {
@@ -538,10 +539,10 @@ export const dashboardPostService = {
   getAll: (limit = 10) =>
     api.get<DashboardPost[]>('/dashboard-posts', { params: { limit } }),
 
-  create: (post: Pick<DashboardPost, 'title' | 'body' | 'category'> & { requesterId: string; authorName: string }) =>
+  create: (post: Pick<DashboardPost, 'title' | 'body' | 'category'> & { requesterId?: string; authorName?: string }) =>
     api.post<DashboardPost>('/dashboard-posts', post),
 
-  delete: (id: string, requesterId: string) =>
+  delete: (id: string, requesterId?: string) =>
     api.delete(`/dashboard-posts/${id}`, { data: { requesterId } }),
 };
 

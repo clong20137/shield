@@ -5,11 +5,9 @@ import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
 import DashboardPage from './pages/DashboardPage';
 import { AccountSettingsPage } from './pages/AccountSettingsPage';
+import AdminConsolePage, { AdminConsoleTab } from './pages/AdminConsolePage';
 import DeviceManagementPage from './pages/DeviceManagementPage';
-import PermissionsPage from './pages/PermissionsPage';
 import MessageInboxPage from './pages/MessageInboxPage';
-import CreateUserPage from './pages/CreateUserPage';
-import AuditLogPage from './pages/AuditLogPage';
 import CalendarPage from './pages/CalendarPage';
 import PerformanceEvaluationsPage from './pages/PerformanceEvaluationsPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
@@ -319,6 +317,11 @@ function LoginSplash({
             )}
             {mode === 'register' && registrationSettings?.mode === 'disabled' && (
               <div className="error">Public registration is currently disabled.</div>
+            )}
+            {registrationSettings?.maintenanceMode && mode === 'login' && (
+              <div className="mb-4 rounded border border-accent/30 bg-accent/10 px-3 py-2 text-sm font-semibold text-accent">
+                Maintenance mode is active. Only administrators can sign in.
+              </div>
             )}
 
             {mode !== 'reset' && (
@@ -1098,6 +1101,14 @@ function CreateUserRouteRedirect({ onOpenCreateUser }: { onOpenCreateUser: () =>
   return <Navigate to="/" replace />;
 }
 
+function AdminRouteRedirect({ onOpenAdmin }: { onOpenAdmin: () => void }) {
+  useEffect(() => {
+    onOpenAdmin();
+  }, [onOpenAdmin]);
+
+  return <Navigate to="/" replace />;
+}
+
 function NotFoundPage() {
   return (
     <div className="flex min-h-[calc(100vh-12rem)] items-center justify-center">
@@ -1534,11 +1545,12 @@ function App() {
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
-  const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
+  const [isAdminConsoleOpen, setIsAdminConsoleOpen] = useState(false);
+  const [adminConsoleTab, setAdminConsoleTab] = useState<AdminConsoleTab>('general');
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
   const [isBugTrackerOpen, setIsBugTrackerOpen] = useState(false);
   const [isFirstLoginGuideOpen, setIsFirstLoginGuideOpen] = useState(false);
-  const [closingModal, setClosingModal] = useState<'messages' | 'calendar' | 'profile' | 'createUser' | 'reportBug' | 'bugTracker' | null>(null);
+  const [closingModal, setClosingModal] = useState<'messages' | 'calendar' | 'profile' | 'adminConsole' | 'reportBug' | 'bugTracker' | null>(null);
 
   useEffect(() => {
     const collapseSidebarOnMobile = () => {
@@ -1821,13 +1833,13 @@ function App() {
     return () => eventSource.close();
   }, [currentUser, loadBugReports, loadUserNotifications]);
 
-  const closeModal = (modal: 'messages' | 'calendar' | 'profile' | 'createUser' | 'reportBug' | 'bugTracker') => {
+  const closeModal = (modal: 'messages' | 'calendar' | 'profile' | 'adminConsole' | 'reportBug' | 'bugTracker') => {
     setClosingModal(modal);
     window.setTimeout(() => {
       if (modal === 'messages') setIsMessagesModalOpen(false);
       if (modal === 'calendar') setIsCalendarModalOpen(false);
       if (modal === 'profile') setIsProfileModalOpen(false);
-      if (modal === 'createUser') setIsCreateUserModalOpen(false);
+      if (modal === 'adminConsole') setIsAdminConsoleOpen(false);
       if (modal === 'reportBug') setIsReportBugOpen(false);
       if (modal === 'bugTracker') setIsBugTrackerOpen(false);
       setClosingModal(null);
@@ -1853,12 +1865,19 @@ function App() {
   };
 
   const toggleCreateUserModal = () => {
-    if (isCreateUserModalOpen) {
-      closeModal('createUser');
+    if (isAdminConsoleOpen && adminConsoleTab === 'create-user') {
+      closeModal('adminConsole');
       return;
     }
 
-    setIsCreateUserModalOpen(true);
+    setAdminConsoleTab('create-user');
+    setIsAdminConsoleOpen(true);
+  };
+
+  const openAdminConsole = (tab: AdminConsoleTab = 'general') => {
+    setAdminConsoleTab(tab);
+    setIsAccountMenuOpen(false);
+    setIsAdminConsoleOpen(true);
   };
 
   const handleReceiveMessagesChange = async (receiveMessages: boolean) => {
@@ -1967,8 +1986,8 @@ function App() {
         return;
       }
 
-      if (isCreateUserModalOpen) {
-        closeModal('createUser');
+      if (isAdminConsoleOpen) {
+        closeModal('adminConsole');
         return;
       }
 
@@ -1990,7 +2009,7 @@ function App() {
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isAccountMenuOpen, isBugTrackerOpen, isCalculatorOpen, isCalendarModalOpen, isCreateUserModalOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isProfileModalOpen, isReportBugOpen]);
+  }, [isAccountMenuOpen, isAdminConsoleOpen, isBugTrackerOpen, isCalculatorOpen, isCalendarModalOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isProfileModalOpen, isReportBugOpen]);
 
   return (
     <Router>
@@ -2076,13 +2095,7 @@ function App() {
               <SidebarLink to="/calendar" label="Calendar" compact={isSidebarCollapsed} icon={CalendarDays} />
               {isAdministrator && <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />}
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
-              {isAdministrator && (
-                <>
-                  <SidebarLink to="/users/create" label="Create User" compact={isSidebarCollapsed} icon={UserPlus} />
-                  <SidebarLink to="/audit" label="Audit Log" compact={isSidebarCollapsed} icon={ClipboardList} />
-                  <SidebarLink to="/permissions" label="Permissions" compact={isSidebarCollapsed} icon={LockKeyhole} />
-                </>
-              )}
+              {isAdministrator && <SidebarLink to="/admin" label="Admin" compact={isSidebarCollapsed} icon={Shield} />}
             </nav>
 
             <div className="shrink-0 border-t border-white/10 p-3" />
@@ -2222,6 +2235,15 @@ function App() {
                     >
                       <UserCircle size={16} /> Account Settings
                     </button>
+                    {isAdministrator && (
+                      <button
+                        type="button"
+                        onClick={() => openAdminConsole('general')}
+                        className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                      >
+                        <Shield size={16} /> Admin Console
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
@@ -2262,24 +2284,17 @@ function App() {
                   )}
                   <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
                   {currentUser && isAdministrator && (
-                    <Route path="/users/create" element={<CreateUserRouteRedirect onOpenCreateUser={() => setIsCreateUserModalOpen(true)} />} />
+                    <Route path="/admin" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('general')} />} />
                   )}
                   {currentUser && isAdministrator && (
-                    <Route path="/audit" element={<AuditLogPage />} />
+                    <Route path="/users/create" element={<CreateUserRouteRedirect onOpenCreateUser={() => openAdminConsole('create-user')} />} />
                   )}
                   <Route path="/reports" element={<ReportsPage />} />
                   {currentUser && isAdministrator && (
-                    <Route
-                      path="/permissions"
-                      element={
-                        <PermissionsPage
-                          account={currentUser}
-                          onAccountUpdate={handleAccountUpdate}
-                          onToast={showToast}
-                          getErrorMessage={getErrorMessage}
-                        />
-                      }
-                    />
+                    <Route path="/audit" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('audit')} />} />
+                  )}
+                  {currentUser && isAdministrator && (
+                    <Route path="/permissions" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('permissions')} />} />
                   )}
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
@@ -2288,7 +2303,7 @@ function App() {
                 isAdministrator={isAdministrator}
                 isSidebarCollapsed={isSidebarCollapsed}
                 badgeCounts={{ messages: messageUnreadCount }}
-                activeModalApp={isMessagesModalOpen ? 'messages' : isCalendarModalOpen ? 'calendar' : isCalculatorOpen ? 'calculator' : isCreateUserModalOpen ? 'create-user' : null}
+                activeModalApp={isMessagesModalOpen ? 'messages' : isCalendarModalOpen ? 'calendar' : isCalculatorOpen ? 'calculator' : isAdminConsoleOpen && adminConsoleTab === 'create-user' ? 'create-user' : null}
                 storageKey={getQuickLaunchStorageKey(currentUser?.id || 'anonymous')}
                 accountId={currentUser?.id}
                 onOpenMessages={toggleMessagesModal}
@@ -2381,28 +2396,33 @@ function App() {
               </div>
             </div>
           )}
-          {isCreateUserModalOpen && currentUser && (
-            <div className={getModalBackdropClass(closingModal === 'createUser')}>
-              <div className={getModalWindowClass(closingModal === 'createUser', 'flex h-[96dvh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:h-auto sm:max-h-[92vh] sm:p-5')}>
-                <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
+          {isAdminConsoleOpen && currentUser && isAdministrator && (
+            <div className={getModalBackdropClass(closingModal === 'adminConsole', 'bg-black/60')}>
+              <div className={getModalWindowClass(closingModal === 'adminConsole', 'flex h-[96dvh] w-full max-w-7xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:h-[94vh] sm:p-5')}>
+                <div className="mb-3 flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Create User</h2>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Add a personnel profile and optional login password.</p>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 sm:text-2xl">Admin Console</h2>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage settings, permissions, users, and audit history from one place.</p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => closeModal('createUser')}
+                    onClick={() => closeModal('adminConsole')}
                     className="icon-close-button"
-                    aria-label="Close create user"
+                    aria-label="Close admin console"
                   >
                     <X size={20} />
                   </button>
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-                  <CreateUserPage
+                <div className="min-h-0 flex-1">
+                  <AdminConsolePage
+                    account={currentUser}
+                    initialTab={adminConsoleTab}
+                    onAccountUpdate={handleAccountUpdate}
                     onToast={showToast}
-                    isModalView
-                    onCreated={() => closeModal('createUser')}
+                    getErrorMessage={getErrorMessage}
+                    onUserCreated={() => {
+                      setAdminConsoleTab('permissions');
+                    }}
                   />
                 </div>
               </div>

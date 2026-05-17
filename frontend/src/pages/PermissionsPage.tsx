@@ -7,6 +7,8 @@ interface PermissionsPageProps {
   onAccountUpdate: (account: AuthAccount) => void;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
   getErrorMessage: (error: unknown, fallback: string) => string;
+  section?: 'all' | 'permissions' | 'settings';
+  isModalView?: boolean;
 }
 
 const permissionOptions = [
@@ -27,6 +29,8 @@ function PermissionsPage({
   onAccountUpdate,
   onToast,
   getErrorMessage,
+  section = 'all',
+  isModalView = false,
 }: PermissionsPageProps) {
   const [accounts, setAccounts] = useState<AuthAccount[]>([]);
   const [roles, setRoles] = useState<AuthRole[]>([]);
@@ -34,7 +38,7 @@ function PermissionsPage({
   const [newRolePermissions, setNewRolePermissions] = useState<string[]>(['users:view']);
   const [isCreateRoleModalOpen, setIsCreateRoleModalOpen] = useState(false);
   const [isSavingRole, setIsSavingRole] = useState(false);
-  const [registrationSettings, setRegistrationSettings] = useState<RegistrationSettings>({ mode: 'public', appBaseUrl: window.location.origin });
+  const [registrationSettings, setRegistrationSettings] = useState<RegistrationSettings>({ mode: 'public', appBaseUrl: window.location.origin, maintenanceMode: false });
   const [inviteEmail, setInviteEmail] = useState('');
   const [invites, setInvites] = useState<AuthInvite[]>([]);
   const [latestInvite, setLatestInvite] = useState<AuthInvite | null>(null);
@@ -195,6 +199,7 @@ function PermissionsPage({
 
   return (
     <div>
+      {!isModalView && (
       <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1>Permissions</h1>
@@ -206,9 +211,19 @@ function PermissionsPage({
           <Plus size={16} />
         </button>
       </div>
+      )}
 
       {error && <div className="error">{error}</div>}
 
+      {(section === 'all' || section === 'permissions') && (
+      <>
+      {isModalView && (
+        <div className="mb-4 flex justify-end">
+          <button type="button" onClick={() => setIsCreateRoleModalOpen(true)} className="btn-primary" aria-label="Create role" title="Create Role">
+            <Plus size={16} />
+          </button>
+        </div>
+      )}
       <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
           <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">Total Accounts</p>
@@ -272,7 +287,10 @@ function PermissionsPage({
           </div>
         )}
       </section>
+      </>
+      )}
 
+      {(section === 'all' || section === 'settings') && (
       <section className="mt-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
         <div className="mb-5">
           <h2>Registration Access</h2>
@@ -306,6 +324,17 @@ function PermissionsPage({
           <button type="submit" className="btn-primary self-end" disabled={isSavingRegistration} aria-label="Save registration settings" title={isSavingRegistration ? 'Saving' : 'Save'}>
             <Save size={16} />
           </button>
+          <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800 lg:col-span-3">
+            <span>
+              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Maintenance mode</span>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Only administrators can sign in while this is enabled.</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={registrationSettings.maintenanceMode}
+              onChange={(event) => setRegistrationSettings((settings) => ({ ...settings, maintenanceMode: event.target.checked }))}
+            />
+          </label>
         </form>
 
         <form onSubmit={createInvite} className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
@@ -363,6 +392,7 @@ function PermissionsPage({
           </div>
         )}
       </section>
+      )}
 
       {isCreateRoleModalOpen && (
         <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

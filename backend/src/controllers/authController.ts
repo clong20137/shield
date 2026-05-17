@@ -216,6 +216,10 @@ export class AuthController {
         return res.status(401).json({ error: 'Invalid email or password' });
       }
 
+      if (result.account.role !== 'administrator' && await SystemSettingModel.getString('maintenanceMode', 'false') === 'true') {
+        return res.status(503).json({ error: 'SHIELD is in maintenance mode. Only administrators can sign in right now.' });
+      }
+
       const token = await AuthSessionModel.createSession(result.account.id);
       res.json({ account: result.account, token });
     } catch (error) {
@@ -498,6 +502,7 @@ export class AuthController {
       res.json({
         mode: await getRegistrationMode(),
         appBaseUrl: await getAppBaseUrl(req),
+        maintenanceMode: await SystemSettingModel.getString('maintenanceMode', 'false') === 'true',
       });
     } catch (error) {
       console.error('Get registration settings error:', error);
@@ -507,7 +512,7 @@ export class AuthController {
 
   static async updateRegistrationSettings(req: Request, res: Response) {
     try {
-      const { mode, appBaseUrl } = req.body as { mode?: string; appBaseUrl?: string };
+      const { mode, appBaseUrl, maintenanceMode } = req.body as { mode?: string; appBaseUrl?: string; maintenanceMode?: boolean };
       const normalizedMode = normalizeRegistrationMode(cleanString(mode, 40));
       const normalizedUrl = cleanString(appBaseUrl, 300).replace(/\/+$/u, '');
 
@@ -516,12 +521,13 @@ export class AuthController {
       }
 
       await SystemSettingModel.setString('registrationMode', normalizedMode);
+      await SystemSettingModel.setString('maintenanceMode', maintenanceMode === true ? 'true' : 'false');
       if (normalizedUrl) {
         await SystemSettingModel.setString('appBaseUrl', normalizedUrl);
       }
 
       broadcastAppEvent({ type: 'permission-updated' });
-      res.json({ mode: normalizedMode, appBaseUrl: normalizedUrl });
+      res.json({ mode: normalizedMode, appBaseUrl: normalizedUrl, maintenanceMode: maintenanceMode === true });
     } catch (error) {
       console.error('Update registration settings error:', error);
       res.status(500).json({ error: 'Failed to update registration settings' });

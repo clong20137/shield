@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { auditService, AuditLog } from '../services/api';
 
-function AuditLogPage() {
+function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,12 +32,14 @@ function AuditLogPage() {
 
   return (
     <div>
+      {!isModalView && (
       <div className="mb-8">
         <div>
           <h1>Audit Log</h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Review administrative activity.</p>
         </div>
       </div>
+      )}
 
       {error && <div className="error">{error}</div>}
 
