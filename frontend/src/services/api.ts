@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/+$/u, '');
+const ASSET_BASE_URL = API_BASE_URL.replace(/\/api$/u, '');
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -39,6 +40,28 @@ export function getMessageEventsUrl(): string | null {
 export function getAppEventsUrl(): string | null {
   const token = getAuthToken();
   return token ? `${API_BASE_URL}/events?token=${encodeURIComponent(token)}` : null;
+}
+
+export function getAssetUrl(value?: string | null): string {
+  if (!value) {
+    return '';
+  }
+
+  if (value.startsWith('data:') || value.startsWith('blob:')) {
+    return value;
+  }
+
+  try {
+    const parsedUrl = new URL(value);
+    if (parsedUrl.pathname.startsWith('/uploads/')) {
+      return `${ASSET_BASE_URL}${parsedUrl.pathname}`;
+    }
+
+    return value;
+  } catch {
+    const normalizedPath = value.startsWith('/') ? value : `/${value}`;
+    return `${ASSET_BASE_URL}${normalizedPath}`;
+  }
 }
 
 export interface User {

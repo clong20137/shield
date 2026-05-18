@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Flag, MessageSquare, Send, Trash2, X } from 'lucide-react';
-import { AuthAccount, DashboardPost, DashboardPostComment, dashboardPostService } from '../services/api';
+import { AuthAccount, DashboardPost, DashboardPostComment, dashboardPostService, getAssetUrl } from '../services/api';
 
 interface DashboardPostPageProps {
   currentUser: AuthAccount | null;
@@ -181,7 +181,7 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
               <aside className="flex flex-col items-center justify-center border-b border-primary-600 bg-primary-500 p-5 text-center text-white dark:border-gray-800 dark:bg-gray-900 md:border-b-0 md:border-r">
                 <div className="flex w-full flex-col items-center justify-center gap-3">
                   {comment.authorProfilePictureUrl ? (
-                    <img src={comment.authorProfilePictureUrl} alt={comment.authorName || 'Comment author'} className="h-20 w-20 rounded-full border-2 border-white object-cover shadow" />
+                    <img src={getAssetUrl(comment.authorProfilePictureUrl)} alt={comment.authorName || 'Comment author'} className="h-20 w-20 rounded-full border-2 border-white object-cover shadow" />
                   ) : (
                     <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-white bg-white text-xl font-bold text-primary-500 shadow">
                       {getCommentInitials(comment)}

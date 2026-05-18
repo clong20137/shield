@@ -13,7 +13,7 @@ import CalendarPage from './pages/CalendarPage';
 import PerformanceEvaluationsPage from './pages/PerformanceEvaluationsPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { RankBadge } from './components/RankBadge';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, clearAuthToken, getAppEventsUrl, getMessageEventsUrl, messageService, notificationService, quickLaunchService, RegistrationSettings, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, clearAuthToken, getAppEventsUrl, getAssetUrl, getMessageEventsUrl, messageService, notificationService, quickLaunchService, RegistrationSettings, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
@@ -1546,16 +1546,19 @@ function FirstLoginGuide({
         height: Math.min(window.innerHeight - Math.max(8, targetRect.top - padding) - 8, targetRect.height + padding * 2),
       }
     : null;
-  const tooltipWidth = 360;
+  const tooltipWidth = Math.min(360, window.innerWidth - 32);
   const tooltipHeightEstimate = 280;
   const shouldPlaceTooltipBelow = step.placement === 'below';
+  const shouldPlaceQuickLaunchTooltipAbove = step.target === 'quick-launch';
   const tooltipLeft = safeRect
-    ? shouldPlaceTooltipBelow
+    ? shouldPlaceTooltipBelow || shouldPlaceQuickLaunchTooltipAbove
       ? Math.min(Math.max(16, safeRect.left + safeRect.width / 2 - tooltipWidth / 2), window.innerWidth - tooltipWidth - 16)
       : Math.min(Math.max(16, safeRect.left + safeRect.width + 18), window.innerWidth - tooltipWidth - 16)
     : Math.max(16, (window.innerWidth - tooltipWidth) / 2);
   const tooltipTop = safeRect
-    ? shouldPlaceTooltipBelow
+    ? shouldPlaceQuickLaunchTooltipAbove
+      ? Math.max(16, safeRect.top - tooltipHeightEstimate - 64)
+      : shouldPlaceTooltipBelow
       ? Math.min(Math.max(16, safeRect.top + safeRect.height + 18), window.innerHeight - tooltipHeightEstimate - 16)
       : Math.min(Math.max(16, safeRect.top), window.innerHeight - tooltipHeightEstimate - 16)
     : Math.max(16, (window.innerHeight - tooltipHeightEstimate) / 2);
@@ -1604,7 +1607,7 @@ function FirstLoginGuide({
       <div
         key={`tip-${animationKey}`}
         className="pointer-events-auto fixed w-[calc(100vw-2rem)] max-w-[360px] rounded-lg border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-900"
-        style={{ left: tooltipLeft, top: tooltipTop }}
+        style={{ left: tooltipLeft, top: tooltipTop, maxWidth: tooltipWidth }}
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
@@ -2210,7 +2213,7 @@ function App() {
                 <div className={isSidebarCollapsed ? 'flex justify-center' : 'flex items-center gap-3'}>
                   {currentUser?.profilePictureUrl ? (
                     <img
-                      src={currentUser.profilePictureUrl}
+                      src={getAssetUrl(currentUser.profilePictureUrl)}
                       alt={currentUser.displayName}
                       className={`${isSidebarCollapsed ? 'h-10 w-10' : 'h-14 w-14'} shrink-0 rounded-full border border-white bg-white object-cover shadow`}
                     />

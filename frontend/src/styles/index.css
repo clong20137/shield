@@ -344,6 +344,17 @@
   }
 }
 
+input:not([type='checkbox']):not([type='radio']),
+textarea {
+  padding-left: 0.875rem !important;
+  padding-right: 0.875rem !important;
+}
+
+select {
+  padding-left: 0.875rem !important;
+  padding-right: 2.5rem !important;
+}
+
 @media (max-width: 640px) {
   input,
   select,

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, Save, Send, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { useSearchParams } from 'react-router-dom';
-import { AuthAccount, messageService, userService, User, UserFilters } from '../services/api';
+import { AuthAccount, getAssetUrl, messageService, userService, User, UserFilters } from '../services/api';
 import { SearchBar } from '../components/SearchBar';
 import { UserTable } from '../components/UserTable';
 import { UserDetail } from '../components/UserDetail';
@@ -352,7 +352,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
               >
                 {editForm.profilePictureUrl ? (
                   <img
-                    src={String(editForm.profilePictureUrl)}
+                    src={getAssetUrl(String(editForm.profilePictureUrl))}
                     alt="Profile"
                     className="h-20 w-20 rounded-full object-cover"
                   />

@@ -308,7 +308,7 @@ export class UserController {
         return res.status(400).json({ error: 'Only valid image uploads are allowed' });
       }
 
-      const profilePictureUrl = `${req.protocol}://${req.get('host')}/uploads/profile-pictures/${file.filename}`;
+      const profilePictureUrl = `/uploads/profile-pictures/${file.filename}`;
       const success = await UserModel.updateUser(req.params.id, { profilePictureUrl });
 
       if (!success) {

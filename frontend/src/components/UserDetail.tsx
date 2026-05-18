@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Pencil, Phone, Send, X } from 'lucide-react';
-import { User } from '../services/api';
+import { getAssetUrl, User } from '../services/api';
 import { RankBadge } from './RankBadge';
 
 interface UserDetailProps {
@@ -57,7 +57,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           <div className="flex items-center gap-4">
           {user.profilePictureUrl ? (
             <img
-              src={user.profilePictureUrl}
+              src={getAssetUrl(user.profilePictureUrl)}
               alt={`${user.firstName} ${user.lastName}`}
               className="h-20 w-20 rounded-full border-2 border-white object-cover"
             />

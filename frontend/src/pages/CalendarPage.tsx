@@ -680,17 +680,11 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2>Interactive Calendar</h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Personal duty information for {currentUser.displayName || currentUser.email}.
-          </p>
-        </div>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => changeMonth(-1)} className="btn-secondary" aria-label="Previous month" title="Previous">
             <ChevronLeft size={16} />
           </button>
-          <div className="min-w-40 text-center font-bold text-gray-700 dark:text-gray-200">
+          <div className="min-w-40 text-center text-xl font-bold text-primary-500 dark:text-blue-100 sm:text-2xl">
             {getMonthLabel(calendarMonth)}
           </div>
           <button type="button" onClick={() => changeMonth(1)} className="btn-secondary" aria-label="Next month" title="Next">
@@ -700,6 +694,9 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
             <CalendarClock size={16} />
           </button>
         </div>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Personal duty information for {currentUser.displayName || currentUser.email}.
+        </p>
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">

@@ -1,7 +1,7 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, CheckCheck, Paperclip, Plus, Send, Trash2, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
-import { AuthAccount, getMessageEventsUrl, messageService, userService, User, UserMessage } from '../services/api';
+import { AuthAccount, getAssetUrl, getMessageEventsUrl, messageService, userService, User, UserMessage } from '../services/api';
 import { RankBadge } from '../components/RankBadge';
 
 interface MessageInboxPageProps {
@@ -581,7 +581,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                 <div className="flex items-center justify-center gap-3 text-center">
                   {selectedThread.contactProfilePictureUrl ? (
                     <img
-                      src={selectedThread.contactProfilePictureUrl}
+                      src={getAssetUrl(selectedThread.contactProfilePictureUrl)}
                       alt={selectedThread.contactName}
                       className="h-12 w-12 rounded-full border border-gray-200 object-cover shadow-sm dark:border-gray-700"
                     />
