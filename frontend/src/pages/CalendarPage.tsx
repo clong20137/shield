@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Calculator, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCopy, Pencil, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { Calculator, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCopy, Pencil, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, CalendarShortcut, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
@@ -7,6 +7,7 @@ type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>;
 type TimePeriod = 'AM' | 'PM';
 
 const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty'];
+const narrativeCharacterLimit = 1000;
 
 const entryColors = [
   { label: 'Accent', value: '#9C865C' },
@@ -549,6 +550,17 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
     setEditingEntryId(null);
   };
 
+  const startNewEntryForSelectedDay = () => {
+    if (!selectedDate) {
+      return;
+    }
+
+    setEntryForm(createDefaultEntryForm(selectedDate, currentUser));
+    setIsDutyHoursManual(false);
+    lastAutoDutyHoursRef.current = '';
+    setEditingEntryId(null);
+  };
+
   const changeMonth = (offset: number) => {
     setCalendarMonth((currentMonth) => {
       const nextMonth = new Date(currentMonth);
@@ -586,9 +598,11 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
           currentEntries.map((entry) => (entry.id === editingEntryId ? response.data : entry)),
         );
         setEditingEntryId(null);
+        setSelectedDate(response.data.date);
       } else {
         const response = await calendarService.create(payload);
         setEntries((currentEntries) => [response.data, ...currentEntries]);
+        setSelectedDate(response.data.date);
       }
       setEntryForm(createDefaultEntryForm(entryForm.date, currentUser));
       setIsDutyHoursManual(false);
@@ -630,6 +644,8 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
     setEntryForm((currentForm) => {
       const nextValue = numericDetailFields.includes(key)
         ? sanitizeDecimalInput(value, mileageDetailFields.has(key) ? 5 : undefined)
+        : key === 'narrative'
+          ? value.slice(0, narrativeCharacterLimit)
         : value;
       const details = {
         ...(currentForm.details || {}),
@@ -959,10 +975,20 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Trooper Daily</p>
                 <h2>{getReadableDate(selectedDate)}</h2>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {editingEntryId ? 'Edit this daily activity report.' : 'Complete the daily activity report for this date.'}
+                  {editingEntryId ? 'Edit this daily activity report.' : `Add one or more daily activity reports for this date. ${selectedEntries.length} saved.`}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={startNewEntryForSelectedDay}
+                  className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                  aria-label="Start new entry for this day"
+                  title="New Entry"
+                  disabled={!editingEntryId && !entryForm.dutyHours && Object.keys(entryForm.details || {}).length === 0}
+                >
+                  <Plus size={18} />
+                </button>
                 {onOpenCalculator && (
                   <button
                     type="button"
@@ -1173,12 +1199,15 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                   <section className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950 xl:col-span-2">
                     <div className="mb-4 flex items-center justify-between gap-3">
                       <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Narrative</h3>
-                      <span className="h-1.5 w-10 rounded-full bg-accent" />
+                      <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
+                        {(entryForm.details?.narrative || '').length}/{narrativeCharacterLimit}
+                      </span>
                     </div>
                     <textarea
                       value={entryForm.details?.narrative || ''}
                       onChange={(event) => updateDailyDetail('narrative', event.target.value)}
                       placeholder="Type a narrative here"
+                      maxLength={narrativeCharacterLimit}
                       className="min-h-40 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
                     />
                   </section>
@@ -1203,7 +1232,12 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
             </form>
 
             <div className="mt-6">
-              <h3 className="mb-3">Entries</h3>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <h3>Entries for this day</h3>
+                <button type="button" onClick={startNewEntryForSelectedDay} className="btn-secondary" aria-label="Add another entry for this day" title="Add Another Entry">
+                  <Plus size={16} />
+                </button>
+              </div>
               {selectedEntries.length === 0 ? (
                 <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">
                   No entries for this day.
@@ -1225,7 +1259,7 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                             {entry.dutyHours} hours - {entry.districtWorked}
                           </p>
                           <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {entry.category} - {entry.specialStatus}
+                            {entry.category} - {entry.specialStatus} - Saved {new Date(entry.createdAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                           </p>
                         </div>
                       </div>

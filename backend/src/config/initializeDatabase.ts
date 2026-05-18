@@ -36,6 +36,24 @@ async function ensureIndex(table: string, indexName: string, definition: string)
   }
 }
 
+async function dropNonPrimaryUniqueIndexes(table: string) {
+  const [rows] = await pool.query(
+    `
+      SELECT DISTINCT INDEX_NAME
+      FROM INFORMATION_SCHEMA.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?
+        AND NON_UNIQUE = 0
+        AND INDEX_NAME <> 'PRIMARY'
+    `,
+    [table]
+  );
+
+  for (const row of rows as Array<{ INDEX_NAME: string }>) {
+    await pool.query(`ALTER TABLE \`${table}\` DROP INDEX \`${row.INDEX_NAME}\``);
+  }
+}
+
 async function tableExists(table: string): Promise<boolean> {
   const [rows] = await pool.query(
     `
@@ -322,6 +340,7 @@ export async function initializeDatabase() {
   `);
   await ensureColumn('calendar_entries', 'ownerAccountId', '`ownerAccountId` VARCHAR(36)');
   await ensureColumn('calendar_entries', 'details', '`details` JSON');
+  await dropNonPrimaryUniqueIndexes('calendar_entries');
   await ensureIndex('calendar_entries', 'idx_calendar_category_date', '`category`, `entryDate`');
   await ensureIndex('calendar_entries', 'idx_calendar_district_date', '`districtWorked`, `entryDate`');
   await ensureIndex('calendar_entries', 'idx_calendar_owner_date', '`ownerAccountId`, `entryDate`');
