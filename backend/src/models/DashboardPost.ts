@@ -35,6 +35,7 @@ export interface DashboardPostComment {
   authorName: string | null;
   authorEmail?: string | null;
   authorRank?: string | null;
+  authorDistrict?: string | null;
   authorProfilePictureUrl?: string | null;
   body: string;
   isFlagged: boolean | number;
@@ -236,6 +237,7 @@ export class DashboardPostModel {
         `SELECT c.*,
           u.\`email\` as authorEmail,
           u.\`rank\` as authorRank,
+          u.\`district\` as authorDistrict,
           u.\`profilePictureUrl\` as authorProfilePictureUrl
         FROM dashboard_post_comments c
         LEFT JOIN users u ON u.\`id\` = c.\`authorId\`
@@ -281,6 +283,7 @@ export class DashboardPostModel {
         authorName,
         authorEmail: null,
         authorRank: null,
+        authorDistrict: null,
         authorProfilePictureUrl: null,
         body: body.trim(),
         isFlagged: false,

@@ -286,6 +286,7 @@ export interface DashboardPostComment {
   authorName: string | null;
   authorEmail?: string | null;
   authorRank?: string | null;
+  authorDistrict?: string | null;
   authorProfilePictureUrl?: string | null;
   body: string;
   isFlagged: boolean;

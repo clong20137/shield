@@ -150,19 +150,20 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
           {comments.length === 0 ? (
             <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No comments yet.</div>
           ) : comments.map((comment) => (
-            <div key={comment.id} className={`grid grid-cols-1 overflow-hidden rounded border dark:border-gray-800 md:grid-cols-[190px_minmax(0,1fr)] ${comment.isFlagged ? 'border-amber-300 dark:border-amber-800' : 'border-gray-200'}`}>
-              <aside className="border-b border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950 md:border-b-0 md:border-r">
-                <div className="flex items-center gap-3 md:block">
+            <div key={comment.id} className={`grid grid-cols-1 overflow-hidden rounded border dark:border-gray-800 md:grid-cols-[210px_minmax(0,1fr)] ${comment.isFlagged ? 'border-amber-300 dark:border-amber-800' : 'border-gray-200'}`}>
+              <aside className="flex flex-col items-center justify-center border-b border-primary-600 bg-primary-500 p-5 text-center text-white dark:border-gray-800 dark:bg-gray-900 md:border-b-0 md:border-r">
+                <div className="flex w-full flex-col items-center justify-center gap-3">
                   {comment.authorProfilePictureUrl ? (
-                    <img src={comment.authorProfilePictureUrl} alt={comment.authorName || 'Comment author'} className="h-14 w-14 rounded-full object-cover md:h-16 md:w-16" />
+                    <img src={comment.authorProfilePictureUrl} alt={comment.authorName || 'Comment author'} className="h-20 w-20 rounded-full border-2 border-white object-cover shadow" />
                   ) : (
-                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent/10 text-lg font-bold text-accent md:h-16 md:w-16">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-white bg-white text-xl font-bold text-primary-500 shadow">
                       {getCommentInitials(comment)}
                     </div>
                   )}
-                  <div className="min-w-0 md:mt-3">
-                    <p className="truncate font-bold text-gray-900 dark:text-gray-100">{comment.authorName || 'User'}</p>
-                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">{comment.authorRank || comment.authorEmail || 'Member'}</p>
+                  <div className="w-full min-w-0">
+                    <p className="truncate text-base font-bold text-white">{comment.authorName || 'User'}</p>
+                    <p className="mt-1 truncate text-xs font-semibold uppercase text-blue-100">{comment.authorRank || 'No rank listed'}</p>
+                    <p className="mt-1 truncate text-xs text-blue-100">{comment.authorDistrict || 'No district listed'}</p>
                   </div>
                 </div>
               </aside>
