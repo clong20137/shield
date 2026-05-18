@@ -2470,7 +2470,7 @@ function App() {
                   </button>
                 </div>
                 <div className="min-h-0 flex-1">
-                  <CalendarPage currentUser={currentUser} />
+                  <CalendarPage currentUser={currentUser} onOpenCalculator={() => setIsCalculatorOpen(true)} />
                 </div>
               </div>
             </div>

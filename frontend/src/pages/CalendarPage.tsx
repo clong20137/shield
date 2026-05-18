@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CalendarClock, ChevronLeft, ChevronRight, Pencil, Save, Trash2, X } from 'lucide-react';
+import { Calculator, CalendarClock, ChevronLeft, ChevronRight, Pencil, Save, Trash2, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
@@ -257,7 +257,7 @@ function getDifferenceLabel(firstValue: number, secondValue: number): string {
   return difference <= 0.01 ? 'Matches' : `${formatHours(difference)} hr off`;
 }
 
-function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
+function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAccount; onOpenCalculator?: () => void }) {
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -601,15 +601,28 @@ function CalendarPage({ currentUser }: { currentUser: AuthAccount }) {
                   {editingEntryId ? 'Edit this daily activity report.' : 'Complete the daily activity report for this date.'}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedDate(null)}
-                className="icon-close-button"
-                aria-label="Close calendar day"
-                title="Close"
-              >
-                <X size={20} />
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                {onOpenCalculator && (
+                  <button
+                    type="button"
+                    onClick={onOpenCalculator}
+                    className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                    aria-label="Open calculator"
+                    title="Calculator"
+                  >
+                    <Calculator size={18} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate(null)}
+                  className="icon-close-button"
+                  aria-label="Close calendar day"
+                  title="Close"
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             <form onSubmit={saveEntry} className="grid grid-cols-1 gap-4 md:grid-cols-2">
