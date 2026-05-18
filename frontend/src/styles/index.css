@@ -140,6 +140,40 @@
   }
 }
 
+@keyframes trooper-daily-match-pop {
+  0% {
+    transform: scale(0.985);
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.35);
+  }
+
+  55% {
+    transform: scale(1.018);
+    box-shadow: 0 0 0 8px rgba(22, 163, 74, 0.08);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0);
+  }
+}
+
+@keyframes trooper-daily-check-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.55) rotate(-16deg);
+  }
+
+  65% {
+    opacity: 1;
+    transform: scale(1.18) rotate(4deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
 @layer base {
   * {
     -webkit-tap-highlight-color: transparent;
@@ -268,6 +302,14 @@
     will-change: transform, opacity, left, top;
   }
 
+  .trooper-daily-match {
+    animation: trooper-daily-match-pop 520ms ease-out both;
+  }
+
+  .trooper-daily-check {
+    animation: trooper-daily-check-pop 420ms ease-out both;
+  }
+
   .shield-loader {
     @apply relative flex h-28 w-28 items-center justify-center text-gray-300 dark:text-gray-800;
   }
@@ -335,6 +377,8 @@
   .onboarding-spotlight,
   .onboarding-tip,
   .onboarding-control-label,
+  .trooper-daily-match,
+  .trooper-daily-check,
   .toast-notification,
   .shield-loader::after,
   .loading::after {

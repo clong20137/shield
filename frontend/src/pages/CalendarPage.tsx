@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Calculator, CalendarClock, ChevronLeft, ChevronRight, ClipboardCopy, Pencil, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { Calculator, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCopy, Pencil, Save, Sparkles, Trash2, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, CalendarShortcut, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
@@ -308,6 +308,45 @@ function formatHours(value: number): string {
 function getDifferenceLabel(firstValue: number, secondValue: number): string {
   const difference = Math.abs(firstValue - secondValue);
   return difference <= 0.01 ? 'Matches' : `${formatHours(difference)} hr off`;
+}
+
+function isHourMatch(reportedHours: number, comparisonHours: number): boolean {
+  return reportedHours > 0 && comparisonHours > 0 && Math.abs(reportedHours - comparisonHours) <= 0.01;
+}
+
+function HourSummaryCard({
+  label,
+  value,
+  tone,
+  helper,
+  isMatch = false,
+}: {
+  label: string;
+  value: string;
+  tone: 'primary' | 'accent';
+  helper?: string;
+  isMatch?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded border p-3 transition-all duration-300 ${
+        isMatch
+          ? 'trooper-daily-match border-green-300 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-100'
+          : 'border-transparent'
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className={`text-xs font-bold uppercase ${isMatch ? 'text-green-700 dark:text-green-200' : 'text-gray-500 dark:text-gray-400'}`}>{label}</p>
+        {isMatch && <CheckCircle2 className="trooper-daily-check text-green-600 dark:text-green-300" size={19} />}
+      </div>
+      <p className={`mt-1 text-2xl font-bold ${isMatch ? 'text-green-700 dark:text-green-200' : tone === 'accent' ? 'text-accent' : 'text-primary-500 dark:text-blue-100'}`}>
+        {value}
+      </p>
+      {helper && (
+        <p className={`text-xs font-semibold ${isMatch ? 'text-green-700 dark:text-green-300' : 'text-gray-500'}`}>{helper}</p>
+      )}
+    </div>
+  );
 }
 
 function calculateShiftHours(details: Record<string, string>): number {
@@ -687,6 +726,9 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
   const dutyActivityHours = dutyActivityHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
   const hasShiftTime = calculatedShiftHours > 0;
   const hasReportedHours = reportedDutyHours > 0;
+  const shiftHoursMatch = isHourMatch(reportedDutyHours, calculatedShiftHours);
+  const attendanceHoursMatch = isHourMatch(reportedDutyHours, attendanceHours);
+  const dutyActivityHoursMatch = isHourMatch(reportedDutyHours, dutyActivityHours);
   const hasHourMismatch =
     hasReportedHours &&
     ((hasShiftTime && Math.abs(calculatedShiftHours - reportedDutyHours) > 0.01) ||
@@ -1019,25 +1061,10 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                 <div className={`mb-4 grid grid-cols-1 gap-3 rounded-lg border p-4 md:grid-cols-4 ${
                   hasHourMismatch ? 'border-danger/40 bg-red-50 dark:bg-red-950/30' : 'border-accent/30 bg-accent/5'
                 }`}>
-                  <div>
-                    <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Reported</p>
-                    <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{formatHours(reportedDutyHours || 0)} hrs</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Shift Time</p>
-                    <p className="mt-1 text-2xl font-bold text-accent">{formatHours(calculatedShiftHours)} hrs</p>
-                    <p className="text-xs font-semibold text-gray-500">{getDifferenceLabel(reportedDutyHours, calculatedShiftHours)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Attendance</p>
-                    <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{formatHours(attendanceHours)} hrs</p>
-                    <p className="text-xs font-semibold text-gray-500">{getDifferenceLabel(reportedDutyHours, attendanceHours)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Duty Activity</p>
-                    <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{formatHours(dutyActivityHours)} hrs</p>
-                    <p className="text-xs font-semibold text-gray-500">{getDifferenceLabel(reportedDutyHours, dutyActivityHours)}</p>
-                  </div>
+                  <HourSummaryCard label="Reported" value={`${formatHours(reportedDutyHours || 0)} hrs`} tone="primary" />
+                  <HourSummaryCard label="Shift Time" value={`${formatHours(calculatedShiftHours)} hrs`} tone="accent" helper={getDifferenceLabel(reportedDutyHours, calculatedShiftHours)} isMatch={shiftHoursMatch} />
+                  <HourSummaryCard label="Attendance" value={`${formatHours(attendanceHours)} hrs`} tone="primary" helper={getDifferenceLabel(reportedDutyHours, attendanceHours)} isMatch={attendanceHoursMatch} />
+                  <HourSummaryCard label="Duty Activity" value={`${formatHours(dutyActivityHours)} hrs`} tone="primary" helper={getDifferenceLabel(reportedDutyHours, dutyActivityHours)} isMatch={dutyActivityHoursMatch} />
                   {hasHourMismatch && (
                     <p className="text-sm font-semibold text-danger md:col-span-4">
                       Hours do not match the reported duty hours. Review shift times, attendance hours, and duty activity hours before submitting.
