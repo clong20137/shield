@@ -18,6 +18,24 @@ async function ensureColumn(table: string, column: string, definition: string) {
   }
 }
 
+async function ensureIndex(table: string, indexName: string, definition: string) {
+  const [rows] = await pool.query(
+    `
+      SELECT INDEX_NAME
+      FROM INFORMATION_SCHEMA.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?
+        AND INDEX_NAME = ?
+      LIMIT 1
+    `,
+    [table, indexName]
+  );
+
+  if ((rows as unknown[]).length === 0) {
+    await pool.query(`ALTER TABLE \`${table}\` ADD INDEX \`${indexName}\` (${definition})`);
+  }
+}
+
 async function tableExists(table: string): Promise<boolean> {
   const [rows] = await pool.query(
     `
@@ -98,6 +116,9 @@ export async function initializeDatabase() {
   await ensureColumn('users', 'maritalStatus', '`maritalStatus` VARCHAR(50)');
   await ensureColumn('users', 'residentialAddress', '`residentialAddress` TEXT');
   await ensureColumn('users', 'mailingAddress', '`mailingAddress` TEXT');
+  await ensureIndex('users', 'idx_users_email', '`email`');
+  await ensureIndex('users', 'idx_users_rank', '`rank`');
+  await ensureIndex('users', 'idx_users_name', '`lastName`, `firstName`');
 
   if (await tableExists('auth_accounts')) {
     await ensureColumn('auth_accounts', 'twoFactorSecret', '`twoFactorSecret` VARCHAR(64)');
@@ -301,6 +322,9 @@ export async function initializeDatabase() {
   `);
   await ensureColumn('calendar_entries', 'ownerAccountId', '`ownerAccountId` VARCHAR(36)');
   await ensureColumn('calendar_entries', 'details', '`details` JSON');
+  await ensureIndex('calendar_entries', 'idx_calendar_category_date', '`category`, `entryDate`');
+  await ensureIndex('calendar_entries', 'idx_calendar_district_date', '`districtWorked`, `entryDate`');
+  await ensureIndex('calendar_entries', 'idx_calendar_owner_date', '`ownerAccountId`, `entryDate`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS calendar_shortcuts (

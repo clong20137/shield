@@ -532,8 +532,8 @@ export const reportService = {
   getDetailedReport: (filters?: UserFilters) =>
     api.get('/reports/detailed', { params: filters }),
 
-  getTrooperDailies: (filters?: { q?: string; from?: string; to?: string; district?: string }) =>
-    api.get<{ count: number; data: TrooperDailyReportEntry[] }>('/reports/trooper-dailies', { params: filters }),
+  getTrooperDailies: (filters?: { q?: string; from?: string; to?: string; district?: string; page?: number; pageSize?: number }) =>
+    api.get<{ count: number; total: number; page: number; pageSize: number; totalPages: number; data: TrooperDailyReportEntry[] }>('/reports/trooper-dailies', { params: filters }),
 };
 
 export const calendarService = {

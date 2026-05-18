@@ -36,6 +36,10 @@ interface TrooperDailyReportRow extends RowDataPacket {
   district: string;
 }
 
+interface CountRow extends RowDataPacket {
+  total: number;
+}
+
 function formatReportDate(value: Date | string): string {
   if (typeof value === 'string') {
     return value.slice(0, 10);
@@ -64,26 +68,16 @@ export class ReportController {
     try {
       conn = await pool.getConnection();
       const { q, from, to, district } = req.query;
-      const params: Array<string> = [];
-      let query = `
-        SELECT
-          ce.*,
-          u.\`firstName\`,
-          u.\`lastName\`,
-          u.\`email\`,
-          u.\`peNumber\`,
-          u.\`badgeNumber\`,
-          u.\`rank\`,
-          u.\`district\`
-        FROM calendar_entries ce
-        LEFT JOIN users u ON u.\`id\` = ce.\`ownerAccountId\`
-        WHERE ce.\`category\` = 'Trooper Daily'
-      `;
+      const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
+      const pageSize = Math.min(100, Math.max(10, Number.parseInt(String(req.query.pageSize || '25'), 10) || 25));
+      const offset = (page - 1) * pageSize;
+      const params: Array<string | number> = [];
+      const whereParts = ["ce.`category` = 'Trooper Daily'"];
 
       if (typeof q === 'string' && q.trim()) {
         const search = `%${q.trim().toLowerCase()}%`;
-        query += `
-          AND (
+        whereParts.push(`
+          (
             LOWER(u.\`firstName\`) LIKE ?
             OR LOWER(u.\`lastName\`) LIKE ?
             OR LOWER(u.\`email\`) LIKE ?
@@ -93,28 +87,51 @@ export class ReportController {
             OR LOWER(u.\`district\`) LIKE ?
             OR LOWER(ce.\`districtWorked\`) LIKE ?
           )
-        `;
+        `);
         params.push(search, search, search, search, search, search, search, search);
       }
 
       if (typeof from === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(from)) {
-        query += ' AND ce.`entryDate` >= ?';
+        whereParts.push('ce.`entryDate` >= ?');
         params.push(from);
       }
 
       if (typeof to === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(to)) {
-        query += ' AND ce.`entryDate` <= ?';
+        whereParts.push('ce.`entryDate` <= ?');
         params.push(to);
       }
 
       if (typeof district === 'string' && district.trim()) {
-        query += ' AND ce.`districtWorked` = ?';
+        whereParts.push('ce.`districtWorked` = ?');
         params.push(district.trim());
       }
 
-      query += ' ORDER BY ce.`entryDate` DESC, u.`lastName`, u.`firstName` LIMIT 500';
+      const fromClause = `
+        FROM calendar_entries ce
+        LEFT JOIN users u ON u.\`id\` = ce.\`ownerAccountId\`
+        WHERE ${whereParts.join(' AND ')}
+      `;
+      const [countRows] = await conn.query<CountRow[]>(
+        `SELECT COUNT(*) as total ${fromClause}`,
+        params
+      );
+      const total = Number(countRows[0]?.total) || 0;
+      const query = `
+        SELECT
+          ce.*,
+          u.\`firstName\`,
+          u.\`lastName\`,
+          u.\`email\`,
+          u.\`peNumber\`,
+          u.\`badgeNumber\`,
+          u.\`rank\`,
+          u.\`district\`
+        ${fromClause}
+        ORDER BY ce.\`entryDate\` DESC, ce.\`updatedAt\` DESC, u.\`lastName\`, u.\`firstName\`
+        LIMIT ? OFFSET ?
+      `;
 
-      const [rows] = await conn.query<TrooperDailyReportRow[]>(query, params);
+      const [rows] = await conn.query<TrooperDailyReportRow[]>(query, [...params, pageSize, offset]);
       const data = rows.map((row) => ({
         id: row.id,
         ownerAccountId: row.ownerAccountId,
@@ -137,7 +154,7 @@ export class ReportController {
         },
       }));
 
-      res.json({ count: data.length, data });
+      res.json({ count: data.length, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)), data });
     } catch (error) {
       console.error('Trooper daily report error:', error);
       res.status(500).json({ error: 'Failed to load Trooper Daily reports' });
