@@ -278,12 +278,11 @@ function formatTimePart(value: number): string {
   return String(value).padStart(2, '0');
 }
 
-function parseTimeInput(value?: string): { hour: string; minute: string; period: TimePeriod } {
+function parseTimeInput(value?: string): { time: string; period: TimePeriod } {
   const parsedMinutes = parseTimeToMinutes(value);
   if (parsedMinutes === null) {
     return {
-      hour: '',
-      minute: '',
+      time: '',
       period: 'AM',
     };
   }
@@ -294,21 +293,30 @@ function parseTimeInput(value?: string): { hour: string; minute: string; period:
   const hours12 = hours24 % 12 || 12;
 
   return {
-    hour: String(hours12),
-    minute: formatTimePart(minutes),
+    time: `${formatTimePart(hours12)}:${formatTimePart(minutes)}`,
     period,
   };
 }
 
-function buildTimeValue(hour: string, minute: string, period: TimePeriod): string {
-  if (!hour || !minute) {
+function sanitizeTimeInput(value: string): string {
+  const digits = value.replace(/\D/gu, '').slice(0, 4);
+  if (digits.length <= 2) {
+    return digits;
+  }
+
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+
+function buildTimeValue(time: string, period: TimePeriod): string {
+  const match = /^(\d{1,2}):(\d{2})$/u.exec(time);
+  if (!match) {
     return '';
   }
 
-  const numericHour = Number(hour);
-  const numericMinute = Number(minute);
+  const numericHour = Number(match[1]);
+  const numericMinute = Number(match[2]);
 
-  if (!Number.isFinite(numericHour) || !Number.isFinite(numericMinute)) {
+  if (!Number.isFinite(numericHour) || !Number.isFinite(numericMinute) || numericHour < 1 || numericHour > 12 || numericMinute < 0 || numericMinute > 59) {
     return '';
   }
 
@@ -371,47 +379,61 @@ function TimeDetailInput({
   onChange: (value: string) => void;
 }) {
   const parsedTime = parseTimeInput(value);
-  const updateTime = (next: Partial<typeof parsedTime>) => {
-    const nextTime = {
-      ...parsedTime,
-      ...next,
-    };
+  const [displayTime, setDisplayTime] = useState(parsedTime.time);
+  const [displayPeriod, setDisplayPeriod] = useState<TimePeriod>(parsedTime.period);
 
-    onChange(buildTimeValue(nextTime.hour, nextTime.minute, nextTime.period));
+  useEffect(() => {
+    setDisplayTime(parsedTime.time);
+    setDisplayPeriod(parsedTime.period);
+  }, [parsedTime.period, parsedTime.time]);
+
+  const commitTime = (time: string, period = displayPeriod) => {
+    if (!time) {
+      onChange('');
+      return;
+    }
+
+    const nextValue = buildTimeValue(time, period);
+    if (nextValue) {
+      onChange(nextValue);
+    }
   };
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
-      <select
-        value={parsedTime.hour}
-        onChange={(event) => updateTime({ hour: event.target.value })}
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+      <input
+        type="text"
+        value={displayTime}
+        onChange={(event) => {
+          const nextTime = sanitizeTimeInput(event.target.value);
+          setDisplayTime(nextTime);
+          commitTime(nextTime, displayPeriod);
+        }}
+        onBlur={(event) => {
+          const sanitizedValue = sanitizeTimeInput(event.target.value);
+          const [hour = '', minute = ''] = sanitizedValue.split(':');
+          if (!hour || !minute) return;
+          const normalizedTime = `${formatTimePart(Number(hour))}:${formatTimePart(Number(minute))}`;
+          setDisplayTime(normalizedTime);
+          commitTime(normalizedTime, displayPeriod);
+        }}
+        placeholder="HH:MM"
+        inputMode="numeric"
+        maxLength={5}
         className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-        aria-label="Hour"
-      >
-        <option value="">Hr</option>
-        {Array.from({ length: 12 }, (_, index) => String(index + 1)).map((hour) => (
-          <option key={hour} value={hour}>{hour}</option>
-        ))}
-      </select>
-      <select
-        value={parsedTime.minute}
-        onChange={(event) => updateTime({ minute: event.target.value })}
-        className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-        aria-label="Minute"
-      >
-        <option value="">Min</option>
-        {Array.from({ length: 12 }, (_, index) => formatTimePart(index * 5)).map((minute) => (
-          <option key={minute} value={minute}>{minute}</option>
-        ))}
-      </select>
+        aria-label="Time"
+      />
       <div className="inline-flex rounded border border-gray-300 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-900" aria-label="AM or PM">
         {(['AM', 'PM'] as const).map((period) => (
           <button
             key={period}
             type="button"
-            onClick={() => updateTime({ period })}
+            onClick={() => {
+              setDisplayPeriod(period);
+              commitTime(displayTime, period);
+            }}
             className={`rounded px-2.5 py-1.5 text-xs font-bold transition ${
-              parsedTime.period === period
+              displayPeriod === period
                 ? 'bg-primary-500 text-white'
                 : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
             }`}
@@ -1085,26 +1107,18 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                 </select>
               </label>
 
-              <div className="block">
-                <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Color Code</span>
-                <div className="flex flex-wrap gap-2">
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Color Code</span>
+                <select
+                  value={entryForm.color}
+                  onChange={(event) => setEntryForm((currentForm) => ({ ...currentForm, color: event.target.value }))}
+                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                >
                   {entryColors.map((color) => (
-                    <button
-                      key={color.value}
-                      type="button"
-                      onClick={() => setEntryForm((currentForm) => ({ ...currentForm, color: color.value }))}
-                      className={`flex h-9 min-w-24 items-center gap-2 rounded border px-3 text-sm font-semibold ${
-                        entryForm.color === color.value
-                          ? 'border-primary-500 bg-gray-50 dark:bg-gray-950'
-                          : 'border-gray-200 dark:border-gray-800'
-                      }`}
-                    >
-                      <span className="h-4 w-4 rounded-full" style={{ backgroundColor: color.value }} />
-                      {color.label}
-                    </button>
+                    <option key={color.value} value={color.value}>{color.label}</option>
                   ))}
-                </div>
-              </div>
+                </select>
+              </label>
 
               <div className="md:col-span-2">
                 <div className={`mb-4 grid grid-cols-1 gap-3 rounded-lg border p-4 md:grid-cols-4 ${
