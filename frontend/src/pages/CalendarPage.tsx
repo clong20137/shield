@@ -186,6 +186,13 @@ const numericDetailFields: string[] = trooperDailySections
   .flatMap((section) => section.fields.map(([key]) => key))
   .filter((key) => !timeDetailFields.has(key));
 
+const wholeNumberDetailFields = new Set<string>(
+  trooperDailySections
+    .filter((section) => ['Traffic Activity', 'OWI Offense Activity', 'Criminal Activity', 'Drug Activity'].includes(section.title))
+    .flatMap((section) => section.fields.map(([key]) => key))
+    .filter((key) => key !== 'certifiedBreathTests'),
+);
+
 const getDefaultDistrict = (currentUser?: AuthAccount) =>
   currentUser?.district && districtOptions.includes(currentUser.district)
     ? currentUser.district
@@ -273,6 +280,10 @@ function sanitizeDecimalInput(value: string, maxIntegerDigits?: number): string 
   const decimalPart = decimalParts.join('').slice(0, 2);
 
   return hasDecimal ? `${integerPart}.${decimalPart}` : integerPart;
+}
+
+function sanitizeWholeNumberInput(value: string): string {
+  return value.replace(/\D/gu, '');
 }
 
 function formatTimePart(value: number): string {
@@ -642,8 +653,10 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
 
   const updateDailyDetail = (key: string, value: string) => {
     setEntryForm((currentForm) => {
-      const nextValue = numericDetailFields.includes(key)
-        ? sanitizeDecimalInput(value, mileageDetailFields.has(key) ? 5 : undefined)
+      const nextValue = wholeNumberDetailFields.has(key)
+        ? sanitizeWholeNumberInput(value)
+        : numericDetailFields.includes(key)
+          ? sanitizeDecimalInput(value, mileageDetailFields.has(key) ? 5 : undefined)
         : key === 'narrative'
           ? value.slice(0, narrativeCharacterLimit)
         : value;
@@ -1182,7 +1195,7 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                               ) : (
                                 <input
                                   type="text"
-                                  inputMode="decimal"
+                                  inputMode={wholeNumberDetailFields.has(key) ? 'numeric' : 'decimal'}
                                   maxLength={mileageDetailFields.has(key) ? 8 : undefined}
                                   value={entryForm.details?.[key] || ''}
                                   onChange={(event) => updateDailyDetail(key, event.target.value)}
