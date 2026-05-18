@@ -50,6 +50,22 @@ Import the `backend/database.sql` file into your MySQL client.
 
 ## Common Tasks
 
+### Run an API Stress Test
+The stress runner lives in the backend and uses the configured API, so point it at local, staging, or a test deployment. By default it is read-only.
+
+```powershell
+cd backend
+$env:SHIELD_STRESS_EMAIL="admin@example.com"
+$env:SHIELD_STRESS_PASSWORD="your-password"
+npm run stress -- --url http://localhost:5000/api --users 25 --duration 120 --ramp 20
+```
+
+Use `--write` only against test data. It adds lightweight Trooper Daily calendar creates to the request mix.
+
+```powershell
+npm run stress -- --url http://localhost:5000/api --users 10 --duration 60 --write
+```
+
 ### Add a New User Field
 1. Update database schema in `backend/database.sql`
 2. Update `User` interface in `backend/src/models/User.ts`
