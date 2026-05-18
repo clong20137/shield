@@ -644,18 +644,26 @@ function HeaderMessagesButton({
 
 function CalculatorModal({ onClose }: { onClose: () => void }) {
   const [display, setDisplay] = useState('0');
+  const [position, setPosition] = useState({ x: Math.max(12, window.innerWidth - 400), y: 112 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const calculatorRef = useRef<HTMLDivElement | null>(null);
   const buttons = ['7', '8', '9', '/', '4', '5', '6', '*', '1', '2', '3', '-', '0', '.', 'C', '+'];
 
-  const appendValue = (value: string) => {
+  const appendValue = useCallback((value: string) => {
     if (value === 'C') {
       setDisplay('0');
       return;
     }
 
     setDisplay((current) => (current === '0' ? value : `${current}${value}`));
-  };
+  }, []);
 
-  const calculate = () => {
+  const deleteLast = useCallback(() => {
+    setDisplay((current) => current.slice(0, -1) || '0');
+  }, []);
+
+  const calculate = useCallback(() => {
     if (!/^[\d+\-*/. ()]+$/u.test(display)) {
       setDisplay('Error');
       return;
@@ -667,17 +675,124 @@ function CalculatorModal({ onClose }: { onClose: () => void }) {
     } catch {
       setDisplay('Error');
     }
+  }, [display]);
+
+  useEffect(() => {
+    calculatorRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (!isDragging) {
+      return undefined;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const width = calculatorRef.current?.offsetWidth || 360;
+      const height = calculatorRef.current?.offsetHeight || 420;
+      const maxX = Math.max(12, window.innerWidth - width - 12);
+      const maxY = Math.max(12, window.innerHeight - height - 12);
+      const nextX = Math.min(Math.max(12, event.clientX - dragOffsetRef.current.x), maxX);
+      const nextY = Math.min(Math.max(12, event.clientY - dragOffsetRef.current.y), maxY);
+      setPosition({ x: nextX, y: nextY });
+    };
+
+    const stopDragging = () => setIsDragging(false);
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', stopDragging);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', stopDragging);
+    };
+  }, [isDragging]);
+
+  useEffect(() => {
+    const keepInView = () => {
+      const width = calculatorRef.current?.offsetWidth || 360;
+      const height = calculatorRef.current?.offsetHeight || 420;
+      const maxX = Math.max(12, window.innerWidth - width - 12);
+      const maxY = Math.max(12, window.innerHeight - height - 12);
+      setPosition((current) => ({
+        x: Math.min(Math.max(12, current.x), maxX),
+        y: Math.min(Math.max(12, current.y), maxY),
+      }));
+    };
+
+    window.addEventListener('resize', keepInView);
+
+    return () => window.removeEventListener('resize', keepInView);
+  }, []);
+
+  const startDragging = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    const rect = calculatorRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return;
+    }
+
+    dragOffsetRef.current = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+    setIsDragging(true);
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const key = event.key.toLowerCase();
+
+    if (/^\d$/u.test(key) || ['+', '-', '/', '.', '(', ')'].includes(key)) {
+      event.preventDefault();
+      appendValue(key);
+      return;
+    }
+
+    if (key === '*' || key === 'x') {
+      event.preventDefault();
+      appendValue('*');
+      return;
+    }
+
+    if (key === 'enter' || key === '=') {
+      event.preventDefault();
+      calculate();
+      return;
+    }
+
+    if (key === 'backspace') {
+      event.preventDefault();
+      deleteLast();
+      return;
+    }
+
+    if (key === 'c') {
+      event.preventDefault();
+      appendValue('C');
+    }
   };
 
   return (
-    <div className={getModalBackdropClass(false, 'bg-black/50')}>
-      <div className="modal-window w-full max-w-sm rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900">
-        <div className="mb-4 flex items-center justify-between border-b border-gray-200 pb-3 dark:border-gray-800">
+    <div className="pointer-events-none fixed inset-0 z-[95]">
+      <div
+        ref={calculatorRef}
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
+        onMouseDown={() => calculatorRef.current?.focus()}
+        className="pointer-events-auto fixed w-[calc(100vw-1.5rem)] max-w-sm rounded-lg bg-white p-4 shadow-2xl outline-none ring-1 ring-gray-200 transition-shadow focus:ring-2 focus:ring-accent dark:bg-gray-900 dark:ring-gray-800"
+        style={{ left: position.x, top: position.y }}
+      >
+        <div
+          onPointerDown={startDragging}
+          className={`mb-4 flex touch-none cursor-grab select-none items-center justify-between border-b border-gray-200 pb-3 dark:border-gray-800 ${isDragging ? 'cursor-grabbing' : ''}`}
+        >
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Calculator</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Quick utility calculator.</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Drag to move. Type numbers or operators.</p>
           </div>
-          <button type="button" onClick={onClose} className="icon-close-button" aria-label="Close calculator" title="Close">
+          <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={onClose} className="icon-close-button" aria-label="Close calculator" title="Close">
             <X size={20} />
           </button>
         </div>
@@ -703,7 +818,7 @@ function CalculatorModal({ onClose }: { onClose: () => void }) {
               {button === '*' ? 'x' : button}
             </button>
           ))}
-          <button type="button" onClick={() => setDisplay((current) => current.slice(0, -1) || '0')} className="flex h-12 items-center justify-center rounded border border-gray-200 bg-white text-lg font-bold text-primary-500 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:text-blue-100">
+          <button type="button" onClick={deleteLast} className="flex h-12 items-center justify-center rounded border border-gray-200 bg-white text-lg font-bold text-primary-500 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:text-blue-100">
             DEL
           </button>
           <button type="button" onClick={calculate} className="col-span-3 flex h-12 items-center justify-center rounded bg-primary-500 text-lg font-bold text-white hover:bg-primary-600">
