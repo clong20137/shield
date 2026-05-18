@@ -3,6 +3,137 @@ import { Search, X } from 'lucide-react';
 import { reportService, ReportRow, SystemStatistics, TrooperDailyReportEntry } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
+const trooperDailySections = [
+  {
+    title: 'Regular Duty',
+    fields: [
+      ['regularDutyStartTime', 'Start Time'],
+      ['regularDutyEndTime', 'End Time'],
+      ['splitStartTime', 'Split Start Time'],
+      ['splitEndTime', 'Split End Time'],
+      ['secondSplitStartTime', '2nd Split Start Time'],
+      ['secondSplitEndTime', '2nd Split End Time'],
+      ['thirdSplitStartTime', '3rd Split Start Time'],
+      ['thirdSplitEndTime', '3rd Split End Time'],
+      ['regularDutyMiles', 'Regular Duty Miles'],
+    ],
+  },
+  {
+    title: 'Attendance Hours',
+    fields: [
+      ['regularDutyHours', 'Regular Duty Hrs'],
+      ['regularDaysOff', 'Regular Days Off'],
+      ['compHoursUsed', 'Comp Hrs Used'],
+      ['personalLeaveHours', 'Personal Leave Hrs'],
+      ['vacationHours', 'Vacation Hrs'],
+      ['holidayHours', 'Holiday Hrs'],
+      ['compOtHoursEarned', 'Comp/OT Hrs Earned'],
+      ['injuryIllnessHours', 'Injury/Illness Hrs'],
+    ],
+  },
+  {
+    title: 'Duty Hours',
+    fields: [
+      ['patrolHours', 'Patrol Hrs'],
+      ['crashInvestHours', 'Crash Invest. Hrs'],
+      ['trafficCourtHours', 'Traffic Court Hrs'],
+      ['incidentReportHours', 'Incident Report Hrs'],
+      ['criminalInvestHours', 'Criminal Invest. Hrs'],
+      ['criminalCourtHours', 'Criminal Court Hrs'],
+      ['mealBreakHours', 'Meal Break Hrs'],
+    ],
+  },
+  {
+    title: 'Traffic Activity',
+    fields: [
+      ['policeServices', 'Police Services'],
+      ['suspensions', 'Suspensions'],
+      ['crashesInvestigated', 'Crashes Investigated'],
+      ['crashCitations', 'Crash Citations'],
+      ['seatBeltCitations', 'Seat Belt Citations'],
+      ['childRestraintCitations', 'Child Restraint Citations'],
+      ['under10kTruckCitations', 'Under 10K Truck Citations'],
+    ],
+  },
+  {
+    title: 'OWI Offense Activity',
+    fields: [
+      ['owiDefendants', 'OWI Defendants'],
+      ['pbt', 'PBT'],
+      ['certifiedBreathTests', 'Certified Breath Tests'],
+      ['refusals', 'Refusals'],
+      ['owiMisdemeanors', 'OWI Misdemeanors'],
+      ['owiFelonies', 'OWI Felonies'],
+      ['owiControlledSubstances', 'OWI Controlled Substances'],
+      ['underAgeOwi', 'Under Age OWI'],
+      ['dreTests', 'DRE Tests'],
+      ['sfstTests', 'SFST Tests'],
+      ['openContainers', 'Open Containers'],
+      ['otherOwiViolations', 'Other OWI Violations'],
+    ],
+  },
+  {
+    title: '10K Truck Activity',
+    fields: [
+      ['movingCitations', 'Moving Citations'],
+      ['nonMovingCitations', 'Non Moving Citations'],
+      ['warnings', 'Warnings'],
+      ['trucksInspected', 'Trucks Inspected'],
+      ['outOfServices', 'Out of Services'],
+      ['mcsapViolations', 'MCSAP Violations'],
+    ],
+  },
+  {
+    title: 'Level 1-3 Regular Duty Inspections',
+    fields: [
+      ['trucksMeasured', 'Trucks Measured'],
+      ['inspectionOutOfServices', 'Out of Services'],
+      ['owGrossCitations', 'OW Gross Citations'],
+      ['owAxleCitations', 'OW Axle Citations'],
+      ['owBridgeCitations', 'OW Bridge Citations'],
+      ['portWeighed', 'Port Weighed'],
+      ['owLoadAdjustments', 'OW Load Adjustments'],
+      ['owVehicleOffLoaded', 'OW Vehicle Off Loaded'],
+    ],
+  },
+  {
+    title: 'Criminal Activity',
+    fields: [
+      ['criminalDefendants', 'Criminal Defendants'],
+      ['totalCriminalArrests', 'Total Criminal Arrests'],
+      ['totalFelonyArrests', 'Total Felony Arrests'],
+      ['criminalActivityReports', 'Criminal Activity Reports'],
+      ['stolenVehiclesRecovered', 'Stolen Vehicles Recovered'],
+      ['gunsSeized', 'Guns Seized'],
+      ['amountUscSeized', 'Amount of USC Seized'],
+      ['htiInteractions', 'HTI Interactions'],
+      ['htiArrests', 'HTI Arrests'],
+      ['htiRescues', 'HTI Rescues'],
+    ],
+  },
+  {
+    title: 'Drug Activity',
+    fields: [
+      ['heroinArrests', 'Heroin Arrests'],
+      ['heroinDefendants', 'Heroin Defendants'],
+      ['cocaineArrests', 'Cocaine Arrests'],
+      ['cocaineDefendants', 'Cocaine Defendants'],
+      ['marijuanaArrests', 'Marijuana Arrests'],
+      ['marijuanaDefendants', 'Marijuana Defendants'],
+      ['totalPlantsSeized', 'Total Plants Seized'],
+      ['totalWeightSeizedGrams', 'Total Weight Seized(in Grams)'],
+      ['methamphetamineArrests', 'Methamphetamine Arrests'],
+      ['methamphetamineDefendants', 'Methamphetamine Defendants'],
+      ['prescriptionArrests', 'Prescription Arrests'],
+      ['prescriptionDefendants', 'Prescription Defendants'],
+      ['otherDrugArrests', 'Other Drug Arrests'],
+      ['otherDrugDefendants', 'Other Drug Defendants'],
+      ['totalDrugArrests', 'Total Drug Arrests'],
+      ['totalDrugDefendants', 'Total Drug Defendants'],
+    ],
+  },
+] as const;
+
 function getErrorMessage(error: unknown, fallback: string): string {
   if (
     typeof error === 'object' &&
@@ -30,6 +161,7 @@ const ReportsPage: React.FC = () => {
   const [dailyLoading, setDailyLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dailyError, setDailyError] = useState<string | null>(null);
+  const [selectedDaily, setSelectedDaily] = useState<TrooperDailyReportEntry | null>(null);
 
   const loadUserReports = async (showLoading = true) => {
     if (showLoading) {
@@ -118,6 +250,26 @@ const ReportsPage: React.FC = () => {
     void loadTrooperDailies(true, { q: '', from: '', to: '', district: '' });
   };
 
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSelectedDaily(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, []);
+
+  const openDailyReport = (entry: TrooperDailyReportEntry) => {
+    setSelectedDaily(entry);
+  };
+
+  const selectedDailyUserName = selectedDaily
+    ? `${selectedDaily.user.firstName || ''} ${selectedDaily.user.lastName || ''}`.trim() || selectedDaily.user.email || 'Unknown'
+    : '';
+
   return (
     <div>
       <h1 className="mb-8">Reports & Analytics</h1>
@@ -179,7 +331,19 @@ const ReportsPage: React.FC = () => {
                   trooperDailies.map((entry) => {
                     const userName = `${entry.user.firstName || ''} ${entry.user.lastName || ''}`.trim() || entry.user.email || 'Unknown';
                     return (
-                      <tr key={entry.id} className="border-b border-gray-200 dark:border-gray-800">
+                      <tr
+                        key={entry.id}
+                        tabIndex={0}
+                        role="button"
+                        onClick={() => openDailyReport(entry)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            openDailyReport(entry);
+                          }
+                        }}
+                        className="cursor-pointer border-b border-gray-200 transition hover:bg-accent/5 focus:bg-accent/10 focus:outline-none dark:border-gray-800"
+                      >
                         <td className="px-3 py-3 font-semibold">{new Date(`${entry.date}T00:00:00`).toLocaleDateString()}</td>
                         <td className="px-3 py-3">
                           <p className="font-bold text-gray-900 dark:text-gray-100">{userName}</p>
@@ -269,6 +433,80 @@ const ReportsPage: React.FC = () => {
             ))}
           </div>
         </>
+      )}
+
+      {selectedDaily && (
+        <div className="modal-backdrop fixed inset-0 z-[80] flex items-end justify-center bg-black/60 sm:items-center">
+          <div className="modal-window flex max-h-[96dvh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl dark:bg-gray-900">
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 bg-primary-500 px-5 py-4 text-white dark:border-gray-800">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-100">Trooper Daily Report</p>
+                <h2 className="text-2xl font-bold text-white">{selectedDailyUserName}</h2>
+                <p className="mt-1 text-sm text-blue-100">
+                  {new Date(`${selectedDaily.date}T00:00:00`).toLocaleDateString()} - {selectedDaily.dutyHours} hours - {selectedDaily.districtWorked}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedDaily(null)}
+                className="icon-close-button border-white/20 bg-white/10 text-white hover:bg-white/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+                aria-label="Close Trooper Daily report"
+                title="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-4">
+                {[
+                  ['Email', selectedDaily.user.email || ''],
+                  ['Rank', selectedDaily.user.rank || 'No rank'],
+                  ['PE Number', selectedDaily.user.peNumber || ''],
+                  ['Badge', selectedDaily.user.badgeNumber || ''],
+                  ['Home District', selectedDaily.user.district || ''],
+                  ['District Worked', selectedDaily.districtWorked],
+                  ['Special Status', selectedDaily.specialStatus],
+                  ['Submitted', new Date(selectedDaily.createdAt).toLocaleString()],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                    <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">{label}</p>
+                    <p className="mt-1 font-semibold text-gray-900 dark:text-gray-100">{value || 'Not entered'}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                {trooperDailySections.map((section) => (
+                  <section key={section.title} className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">{section.title}</h3>
+                      <span className="h-1.5 w-10 rounded-full bg-accent" />
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {section.fields.map(([key, label]) => (
+                        <div key={key} className="rounded border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-900">
+                          <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">{label}</p>
+                          <p className="mt-1 font-semibold text-gray-900 dark:text-gray-100">{selectedDaily.details?.[key] || '0'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+
+                <section className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950 xl:col-span-2">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Narrative</h3>
+                    <span className="h-1.5 w-10 rounded-full bg-accent" />
+                  </div>
+                  <p className="min-h-32 whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
+                    {selectedDaily.details?.narrative || 'No narrative entered.'}
+                  </p>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
