@@ -206,6 +206,7 @@ export async function initializeDatabase() {
       \`title\` VARCHAR(200) NOT NULL,
       \`body\` TEXT NOT NULL,
       \`category\` VARCHAR(50) NOT NULL DEFAULT 'Update',
+      \`allowComments\` BOOLEAN DEFAULT 1,
       \`authorId\` VARCHAR(36),
       \`authorName\` VARCHAR(150),
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -214,6 +215,8 @@ export async function initializeDatabase() {
       INDEX \`idx_dashboard_posts_category\` (\`category\`)
     )
   `);
+
+  await ensureColumn('dashboard_posts', 'allowComments', '`allowComments` BOOLEAN DEFAULT 1');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS dashboard_post_reactions (
@@ -226,6 +229,20 @@ export async function initializeDatabase() {
       UNIQUE KEY \`uniq_dashboard_post_reaction\` (\`postId\`, \`userId\`),
       INDEX \`idx_dashboard_post_reactions_post\` (\`postId\`),
       INDEX \`idx_dashboard_post_reactions_user\` (\`userId\`)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dashboard_post_comments (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`postId\` VARCHAR(36) NOT NULL,
+      \`authorId\` VARCHAR(36) NOT NULL,
+      \`authorName\` VARCHAR(150),
+      \`body\` TEXT NOT NULL,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX \`idx_dashboard_post_comments_post\` (\`postId\`),
+      INDEX \`idx_dashboard_post_comments_created\` (\`createdAt\`)
     )
   `);
 

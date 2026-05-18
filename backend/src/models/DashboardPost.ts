@@ -7,6 +7,7 @@ export interface DashboardPost {
   title: string;
   body: string;
   category: string;
+  allowComments: boolean | number;
   authorId: string | null;
   authorName: string | null;
   reactions: Record<string, number>;
@@ -27,10 +28,23 @@ interface DashboardPostViewerReactionRow extends RowDataPacket {
   reaction: string;
 }
 
+export interface DashboardPostComment {
+  id: string;
+  postId: string;
+  authorId: string;
+  authorName: string | null;
+  body: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface DashboardPostCommentRow extends RowDataPacket, DashboardPostComment {}
+
 export interface DashboardPostInput {
   title: string;
   body: string;
   category: string;
+  allowComments?: boolean;
   authorId?: string;
   authorName?: string;
 }
@@ -73,6 +87,7 @@ export class DashboardPostModel {
 
       return posts.map((post) => ({
         ...post,
+        allowComments: post.allowComments !== false && post.allowComments !== 0,
         reactions: reactionCounts.get(post.id) || {},
         myReaction: viewerReactions.get(post.id) || null,
       }));
@@ -128,13 +143,14 @@ export class DashboardPostModel {
 
       await conn.query<ResultSetHeader>(
         `INSERT INTO dashboard_posts (
-          \`id\`, \`title\`, \`body\`, \`category\`, \`authorId\`, \`authorName\`, \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          \`id\`, \`title\`, \`body\`, \`category\`, \`allowComments\`, \`authorId\`, \`authorName\`, \`createdAt\`, \`updatedAt\`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           input.title.trim(),
           input.body.trim(),
           input.category || 'Update',
+          input.allowComments === false ? 0 : 1,
           input.authorId || null,
           input.authorName || null,
           now,
@@ -147,6 +163,7 @@ export class DashboardPostModel {
         title: input.title.trim(),
         body: input.body.trim(),
         category: input.category || 'Update',
+        allowComments: input.allowComments !== false,
         authorId: input.authorId || null,
         authorName: input.authorName || null,
         reactions: {},
@@ -163,6 +180,7 @@ export class DashboardPostModel {
     const conn = await pool.getConnection();
     try {
       await conn.query<ResultSetHeader>('DELETE FROM dashboard_post_reactions WHERE `postId` = ?', [id]);
+      await conn.query<ResultSetHeader>('DELETE FROM dashboard_post_comments WHERE `postId` = ?', [id]);
       const [result] = await conn.query<ResultSetHeader>('DELETE FROM dashboard_posts WHERE `id` = ?', [id]);
       return result.affectedRows > 0;
     } finally {
@@ -199,6 +217,55 @@ export class DashboardPostModel {
       }
 
       return DashboardPostModel.getPost(postId, userId);
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async listComments(postId: string): Promise<DashboardPostComment[]> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<DashboardPostCommentRow[]>(
+        'SELECT * FROM dashboard_post_comments WHERE `postId` = ? ORDER BY `createdAt` ASC',
+        [postId],
+      );
+
+      return rows;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async createComment(postId: string, authorId: string, authorName: string, body: string): Promise<DashboardPostComment | null> {
+    const conn = await pool.getConnection();
+    try {
+      const [postRows] = await conn.query<RowDataPacket[]>(
+        'SELECT `id`, `allowComments` FROM dashboard_posts WHERE `id` = ? LIMIT 1',
+        [postId],
+      );
+
+      if (postRows.length === 0 || postRows[0].allowComments === false || postRows[0].allowComments === 0) {
+        return null;
+      }
+
+      const id = uuidv4();
+      const now = new Date();
+      await conn.query<ResultSetHeader>(
+        `INSERT INTO dashboard_post_comments (
+          \`id\`, \`postId\`, \`authorId\`, \`authorName\`, \`body\`, \`createdAt\`, \`updatedAt\`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [id, postId, authorId, authorName, body.trim(), now, now],
+      );
+
+      return {
+        id,
+        postId,
+        authorId,
+        authorName,
+        body: body.trim(),
+        createdAt: now,
+        updatedAt: now,
+      };
     } finally {
       conn.release();
     }

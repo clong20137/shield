@@ -539,6 +539,46 @@ export class AuthAccountModel {
     }
   }
 
+  static async updateRoleDefinition(id: string, name: string, permissions: string[]): Promise<AuthRole | null> {
+    const conn = await pool.getConnection();
+    try {
+      const [existingRows] = await conn.query<RowDataPacket[]>(
+        'SELECT * FROM roles WHERE `id` = ? LIMIT 1',
+        [id],
+      );
+      const existing = existingRows[0];
+
+      if (!existing) {
+        return null;
+      }
+
+      const normalizedName = name.trim().toLowerCase().replace(/\s+/gu, '-');
+      const now = new Date();
+
+      await conn.query<ResultSetHeader>(
+        'UPDATE roles SET `name` = ?, `permissions` = ?, `updatedAt` = ? WHERE `id` = ?',
+        [normalizedName, JSON.stringify(permissions), now, id],
+      );
+
+      if (existing.name !== normalizedName) {
+        await conn.query<ResultSetHeader>(
+          'UPDATE users SET `role` = ?, `updatedAt` = ? WHERE `role` = ?',
+          [normalizedName, now, existing.name],
+        );
+      }
+
+      return {
+        id,
+        name: normalizedName,
+        permissions,
+        createdAt: existing.createdAt,
+        updatedAt: now,
+      };
+    } finally {
+      conn.release();
+    }
+  }
+
   static async getPermissionsForAccount(accountId: string): Promise<string[]> {
     const conn = await pool.getConnection();
     try {

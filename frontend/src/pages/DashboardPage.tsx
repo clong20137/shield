@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, ChevronLeft, ChevronRight, Heart, KeyRound, LucideIcon, MapPinned, Pencil, PartyPopper, Plus, Save, Send, ShieldCheck, ThumbsUp, Trash2, UserCheck, Users, UserX, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, reportService, SystemStatistics } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>;
-type DashboardPostForm = Pick<DashboardPost, 'title' | 'body' | 'category'>;
+type DashboardPostForm = Pick<DashboardPost, 'title' | 'body' | 'category' | 'allowComments'>;
 
 const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty'];
 
@@ -21,6 +22,7 @@ const defaultPostForm: DashboardPostForm = {
   title: '',
   body: '',
   category: 'Update',
+  allowComments: true,
 };
 
 const reactionOptions: Array<{
@@ -615,6 +617,11 @@ function DashboardNews({
                 )}
               </div>
               <p className="whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300">{post.body}</p>
+              <div className="mt-4">
+                <Link to={`/updates/${post.id}`} className="inline-flex items-center rounded border border-accent/30 px-3 py-2 text-sm font-bold text-accent hover:bg-accent/10">
+                  Read More
+                </Link>
+              </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {reactionOptions.map(({ key, label, Icon }) => {
                   const isActive = post.myReaction === key;
@@ -690,6 +697,17 @@ function DashboardNews({
                   value={postForm.body}
                   onChange={(event) => setPostForm((form) => ({ ...form, body: event.target.value }))}
                   className="min-h-32 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-3 dark:border-gray-800">
+                <span>
+                  <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Allow comments</span>
+                  <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Readers can comment on the full story page.</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={postForm.allowComments}
+                  onChange={(event) => setPostForm((form) => ({ ...form, allowComments: event.target.checked }))}
                 />
               </label>
               <div className="flex justify-end gap-2">

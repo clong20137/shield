@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation,
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
 import DashboardPage from './pages/DashboardPage';
+import DashboardPostPage from './pages/DashboardPostPage';
 import { AccountSettingsPage } from './pages/AccountSettingsPage';
 import AdminConsolePage, { AdminConsoleTab } from './pages/AdminConsolePage';
 import DeviceManagementPage from './pages/DeviceManagementPage';
@@ -2272,6 +2273,7 @@ function App() {
               <div data-onboarding-target="workspace" className="min-h-[calc(100vh-12rem)]">
                 <Routes>
                   <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
+                  {currentUser && <Route path="/updates/:postId" element={<DashboardPostPage currentUser={currentUser} />} />}
                   {currentUser && <Route path="/messages" element={<MessagesRouteRedirect onOpenMessages={() => setIsMessagesModalOpen(true)} />} />}
                   {currentUser && <Route path="/calendar" element={<CalendarRouteRedirect onOpenCalendar={() => setIsCalendarModalOpen(true)} />} />}
                   <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />

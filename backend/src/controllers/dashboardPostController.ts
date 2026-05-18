@@ -31,6 +31,7 @@ export class DashboardPostController {
       const title = cleanString(req.body?.title, 160);
       const body = cleanMultiline(req.body?.body, 5000);
       const category = cleanString(req.body?.category, 40) || 'Update';
+      const allowComments = req.body?.allowComments !== false;
 
       if (!title || !body) {
         return res.status(400).json({ error: 'Title and body are required' });
@@ -44,6 +45,7 @@ export class DashboardPostController {
         title,
         body,
         category,
+        allowComments,
         authorId: account.id,
         authorName: account.displayName || account.email,
       });
@@ -53,6 +55,63 @@ export class DashboardPostController {
     } catch (error) {
       console.error('Dashboard post create error:', error);
       res.status(500).json({ error: 'Failed to create dashboard post' });
+    }
+  }
+
+  static async getPost(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      const post = await DashboardPostModel.getPost(req.params.id, account?.id);
+
+      if (!post) {
+        return res.status(404).json({ error: 'Dashboard post not found' });
+      }
+
+      res.json(post);
+    } catch (error) {
+      console.error('Dashboard post get error:', error);
+      res.status(500).json({ error: 'Failed to load dashboard post' });
+    }
+  }
+
+  static async listComments(req: Request, res: Response) {
+    try {
+      const comments = await DashboardPostModel.listComments(req.params.id);
+      res.json(comments);
+    } catch (error) {
+      console.error('Dashboard post comments list error:', error);
+      res.status(500).json({ error: 'Failed to load comments' });
+    }
+  }
+
+  static async createComment(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const body = cleanMultiline(req.body?.body, 1200);
+      if (!body) {
+        return res.status(400).json({ error: 'Comment is required' });
+      }
+
+      const comment = await DashboardPostModel.createComment(
+        req.params.id,
+        account.id,
+        account.displayName || account.email,
+        body,
+      );
+
+      if (!comment) {
+        return res.status(404).json({ error: 'Post not found or comments are disabled' });
+      }
+
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: req.params.id });
+      res.status(201).json(comment);
+    } catch (error) {
+      console.error('Dashboard post comment create error:', error);
+      res.status(500).json({ error: 'Failed to add comment' });
     }
   }
 

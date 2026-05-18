@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Mail, Plus, Save, X } from 'lucide-react';
+import { Mail, Pencil, Plus, Save, X } from 'lucide-react';
 import { AuthAccount, AuthInvite, AuthRole, RegistrationSettings, authService } from '../services/api';
 
 interface PermissionsPageProps {
@@ -37,6 +37,9 @@ function PermissionsPage({
   const [newRoleName, setNewRoleName] = useState('');
   const [newRolePermissions, setNewRolePermissions] = useState<string[]>(['users:view']);
   const [isCreateRoleModalOpen, setIsCreateRoleModalOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState<AuthRole | null>(null);
+  const [editRoleName, setEditRoleName] = useState('');
+  const [editRolePermissions, setEditRolePermissions] = useState<string[]>([]);
   const [isSavingRole, setIsSavingRole] = useState(false);
   const [registrationSettings, setRegistrationSettings] = useState<RegistrationSettings>({ mode: 'public', appBaseUrl: window.location.origin, maintenanceMode: false });
   const [inviteEmail, setInviteEmail] = useState('');
@@ -89,12 +92,21 @@ function PermissionsPage({
       if (event.key === 'Escape' && isCreateRoleModalOpen) {
         setIsCreateRoleModalOpen(false);
       }
+      if (event.key === 'Escape' && editingRole) {
+        setEditingRole(null);
+      }
     };
 
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isCreateRoleModalOpen]);
+  }, [isCreateRoleModalOpen, editingRole]);
+
+  const openEditRole = (role: AuthRole) => {
+    setEditingRole(role);
+    setEditRoleName(role.name);
+    setEditRolePermissions(role.permissions);
+  };
 
   const updateRole = async (targetAccount: AuthAccount, role: string) => {
     setSavingAccountId(targetAccount.id);
@@ -144,6 +156,31 @@ function PermissionsPage({
       onToast('success', 'Role created.');
     } catch (err) {
       const message = getErrorMessage(err, 'Failed to create role.');
+      setError(message);
+      onToast('error', message);
+    } finally {
+      setIsSavingRole(false);
+    }
+  };
+
+  const saveRoleEdit = async (event?: React.FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+
+    if (!editingRole || !editRoleName.trim()) {
+      onToast('error', 'Role name is required.');
+      return;
+    }
+
+    setIsSavingRole(true);
+    setError(null);
+    try {
+      const response = await authService.updateRoleDefinition(editingRole.id, editRoleName, editRolePermissions);
+      setRoles((currentRoles) => currentRoles.map((role) => (role.id === editingRole.id ? response.data : role)).sort((a, b) => a.name.localeCompare(b.name)));
+      setAccounts((currentAccounts) => currentAccounts.map((item) => (item.role === editingRole.name ? { ...item, role: response.data.name } : item)));
+      setEditingRole(null);
+      onToast('success', 'Role updated.');
+    } catch (err) {
+      const message = getErrorMessage(err, 'Failed to update role.');
       setError(message);
       onToast('error', message);
     } finally {
@@ -240,7 +277,16 @@ function PermissionsPage({
       </div>
 
       <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-        <h2 className="mb-5">Account Roles</h2>
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <h2>Account Roles</h2>
+          <div className="flex flex-wrap gap-2">
+            {roles.map((role) => (
+              <button key={role.id} type="button" onClick={() => openEditRole(role)} className="btn-secondary" aria-label={`Edit ${role.name} role`} title={`Edit ${role.name}`}>
+                <Pencil size={16} />
+              </button>
+            ))}
+          </div>
+        </div>
         {loading ? (
           <div className="loading">Loading accounts...</div>
         ) : accounts.length === 0 ? (
@@ -452,6 +498,62 @@ function PermissionsPage({
               </button>
               <button type="submit" className="btn-primary" disabled={isSavingRole} aria-label="Create role" title={isSavingRole ? 'Creating' : 'Create Role'}>
                 <Plus size={16} />
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+      {editingRole && (
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form onSubmit={saveRoleEdit} className="modal-window w-full max-w-3xl rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Edit Role</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Update this role name and permissions.</p>
+              </div>
+              <button type="button" onClick={() => setEditingRole(null)} className="icon-close-button" aria-label="Close edit role" title="Close">
+                <X size={20} />
+              </button>
+            </div>
+
+            <label className="mb-4 block">
+              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Role Name</span>
+              <input
+                value={editRoleName}
+                onChange={(event) => setEditRoleName(event.target.value)}
+                className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                autoFocus
+              />
+            </label>
+
+            <div>
+              <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Permissions</span>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {permissionOptions.map((permission) => (
+                  <label key={permission.key} className="flex items-center gap-2 rounded border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
+                    <input
+                      type="checkbox"
+                      checked={editRolePermissions.includes(permission.key)}
+                      onChange={(event) => {
+                        setEditRolePermissions((currentPermissions) =>
+                          event.target.checked
+                            ? [...currentPermissions, permission.key]
+                            : currentPermissions.filter((item) => item !== permission.key),
+                        );
+                      }}
+                    />
+                    {permission.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-800">
+              <button type="button" onClick={() => setEditingRole(null)} className="btn-secondary" aria-label="Cancel edit role" title="Cancel">
+                <X size={16} />
+              </button>
+              <button type="submit" className="btn-primary" disabled={isSavingRole} aria-label="Save role" title={isSavingRole ? 'Saving' : 'Save Role'}>
+                <Save size={16} />
               </button>
             </div>
           </form>

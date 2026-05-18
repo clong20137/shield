@@ -7,6 +7,9 @@ const router = Router();
 
 router.get('/', requireAuthenticated(), DashboardPostController.listPosts);
 router.post('/', requirePermission('dashboard:manage'), DashboardPostController.createPost);
+router.get('/:id', requireAuthenticated(), DashboardPostController.getPost);
+router.get('/:id/comments', requireAuthenticated(), DashboardPostController.listComments);
+router.post('/:id/comments', requireAuthenticated(), DashboardPostController.createComment);
 router.put('/:id/reaction', requireAuthenticated(), DashboardPostController.setReaction);
 router.delete('/:id', requirePermission('dashboard:manage'), DashboardPostController.deletePost);
 

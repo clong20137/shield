@@ -31,5 +31,6 @@ router.put('/accounts/:accountId/message-preferences', requireSelfOrPermission((
 router.put('/accounts/:accountId/onboarding-complete', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), AuthController.completeOnboarding);
 router.get('/roles', requirePermission('roles:manage'), AuthController.listRoles);
 router.post('/roles', requirePermission('roles:manage'), AuthController.createRole);
+router.put('/roles/:roleId', requirePermission('roles:manage'), AuthController.updateRoleDefinition);
 
 export default router;

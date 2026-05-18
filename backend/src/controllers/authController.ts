@@ -722,4 +722,40 @@ export class AuthController {
       res.status(500).json({ error: 'Failed to create role' });
     }
   }
+
+  static async updateRoleDefinition(req: Request, res: Response) {
+    try {
+      const { name, permissions } = req.body as {
+        name?: string;
+        permissions?: string[];
+      };
+      const requester = await getSessionAccount(req);
+
+      if (!(await canManageRoles(requester))) {
+        return res.status(403).json({ error: 'Role management permission required' });
+      }
+
+      const cleanName = cleanRoleName(name);
+      const cleanPermissions = normalizePermissions(permissions);
+
+      if (!cleanName) {
+        return res.status(400).json({ error: 'Role name is required' });
+      }
+
+      const role = await AuthAccountModel.updateRoleDefinition(req.params.roleId, cleanName, cleanPermissions);
+      if (!role) {
+        return res.status(404).json({ error: 'Role not found' });
+      }
+
+      broadcastAppEvent({ type: 'permission-updated', entityId: role.id });
+      res.json(role);
+    } catch (error) {
+      if (isDuplicateEmailError(error)) {
+        return res.status(409).json({ error: 'A role with that name already exists' });
+      }
+
+      console.error('Update role error:', error);
+      res.status(500).json({ error: 'Failed to update role' });
+    }
+  }
 }

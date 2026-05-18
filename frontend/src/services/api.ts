@@ -268,6 +268,7 @@ export interface DashboardPost {
   title: string;
   body: string;
   category: 'Update' | 'News' | 'Alert';
+  allowComments: boolean;
   authorId: string | null;
   authorName: string | null;
   reactions: Record<string, number>;
@@ -277,6 +278,16 @@ export interface DashboardPost {
 }
 
 export type DashboardReaction = 'like' | 'celebrate' | 'important' | 'thanks';
+
+export interface DashboardPostComment {
+  id: string;
+  postId: string;
+  authorId: string;
+  authorName: string | null;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export type BugReportStatus = 'New' | 'Pending' | 'Fixed' | 'Closed';
 export type BugReportPriority = 'Low' | 'Normal' | 'High' | 'Critical';
@@ -409,6 +420,9 @@ export const authService = {
 
   createRole: (requesterId: string, name: string, permissions: string[]) =>
     api.post<AuthRole>('/auth/roles', { requesterId, name, permissions }),
+
+  updateRoleDefinition: (roleId: string, name: string, permissions: string[]) =>
+    api.put<AuthRole>(`/auth/roles/${roleId}`, { name, permissions }),
 
   getRegistrationSettings: () =>
     api.get<RegistrationSettings>('/auth/registration-settings'),
@@ -544,7 +558,10 @@ export const dashboardPostService = {
   getAll: (limit = 10) =>
     api.get<DashboardPost[]>('/dashboard-posts', { params: { limit } }),
 
-  create: (post: Pick<DashboardPost, 'title' | 'body' | 'category'> & { requesterId?: string; authorName?: string }) =>
+  getById: (id: string) =>
+    api.get<DashboardPost>(`/dashboard-posts/${id}`),
+
+  create: (post: Pick<DashboardPost, 'title' | 'body' | 'category' | 'allowComments'> & { requesterId?: string; authorName?: string }) =>
     api.post<DashboardPost>('/dashboard-posts', post),
 
   delete: (id: string, requesterId?: string) =>
@@ -552,6 +569,12 @@ export const dashboardPostService = {
 
   react: (id: string, reaction: DashboardReaction | null) =>
     api.put<DashboardPost>(`/dashboard-posts/${id}/reaction`, { reaction }),
+
+  getComments: (id: string) =>
+    api.get<DashboardPostComment[]>(`/dashboard-posts/${id}/comments`),
+
+  addComment: (id: string, body: string) =>
+    api.post<DashboardPostComment>(`/dashboard-posts/${id}/comments`, { body }),
 };
 
 export const bugReportService = {
