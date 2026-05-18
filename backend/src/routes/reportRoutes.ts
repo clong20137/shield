@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { ReportController } from '../controllers/reportController';
 import { requirePermission } from '../middleware/permissions';
+import { requireAuthenticated } from '../middleware/authSession';
 
 const router = Router();
 
-router.get('/trooper-dailies', requirePermission('reports:trooper-dailies'), ReportController.getTrooperDailies);
+router.get('/trooper-dailies', requireAuthenticated(), ReportController.getTrooperDailies);
 router.get('/by-rank', requirePermission('users:view'), ReportController.getUsersByRank);
 router.get('/by-district', requirePermission('users:view'), ReportController.getUsersByDistrict);
 router.get('/by-employment-type', requirePermission('users:view'), ReportController.getUsersByEmploymentType);

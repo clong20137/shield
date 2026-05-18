@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { RowDataPacket } from 'mysql2';
 import pool from '../config/database';
+import { getSessionAccount } from '../middleware/authSession';
+import { AuthAccountModel } from '../models/AuthAccount';
 
 interface StatisticsRow extends RowDataPacket {
   totalUsers: number;
@@ -67,12 +69,24 @@ export class ReportController {
     let conn;
     try {
       conn = await pool.getConnection();
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const permissions = account.role === 'administrator' ? ['reports:trooper-dailies'] : await AuthAccountModel.getPermissionsForAccount(account.id);
+      const canViewAllReports = account.role === 'administrator' || permissions.includes('reports:trooper-dailies');
       const { q, from, to, district } = req.query;
       const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
       const pageSize = Math.min(100, Math.max(10, Number.parseInt(String(req.query.pageSize || '25'), 10) || 25));
       const offset = (page - 1) * pageSize;
       const params: Array<string | number> = [];
       const whereParts = ["ce.`category` = 'Trooper Daily'"];
+
+      if (!canViewAllReports) {
+        whereParts.push('ce.`ownerAccountId` = ?');
+        params.push(account.id);
+      }
 
       if (typeof q === 'string' && q.trim()) {
         const search = `%${q.trim().toLowerCase()}%`;
@@ -154,7 +168,7 @@ export class ReportController {
         },
       }));
 
-      res.json({ count: data.length, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)), data });
+      res.json({ count: data.length, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)), scope: canViewAllReports ? 'all' : 'own', data });
     } catch (error) {
       console.error('Trooper daily report error:', error);
       res.status(500).json({ error: 'Failed to load Trooper Daily reports' });

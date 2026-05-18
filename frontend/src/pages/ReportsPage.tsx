@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
-import { reportService, ReportRow, SystemStatistics, TrooperDailyReportEntry } from '../services/api';
+import { AuthAccount, reportService, ReportRow, SystemStatistics, TrooperDailyReportEntry } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
 const trooperDailySections = [
@@ -147,7 +147,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-const ReportsPage: React.FC = () => {
+const ReportsPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUser }) => {
   const [rankReport, setRankReport] = useState<ReportRow[]>([]);
   const [districtReport, setDistrictReport] = useState<ReportRow[]>([]);
   const [employmentReport, setEmploymentReport] = useState<ReportRow[]>([]);
@@ -161,6 +161,7 @@ const ReportsPage: React.FC = () => {
   const [dailyPageSize, setDailyPageSize] = useState(25);
   const [dailyTotal, setDailyTotal] = useState(0);
   const [dailyTotalPages, setDailyTotalPages] = useState(1);
+  const [dailyScope, setDailyScope] = useState<'all' | 'own'>('own');
   const [loading, setLoading] = useState(true);
   const [dailyLoading, setDailyLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -223,19 +224,24 @@ const ReportsPage: React.FC = () => {
       setDailyPage(response.data.page);
       setDailyPageSize(response.data.pageSize);
       setDailyTotalPages(response.data.totalPages);
+      setDailyScope(response.data.scope);
+      if (response.data.scope === 'all') {
+        void loadUserReports(false);
+      } else {
+        setLoading(false);
+      }
     } catch (err) {
       setDailyError(getErrorMessage(err, 'Trooper Daily reports require permission.'));
       console.error(err);
+      setLoading(false);
     } finally {
       setDailyLoading(false);
     }
   };
 
   useEffect(() => {
-    void loadUserReports();
     void loadTrooperDailies();
     const handleReportsUpdate = () => {
-      void loadUserReports(false);
       void loadTrooperDailies(false);
     };
 
@@ -321,7 +327,9 @@ const ReportsPage: React.FC = () => {
           <div>
             <h2>Trooper Daily Reports</h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Search submitted Trooper Dailies by user, email, PE number, badge, rank, or district.
+              {dailyScope === 'all'
+                ? 'Search submitted Trooper Dailies by user, email, PE number, badge, rank, or district.'
+                : `Search your submitted Trooper Dailies${currentUser?.displayName ? `, ${currentUser.displayName}` : ''}.`}
             </p>
           </div>
           <span className="rounded bg-accent/10 px-3 py-1 text-sm font-bold text-accent">
@@ -437,7 +445,7 @@ const ReportsPage: React.FC = () => {
         )}
       </section>
 
-      {loading ? (
+      {dailyScope === 'all' && (loading ? (
         <div className="loading">Loading user analytics...</div>
       ) : (
         <>
@@ -503,7 +511,7 @@ const ReportsPage: React.FC = () => {
             ))}
           </div>
         </>
-      )}
+      ))}
 
       {selectedDaily && (
         <div className="modal-backdrop fixed inset-0 z-[80] flex items-end justify-center bg-black/60 sm:items-center">

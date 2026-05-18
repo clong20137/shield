@@ -533,7 +533,7 @@ export const reportService = {
     api.get('/reports/detailed', { params: filters }),
 
   getTrooperDailies: (filters?: { q?: string; from?: string; to?: string; district?: string; page?: number; pageSize?: number }) =>
-    api.get<{ count: number; total: number; page: number; pageSize: number; totalPages: number; data: TrooperDailyReportEntry[] }>('/reports/trooper-dailies', { params: filters }),
+    api.get<{ count: number; total: number; page: number; pageSize: number; totalPages: number; scope: 'all' | 'own'; data: TrooperDailyReportEntry[] }>('/reports/trooper-dailies', { params: filters }),
 };
 
 export const calendarService = {

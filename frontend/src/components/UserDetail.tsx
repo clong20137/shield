@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Mail, Pencil, Phone, Send, X } from 'lucide-react';
 import { User } from '../services/api';
 import { RankBadge } from './RankBadge';
@@ -41,11 +41,20 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const callNumber = user.departmentPhoneNumber || user.personalPhoneNumber;
   const callHref = callNumber ? `tel:${callNumber.replace(/[^\d+]/gu, '')}` : undefined;
   const emailHref = user.email ? `mailto:${user.email}` : undefined;
+  const [activeTab, setActiveTab] = useState<'personal' | 'identification' | 'employment' | 'contact' | 'additional'>('personal');
+  const tabs = [
+    ['personal', 'Personal'],
+    ['identification', 'Identification'],
+    ['employment', 'Employment'],
+    ['contact', 'Contact'],
+    ['additional', 'Additional'],
+  ] as const;
 
   return (
     <div className="bg-white rounded-lg shadow-xl overflow-hidden dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-      <div className="bg-primary-500 text-white px-5 py-5 flex flex-wrap justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <div className="bg-primary-500 text-white px-5 py-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-center gap-4">
           {user.profilePictureUrl ? (
             <img
               src={user.profilePictureUrl}
@@ -58,7 +67,35 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
             </div>
           )}
           <div>
-            <h2 className="text-2xl font-bold m-0 text-white">{user.firstName} {user.lastName}</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="m-0 text-2xl font-bold text-white">{user.firstName} {user.lastName}</h2>
+              <div className="flex gap-2">
+                <a
+                  className={`flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white hover:bg-white/20 ${emailHref ? '' : 'pointer-events-none opacity-50'}`}
+                  href={emailHref}
+                  aria-label="Email user"
+                  title={emailHref ? 'Email User' : 'No email on file'}
+                >
+                  <Mail size={16} />
+                </a>
+                <a
+                  className={`flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white hover:bg-white/20 ${callHref ? '' : 'pointer-events-none opacity-50'}`}
+                  href={callHref}
+                  aria-label="Call user"
+                  title={callHref ? `Call ${callNumber}` : 'No phone number on file'}
+                >
+                  <Phone size={16} />
+                </a>
+                <button className="flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => onMessage?.(user)} aria-label="Send message" title="Send Message" type="button">
+                  <Send size={16} />
+                </button>
+                {canEdit && (
+                  <button className="flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => onEdit?.(user)} aria-label="Edit user" title="Edit User" type="button">
+                    <Pencil size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="mt-2">
               <RankBadge rank={user.rank} />
             </div>
@@ -66,36 +103,49 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
             <p className="mt-1 text-sm text-blue-100">PE {user.peNumber || 'N/A'} - {user.district || 'No district'}</p>
           </div>
         </div>
-        <button
-          className="icon-close-button border-white/20 bg-white/10 text-white hover:bg-white/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
-          onClick={onClose}
-          aria-label="Close user detail"
-          title="Close"
-          type="button"
-        >
-          <X size={20} />
-        </button>
+          <button
+            className="icon-close-button border-white/20 bg-white/10 text-white hover:bg-white/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+            onClick={onClose}
+            aria-label="Close user detail"
+            title="Close"
+            type="button"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="mt-5 flex flex-wrap gap-2 border-t border-white/15 pt-4">
+          {tabs.map(([tab, label]) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`rounded px-3 py-2 text-sm font-bold transition ${activeTab === tab ? 'bg-white text-primary-500' : 'bg-white/10 text-white hover:bg-white/20'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="px-5 py-6 max-h-[70vh] overflow-y-auto">
-        <DetailSection title="Personal Information">
+        {activeTab === 'personal' && <DetailSection title="Personal Information">
           <DetailRow label="Name" value={`${user.firstName} ${user.lastName}`} />
           <DetailRow label="Email" value={user.email} />
           <DetailRow label="Sex" value={user.sex} />
           <DetailRow label="Marital Status" value={user.maritalStatus} />
           <DetailRow label="Race" value={user.race} />
-        </DetailSection>
+        </DetailSection>}
 
-        <DetailSection title="Identification">
+        {activeTab === 'identification' && <DetailSection title="Identification">
           <DetailRow label="PE Number" value={user.peNumber} />
           <DetailRow label="PeopleSoft ID" value={user.peopleSoftId} />
           <DetailRow label="Badge Number" value={user.badgeNumber} />
           <DetailRow label="Radio Number" value={user.radioNumber} />
           <DetailRow label="Public Safety ID" value={user.publicSafetyId} />
           <DetailRow label="Car Number" value={user.carNumber} />
-        </DetailSection>
+        </DetailSection>}
 
-        <DetailSection title="Employment Details">
+        {activeTab === 'employment' && <DetailSection title="Employment Details">
           <DetailRow label="Employee Type" value={user.employmentType} />
           <DetailRow label="Status" value={user.status} />
           <DetailRow label="District" value={user.district} />
@@ -109,48 +159,18 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           <DetailRow label="Supervisor" value={user.supervisor} />
           <DetailRow label="Active" value={user.isActive} />
           <DetailRow label="Type Details" value={user.typeDetails} />
-        </DetailSection>
+        </DetailSection>}
 
-        <DetailSection title="Contact">
+        {activeTab === 'contact' && <DetailSection title="Contact">
           <DetailRow label="Personal Phone" value={user.personalPhoneNumber} />
           <DetailRow label="Department Phone" value={user.departmentPhoneNumber} />
           <DetailRow label="Residential Address" value={user.residentialAddress} />
           <DetailRow label="Mailing Address" value={user.mailingAddress} />
-        </DetailSection>
+        </DetailSection>}
 
-        <DetailSection title="Additional">
+        {activeTab === 'additional' && <DetailSection title="Additional">
           <DetailRow label="Specialty Certifications" value={user.specialtyCertifications} />
-        </DetailSection>
-      </div>
-
-      <div className="flex gap-2 px-5 py-4 border-t-2 border-gray-300">
-        <a
-          className={`btn-secondary ${emailHref ? '' : 'pointer-events-none opacity-50'}`}
-          href={emailHref}
-          aria-label="Email user"
-          title={emailHref ? 'Email User' : 'No email on file'}
-        >
-          <Mail size={16} />
-        </a>
-        <a
-          className={`btn-secondary ${callHref ? '' : 'pointer-events-none opacity-50'}`}
-          href={callHref}
-          aria-label="Call user"
-          title={callHref ? `Call ${callNumber}` : 'No phone number on file'}
-        >
-          <Phone size={16} />
-        </a>
-        <button className="btn-secondary" onClick={() => onMessage?.(user)} aria-label="Send message" title="Send Message">
-          <Send size={16} />
-        </button>
-        {canEdit && (
-          <button className="btn-primary" onClick={() => onEdit?.(user)} aria-label="Edit user" title="Edit User">
-            <Pencil size={16} />
-          </button>
-        )}
-        <button className="btn bg-gray-400 text-gray-800 hover:bg-gray-500" onClick={onClose} aria-label="Close user detail" title="Close">
-          <X size={16} />
-        </button>
+        </DetailSection>}
       </div>
     </div>
   );
