@@ -195,6 +195,19 @@ export interface CalendarEntry {
   updatedAt: string;
 }
 
+export interface CalendarShortcut {
+  id: string;
+  ownerAccountId?: string;
+  name: string;
+  dutyHours: string;
+  districtWorked: string;
+  specialStatus: string;
+  color: string;
+  details: Record<string, string>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AuditLog {
   id: string;
   actorId: string | null;
@@ -510,6 +523,18 @@ export const calendarService = {
 
   delete: (id: string, actor?: { accountId?: string; actorId?: string; actorName?: string }) =>
     api.delete(`/calendar/${id}`, { data: actor }),
+
+  getShortcuts: () =>
+    api.get<CalendarShortcut[]>('/calendar/shortcuts'),
+
+  createShortcut: (shortcut: Omit<CalendarShortcut, 'id' | 'createdAt' | 'updatedAt'>) =>
+    api.post<CalendarShortcut>('/calendar/shortcuts', shortcut),
+
+  updateShortcut: (id: string, shortcut: Omit<CalendarShortcut, 'id' | 'createdAt' | 'updatedAt'>) =>
+    api.put<CalendarShortcut>(`/calendar/shortcuts/${id}`, shortcut),
+
+  deleteShortcut: (id: string) =>
+    api.delete(`/calendar/shortcuts/${id}`),
 };
 
 export const auditService = {

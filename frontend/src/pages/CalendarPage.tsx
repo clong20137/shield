@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Calculator, CalendarClock, ChevronLeft, ChevronRight, ClipboardCopy, Pencil, Save, Sparkles, Trash2, X } from 'lucide-react';
-import { AuthAccount, CalendarEntry, calendarService } from '../services/api';
+import { AuthAccount, CalendarEntry, CalendarShortcut, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>;
@@ -333,6 +333,10 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
   const [districtFilter, setDistrictFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [entryPendingDelete, setEntryPendingDelete] = useState<CalendarEntry | null>(null);
+  const [shortcuts, setShortcuts] = useState<CalendarShortcut[]>([]);
+  const [shortcutName, setShortcutName] = useState('');
+  const [editingShortcutId, setEditingShortcutId] = useState<string | null>(null);
+  const [isSavingShortcut, setIsSavingShortcut] = useState(false);
   const [isCalendarLoading, setIsCalendarLoading] = useState(true);
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [isDutyHoursManual, setIsDutyHoursManual] = useState(false);
@@ -359,8 +363,19 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
     }
   };
 
+  const loadShortcuts = async () => {
+    try {
+      const response = await calendarService.getShortcuts();
+      setShortcuts(response.data);
+    } catch (err) {
+      console.error('Failed to load calendar shortcuts:', err);
+      setCalendarError(getApiErrorMessage(err, 'Failed to load daily shortcuts.'));
+    }
+  };
+
   useEffect(() => {
     loadCalendarEntries();
+    void loadShortcuts();
     const handleCalendarUpdate = () => loadCalendarEntries(false);
 
     window.addEventListener('shield:calendar-updated', handleCalendarUpdate);
@@ -516,6 +531,83 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
     }));
     setIsDutyHoursManual(false);
     lastAutoDutyHoursRef.current = template.dutyHours;
+  };
+
+  const applyShortcut = (shortcut: CalendarShortcut) => {
+    setEntryForm((currentForm) => ({
+      ...currentForm,
+      dutyHours: shortcut.dutyHours,
+      districtWorked: shortcut.districtWorked || currentForm.districtWorked,
+      specialStatus: shortcut.specialStatus,
+      color: shortcut.color,
+      details: {
+        ...(currentForm.details || {}),
+        ...(shortcut.details || {}),
+      },
+    }));
+    setIsDutyHoursManual(true);
+    lastAutoDutyHoursRef.current = '';
+  };
+
+  const startEditingShortcut = (shortcut: CalendarShortcut) => {
+    setShortcutName(shortcut.name);
+    setEditingShortcutId(shortcut.id);
+    applyShortcut(shortcut);
+  };
+
+  const resetShortcutEditor = () => {
+    setShortcutName('');
+    setEditingShortcutId(null);
+  };
+
+  const saveShortcut = async () => {
+    if (!shortcutName.trim()) {
+      setCalendarError('Enter a shortcut name.');
+      return;
+    }
+
+    setIsSavingShortcut(true);
+    setCalendarError(null);
+
+    const payload = {
+      ownerAccountId: currentUser.id,
+      name: shortcutName.trim(),
+      dutyHours: entryForm.dutyHours || '0',
+      districtWorked: entryForm.districtWorked,
+      specialStatus: entryForm.specialStatus,
+      color: entryForm.color,
+      details: entryForm.details || {},
+    };
+
+    try {
+      if (editingShortcutId) {
+        const response = await calendarService.updateShortcut(editingShortcutId, payload);
+        setShortcuts((items) => items.map((item) => (item.id === editingShortcutId ? response.data : item)));
+      } else {
+        const response = await calendarService.createShortcut(payload);
+        setShortcuts((items) => [...items, response.data].sort((a, b) => a.name.localeCompare(b.name)));
+      }
+      resetShortcutEditor();
+    } catch (err) {
+      console.error('Failed to save shortcut:', err);
+      setCalendarError(getApiErrorMessage(err, 'Failed to save shortcut.'));
+    } finally {
+      setIsSavingShortcut(false);
+    }
+  };
+
+  const deleteShortcut = async (shortcut: CalendarShortcut) => {
+    setCalendarError(null);
+    try {
+      await calendarService.deleteShortcut(shortcut.id);
+      setShortcuts((items) => items.filter((item) => item.id !== shortcut.id));
+      if (editingShortcutId === shortcut.id) {
+        resetShortcutEditor();
+      }
+    } catch (err) {
+      console.error('Failed to delete shortcut:', err);
+      setCalendarError(getApiErrorMessage(err, 'Failed to delete shortcut.'));
+    }
   };
 
   const fillBlankNumericDetailsWithZero = () => {
@@ -797,6 +889,46 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                       {template.label}
                     </button>
                   ))}
+                </div>
+                {shortcuts.length > 0 && (
+                  <div className="mt-3 border-t border-accent/20 pt-3">
+                    <p className="mb-2 text-xs font-bold uppercase text-gray-500 dark:text-gray-400">My Shortcuts</p>
+                    <div className="flex flex-wrap gap-2">
+                      {shortcuts.map((shortcut) => (
+                        <span key={shortcut.id} className="inline-flex overflow-hidden rounded border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-950">
+                          <button
+                            type="button"
+                            onClick={() => applyShortcut(shortcut)}
+                            className="px-3 py-2 text-sm font-bold text-primary-500 hover:text-accent dark:text-blue-100"
+                          >
+                            {shortcut.name}
+                          </button>
+                          <button type="button" onClick={() => startEditingShortcut(shortcut)} className="border-l border-gray-200 px-2 text-primary-500 hover:bg-gray-50 dark:border-gray-800 dark:text-blue-100 dark:hover:bg-gray-900" aria-label={`Edit ${shortcut.name}`} title="Edit Shortcut">
+                            <Pencil size={14} />
+                          </button>
+                          <button type="button" onClick={() => deleteShortcut(shortcut)} className="border-l border-gray-200 px-2 text-danger hover:bg-red-50 dark:border-gray-800 dark:hover:bg-red-950" aria-label={`Delete ${shortcut.name}`} title="Delete Shortcut">
+                            <Trash2 size={14} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="mt-3 grid grid-cols-1 gap-2 border-t border-accent/20 pt-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                  <input
+                    value={shortcutName}
+                    onChange={(event) => setShortcutName(event.target.value)}
+                    placeholder="Shortcut name"
+                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                  />
+                  <button type="button" onClick={saveShortcut} className="btn-primary" disabled={isSavingShortcut} aria-label={editingShortcutId ? 'Update shortcut from current daily form' : 'Save current daily form as shortcut'} title={editingShortcutId ? 'Update Shortcut' : 'Save Shortcut'}>
+                    <Save size={16} />
+                  </button>
+                  {editingShortcutId && (
+                    <button type="button" onClick={resetShortcutEditor} className="btn-secondary" aria-label="Cancel shortcut edit" title="Cancel Shortcut Edit">
+                      <X size={16} />
+                    </button>
+                  )}
                 </div>
               </div>
 

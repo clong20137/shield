@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { CalendarEntryModel } from '../models/CalendarEntry';
+import { CalendarShortcutModel } from '../models/CalendarShortcut';
 import { AuditLogModel } from '../models/AuditLog';
 import { getSessionAccount } from '../middleware/authSession';
 import { broadcastAccountEvent } from '../services/appEvents';
@@ -103,7 +104,131 @@ function validateCalendarEntryPayload(body: Record<string, unknown>) {
   };
 }
 
+function validateCalendarShortcutPayload(body: Record<string, unknown>) {
+  const name = cleanString(body.name, 120);
+  const districtWorked = cleanString(body.districtWorked, 100);
+  const specialStatus = cleanString(body.specialStatus, 80) || 'None';
+  const color = cleanString(body.color, 20) || '#9C865C';
+  const hours = Number(body.dutyHours || 0);
+
+  if (!name) {
+    return { error: 'Shortcut name is required' };
+  }
+
+  if (!Number.isFinite(hours) || hours < 0 || hours > 24) {
+    return { error: 'Duty hours must be between 0 and 24' };
+  }
+
+  if (!districtWorked || !isOneOf(districtWorked, districtOptions)) {
+    return { error: 'Choose a valid district worked' };
+  }
+
+  if (!isOneOf(specialStatus, specialStatusOptions)) {
+    return { error: 'Choose a valid special status' };
+  }
+
+  if (!isValidHexColor(color)) {
+    return { error: 'Choose a valid calendar color' };
+  }
+
+  return {
+    value: {
+      name,
+      dutyHours: String(hours),
+      districtWorked,
+      specialStatus,
+      color,
+      details: cleanRecord(body.details, 160, 1000),
+    },
+  };
+}
+
 export class CalendarController {
+  static async listShortcuts(req: Request, res: Response) {
+    try {
+      const account = await getCalendarAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in to view shortcuts' });
+      }
+
+      const shortcuts = await CalendarShortcutModel.listShortcuts(account.id);
+      res.json(shortcuts);
+    } catch (error) {
+      console.error('Calendar shortcut list error:', error);
+      res.status(500).json({ error: 'Failed to load calendar shortcuts' });
+    }
+  }
+
+  static async createShortcut(req: Request, res: Response) {
+    try {
+      const account = await getCalendarAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in to save shortcuts' });
+      }
+
+      const validation = validateCalendarShortcutPayload(req.body);
+      if (validation.error || !validation.value) {
+        return res.status(400).json({ error: validation.error || 'Invalid shortcut' });
+      }
+
+      const shortcut = await CalendarShortcutModel.createShortcut({
+        ownerAccountId: account.id,
+        ...validation.value,
+      });
+      res.status(201).json(shortcut);
+    } catch (error) {
+      console.error('Calendar shortcut create error:', error);
+      res.status(500).json({ error: 'Failed to save calendar shortcut' });
+    }
+  }
+
+  static async updateShortcut(req: Request, res: Response) {
+    try {
+      const account = await getCalendarAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in to update shortcuts' });
+      }
+
+      const validation = validateCalendarShortcutPayload(req.body);
+      if (validation.error || !validation.value) {
+        return res.status(400).json({ error: validation.error || 'Invalid shortcut' });
+      }
+
+      const shortcut = await CalendarShortcutModel.updateShortcut(req.params.id, {
+        ownerAccountId: account.id,
+        ...validation.value,
+      });
+
+      if (!shortcut) {
+        return res.status(404).json({ error: 'Shortcut not found' });
+      }
+
+      res.json(shortcut);
+    } catch (error) {
+      console.error('Calendar shortcut update error:', error);
+      res.status(500).json({ error: 'Failed to update calendar shortcut' });
+    }
+  }
+
+  static async deleteShortcut(req: Request, res: Response) {
+    try {
+      const account = await getCalendarAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in to delete shortcuts' });
+      }
+
+      const deleted = await CalendarShortcutModel.deleteShortcut(req.params.id, account.id);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Shortcut not found' });
+      }
+
+      res.json({ message: 'Shortcut deleted successfully' });
+    } catch (error) {
+      console.error('Calendar shortcut delete error:', error);
+      res.status(500).json({ error: 'Failed to delete calendar shortcut' });
+    }
+  }
+
   static async listEntries(req: Request, res: Response) {
     try {
       const requestedAccountId = typeof req.query.accountId === 'string' ? req.query.accountId : undefined;

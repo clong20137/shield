@@ -297,6 +297,22 @@ export async function initializeDatabase() {
   await ensureColumn('calendar_entries', 'details', '`details` JSON');
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS calendar_shortcuts (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`ownerAccountId\` VARCHAR(36) NOT NULL,
+      \`name\` VARCHAR(120) NOT NULL,
+      \`dutyHours\` DECIMAL(6,2) NOT NULL DEFAULT 0,
+      \`districtWorked\` VARCHAR(100) NOT NULL,
+      \`specialStatus\` VARCHAR(50) NOT NULL DEFAULT 'None',
+      \`color\` VARCHAR(20) NOT NULL DEFAULT '#9C865C',
+      \`details\` JSON,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX \`idx_calendar_shortcuts_owner\` (\`ownerAccountId\`)
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS bug_reports (
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`reporterId\` VARCHAR(36),
