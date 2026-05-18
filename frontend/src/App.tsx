@@ -1313,10 +1313,31 @@ const onboardingSteps: OnboardingStep[] = [
     body: 'Use the left navigation for dashboard, calendar, devices, reports, and admin tools based on your permissions.',
   },
   {
-    target: 'header-actions',
+    target: 'notifications',
     eyebrow: 'Alerts',
-    title: 'Messages, notifications, and preferences',
-    body: 'The top-right controls keep messages, notifications, theme, account settings, preferences, and sign out close at hand.',
+    title: 'Check notifications',
+    body: 'Open notifications for system alerts, bug updates, flagged comments, and other activity that needs attention.',
+    placement: 'below',
+  },
+  {
+    target: 'messages',
+    eyebrow: 'Messages',
+    title: 'Open conversations',
+    body: 'Use messages for real-time chats, unread message badges, group conversations, emojis, and attachments.',
+    placement: 'below',
+  },
+  {
+    target: 'theme',
+    eyebrow: 'Theme',
+    title: 'Switch light or dark mode',
+    body: 'Toggle the application theme whenever you want a lighter or darker workspace.',
+    placement: 'below',
+  },
+  {
+    target: 'settings',
+    eyebrow: 'Settings',
+    title: 'Account and preferences',
+    body: 'Open account settings, preferences, admin tools, and sign out from the account menu.',
     placement: 'below',
   },
   {
@@ -1328,19 +1349,8 @@ const onboardingSteps: OnboardingStep[] = [
   },
 ];
 
-const headerControlLabels: Record<string, string> = {
-  notifications: 'Notifications',
-  messages: 'Messages',
-  theme: 'Light/Dark',
-  settings: 'Settings',
-  bugs: 'Bugs',
-};
-
-interface OnboardingControlRect {
-  key: string;
-  label: string;
-  rect: DOMRect;
-}
+const findOnboardingElement = (target: string) =>
+  document.querySelector<HTMLElement>(`[data-onboarding-target="${target}"], [data-onboarding-control="${target}"]`);
 
 function FirstLoginGuide({
   account,
@@ -1353,7 +1363,6 @@ function FirstLoginGuide({
 }) {
   const [stepIndex, setStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
-  const [controlRects, setControlRects] = useState<OnboardingControlRect[]>([]);
   const [animationKey, setAnimationKey] = useState(0);
   const step = onboardingSteps[stepIndex];
 
@@ -1366,33 +1375,17 @@ function FirstLoginGuide({
     let frame = 0;
 
     const measureTarget = () => {
-      const target = document.querySelector(`[data-onboarding-target="${step.target}"]`);
+      const target = findOnboardingElement(step.target);
       if (!target) {
         setTargetRect(null);
-        setControlRects([]);
         return;
       }
 
       setTargetRect(target.getBoundingClientRect());
-      if (step.target === 'header-actions') {
-        const controls = Array.from(document.querySelectorAll<HTMLElement>('[data-onboarding-control]'))
-          .map((control) => {
-            const key = control.dataset.onboardingControl || '';
-            return {
-              key,
-              label: headerControlLabels[key] || key,
-              rect: control.getBoundingClientRect(),
-            };
-          })
-          .filter((control) => control.label);
-        setControlRects(controls);
-      } else {
-        setControlRects([]);
-      }
     };
 
     const scrollToTarget = () => {
-      const target = document.querySelector(`[data-onboarding-target="${step.target}"]`);
+      const target = findOnboardingElement(step.target);
       target?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
       window.setTimeout(measureTarget, 220);
     };
@@ -1427,7 +1420,7 @@ function FirstLoginGuide({
     : Math.max(16, (window.innerWidth - tooltipWidth) / 2);
   const tooltipTop = safeRect
     ? shouldPlaceTooltipBelow
-      ? Math.min(Math.max(16, safeRect.top + safeRect.height + (step.target === 'header-actions' ? 56 : 18)), window.innerHeight - tooltipHeightEstimate - 16)
+      ? Math.min(Math.max(16, safeRect.top + safeRect.height + 18), window.innerHeight - tooltipHeightEstimate - 16)
       : Math.min(Math.max(16, safeRect.top), window.innerHeight - tooltipHeightEstimate - 16)
     : Math.max(16, (window.innerHeight - tooltipHeightEstimate) / 2);
 
@@ -1445,18 +1438,6 @@ function FirstLoginGuide({
             className="onboarding-spotlight absolute rounded-xl border-2 border-accent transition-all duration-300 ease-out"
             style={{ top: safeRect.top, left: safeRect.left, width: safeRect.width, height: safeRect.height }}
           />
-          {step.target === 'header-actions' && controlRects.map((control) => (
-            <div
-              key={control.key}
-              className="onboarding-control-label pointer-events-none fixed rounded-full border border-accent/40 bg-white px-2.5 py-1 text-[11px] font-bold text-accent shadow-lg dark:bg-gray-900"
-              style={{
-                left: Math.min(Math.max(8, control.rect.left + control.rect.width / 2 - 42), window.innerWidth - 92),
-                top: Math.min(control.rect.bottom + 8, window.innerHeight - 34),
-              }}
-            >
-              {control.label}
-            </div>
-          ))}
           {step.target === 'quick-launch' && (
             <>
               <div
