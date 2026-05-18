@@ -454,14 +454,14 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           <div className="rounded bg-accent/10 px-4 py-2 text-sm font-bold text-accent">
             {devices.length} total devices
           </div>
-          <button type="button" onClick={exportCsv} className="btn-secondary" title="Export CSV" aria-label="Export CSV">
-            <Download size={16} />
-          </button>
           {canManageDevices && (
             <button type="button" onClick={openAddDeviceModal} className="btn-primary" title="Add Device" aria-label="Add Device">
               <Plus size={16} />
             </button>
           )}
+          <button type="button" onClick={exportCsv} className="btn-secondary" title="Export CSV" aria-label="Export CSV">
+            <Download size={16} />
+          </button>
           {canManageDevices && (
             <label className="btn-secondary cursor-pointer" title="Import CSV" aria-label="Import CSV">
               <Upload size={16} />
