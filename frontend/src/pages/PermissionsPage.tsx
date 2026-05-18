@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Mail, Pencil, Plus, Save, X } from 'lucide-react';
+import { Mail, Pencil, Plus, Save, ShieldCheck, X } from 'lucide-react';
 import { AuthAccount, AuthInvite, AuthRole, RegistrationSettings, authService } from '../services/api';
 
 interface PermissionsPageProps {
@@ -255,7 +255,11 @@ function PermissionsPage({
       {(section === 'all' || section === 'permissions') && (
       <>
       {isModalView && (
-        <div className="mb-4 flex justify-end">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Roles & Access</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Assign account roles or adjust role permissions.</p>
+          </div>
           <button type="button" onClick={() => setIsCreateRoleModalOpen(true)} className="btn-primary" aria-label="Create role" title="Create Role">
             <Plus size={16} />
           </button>
@@ -281,7 +285,9 @@ function PermissionsPage({
           <h2>Account Roles</h2>
           <div className="flex flex-wrap gap-2">
             {roles.map((role) => (
-              <button key={role.id} type="button" onClick={() => openEditRole(role)} className="btn-secondary" aria-label={`Edit ${role.name} role`} title={`Edit ${role.name}`}>
+              <button key={role.id} type="button" onClick={() => openEditRole(role)} className="inline-flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold text-gray-700 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200" aria-label={`Edit ${role.name} role`} title={`Edit ${role.name}`}>
+                <ShieldCheck size={16} />
+                <span>{role.name}</span>
                 <Pencil size={16} />
               </button>
             ))}
@@ -472,7 +478,7 @@ function PermissionsPage({
 
             <div>
               <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Permissions</span>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid max-h-[42vh] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-4">
                 {permissionOptions.map((permission) => (
                   <label key={permission.key} className="flex items-center gap-2 rounded border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
                     <input
@@ -528,7 +534,7 @@ function PermissionsPage({
 
             <div>
               <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Permissions</span>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid max-h-[42vh] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-4">
                 {permissionOptions.map((permission) => (
                   <label key={permission.key} className="flex items-center gap-2 rounded border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
                     <input

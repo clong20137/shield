@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Save } from 'lucide-react';
+import { Bug, Save } from 'lucide-react';
 import { BugReport, BugReportStatus } from '../services/api';
 
 interface BugTrackerPageProps {
@@ -21,7 +21,13 @@ export function BugTrackerPage({ reports, onStatusChange }: BugTrackerPageProps)
 
   return (
     <div className="grid min-h-[520px] grid-cols-1 gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
-      <section className="min-h-0 overflow-y-auto rounded border border-gray-200 dark:border-gray-800">
+      <section className="min-h-0 overflow-y-auto rounded border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+        <div className="sticky top-0 z-10 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Bug Reports</h3>
+            <span className="rounded-full bg-accent/10 px-2 py-1 text-xs font-bold text-accent">{reports.length}</span>
+          </div>
+        </div>
         {reports.length === 0 ? (
           <div className="empty-state">No bug reports found.</div>
         ) : (
@@ -34,7 +40,11 @@ export function BugTrackerPage({ reports, onStatusChange }: BugTrackerPageProps)
             >
               <div className="flex items-start justify-between gap-3">
                 <p className="line-clamp-1 font-bold text-gray-900 dark:text-gray-100">{report.title}</p>
-                <span className="shrink-0 rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-600 dark:bg-gray-800 dark:text-gray-300">{report.status}</span>
+                <span className={`shrink-0 rounded px-2 py-1 text-xs font-bold ${
+                  report.status === 'Fixed' || report.status === 'Closed'
+                    ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
+                    : 'bg-accent/10 text-accent'
+                }`}>{report.status}</span>
               </div>
               <p className="mt-1 line-clamp-1 text-sm text-gray-500 dark:text-gray-400">{report.location || 'No location'} - {report.priority}</p>
               <p className="mt-1 text-xs text-gray-400">{new Date(report.createdAt).toLocaleString()}</p>
@@ -42,18 +52,23 @@ export function BugTrackerPage({ reports, onStatusChange }: BugTrackerPageProps)
           ))
         )}
       </section>
-      <section className="rounded border border-gray-200 p-4 dark:border-gray-800">
+      <section className="rounded border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
         {!selectedReport ? (
           <div className="empty-state">Select a bug report.</div>
         ) : (
           <div className="space-y-4">
             <div>
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
+                <div className="flex min-w-0 gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">
+                    <Bug size={18} />
+                  </div>
+                  <div className="min-w-0">
                   <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">{selectedReport.title}</h3>
                   <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     Reported by {selectedReport.reporterName || selectedReport.reporterEmail || 'Unknown'} on {new Date(selectedReport.createdAt).toLocaleString()}
                   </p>
+                  </div>
                 </div>
                 <span className="rounded bg-accent/10 px-3 py-1 text-sm font-bold text-accent">{selectedReport.priority}</span>
               </div>

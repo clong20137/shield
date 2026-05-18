@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Flag, Send, Trash2, X } from 'lucide-react';
+import { Flag, MessageSquare, Send, Trash2, X } from 'lucide-react';
 import { AuthAccount, DashboardPost, DashboardPostComment, dashboardPostService } from '../services/api';
 
 interface DashboardPostPageProps {
@@ -100,7 +100,20 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
       .toUpperCase();
 
   if (isLoading) {
-    return <div className="loading">Loading update...</div>;
+    return (
+      <div className="mx-auto max-w-4xl space-y-6">
+        <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+          <div className="h-4 w-32 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
+          <div className="mt-6 h-8 w-2/3 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
+          <div className="mt-4 h-4 w-1/2 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
+          <div className="mt-8 space-y-3">
+            <div className="h-4 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
+            <div className="h-4 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
+            <div className="h-4 w-4/5 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!post) {
@@ -127,22 +140,36 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
         <p className="mt-6 whitespace-pre-wrap text-base leading-8 text-gray-700 dark:text-gray-300">{post.body}</p>
       </article>
 
-      <section className="mt-6 rounded-lg bg-white p-6 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-        <h2>Comments</h2>
+      <section className="mt-6 rounded-lg bg-white p-4 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2>Comments</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {comments.length} comment{comments.length === 1 ? '' : 's'} on this update
+            </p>
+          </div>
+          <div className="flex h-10 w-10 items-center justify-center rounded bg-accent/10 text-accent">
+            <MessageSquare size={18} />
+          </div>
+        </div>
         {!post.allowComments ? (
           <div className="empty-state mt-4 rounded border border-dashed border-gray-300 dark:border-gray-700">Comments are disabled for this update.</div>
         ) : (
-          <form onSubmit={submitComment} className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-            <input
+          <form onSubmit={submitComment} className="mt-4 rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+            <textarea
               value={commentBody}
               onChange={(event) => setCommentBody(event.target.value)}
-              className="rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+              className="min-h-24 w-full resize-y rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900"
               placeholder={currentUser ? 'Add a comment...' : 'Sign in to comment'}
               disabled={!currentUser}
+              maxLength={1200}
             />
-            <button type="submit" className="btn-primary" disabled={!currentUser || isSavingComment || !commentBody.trim()} aria-label="Post comment" title="Post Comment">
-              <Send size={16} />
-            </button>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{commentBody.length}/1200</span>
+              <button type="submit" className="btn-primary" disabled={!currentUser || isSavingComment || !commentBody.trim()} aria-label="Post comment" title={isSavingComment ? 'Posting' : 'Post Comment'}>
+                <Send size={16} />
+              </button>
+            </div>
           </form>
         )}
 
