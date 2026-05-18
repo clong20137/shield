@@ -52,6 +52,19 @@ export class DashboardPostController {
         authorName: account.displayName || account.email,
       });
 
+      const accounts = await AuthAccountModel.listAccounts();
+      await Promise.all(accounts.filter((item) => item.id !== account.id).map(async (recipient) => {
+        await UserNotificationModel.create({
+          userId: recipient.id,
+          type: 'dashboard_post',
+          title: `${category}: ${title}`,
+          message: body.length > 140 ? `${body.slice(0, 137)}...` : body,
+          entityType: 'dashboard_post',
+          entityId: post.id,
+        });
+        broadcastAccountEvent(recipient.id, { type: 'notification-created', entityId: post.id });
+      }));
+
       broadcastAppEvent({ type: 'dashboard-updated', entityId: post.id });
       res.status(201).json(post);
     } catch (error) {
@@ -192,8 +205,8 @@ export class DashboardPostController {
           type: 'comment_flag',
           title: 'Comment flagged',
           message: `${account.displayName || account.email} flagged a comment on "${post?.title || 'an update'}".`,
-          entityType: 'dashboard_post_comment',
-          entityId: comment.id,
+          entityType: 'dashboard_post',
+          entityId: req.params.id,
         });
         broadcastAccountEvent(admin.id, { type: 'notification-created', entityId: comment.id });
       }));

@@ -41,6 +41,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState<Partial<User>>({});
+  const [supervisorOptions, setSupervisorOptions] = useState<User[]>([]);
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
@@ -99,6 +100,16 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     }
   };
 
+  const loadSupervisorOptions = async () => {
+    try {
+      const response = await userService.getAll(1, 500);
+      setSupervisorOptions(response.data.data);
+    } catch (err) {
+      console.error('Failed to load supervisor options:', err);
+      onToast('error', 'Failed to load supervisor list.');
+    }
+  };
+
   const openEditUser = (user: User) => {
     if (!isAdministrator) {
       onToast('error', 'Administrator permission required.');
@@ -107,6 +118,9 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
 
     setEditingUser(user);
     setEditForm(user);
+    if (supervisorOptions.length === 0) {
+      void loadSupervisorOptions();
+    }
   };
 
   const updateEditField = (field: keyof User, value: string | boolean) => {
@@ -455,7 +469,17 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Supervisor</span>
-                  <input value={String(editForm.supervisor || '')} onChange={(event) => updateEditField('supervisor', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  <select value={String(editForm.supervisor || '')} onChange={(event) => updateEditField('supervisor', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                    <option value="">Select</option>
+                    {supervisorOptions.map((supervisor) => {
+                      const supervisorName = `${supervisor.firstName || ''} ${supervisor.lastName || ''}`.trim() || supervisor.email || supervisor.id;
+                      return (
+                        <option key={supervisor.id} value={supervisorName}>
+                          {supervisorName}{supervisor.rank ? ` - ${supervisor.rank}` : ''}{supervisor.district ? ` (${supervisor.district})` : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </label>
                 <label className="block md:col-span-2 xl:col-span-3">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Residential Address</span>

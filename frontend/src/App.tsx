@@ -1919,6 +1919,25 @@ function App() {
     }
   };
 
+  const openNotification = async (notification: UserNotification) => {
+    await markNotificationRead(notification);
+    setIsNotificationsOpen(false);
+
+    if (notification.entityType === 'dashboard_post' && notification.entityId) {
+      window.location.assign(`/updates/${encodeURIComponent(notification.entityId)}`);
+      return;
+    }
+
+    if (notification.entityType === 'bug_report') {
+      openAdminConsole('bugs');
+      return;
+    }
+
+    if (notification.entityType === 'performance_evaluation') {
+      window.location.assign('/evaluations');
+    }
+  };
+
   const updateBugStatus = async (report: BugReport, status: BugReportStatus, adminNotes: string) => {
     try {
       const response = await bugReportService.updateStatus(report.id, status, adminNotes);
@@ -2158,7 +2177,7 @@ function App() {
                               <button
                                 key={notification.id}
                                 type="button"
-                                onClick={() => markNotificationRead(notification)}
+                                onClick={() => openNotification(notification)}
                                 className={`mb-1 block w-full rounded px-3 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${notification.isRead ? '' : 'bg-accent/10'}`}
                               >
                                 <p className="font-semibold text-gray-800 dark:text-gray-100">{notification.title}</p>
