@@ -572,6 +572,9 @@ export const dashboardPostService = {
   create: (post: Pick<DashboardPost, 'title' | 'body' | 'category' | 'allowComments'> & { requesterId?: string; authorName?: string }) =>
     api.post<DashboardPost>('/dashboard-posts', post),
 
+  update: (id: string, post: Pick<DashboardPost, 'title' | 'body' | 'category' | 'allowComments'>) =>
+    api.put<DashboardPost>(`/dashboard-posts/${id}`, post),
+
   delete: (id: string, requesterId?: string) =>
     api.delete(`/dashboard-posts/${id}`, { data: { requesterId } }),
 

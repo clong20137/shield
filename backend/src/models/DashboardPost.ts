@@ -184,6 +184,34 @@ export class DashboardPostModel {
     }
   }
 
+  static async updatePost(id: string, input: DashboardPostInput, viewerId?: string): Promise<DashboardPost | null> {
+    const conn = await pool.getConnection();
+    try {
+      const now = new Date();
+      const [result] = await conn.query<ResultSetHeader>(
+        `UPDATE dashboard_posts
+         SET \`title\` = ?, \`body\` = ?, \`category\` = ?, \`allowComments\` = ?, \`updatedAt\` = ?
+         WHERE \`id\` = ?`,
+        [
+          input.title.trim(),
+          input.body.trim(),
+          input.category || 'Update',
+          input.allowComments === false ? 0 : 1,
+          now,
+          id,
+        ],
+      );
+
+      if (result.affectedRows === 0) {
+        return null;
+      }
+
+      return DashboardPostModel.getPost(id, viewerId);
+    } finally {
+      conn.release();
+    }
+  }
+
   static async deletePost(id: string): Promise<boolean> {
     const conn = await pool.getConnection();
     try {

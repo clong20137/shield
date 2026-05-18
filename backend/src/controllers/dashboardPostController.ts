@@ -76,6 +76,45 @@ export class DashboardPostController {
     }
   }
 
+  static async updatePost(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const title = cleanString(req.body?.title, 160);
+      const body = cleanMultiline(req.body?.body, 5000);
+      const category = cleanString(req.body?.category, 40) || 'Update';
+      const allowComments = req.body?.allowComments !== false;
+
+      if (!title || !body) {
+        return res.status(400).json({ error: 'Title and body are required' });
+      }
+
+      if (!isOneOf(category, dashboardCategories)) {
+        return res.status(400).json({ error: 'Choose a valid post category' });
+      }
+
+      const post = await DashboardPostModel.updatePost(req.params.id, {
+        title,
+        body,
+        category,
+        allowComments,
+      }, account.id);
+
+      if (!post) {
+        return res.status(404).json({ error: 'Dashboard post not found' });
+      }
+
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: post.id });
+      res.json(post);
+    } catch (error) {
+      console.error('Dashboard post update error:', error);
+      res.status(500).json({ error: 'Failed to update dashboard post' });
+    }
+  }
+
   static async listComments(req: Request, res: Response) {
     try {
       const comments = await DashboardPostModel.listComments(req.params.id);

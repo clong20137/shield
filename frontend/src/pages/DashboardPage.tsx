@@ -490,6 +490,7 @@ function DashboardNews({
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isSavingPost, setIsSavingPost] = useState(false);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<DashboardPost | null>(null);
   const [postPendingDelete, setPostPendingDelete] = useState<DashboardPost | null>(null);
   const [postError, setPostError] = useState<string | null>(null);
   const isAdministrator = currentUser?.role === 'administrator';
@@ -561,6 +562,47 @@ function DashboardNews({
     }
   };
 
+  const openEditPost = (post: DashboardPost) => {
+    setEditingPost(post);
+    setPostForm({
+      title: post.title,
+      body: post.body,
+      category: post.category,
+      allowComments: post.allowComments,
+    });
+    setIsCreatePostOpen(false);
+  };
+
+  const closePostForm = () => {
+    setIsCreatePostOpen(false);
+    setEditingPost(null);
+    setPostForm(defaultPostForm);
+  };
+
+  const updatePost = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!editingPost || !postForm.title.trim() || !postForm.body.trim()) {
+      setPostError('Title and body are required.');
+      return;
+    }
+
+    setIsSavingPost(true);
+    setPostError(null);
+    try {
+      const response = await dashboardPostService.update(editingPost.id, postForm);
+      setPosts((currentPosts) =>
+        currentPosts.map((currentPost) => (currentPost.id === editingPost.id ? response.data : currentPost)),
+      );
+      closePostForm();
+    } catch (err) {
+      console.error('Failed to update dashboard post:', err);
+      setPostError('Failed to update post.');
+    } finally {
+      setIsSavingPost(false);
+    }
+  };
+
   const reactToPost = async (post: DashboardPost, reaction: DashboardReaction) => {
     const nextReaction = post.myReaction === reaction ? null : reaction;
     setPostError(null);
@@ -611,9 +653,14 @@ function DashboardNews({
                   <h3 className="mt-3 text-base">{post.title}</h3>
                 </div>
                 {isAdministrator && (
-                  <button type="button" onClick={() => setPostPendingDelete(post)} className="btn-danger" aria-label="Delete post" title="Delete">
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => openEditPost(post)} className="btn-secondary" aria-label="Edit post" title="Edit">
+                      <Pencil size={16} />
+                    </button>
+                    <button type="button" onClick={() => setPostPendingDelete(post)} className="btn-danger" aria-label="Delete post" title="Delete">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 )}
               </div>
               <p className="whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300">{post.body}</p>
@@ -653,22 +700,22 @@ function DashboardNews({
           ))}
         </div>
       )}
-      {isCreatePostOpen && (
+      {(isCreatePostOpen || editingPost) && (
         <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
           <div className="modal-window w-full max-w-xl rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Create Update</h2>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{editingPost ? 'Edit Update' : 'Create Update'}</h2>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Publish news, updates, or alerts to the dashboard.
+                  {editingPost ? 'Update this published story.' : 'Publish news, updates, or alerts to the dashboard.'}
                 </p>
               </div>
-              <button type="button" onClick={() => setIsCreatePostOpen(false)} className="icon-close-button" aria-label="Close create update modal" title="Close">
+              <button type="button" onClick={closePostForm} className="icon-close-button" aria-label="Close update modal" title="Close">
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={createPost} className="space-y-4">
+            <form onSubmit={editingPost ? updatePost : createPost} className="space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-[150px_minmax(0,1fr)]">
                 <label>
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Type</span>
@@ -711,11 +758,11 @@ function DashboardNews({
                 />
               </label>
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setIsCreatePostOpen(false)} className="btn-secondary" aria-label="Cancel create update" title="Cancel">
+                <button type="button" onClick={closePostForm} className="btn-secondary" aria-label="Cancel update" title="Cancel">
                   <X size={16} />
                 </button>
-                <button type="submit" className="btn-primary" disabled={isSavingPost} aria-label="Publish post" title={isSavingPost ? 'Publishing' : 'Publish Post'}>
-                  <Send size={16} />
+                <button type="submit" className="btn-primary" disabled={isSavingPost} aria-label={editingPost ? 'Save post' : 'Publish post'} title={isSavingPost ? 'Saving' : editingPost ? 'Save Post' : 'Publish Post'}>
+                  {editingPost ? <Save size={16} /> : <Send size={16} />}
                 </button>
               </div>
             </form>
