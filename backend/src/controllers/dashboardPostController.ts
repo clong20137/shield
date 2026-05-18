@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import { getSessionAccount } from '../middleware/authSession';
+import { AuthAccountModel } from '../models/AuthAccount';
 import { DashboardPostModel } from '../models/DashboardPost';
-import { broadcastAppEvent } from '../services/appEvents';
+import { UserNotificationModel } from '../models/UserNotification';
+import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents';
 import { cleanMultiline, cleanString, isOneOf } from '../utils/validation';
 
 const dashboardCategories = ['Update', 'News', 'Alert'] as const;
@@ -112,6 +114,56 @@ export class DashboardPostController {
     } catch (error) {
       console.error('Dashboard post comment create error:', error);
       res.status(500).json({ error: 'Failed to add comment' });
+    }
+  }
+
+  static async deleteComment(req: Request, res: Response) {
+    try {
+      const deleted = await DashboardPostModel.deleteComment(req.params.id, req.params.commentId);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Comment not found' });
+      }
+
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: req.params.id });
+      res.json({ message: 'Comment deleted' });
+    } catch (error) {
+      console.error('Dashboard post comment delete error:', error);
+      res.status(500).json({ error: 'Failed to delete comment' });
+    }
+  }
+
+  static async flagComment(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const reason = cleanMultiline(req.body?.reason, 800);
+      const comment = await DashboardPostModel.flagComment(req.params.id, req.params.commentId, account.id, reason);
+      if (!comment) {
+        return res.status(404).json({ error: 'Comment not found' });
+      }
+
+      const post = await DashboardPostModel.getPost(req.params.id, account.id);
+      const admins = (await AuthAccountModel.listAccounts()).filter((item) => item.role === 'administrator');
+      await Promise.all(admins.map(async (admin) => {
+        await UserNotificationModel.create({
+          userId: admin.id,
+          type: 'comment_flag',
+          title: 'Comment flagged',
+          message: `${account.displayName || account.email} flagged a comment on "${post?.title || 'an update'}".`,
+          entityType: 'dashboard_post_comment',
+          entityId: comment.id,
+        });
+        broadcastAccountEvent(admin.id, { type: 'notification-created', entityId: comment.id });
+      }));
+
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: req.params.id });
+      res.json(comment);
+    } catch (error) {
+      console.error('Dashboard post comment flag error:', error);
+      res.status(500).json({ error: 'Failed to flag comment' });
     }
   }
 

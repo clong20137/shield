@@ -284,7 +284,14 @@ export interface DashboardPostComment {
   postId: string;
   authorId: string;
   authorName: string | null;
+  authorEmail?: string | null;
+  authorRank?: string | null;
+  authorProfilePictureUrl?: string | null;
   body: string;
+  isFlagged: boolean;
+  flaggedBy: string | null;
+  flaggedAt: string | null;
+  flagReason: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -575,6 +582,12 @@ export const dashboardPostService = {
 
   addComment: (id: string, body: string) =>
     api.post<DashboardPostComment>(`/dashboard-posts/${id}/comments`, { body }),
+
+  flagComment: (id: string, commentId: string, reason: string) =>
+    api.post<DashboardPostComment>(`/dashboard-posts/${id}/comments/${commentId}/flag`, { reason }),
+
+  deleteComment: (id: string, commentId: string) =>
+    api.delete(`/dashboard-posts/${id}/comments/${commentId}`),
 };
 
 export const bugReportService = {

@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Send } from 'lucide-react';
+import { Flag, Send, Trash2, X } from 'lucide-react';
 import { AuthAccount, DashboardPost, DashboardPostComment, dashboardPostService } from '../services/api';
 
 interface DashboardPostPageProps {
@@ -12,9 +12,12 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
   const [post, setPost] = useState<DashboardPost | null>(null);
   const [comments, setComments] = useState<DashboardPostComment[]>([]);
   const [commentBody, setCommentBody] = useState('');
+  const [commentPendingDelete, setCommentPendingDelete] = useState<DashboardPostComment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingComment, setIsSavingComment] = useState(false);
+  const [moderatingCommentId, setModeratingCommentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const isAdministrator = currentUser?.role === 'administrator';
 
   const loadPost = async () => {
     if (!postId) return;
@@ -56,6 +59,45 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
       setIsSavingComment(false);
     }
   };
+
+  const flagComment = async (comment: DashboardPostComment) => {
+    if (!post) return;
+    setModeratingCommentId(comment.id);
+    setError(null);
+    try {
+      const response = await dashboardPostService.flagComment(post.id, comment.id, 'Flagged for admin review');
+      setComments((items) => items.map((item) => (item.id === comment.id ? response.data : item)));
+    } catch (err) {
+      console.error('Failed to flag comment:', err);
+      setError('Failed to flag comment.');
+    } finally {
+      setModeratingCommentId(null);
+    }
+  };
+
+  const deleteComment = async (comment: DashboardPostComment) => {
+    if (!post) return;
+    setModeratingCommentId(comment.id);
+    setError(null);
+    try {
+      await dashboardPostService.deleteComment(post.id, comment.id);
+      setComments((items) => items.filter((item) => item.id !== comment.id));
+      setCommentPendingDelete(null);
+    } catch (err) {
+      console.error('Failed to delete comment:', err);
+      setError('Failed to delete comment.');
+    } finally {
+      setModeratingCommentId(null);
+    }
+  };
+
+  const getCommentInitials = (comment: DashboardPostComment) =>
+    (comment.authorName || comment.authorEmail || 'User')
+      .split(/\s+/u)
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
 
   if (isLoading) {
     return <div className="loading">Loading update...</div>;
@@ -104,20 +146,65 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
           </form>
         )}
 
-        <div className="mt-5 space-y-3">
+        <div className="mt-5 space-y-4">
           {comments.length === 0 ? (
             <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No comments yet.</div>
           ) : comments.map((comment) => (
-            <div key={comment.id} className="rounded border border-gray-200 p-3 dark:border-gray-800">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-bold text-gray-800 dark:text-gray-100">{comment.authorName || 'User'}</p>
-                <p className="text-xs text-gray-400">{new Date(comment.createdAt).toLocaleString()}</p>
+            <div key={comment.id} className={`grid grid-cols-1 overflow-hidden rounded border dark:border-gray-800 md:grid-cols-[190px_minmax(0,1fr)] ${comment.isFlagged ? 'border-amber-300 dark:border-amber-800' : 'border-gray-200'}`}>
+              <aside className="border-b border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950 md:border-b-0 md:border-r">
+                <div className="flex items-center gap-3 md:block">
+                  {comment.authorProfilePictureUrl ? (
+                    <img src={comment.authorProfilePictureUrl} alt={comment.authorName || 'Comment author'} className="h-14 w-14 rounded-full object-cover md:h-16 md:w-16" />
+                  ) : (
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent/10 text-lg font-bold text-accent md:h-16 md:w-16">
+                      {getCommentInitials(comment)}
+                    </div>
+                  )}
+                  <div className="min-w-0 md:mt-3">
+                    <p className="truncate font-bold text-gray-900 dark:text-gray-100">{comment.authorName || 'User'}</p>
+                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">{comment.authorRank || comment.authorEmail || 'Member'}</p>
+                  </div>
+                </div>
+              </aside>
+              <div className="p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase text-gray-400">{new Date(comment.createdAt).toLocaleString()}</p>
+                    {comment.isFlagged && <p className="mt-1 text-xs font-bold uppercase text-amber-600">Flagged for review</p>}
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => flagComment(comment)} disabled={moderatingCommentId === comment.id || comment.isFlagged} className="btn-secondary" aria-label="Flag comment" title={comment.isFlagged ? 'Already Flagged' : 'Flag Comment'}>
+                      <Flag size={16} />
+                    </button>
+                    {isAdministrator && (
+                      <button type="button" onClick={() => setCommentPendingDelete(comment)} disabled={moderatingCommentId === comment.id} className="btn-danger" aria-label="Delete comment" title="Delete Comment">
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300">{comment.body}</p>
               </div>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300">{comment.body}</p>
             </div>
           ))}
         </div>
       </section>
+      {commentPendingDelete && (
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Comment</h2>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Remove this comment from the update?</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setCommentPendingDelete(null)} className="btn-secondary" aria-label="Cancel delete comment" title="Cancel">
+                <X size={16} />
+              </button>
+              <button type="button" onClick={() => deleteComment(commentPendingDelete)} className="btn-danger" aria-label="Delete comment" title="Delete">
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -239,12 +239,21 @@ export async function initializeDatabase() {
       \`authorId\` VARCHAR(36) NOT NULL,
       \`authorName\` VARCHAR(150),
       \`body\` TEXT NOT NULL,
+      \`isFlagged\` BOOLEAN DEFAULT 0,
+      \`flaggedBy\` VARCHAR(36),
+      \`flaggedAt\` DATETIME,
+      \`flagReason\` TEXT,
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX \`idx_dashboard_post_comments_post\` (\`postId\`),
       INDEX \`idx_dashboard_post_comments_created\` (\`createdAt\`)
     )
   `);
+
+  await ensureColumn('dashboard_post_comments', 'isFlagged', '`isFlagged` BOOLEAN DEFAULT 0');
+  await ensureColumn('dashboard_post_comments', 'flaggedBy', '`flaggedBy` VARCHAR(36)');
+  await ensureColumn('dashboard_post_comments', 'flaggedAt', '`flaggedAt` DATETIME');
+  await ensureColumn('dashboard_post_comments', 'flagReason', '`flagReason` TEXT');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_messages (

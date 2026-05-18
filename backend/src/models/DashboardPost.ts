@@ -33,7 +33,14 @@ export interface DashboardPostComment {
   postId: string;
   authorId: string;
   authorName: string | null;
+  authorEmail?: string | null;
+  authorRank?: string | null;
+  authorProfilePictureUrl?: string | null;
   body: string;
+  isFlagged: boolean | number;
+  flaggedBy: string | null;
+  flaggedAt: Date | null;
+  flagReason: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -226,11 +233,21 @@ export class DashboardPostModel {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<DashboardPostCommentRow[]>(
-        'SELECT * FROM dashboard_post_comments WHERE `postId` = ? ORDER BY `createdAt` ASC',
+        `SELECT c.*,
+          u.\`email\` as authorEmail,
+          u.\`rank\` as authorRank,
+          u.\`profilePictureUrl\` as authorProfilePictureUrl
+        FROM dashboard_post_comments c
+        LEFT JOIN users u ON u.\`id\` = c.\`authorId\`
+        WHERE c.\`postId\` = ?
+        ORDER BY c.\`createdAt\` ASC`,
         [postId],
       );
 
-      return rows;
+      return rows.map((row) => ({
+        ...row,
+        isFlagged: row.isFlagged !== false && row.isFlagged !== 0,
+      }));
     } finally {
       conn.release();
     }
@@ -262,12 +279,54 @@ export class DashboardPostModel {
         postId,
         authorId,
         authorName,
+        authorEmail: null,
+        authorRank: null,
+        authorProfilePictureUrl: null,
         body: body.trim(),
+        isFlagged: false,
+        flaggedBy: null,
+        flaggedAt: null,
+        flagReason: null,
         createdAt: now,
         updatedAt: now,
       };
     } finally {
       conn.release();
     }
+  }
+
+  static async deleteComment(postId: string, commentId: string): Promise<boolean> {
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>(
+        'DELETE FROM dashboard_post_comments WHERE `id` = ? AND `postId` = ?',
+        [commentId, postId],
+      );
+      return result.affectedRows > 0;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async flagComment(postId: string, commentId: string, flaggedBy: string, reason: string): Promise<DashboardPostComment | null> {
+    const conn = await pool.getConnection();
+    try {
+      const now = new Date();
+      const [result] = await conn.query<ResultSetHeader>(
+        `UPDATE dashboard_post_comments
+         SET \`isFlagged\` = 1, \`flaggedBy\` = ?, \`flaggedAt\` = ?, \`flagReason\` = ?, \`updatedAt\` = ?
+         WHERE \`id\` = ? AND \`postId\` = ?`,
+        [flaggedBy, now, reason.trim() || null, now, commentId, postId],
+      );
+
+      if (result.affectedRows === 0) {
+        return null;
+      }
+    } finally {
+      conn.release();
+    }
+
+    const comments = await DashboardPostModel.listComments(postId);
+    return comments.find((comment) => comment.id === commentId) || null;
   }
 }
