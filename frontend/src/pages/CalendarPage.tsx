@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Calculator, CalendarClock, ChevronLeft, ChevronRight, Pencil, Save, Trash2, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Calculator, CalendarClock, ChevronLeft, ChevronRight, ClipboardCopy, Pencil, Save, Sparkles, Trash2, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
@@ -178,11 +178,64 @@ const dutyActivityHourFields = [
   'mealBreakHours',
 ];
 
-const createDefaultEntryForm = (date: string): CalendarEntryForm => ({
+const numericDetailFields = trooperDailySections
+  .flatMap((section) => section.fields.map(([key]) => key))
+  .filter((key) => !timeDetailFields.has(key));
+
+const dailyTemplates = [
+  {
+    label: 'Regular Shift',
+    dutyHours: '8',
+    specialStatus: 'None',
+    details: {
+      regularDutyHours: '8',
+      patrolHours: '8',
+    },
+  },
+  {
+    label: 'Day Off',
+    dutyHours: '0',
+    specialStatus: 'None',
+    details: {
+      regularDaysOff: '1',
+    },
+  },
+  {
+    label: 'Court',
+    dutyHours: '8',
+    specialStatus: 'None',
+    details: {
+      trafficCourtHours: '8',
+    },
+  },
+  {
+    label: 'Crash',
+    dutyHours: '8',
+    specialStatus: 'None',
+    details: {
+      crashInvestHours: '8',
+    },
+  },
+  {
+    label: 'Admin',
+    dutyHours: '8',
+    specialStatus: 'None',
+    details: {
+      incidentReportHours: '8',
+    },
+  },
+] as const;
+
+const getDefaultDistrict = (currentUser?: AuthAccount) =>
+  currentUser?.district && districtOptions.includes(currentUser.district)
+    ? currentUser.district
+    : districtOptions[0];
+
+const createDefaultEntryForm = (date: string, currentUser?: AuthAccount): CalendarEntryForm => ({
   category: 'Trooper Daily',
   date,
   dutyHours: '',
-  districtWorked: districtOptions[0],
+  districtWorked: getDefaultDistrict(currentUser),
   specialStatus: specialStatusOptions[0],
   color: entryColors[0].value,
   details: {},
@@ -257,6 +310,15 @@ function getDifferenceLabel(firstValue: number, secondValue: number): string {
   return difference <= 0.01 ? 'Matches' : `${formatHours(difference)} hr off`;
 }
 
+function calculateShiftHours(details: Record<string, string>): number {
+  return (
+    calculateTimeRangeHours(details, 'regularDutyStartTime', 'regularDutyEndTime') +
+    calculateTimeRangeHours(details, 'splitStartTime', 'splitEndTime') +
+    calculateTimeRangeHours(details, 'secondSplitStartTime', 'secondSplitEndTime') +
+    calculateTimeRangeHours(details, 'thirdSplitStartTime', 'thirdSplitEndTime')
+  );
+}
+
 function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAccount; onOpenCalculator?: () => void }) {
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const today = new Date();
@@ -265,7 +327,7 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
   const [entries, setEntries] = useState<CalendarEntry[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [entryForm, setEntryForm] = useState<CalendarEntryForm>(() =>
-    createDefaultEntryForm(formatDateKey(new Date())),
+    createDefaultEntryForm(formatDateKey(new Date()), currentUser),
   );
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [districtFilter, setDistrictFilter] = useState('');
@@ -273,6 +335,8 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
   const [entryPendingDelete, setEntryPendingDelete] = useState<CalendarEntry | null>(null);
   const [isCalendarLoading, setIsCalendarLoading] = useState(true);
   const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [isDutyHoursManual, setIsDutyHoursManual] = useState(false);
+  const lastAutoDutyHoursRef = useRef('');
 
   const actor = {
     actorId: currentUser.id,
@@ -328,7 +392,9 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
 
   const openDay = (dateKey: string) => {
     setSelectedDate(dateKey);
-    setEntryForm(createDefaultEntryForm(dateKey));
+    setEntryForm(createDefaultEntryForm(dateKey, currentUser));
+    setIsDutyHoursManual(false);
+    lastAutoDutyHoursRef.current = '';
     setEditingEntryId(null);
   };
 
@@ -373,7 +439,9 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
         const response = await calendarService.create(payload);
         setEntries((currentEntries) => [response.data, ...currentEntries]);
       }
-      setEntryForm(createDefaultEntryForm(entryForm.date));
+      setEntryForm(createDefaultEntryForm(entryForm.date, currentUser));
+      setIsDutyHoursManual(false);
+      lastAutoDutyHoursRef.current = '';
     } catch (err) {
       console.error('Failed to save calendar entry:', err);
       setCalendarError(getApiErrorMessage(err, 'Failed to save calendar entry.'));
@@ -403,16 +471,95 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
       color: entry.color,
       details: entry.details || {},
     });
+    setIsDutyHoursManual(true);
+    lastAutoDutyHoursRef.current = '';
   };
 
   const updateDailyDetail = (key: string, value: string) => {
-    setEntryForm((currentForm) => ({
-      ...currentForm,
-      details: {
+    setEntryForm((currentForm) => {
+      const details = {
         ...(currentForm.details || {}),
         [key]: value,
+      };
+      const nextForm = {
+        ...currentForm,
+        details,
+      };
+
+      if (timeDetailFields.has(key) && !isDutyHoursManual) {
+        const shiftHours = calculateShiftHours(details);
+        if (shiftHours > 0) {
+          const formattedHours = formatHours(shiftHours);
+          nextForm.dutyHours = formattedHours;
+          lastAutoDutyHoursRef.current = formattedHours;
+        }
+      }
+
+      return nextForm;
+    });
+  };
+
+  const updateDutyHours = (value: string) => {
+    setIsDutyHoursManual(value !== '' && value !== lastAutoDutyHoursRef.current);
+    setEntryForm((currentForm) => ({ ...currentForm, dutyHours: value }));
+  };
+
+  const applyTemplate = (template: typeof dailyTemplates[number]) => {
+    setEntryForm((currentForm) => ({
+      ...currentForm,
+      dutyHours: template.dutyHours,
+      specialStatus: template.specialStatus,
+      details: {
+        ...(currentForm.details || {}),
+        ...template.details,
       },
     }));
+    setIsDutyHoursManual(false);
+    lastAutoDutyHoursRef.current = template.dutyHours;
+  };
+
+  const fillBlankNumericDetailsWithZero = () => {
+    setEntryForm((currentForm) => {
+      const details = { ...(currentForm.details || {}) };
+      numericDetailFields.forEach((key) => {
+        if (!details[key]) {
+          details[key] = '0';
+        }
+      });
+
+      return {
+        ...currentForm,
+        details,
+      };
+    });
+  };
+
+  const copyPreviousDaily = () => {
+    if (!selectedDate) {
+      return;
+    }
+
+    const previousEntry = entries
+      .filter((entry) => entry.date < selectedDate)
+      .sort((firstEntry, secondEntry) => secondEntry.date.localeCompare(firstEntry.date))[0];
+
+    if (!previousEntry) {
+      setCalendarError('No previous Trooper Daily entry found to copy.');
+      return;
+    }
+
+    setCalendarError(null);
+    setEntryForm({
+      category: 'Trooper Daily',
+      date: selectedDate,
+      dutyHours: previousEntry.dutyHours,
+      districtWorked: previousEntry.districtWorked || getDefaultDistrict(currentUser),
+      specialStatus: previousEntry.specialStatus,
+      color: previousEntry.color,
+      details: { ...(previousEntry.details || {}) },
+    });
+    setIsDutyHoursManual(true);
+    lastAutoDutyHoursRef.current = '';
   };
 
   const visibleEntries = entries.filter((entry) => {
@@ -443,11 +590,7 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
   const monthDutyHours = monthEntries.reduce((total, entry) => total + (Number(entry.dutyHours) || 0), 0);
   const reportedDutyHours = Number(entryForm.dutyHours) || 0;
   const entryDetails = entryForm.details || {};
-  const calculatedShiftHours =
-    calculateTimeRangeHours(entryDetails, 'regularDutyStartTime', 'regularDutyEndTime') +
-    calculateTimeRangeHours(entryDetails, 'splitStartTime', 'splitEndTime') +
-    calculateTimeRangeHours(entryDetails, 'secondSplitStartTime', 'secondSplitEndTime') +
-    calculateTimeRangeHours(entryDetails, 'thirdSplitStartTime', 'thirdSplitEndTime');
+  const calculatedShiftHours = calculateShiftHours(entryDetails);
   const attendanceHours = attendanceHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
   const dutyActivityHours = dutyActivityHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
   const hasShiftTime = calculatedShiftHours > 0;
@@ -626,6 +769,37 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
             </div>
 
             <form onSubmit={saveEntry} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 md:col-span-2">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Daily Shortcuts</h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      Start with a common daily type, copy your last entry, or zero out blank count fields.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={copyPreviousDaily} className="btn-secondary" aria-label="Copy previous daily" title="Copy Previous Daily">
+                      <ClipboardCopy size={16} />
+                    </button>
+                    <button type="button" onClick={fillBlankNumericDetailsWithZero} className="btn-secondary" aria-label="Fill blank numeric fields with zero" title="Fill Blanks With Zero">
+                      <Sparkles size={16} />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {dailyTemplates.map((template) => (
+                    <button
+                      key={template.label}
+                      type="button"
+                      onClick={() => applyTemplate(template)}
+                      className="rounded border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-primary-500 shadow-sm hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-950 dark:text-blue-100"
+                    >
+                      {template.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <label className="block">
                 <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Date</span>
                 <input
@@ -647,12 +821,15 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                   step="0.01"
                   inputMode="decimal"
                   value={entryForm.dutyHours}
-                  onChange={(event) =>
-                    setEntryForm((currentForm) => ({ ...currentForm, dutyHours: event.target.value }))
-                  }
+                  onChange={(event) => updateDutyHours(event.target.value)}
                   className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
                   required
                 />
+                {calculatedShiftHours > 0 && (
+                  <span className="mt-1 block text-xs font-semibold text-gray-500 dark:text-gray-400">
+                    Shift times calculate to {formatHours(calculatedShiftHours)} hrs.
+                  </span>
+                )}
               </label>
 
               <label className="block">
@@ -787,7 +964,9 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                 {editingEntryId && (
                   <button type="button" onClick={() => {
                     setEditingEntryId(null);
-                    setEntryForm(createDefaultEntryForm(selectedDate));
+                    setEntryForm(createDefaultEntryForm(selectedDate, currentUser));
+                    setIsDutyHoursManual(false);
+                    lastAutoDutyHoursRef.current = '';
                   }} className="btn-secondary ml-2" aria-label="Cancel edit" title="Cancel Edit">
                     <X size={16} />
                   </button>

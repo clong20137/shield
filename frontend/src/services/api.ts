@@ -124,6 +124,7 @@ export interface AuthAccount {
   displayName: string;
   profilePictureUrl: string;
   role: string;
+  district: string;
   isActive: boolean;
   receivesMessages: boolean;
   hasCompletedOnboarding: boolean;

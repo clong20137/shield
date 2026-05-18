@@ -9,6 +9,7 @@ export interface AuthAccount {
   displayName: string;
   profilePictureUrl: string;
   role: string;
+  district: string;
   isActive: boolean;
   receivesMessages: boolean;
   hasCompletedOnboarding: boolean;
@@ -33,6 +34,7 @@ interface AuthAccountRow extends RowDataPacket {
   displayName: string | null;
   profilePictureUrl: string | null;
   role: string;
+  district: string | null;
   isActive: boolean | number;
   receivesMessages: boolean | number;
   hasCompletedOnboarding: boolean | number;
@@ -154,6 +156,7 @@ function toPublicAccount(account: AuthAccountRow): AuthAccount {
     displayName: account.displayName || fallbackName || account.email,
     profilePictureUrl: account.profilePictureUrl || '',
     role: account.role || 'user',
+    district: account.district || '',
     isActive: account.isActive !== false && account.isActive !== 0,
     receivesMessages: account.receivesMessages !== false && account.receivesMessages !== 0,
     hasCompletedOnboarding: Boolean(account.hasCompletedOnboarding),
@@ -238,6 +241,7 @@ export class AuthAccountModel {
           displayName: displayName.trim(),
           profilePictureUrl: existingUser.profilePictureUrl || '',
           role,
+          district: existingUser.district || '',
           isActive: existingUser.isActive !== false && existingUser.isActive !== 0,
           receivesMessages: existingUser.receivesMessages !== false && existingUser.receivesMessages !== 0,
           hasCompletedOnboarding: Boolean(existingUser.hasCompletedOnboarding),
@@ -263,6 +267,7 @@ export class AuthAccountModel {
         displayName: displayName.trim(),
         profilePictureUrl: '',
         role,
+        district: '',
         isActive: true,
         receivesMessages: true,
         hasCompletedOnboarding: false,
