@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ClipboardList, LockKeyhole, Settings, UserPlus } from 'lucide-react';
-import { AuthAccount, User } from '../services/api';
+import { Bug, ClipboardList, LockKeyhole, Settings, UserPlus } from 'lucide-react';
+import { AuthAccount, BugReport, BugReportStatus, User } from '../services/api';
 import AuditLogPage from './AuditLogPage';
+import BugTrackerPage from './BugTrackerPage';
 import CreateUserPage from './CreateUserPage';
 import PermissionsPage from './PermissionsPage';
 
-export type AdminConsoleTab = 'general' | 'permissions' | 'create-user' | 'audit';
+export type AdminConsoleTab = 'general' | 'permissions' | 'create-user' | 'audit' | 'bugs';
 
 interface AdminConsolePageProps {
   account: AuthAccount;
@@ -14,12 +15,15 @@ interface AdminConsolePageProps {
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
   getErrorMessage: (error: unknown, fallback: string) => string;
   onUserCreated?: (user: User) => void;
+  bugReports?: BugReport[];
+  onBugStatusChange?: (report: BugReport, status: BugReportStatus, adminNotes: string) => void;
 }
 
 const tabs: Array<{ id: AdminConsoleTab; label: string; icon: typeof Settings }> = [
   { id: 'general', label: 'General', icon: Settings },
   { id: 'permissions', label: 'Permissions', icon: LockKeyhole },
   { id: 'create-user', label: 'Create User', icon: UserPlus },
+  { id: 'bugs', label: 'Bug Tracker', icon: Bug },
   { id: 'audit', label: 'Audit Log', icon: ClipboardList },
 ];
 
@@ -30,6 +34,8 @@ export function AdminConsolePage({
   onToast,
   getErrorMessage,
   onUserCreated,
+  bugReports = [],
+  onBugStatusChange,
 }: AdminConsolePageProps) {
   const [activeTab, setActiveTab] = useState<AdminConsoleTab>(initialTab);
 
@@ -92,6 +98,14 @@ export function AdminConsolePage({
         )}
 
         {activeTab === 'audit' && <AuditLogPage isModalView />}
+
+        {activeTab === 'bugs' && (
+          onBugStatusChange ? (
+            <BugTrackerPage reports={bugReports} onStatusChange={onBugStatusChange} />
+          ) : (
+            <div className="empty-state">Bug tracker is unavailable.</div>
+          )
+        )}
       </div>
     </div>
   );

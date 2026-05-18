@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, Pencil, X } from 'lucide-react';
+import { Mail, Pencil, Phone, Send, X } from 'lucide-react';
 import { User } from '../services/api';
 import { RankBadge } from './RankBadge';
 
@@ -38,6 +38,10 @@ function getInitials(user: User): string {
 }
 
 export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, onMessage, canEdit = false }) => {
+  const callNumber = user.departmentPhoneNumber || user.personalPhoneNumber;
+  const callHref = callNumber ? `tel:${callNumber.replace(/[^\d+]/gu, '')}` : undefined;
+  const emailHref = user.email ? `mailto:${user.email}` : undefined;
+
   return (
     <div className="bg-white rounded-lg shadow-xl overflow-hidden dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
       <div className="bg-primary-500 text-white px-5 py-5 flex flex-wrap justify-between gap-4">
@@ -120,8 +124,24 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
       </div>
 
       <div className="flex gap-2 px-5 py-4 border-t-2 border-gray-300">
-        <button className="btn-secondary" onClick={() => onMessage?.(user)} aria-label="Send message" title="Send Message">
+        <a
+          className={`btn-secondary ${emailHref ? '' : 'pointer-events-none opacity-50'}`}
+          href={emailHref}
+          aria-label="Email user"
+          title={emailHref ? 'Email User' : 'No email on file'}
+        >
           <Mail size={16} />
+        </a>
+        <a
+          className={`btn-secondary ${callHref ? '' : 'pointer-events-none opacity-50'}`}
+          href={callHref}
+          aria-label="Call user"
+          title={callHref ? `Call ${callNumber}` : 'No phone number on file'}
+        >
+          <Phone size={16} />
+        </a>
+        <button className="btn-secondary" onClick={() => onMessage?.(user)} aria-label="Send message" title="Send Message">
+          <Send size={16} />
         </button>
         {canEdit && (
           <button className="btn-primary" onClick={() => onEdit?.(user)} aria-label="Edit user" title="Edit User">

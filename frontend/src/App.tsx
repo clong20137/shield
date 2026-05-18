@@ -1906,7 +1906,7 @@ function App() {
 
   const openBugTrackerFromNotification = () => {
     setIsNotificationsOpen(false);
-    setIsBugTrackerOpen(true);
+    openAdminConsole('bugs');
   };
 
   const markNotificationRead = async (notification: UserNotification) => {
@@ -2204,7 +2204,7 @@ function App() {
                   <button
                     data-onboarding-control="bugs"
                     type="button"
-                    onClick={() => setIsBugTrackerOpen(true)}
+                    onClick={() => openAdminConsole('bugs')}
                     className="relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
                     aria-label="Open bug tracker"
                     title="Bug Tracker"
@@ -2401,7 +2401,7 @@ function App() {
                 <div className="mb-3 flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 sm:text-2xl">Admin Console</h2>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage settings, permissions, users, and audit history from one place.</p>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage settings, permissions, users, bug reports, and audit history from one place.</p>
                   </div>
                   <button
                     type="button"
@@ -2422,6 +2422,8 @@ function App() {
                     onUserCreated={() => {
                       setAdminConsoleTab('permissions');
                     }}
+                    bugReports={bugReports}
+                    onBugStatusChange={updateBugStatus}
                   />
                 </div>
               </div>
