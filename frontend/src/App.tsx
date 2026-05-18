@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { BarChart3, Bell, Bug, Calculator, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Plus, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
+import { BarChart3, Bell, Bug, Calculator, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import ReportsPage from './pages/ReportsPage';
@@ -883,6 +883,12 @@ function QuickLaunchTray({
   const [externalLabel, setExternalLabel] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
   const availableApps = quickLaunchApps.filter((app) => !app.adminOnly || isAdministrator);
+  const usedAppIds = new Set(
+    slots
+      .map((slot, index) => (index === editingSlot ? null : slot))
+      .filter((slot): slot is QuickLaunchAppId => typeof slot === 'string'),
+  );
+  const editingExternalSlot = editingSlot !== null && isExternalQuickLaunchSlot(slots[editingSlot]) ? slots[editingSlot] : null;
 
   const isAppActive = (app: QuickLaunchApp) => {
     if (app.id === activeModalApp) {
@@ -1128,7 +1134,7 @@ function QuickLaunchTray({
                   aria-label={`Change ${label} shortcut`}
                   title="Change shortcut"
                 >
-                  <Plus size={13} />
+                  <Pencil size={13} />
                 </button>
               )}
             </div>
@@ -1162,18 +1168,36 @@ function QuickLaunchTray({
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {availableApps.map((app) => {
                 const Icon = app.icon;
+                const isAlreadyUsed = usedAppIds.has(app.id);
                 return (
                   <button
                     key={app.id}
                     type="button"
                     onClick={() => assignSlot(app.id)}
-                    className="flex items-center gap-3 rounded border border-gray-200 px-4 py-3 text-left text-sm font-bold text-gray-800 hover:border-accent hover:text-accent dark:border-gray-800 dark:text-gray-100 dark:hover:border-accent"
+                    disabled={isAlreadyUsed}
+                    className="flex items-center gap-3 rounded border border-gray-200 px-4 py-3 text-left text-sm font-bold text-gray-800 hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-gray-800 dark:text-gray-100 dark:hover:border-accent dark:disabled:bg-gray-950 dark:disabled:text-gray-600"
+                    title={isAlreadyUsed ? 'Already in your dock' : app.label}
                   >
                     <Icon size={18} />
-                    {app.label}
+                    <span className="min-w-0 flex-1">{app.label}</span>
+                    {isAlreadyUsed && <span className="text-xs font-semibold text-gray-400">Added</span>}
                   </button>
                 );
               })}
+              {editingExternalSlot && (
+                <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-danger dark:border-red-900 dark:bg-red-950/40 sm:col-span-2">
+                  <p className="font-bold">External site in this box</p>
+                  <p className="mt-1 break-all">{editingExternalSlot.label} - {editingExternalSlot.url}</p>
+                  <button
+                    type="button"
+                    onClick={() => assignSlot(null)}
+                    className="mt-3 flex w-full items-center gap-3 rounded border border-danger bg-white px-4 py-3 text-left text-sm font-bold text-danger hover:bg-red-50 dark:bg-gray-950 dark:hover:bg-red-950"
+                  >
+                    <Trash2 size={18} />
+                    Remove external site from this box
+                  </button>
+                </div>
+              )}
               <form onSubmit={assignExternalSlot} className="rounded border border-gray-200 p-3 dark:border-gray-800 sm:col-span-2">
                 <div className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-800 dark:text-gray-100">
                   <Link size={18} />
@@ -1200,7 +1224,7 @@ function QuickLaunchTray({
               <button
                 type="button"
                 onClick={() => assignSlot(null)}
-                className="flex items-center gap-3 rounded border border-danger px-4 py-3 text-left text-sm font-bold text-danger hover:bg-red-50 dark:hover:bg-red-950"
+                className="flex items-center gap-3 rounded border border-danger px-4 py-3 text-left text-sm font-bold text-danger hover:bg-red-50 dark:hover:bg-red-950 sm:col-span-2"
               >
                 <Trash2 size={18} />
                 Clear this box

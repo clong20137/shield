@@ -4,6 +4,7 @@ import { AuthAccount, CalendarEntry, CalendarShortcut, calendarService } from '.
 import { districtOptions } from '../constants/districts';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>;
+type TimePeriod = 'AM' | 'PM';
 
 const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty'];
 
@@ -147,7 +148,7 @@ const trooperDailySections = [
   },
 ] as const;
 
-const timeDetailFields = new Set([
+const timeDetailFields = new Set<string>([
   'regularDutyStartTime',
   'regularDutyEndTime',
   'splitStartTime',
@@ -157,6 +158,8 @@ const timeDetailFields = new Set([
   'thirdSplitStartTime',
   'thirdSplitEndTime',
 ]);
+
+const mileageDetailFields = new Set<string>(['regularDutyMiles']);
 
 const attendanceHourFields = [
   'regularDutyHours',
@@ -178,7 +181,7 @@ const dutyActivityHourFields = [
   'mealBreakHours',
 ];
 
-const numericDetailFields = trooperDailySections
+const numericDetailFields: string[] = trooperDailySections
   .flatMap((section) => section.fields.map(([key]) => key))
   .filter((key) => !timeDetailFields.has(key));
 
@@ -261,6 +264,61 @@ function formatHours(value: number): string {
   return value.toFixed(2).replace(/\.?0+$/u, '');
 }
 
+function sanitizeDecimalInput(value: string, maxIntegerDigits?: number): string {
+  const cleanedValue = value.replace(/[^\d.]/gu, '');
+  const [rawInteger = '', ...decimalParts] = cleanedValue.split('.');
+  const integerPart = (maxIntegerDigits ? rawInteger.slice(0, maxIntegerDigits) : rawInteger) || (cleanedValue.startsWith('.') ? '0' : '');
+  const hasDecimal = cleanedValue.includes('.');
+  const decimalPart = decimalParts.join('').slice(0, 2);
+
+  return hasDecimal ? `${integerPart}.${decimalPart}` : integerPart;
+}
+
+function formatTimePart(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+function parseTimeInput(value?: string): { hour: string; minute: string; period: TimePeriod } {
+  const parsedMinutes = parseTimeToMinutes(value);
+  if (parsedMinutes === null) {
+    return {
+      hour: '',
+      minute: '',
+      period: 'AM',
+    };
+  }
+
+  const hours24 = Math.floor(parsedMinutes / 60);
+  const minutes = parsedMinutes % 60;
+  const period: TimePeriod = hours24 >= 12 ? 'PM' : 'AM';
+  const hours12 = hours24 % 12 || 12;
+
+  return {
+    hour: String(hours12),
+    minute: formatTimePart(minutes),
+    period,
+  };
+}
+
+function buildTimeValue(hour: string, minute: string, period: TimePeriod): string {
+  if (!hour || !minute) {
+    return '';
+  }
+
+  const numericHour = Number(hour);
+  const numericMinute = Number(minute);
+
+  if (!Number.isFinite(numericHour) || !Number.isFinite(numericMinute)) {
+    return '';
+  }
+
+  const hours24 = period === 'PM'
+    ? numericHour === 12 ? 12 : numericHour + 12
+    : numericHour === 12 ? 0 : numericHour;
+
+  return `${formatTimePart(hours24)}:${formatTimePart(numericMinute)}`;
+}
+
 function getDifferenceLabel(firstValue: number, secondValue: number): string {
   const difference = Math.abs(firstValue - secondValue);
   return difference <= 0.01 ? 'Matches' : `${formatHours(difference)} hr off`;
@@ -301,6 +359,67 @@ function HourSummaryCard({
       {helper && (
         <p className={`text-xs font-semibold ${isMatch ? 'text-green-700 dark:text-green-300' : 'text-gray-500'}`}>{helper}</p>
       )}
+    </div>
+  );
+}
+
+function TimeDetailInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const parsedTime = parseTimeInput(value);
+  const updateTime = (next: Partial<typeof parsedTime>) => {
+    const nextTime = {
+      ...parsedTime,
+      ...next,
+    };
+
+    onChange(buildTimeValue(nextTime.hour, nextTime.minute, nextTime.period));
+  };
+
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
+      <select
+        value={parsedTime.hour}
+        onChange={(event) => updateTime({ hour: event.target.value })}
+        className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+        aria-label="Hour"
+      >
+        <option value="">Hr</option>
+        {Array.from({ length: 12 }, (_, index) => String(index + 1)).map((hour) => (
+          <option key={hour} value={hour}>{hour}</option>
+        ))}
+      </select>
+      <select
+        value={parsedTime.minute}
+        onChange={(event) => updateTime({ minute: event.target.value })}
+        className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+        aria-label="Minute"
+      >
+        <option value="">Min</option>
+        {Array.from({ length: 12 }, (_, index) => formatTimePart(index * 5)).map((minute) => (
+          <option key={minute} value={minute}>{minute}</option>
+        ))}
+      </select>
+      <div className="inline-flex rounded border border-gray-300 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-900" aria-label="AM or PM">
+        {(['AM', 'PM'] as const).map((period) => (
+          <button
+            key={period}
+            type="button"
+            onClick={() => updateTime({ period })}
+            className={`rounded px-2.5 py-1.5 text-xs font-bold transition ${
+              parsedTime.period === period
+                ? 'bg-primary-500 text-white'
+                : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+            }`}
+          >
+            {period}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -487,9 +606,12 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
 
   const updateDailyDetail = (key: string, value: string) => {
     setEntryForm((currentForm) => {
+      const nextValue = numericDetailFields.includes(key)
+        ? sanitizeDecimalInput(value, mileageDetailFields.has(key) ? 5 : undefined)
+        : value;
       const details = {
         ...(currentForm.details || {}),
-        [key]: value,
+        [key]: nextValue,
       };
       const nextForm = {
         ...currentForm,
@@ -510,8 +632,9 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
   };
 
   const updateDutyHours = (value: string) => {
-    setIsDutyHoursManual(value !== '' && value !== lastAutoDutyHoursRef.current);
-    setEntryForm((currentForm) => ({ ...currentForm, dutyHours: value }));
+    const nextValue = sanitizeDecimalInput(value);
+    setIsDutyHoursManual(nextValue !== '' && nextValue !== lastAutoDutyHoursRef.current);
+    setEntryForm((currentForm) => ({ ...currentForm, dutyHours: nextValue }));
   };
 
   const applyShortcut = (shortcut: CalendarShortcut) => {
@@ -917,9 +1040,8 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
               <label className="block">
                 <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Duty Hours</span>
                 <input
-                  type="number"
+                  type="text"
                   min="0"
-                  step="0.01"
                   inputMode="decimal"
                   value={entryForm.dutyHours}
                   onChange={(event) => updateDutyHours(event.target.value)}
@@ -1012,15 +1134,21 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                           return (
                             <label key={key} className="block">
                               <span className="mb-1 block text-xs font-bold uppercase text-gray-500 dark:text-gray-400">{label}</span>
-                              <input
-                                type={isTimeField ? 'time' : 'number'}
-                                min={isTimeField ? undefined : '0'}
-                                step={isTimeField ? undefined : '0.01'}
-                                inputMode={isTimeField ? undefined : 'decimal'}
-                                value={entryForm.details?.[key] || ''}
-                                onChange={(event) => updateDailyDetail(key, event.target.value)}
-                                className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-                              />
+                              {isTimeField ? (
+                                <TimeDetailInput
+                                  value={entryForm.details?.[key] || ''}
+                                  onChange={(value) => updateDailyDetail(key, value)}
+                                />
+                              ) : (
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  maxLength={mileageDetailFields.has(key) ? 8 : undefined}
+                                  value={entryForm.details?.[key] || ''}
+                                  onChange={(event) => updateDailyDetail(key, event.target.value)}
+                                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                                />
+                              )}
                             </label>
                           );
                         })}
