@@ -65,7 +65,13 @@ export class AuthSessionModel {
         return null;
       }
 
-      return AuthAccountModel.getAccountById(session.userId);
+      const account = await AuthAccountModel.getAccountById(session.userId);
+      if (!account?.isActive) {
+        await AuthSessionModel.revokeAllSessions(session.userId);
+        return null;
+      }
+
+      return account;
     } finally {
       conn.release();
     }

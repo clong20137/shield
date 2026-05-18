@@ -1880,6 +1880,14 @@ function App() {
     showToast('info', 'Signed out.');
   };
 
+  const handleForcedLogout = useCallback((message: string) => {
+    clearAuthToken();
+    window.localStorage.removeItem(SESSION_KEY);
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    showToast('error', message);
+  }, []);
+
   const handleAccountUpdate = (account: AuthAccount) => {
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(account));
     setCurrentUser(account);
@@ -1942,13 +1950,14 @@ function App() {
     eventSource.addEventListener('performance-evaluation-updated', () => dispatchAppUpdate('performance-evaluation-updated'));
     eventSource.addEventListener('permission-updated', () => dispatchAppUpdate('permission-updated'));
     eventSource.addEventListener('quick-launch-updated', () => dispatchAppUpdate('quick-launch-updated'));
+    eventSource.addEventListener('session-revoked', () => handleForcedLogout('Your account has been deactivated. Please contact an administrator.'));
     eventSource.addEventListener('user-updated', () => dispatchAppUpdate('user-updated'));
     eventSource.addEventListener('error', (event) => {
       console.error('Application realtime connection error:', event);
     });
 
     return () => eventSource.close();
-  }, [currentUser, loadBugReports, loadUserNotifications]);
+  }, [currentUser, handleForcedLogout, loadBugReports, loadUserNotifications]);
 
   const closeModal = (modal: 'messages' | 'calendar' | 'profile' | 'adminConsole' | 'reportBug' | 'bugTracker') => {
     setClosingModal(modal);

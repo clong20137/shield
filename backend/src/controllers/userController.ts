@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import fs from 'fs';
 import { User, UserModel } from '../models/User';
-import { broadcastAppEvent } from '../services/appEvents';
+import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents';
 import { getSessionAccount } from '../middleware/authSession';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { AuthSessionModel } from '../models/AuthSession';
@@ -258,12 +258,13 @@ export class UserController {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      broadcastAppEvent({ type: 'user-updated', entityId: id });
-      broadcastAppEvent({ type: 'dashboard-updated', entityId: id });
-
       if (validation.value.isActive === false) {
+        broadcastAccountEvent(id, { type: 'session-revoked', entityId: id });
         await AuthSessionModel.revokeAllSessions(id);
       }
+
+      broadcastAppEvent({ type: 'user-updated', entityId: id });
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: id });
 
       res.json({ message: 'User updated successfully' });
     } catch (error) {

@@ -42,6 +42,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState<Partial<User>>({});
   const [supervisorOptions, setSupervisorOptions] = useState<User[]>([]);
+  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
@@ -100,13 +101,19 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     }
   };
 
-  const loadSupervisorOptions = async () => {
+  const loadUserEditOptions = async () => {
     try {
       const response = await userService.getAll(1, 500);
-      setSupervisorOptions(response.data.data);
+      const loadedUsers = response.data.data;
+      const addresses = loadedUsers
+        .flatMap((user) => [user.residentialAddress, user.mailingAddress])
+        .filter((address): address is string => Boolean(address?.trim()));
+
+      setSupervisorOptions(loadedUsers);
+      setAddressSuggestions(Array.from(new Set(addresses)).slice(0, 100));
     } catch (err) {
-      console.error('Failed to load supervisor options:', err);
-      onToast('error', 'Failed to load supervisor list.');
+      console.error('Failed to load user edit options:', err);
+      onToast('error', 'Failed to load user edit options.');
     }
   };
 
@@ -118,8 +125,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
 
     setEditingUser(user);
     setEditForm(user);
-    if (supervisorOptions.length === 0) {
-      void loadSupervisorOptions();
+    if (supervisorOptions.length === 0 || addressSuggestions.length === 0) {
+      void loadUserEditOptions();
     }
   };
 
@@ -483,13 +490,16 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                 </label>
                 <label className="block md:col-span-2 xl:col-span-3">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Residential Address</span>
-                  <textarea value={String(editForm.residentialAddress || '')} onChange={(event) => updateEditField('residentialAddress', event.target.value)} className="min-h-20 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  <input value={String(editForm.residentialAddress || '')} onChange={(event) => updateEditField('residentialAddress', event.target.value)} autoComplete="street-address" list="shield-edit-addresses" className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
                 </label>
                 <label className="block md:col-span-2 xl:col-span-3">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Mailing Address</span>
-                  <textarea value={String(editForm.mailingAddress || '')} onChange={(event) => updateEditField('mailingAddress', event.target.value)} className="min-h-20 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  <input value={String(editForm.mailingAddress || '')} onChange={(event) => updateEditField('mailingAddress', event.target.value)} autoComplete="street-address" list="shield-edit-addresses" className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
                 </label>
               </div>
+              <datalist id="shield-edit-addresses">
+                {addressSuggestions.map((address) => <option key={address} value={address} />)}
+              </datalist>
             </div>
 
             <div className="flex flex-wrap gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-800">

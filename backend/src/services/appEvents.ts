@@ -12,6 +12,7 @@ export type AppEventType =
   | 'performance-evaluation-updated'
   | 'mileage-updated'
   | 'quick-launch-updated'
+  | 'session-revoked'
   | 'user-updated';
 
 interface AppEventPayload {
