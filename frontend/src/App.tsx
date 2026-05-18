@@ -155,6 +155,8 @@ function LoginSplash({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
+  const loginFormRef = useRef<HTMLFormElement | null>(null);
+  const lastAutoSubmittedTwoFactorCodeRef = useRef('');
 
   useEffect(() => {
     authService.getRegistrationSettings()
@@ -171,6 +173,24 @@ function LoginSplash({
         console.error('Failed to load registration settings:', err);
       });
   }, [inviteToken, resetToken]);
+
+  useEffect(() => {
+    const cleanCode = twoFactorCode.replace(/\D/gu, '');
+
+    if (!requiresTwoFactor || mode !== 'login' || cleanCode.length !== 6 || isSubmitting) {
+      if (cleanCode.length !== 6) {
+        lastAutoSubmittedTwoFactorCodeRef.current = '';
+      }
+      return;
+    }
+
+    if (lastAutoSubmittedTwoFactorCodeRef.current === cleanCode) {
+      return;
+    }
+
+    lastAutoSubmittedTwoFactorCodeRef.current = cleanCode;
+    loginFormRef.current?.requestSubmit();
+  }, [isSubmitting, mode, requiresTwoFactor, twoFactorCode]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -295,7 +315,7 @@ function LoginSplash({
         </section>
 
         <section className="flex items-center justify-center px-6 py-10">
-          <form onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-6 shadow-lg dark:border-gray-800 dark:bg-gray-900">
+          <form ref={loginFormRef} onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-6 shadow-lg dark:border-gray-800 dark:bg-gray-900">
             <div className="mb-6">
               <h2 className="mb-2 text-2xl font-bold text-primary-500">
                 {mode === 'register' ? 'Create login' : mode === 'forgot' ? 'Reset password' : mode === 'reset' ? 'Set new password' : 'Sign in'}
@@ -383,10 +403,11 @@ function LoginSplash({
                 <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">2FA code</span>
                 <input
                   value={twoFactorCode}
-                  onChange={(event) => setTwoFactorCode(event.target.value)}
+                  onChange={(event) => setTwoFactorCode(event.target.value.replace(/\D/gu, '').slice(0, 6))}
                   className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
                   autoComplete="one-time-code"
                   inputMode="numeric"
+                  maxLength={6}
                 />
               </label>
             )}
