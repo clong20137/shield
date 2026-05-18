@@ -4,6 +4,7 @@ import { requirePermission } from '../middleware/permissions';
 
 const router = Router();
 
+router.get('/trooper-dailies', requirePermission('reports:trooper-dailies'), ReportController.getTrooperDailies);
 router.get('/by-rank', requirePermission('users:view'), ReportController.getUsersByRank);
 router.get('/by-district', requirePermission('users:view'), ReportController.getUsersByDistrict);
 router.get('/by-employment-type', requirePermission('users:view'), ReportController.getUsersByEmploymentType);

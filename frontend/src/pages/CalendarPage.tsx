@@ -182,50 +182,6 @@ const numericDetailFields = trooperDailySections
   .flatMap((section) => section.fields.map(([key]) => key))
   .filter((key) => !timeDetailFields.has(key));
 
-const dailyTemplates = [
-  {
-    label: 'Regular Shift',
-    dutyHours: '8',
-    specialStatus: 'None',
-    details: {
-      regularDutyHours: '8',
-      patrolHours: '8',
-    },
-  },
-  {
-    label: 'Day Off',
-    dutyHours: '0',
-    specialStatus: 'None',
-    details: {
-      regularDaysOff: '1',
-    },
-  },
-  {
-    label: 'Court',
-    dutyHours: '8',
-    specialStatus: 'None',
-    details: {
-      trafficCourtHours: '8',
-    },
-  },
-  {
-    label: 'Crash',
-    dutyHours: '8',
-    specialStatus: 'None',
-    details: {
-      crashInvestHours: '8',
-    },
-  },
-  {
-    label: 'Admin',
-    dutyHours: '8',
-    specialStatus: 'None',
-    details: {
-      incidentReportHours: '8',
-    },
-  },
-] as const;
-
 const getDefaultDistrict = (currentUser?: AuthAccount) =>
   currentUser?.district && districtOptions.includes(currentUser.district)
     ? currentUser.district
@@ -556,20 +512,6 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
   const updateDutyHours = (value: string) => {
     setIsDutyHoursManual(value !== '' && value !== lastAutoDutyHoursRef.current);
     setEntryForm((currentForm) => ({ ...currentForm, dutyHours: value }));
-  };
-
-  const applyTemplate = (template: typeof dailyTemplates[number]) => {
-    setEntryForm((currentForm) => ({
-      ...currentForm,
-      dutyHours: template.dutyHours,
-      specialStatus: template.specialStatus,
-      details: {
-        ...(currentForm.details || {}),
-        ...template.details,
-      },
-    }));
-    setIsDutyHoursManual(false);
-    lastAutoDutyHoursRef.current = template.dutyHours;
   };
 
   const applyShortcut = (shortcut: CalendarShortcut) => {
@@ -908,7 +850,7 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                   <div>
                     <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Daily Shortcuts</h3>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      Start with a common daily type, copy your last entry, or zero out blank count fields.
+                      Apply your saved autofill shortcuts, copy your last entry, or zero out blank count fields.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -920,20 +862,8 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                     </button>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {dailyTemplates.map((template) => (
-                    <button
-                      key={template.label}
-                      type="button"
-                      onClick={() => applyTemplate(template)}
-                      className="rounded border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-primary-500 shadow-sm hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-950 dark:text-blue-100"
-                    >
-                      {template.label}
-                    </button>
-                  ))}
-                </div>
                 {shortcuts.length > 0 && (
-                  <div className="mt-3 border-t border-accent/20 pt-3">
+                  <div className="border-t border-accent/20 pt-3">
                     <p className="mb-2 text-xs font-bold uppercase text-gray-500 dark:text-gray-400">My Shortcuts</p>
                     <div className="flex flex-wrap gap-2">
                       {shortcuts.map((shortcut) => (

@@ -17,6 +17,7 @@ const permissionOptions = [
   { key: 'users:edit', label: 'Edit users' },
   { key: 'devices:manage', label: 'Manage devices' },
   { key: 'calendar:manage', label: 'Manage calendar' },
+  { key: 'reports:trooper-dailies', label: 'View Trooper Daily reports' },
   { key: 'audit:view', label: 'View audit log' },
   { key: 'roles:manage', label: 'Manage roles' },
   { key: 'messages:send', label: 'Send messages' },

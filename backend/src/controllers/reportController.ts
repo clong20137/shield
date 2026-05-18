@@ -16,7 +16,136 @@ interface AccountStatisticsRow extends RowDataPacket {
   standardAccounts: number;
 }
 
+interface TrooperDailyReportRow extends RowDataPacket {
+  id: string;
+  ownerAccountId: string;
+  entryDate: Date | string;
+  dutyHours: number | string;
+  districtWorked: string;
+  specialStatus: string;
+  color: string;
+  details: string | Record<string, string> | null;
+  createdAt: Date;
+  updatedAt: Date;
+  firstName: string;
+  lastName: string;
+  email: string;
+  peNumber: string;
+  badgeNumber: string;
+  rank: string;
+  district: string;
+}
+
+function formatReportDate(value: Date | string): string {
+  if (typeof value === 'string') {
+    return value.slice(0, 10);
+  }
+
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseDetails(value: string | Record<string, string> | null): Record<string, string> {
+  if (!value) return {};
+  if (typeof value !== 'string') return value;
+
+  try {
+    return JSON.parse(value || '{}');
+  } catch {
+    return {};
+  }
+}
+
 export class ReportController {
+  static async getTrooperDailies(req: Request, res: Response) {
+    let conn;
+    try {
+      conn = await pool.getConnection();
+      const { q, from, to, district } = req.query;
+      const params: Array<string> = [];
+      let query = `
+        SELECT
+          ce.*,
+          u.\`firstName\`,
+          u.\`lastName\`,
+          u.\`email\`,
+          u.\`peNumber\`,
+          u.\`badgeNumber\`,
+          u.\`rank\`,
+          u.\`district\`
+        FROM calendar_entries ce
+        LEFT JOIN users u ON u.\`id\` = ce.\`ownerAccountId\`
+        WHERE ce.\`category\` = 'Trooper Daily'
+      `;
+
+      if (typeof q === 'string' && q.trim()) {
+        const search = `%${q.trim().toLowerCase()}%`;
+        query += `
+          AND (
+            LOWER(u.\`firstName\`) LIKE ?
+            OR LOWER(u.\`lastName\`) LIKE ?
+            OR LOWER(u.\`email\`) LIKE ?
+            OR LOWER(u.\`peNumber\`) LIKE ?
+            OR LOWER(u.\`badgeNumber\`) LIKE ?
+            OR LOWER(u.\`rank\`) LIKE ?
+            OR LOWER(u.\`district\`) LIKE ?
+            OR LOWER(ce.\`districtWorked\`) LIKE ?
+          )
+        `;
+        params.push(search, search, search, search, search, search, search, search);
+      }
+
+      if (typeof from === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(from)) {
+        query += ' AND ce.`entryDate` >= ?';
+        params.push(from);
+      }
+
+      if (typeof to === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(to)) {
+        query += ' AND ce.`entryDate` <= ?';
+        params.push(to);
+      }
+
+      if (typeof district === 'string' && district.trim()) {
+        query += ' AND ce.`districtWorked` = ?';
+        params.push(district.trim());
+      }
+
+      query += ' ORDER BY ce.`entryDate` DESC, u.`lastName`, u.`firstName` LIMIT 500';
+
+      const [rows] = await conn.query<TrooperDailyReportRow[]>(query, params);
+      const data = rows.map((row) => ({
+        id: row.id,
+        ownerAccountId: row.ownerAccountId,
+        date: formatReportDate(row.entryDate),
+        dutyHours: String(row.dutyHours).replace(/\.?0+$/u, ''),
+        districtWorked: row.districtWorked,
+        specialStatus: row.specialStatus,
+        color: row.color,
+        details: parseDetails(row.details),
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        user: {
+          firstName: row.firstName || '',
+          lastName: row.lastName || '',
+          email: row.email || '',
+          peNumber: row.peNumber || '',
+          badgeNumber: row.badgeNumber || '',
+          rank: row.rank || '',
+          district: row.district || '',
+        },
+      }));
+
+      res.json({ count: data.length, data });
+    } catch (error) {
+      console.error('Trooper daily report error:', error);
+      res.status(500).json({ error: 'Failed to load Trooper Daily reports' });
+    } finally {
+      conn?.release();
+    }
+  }
+
   static async getUsersByRank(req: Request, res: Response) {
     let conn;
     try {

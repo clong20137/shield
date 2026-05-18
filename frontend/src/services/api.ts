@@ -208,6 +208,28 @@ export interface CalendarShortcut {
   updatedAt: string;
 }
 
+export interface TrooperDailyReportEntry {
+  id: string;
+  ownerAccountId: string;
+  date: string;
+  dutyHours: string;
+  districtWorked: string;
+  specialStatus: string;
+  color: string;
+  details: Record<string, string>;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    peNumber: string;
+    badgeNumber: string;
+    rank: string;
+    district: string;
+  };
+}
+
 export interface AuditLog {
   id: string;
   actorId: string | null;
@@ -509,6 +531,9 @@ export const reportService = {
   
   getDetailedReport: (filters?: UserFilters) =>
     api.get('/reports/detailed', { params: filters }),
+
+  getTrooperDailies: (filters?: { q?: string; from?: string; to?: string; district?: string }) =>
+    api.get<{ count: number; data: TrooperDailyReportEntry[] }>('/reports/trooper-dailies', { params: filters }),
 };
 
 export const calendarService = {
