@@ -34,4 +34,20 @@ export class NotificationController {
       res.status(500).json({ error: 'Failed to update notification' });
     }
   }
+
+  static async clearAll(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const cleared = await UserNotificationModel.clearForUser(account.id);
+      broadcastAccountEvent(account.id, { type: 'notification-updated' });
+      res.json({ message: 'Notifications cleared', cleared });
+    } catch (error) {
+      console.error('Clear notifications error:', error);
+      res.status(500).json({ error: 'Failed to clear notifications' });
+    }
+  }
 }

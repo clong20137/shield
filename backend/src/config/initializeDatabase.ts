@@ -106,6 +106,9 @@ export async function initializeDatabase() {
       \`maritalStatus\` VARCHAR(50),
       \`residentialAddress\` TEXT,
       \`mailingAddress\` TEXT,
+      \`emergencyContactName\` VARCHAR(150),
+      \`emergencyContactRelationship\` VARCHAR(100),
+      \`emergencyContactPhone\` VARCHAR(50),
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX \`idx_firstName\` (\`firstName\`),
@@ -134,6 +137,9 @@ export async function initializeDatabase() {
   await ensureColumn('users', 'maritalStatus', '`maritalStatus` VARCHAR(50)');
   await ensureColumn('users', 'residentialAddress', '`residentialAddress` TEXT');
   await ensureColumn('users', 'mailingAddress', '`mailingAddress` TEXT');
+  await ensureColumn('users', 'emergencyContactName', '`emergencyContactName` VARCHAR(150)');
+  await ensureColumn('users', 'emergencyContactRelationship', '`emergencyContactRelationship` VARCHAR(100)');
+  await ensureColumn('users', 'emergencyContactPhone', '`emergencyContactPhone` VARCHAR(50)');
   await ensureIndex('users', 'idx_users_email', '`email`');
   await ensureIndex('users', 'idx_users_rank', '`rank`');
   await ensureIndex('users', 'idx_users_name', '`lastName`, `firstName`');

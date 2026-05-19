@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Calculator, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCopy, Pencil, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { Calculator, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCopy, Pencil, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, CalendarShortcut, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
@@ -340,6 +340,19 @@ function buildTimeValue(time: string, period: TimePeriod): string {
   return `${formatTimePart(hours24)}:${formatTimePart(numericMinute)}`;
 }
 
+function buildMilitaryTimeValue(time: string): string {
+  const match = /^(\d{1,2}):(\d{2})$/u.exec(time);
+  if (!match) return '';
+
+  const numericHour = Number(match[1]);
+  const numericMinute = Number(match[2]);
+  if (!Number.isFinite(numericHour) || !Number.isFinite(numericMinute) || numericHour < 0 || numericHour > 23 || numericMinute < 0 || numericMinute > 59) {
+    return '';
+  }
+
+  return `${formatTimePart(numericHour)}:${formatTimePart(numericMinute)}`;
+}
+
 function getDifferenceLabel(firstValue: number, secondValue: number): string {
   const difference = Math.abs(firstValue - secondValue);
   return difference <= 0.01 ? 'Matches' : `${formatHours(difference)} hr off`;
@@ -396,19 +409,21 @@ function TimeDetailInput({
   value,
   onChange,
   isComplete = false,
+  useMilitaryTime = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   isComplete?: boolean;
+  useMilitaryTime?: boolean;
 }) {
   const parsedTime = parseTimeInput(value);
-  const [displayTime, setDisplayTime] = useState(parsedTime.time);
+  const [displayTime, setDisplayTime] = useState(useMilitaryTime ? value : parsedTime.time);
   const [displayPeriod, setDisplayPeriod] = useState<TimePeriod>(parsedTime.period);
 
   useEffect(() => {
-    setDisplayTime(parsedTime.time);
+    setDisplayTime(useMilitaryTime ? value : parsedTime.time);
     setDisplayPeriod(parsedTime.period);
-  }, [parsedTime.period, parsedTime.time]);
+  }, [parsedTime.period, parsedTime.time, useMilitaryTime, value]);
 
   const commitTime = (time: string, period = displayPeriod) => {
     if (!time) {
@@ -416,14 +431,14 @@ function TimeDetailInput({
       return;
     }
 
-    const nextValue = buildTimeValue(time, period);
+    const nextValue = useMilitaryTime ? buildMilitaryTimeValue(time) : buildTimeValue(time, period);
     if (nextValue) {
       onChange(nextValue);
     }
   };
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+    <div className={`grid gap-2 ${useMilitaryTime ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_auto]'}`}>
       <div className="relative min-w-0">
         <input
           type="text"
@@ -441,7 +456,7 @@ function TimeDetailInput({
             setDisplayTime(normalizedTime);
             commitTime(normalizedTime, displayPeriod);
           }}
-          placeholder="HH:MM"
+          placeholder={useMilitaryTime ? '00:00' : 'HH:MM'}
           inputMode="numeric"
           maxLength={5}
           className={`w-full rounded border bg-white px-3 py-2 pr-8 text-sm transition dark:bg-gray-900 ${
@@ -457,7 +472,7 @@ function TimeDetailInput({
           </span>
         )}
       </div>
-      <div className="inline-flex rounded border border-gray-300 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-900" aria-label="AM or PM">
+      {!useMilitaryTime && <div className="inline-flex rounded border border-gray-300 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-900" aria-label="AM or PM">
         {(['AM', 'PM'] as const).map((period) => (
           <button
             key={period}
@@ -475,7 +490,7 @@ function TimeDetailInput({
             {period}
           </button>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -489,7 +504,7 @@ function calculateShiftHours(details: Record<string, string>): number {
   );
 }
 
-function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAccount; onOpenCalculator?: () => void }) {
+function CalendarPage({ currentUser, onOpenCalculator, useMilitaryTime = false }: { currentUser: AuthAccount; onOpenCalculator?: () => void; useMilitaryTime?: boolean }) {
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -503,6 +518,7 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
   const [districtFilter, setDistrictFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [entryPendingDelete, setEntryPendingDelete] = useState<CalendarEntry | null>(null);
+  const [collapsedDailySections, setCollapsedDailySections] = useState<string[]>([]);
   const [shortcuts, setShortcuts] = useState<CalendarShortcut[]>([]);
   const [shortcutName, setShortcutName] = useState('');
   const [editingShortcutId, setEditingShortcutId] = useState<string | null>(null);
@@ -1216,13 +1232,27 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                         : 'border-gray-200 dark:border-gray-800'
                     }`}>
                       <div className="mb-4 flex items-center justify-between gap-3">
-                        <h3 className="flex items-center gap-2 text-base font-bold text-gray-900 dark:text-gray-100">
-                          {section.title}
-                          {isSectionComplete(entryForm.details, section) && <CheckCircle2 className="trooper-daily-check text-green-600 dark:text-green-300" size={18} />}
-                        </h3>
-                        <span className={`h-1.5 w-10 rounded-full ${isSectionComplete(entryForm.details, section) ? 'bg-green-500' : 'bg-accent'}`} />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCollapsedDailySections((sections) =>
+                              sections.includes(section.title)
+                                ? sections.filter((title) => title !== section.title)
+                                : [...sections, section.title],
+                            )
+                          }
+                          className="flex min-w-0 items-center gap-2 text-left"
+                          aria-expanded={!collapsedDailySections.includes(section.title)}
+                        >
+                          <ChevronDown className={`shrink-0 text-gray-400 transition ${collapsedDailySections.includes(section.title) ? '-rotate-90' : ''}`} size={18} />
+                          <h3 className="flex min-w-0 items-center gap-2 text-base font-bold text-gray-900 dark:text-gray-100">
+                            {section.title}
+                            {isSectionComplete(entryForm.details, section) && <CheckCircle2 className="trooper-daily-check shrink-0 text-green-600 dark:text-green-300" size={18} />}
+                          </h3>
+                        </button>
+                        <span className={`h-1.5 w-10 shrink-0 rounded-full ${isSectionComplete(entryForm.details, section) ? 'bg-green-500' : 'bg-accent'}`} />
                       </div>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {!collapsedDailySections.includes(section.title) && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {section.fields.map(([key, label]) => {
                           const isTimeField = timeDetailFields.has(key);
                           const isComplete = isDetailComplete(entryForm.details, key);
@@ -1234,6 +1264,7 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                                   value={entryForm.details?.[key] || ''}
                                   onChange={(value) => updateDailyDetail(key, value)}
                                   isComplete={isComplete}
+                                  useMilitaryTime={useMilitaryTime}
                                 />
                               ) : (
                                 <div className="relative">
@@ -1259,7 +1290,7 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                             </label>
                           );
                         })}
-                      </div>
+                      </div>}
                     </section>
                   ))}
 
@@ -1358,10 +1389,10 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
             </div>
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setEntryPendingDelete(null)} className="btn-secondary" aria-label="Cancel delete" title="Cancel">
-                <X size={16} />
+                Cancel
               </button>
               <button type="button" onClick={() => deleteEntry(entryPendingDelete)} className="btn-danger" aria-label="Delete entry" title="Delete">
-                <Trash2 size={16} />
+                Delete
               </button>
             </div>
           </div>

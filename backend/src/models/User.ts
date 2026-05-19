@@ -31,6 +31,9 @@ export interface User {
   maritalStatus: string;
   residentialAddress: string;
   mailingAddress: string;
+  emergencyContactName: string;
+  emergencyContactRelationship: string;
+  emergencyContactPhone: string;
   role: string;
   receivesMessages: boolean;
   createdAt: Date;
@@ -69,6 +72,9 @@ export class UserModel {
     'maritalStatus',
     'residentialAddress',
     'mailingAddress',
+    'emergencyContactName',
+    'emergencyContactRelationship',
+    'emergencyContactPhone',
     'receivesMessages',
   ] as const;
 
@@ -99,6 +105,9 @@ export class UserModel {
     maritalStatus: '`maritalStatus`',
     residentialAddress: '`residentialAddress`',
     mailingAddress: '`mailingAddress`',
+    emergencyContactName: '`emergencyContactName`',
+    emergencyContactRelationship: '`emergencyContactRelationship`',
+    emergencyContactPhone: '`emergencyContactPhone`',
     receivesMessages: '`receivesMessages`',
   };
 
@@ -251,8 +260,9 @@ export class UserModel {
           \`radioNumber\`, \`personalPhoneNumber\`, \`departmentPhoneNumber\`, \`assignedTo\`, \`district\`, \`rank\`,
           \`isActive\`, \`employmentType\`, \`typeDetails\`, \`status\`, \`supervisor\`, \`specialtyCertifications\`,
           \`publicSafetyId\`, \`race\`, \`sex\`, \`maritalStatus\`, \`residentialAddress\`, \`mailingAddress\`,
+          \`emergencyContactName\`, \`emergencyContactRelationship\`, \`emergencyContactPhone\`,
           \`receivesMessages\`, \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           user.firstName,
@@ -284,6 +294,9 @@ export class UserModel {
           user.maritalStatus,
           user.residentialAddress,
           user.mailingAddress,
+          user.emergencyContactName,
+          user.emergencyContactRelationship,
+          user.emergencyContactPhone,
           user.receivesMessages === false ? 0 : 1,
           now,
           now,

@@ -167,6 +167,9 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           <DetailRow label="Department Phone" value={user.departmentPhoneNumber} />
           <DetailRow label="Residential Address" value={user.residentialAddress} />
           <DetailRow label="Mailing Address" value={user.mailingAddress} />
+          <DetailRow label="Emergency Contact" value={user.emergencyContactName} />
+          <DetailRow label="Emergency Relationship" value={user.emergencyContactRelationship} />
+          <DetailRow label="Emergency Phone" value={user.emergencyContactPhone} />
         </DetailSection>}
 
         {activeTab === 'additional' && <DetailSection title="Additional">

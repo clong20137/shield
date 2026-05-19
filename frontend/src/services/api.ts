@@ -151,6 +151,9 @@ export interface User {
   maritalStatus: string;
   residentialAddress: string;
   mailingAddress: string;
+  emergencyContactName: string;
+  emergencyContactRelationship: string;
+  emergencyContactPhone: string;
   role: string;
   receivesMessages: boolean;
   createdAt: string;
@@ -752,6 +755,9 @@ export const notificationService = {
 
   markRead: (id: string) =>
     api.put(`/notifications/${id}/read`),
+
+  clearAll: () =>
+    api.delete<{ message: string; cleared: number }>('/notifications'),
 };
 
 export const quickLaunchService = {

@@ -5,6 +5,7 @@ import { requireAuthenticated } from '../middleware/authSession';
 const router = Router();
 
 router.get('/', requireAuthenticated(), NotificationController.list);
+router.delete('/', requireAuthenticated(), NotificationController.clearAll);
 router.put('/:id/read', requireAuthenticated(), NotificationController.markRead);
 
 export default router;

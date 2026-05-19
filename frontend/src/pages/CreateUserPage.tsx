@@ -59,6 +59,9 @@ const emptyUserForm: UserForm = {
   maritalStatus: '',
   residentialAddress: '',
   mailingAddress: '',
+  emergencyContactName: '',
+  emergencyContactRelationship: '',
+  emergencyContactPhone: '',
   role: 'user',
   receivesMessages: true,
   password: '',
@@ -221,6 +224,18 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
           <label className="block md:col-span-2 xl:col-span-3">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Mailing Address</span>
             <input value={form.mailingAddress} onChange={(event) => updateField('mailingAddress', event.target.value)} autoComplete="street-address" list="shield-addresses" className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Emergency Contact Name</span>
+            <input value={form.emergencyContactName} onChange={(event) => updateField('emergencyContactName', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Emergency Contact Relationship</span>
+            <input value={form.emergencyContactRelationship} onChange={(event) => updateField('emergencyContactRelationship', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Emergency Contact Phone</span>
+            <input type="tel" inputMode="tel" placeholder="(555) 555-5555" value={form.emergencyContactPhone} onChange={(event) => updateField('emergencyContactPhone', formatPhoneNumber(event.target.value))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
           </label>
         </div>
         <datalist id="shield-addresses">

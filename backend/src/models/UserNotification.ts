@@ -79,4 +79,18 @@ export class UserNotificationModel {
       conn.release();
     }
   }
+
+  static async clearForUser(userId: string): Promise<number> {
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>(
+        'DELETE FROM user_notifications WHERE `userId` = ?',
+        [userId]
+      );
+
+      return result.affectedRows;
+    } finally {
+      conn.release();
+    }
+  }
 }

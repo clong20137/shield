@@ -25,6 +25,7 @@ const MODAL_CLOSE_MS = 220;
 interface MessagePreferences {
   receiveMessages: boolean;
   playMessageSound: boolean;
+  useMilitaryTime: boolean;
 }
 
 type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'calculator' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
@@ -42,6 +43,7 @@ interface QuickLaunchApp {
 const defaultMessagePreferences: MessagePreferences = {
   receiveMessages: true,
   playMessageSound: true,
+  useMilitaryTime: false,
 };
 
 const quickLaunchApps: QuickLaunchApp[] = [
@@ -2105,6 +2107,19 @@ function App() {
     }
   };
 
+  const clearAllNotifications = async () => {
+    setNotifications([]);
+    setUserNotifications([]);
+    try {
+      await notificationService.clearAll();
+      window.dispatchEvent(new CustomEvent('shield:notification-updated'));
+    } catch (err) {
+      console.error('Failed to clear notifications:', err);
+      showToast('error', 'Failed to clear notifications.');
+      void loadUserNotifications();
+    }
+  };
+
   const openNotification = async (notification: UserNotification) => {
     await markNotificationRead(notification);
     setIsNotificationsOpen(false);
@@ -2337,7 +2352,7 @@ function App() {
                         <h3 className="text-base font-bold text-primary-500 dark:text-blue-100">Notifications</h3>
                         <button
                           type="button"
-                          onClick={() => setNotifications([])}
+                          onClick={clearAllNotifications}
                           className="text-xs font-semibold text-gray-500 hover:text-primary-500 dark:text-gray-400"
                         >
                           Clear
@@ -2561,7 +2576,7 @@ function App() {
                   </button>
                 </div>
                 <div className="min-h-0 flex-1">
-                  <CalendarPage currentUser={currentUser} onOpenCalculator={() => setIsCalculatorOpen(true)} />
+                  <CalendarPage currentUser={currentUser} onOpenCalculator={() => setIsCalculatorOpen(true)} useMilitaryTime={messagePreferences.useMilitaryTime} />
                 </div>
               </div>
             </div>
@@ -2592,6 +2607,12 @@ function App() {
                       setMessagePreferences((preferences) => ({
                         ...preferences,
                         playMessageSound,
+                      }))
+                    }
+                    onMilitaryTimeChange={(useMilitaryTime) =>
+                      setMessagePreferences((preferences) => ({
+                        ...preferences,
+                        useMilitaryTime,
                       }))
                     }
                     onOpenEvaluations={() => closeModal('profile')}

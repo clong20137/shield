@@ -19,6 +19,9 @@ const selfEditableFields = new Set([
   'departmentPhoneNumber',
   'residentialAddress',
   'mailingAddress',
+  'emergencyContactName',
+  'emergencyContactRelationship',
+  'emergencyContactPhone',
   'maritalStatus',
 ]);
 
@@ -75,6 +78,7 @@ function validateUserPayload(body: Record<string, unknown>, isCreate: boolean): 
   const maritalStatus = cleanString(body.maritalStatus, 30);
   const personalPhoneNumber = normalizePhone(body.personalPhoneNumber);
   const departmentPhoneNumber = normalizePhone(body.departmentPhoneNumber);
+  const emergencyContactPhone = normalizePhone(body.emergencyContactPhone);
 
   if ((isCreate || has('firstName') || has('lastName')) && (!firstName || !lastName)) {
     return { error: 'First and last name are required' };
@@ -102,6 +106,10 @@ function validateUserPayload(body: Record<string, unknown>, isCreate: boolean): 
 
   if ((has('personalPhoneNumber') && !isValidPhone(personalPhoneNumber)) || (has('departmentPhoneNumber') && !isValidPhone(departmentPhoneNumber))) {
     return { error: 'Phone numbers must be valid 10-digit phone numbers' };
+  }
+
+  if (has('emergencyContactPhone') && !isValidPhone(emergencyContactPhone)) {
+    return { error: 'Emergency contact phone must be a valid 10-digit phone number' };
   }
 
   const cleaned: Record<string, unknown> = {};
@@ -138,6 +146,9 @@ function validateUserPayload(body: Record<string, unknown>, isCreate: boolean): 
   if (isCreate || has('maritalStatus')) cleaned.maritalStatus = maritalStatus;
   setCleanMultiline('residentialAddress', 1000);
   setCleanMultiline('mailingAddress', 1000);
+  setCleanString('emergencyContactName', 150);
+  setCleanString('emergencyContactRelationship', 100);
+  if (isCreate || has('emergencyContactPhone')) cleaned.emergencyContactPhone = emergencyContactPhone;
   if (isCreate || has('receivesMessages')) cleaned.receivesMessages = body.receivesMessages !== false;
 
   return {

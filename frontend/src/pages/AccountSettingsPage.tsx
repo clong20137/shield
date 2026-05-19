@@ -10,9 +10,11 @@ interface AccountSettingsPageProps {
   messagePreferences: {
     receiveMessages: boolean;
     playMessageSound: boolean;
+    useMilitaryTime: boolean;
   };
   onReceiveMessagesChange: (receiveMessages: boolean) => void;
   onMessageSoundChange: (playMessageSound: boolean) => void;
+  onMilitaryTimeChange: (useMilitaryTime: boolean) => void;
   onOpenEvaluations?: () => void;
   onAccountUpdate: (account: AuthAccount) => void;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
@@ -35,6 +37,7 @@ export function AccountSettingsPage({
   messagePreferences,
   onReceiveMessagesChange,
   onMessageSoundChange,
+  onMilitaryTimeChange,
   onOpenEvaluations,
   onAccountUpdate,
   onToast,
@@ -618,6 +621,18 @@ export function AccountSettingsPage({
               checked={messagePreferences.playMessageSound}
               disabled={!messagePreferences.receiveMessages}
               onChange={(event) => onMessageSoundChange(event.target.checked)}
+            />
+          </label>
+
+          <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
+            <span>
+              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Military time for Trooper Dailies</span>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Use 24-hour time inputs instead of AM/PM toggles.</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={messagePreferences.useMilitaryTime}
+              onChange={(event) => onMilitaryTimeChange(event.target.checked)}
             />
           </label>
         </section>
