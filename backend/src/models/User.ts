@@ -107,6 +107,18 @@ export class UserModel {
     return trimmedValue ? trimmedValue : null;
   }
 
+  private static normalizeUpdateValue(key: string, value: unknown): string | boolean | Date | null {
+    if (['email', 'peNumber', 'badgeNumber', 'publicSafetyId'].includes(key)) {
+      return typeof value === 'string' ? UserModel.blankToNull(value) : null;
+    }
+
+    if (key === 'isActive' || key === 'receivesMessages') {
+      return value === false ? false : true;
+    }
+
+    return value as string | boolean | Date | null;
+  }
+
   static async searchUsers(
     searchTerm: string,
     filters?: Partial<User>
@@ -294,7 +306,7 @@ export class UserModel {
       Object.entries(updates).forEach(([key, value]) => {
         if (UserModel.editableFields.includes(key as typeof UserModel.editableFields[number])) {
           fields.push(`${UserModel.columnNames[key as typeof UserModel.editableFields[number]]} = ?`);
-          values.push(value as string | boolean | null);
+          values.push(UserModel.normalizeUpdateValue(key, value));
         }
       });
 

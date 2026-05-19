@@ -42,7 +42,13 @@ function PermissionsPage({
   const [editRoleName, setEditRoleName] = useState('');
   const [editRolePermissions, setEditRolePermissions] = useState<string[]>([]);
   const [isSavingRole, setIsSavingRole] = useState(false);
-  const [registrationSettings, setRegistrationSettings] = useState<RegistrationSettings>({ mode: 'public', appBaseUrl: window.location.origin, maintenanceMode: false });
+  const [registrationSettings, setRegistrationSettings] = useState<RegistrationSettings>({
+    mode: 'public',
+    appBaseUrl: window.location.origin,
+    maintenanceMode: false,
+    loginWarningEnabled: true,
+    loginWarningMessage: 'This is a Indiana State Police computer application system that is for Official use only. This system is subject to monitoring. Therefore, no expectation of privacy is to be assumed. Individuals found performing unauthorized activities may be subject to disciplinary action including criminal prosecution.',
+  });
   const [inviteEmail, setInviteEmail] = useState('');
   const [invites, setInvites] = useState<AuthInvite[]>([]);
   const [latestInvite, setLatestInvite] = useState<AuthInvite | null>(null);
@@ -386,6 +392,26 @@ function PermissionsPage({
               type="checkbox"
               checked={registrationSettings.maintenanceMode}
               onChange={(event) => setRegistrationSettings((settings) => ({ ...settings, maintenanceMode: event.target.checked }))}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800 lg:col-span-3">
+            <span>
+              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Login warning acknowledgement</span>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Require users to acknowledge an official-use warning on every sign-in.</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={registrationSettings.loginWarningEnabled}
+              onChange={(event) => setRegistrationSettings((settings) => ({ ...settings, loginWarningEnabled: event.target.checked }))}
+            />
+          </label>
+          <label className="lg:col-span-3">
+            <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Login Warning Message</span>
+            <textarea
+              value={registrationSettings.loginWarningMessage}
+              onChange={(event) => setRegistrationSettings((settings) => ({ ...settings, loginWarningMessage: event.target.value }))}
+              className="min-h-32 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+              disabled={!registrationSettings.loginWarningEnabled}
             />
           </label>
         </form>

@@ -195,6 +195,8 @@ export interface RegistrationSettings {
   mode: RegistrationMode;
   appBaseUrl: string;
   maintenanceMode: boolean;
+  loginWarningEnabled: boolean;
+  loginWarningMessage: string;
 }
 
 export interface AuthInvite {

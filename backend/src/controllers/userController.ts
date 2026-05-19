@@ -40,6 +40,30 @@ function isDuplicateUserError(error: unknown): boolean {
   );
 }
 
+function getDuplicateUserMessage(error: unknown): string {
+  const text = typeof error === 'object' && error !== null
+    ? `${(error as { sqlMessage?: string; message?: string }).sqlMessage || ''} ${(error as { message?: string }).message || ''}`.toLowerCase()
+    : '';
+
+  if (text.includes('penumber')) {
+    return 'That PE number is already assigned to another user.';
+  }
+
+  if (text.includes('badgenumber')) {
+    return 'That badge number is already assigned to another user.';
+  }
+
+  if (text.includes('publicsafetyid')) {
+    return 'That public safety ID is already assigned to another user.';
+  }
+
+  if (text.includes('email')) {
+    return 'That email is already assigned to another user.';
+  }
+
+  return 'A unique user identifier is already assigned to another user.';
+}
+
 function validateUserPayload(body: Record<string, unknown>, isCreate: boolean): { value?: Record<string, unknown>; error?: string } {
   const has = (field: string) => Object.prototype.hasOwnProperty.call(body, field);
   const firstName = cleanString(body.firstName, 100);
@@ -225,7 +249,7 @@ export class UserController {
       res.status(201).json(user);
     } catch (error) {
       if (isDuplicateUserError(error)) {
-        return res.status(409).json({ error: 'A user with that email, PE number, badge number, or identifier already exists' });
+        return res.status(409).json({ error: getDuplicateUserMessage(error) });
       }
 
       console.error('Create user error:', error);
@@ -268,7 +292,7 @@ export class UserController {
       res.json({ message: 'User updated successfully' });
     } catch (error) {
       if (isDuplicateUserError(error)) {
-        return res.status(409).json({ error: 'A user with that email, PE number, badge number, or identifier already exists' });
+        return res.status(409).json({ error: getDuplicateUserMessage(error) });
       }
 
       console.error('Update user error:', error);

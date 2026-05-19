@@ -155,6 +155,8 @@ function LoginSplash({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
+  const [isLoginWarningOpen, setIsLoginWarningOpen] = useState(false);
+  const [hasAcknowledgedLoginWarning, setHasAcknowledgedLoginWarning] = useState(false);
   const loginFormRef = useRef<HTMLFormElement | null>(null);
   const lastAutoSubmittedTwoFactorCodeRef = useRef('');
 
@@ -261,6 +263,11 @@ function LoginSplash({
 
     if (requiresTwoFactor && !twoFactorCode.trim()) {
       setError('Enter your 2FA code.');
+      return;
+    }
+
+    if (mode === 'login' && registrationSettings?.loginWarningEnabled && !hasAcknowledgedLoginWarning) {
+      setIsLoginWarningOpen(true);
       return;
     }
 
@@ -451,6 +458,32 @@ function LoginSplash({
           </form>
         </section>
       </div>
+      {isLoginWarningOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-xl rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Official Use Warning</h2>
+            <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300">
+              {registrationSettings?.loginWarningMessage}
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button type="button" className="btn-secondary" onClick={() => setIsLoginWarningOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  setHasAcknowledgedLoginWarning(true);
+                  setIsLoginWarningOpen(false);
+                  window.setTimeout(() => loginFormRef.current?.requestSubmit(), 0);
+                }}
+              >
+                Acknowledge
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

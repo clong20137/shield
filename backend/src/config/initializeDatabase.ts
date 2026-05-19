@@ -419,7 +419,10 @@ export async function initializeDatabase() {
     INSERT IGNORE INTO system_settings (\`settingKey\`, \`settingValue\`)
     VALUES
       ('registrationMode', 'public'),
-      ('appBaseUrl', 'http://localhost:3000')
+      ('appBaseUrl', 'http://localhost:3000'),
+      ('maintenanceMode', 'false'),
+      ('loginWarningEnabled', 'true'),
+      ('loginWarningMessage', 'This is a Indiana State Police computer application system that is for Official use only. This system is subject to monitoring. Therefore, no expectation of privacy is to be assumed. Individuals found performing unauthorized activities may be subject to disciplinary action including criminal prosecution.')
   `);
 
   await pool.query(`

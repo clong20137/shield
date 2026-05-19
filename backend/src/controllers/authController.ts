@@ -7,7 +7,9 @@ import { SystemSettingModel } from '../models/SystemSetting';
 import { getBearerToken, getSessionAccount } from '../middleware/authSession';
 import { broadcastAppEvent } from '../services/appEvents';
 import { sendEmail } from '../services/emailService';
-import { cleanString, isOneOf, isStrongPassword, isValidEmail, normalizeEmail } from '../utils/validation';
+import { cleanMultiline, cleanString, isOneOf, isStrongPassword, isValidEmail, normalizeEmail } from '../utils/validation';
+
+const DEFAULT_LOGIN_WARNING_MESSAGE = 'This is a Indiana State Police computer application system that is for Official use only. This system is subject to monitoring. Therefore, no expectation of privacy is to be assumed. Individuals found performing unauthorized activities may be subject to disciplinary action including criminal prosecution.';
 
 const allowedPermissions = [
   'users:view',
@@ -514,6 +516,8 @@ export class AuthController {
         mode: await getRegistrationMode(),
         appBaseUrl: await getAppBaseUrl(req),
         maintenanceMode: await SystemSettingModel.getString('maintenanceMode', 'false') === 'true',
+        loginWarningEnabled: await SystemSettingModel.getString('loginWarningEnabled', 'true') === 'true',
+        loginWarningMessage: await SystemSettingModel.getString('loginWarningMessage', DEFAULT_LOGIN_WARNING_MESSAGE),
       });
     } catch (error) {
       console.error('Get registration settings error:', error);
@@ -523,9 +527,10 @@ export class AuthController {
 
   static async updateRegistrationSettings(req: Request, res: Response) {
     try {
-      const { mode, appBaseUrl, maintenanceMode } = req.body as { mode?: string; appBaseUrl?: string; maintenanceMode?: boolean };
+      const { mode, appBaseUrl, maintenanceMode, loginWarningEnabled, loginWarningMessage } = req.body as { mode?: string; appBaseUrl?: string; maintenanceMode?: boolean; loginWarningEnabled?: boolean; loginWarningMessage?: string };
       const normalizedMode = normalizeRegistrationMode(cleanString(mode, 40));
       const normalizedUrl = cleanString(appBaseUrl, 300).replace(/\/+$/u, '');
+      const normalizedWarningMessage = cleanMultiline(loginWarningMessage, 2000) || DEFAULT_LOGIN_WARNING_MESSAGE;
 
       if (normalizedUrl && !/^https?:\/\//iu.test(normalizedUrl)) {
         return res.status(400).json({ error: 'App URL must start with http:// or https://' });
@@ -533,12 +538,20 @@ export class AuthController {
 
       await SystemSettingModel.setString('registrationMode', normalizedMode);
       await SystemSettingModel.setString('maintenanceMode', maintenanceMode === true ? 'true' : 'false');
+      await SystemSettingModel.setString('loginWarningEnabled', loginWarningEnabled === false ? 'false' : 'true');
+      await SystemSettingModel.setString('loginWarningMessage', normalizedWarningMessage);
       if (normalizedUrl) {
         await SystemSettingModel.setString('appBaseUrl', normalizedUrl);
       }
 
       broadcastAppEvent({ type: 'permission-updated' });
-      res.json({ mode: normalizedMode, appBaseUrl: normalizedUrl, maintenanceMode: maintenanceMode === true });
+      res.json({
+        mode: normalizedMode,
+        appBaseUrl: normalizedUrl,
+        maintenanceMode: maintenanceMode === true,
+        loginWarningEnabled: loginWarningEnabled !== false,
+        loginWarningMessage: normalizedWarningMessage,
+      });
     } catch (error) {
       console.error('Update registration settings error:', error);
       res.status(500).json({ error: 'Failed to update registration settings' });

@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { Flag, MessageSquare, Pin, PinOff, Send, Smile, Trash2, X } from 'lucide-react';
 import { UserDetail } from '../components/UserDetail';
@@ -20,6 +20,7 @@ const sortComments = (items: DashboardPostComment[]) =>
 
 export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
   const { postId = '' } = useParams();
+  const navigate = useNavigate();
   const [post, setPost] = useState<DashboardPost | null>(null);
   const [comments, setComments] = useState<DashboardPostComment[]>([]);
   const [commentBody, setCommentBody] = useState('');
@@ -311,7 +312,15 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
       {selectedCommentUser && (
         <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
           <div className="modal-window max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-lg">
-            <UserDetail user={selectedCommentUser} onClose={() => setSelectedCommentUser(null)} canEdit={false} />
+            <UserDetail
+              user={selectedCommentUser}
+              onClose={() => setSelectedCommentUser(null)}
+              canEdit={isAdministrator}
+              onEdit={(user) => {
+                setSelectedCommentUser(null);
+                navigate(`/search?userId=${encodeURIComponent(user.id)}&q=${encodeURIComponent(`${user.firstName} ${user.lastName}`.trim() || user.email || user.id)}`);
+              }}
+            />
           </div>
         </div>
       )}
