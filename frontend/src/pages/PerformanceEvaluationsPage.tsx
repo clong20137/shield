@@ -7,6 +7,7 @@ interface PerformanceEvaluationsPageProps {
   currentUser: AuthAccount;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
   getErrorMessage: (error: unknown, fallback: string) => string;
+  compactTitle?: boolean;
 }
 
 const ratingFields = [
@@ -206,7 +207,7 @@ function EvaluationDetail({
   );
 }
 
-function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage }: PerformanceEvaluationsPageProps) {
+function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage, compactTitle = false }: PerformanceEvaluationsPageProps) {
   const [evaluations, setEvaluations] = useState<PerformanceEvaluation[]>([]);
   const [accounts, setAccounts] = useState<AuthAccount[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -217,7 +218,7 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage }: P
   const [statusFilter, setStatusFilter] = useState<'all' | PerformanceEvaluation['status']>('all');
   const [periodFilter, setPeriodFilter] = useState('all');
   const [form, setForm] = useState(emptyForm);
-  const isSupervisor = currentUser.role === 'administrator' || currentUser.role === 'supervisor';
+  const [canCreateCpar, setCanCreateCpar] = useState(currentUser.role === 'administrator');
 
   const periodOptions = useMemo(
     () => Array.from(new Set(evaluations.map((evaluation) => evaluation.evaluationPeriod).filter(Boolean))).sort().reverse(),
@@ -267,14 +268,16 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage }: P
   }, []);
 
   useEffect(() => {
-    if (!isSupervisor) return;
-
     authService.getAccounts(currentUser.id)
-      .then((response) => setAccounts(response.data.filter((account) => account.id !== currentUser.id)))
+      .then((response) => {
+        setAccounts(response.data.filter((account) => account.id !== currentUser.id));
+        setCanCreateCpar(true);
+      })
       .catch((error) => {
         console.error('Failed to load accounts for evaluations:', error);
+        setCanCreateCpar(currentUser.role === 'administrator');
       });
-  }, [currentUser.id, isSupervisor]);
+  }, [currentUser.id, currentUser.role]);
 
   const sentCount = useMemo(() => evaluations.filter((evaluation) => evaluation.status === 'Sent').length, [evaluations]);
   const signedCount = evaluations.length - sentCount;
@@ -315,12 +318,15 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage }: P
     <div>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1>Performance Evaluations</h1>
+          {!compactTitle && <h1>Performance Evaluations</h1>}
+          {compactTitle && <h2>CPAR</h2>}
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Supervisors send evaluations for employees to review, sign, and return.
+            {canCreateCpar
+              ? 'Create CPAR reports and send them to employees for review, signature, and return.'
+              : 'Review, sign, and download your CPAR reports.'}
           </p>
         </div>
-        {isSupervisor && (
+        {canCreateCpar && (
           <button type="button" onClick={() => setIsCreateOpen(true)} className="btn-primary" aria-label="Create evaluation" title="Create Evaluation">
             <Plus size={16} />
           </button>

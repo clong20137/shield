@@ -2495,7 +2495,7 @@ function App() {
                   {currentUser && isAdministrator && (
                     <Route path="/users/create" element={<CreateUserRouteRedirect onOpenCreateUser={() => openAdminConsole('create-user')} />} />
                   )}
-                  <Route path="/reports" element={<ReportsPage currentUser={currentUser} />} />
+                  <Route path="/reports" element={<ReportsPage currentUser={currentUser} onToast={showToast} getErrorMessage={getErrorMessage} />} />
                   {currentUser && isAdministrator && (
                     <Route path="/audit" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('audit')} />} />
                   )}

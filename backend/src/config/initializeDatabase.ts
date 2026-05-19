@@ -219,13 +219,13 @@ export async function initializeDatabase() {
   await pool.query(`
     INSERT IGNORE INTO roles (\`id\`, \`name\`, \`permissions\`)
     VALUES
-      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","devices:manage","calendar:manage","reports:trooper-dailies","audit:view","roles:manage","messages:send","dashboard:manage","bugs:manage"]'),
+      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","devices:manage","calendar:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","dashboard:manage","bugs:manage"]'),
       ('role-user', 'user', '["users:view","calendar:manage","messages:send"]')
   `);
 
   await pool.query(`
     UPDATE roles
-    SET \`permissions\` = '["users:view","users:create","users:edit","devices:manage","calendar:manage","reports:trooper-dailies","audit:view","roles:manage","messages:send","dashboard:manage","bugs:manage"]'
+    SET \`permissions\` = '["users:view","users:create","users:edit","devices:manage","calendar:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","dashboard:manage","bugs:manage"]'
     WHERE \`name\` = 'administrator'
   `);
 

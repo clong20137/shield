@@ -7,8 +7,12 @@ import { UserNotificationModel } from '../models/UserNotification';
 import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents';
 import { parsePagination } from '../utils/pagination';
 
-function isSupervisor(account: { role: string } | null): boolean {
-  return account?.role === 'administrator' || account?.role === 'supervisor';
+async function canCreateCpar(account: { id: string; role: string } | null): Promise<boolean> {
+  if (!account) return false;
+  if (account.role === 'administrator') return true;
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
+  return permissions.includes('reports:cpar');
 }
 
 function cleanText(value: unknown): string {
@@ -24,7 +28,7 @@ export class PerformanceEvaluationController {
       }
 
       const pagination = parsePagination(req.query, { defaultPageSize: 200, maxPageSize: 500 });
-      const evaluations = await PerformanceEvaluationModel.listForAccount(account.id, isSupervisor(account), pagination.pageSize, pagination.offset);
+      const evaluations = await PerformanceEvaluationModel.listForAccount(account.id, account.role === 'administrator', pagination.pageSize, pagination.offset);
       res.json(evaluations);
     } catch (error) {
       console.error('List performance evaluations error:', error);
@@ -39,8 +43,8 @@ export class PerformanceEvaluationController {
         return res.status(401).json({ error: 'Sign in required' });
       }
 
-      if (!isSupervisor(account)) {
-        return res.status(403).json({ error: 'Supervisor access required' });
+      if (!(await canCreateCpar(account))) {
+        return res.status(403).json({ error: 'CPAR creation permission required' });
       }
 
       const employeeAccountId = cleanText(req.body?.employeeAccountId);
@@ -168,7 +172,7 @@ export class PerformanceEvaluationController {
         return res.status(404).json({ error: 'Unsigned evaluation not found' });
       }
 
-      if (existing.supervisorAccountId !== account.id && !isSupervisor(account)) {
+      if (existing.supervisorAccountId !== account.id && account.role !== 'administrator' && !(await canCreateCpar(account))) {
         return res.status(403).json({ error: 'Supervisor access required' });
       }
 

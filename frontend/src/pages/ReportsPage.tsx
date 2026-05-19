@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, FileText, Search, X } from 'lucide-react';
-import { AuthAccount, reportService, ReportRow, SystemStatistics, TrooperDailyReportEntry } from '../services/api';
+import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import { AuthAccount, reportService, TrooperDailyReportEntry } from '../services/api';
 import { districtOptions } from '../constants/districts';
+import PerformanceEvaluationsPage from './PerformanceEvaluationsPage';
 
 const trooperDailySections = [
   {
@@ -147,12 +148,12 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-const ReportsPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUser }) => {
+const ReportsPage: React.FC<{
+  currentUser: AuthAccount | null;
+  onToast: (type: 'success' | 'error' | 'info', message: string) => void;
+  getErrorMessage: (error: unknown, fallback: string) => string;
+}> = ({ currentUser, onToast, getErrorMessage: getAppErrorMessage }) => {
   const [selectedReportType, setSelectedReportType] = useState<'trooper-daily' | 'cpar'>('trooper-daily');
-  const [rankReport, setRankReport] = useState<ReportRow[]>([]);
-  const [districtReport, setDistrictReport] = useState<ReportRow[]>([]);
-  const [employmentReport, setEmploymentReport] = useState<ReportRow[]>([]);
-  const [statistics, setStatistics] = useState<SystemStatistics | null>(null);
   const [trooperDailies, setTrooperDailies] = useState<TrooperDailyReportEntry[]>([]);
   const [dailySearch, setDailySearch] = useState('');
   const [dailyFrom, setDailyFrom] = useState('');
@@ -163,37 +164,9 @@ const ReportsPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUse
   const [dailyTotal, setDailyTotal] = useState(0);
   const [dailyTotalPages, setDailyTotalPages] = useState(1);
   const [dailyScope, setDailyScope] = useState<'all' | 'own'>('own');
-  const [loading, setLoading] = useState(true);
   const [dailyLoading, setDailyLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [dailyError, setDailyError] = useState<string | null>(null);
   const [selectedDaily, setSelectedDaily] = useState<TrooperDailyReportEntry | null>(null);
-
-  const loadUserReports = async (showLoading = true) => {
-    if (showLoading) {
-      setLoading(true);
-    }
-    setError(null);
-
-    try {
-      const [rankRes, districtRes, employmentRes, statsRes] = await Promise.all([
-        reportService.getByRank(),
-        reportService.getByDistrict(),
-        reportService.getByEmploymentType(),
-        reportService.getStatistics(),
-      ]);
-
-      setRankReport(rankRes.data);
-      setDistrictReport(districtRes.data);
-      setEmploymentReport(employmentRes.data);
-      setStatistics(statsRes.data);
-    } catch (err) {
-      setError(getErrorMessage(err, 'User analytics require user report permission.'));
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadTrooperDailies = async (
     showLoading = true,
@@ -226,15 +199,9 @@ const ReportsPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUse
       setDailyPageSize(response.data.pageSize);
       setDailyTotalPages(response.data.totalPages);
       setDailyScope(response.data.scope);
-      if (response.data.scope === 'all') {
-        void loadUserReports(false);
-      } else {
-        setLoading(false);
-      }
     } catch (err) {
       setDailyError(getErrorMessage(err, 'Trooper Daily reports require permission.'));
       console.error(err);
-      setLoading(false);
     } finally {
       setDailyLoading(false);
     }
@@ -465,84 +432,12 @@ const ReportsPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUse
         )}
       </section>
       ) : (
-        <section className="mb-8 rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded bg-accent/10 text-accent">
-            <FileText size={22} />
-          </div>
-          <h2 className="mt-4">CPAR</h2>
-          <p className="mx-auto mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
-            CPAR reporting is ready as a report type. The CPAR dataset and filters can be wired in when those records are added.
-          </p>
-        </section>
+        currentUser ? (
+          <PerformanceEvaluationsPage currentUser={currentUser} onToast={onToast} getErrorMessage={getAppErrorMessage} compactTitle />
+        ) : (
+          <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">Sign in to view CPAR reports.</div>
+        )
       )}
-
-      {selectedReportType === 'trooper-daily' && dailyScope === 'all' && (loading ? (
-        <div className="loading">Loading user analytics...</div>
-      ) : (
-        <>
-          {error && <div className="error">{error}</div>}
-
-          {statistics && (
-            <div className="mb-12">
-              <h2 className="mb-6">System Statistics</h2>
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
-                <div className="rounded-lg border-l-4 border-primary-500 bg-white p-5 text-center shadow dark:bg-gray-900 dark:shadow-none">
-                  <h3 className="m-0 mb-2 text-3xl font-bold text-primary-500">{statistics.totalUsers}</h3>
-                  <p className="m-0 text-sm text-gray-500 dark:text-gray-400">Total Users</p>
-                </div>
-                <div className="rounded-lg border-l-4 border-success bg-white p-5 text-center shadow dark:bg-gray-900 dark:shadow-none">
-                  <h3 className="m-0 mb-2 text-3xl font-bold text-success">{statistics.activeUsers}</h3>
-                  <p className="m-0 text-sm text-gray-500 dark:text-gray-400">Active Users</p>
-                </div>
-                <div className="rounded-lg border-l-4 border-danger bg-white p-5 text-center shadow dark:bg-gray-900 dark:shadow-none">
-                  <h3 className="m-0 mb-2 text-3xl font-bold text-danger">{statistics.inactiveUsers}</h3>
-                  <p className="m-0 text-sm text-gray-500 dark:text-gray-400">Inactive Users</p>
-                </div>
-                <div className="rounded-lg border-l-4 border-secondary-500 bg-white p-5 text-center shadow dark:bg-gray-900 dark:shadow-none">
-                  <h3 className="m-0 mb-2 text-3xl font-bold text-secondary-500">{statistics.totalDistricts}</h3>
-                  <p className="m-0 text-sm text-gray-500 dark:text-gray-400">Total Districts</p>
-                </div>
-                <div className="rounded-lg border-l-4 border-accent bg-white p-5 text-center shadow dark:bg-gray-900 dark:shadow-none">
-                  <h3 className="m-0 mb-2 text-3xl font-bold text-accent">{statistics.totalRanks}</h3>
-                  <p className="m-0 text-sm text-gray-500 dark:text-gray-400">Total Ranks</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
-            {[
-              { title: 'Users by Rank', rows: rankReport, keyName: 'rank', label: 'Rank' },
-              { title: 'Users by District', rows: districtReport, keyName: 'district', label: 'District' },
-              { title: 'Users by Employment Type', rows: employmentReport, keyName: 'employmentType', label: 'Employment Type' },
-            ].map((report) => (
-              <div key={report.title} className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-                <h2 className="mb-4">{report.title}</h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b-2 border-gray-300 dark:border-gray-700">
-                        <th className="py-2 text-left font-semibold">{report.label}</th>
-                        <th className="py-2 text-left font-semibold">Total</th>
-                        <th className="py-2 text-left font-semibold">Active</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {report.rows.map((item, index) => (
-                        <tr key={index} className="border-b border-gray-200 dark:border-gray-800">
-                          <td className="py-2">{String(item[report.keyName as keyof ReportRow] || 'Unassigned')}</td>
-                          <td className="py-2">{item.count}</td>
-                          <td className="py-2">{item.activeCount}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      ))}
 
       {selectedDaily && (
         <div className="modal-backdrop fixed inset-0 z-[80] flex items-end justify-center bg-black/60 sm:items-center">

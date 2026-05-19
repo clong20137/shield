@@ -18,6 +18,7 @@ const allowedPermissions = [
   'devices:manage',
   'calendar:manage',
   'reports:trooper-dailies',
+  'reports:cpar',
   'audit:view',
   'roles:manage',
   'messages:send',
