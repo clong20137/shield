@@ -46,24 +46,35 @@ export function getAssetUrl(value?: string | null): string {
     return '';
   }
 
-  if (value.startsWith('data:') || value.startsWith('blob:')) {
-    return value;
+  const rawValue = value.trim().replace(/\\/gu, '/');
+
+  if (rawValue.startsWith('data:') || rawValue.startsWith('blob:')) {
+    return rawValue;
+  }
+
+  const uploadMatch = rawValue.match(/(?:^|\/)(?:api\/)?uploads\/(.+)$/u);
+  if (uploadMatch?.[1]) {
+    const safeAssetPath = uploadMatch[1]
+      .split('/')
+      .filter(Boolean)
+      .map((part) => encodeURIComponent(decodeURIComponent(part)))
+      .join('/');
+
+    return `${API_BASE_URL}/uploads/${safeAssetPath}`;
   }
 
   try {
-    const parsedUrl = new URL(value);
-    if (parsedUrl.pathname.startsWith('/uploads/')) {
-      return `${API_BASE_URL}${parsedUrl.pathname}`;
-    }
+    const parsedUrl = new URL(rawValue);
 
-    if (parsedUrl.pathname.startsWith('/api/uploads/')) {
-      return value;
-    }
-
-    return value;
+    return parsedUrl.toString();
   } catch {
-    const normalizedPath = value.startsWith('/') ? value : `/${value}`;
-    return normalizedPath.startsWith('/api/uploads/') ? normalizedPath : `${API_BASE_URL}${normalizedPath}`;
+    const normalizedPath = rawValue.startsWith('/') ? rawValue : `/${rawValue}`;
+    const safePath = normalizedPath
+      .split('/')
+      .map((part) => encodeURIComponent(decodeURIComponent(part)))
+      .join('/');
+
+    return `${API_BASE_URL}${safePath}`;
   }
 }
 
