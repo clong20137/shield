@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import axios from 'axios';
 import { Camera, Save, Send, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { useSearchParams } from 'react-router-dom';
@@ -26,6 +27,47 @@ function formatPhoneNumber(value: string): string {
   }
 
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+const userUpdateFields = [
+  'firstName',
+  'lastName',
+  'email',
+  'profilePictureUrl',
+  'peNumber',
+  'peopleSoftId',
+  'carNumber',
+  'badgeNumber',
+  'radioNumber',
+  'personalPhoneNumber',
+  'departmentPhoneNumber',
+  'assignedTo',
+  'district',
+  'rank',
+  'isActive',
+  'employmentType',
+  'typeDetails',
+  'status',
+  'supervisor',
+  'specialtyCertifications',
+  'publicSafetyId',
+  'race',
+  'sex',
+  'maritalStatus',
+  'residentialAddress',
+  'mailingAddress',
+  'receivesMessages',
+] as const satisfies readonly (keyof User)[];
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const message = error.response?.data?.error;
+    if (typeof message === 'string' && message.trim()) {
+      return message;
+    }
+  }
+
+  return fallback;
 }
 
 const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
@@ -205,8 +247,16 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     setIsSavingUser(true);
 
     try {
-      await userService.update(editingUser.id, editForm);
-      const updatedUser = { ...editingUser, ...editForm } as User;
+      const payload = userUpdateFields.reduce<Partial<User>>((updates, field) => {
+        if (Object.prototype.hasOwnProperty.call(editForm, field)) {
+          updates[field] = editForm[field] as never;
+        }
+
+        return updates;
+      }, {});
+      await userService.update(editingUser.id, payload);
+      const response = await userService.getById(editingUser.id);
+      const updatedUser = response.data as User;
       setUsers((currentUsers) =>
         currentUsers.map((user) => (user.id === editingUser.id ? updatedUser : user)),
       );
@@ -216,7 +266,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       onToast('success', 'User updated.');
     } catch (err) {
       console.error(err);
-      onToast('error', 'Failed to update user.');
+      onToast('error', getErrorMessage(err, 'Failed to update user.'));
     } finally {
       setIsSavingUser(false);
     }

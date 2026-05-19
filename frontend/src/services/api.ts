@@ -1,6 +1,17 @@
 import axios from 'axios';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/+$/u, '');
+const API_ORIGIN_URL = (() => {
+  try {
+    const parsedUrl = new URL(API_BASE_URL);
+    parsedUrl.pathname = parsedUrl.pathname.replace(/\/api$/u, '') || '/';
+    parsedUrl.search = '';
+    parsedUrl.hash = '';
+    return parsedUrl.toString().replace(/\/+$/u, '');
+  } catch {
+    return API_BASE_URL.replace(/\/api$/u, '');
+  }
+})();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -60,7 +71,7 @@ export function getAssetUrl(value?: string | null): string {
       .map((part) => encodeURIComponent(decodeURIComponent(part)))
       .join('/');
 
-    return `${API_BASE_URL}/uploads/${safeAssetPath}`;
+    return `${API_ORIGIN_URL}/uploads/${safeAssetPath}`;
   }
 
   try {

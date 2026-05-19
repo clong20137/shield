@@ -350,7 +350,7 @@ textarea {
   padding-right: 0.875rem !important;
 }
 
-.global-search-input {
+input.global-search-input {
   padding-left: 3rem !important;
   padding-right: 0.75rem !important;
 }
