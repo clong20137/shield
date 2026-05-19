@@ -5,6 +5,7 @@ import { DashboardPostModel } from '../models/DashboardPost';
 import { UserNotificationModel } from '../models/UserNotification';
 import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents';
 import { cleanMultiline, cleanString, isOneOf } from '../utils/validation';
+import { parsePagination } from '../utils/pagination';
 
 const dashboardCategories = ['Update', 'News', 'Alert'] as const;
 const dashboardReactions = ['like', 'celebrate', 'important', 'thanks'] as const;
@@ -130,7 +131,8 @@ export class DashboardPostController {
 
   static async listComments(req: Request, res: Response) {
     try {
-      const comments = await DashboardPostModel.listComments(req.params.id);
+      const pagination = parsePagination(req.query, { defaultPageSize: 200, maxPageSize: 500 });
+      const comments = await DashboardPostModel.listComments(req.params.id, pagination.pageSize, pagination.offset);
       res.json(comments);
     } catch (error) {
       console.error('Dashboard post comments list error:', error);
@@ -216,6 +218,27 @@ export class DashboardPostController {
     } catch (error) {
       console.error('Dashboard post comment flag error:', error);
       res.status(500).json({ error: 'Failed to flag comment' });
+    }
+  }
+
+  static async setCommentPinned(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const isPinned = req.body?.isPinned !== false;
+      const comment = await DashboardPostModel.setCommentPinned(req.params.id, req.params.commentId, account.id, isPinned);
+      if (!comment) {
+        return res.status(404).json({ error: 'Comment not found' });
+      }
+
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: req.params.id });
+      res.json(comment);
+    } catch (error) {
+      console.error('Dashboard post comment pin error:', error);
+      res.status(500).json({ error: 'Failed to update pinned comment' });
     }
   }
 

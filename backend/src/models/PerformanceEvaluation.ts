@@ -113,18 +113,20 @@ function toEvaluation(row: PerformanceEvaluationRow): PerformanceEvaluation {
 }
 
 export class PerformanceEvaluationModel {
-  static async listForAccount(accountId: string, includeAll: boolean): Promise<PerformanceEvaluation[]> {
+  static async listForAccount(accountId: string, includeAll: boolean, limit = 200, offset = 0): Promise<PerformanceEvaluation[]> {
     const conn = await pool.getConnection();
     try {
       const [rows] = includeAll
         ? await conn.query<PerformanceEvaluationRow[]>(
-            'SELECT * FROM performance_evaluations ORDER BY `createdAt` DESC'
+            'SELECT * FROM performance_evaluations ORDER BY `createdAt` DESC LIMIT ? OFFSET ?',
+            [limit, offset]
           )
         : await conn.query<PerformanceEvaluationRow[]>(
             `SELECT * FROM performance_evaluations
             WHERE \`employeeAccountId\` = ? OR \`supervisorAccountId\` = ?
-            ORDER BY \`createdAt\` DESC`,
-            [accountId, accountId]
+            ORDER BY \`createdAt\` DESC
+            LIMIT ? OFFSET ?`,
+            [accountId, accountId, limit, offset]
           );
 
       return rows.map(toEvaluation);

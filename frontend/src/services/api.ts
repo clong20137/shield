@@ -355,6 +355,9 @@ export interface DashboardPostComment {
   flaggedBy: string | null;
   flaggedAt: string | null;
   flagReason: string | null;
+  isPinned: boolean;
+  pinnedBy: string | null;
+  pinnedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -666,6 +669,9 @@ export const dashboardPostService = {
 
   flagComment: (id: string, commentId: string, reason: string) =>
     api.post<DashboardPostComment>(`/dashboard-posts/${id}/comments/${commentId}/flag`, { reason }),
+
+  pinComment: (id: string, commentId: string, isPinned: boolean) =>
+    api.put<DashboardPostComment>(`/dashboard-posts/${id}/comments/${commentId}/pin`, { isPinned }),
 
   deleteComment: (id: string, commentId: string) =>
     api.delete(`/dashboard-posts/${id}/comments/${commentId}`),

@@ -108,11 +108,12 @@ function normalizeDeviceInput(device: DeviceInput): DeviceInput {
 }
 
 export class DeviceModel {
-  static async listDevices(): Promise<Device[]> {
+  static async listDevices(limit = 250, offset = 0): Promise<Device[]> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<DeviceRow[]>(
-        `SELECT ${deviceColumns} FROM devices ORDER BY \`updatedAt\` DESC, \`assetTag\``
+        `SELECT ${deviceColumns} FROM devices ORDER BY \`updatedAt\` DESC, \`assetTag\` LIMIT ? OFFSET ?`,
+        [limit, offset]
       );
 
       return rows;
@@ -121,15 +122,16 @@ export class DeviceModel {
     }
   }
 
-  static async listAssignedDevices(account: { email: string; displayName: string }): Promise<Device[]> {
+  static async listAssignedDevices(account: { email: string; displayName: string }, limit = 100, offset = 0): Promise<Device[]> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<DeviceRow[]>(
         `SELECT ${deviceColumns}
         FROM devices
         WHERE LOWER(\`assignedTo\`) IN (?, ?)
-        ORDER BY \`updatedAt\` DESC, \`assetTag\``,
-        [account.email.toLowerCase(), account.displayName.toLowerCase()]
+        ORDER BY \`updatedAt\` DESC, \`assetTag\`
+        LIMIT ? OFFSET ?`,
+        [account.email.toLowerCase(), account.displayName.toLowerCase(), limit, offset]
       );
 
       return rows;
@@ -331,12 +333,12 @@ export class DeviceModel {
     }
   }
 
-  static async listEvents(deviceId: string): Promise<DeviceEvent[]> {
+  static async listEvents(deviceId: string, limit = 100, offset = 0): Promise<DeviceEvent[]> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<DeviceEventRow[]>(
-        'SELECT * FROM device_events WHERE `deviceId` = ? ORDER BY `createdAt` DESC',
-        [deviceId]
+        'SELECT * FROM device_events WHERE `deviceId` = ? ORDER BY `createdAt` DESC LIMIT ? OFFSET ?',
+        [deviceId, limit, offset]
       );
 
       return rows;

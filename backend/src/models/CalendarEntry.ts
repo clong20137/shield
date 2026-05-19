@@ -63,12 +63,12 @@ function toCalendarEntry(row: CalendarEntryRow): CalendarEntry {
 }
 
 export class CalendarEntryModel {
-  static async listEntries(ownerAccountId: string): Promise<CalendarEntry[]> {
+  static async listEntries(ownerAccountId: string, limit = 1000, offset = 0): Promise<CalendarEntry[]> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<CalendarEntryRow[]>(
-        'SELECT * FROM calendar_entries WHERE `ownerAccountId` = ? ORDER BY `entryDate` DESC, `updatedAt` DESC',
-        [ownerAccountId]
+        'SELECT * FROM calendar_entries WHERE `ownerAccountId` = ? ORDER BY `entryDate` DESC, `updatedAt` DESC LIMIT ? OFFSET ?',
+        [ownerAccountId, limit, offset]
       );
 
       return rows.map(toCalendarEntry);

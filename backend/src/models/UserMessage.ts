@@ -101,12 +101,12 @@ export class UserMessageModel {
     }
   }
 
-  static async listMessagesForUser(recipientUserId: string): Promise<UserMessage[]> {
+  static async listMessagesForUser(recipientUserId: string, limit = 250, offset = 0): Promise<UserMessage[]> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<UserMessageRow[]>(
-        'SELECT * FROM user_messages WHERE `recipientUserId` = ? ORDER BY `createdAt` DESC',
-        [recipientUserId]
+        'SELECT * FROM user_messages WHERE `recipientUserId` = ? ORDER BY `createdAt` DESC LIMIT ? OFFSET ?',
+        [recipientUserId, limit, offset]
       );
 
       return rows.map(toUserMessage);
@@ -115,7 +115,7 @@ export class UserMessageModel {
     }
   }
 
-  static async listInbox(accountId: string): Promise<UserMessage[]> {
+  static async listInbox(accountId: string, limit = 250, offset = 0): Promise<UserMessage[]> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<UserMessageRow[]>(
@@ -136,8 +136,9 @@ export class UserMessageModel {
         WHERE m.recipientUserId = ?
           AND m.recipientDeleted = 0
           AND m.isArchived = 0
-        ORDER BY m.createdAt DESC`,
-        [accountId]
+        ORDER BY m.createdAt DESC
+        LIMIT ? OFFSET ?`,
+        [accountId, limit, offset]
       );
 
       return rows.map(toUserMessage);
@@ -146,7 +147,7 @@ export class UserMessageModel {
     }
   }
 
-  static async listSent(accountId: string): Promise<UserMessage[]> {
+  static async listSent(accountId: string, limit = 250, offset = 0): Promise<UserMessage[]> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<UserMessageRow[]>(
@@ -166,8 +167,9 @@ export class UserMessageModel {
         LEFT JOIN users r ON r.id = m.recipientUserId
         WHERE m.senderAccountId = ?
           AND m.senderDeleted = 0
-        ORDER BY m.createdAt DESC`,
-        [accountId]
+        ORDER BY m.createdAt DESC
+        LIMIT ? OFFSET ?`,
+        [accountId, limit, offset]
       );
 
       return rows.map(toUserMessage);

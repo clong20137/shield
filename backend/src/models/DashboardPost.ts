@@ -42,6 +42,9 @@ export interface DashboardPostComment {
   flaggedBy: string | null;
   flaggedAt: Date | null;
   flagReason: string | null;
+  isPinned: boolean | number;
+  pinnedBy: string | null;
+  pinnedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -258,7 +261,7 @@ export class DashboardPostModel {
     }
   }
 
-  static async listComments(postId: string): Promise<DashboardPostComment[]> {
+  static async listComments(postId: string, limit = 200, offset = 0): Promise<DashboardPostComment[]> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<DashboardPostCommentRow[]>(
@@ -270,13 +273,15 @@ export class DashboardPostModel {
         FROM dashboard_post_comments c
         LEFT JOIN users u ON u.\`id\` = c.\`authorId\`
         WHERE c.\`postId\` = ?
-        ORDER BY c.\`createdAt\` ASC`,
-        [postId],
+        ORDER BY c.\`isPinned\` DESC, c.\`pinnedAt\` DESC, c.\`createdAt\` ASC
+        LIMIT ? OFFSET ?`,
+        [postId, limit, offset],
       );
 
       return rows.map((row) => ({
         ...row,
         isFlagged: row.isFlagged !== false && row.isFlagged !== 0,
+        isPinned: row.isPinned !== false && row.isPinned !== 0,
       }));
     } finally {
       conn.release();
@@ -318,6 +323,9 @@ export class DashboardPostModel {
         flaggedBy: null,
         flaggedAt: null,
         flagReason: null,
+        isPinned: false,
+        pinnedBy: null,
+        pinnedAt: null,
         createdAt: now,
         updatedAt: now,
       };
@@ -353,6 +361,50 @@ export class DashboardPostModel {
       if (result.affectedRows === 0) {
         return null;
       }
+    } finally {
+      conn.release();
+    }
+
+    const comments = await DashboardPostModel.listComments(postId);
+    return comments.find((comment) => comment.id === commentId) || null;
+  }
+
+  static async setCommentPinned(postId: string, commentId: string, pinnedBy: string, isPinned: boolean): Promise<DashboardPostComment | null> {
+    const conn = await pool.getConnection();
+    try {
+      const now = new Date();
+      await conn.beginTransaction();
+
+      const [commentRows] = await conn.query<RowDataPacket[]>(
+        'SELECT `id` FROM dashboard_post_comments WHERE `id` = ? AND `postId` = ? LIMIT 1',
+        [commentId, postId],
+      );
+
+      if (commentRows.length === 0) {
+        await conn.rollback();
+        return null;
+      }
+
+      if (isPinned) {
+        await conn.query<ResultSetHeader>(
+          `UPDATE dashboard_post_comments
+           SET \`isPinned\` = 0, \`pinnedBy\` = NULL, \`pinnedAt\` = NULL, \`updatedAt\` = ?
+           WHERE \`postId\` = ?`,
+          [now, postId],
+        );
+      }
+
+      await conn.query<ResultSetHeader>(
+        `UPDATE dashboard_post_comments
+         SET \`isPinned\` = ?, \`pinnedBy\` = ?, \`pinnedAt\` = ?, \`updatedAt\` = ?
+         WHERE \`id\` = ? AND \`postId\` = ?`,
+        [isPinned ? 1 : 0, isPinned ? pinnedBy : null, isPinned ? now : null, now, commentId, postId],
+      );
+
+      await conn.commit();
+    } catch (error) {
+      await conn.rollback();
+      throw error;
     } finally {
       conn.release();
     }

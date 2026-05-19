@@ -288,6 +288,9 @@ export async function initializeDatabase() {
       \`flaggedBy\` VARCHAR(36),
       \`flaggedAt\` DATETIME,
       \`flagReason\` TEXT,
+      \`isPinned\` BOOLEAN DEFAULT 0,
+      \`pinnedBy\` VARCHAR(36),
+      \`pinnedAt\` DATETIME,
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX \`idx_dashboard_post_comments_post\` (\`postId\`),
@@ -299,6 +302,9 @@ export async function initializeDatabase() {
   await ensureColumn('dashboard_post_comments', 'flaggedBy', '`flaggedBy` VARCHAR(36)');
   await ensureColumn('dashboard_post_comments', 'flaggedAt', '`flaggedAt` DATETIME');
   await ensureColumn('dashboard_post_comments', 'flagReason', '`flagReason` TEXT');
+  await ensureColumn('dashboard_post_comments', 'isPinned', '`isPinned` BOOLEAN DEFAULT 0');
+  await ensureColumn('dashboard_post_comments', 'pinnedBy', '`pinnedBy` VARCHAR(36)');
+  await ensureColumn('dashboard_post_comments', 'pinnedAt', '`pinnedAt` DATETIME');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_messages (

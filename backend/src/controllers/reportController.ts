@@ -3,6 +3,7 @@ import { RowDataPacket } from 'mysql2';
 import pool from '../config/database';
 import { getSessionAccount } from '../middleware/authSession';
 import { AuthAccountModel } from '../models/AuthAccount';
+import { parsePagination } from '../utils/pagination';
 
 interface StatisticsRow extends RowDataPacket {
   totalUsers: number;
@@ -278,6 +279,7 @@ export class ReportController {
     try {
       conn = await pool.getConnection();
       const { district, rank, active } = req.query;
+      const pagination = parsePagination(req.query, { defaultPageSize: 250, maxPageSize: 500 });
 
       let query = 'SELECT * FROM users WHERE 1=1';
       const params: Array<string | number> = [];
@@ -295,7 +297,8 @@ export class ReportController {
         params.push(active === 'true' ? 1 : 0);
       }
 
-      query += ' ORDER BY `lastName`, `firstName`';
+      query += ' ORDER BY `lastName`, `firstName` LIMIT ? OFFSET ?';
+      params.push(pagination.pageSize, pagination.offset);
 
       const [rows] = await conn.query(query, params);
       

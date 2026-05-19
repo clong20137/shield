@@ -5,6 +5,7 @@ import { UserMessageModel } from '../models/UserMessage';
 import { addMessageEventClient, broadcastMessageEvent } from '../services/messageEvents';
 import { cleanMultiline, cleanString } from '../utils/validation';
 import { isWellFormedSessionToken } from '../middleware/authSession';
+import { parsePagination } from '../utils/pagination';
 
 export class MessageController {
   static async streamEvents(req: Request, res: Response) {
@@ -79,7 +80,8 @@ export class MessageController {
         return res.status(400).json({ error: 'Account is required' });
       }
 
-      const messages = await UserMessageModel.listMessagesForUser(accountId);
+      const pagination = parsePagination(req.query, { defaultPageSize: 250, maxPageSize: 500 });
+      const messages = await UserMessageModel.listMessagesForUser(accountId, pagination.pageSize, pagination.offset);
       res.json(messages);
     } catch (error) {
       console.error('List messages error:', error);
@@ -94,7 +96,8 @@ export class MessageController {
         return res.status(400).json({ error: 'Account is required' });
       }
 
-      const messages = await UserMessageModel.listInbox(accountId);
+      const pagination = parsePagination(req.query, { defaultPageSize: 250, maxPageSize: 500 });
+      const messages = await UserMessageModel.listInbox(accountId, pagination.pageSize, pagination.offset);
       res.json(messages);
     } catch (error) {
       console.error('List inbox error:', error);
@@ -109,7 +112,8 @@ export class MessageController {
         return res.status(400).json({ error: 'Account is required' });
       }
 
-      const messages = await UserMessageModel.listSent(accountId);
+      const pagination = parsePagination(req.query, { defaultPageSize: 250, maxPageSize: 500 });
+      const messages = await UserMessageModel.listSent(accountId, pagination.pageSize, pagination.offset);
       res.json(messages);
     } catch (error) {
       console.error('List sent messages error:', error);

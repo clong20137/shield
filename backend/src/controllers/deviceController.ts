@@ -3,6 +3,7 @@ import { DeviceModel } from '../models/Device';
 import { broadcastAppEvent } from '../services/appEvents';
 import { getSessionAccount } from '../middleware/authSession';
 import { cleanMultiline, cleanString, isOneOf, isValidIsoDate, isValidPhone, normalizePhone } from '../utils/validation';
+import { parsePagination } from '../utils/pagination';
 
 function isDuplicateAssetTagError(error: unknown): boolean {
   return (
@@ -87,7 +88,8 @@ export class DeviceController {
         return res.status(401).json({ error: 'Sign in required' });
       }
 
-      const devices = await DeviceModel.listAssignedDevices(account);
+      const pagination = parsePagination(req.query, { defaultPageSize: 100, maxPageSize: 200 });
+      const devices = await DeviceModel.listAssignedDevices(account, pagination.pageSize, pagination.offset);
       res.json(devices);
     } catch (error) {
       console.error('Assigned device list error:', error);
@@ -97,7 +99,8 @@ export class DeviceController {
 
   static async listDevices(req: Request, res: Response) {
     try {
-      const devices = await DeviceModel.listDevices();
+      const pagination = parsePagination(req.query, { defaultPageSize: 250, maxPageSize: 500 });
+      const devices = await DeviceModel.listDevices(pagination.pageSize, pagination.offset);
       res.json(devices);
     } catch (error) {
       console.error('Device list error:', error);
@@ -188,7 +191,8 @@ export class DeviceController {
 
   static async listDeviceEvents(req: Request, res: Response) {
     try {
-      const events = await DeviceModel.listEvents(req.params.id);
+      const pagination = parsePagination(req.query, { defaultPageSize: 100, maxPageSize: 250 });
+      const events = await DeviceModel.listEvents(req.params.id, pagination.pageSize, pagination.offset);
       res.json(events);
     } catch (error) {
       console.error('Device events error:', error);

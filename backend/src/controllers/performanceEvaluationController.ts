@@ -5,6 +5,7 @@ import { AuthAccountModel } from '../models/AuthAccount';
 import { PerformanceEvaluationModel } from '../models/PerformanceEvaluation';
 import { UserNotificationModel } from '../models/UserNotification';
 import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents';
+import { parsePagination } from '../utils/pagination';
 
 function isSupervisor(account: { role: string } | null): boolean {
   return account?.role === 'administrator' || account?.role === 'supervisor';
@@ -22,7 +23,8 @@ export class PerformanceEvaluationController {
         return res.status(401).json({ error: 'Sign in required' });
       }
 
-      const evaluations = await PerformanceEvaluationModel.listForAccount(account.id, isSupervisor(account));
+      const pagination = parsePagination(req.query, { defaultPageSize: 200, maxPageSize: 500 });
+      const evaluations = await PerformanceEvaluationModel.listForAccount(account.id, isSupervisor(account), pagination.pageSize, pagination.offset);
       res.json(evaluations);
     } catch (error) {
       console.error('List performance evaluations error:', error);

@@ -586,7 +586,7 @@ function GlobalSearch({ compact }: { compact: boolean }) {
             }
           }}
           placeholder="Global search"
-          className="h-11 w-full rounded border border-white/10 bg-white/10 py-2 pl-12 pr-3 text-sm text-white outline-none placeholder:text-blue-100 focus:border-white/40 focus:bg-white/15"
+          className="global-search-input h-11 w-full rounded border border-white/10 bg-white/10 py-2 text-sm text-white outline-none placeholder:text-blue-100 focus:border-white/40 focus:bg-white/15"
         />
       </div>
       <button

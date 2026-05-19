@@ -76,11 +76,12 @@ export class BugReportModel {
     }
   }
 
-  static async list(): Promise<BugReport[]> {
+  static async list(limit = 200, offset = 0): Promise<BugReport[]> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<BugReportRow[]>(
-        'SELECT * FROM bug_reports ORDER BY FIELD(`status`, "New", "Pending", "Fixed", "Closed"), `createdAt` DESC'
+        'SELECT * FROM bug_reports ORDER BY FIELD(`status`, "New", "Pending", "Fixed", "Closed"), `createdAt` DESC LIMIT ? OFFSET ?',
+        [limit, offset]
       );
 
       return rows;

@@ -5,6 +5,7 @@ import { AuditLogModel } from '../models/AuditLog';
 import { getSessionAccount } from '../middleware/authSession';
 import { broadcastAccountEvent } from '../services/appEvents';
 import { cleanRecord, cleanString, isOneOf, isValidHexColor, isValidIsoDate } from '../utils/validation';
+import { parsePagination } from '../utils/pagination';
 
 const calendarCategories = ['General Information', 'Trooper Daily'] as const;
 const districtOptions = [
@@ -237,7 +238,8 @@ export class CalendarController {
         return res.status(401).json({ error: 'Sign in to view your calendar' });
       }
 
-      const entries = await CalendarEntryModel.listEntries(account.id);
+      const pagination = parsePagination(req.query, { defaultPageSize: 1000, maxPageSize: 2000 });
+      const entries = await CalendarEntryModel.listEntries(account.id, pagination.pageSize, pagination.offset);
       res.json(entries);
     } catch (error) {
       if (typeof error === 'object' && error !== null && (error as { statusCode?: number }).statusCode === 403) {

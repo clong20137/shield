@@ -7,6 +7,7 @@ import { AuthAccountModel } from '../models/AuthAccount';
 import { AuthSessionModel } from '../models/AuthSession';
 import { cleanMultiline, cleanString, isOneOf, isStrongPassword, isValidEmail, isValidPhone, normalizeEmail, normalizePhone } from '../utils/validation';
 import { isSafeUploadedImage } from '../middleware/profileUpload';
+import { parsePagination } from '../utils/pagination';
 
 const employmentTypes = ['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inactive', 'Other', 'CPS'] as const;
 const userStatuses = ['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Administrative Duty', 'Inactive'] as const;
@@ -166,15 +167,13 @@ export class UserController {
 
   static async getAllUsers(req: Request, res: Response) {
     try {
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 50;
-      const offset = (page - 1) * limit;
+      const { page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 50, maxPageSize: 250 });
 
-      const users = await UserModel.getAllUsers(limit, offset);
+      const users = await UserModel.getAllUsers(pageSize, offset);
       res.json({
         data: users,
         page,
-        limit,
+        limit: pageSize,
         count: users.length,
       });
     } catch (error) {

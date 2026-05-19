@@ -4,6 +4,7 @@ import { BugReportModel, BugReportPriority, BugReportStatus } from '../models/Bu
 import { getSessionAccount } from '../middleware/authSession';
 import { UserNotificationModel } from '../models/UserNotification';
 import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents';
+import { parsePagination } from '../utils/pagination';
 
 const statuses: BugReportStatus[] = ['New', 'Pending', 'Fixed', 'Closed'];
 const priorities: BugReportPriority[] = ['Low', 'Normal', 'High', 'Critical'];
@@ -56,7 +57,8 @@ export class BugReportController {
 
   static async list(req: Request, res: Response) {
     try {
-      const reports = await BugReportModel.list();
+      const pagination = parsePagination(req.query, { defaultPageSize: 200, maxPageSize: 500 });
+      const reports = await BugReportModel.list(pagination.pageSize, pagination.offset);
       res.json(reports);
     } catch (error) {
       console.error('List bug reports error:', error);

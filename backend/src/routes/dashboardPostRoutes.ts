@@ -11,6 +11,7 @@ router.get('/:id', requireAuthenticated(), DashboardPostController.getPost);
 router.get('/:id/comments', requireAuthenticated(), DashboardPostController.listComments);
 router.post('/:id/comments', requireAuthenticated(), DashboardPostController.createComment);
 router.post('/:id/comments/:commentId/flag', requireAuthenticated(), DashboardPostController.flagComment);
+router.put('/:id/comments/:commentId/pin', requirePermission('dashboard:manage'), DashboardPostController.setCommentPinned);
 router.delete('/:id/comments/:commentId', requirePermission('dashboard:manage'), DashboardPostController.deleteComment);
 router.put('/:id', requirePermission('dashboard:manage'), DashboardPostController.updatePost);
 router.put('/:id/reaction', requireAuthenticated(), DashboardPostController.setReaction);

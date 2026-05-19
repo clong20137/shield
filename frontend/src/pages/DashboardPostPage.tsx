@@ -1,11 +1,22 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Flag, MessageSquare, Send, Trash2, X } from 'lucide-react';
-import { AuthAccount, DashboardPost, DashboardPostComment, dashboardPostService, getAssetUrl } from '../services/api';
+import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
+import { Flag, MessageSquare, Pin, PinOff, Send, Smile, Trash2, X } from 'lucide-react';
+import { UserDetail } from '../components/UserDetail';
+import { AuthAccount, DashboardPost, DashboardPostComment, User, dashboardPostService, getAssetUrl, userService } from '../services/api';
 
 interface DashboardPostPageProps {
   currentUser: AuthAccount | null;
 }
+
+const sortComments = (items: DashboardPostComment[]) =>
+  [...items].sort((a, b) => {
+    if (a.isPinned !== b.isPinned) {
+      return a.isPinned ? -1 : 1;
+    }
+
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
 
 export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
   const { postId = '' } = useParams();
@@ -13,6 +24,8 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
   const [comments, setComments] = useState<DashboardPostComment[]>([]);
   const [commentBody, setCommentBody] = useState('');
   const [commentPendingDelete, setCommentPendingDelete] = useState<DashboardPostComment | null>(null);
+  const [selectedCommentUser, setSelectedCommentUser] = useState<User | null>(null);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [moderatingCommentId, setModeratingCommentId] = useState<string | null>(null);
@@ -29,7 +42,7 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
         dashboardPostService.getComments(postId),
       ]);
       setPost(postResponse.data);
-      setComments(commentsResponse.data);
+      setComments(sortComments(commentsResponse.data));
     } catch (err) {
       console.error('Failed to load update:', err);
       setError('Failed to load this update.');
@@ -50,8 +63,9 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
     setError(null);
     try {
       const response = await dashboardPostService.addComment(post.id, commentBody);
-      setComments((items) => [...items, response.data]);
+      setComments((items) => sortComments([...items, response.data]));
       setCommentBody('');
+      setIsEmojiPickerOpen(false);
     } catch (err) {
       console.error('Failed to add comment:', err);
       setError('Failed to add comment.');
@@ -66,7 +80,7 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
     setError(null);
     try {
       const response = await dashboardPostService.flagComment(post.id, comment.id, 'Flagged for admin review');
-      setComments((items) => items.map((item) => (item.id === comment.id ? response.data : item)));
+      setComments((items) => sortComments(items.map((item) => (item.id === comment.id ? response.data : item))));
     } catch (err) {
       console.error('Failed to flag comment:', err);
       setError('Failed to flag comment.');
@@ -89,6 +103,42 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
     } finally {
       setModeratingCommentId(null);
     }
+  };
+
+  const pinComment = async (comment: DashboardPostComment) => {
+    if (!post) return;
+    setModeratingCommentId(comment.id);
+    setError(null);
+    try {
+      const response = await dashboardPostService.pinComment(post.id, comment.id, !comment.isPinned);
+      setComments((items) => {
+        const updated = comment.isPinned
+          ? items.map((item) => (item.id === comment.id ? response.data : item))
+          : items.map((item) => (item.id === comment.id ? response.data : { ...item, isPinned: false, pinnedBy: null, pinnedAt: null }));
+        return sortComments(updated);
+      });
+    } catch (err) {
+      console.error('Failed to pin comment:', err);
+      setError('Failed to update pinned comment.');
+    } finally {
+      setModeratingCommentId(null);
+    }
+  };
+
+  const openCommentAuthor = async (comment: DashboardPostComment) => {
+    setError(null);
+    try {
+      const response = await userService.getById(comment.authorId);
+      setSelectedCommentUser(response.data as User);
+    } catch (err) {
+      console.error('Failed to load comment author:', err);
+      setError('Failed to load that profile.');
+    }
+  };
+
+  const addEmoji = (emojiData: EmojiClickData) => {
+    setCommentBody((body) => `${body}${emojiData.emoji}`.slice(0, 1200));
+    setIsEmojiPickerOpen(false);
   };
 
   const getCommentInitials = (comment: DashboardPostComment) =>
@@ -166,9 +216,26 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
             />
             <div className="mt-3 flex items-center justify-between gap-3">
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{commentBody.length}/1200</span>
-              <button type="submit" className="btn-primary" disabled={!currentUser || isSavingComment || !commentBody.trim()} aria-label="Post comment" title={isSavingComment ? 'Posting' : 'Post Comment'}>
-                <Send size={16} />
-              </button>
+              <div className="relative flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEmojiPickerOpen((value) => !value)}
+                  className="btn-secondary"
+                  disabled={!currentUser}
+                  aria-label="Add emoji"
+                  title="Add Emoji"
+                >
+                  <Smile size={16} />
+                </button>
+                {isEmojiPickerOpen && (
+                  <div className="absolute bottom-12 right-0 z-50 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                    <EmojiPicker onEmojiClick={addEmoji} />
+                  </div>
+                )}
+                <button type="submit" className="btn-primary" disabled={!currentUser || isSavingComment || !commentBody.trim()} aria-label="Post comment" title={isSavingComment ? 'Posting' : 'Post Comment'}>
+                  <Send size={16} />
+                </button>
+              </div>
             </div>
           </form>
         )}
@@ -177,16 +244,18 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
           {comments.length === 0 ? (
             <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No comments yet.</div>
           ) : comments.map((comment) => (
-            <div key={comment.id} className={`grid grid-cols-1 overflow-hidden rounded border dark:border-gray-800 md:grid-cols-[210px_minmax(0,1fr)] ${comment.isFlagged ? 'border-amber-300 dark:border-amber-800' : 'border-gray-200'}`}>
+            <div key={comment.id} className={`grid grid-cols-1 overflow-hidden rounded border dark:border-gray-800 md:grid-cols-[210px_minmax(0,1fr)] ${comment.isPinned ? 'border-accent bg-accent/5 shadow-sm' : comment.isFlagged ? 'border-amber-300 dark:border-amber-800' : 'border-gray-200'}`}>
               <aside className="flex flex-col items-center justify-center border-b border-primary-600 bg-primary-500 p-5 text-center text-white dark:border-gray-800 dark:bg-gray-900 md:border-b-0 md:border-r">
                 <div className="flex w-full flex-col items-center justify-center gap-3">
-                  {comment.authorProfilePictureUrl ? (
-                    <img src={getAssetUrl(comment.authorProfilePictureUrl)} alt={comment.authorName || 'Comment author'} className="h-20 w-20 rounded-full border-2 border-white object-cover shadow" />
-                  ) : (
-                    <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-white bg-white text-xl font-bold text-primary-500 shadow">
-                      {getCommentInitials(comment)}
-                    </div>
-                  )}
+                  <button type="button" onClick={() => openCommentAuthor(comment)} className="rounded-full focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-primary-500" aria-label={`Open ${comment.authorName || 'comment author'} profile`} title="Open Profile">
+                    {comment.authorProfilePictureUrl ? (
+                      <img src={getAssetUrl(comment.authorProfilePictureUrl)} alt={comment.authorName || 'Comment author'} className="h-20 w-20 rounded-full border-2 border-white object-cover shadow transition hover:scale-105" />
+                    ) : (
+                      <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-white bg-white text-xl font-bold text-primary-500 shadow transition hover:scale-105">
+                        {getCommentInitials(comment)}
+                      </div>
+                    )}
+                  </button>
                   <div className="w-full min-w-0">
                     <p className="truncate text-base font-bold text-white">{comment.authorName || 'User'}</p>
                     <p className="mt-1 truncate text-xs font-semibold uppercase text-blue-100">{comment.authorRank || 'No rank listed'}</p>
@@ -198,6 +267,7 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-bold uppercase text-gray-400">{new Date(comment.createdAt).toLocaleString()}</p>
+                    {comment.isPinned && <p className="mt-1 inline-flex items-center gap-1 rounded bg-accent/10 px-2 py-1 text-xs font-bold uppercase text-accent"><Pin size={12} /> Pinned Comment</p>}
                     {comment.isFlagged && <p className="mt-1 text-xs font-bold uppercase text-amber-600">Flagged for review</p>}
                   </div>
                   <div className="flex gap-2">
@@ -205,9 +275,14 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
                       <Flag size={16} />
                     </button>
                     {isAdministrator && (
-                      <button type="button" onClick={() => setCommentPendingDelete(comment)} disabled={moderatingCommentId === comment.id} className="btn-danger" aria-label="Delete comment" title="Delete Comment">
-                        <Trash2 size={16} />
-                      </button>
+                      <>
+                        <button type="button" onClick={() => pinComment(comment)} disabled={moderatingCommentId === comment.id} className="btn-secondary" aria-label={comment.isPinned ? 'Unpin comment' : 'Pin comment'} title={comment.isPinned ? 'Unpin Comment' : 'Pin Comment'}>
+                          {comment.isPinned ? <PinOff size={16} /> : <Pin size={16} />}
+                        </button>
+                        <button type="button" onClick={() => setCommentPendingDelete(comment)} disabled={moderatingCommentId === comment.id} className="btn-danger" aria-label="Delete comment" title="Delete Comment">
+                          <Trash2 size={16} />
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -230,6 +305,13 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
                 <Trash2 size={16} />
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {selectedCommentUser && (
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="modal-window max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-lg">
+            <UserDetail user={selectedCommentUser} onClose={() => setSelectedCommentUser(null)} canEdit={false} />
           </div>
         </div>
       )}
