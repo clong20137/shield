@@ -9,6 +9,9 @@ const config = {
   users: readNumberArg('--users', Number(process.env.SHIELD_STRESS_USERS || 10)),
   durationSeconds: readNumberArg('--duration', Number(process.env.SHIELD_STRESS_DURATION || 60)),
   rampSeconds: readNumberArg('--ramp', Number(process.env.SHIELD_STRESS_RAMP || 10)),
+  thinkMs: readNumberArg('--think', Number(process.env.SHIELD_STRESS_THINK_MS || 1000)),
+  maxRps: readNumberArg('--rps', Number(process.env.SHIELD_STRESS_RPS || 0)),
+  timeoutMs: readNumberArg('--timeout', Number(process.env.SHIELD_STRESS_TIMEOUT_MS || 8000)),
   write: readBooleanArg('--write', process.env.SHIELD_STRESS_WRITE === 'true'),
 };
 
@@ -47,6 +50,7 @@ const writeScenarios = [
 const scenarios = config.write ? [...readOnlyScenarios, ...writeScenarios] : readOnlyScenarios;
 const stats = new Map(scenarios.map((scenario) => [scenario.name, createStats()]));
 const totals = createStats();
+const limiter = createRateLimiter(config.maxRps);
 let stopRequested = false;
 
 if (!config.email || !config.password) {
@@ -71,7 +75,7 @@ const workers = Array.from({ length: config.users }, (_, index) => runWorker(ind
 
 console.log(`SHIELD stress test`);
 console.log(`Target: ${config.baseUrl}`);
-console.log(`Users: ${config.users}, duration: ${config.durationSeconds}s, ramp: ${config.rampSeconds}s, writes: ${config.write ? 'on' : 'off'}`);
+console.log(`Users: ${config.users}, duration: ${config.durationSeconds}s, ramp: ${config.rampSeconds}s, think: ${config.thinkMs}ms, timeout: ${config.timeoutMs}ms, rps cap: ${config.maxRps || 'off'}, writes: ${config.write ? 'on' : 'off'}`);
 console.log('');
 
 await Promise.all(workers);
@@ -128,18 +132,31 @@ async function runWorker(index, client, endsAt) {
     const elapsed = performance.now() - started;
     record(stats.get(scenario.name), elapsed, ok, status);
     record(totals, elapsed, ok, status);
+
+    if (config.thinkMs > 0) {
+      await delay(jitter(config.thinkMs));
+    }
   }
 }
 
 async function request(method, path, token, payload) {
-  return fetch(`${config.baseUrl}${path}`, {
-    method,
-    headers: {
-      authorization: `Bearer ${token}`,
-      ...(payload ? { 'content-type': 'application/json' } : {}),
-    },
-    body: payload ? JSON.stringify(payload) : undefined,
-  });
+  await limiter.wait();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+
+  try {
+    return await fetch(`${config.baseUrl}${path}`, {
+      method,
+      headers: {
+        authorization: `Bearer ${token}`,
+        ...(payload ? { 'content-type': 'application/json' } : {}),
+      },
+      body: payload ? JSON.stringify(payload) : undefined,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function readBody(response) {
@@ -234,6 +251,32 @@ function delay(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+function jitter(baseMs) {
+  return Math.max(0, Math.round(baseMs * (0.7 + Math.random() * 0.6)));
+}
+
+function createRateLimiter(maxRps) {
+  if (!maxRps || maxRps <= 0) {
+    return {
+      wait: async () => {},
+    };
+  }
+
+  let nextAllowedAt = 0;
+  const intervalMs = 1000 / maxRps;
+
+  return {
+    async wait() {
+      const now = performance.now();
+      const waitMs = Math.max(0, nextAllowedAt - now);
+      nextAllowedAt = Math.max(now, nextAllowedAt) + intervalMs;
+      if (waitMs > 0) {
+        await delay(waitMs);
+      }
+    },
+  };
 }
 
 function readStringArg(name, fallback) {

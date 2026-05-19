@@ -29,10 +29,16 @@ export function rateLimit(options: RateLimitOptions) {
 
     if (!existing || existing.resetAt <= now) {
       buckets.set(key, { count: 1, resetAt: now + options.windowMs });
+      res.setHeader('X-RateLimit-Limit', String(options.max));
+      res.setHeader('X-RateLimit-Remaining', String(Math.max(0, options.max - 1)));
+      res.setHeader('X-RateLimit-Reset', String(Math.ceil((now + options.windowMs) / 1000)));
       return next();
     }
 
     existing.count += 1;
+    res.setHeader('X-RateLimit-Limit', String(options.max));
+    res.setHeader('X-RateLimit-Remaining', String(Math.max(0, options.max - existing.count)));
+    res.setHeader('X-RateLimit-Reset', String(Math.ceil(existing.resetAt / 1000)));
     if (existing.count > options.max) {
       const retryAfterSeconds = Math.ceil((existing.resetAt - now) / 1000);
       res.setHeader('Retry-After', String(retryAfterSeconds));

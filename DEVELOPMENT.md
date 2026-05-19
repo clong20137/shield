@@ -57,13 +57,38 @@ The stress runner lives in the backend and uses the configured API, so point it 
 cd backend
 $env:SHIELD_STRESS_EMAIL="admin@example.com"
 $env:SHIELD_STRESS_PASSWORD="your-password"
-npm run stress -- --url http://localhost:5000/api --users 25 --duration 120 --ramp 20
+npm run stress -- --url http://localhost:5000/api --users 5 --duration 60 --ramp 15 --think 1000
 ```
 
 Use `--write` only against test data. It adds lightweight Trooper Daily calendar creates to the request mix.
 
 ```powershell
-npm run stress -- --url http://localhost:5000/api --users 10 --duration 60 --write
+npm run stress -- --url http://localhost:5000/api --users 10 --duration 60 --ramp 20 --think 1000 --rps 20 --write
+```
+
+Useful options:
+- `--users`: concurrent simulated users.
+- `--duration`: seconds to run, not milliseconds.
+- `--ramp`: seconds to gradually start all users.
+- `--think`: milliseconds each user waits between actions. Use `0` only for an aggressive load test.
+- `--rps`: optional global request-per-second cap.
+- `--timeout`: request timeout in milliseconds.
+
+### API Rate Limiting
+The backend applies a global API limiter to `/api/*` routes. Upload assets under `/api/uploads/*` are served before this limiter.
+
+Defaults:
+- `API_RATE_LIMIT_WINDOW_MS=60000`
+- `API_RATE_LIMIT_MAX=300`
+- `API_REQUEST_TIMEOUT_MS=30000`
+
+For a tighter local test:
+
+```powershell
+$env:API_RATE_LIMIT_WINDOW_MS="60000"
+$env:API_RATE_LIMIT_MAX="120"
+$env:API_REQUEST_TIMEOUT_MS="30000"
+npm run dev
 ```
 
 ### Add a New User Field

@@ -19,6 +19,8 @@ import quickLaunchRoutes from './routes/quickLaunchRoutes';
 import eventRoutes from './routes/eventRoutes';
 import performanceEvaluationRoutes from './routes/performanceEvaluationRoutes';
 import { startSecurityCleanupJob } from './services/securityCleanup';
+import { rateLimit } from './middleware/rateLimit';
+import { requestTimeout } from './middleware/requestTimeout';
 
 dotenv.config();
 
@@ -28,6 +30,9 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
+const apiRateLimitWindowMs = Number(process.env.API_RATE_LIMIT_WINDOW_MS || 60 * 1000);
+const apiRateLimitMax = Number(process.env.API_RATE_LIMIT_MAX || 300);
+const apiRequestTimeoutMs = Number(process.env.API_REQUEST_TIMEOUT_MS || 30 * 1000);
 
 // Middleware
 app.disable('x-powered-by');
@@ -70,6 +75,18 @@ app.use('/uploads', uploadsStaticMiddleware);
 app.use('/api/uploads', uploadsStaticMiddleware);
 
 // Routes
+app.use('/api', rateLimit({
+  keyPrefix: 'api',
+  windowMs: Number.isFinite(apiRateLimitWindowMs) && apiRateLimitWindowMs > 0 ? apiRateLimitWindowMs : 60 * 1000,
+  max: Number.isFinite(apiRateLimitMax) && apiRateLimitMax > 0 ? apiRateLimitMax : 300,
+  message: 'Too many API requests. Slow down and try again shortly.',
+}));
+app.use('/api', requestTimeout({
+  timeoutMs: Number.isFinite(apiRequestTimeoutMs) && apiRequestTimeoutMs > 0 ? apiRequestTimeoutMs : 30 * 1000,
+  message: 'The request took too long. Try again shortly.',
+  skipPaths: ['/api/events', '/api/messages/events'],
+}));
+
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
