@@ -423,34 +423,36 @@ function TimeDetailInput({
   };
 
   return (
-    <div className="relative grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-      <input
-        type="text"
-        value={displayTime}
-        onChange={(event) => {
-          const nextTime = sanitizeTimeInput(event.target.value);
-          setDisplayTime(nextTime);
-          commitTime(nextTime, displayPeriod);
-        }}
-        onBlur={(event) => {
-          const sanitizedValue = sanitizeTimeInput(event.target.value);
-          const [hour = '', minute = ''] = sanitizedValue.split(':');
-          if (!hour || !minute) return;
-          const normalizedTime = `${formatTimePart(Number(hour))}:${formatTimePart(Number(minute))}`;
-          setDisplayTime(normalizedTime);
-          commitTime(normalizedTime, displayPeriod);
-        }}
-        placeholder="HH:MM"
-        inputMode="numeric"
-        maxLength={5}
-        className={`w-full rounded border bg-white px-3 py-2 pr-8 text-sm transition dark:bg-gray-900 ${
-          isComplete
-            ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
-            : 'border-gray-300 dark:border-gray-700'
-        }`}
-        aria-label="Time"
-      />
-      {isComplete && <CheckCircle2 className="trooper-daily-check pointer-events-none absolute right-[4.7rem] top-1/2 -translate-y-1/2 text-green-600 dark:text-green-300" size={16} />}
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+      <div className="relative min-w-0">
+        <input
+          type="text"
+          value={displayTime}
+          onChange={(event) => {
+            const nextTime = sanitizeTimeInput(event.target.value);
+            setDisplayTime(nextTime);
+            commitTime(nextTime, displayPeriod);
+          }}
+          onBlur={(event) => {
+            const sanitizedValue = sanitizeTimeInput(event.target.value);
+            const [hour = '', minute = ''] = sanitizedValue.split(':');
+            if (!hour || !minute) return;
+            const normalizedTime = `${formatTimePart(Number(hour))}:${formatTimePart(Number(minute))}`;
+            setDisplayTime(normalizedTime);
+            commitTime(normalizedTime, displayPeriod);
+          }}
+          placeholder="HH:MM"
+          inputMode="numeric"
+          maxLength={5}
+          className={`w-full rounded border bg-white px-3 py-2 pr-8 text-sm transition dark:bg-gray-900 ${
+            isComplete
+              ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
+              : 'border-gray-300 dark:border-gray-700'
+          }`}
+          aria-label="Time"
+        />
+        {isComplete && <CheckCircle2 className="trooper-daily-check pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-green-600 dark:text-green-300" size={16} />}
+      </div>
       <div className="inline-flex rounded border border-gray-300 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-900" aria-label="AM or PM">
         {(['AM', 'PM'] as const).map((period) => (
           <button
