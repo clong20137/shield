@@ -8,6 +8,7 @@ type TimePeriod = 'AM' | 'PM';
 
 const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty'];
 const narrativeCharacterLimit = 1000;
+const dailyInputCharacterLimit = 5;
 
 const entryColors = [
   { label: 'Accent', value: '#9C865C' },
@@ -188,9 +189,8 @@ const numericDetailFields: string[] = trooperDailySections
 
 const wholeNumberDetailFields = new Set<string>(
   trooperDailySections
-    .filter((section) => ['Traffic Activity', 'OWI Offense Activity', 'Criminal Activity', 'Drug Activity'].includes(section.title))
-    .flatMap((section) => section.fields.map(([key]) => key))
-    .filter((key) => key !== 'certifiedBreathTests'),
+    .filter((section) => !['Regular Duty', 'Attendance Hours', 'Duty Hours'].includes(section.title))
+    .flatMap((section) => section.fields.map(([key]) => key)),
 );
 
 const getDefaultDistrict = (currentUser?: AuthAccount) =>
@@ -272,18 +272,19 @@ function formatHours(value: number): string {
   return value.toFixed(2).replace(/\.?0+$/u, '');
 }
 
-function sanitizeDecimalInput(value: string, maxIntegerDigits?: number): string {
+function sanitizeDecimalInput(value: string, maxIntegerDigits?: number, maxLength = dailyInputCharacterLimit): string {
   const cleanedValue = value.replace(/[^\d.]/gu, '');
   const [rawInteger = '', ...decimalParts] = cleanedValue.split('.');
   const integerPart = (maxIntegerDigits ? rawInteger.slice(0, maxIntegerDigits) : rawInteger) || (cleanedValue.startsWith('.') ? '0' : '');
   const hasDecimal = cleanedValue.includes('.');
   const decimalPart = decimalParts.join('').slice(0, 2);
+  const nextValue = hasDecimal ? `${integerPart}.${decimalPart}` : integerPart;
 
-  return hasDecimal ? `${integerPart}.${decimalPart}` : integerPart;
+  return nextValue.slice(0, maxLength);
 }
 
 function sanitizeWholeNumberInput(value: string): string {
-  return value.replace(/\D/gu, '');
+  return value.replace(/\D/gu, '').slice(0, dailyInputCharacterLimit);
 }
 
 function formatTimePart(value: number): string {
@@ -348,6 +349,14 @@ function isHourMatch(reportedHours: number, comparisonHours: number): boolean {
   return reportedHours > 0 && comparisonHours > 0 && Math.abs(reportedHours - comparisonHours) <= 0.01;
 }
 
+function isDetailComplete(details: Record<string, string> | undefined, key: string): boolean {
+  return Boolean(details?.[key]?.trim());
+}
+
+function isSectionComplete(details: Record<string, string> | undefined, section: typeof trooperDailySections[number]): boolean {
+  return section.fields.every(([key]) => isDetailComplete(details, key));
+}
+
 function HourSummaryCard({
   label,
   value,
@@ -386,9 +395,11 @@ function HourSummaryCard({
 function TimeDetailInput({
   value,
   onChange,
+  isComplete = false,
 }: {
   value: string;
   onChange: (value: string) => void;
+  isComplete?: boolean;
 }) {
   const parsedTime = parseTimeInput(value);
   const [displayTime, setDisplayTime] = useState(parsedTime.time);
@@ -412,7 +423,7 @@ function TimeDetailInput({
   };
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+    <div className="relative grid grid-cols-[minmax(0,1fr)_auto] gap-2">
       <input
         type="text"
         value={displayTime}
@@ -432,9 +443,14 @@ function TimeDetailInput({
         placeholder="HH:MM"
         inputMode="numeric"
         maxLength={5}
-        className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+        className={`w-full rounded border bg-white px-3 py-2 pr-8 text-sm transition dark:bg-gray-900 ${
+          isComplete
+            ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
+            : 'border-gray-300 dark:border-gray-700'
+        }`}
         aria-label="Time"
       />
+      {isComplete && <CheckCircle2 className="trooper-daily-check pointer-events-none absolute right-[4.7rem] top-1/2 -translate-y-1/2 text-green-600 dark:text-green-300" size={16} />}
       <div className="inline-flex rounded border border-gray-300 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-900" aria-label="AM or PM">
         {(['AM', 'PM'] as const).map((period) => (
           <button
@@ -1100,15 +1116,23 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
 
               <label className="block">
                 <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Duty Hours</span>
-                <input
-                  type="text"
-                  min="0"
-                  inputMode="decimal"
-                  value={entryForm.dutyHours}
-                  onChange={(event) => updateDutyHours(event.target.value)}
-                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    min="0"
+                    inputMode="decimal"
+                    maxLength={dailyInputCharacterLimit}
+                    value={entryForm.dutyHours}
+                    onChange={(event) => updateDutyHours(event.target.value)}
+                    className={`w-full rounded border bg-white px-3 py-2 pr-9 transition dark:bg-gray-950 ${
+                      entryForm.dutyHours
+                        ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
+                        : 'border-gray-300 dark:border-gray-700'
+                    }`}
+                    required
+                  />
+                  {entryForm.dutyHours && <CheckCircle2 className="trooper-daily-check pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-green-600 dark:text-green-300" size={17} />}
+                </div>
                 {calculatedShiftHours > 0 && (
                   <span className="mt-1 block text-xs font-semibold text-gray-500 dark:text-gray-400">
                     Shift times calculate to {formatHours(calculatedShiftHours)} hrs.
@@ -1176,14 +1200,22 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
 
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                   {trooperDailySections.map((section) => (
-                    <section key={section.title} className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950">
+                    <section key={section.title} className={`rounded-lg border bg-white p-4 transition-all duration-300 dark:bg-gray-950 ${
+                      isSectionComplete(entryForm.details, section)
+                        ? 'trooper-daily-match border-green-300 dark:border-green-800'
+                        : 'border-gray-200 dark:border-gray-800'
+                    }`}>
                       <div className="mb-4 flex items-center justify-between gap-3">
-                        <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">{section.title}</h3>
-                        <span className="h-1.5 w-10 rounded-full bg-accent" />
+                        <h3 className="flex items-center gap-2 text-base font-bold text-gray-900 dark:text-gray-100">
+                          {section.title}
+                          {isSectionComplete(entryForm.details, section) && <CheckCircle2 className="trooper-daily-check text-green-600 dark:text-green-300" size={18} />}
+                        </h3>
+                        <span className={`h-1.5 w-10 rounded-full ${isSectionComplete(entryForm.details, section) ? 'bg-green-500' : 'bg-accent'}`} />
                       </div>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {section.fields.map(([key, label]) => {
                           const isTimeField = timeDetailFields.has(key);
+                          const isComplete = isDetailComplete(entryForm.details, key);
                           return (
                             <label key={key} className="block">
                               <span className="mb-1 block text-xs font-bold uppercase text-gray-500 dark:text-gray-400">{label}</span>
@@ -1191,16 +1223,24 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                                 <TimeDetailInput
                                   value={entryForm.details?.[key] || ''}
                                   onChange={(value) => updateDailyDetail(key, value)}
+                                  isComplete={isComplete}
                                 />
                               ) : (
-                                <input
-                                  type="text"
-                                  inputMode={wholeNumberDetailFields.has(key) ? 'numeric' : 'decimal'}
-                                  maxLength={mileageDetailFields.has(key) ? 8 : undefined}
-                                  value={entryForm.details?.[key] || ''}
-                                  onChange={(event) => updateDailyDetail(key, event.target.value)}
-                                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-                                />
+                                <div className="relative">
+                                  <input
+                                    type="text"
+                                    inputMode={wholeNumberDetailFields.has(key) ? 'numeric' : 'decimal'}
+                                    maxLength={dailyInputCharacterLimit}
+                                    value={entryForm.details?.[key] || ''}
+                                    onChange={(event) => updateDailyDetail(key, event.target.value)}
+                                    className={`w-full rounded border bg-white px-3 py-2 pr-8 text-sm transition dark:bg-gray-900 ${
+                                      isComplete
+                                        ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
+                                        : 'border-gray-300 dark:border-gray-700'
+                                    }`}
+                                  />
+                                  {isComplete && <CheckCircle2 className="trooper-daily-check pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-green-600 dark:text-green-300" size={16} />}
+                                </div>
                               )}
                             </label>
                           );

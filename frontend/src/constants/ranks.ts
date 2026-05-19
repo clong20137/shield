@@ -1,5 +1,6 @@
 export const rankOptions = [
   '',
+  'Civilian',
   'Trooper',
   'Master Trooper',
   'Detective',

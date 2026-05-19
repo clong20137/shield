@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, Search, X } from 'lucide-react';
 import { AuthAccount, reportService, ReportRow, SystemStatistics, TrooperDailyReportEntry } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
@@ -148,6 +148,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 const ReportsPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUser }) => {
+  const [selectedReportType, setSelectedReportType] = useState<'trooper-daily' | 'cpar'>('trooper-daily');
   const [rankReport, setRankReport] = useState<ReportRow[]>([]);
   const [districtReport, setDistrictReport] = useState<ReportRow[]>([]);
   const [employmentReport, setEmploymentReport] = useState<ReportRow[]>([]);
@@ -240,9 +241,13 @@ const ReportsPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUse
   };
 
   useEffect(() => {
-    void loadTrooperDailies();
+    if (selectedReportType === 'trooper-daily') {
+      void loadTrooperDailies();
+    }
     const handleReportsUpdate = () => {
-      void loadTrooperDailies(false);
+      if (selectedReportType === 'trooper-daily') {
+        void loadTrooperDailies(false);
+      }
     };
 
     window.addEventListener('shield:user-updated', handleReportsUpdate);
@@ -253,7 +258,7 @@ const ReportsPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUse
       window.removeEventListener('shield:dashboard-updated', handleReportsUpdate);
       window.removeEventListener('shield:calendar-updated', handleReportsUpdate);
     };
-  }, []);
+  }, [selectedReportType]);
 
   const searchTrooperDailies = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -322,6 +327,21 @@ const ReportsPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUse
     <div>
       <h1 className="mb-8">Reports & Analytics</h1>
 
+      <section className="mb-6 rounded-lg border border-gray-200 bg-white p-5 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
+        <label className="block max-w-md">
+          <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Report to Load</span>
+          <select
+            value={selectedReportType}
+            onChange={(event) => setSelectedReportType(event.target.value as 'trooper-daily' | 'cpar')}
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+          >
+            <option value="trooper-daily">Trooper Daily Reports</option>
+            <option value="cpar">CPAR</option>
+          </select>
+        </label>
+      </section>
+
+      {selectedReportType === 'trooper-daily' ? (
       <section className="mb-8 rounded-lg border border-gray-200 bg-white p-5 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -444,8 +464,19 @@ const ReportsPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUse
           </>
         )}
       </section>
+      ) : (
+        <section className="mb-8 rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded bg-accent/10 text-accent">
+            <FileText size={22} />
+          </div>
+          <h2 className="mt-4">CPAR</h2>
+          <p className="mx-auto mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
+            CPAR reporting is ready as a report type. The CPAR dataset and filters can be wired in when those records are added.
+          </p>
+        </section>
+      )}
 
-      {dailyScope === 'all' && (loading ? (
+      {selectedReportType === 'trooper-daily' && dailyScope === 'all' && (loading ? (
         <div className="loading">Loading user analytics...</div>
       ) : (
         <>
