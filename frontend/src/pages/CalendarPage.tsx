@@ -451,7 +451,11 @@ function TimeDetailInput({
           }`}
           aria-label="Time"
         />
-        {isComplete && <CheckCircle2 className="trooper-daily-check pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-green-600 dark:text-green-300" size={16} />}
+        {isComplete && (
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-green-600 dark:text-green-300">
+            <CheckCircle2 className="trooper-daily-check" size={16} />
+          </span>
+        )}
       </div>
       <div className="inline-flex rounded border border-gray-300 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-900" aria-label="AM or PM">
         {(['AM', 'PM'] as const).map((period) => (
@@ -1133,7 +1137,11 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                     }`}
                     required
                   />
-                  {entryForm.dutyHours && <CheckCircle2 className="trooper-daily-check pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-green-600 dark:text-green-300" size={17} />}
+                  {entryForm.dutyHours && (
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-green-600 dark:text-green-300">
+                      <CheckCircle2 className="trooper-daily-check" size={17} />
+                    </span>
+                  )}
                 </div>
                 {calculatedShiftHours > 0 && (
                   <span className="mt-1 block text-xs font-semibold text-gray-500 dark:text-gray-400">
@@ -1241,7 +1249,11 @@ function CalendarPage({ currentUser, onOpenCalculator }: { currentUser: AuthAcco
                                         : 'border-gray-300 dark:border-gray-700'
                                     }`}
                                   />
-                                  {isComplete && <CheckCircle2 className="trooper-daily-check pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-green-600 dark:text-green-300" size={16} />}
+                                  {isComplete && (
+                                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-green-600 dark:text-green-300">
+                                      <CheckCircle2 className="trooper-daily-check" size={16} />
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </label>

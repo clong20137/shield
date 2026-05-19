@@ -2,7 +2,7 @@ import QRCode from 'qrcode';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Camera, Download, ExternalLink, KeyRound, Laptop, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, X } from 'lucide-react';
-import { AuthAccount, AuthSession, DeviceRecord, TwoFactorSetupResponse, authService, deviceService, getAssetUrl, performanceEvaluationService, userService } from '../services/api';
+import { AuthAccount, AuthSession, DeviceRecord, TwoFactorSetupResponse, authService, deviceService, getAssetUrl, handleAssetImageError, performanceEvaluationService, userService } from '../services/api';
 import { downloadPerformanceEvaluationPdf } from '../utils/performanceEvaluationPdf';
 
 interface AccountSettingsPageProps {
@@ -287,6 +287,7 @@ export function AccountSettingsPage({
                 <img
                   src={getAssetUrl(account.profilePictureUrl)}
                   alt={account.displayName}
+                  onError={handleAssetImageError}
                   className="h-full w-full object-cover"
                 />
               ) : (

@@ -13,6 +13,23 @@ const API_ORIGIN_URL = (() => {
   }
 })();
 
+const ASSET_ORIGIN_URL = (() => {
+  if (typeof window === 'undefined') {
+    return API_ORIGIN_URL;
+  }
+
+  try {
+    const apiOrigin = new URL(API_ORIGIN_URL);
+    const pageOrigin = new URL(window.location.origin);
+    const apiIsLocalhost = ['localhost', '127.0.0.1'].includes(apiOrigin.hostname);
+    const pageIsLocalhost = ['localhost', '127.0.0.1'].includes(pageOrigin.hostname);
+
+    return apiIsLocalhost && !pageIsLocalhost ? window.location.origin : API_ORIGIN_URL;
+  } catch {
+    return API_ORIGIN_URL;
+  }
+})();
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 8000,
@@ -71,7 +88,7 @@ export function getAssetUrl(value?: string | null): string {
       .map((part) => encodeURIComponent(decodeURIComponent(part)))
       .join('/');
 
-    return `${API_ORIGIN_URL}/uploads/${safeAssetPath}`;
+    return `${ASSET_ORIGIN_URL}/uploads/${safeAssetPath}`;
   }
 
   try {
@@ -87,6 +104,23 @@ export function getAssetUrl(value?: string | null): string {
 
     return `${API_BASE_URL}${safePath}`;
   }
+}
+
+export function handleAssetImageError(event: { currentTarget: HTMLImageElement }) {
+  const image = event.currentTarget;
+  const currentSource = image.currentSrc || image.src;
+
+  if (
+    image.dataset.assetFallback !== 'api' &&
+    currentSource.includes('/uploads/') &&
+    !currentSource.includes('/api/uploads/')
+  ) {
+    image.dataset.assetFallback = 'api';
+    image.src = currentSource.replace('/uploads/', '/api/uploads/');
+    return;
+  }
+
+  image.style.display = 'none';
 }
 
 export interface User {

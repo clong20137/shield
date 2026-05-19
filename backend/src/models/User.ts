@@ -1,4 +1,4 @@
-import { ResultSetHeader } from 'mysql2';
+import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database';
 import { createPasswordHash } from './AuthAccount';
@@ -309,6 +309,20 @@ export class UserModel {
           values.push(UserModel.normalizeUpdateValue(key, value));
         }
       });
+
+      if (typeof updates.firstName === 'string' || typeof updates.lastName === 'string') {
+        const [rows] = await conn.query<Array<RowDataPacket & { firstName: string; lastName: string }>>(
+          'SELECT `firstName`, `lastName` FROM users WHERE `id` = ? LIMIT 1',
+          [id]
+        );
+        const currentUser = rows[0];
+        if (currentUser) {
+          const firstName = typeof updates.firstName === 'string' ? updates.firstName : currentUser.firstName;
+          const lastName = typeof updates.lastName === 'string' ? updates.lastName : currentUser.lastName;
+          fields.push('`displayName` = ?');
+          values.push(`${firstName} ${lastName}`.trim());
+        }
+      }
 
       if (fields.length === 0) return true;
 

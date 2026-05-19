@@ -108,7 +108,7 @@ function EvaluationDetail({
             {evaluation.evaluationPeriod} - {evaluation.positionTitle || 'No position listed'}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => downloadPerformanceEvaluationPdf([evaluation], `performance-evaluation-${evaluation.employeeName.replace(/\s+/gu, '-').toLowerCase()}-${evaluation.evaluationPeriod.replace(/\s+/gu, '-').toLowerCase()}.pdf`)}
@@ -123,7 +123,7 @@ function EvaluationDetail({
               <BellRing size={16} />
             </button>
           )}
-          <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${getStatusTone(evaluation.status)}`}>
+          <span className={`inline-flex min-h-10 items-center justify-center rounded-full px-4 py-2 text-xs font-bold uppercase leading-none ${getStatusTone(evaluation.status)}`}>
             {evaluation.status}
           </span>
         </div>

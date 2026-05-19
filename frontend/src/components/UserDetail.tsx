@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Pencil, Phone, Send, X } from 'lucide-react';
-import { getAssetUrl, User } from '../services/api';
+import { getAssetUrl, handleAssetImageError, User } from '../services/api';
 import { RankBadge } from './RankBadge';
 
 interface UserDetailProps {
@@ -59,6 +59,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
             <img
               src={getAssetUrl(user.profilePictureUrl)}
               alt={`${user.firstName} ${user.lastName}`}
+              onError={handleAssetImageError}
               className="h-20 w-20 rounded-full border-2 border-white object-cover"
             />
           ) : (

@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { Flag, MessageSquare, Pin, PinOff, Send, Smile, Trash2, X } from 'lucide-react';
 import { UserDetail } from '../components/UserDetail';
-import { AuthAccount, DashboardPost, DashboardPostComment, User, dashboardPostService, getAssetUrl, userService } from '../services/api';
+import { AuthAccount, DashboardPost, DashboardPostComment, User, dashboardPostService, getAssetUrl, handleAssetImageError, userService } from '../services/api';
 
 interface DashboardPostPageProps {
   currentUser: AuthAccount | null;
@@ -250,7 +250,7 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
                 <div className="flex w-full flex-col items-center justify-center gap-3">
                   <button type="button" onClick={() => openCommentAuthor(comment)} className="rounded-full focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-primary-500" aria-label={`Open ${comment.authorName || 'comment author'} profile`} title="Open Profile">
                     {comment.authorProfilePictureUrl ? (
-                      <img src={getAssetUrl(comment.authorProfilePictureUrl)} alt={comment.authorName || 'Comment author'} className="h-20 w-20 rounded-full border-2 border-white object-cover shadow transition hover:scale-105" />
+                      <img src={getAssetUrl(comment.authorProfilePictureUrl)} alt={comment.authorName || 'Comment author'} onError={handleAssetImageError} className="h-20 w-20 rounded-full border-2 border-white object-cover shadow transition hover:scale-105" />
                     ) : (
                       <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-white bg-white text-xl font-bold text-primary-500 shadow transition hover:scale-105">
                         {getCommentInitials(comment)}

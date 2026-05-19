@@ -13,7 +13,7 @@ import CalendarPage from './pages/CalendarPage';
 import PerformanceEvaluationsPage from './pages/PerformanceEvaluationsPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { RankBadge } from './components/RankBadge';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, clearAuthToken, getAppEventsUrl, getAssetUrl, getMessageEventsUrl, messageService, notificationService, quickLaunchService, RegistrationSettings, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, clearAuthToken, getAppEventsUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, notificationService, quickLaunchService, RegistrationSettings, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
@@ -2272,6 +2272,7 @@ function App() {
                     <img
                       src={getAssetUrl(currentUser.profilePictureUrl)}
                       alt={currentUser.displayName}
+                      onError={handleAssetImageError}
                       className={`${isSidebarCollapsed ? 'h-10 w-10' : 'h-14 w-14'} shrink-0 rounded-full border border-white bg-white object-cover shadow`}
                     />
                   ) : (
