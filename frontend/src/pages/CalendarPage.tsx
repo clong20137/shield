@@ -1225,74 +1225,81 @@ function CalendarPage({ currentUser, onOpenCalculator, useMilitaryTime = false }
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                  {trooperDailySections.map((section) => (
-                    <section key={section.title} className={`rounded-lg border bg-white p-4 transition-all duration-300 dark:bg-gray-950 ${
-                      isSectionComplete(entryForm.details, section)
-                        ? 'trooper-daily-match border-green-300 dark:border-green-800'
-                        : 'border-gray-200 dark:border-gray-800'
-                    }`}>
-                      <div className="mb-4 flex items-center justify-between gap-3">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCollapsedDailySections((sections) =>
-                              sections.includes(section.title)
-                                ? sections.filter((title) => title !== section.title)
-                                : [...sections, section.title],
-                            )
-                          }
-                          className="flex min-w-0 items-center gap-2 text-left"
-                          aria-expanded={!collapsedDailySections.includes(section.title)}
-                        >
-                          <ChevronDown className={`shrink-0 text-gray-400 transition ${collapsedDailySections.includes(section.title) ? '-rotate-90' : ''}`} size={18} />
-                          <h3 className="flex min-w-0 items-center gap-2 text-base font-bold text-gray-900 dark:text-gray-100">
-                            {section.title}
-                            {isSectionComplete(entryForm.details, section) && <CheckCircle2 className="trooper-daily-check shrink-0 text-green-600 dark:text-green-300" size={18} />}
-                          </h3>
-                        </button>
-                        <span className={`h-1.5 w-10 shrink-0 rounded-full ${isSectionComplete(entryForm.details, section) ? 'bg-green-500' : 'bg-accent'}`} />
-                      </div>
-                      {!collapsedDailySections.includes(section.title) && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        {section.fields.map(([key, label]) => {
-                          const isTimeField = timeDetailFields.has(key);
-                          const isComplete = isDetailComplete(entryForm.details, key);
-                          return (
-                            <label key={key} className="block">
-                              <span className="mb-1 block text-xs font-bold uppercase text-gray-500 dark:text-gray-400">{label}</span>
-                              {isTimeField ? (
-                                <TimeDetailInput
-                                  value={entryForm.details?.[key] || ''}
-                                  onChange={(value) => updateDailyDetail(key, value)}
-                                  isComplete={isComplete}
-                                  useMilitaryTime={useMilitaryTime}
-                                />
-                              ) : (
-                                <div className="relative">
-                                  <input
-                                    type="text"
-                                    inputMode={wholeNumberDetailFields.has(key) ? 'numeric' : 'decimal'}
-                                    maxLength={dailyInputCharacterLimit}
-                                    value={entryForm.details?.[key] || ''}
-                                    onChange={(event) => updateDailyDetail(key, event.target.value)}
-                                    className={`w-full rounded border bg-white px-3 py-2 pr-8 text-sm transition dark:bg-gray-900 ${
-                                      isComplete
-                                        ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
-                                        : 'border-gray-300 dark:border-gray-700'
-                                    }`}
-                                  />
-                                  {isComplete && (
-                                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-green-600 dark:text-green-300">
-                                      <CheckCircle2 className="trooper-daily-check" size={16} />
-                                    </span>
+                  {trooperDailySections.map((section) => {
+                    const isCollapsed = collapsedDailySections.includes(section.title);
+                    return (
+                      <section
+                        key={section.title}
+                        className={`rounded-lg border bg-white transition-all duration-300 overflow-hidden dark:bg-gray-950 ${
+                          isSectionComplete(entryForm.details, section)
+                            ? 'trooper-daily-match border-green-300 dark:border-green-800'
+                            : 'border-gray-200 dark:border-gray-800'
+                        } ${isCollapsed ? 'pb-0' : 'p-4'}`}
+                      >
+                        <div className={`${isCollapsed ? '' : 'mb-4'} flex items-center justify-between gap-3`}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCollapsedDailySections((sections) =>
+                                sections.includes(section.title)
+                                  ? sections.filter((title) => title !== section.title)
+                                  : [...sections, section.title],
+                              )
+                            }
+                            className="flex min-w-0 items-center gap-2 text-left"
+                            aria-expanded={!isCollapsed}
+                          >
+                            <ChevronDown className={`shrink-0 text-gray-400 transition ${isCollapsed ? '-rotate-90' : ''}`} size={18} />
+                            <h3 className="flex min-w-0 items-center gap-2 text-base font-bold text-gray-900 dark:text-gray-100">
+                              {section.title}
+                              {isSectionComplete(entryForm.details, section) && <CheckCircle2 className="trooper-daily-check shrink-0 text-green-600 dark:text-green-300" size={18} />}
+                            </h3>
+                          </button>
+                          <span className={`h-1.5 w-10 shrink-0 rounded-full ${isSectionComplete(entryForm.details, section) ? 'bg-green-500' : 'bg-accent'}`} />
+                        </div>
+                        <div className={`overflow-hidden transition-all duration-300 ${isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[1200px] opacity-100'}`}>
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            {section.fields.map(([key, label]) => {
+                              const isTimeField = timeDetailFields.has(key);
+                              const isComplete = isDetailComplete(entryForm.details, key);
+                              return (
+                                <label key={key} className="block">
+                                  <span className="mb-1 block text-xs font-bold uppercase text-gray-500 dark:text-gray-400">{label}</span>
+                                  {isTimeField ? (
+                                    <TimeDetailInput
+                                      value={entryForm.details?.[key] || ''}
+                                      onChange={(value) => updateDailyDetail(key, value)}
+                                      isComplete={isComplete}
+                                      useMilitaryTime={useMilitaryTime}
+                                    />
+                                  ) : (
+                                    <div className="relative">
+                                      <input
+                                        type="text"
+                                        inputMode={wholeNumberDetailFields.has(key) ? 'numeric' : 'decimal'}
+                                        maxLength={dailyInputCharacterLimit}
+                                        value={entryForm.details?.[key] || ''}
+                                        onChange={(event) => updateDailyDetail(key, event.target.value)}
+                                        className={`w-full rounded border bg-white px-3 py-2 pr-8 text-sm transition dark:bg-gray-900 ${
+                                          isComplete
+                                            ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
+                                            : 'border-gray-300 dark:border-gray-700'
+                                        }`}
+                                      />
+                                      {isComplete && (
+                                        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-green-600 dark:text-green-300">
+                                          <CheckCircle2 className="trooper-daily-check" size={16} />
+                                        </span>
+                                      )}
+                                    </div>
                                   )}
-                                </div>
-                              )}
-                            </label>
+                                </label>
                           );
                         })}
-                      </div>}
+                      </div>
+                    </div>
                     </section>
-                  ))}
+                  })}
 
                   <section className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950 xl:col-span-2">
                     <div className="mb-4 flex items-center justify-between gap-3">
