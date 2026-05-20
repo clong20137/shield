@@ -125,6 +125,28 @@ function saveLegacyQuickLaunchSlots(storageKey: string, slots: QuickLaunchSlot[]
   }
 }
 
+const WELCOME_SPLASH_KEY_PREFIX = 'shield_welcome_splash_seen';
+
+function getWelcomeSplashStorageKey(accountId: string): string {
+  return `${WELCOME_SPLASH_KEY_PREFIX}_${accountId}`;
+}
+
+function hasSeenWelcomeSplash(accountId: string): boolean {
+  try {
+    return window.localStorage.getItem(getWelcomeSplashStorageKey(accountId)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markWelcomeSplashSeen(accountId: string) {
+  try {
+    window.localStorage.setItem(getWelcomeSplashStorageKey(accountId), '1');
+  } catch {
+    // ignore local storage failures
+  }
+}
+
 function getErrorMessage(error: unknown, fallback: string): string {
   if (
     typeof error === 'object' &&
@@ -1709,6 +1731,69 @@ function FirstLoginGuide({
   );
 }
 
+function WelcomeSplash({
+  account,
+  onStart,
+  onLater,
+}: {
+  account: AuthAccount;
+  onStart: () => void;
+  onLater: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl rounded-[2rem] border border-gray-200 bg-white p-8 shadow-2xl dark:border-gray-800 dark:bg-gray-950">
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.22em] text-primary-600 dark:text-primary-400">Welcome</p>
+            <h1 className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">Welcome to Shield</h1>
+          </div>
+          <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-primary-500 text-white shadow-lg">
+            <Shield size={28} />
+          </div>
+        </div>
+
+        <p className="text-sm leading-7 text-gray-600 dark:text-gray-300">
+          {account.displayName
+            ? `Hello ${account.displayName}, your SHIELD workspace is ready.`
+            : `Hello ${account.email}, your SHIELD workspace is ready.`}
+        </p>
+        <p className="mt-4 text-sm leading-7 text-gray-600 dark:text-gray-300">
+          First, we’ll walk you through the most important areas: dashboard, notifications, messages, and quick launch navigation.
+        </p>
+
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Dashboard</p>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Get a quick picture of security alerts, your team, and system status.</p>
+          </div>
+          <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Quick Launch</p>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Customize shortcuts for fast access to search, messages, and reporting tools.</p>
+          </div>
+        </div>
+
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onLater}
+            className="rounded-full border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            Maybe later
+          </button>
+          <button
+            type="button"
+            onClick={onStart}
+            className="rounded-full bg-primary-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-700"
+          >
+            Start the guide
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthAccount | null>(null);
@@ -1729,6 +1814,8 @@ function App() {
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
   const [isBugTrackerOpen, setIsBugTrackerOpen] = useState(false);
   const [isFirstLoginGuideOpen, setIsFirstLoginGuideOpen] = useState(false);
+  const [isWelcomeSplashOpen, setIsWelcomeSplashOpen] = useState(false);
+  const [shouldLaunchGuideAfterWelcome, setShouldLaunchGuideAfterWelcome] = useState(false);
   const [closingModal, setClosingModal] = useState<'messages' | 'calendar' | 'profile' | 'adminConsole' | 'reportBug' | 'bugTracker' | null>(null);
 
   useEffect(() => {
@@ -1820,10 +1907,10 @@ function App() {
   }, [loadUserNotifications]);
 
   useEffect(() => {
-    if (currentUser && !currentUser.hasCompletedOnboarding) {
+    if (currentUser && !currentUser.hasCompletedOnboarding && !isWelcomeSplashOpen && shouldLaunchGuideAfterWelcome) {
       setIsFirstLoginGuideOpen(true);
     }
-  }, [currentUser?.id, currentUser?.hasCompletedOnboarding]);
+  }, [currentUser?.id, currentUser?.hasCompletedOnboarding, isWelcomeSplashOpen, shouldLaunchGuideAfterWelcome]);
 
   const playMessagePing = () => {
     if (!messagePreferences.receiveMessages || !messagePreferences.playMessageSound) {
@@ -1913,6 +2000,13 @@ function App() {
           setCurrentUser(response.data.account);
           setIsAuthenticated(true);
           window.localStorage.setItem(SESSION_KEY, JSON.stringify(response.data.account));
+
+          if (!response.data.account.hasCompletedOnboarding) {
+            if (!hasSeenWelcomeSplash(response.data.account.id)) {
+              setIsWelcomeSplashOpen(true);
+            }
+            setShouldLaunchGuideAfterWelcome(true);
+          }
         }
       })
       .catch(() => {
@@ -1927,6 +2021,13 @@ function App() {
     setCurrentUser(account);
     setIsAuthenticated(true);
     showToast('success', `Signed in as ${account.email}.`);
+
+    if (!account.hasCompletedOnboarding) {
+      if (!hasSeenWelcomeSplash(account.id)) {
+        setIsWelcomeSplashOpen(true);
+      }
+      setShouldLaunchGuideAfterWelcome(true);
+    }
   };
 
   const handleLogout = async () => {
@@ -1939,6 +2040,9 @@ function App() {
     window.localStorage.removeItem(SESSION_KEY);
     setCurrentUser(null);
     setIsAuthenticated(false);
+    setIsWelcomeSplashOpen(false);
+    setShouldLaunchGuideAfterWelcome(false);
+    setIsFirstLoginGuideOpen(false);
     showToast('info', 'Signed out.');
   };
 
@@ -1947,8 +2051,32 @@ function App() {
     window.localStorage.removeItem(SESSION_KEY);
     setCurrentUser(null);
     setIsAuthenticated(false);
+    setIsWelcomeSplashOpen(false);
+    setShouldLaunchGuideAfterWelcome(false);
+    setIsFirstLoginGuideOpen(false);
     showToast('error', message);
   }, []);
+
+  const handleWelcomeStart = () => {
+    if (!currentUser) {
+      setIsWelcomeSplashOpen(false);
+      setShouldLaunchGuideAfterWelcome(false);
+      return;
+    }
+
+    markWelcomeSplashSeen(currentUser.id);
+    setIsWelcomeSplashOpen(false);
+    setShouldLaunchGuideAfterWelcome(true);
+  };
+
+  const handleWelcomeLater = () => {
+    if (currentUser) {
+      markWelcomeSplashSeen(currentUser.id);
+    }
+
+    setIsWelcomeSplashOpen(false);
+    setShouldLaunchGuideAfterWelcome(false);
+  };
 
   const handleAccountUpdate = (account: AuthAccount) => {
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(account));
@@ -2708,6 +2836,13 @@ function App() {
                 </div>
               </div>
             </div>
+          )}
+          {isWelcomeSplashOpen && currentUser && (
+            <WelcomeSplash
+              account={currentUser}
+              onStart={handleWelcomeStart}
+              onLater={handleWelcomeLater}
+            />
           )}
           {isFirstLoginGuideOpen && currentUser && (
             <FirstLoginGuide
