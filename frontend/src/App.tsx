@@ -18,6 +18,7 @@ import { AuthAccount, authService, bugReportService, BugReport, BugReportPriorit
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
 const MESSAGE_PREFERENCES_KEY = 'shield_message_preferences';
+const SESSION_TIMEOUT_KEY = 'shield_session_timeout_minutes';
 const QUICK_LAUNCH_KEY = 'shield_quick_launch';
 const QUICK_LAUNCH_SLOT_COUNT = 8;
 const MODAL_CLOSE_MS = 220;
@@ -1837,6 +1838,16 @@ function App() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [notifications, setNotifications] = useState<ToastMessage[]>([]);
+  const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState<number>(() => {
+    try {
+      const raw = window.localStorage.getItem(SESSION_TIMEOUT_KEY);
+      return raw ? parseInt(raw, 10) || 0 : 0;
+    } catch {
+      return 0;
+    }
+  });
+  const inactivityTimerRef = useRef<number | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
   const [userNotifications, setUserNotifications] = useState<UserNotification[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSessionLoading, setIsSessionLoading] = useState(true);
@@ -1890,6 +1901,50 @@ function App() {
     const timer = window.setTimeout(() => setShowConfetti(false), 1800);
     return () => window.clearTimeout(timer);
   }, [showConfetti]);
+
+  const clearInactivityTimer = () => {
+    if (inactivityTimerRef.current) {
+      window.clearTimeout(inactivityTimerRef.current as unknown as number);
+      inactivityTimerRef.current = null;
+    }
+  };
+
+  const startInactivityTimer = () => {
+    clearInactivityTimer();
+
+    if (!sessionTimeoutMinutes || sessionTimeoutMinutes <= 0) return;
+
+    const ms = sessionTimeoutMinutes * 60 * 1000;
+    inactivityTimerRef.current = window.setTimeout(() => {
+      // Auto logout on inactivity
+      handleLogout();
+    }, ms);
+  };
+
+  const resetInactivityTimer = () => {
+    lastActivityRef.current = Date.now();
+    if (sessionTimeoutMinutes && sessionTimeoutMinutes > 0) {
+      startInactivityTimer();
+    }
+  };
+
+  useEffect(() => {
+    let cleanup = () => {};
+
+    const activityHandler = () => resetInactivityTimer();
+
+    if (isAuthenticated && sessionTimeoutMinutes && sessionTimeoutMinutes > 0) {
+      ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'].forEach((ev) => window.addEventListener(ev, activityHandler));
+      startInactivityTimer();
+
+      cleanup = () => {
+        ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'].forEach((ev) => window.removeEventListener(ev, activityHandler));
+        clearInactivityTimer();
+      };
+    }
+
+    return cleanup;
+  }, [isAuthenticated, sessionTimeoutMinutes]);
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem(THEME_KEY);
@@ -2088,6 +2143,7 @@ function App() {
     setIsWelcomeSplashOpen(false);
     setShouldLaunchGuideAfterWelcome(false);
     setIsFirstLoginGuideOpen(false);
+    clearInactivityTimer();
     showToast('info', 'Signed out.');
   };
 
