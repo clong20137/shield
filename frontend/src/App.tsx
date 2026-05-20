@@ -1953,6 +1953,24 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const handler = (e: Event) => {
+      try {
+        // @ts-ignore
+        const minutes = (e as CustomEvent).detail?.minutes;
+        if (typeof minutes === 'number') {
+          setSessionTimeoutMinutes(minutes);
+          try {
+            window.localStorage.setItem(SESSION_TIMEOUT_KEY, String(minutes));
+          } catch {}
+        }
+      } catch {}
+    };
+
+    window.addEventListener('shield:session-timeout-updated', handler as EventListener);
+    return () => window.removeEventListener('shield:session-timeout-updated', handler as EventListener);
+  }, []);
+
+  useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
     window.localStorage.setItem(THEME_KEY, theme);
   }, [theme]);

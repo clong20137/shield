@@ -225,6 +225,10 @@ function PermissionsPage({
         // @ts-ignore
         const minutes = (response.data && (response.data.sessionTimeoutMinutes ?? (registrationSettings as any).sessionTimeoutMinutes)) || 0;
         window.localStorage.setItem(SESSION_TIMEOUT_KEY, String(minutes));
+        // notify other components in the same window about the change
+        try {
+          window.dispatchEvent(new CustomEvent('shield:session-timeout-updated', { detail: { minutes } }));
+        } catch {}
       } catch {}
       onToast('success', 'Registration settings saved.');
     } catch (err) {
