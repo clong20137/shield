@@ -1,3 +1,5 @@
+import { AlertCircle, CheckCircle2, Info, LucideIcon } from 'lucide-react';
+
 export type ToastType = 'success' | 'error' | 'info';
 
 export interface ToastMessage {
@@ -12,17 +14,42 @@ const toastStyles: Record<ToastType, string> = {
   info: 'border-primary-500 bg-blue-50 text-primary-500',
 };
 
+const toastIcons: Record<ToastType, LucideIcon> = {
+  success: CheckCircle2,
+  error: AlertCircle,
+  info: Info,
+};
+
 export function ToastHost({ toasts }: { toasts: ToastMessage[] }) {
   return (
     <div className="fixed right-4 top-4 z-[110] flex w-full max-w-sm flex-col gap-3">
-      {toasts.map((toast) => (
-        <div
-          key={toast.id}
-          className={`toast-notification rounded border-l-4 px-4 py-3 text-sm font-semibold shadow-lg ${toastStyles[toast.type]}`}
-        >
-          {toast.message}
-        </div>
-      ))}
+      {toasts.map((toast) => {
+        const Icon = toastIcons[toast.type];
+        const lines = toast.message.split('\n');
+
+        return (
+          <div
+            key={toast.id}
+            className={`toast-notification rounded border-l-4 px-4 py-3 text-sm shadow-lg ${toastStyles[toast.type]}`}
+          >
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-current shadow-sm dark:bg-slate-950/80">
+                <Icon className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                {lines.map((line, index) => (
+                  <p
+                    key={index}
+                    className={index === 0 ? 'leading-5 font-semibold' : 'mt-1 text-xs leading-5 font-medium text-slate-600 dark:text-slate-300'}
+                  >
+                    {line}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -1806,11 +1806,35 @@ function WelcomeSplash({
   );
 }
 
+function ConfettiOverlay() {
+  const confettiColors = ['#60a5fa', '#38bdf8', '#a5b4fc', '#f472b6', '#fb7185', '#facc15'];
+  const pieces = Array.from({ length: 14 }, (_, index) => index);
+
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[108] overflow-hidden">
+      {pieces.map((index) => (
+        <span
+          key={index}
+          className="confetti-piece"
+          style={{
+            left: `${6 + (index * 7) % 88}%`,
+            backgroundColor: confettiColors[index % confettiColors.length],
+            animationDelay: `${index * 120}ms`,
+            width: `${6 + (index % 3) * 2}px`,
+            height: `${12 + (index % 3) * 3}px`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthAccount | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [notifications, setNotifications] = useState<ToastMessage[]>([]);
   const [userNotifications, setUserNotifications] = useState<UserNotification[]>([]);
@@ -1857,6 +1881,15 @@ function App() {
       setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== id));
     }, 4500);
   };
+
+  useEffect(() => {
+    if (!showConfetti) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setShowConfetti(false), 1800);
+    return () => window.clearTimeout(timer);
+  }, [showConfetti]);
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem(THEME_KEY);
@@ -2303,7 +2336,8 @@ function App() {
       if (response.data.account) {
         handleAccountUpdate(response.data.account);
       }
-      showToast('success', 'First login guide completed.');
+      showToast('success', 'Welcome to Shield\nFor completing the Shield guide walkthrough.');
+      setShowConfetti(true);
     } catch (err) {
       console.error(err);
       showToast('error', 'Failed to save guide completion.');
@@ -2374,6 +2408,7 @@ function App() {
   return (
     <Router>
       <ToastHost toasts={toasts} />
+      {showConfetti && <ConfettiOverlay />}
       {isSessionLoading ? (
         <ShieldLoading />
       ) : !isAuthenticated ? (
