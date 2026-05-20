@@ -9,9 +9,9 @@ export interface ToastMessage {
 }
 
 const toastStyles: Record<ToastType, string> = {
-  success: 'border-success bg-green-50 text-success',
-  error: 'border-danger bg-red-50 text-danger',
-  info: 'border-primary-500 bg-blue-50 text-primary-500',
+  success: 'border-success bg-green-50 text-success dark:bg-green-950 dark:text-green-200',
+  error: 'border-danger bg-red-50 text-danger dark:bg-red-950 dark:text-red-200',
+  info: 'border-primary-500 bg-blue-50 text-primary-500 dark:bg-slate-950 dark:text-blue-200',
 };
 
 const toastIcons: Record<ToastType, LucideIcon> = {
@@ -33,7 +33,7 @@ export function ToastHost({ toasts }: { toasts: ToastMessage[] }) {
             className={`toast-notification rounded border-l-4 px-4 py-3 text-sm shadow-lg ${toastStyles[toast.type]}`}
           >
             <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-current shadow-sm dark:bg-slate-950/80">
+              <span className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-current shadow-sm ring-1 ring-slate-200 dark:bg-slate-950/80 dark:ring-slate-700">
                 <Icon className="h-4 w-4" />
               </span>
               <div className="min-w-0">
