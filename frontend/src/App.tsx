@@ -1741,50 +1741,62 @@ function WelcomeSplash({
   onLater: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-[2rem] border border-gray-200 bg-white p-8 shadow-2xl dark:border-gray-800 dark:bg-gray-950">
-        <div className="mb-6 flex items-center justify-between gap-4">
+    <div className="fixed inset-0 z-[95] flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-primary-950/90 to-slate-900/95 px-4 py-8">
+      <div className="pointer-events-none absolute inset-0 opacity-60">
+        <div className="absolute left-8 top-10 h-40 w-40 rounded-full bg-primary-500/20 blur-3xl animate-welcome-glow" />
+        <div className="absolute right-12 top-24 h-28 w-28 rounded-full bg-cyan-400/15 blur-3xl animate-welcome-glow" />
+        <div className="absolute left-1/2 top-1/4 h-72 w-72 -translate-x-1/2 rounded-full bg-white/5 blur-3xl" />
+      </div>
+
+      <div className="relative w-full max-w-3xl overflow-hidden rounded-[2rem] border border-white/10 bg-white/95 p-8 shadow-[0_35px_120px_rgba(15,23,42,0.32)] ring-1 ring-white/10 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 dark:shadow-[0_35px_120px_rgba(15,23,42,0.6)] animate-welcome-pop">
+        <div className="mb-6 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.22em] text-primary-600 dark:text-primary-400">Welcome</p>
-            <h1 className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">Welcome to Shield</h1>
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-400">Mission Briefing</p>
+            <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-slate-950 dark:text-white sm:text-5xl">
+              Welcome to Shield
+            </h1>
           </div>
-          <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-primary-500 text-white shadow-lg">
-            <Shield size={28} />
+          <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-primary-500 text-white shadow-[0_25px_80px_rgba(59,130,246,0.35)]">
+            <div className="absolute inset-0 rounded-3xl border border-white/20" />
+            <Shield size={32} className="relative z-10 animate-welcome-ring" />
           </div>
         </div>
 
-        <p className="text-sm leading-7 text-gray-600 dark:text-gray-300">
+        <p className="text-base leading-7 text-slate-600 dark:text-slate-300">
           {account.displayName
             ? `Hello ${account.displayName}, your SHIELD workspace is ready.`
             : `Hello ${account.email}, your SHIELD workspace is ready.`}
         </p>
-        <p className="mt-4 text-sm leading-7 text-gray-600 dark:text-gray-300">
-          First, we’ll walk you through the most important areas: dashboard, notifications, messages, and quick launch navigation.
+        <p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-300">
+          You’re about to unlock mission control for security, teams, alerts, and rapid response.
+          Let’s make your first login unforgettable.
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
-            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Dashboard</p>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Get a quick picture of security alerts, your team, and system status.</p>
+          <div className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary-500 via-cyan-400 to-primary-500 opacity-60" />
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">Command Center</p>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">See live alerts, team activity, and mission status right away.</p>
           </div>
-          <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
-            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Quick Launch</p>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Customize shortcuts for fast access to search, messages, and reporting tools.</p>
+          <div className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary-500 via-cyan-400 to-primary-500 opacity-60" />
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">Quick Launch</p>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Customize shortcuts for instant access to search, messages, and reports.</p>
           </div>
         </div>
 
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
+        <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onLater}
-            className="rounded-full border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+            className="btn-secondary w-full sm:w-auto"
           >
             Maybe later
           </button>
           <button
             type="button"
             onClick={onStart}
-            className="rounded-full bg-primary-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-700"
+            className="btn-primary w-full sm:w-auto"
           >
             Start the guide
           </button>

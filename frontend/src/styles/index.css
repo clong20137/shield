@@ -36,6 +36,42 @@
   }
 }
 
+@keyframes welcome-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes welcome-ring {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes welcome-glow {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.65;
+    transform: scale(1.1);
+  }
+}
+
 @keyframes modal-backdrop-enter {
   0% {
     opacity: 0;
@@ -261,6 +297,18 @@
 
   .toast-notification {
     animation: toast-lifecycle 4.5s ease-in-out both;
+  }
+
+  .animate-welcome-pop {
+    animation: welcome-pop 320ms ease-out both;
+  }
+
+  .animate-welcome-ring {
+    animation: welcome-ring 1.8s ease-in-out infinite;
+  }
+
+  .animate-welcome-glow {
+    animation: welcome-glow 2s ease-in-out infinite;
   }
 
   .modal-backdrop {

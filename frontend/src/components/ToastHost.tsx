@@ -14,7 +14,7 @@ const toastStyles: Record<ToastType, string> = {
 
 export function ToastHost({ toasts }: { toasts: ToastMessage[] }) {
   return (
-    <div className="fixed right-4 top-4 z-50 flex w-full max-w-sm flex-col gap-3">
+    <div className="fixed right-4 top-4 z-[110] flex w-full max-w-sm flex-col gap-3">
       {toasts.map((toast) => (
         <div
           key={toast.id}
