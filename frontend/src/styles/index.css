@@ -396,28 +396,67 @@
     transform: translateZ(0);
   }
 
-  .confetti-piece {
+  .firework-burst {
     position: absolute;
-    top: -4%;
-    opacity: 0;
+    height: 8px;
+    width: 8px;
     border-radius: 999px;
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
-    animation: confetti-fall 1.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+    transform: translate(-50%, -50%);
   }
 
-  @keyframes confetti-fall {
+  .firework-burst::before {
+    position: absolute;
+    inset: -2px;
+    content: '';
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    border-radius: 999px;
+    animation: firework-ring 1.35s ease-out both;
+    animation-delay: inherit;
+  }
+
+  .firework-particle {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    height: 7px;
+    width: 7px;
+    border-radius: 999px;
+    background: var(--color);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--color) 70%, white);
+    transform: translate(-50%, -50%) scale(0.25);
+    animation: firework-particle 1.35s cubic-bezier(0.12, 0.92, 0.2, 1) both;
+  }
+
+  @keyframes firework-ring {
     0% {
-      transform: translateY(0) rotate(0deg);
-      opacity: 1;
+      opacity: 0;
+      transform: scale(0.15);
     }
 
-    60% {
+    18% {
       opacity: 1;
     }
 
     100% {
-      transform: translateY(180vh) rotate(720deg);
       opacity: 0;
+      transform: scale(14);
+    }
+  }
+
+  @keyframes firework-particle {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.2);
+    }
+
+    14% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    100% {
+      opacity: 0;
+      transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) scale(0.1);
     }
   }
 

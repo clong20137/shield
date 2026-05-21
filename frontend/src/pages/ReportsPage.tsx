@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Download, Search, X } from 'lucide-react';
 import { AuthAccount, reportService, TrooperDailyReportEntry } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import PerformanceEvaluationsPage from './PerformanceEvaluationsPage';
-import { downloadTrooperDailiesCsv, downloadTrooperDailiesPdf } from '../utils/trooperDailyExport';
+import { downloadTrooperDailiesCsv, downloadTrooperDailiesPdf, downloadTrooperDailiesXls } from '../utils/trooperDailyExport';
 
 const trooperDailySections = [
   {
@@ -136,6 +136,8 @@ const trooperDailySections = [
   },
 ] as const;
 
+type DailyExportFormat = 'csv' | 'pdf' | 'xls';
+
 function getErrorMessage(error: unknown, fallback: string): string {
   if (
     typeof error === 'object' &&
@@ -166,7 +168,8 @@ const ReportsPage: React.FC<{
   const [dailyTotalPages, setDailyTotalPages] = useState(1);
   const [dailyScope, setDailyScope] = useState<'all' | 'own'>('own');
   const [dailyLoading, setDailyLoading] = useState(true);
-  const [dailyExportFormat, setDailyExportFormat] = useState<'csv' | 'pdf'>('csv');
+  const [dailyExportFormat, setDailyExportFormat] = useState<DailyExportFormat>('csv');
+  const [selectedDailyExportFormat, setSelectedDailyExportFormat] = useState<DailyExportFormat>('pdf');
   const [dailyExporting, setDailyExporting] = useState(false);
   const [dailyError, setDailyError] = useState<string | null>(null);
   const [selectedDaily, setSelectedDaily] = useState<TrooperDailyReportEntry | null>(null);
@@ -301,8 +304,10 @@ const ReportsPage: React.FC<{
       const label = `trooper-dailies-${dailyFrom || 'start'}-${dailyTo || 'end'}-${dailyDistrict || 'all-districts'}`;
       if (dailyExportFormat === 'csv') {
         downloadTrooperDailiesCsv(entries, label);
-      } else {
+      } else if (dailyExportFormat === 'pdf') {
         downloadTrooperDailiesPdf(entries, label);
+      } else {
+        downloadTrooperDailiesXls(entries, label);
       }
       onToast('success', `Trooper Daily ${dailyExportFormat.toUpperCase()} export ready.`);
     } catch (err) {
@@ -328,6 +333,23 @@ const ReportsPage: React.FC<{
 
   const openDailyReport = (entry: TrooperDailyReportEntry) => {
     setSelectedDaily(entry);
+  };
+
+  const getDailyExportLabel = (entry: TrooperDailyReportEntry) => {
+    const user = `${entry.user.firstName || ''} ${entry.user.lastName || ''}`.trim() || entry.user.email || entry.id;
+    return `trooper-daily-${entry.date}-${user}`;
+  };
+
+  const exportSingleDaily = (entry: TrooperDailyReportEntry, format = selectedDailyExportFormat) => {
+    const label = getDailyExportLabel(entry);
+    if (format === 'csv') {
+      downloadTrooperDailiesCsv([entry], label);
+    } else if (format === 'pdf') {
+      downloadTrooperDailiesPdf([entry], label);
+    } else {
+      downloadTrooperDailiesXls([entry], label);
+    }
+    onToast('success', `Trooper Daily ${format.toUpperCase()} export ready.`);
   };
 
   const selectedDailyUserName = selectedDaily
@@ -390,12 +412,13 @@ const ReportsPage: React.FC<{
           <div className="flex gap-2">
             <select
               value={dailyExportFormat}
-              onChange={(event) => setDailyExportFormat(event.target.value as 'csv' | 'pdf')}
+              onChange={(event) => setDailyExportFormat(event.target.value as DailyExportFormat)}
               className="min-w-24 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
               aria-label="Export format"
             >
               <option value="csv">CSV</option>
               <option value="pdf">PDF</option>
+              <option value="xls">XLS</option>
             </select>
             <button type="button" onClick={exportTrooperDailies} className="btn-secondary" disabled={dailyExporting} aria-label="Export Trooper Daily reports" title={dailyExporting ? 'Exporting' : 'Export'}>
               <Download size={16} />
@@ -442,12 +465,13 @@ const ReportsPage: React.FC<{
                   <th className="px-3 py-3 text-left font-semibold">Hours</th>
                   <th className="px-3 py-3 text-left font-semibold">Status</th>
                   <th className="px-3 py-3 text-left font-semibold">Narrative</th>
+                  <th className="px-3 py-3 text-left font-semibold">Download</th>
                 </tr>
               </thead>
               <tbody>
                 {trooperDailies.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-3 py-8 text-center text-gray-500 dark:text-gray-400">No submitted Trooper Dailies found.</td>
+                    <td colSpan={7} className="px-3 py-8 text-center text-gray-500 dark:text-gray-400">No submitted Trooper Dailies found.</td>
                   </tr>
                 ) : (
                   trooperDailies.map((entry) => {
@@ -479,6 +503,20 @@ const ReportsPage: React.FC<{
                         <td className="max-w-sm px-3 py-3 text-gray-600 dark:text-gray-400">
                           <p className="line-clamp-2">{entry.details?.narrative || 'No narrative'}</p>
                         </td>
+                        <td className="px-3 py-3">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              exportSingleDaily(entry, 'pdf');
+                            }}
+                            className="btn-secondary"
+                            aria-label="Download this Trooper Daily report"
+                            title="Download PDF"
+                          >
+                            <Download size={16} />
+                          </button>
+                        </td>
                       </tr>
                     );
                   })
@@ -508,15 +546,36 @@ const ReportsPage: React.FC<{
                   {new Date(`${selectedDaily.date}T00:00:00`).toLocaleDateString()} - {selectedDaily.dutyHours} hours - {selectedDaily.districtWorked}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedDaily(null)}
-                className="icon-close-button border-white/20 bg-white/10 text-white hover:bg-white/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
-                aria-label="Close Trooper Daily report"
-                title="Close"
-              >
-                <X size={20} />
-              </button>
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedDailyExportFormat}
+                  onChange={(event) => setSelectedDailyExportFormat(event.target.value as DailyExportFormat)}
+                  className="rounded border border-white/25 bg-white px-3 py-2 text-sm font-semibold text-primary-500 shadow-sm"
+                  aria-label="Selected report export format"
+                >
+                  <option value="pdf">PDF</option>
+                  <option value="csv">CSV</option>
+                  <option value="xls">XLS</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => exportSingleDaily(selectedDaily)}
+                  className="flex h-10 w-10 items-center justify-center rounded border border-white/20 bg-white/10 text-white hover:bg-white/20"
+                  aria-label="Download selected Trooper Daily report"
+                  title="Download"
+                >
+                  <Download size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDaily(null)}
+                  className="icon-close-button border-white/20 bg-white/10 text-white hover:bg-white/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+                  aria-label="Close Trooper Daily report"
+                  title="Close"
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5">

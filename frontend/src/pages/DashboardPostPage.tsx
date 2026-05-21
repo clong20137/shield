@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { Flag, MessageSquare, Pin, PinOff, Send, Smile, Trash2, X } from 'lucide-react';
 import { UserDetail } from '../components/UserDetail';
-import { AuthAccount, DashboardPost, DashboardPostComment, User, dashboardPostService, getAppEventsUrl, getAssetUrl, handleAssetImageError, userService } from '../services/api';
+import { AuthAccount, DashboardPost, DashboardPostComment, User, dashboardPostService, getAssetUrl, handleAssetImageError, userService } from '../services/api';
 
 interface DashboardPostPageProps {
   currentUser: AuthAccount | null;
@@ -59,11 +59,11 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
   useEffect(() => {
     if (!postId) return;
 
-    const eventsUrl = getAppEventsUrl();
-    const eventSource = eventsUrl ? new EventSource(eventsUrl) : null;
     const handleDashboardUpdate = (event: Event) => {
       try {
-        const payload = JSON.parse((event as MessageEvent).data || '{}') as { entityId?: string };
+        const payload = event instanceof MessageEvent
+          ? JSON.parse(event.data || '{}') as { entityId?: string }
+          : (event as CustomEvent<{ entityId?: string }>).detail || {};
         if (!payload.entityId || payload.entityId === postId) {
           void loadPost();
         }
@@ -72,8 +72,8 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
       }
     };
 
-    eventSource?.addEventListener('dashboard-updated', handleDashboardUpdate);
-    return () => eventSource?.close();
+    window.addEventListener('shield:dashboard-updated', handleDashboardUpdate);
+    return () => window.removeEventListener('shield:dashboard-updated', handleDashboardUpdate);
   }, [postId]);
 
   const submitComment = async (event: FormEvent<HTMLFormElement>) => {

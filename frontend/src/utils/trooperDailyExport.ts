@@ -158,6 +158,62 @@ function escapeCsv(value: unknown) {
   return /[",\n]/u.test(text) ? `"${text.replace(/"/gu, '""')}"` : text;
 }
 
+function escapeHtml(value: unknown) {
+  return String(value ?? '')
+    .replace(/&/gu, '&amp;')
+    .replace(/</gu, '&lt;')
+    .replace(/>/gu, '&gt;')
+    .replace(/"/gu, '&quot;')
+    .replace(/'/gu, '&#39;');
+}
+
+function getDetailKeys(entries: TrooperDailyReportEntry[]) {
+  const orderedKeys = reportSections.flatMap((section) => section.fields.map(([key]) => key as string));
+  const extraKeys = entries
+    .flatMap((entry) => Object.keys(entry.details || {}))
+    .filter((key) => key !== 'narrative' && !orderedKeys.includes(key))
+    .sort();
+
+  return [...orderedKeys, ...extraKeys];
+}
+
+function getExportRows(entries: TrooperDailyReportEntry[]) {
+  const detailKeys = getDetailKeys(entries);
+  const fieldLabels = new Map<string, string>(
+    reportSections.flatMap((section) => section.fields.map(([key, label]) => [key as string, label as string])),
+  );
+  const headers = [
+    'Date',
+    'User',
+    'Email',
+    'Rank',
+    'PE Number',
+    'Badge',
+    'Home District',
+    'District Worked',
+    'Duty Hours',
+    'Special Status',
+    'Narrative',
+    ...detailKeys.map((key) => fieldLabels.get(key) || key),
+  ];
+  const rows = entries.map((entry) => [
+    entry.date,
+    userName(entry),
+    entry.user.email || '',
+    entry.user.rank || '',
+    entry.user.peNumber || '',
+    entry.user.badgeNumber || '',
+    entry.user.district || '',
+    entry.districtWorked,
+    entry.dutyHours,
+    entry.specialStatus,
+    entry.details?.narrative || '',
+    ...detailKeys.map((key) => entry.details?.[key] || ''),
+  ]);
+
+  return { headers, rows };
+}
+
 function downloadBlob(content: BlobPart, type: string, filename: string) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -356,39 +412,41 @@ function buildDetailedReportPages(entry: TrooperDailyReportEntry, startPage: num
 }
 
 export function downloadTrooperDailiesCsv(entries: TrooperDailyReportEntry[], label = 'trooper-dailies') {
-  const detailKeys = Array.from(new Set(entries.flatMap((entry) => Object.keys(entry.details || {}))))
-    .filter((key) => key !== 'narrative')
-    .sort();
-  const headers = [
-    'Date',
-    'User',
-    'Email',
-    'Rank',
-    'PE Number',
-    'Badge',
-    'Home District',
-    'District Worked',
-    'Duty Hours',
-    'Special Status',
-    'Narrative',
-    ...detailKeys,
-  ];
-  const rows = entries.map((entry) => [
-    entry.date,
-    userName(entry),
-    entry.user.email || '',
-    entry.user.rank || '',
-    entry.user.peNumber || '',
-    entry.user.badgeNumber || '',
-    entry.user.district || '',
-    entry.districtWorked,
-    entry.dutyHours,
-    entry.specialStatus,
-    entry.details?.narrative || '',
-    ...detailKeys.map((key) => entry.details?.[key] || ''),
-  ]);
+  const { headers, rows } = getExportRows(entries);
   const csv = [headers, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
   downloadBlob(csv, 'text/csv;charset=utf-8', `${cleanFilePart(label)}.csv`);
+}
+
+export function downloadTrooperDailiesXls(entries: TrooperDailyReportEntry[], label = 'trooper-dailies') {
+  const { headers, rows } = getExportRows(entries);
+  const title = cleanFilePart(label);
+  const tableRows = [headers, ...rows]
+    .map((row, rowIndex) => (
+      `<tr>${row.map((cell) => {
+        const tag = rowIndex === 0 ? 'th' : 'td';
+        return `<${tag}>${escapeHtml(cell)}</${tag}>`;
+      }).join('')}</tr>`
+    ))
+    .join('');
+  const workbook = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { font-family: Arial, sans-serif; }
+    h1 { color: #12294d; font-size: 18px; }
+    table { border-collapse: collapse; width: 100%; }
+    th { background: #12294d; color: #fff; font-weight: 700; }
+    th, td { border: 1px solid #d6d6d6; padding: 6px 8px; font-size: 12px; vertical-align: top; }
+    tr:nth-child(even) td { background: #f7f7f7; }
+  </style>
+</head>
+<body>
+  <h1>SHIELD Trooper Daily Reports</h1>
+  <table>${tableRows}</table>
+</body>
+</html>`;
+  downloadBlob(workbook, 'application/vnd.ms-excel;charset=utf-8', `${title}.xls`);
 }
 
 export function downloadTrooperDailiesPdf(entries: TrooperDailyReportEntry[], label = 'trooper-dailies') {

@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { CSSProperties, FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { BarChart3, Bell, Bug, Calculator, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
@@ -1852,23 +1852,45 @@ function WelcomeSplash({
 }
 
 function ConfettiOverlay() {
-  const confettiColors = ['#60a5fa', '#38bdf8', '#a5b4fc', '#f472b6', '#fb7185', '#facc15'];
-  const pieces = Array.from({ length: 14 }, (_, index) => index);
+  const fireworkColors = ['#9C865C', '#60a5fa', '#f8fafc', '#facc15', '#38bdf8', '#fb7185'];
+  const bursts = [
+    { left: '20%', top: '30%' },
+    { left: '48%', top: '20%' },
+    { left: '76%', top: '34%' },
+    { left: '36%', top: '56%' },
+    { left: '66%', top: '58%' },
+  ];
+  const particles = Array.from({ length: 16 }, (_, index) => index);
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[108] overflow-hidden">
-      {pieces.map((index) => (
+      {bursts.map((burst, burstIndex) => (
         <span
-          key={index}
-          className="confetti-piece"
+          key={`${burst.left}-${burst.top}`}
+          className="firework-burst"
           style={{
-            left: `${6 + (index * 7) % 88}%`,
-            backgroundColor: confettiColors[index % confettiColors.length],
-            animationDelay: `${index * 120}ms`,
-            width: `${6 + (index % 3) * 2}px`,
-            height: `${12 + (index % 3) * 3}px`,
+            left: burst.left,
+            top: burst.top,
+            animationDelay: `${burstIndex * 160}ms`,
           }}
-        />
+        >
+          {particles.map((particle) => {
+            const angle = ((Math.PI * 2) / particles.length) * particle;
+            const distance = 48 + ((particle + burstIndex) % 5) * 10;
+            return (
+              <span
+                key={particle}
+                className="firework-particle"
+                style={{
+                  '--x': `${Math.cos(angle) * distance}px`,
+                  '--y': `${Math.sin(angle) * distance}px`,
+                  '--color': fireworkColors[(particle + burstIndex) % fireworkColors.length],
+                  animationDelay: `${burstIndex * 160}ms`,
+                } as CSSProperties}
+              />
+            );
+          })}
+        </span>
       ))}
     </div>
   );
@@ -1944,7 +1966,7 @@ function App() {
       return;
     }
 
-    const timer = window.setTimeout(() => setShowConfetti(false), 1800);
+    const timer = window.setTimeout(() => setShowConfetti(false), 2400);
     return () => window.clearTimeout(timer);
   }, [showConfetti]);
 
@@ -2300,8 +2322,8 @@ function App() {
       return;
     }
 
-    const dispatchAppUpdate = (name: string) => {
-      window.dispatchEvent(new CustomEvent(`shield:${name}`));
+    const dispatchAppUpdate = (name: string, detail?: Record<string, unknown>) => {
+      window.dispatchEvent(new CustomEvent(`shield:${name}`, { detail }));
     };
     const handleNotificationUpdate = () => {
       void loadUserNotifications();
@@ -2314,17 +2336,25 @@ function App() {
 
     eventSource.addEventListener('notification-created', handleNotificationUpdate);
     eventSource.addEventListener('notification-updated', handleNotificationUpdate);
-    eventSource.addEventListener('audit-updated', () => dispatchAppUpdate('audit-updated'));
+    const handleRealtimeAppUpdate = (name: string) => (event: Event) => {
+      try {
+        dispatchAppUpdate(name, JSON.parse((event as MessageEvent).data || '{}') as Record<string, unknown>);
+      } catch {
+        dispatchAppUpdate(name);
+      }
+    };
+
+    eventSource.addEventListener('audit-updated', handleRealtimeAppUpdate('audit-updated'));
     eventSource.addEventListener('bug-updated', handleBugUpdate);
-    eventSource.addEventListener('calendar-updated', () => dispatchAppUpdate('calendar-updated'));
-    eventSource.addEventListener('dashboard-updated', () => dispatchAppUpdate('dashboard-updated'));
-    eventSource.addEventListener('device-updated', () => dispatchAppUpdate('device-updated'));
-    eventSource.addEventListener('mileage-updated', () => dispatchAppUpdate('mileage-updated'));
-    eventSource.addEventListener('performance-evaluation-updated', () => dispatchAppUpdate('performance-evaluation-updated'));
-    eventSource.addEventListener('permission-updated', () => dispatchAppUpdate('permission-updated'));
-    eventSource.addEventListener('quick-launch-updated', () => dispatchAppUpdate('quick-launch-updated'));
+    eventSource.addEventListener('calendar-updated', handleRealtimeAppUpdate('calendar-updated'));
+    eventSource.addEventListener('dashboard-updated', handleRealtimeAppUpdate('dashboard-updated'));
+    eventSource.addEventListener('device-updated', handleRealtimeAppUpdate('device-updated'));
+    eventSource.addEventListener('mileage-updated', handleRealtimeAppUpdate('mileage-updated'));
+    eventSource.addEventListener('performance-evaluation-updated', handleRealtimeAppUpdate('performance-evaluation-updated'));
+    eventSource.addEventListener('permission-updated', handleRealtimeAppUpdate('permission-updated'));
+    eventSource.addEventListener('quick-launch-updated', handleRealtimeAppUpdate('quick-launch-updated'));
     eventSource.addEventListener('session-revoked', () => handleForcedLogout('Your account has been deactivated. Please contact an administrator.'));
-    eventSource.addEventListener('user-updated', () => dispatchAppUpdate('user-updated'));
+    eventSource.addEventListener('user-updated', handleRealtimeAppUpdate('user-updated'));
     eventSource.addEventListener('error', (event) => {
       console.error('Application realtime connection error:', event);
     });
@@ -2735,24 +2765,6 @@ function App() {
                 >
                   <Settings size={18} />
                 </button>
-                {isAdministrator && (
-                  <button
-                    data-onboarding-control="bugs"
-                    type="button"
-                    onClick={() => openAdminConsole('bugs')}
-                    className="relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
-                    aria-label="Open bug tracker"
-                    title="Bug Tracker"
-                  >
-                    <Bug size={18} />
-                    {openBugCount > 0 && (
-                      <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
-                        {openBugCount > 9 ? '9+' : openBugCount}
-                      </span>
-                    )}
-                  </button>
-                )}
-
                 {isAccountMenuOpen && (
                   <div className="absolute right-0 top-12 z-40 w-[calc(100vw-6.5rem)] max-w-64 rounded border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 sm:w-64">
                     <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
