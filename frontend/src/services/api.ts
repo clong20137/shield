@@ -283,9 +283,16 @@ export interface CalendarEntry {
   specialStatus: string;
   color: string;
   details: Record<string, string>;
+  reviewStatus: 'Pending' | 'Approved' | 'Returned';
+  reviewNotes: string;
+  reviewedBy: string | null;
+  reviewedByName: string | null;
+  reviewedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
+
+export type CalendarEntryPayload = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 
 export interface CalendarShortcut {
   id: string;
@@ -309,6 +316,11 @@ export interface TrooperDailyReportEntry {
   specialStatus: string;
   color: string;
   details: Record<string, string>;
+  reviewStatus: 'Pending' | 'Approved' | 'Returned';
+  reviewNotes: string;
+  reviewedBy: string | null;
+  reviewedByName: string | null;
+  reviewedAt: string | null;
   createdAt: string;
   updatedAt: string;
   user: {
@@ -634,16 +646,19 @@ export const reportService = {
 
   getTrooperDailies: (filters?: { q?: string; from?: string; to?: string; district?: string; page?: number; pageSize?: number }) =>
     api.get<{ count: number; total: number; page: number; pageSize: number; totalPages: number; scope: 'all' | 'own'; data: TrooperDailyReportEntry[] }>('/reports/trooper-dailies', { params: filters }),
+
+  reviewTrooperDaily: (id: string, status: 'Approved' | 'Returned', notes: string) =>
+    api.put<TrooperDailyReportEntry>(`/reports/trooper-dailies/${id}/review`, { status, notes }),
 };
 
 export const calendarService = {
   getAll: (accountId: string) =>
     api.get<CalendarEntry[]>('/calendar', { params: { accountId } }),
 
-  create: (entry: Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'> & { accountId: string; actorId?: string; actorName?: string }) =>
+  create: (entry: CalendarEntryPayload & { accountId: string; actorId?: string; actorName?: string }) =>
     api.post<CalendarEntry>('/calendar', entry),
 
-  update: (id: string, entry: Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'> & { accountId: string; actorId?: string; actorName?: string }) =>
+  update: (id: string, entry: CalendarEntryPayload & { accountId: string; actorId?: string; actorName?: string }) =>
     api.put<CalendarEntry>(`/calendar/${id}`, entry),
 
   delete: (id: string, actor?: { accountId?: string; actorId?: string; actorName?: string }) =>

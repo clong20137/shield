@@ -12,6 +12,11 @@ export interface CalendarEntry {
   specialStatus: string;
   color: string;
   details: Record<string, string>;
+  reviewStatus: 'Pending' | 'Approved' | 'Returned';
+  reviewNotes: string;
+  reviewedBy: string | null;
+  reviewedByName: string | null;
+  reviewedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,11 +31,16 @@ interface CalendarEntryRow extends RowDataPacket {
   specialStatus: string;
   color: string;
   details: string | Record<string, string> | null;
+  reviewStatus: 'Pending' | 'Approved' | 'Returned' | null;
+  reviewNotes: string | null;
+  reviewedBy: string | null;
+  reviewedByName: string | null;
+  reviewedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export type CalendarEntryInput = Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>;
+export type CalendarEntryInput = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 
 function formatDate(value: Date | string): string {
   if (typeof value === 'string') {
@@ -57,6 +67,11 @@ function toCalendarEntry(row: CalendarEntryRow): CalendarEntry {
     specialStatus: row.specialStatus,
     color: row.color,
     details,
+    reviewStatus: row.reviewStatus || 'Pending',
+    reviewNotes: row.reviewNotes || '',
+    reviewedBy: row.reviewedBy || null,
+    reviewedByName: row.reviewedByName || null,
+    reviewedAt: row.reviewedAt || null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -86,8 +101,8 @@ export class CalendarEntryModel {
       await conn.query<ResultSetHeader>(
         `INSERT INTO calendar_entries (
           \`id\`, \`ownerAccountId\`, \`category\`, \`entryDate\`, \`dutyHours\`, \`districtWorked\`,
-          \`specialStatus\`, \`color\`, \`details\`, \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          \`specialStatus\`, \`color\`, \`details\`, \`reviewStatus\`, \`createdAt\`, \`updatedAt\`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           entry.ownerAccountId,
@@ -98,6 +113,7 @@ export class CalendarEntryModel {
           entry.specialStatus,
           entry.color,
           JSON.stringify(entry.details || {}),
+          'Pending',
           now,
           now,
         ]
@@ -107,6 +123,11 @@ export class CalendarEntryModel {
         ...entry,
         dutyHours: String(entry.dutyHours),
         id,
+        reviewStatus: 'Pending',
+        reviewNotes: '',
+        reviewedBy: null,
+        reviewedByName: null,
+        reviewedAt: null,
         createdAt: now,
         updatedAt: now,
       };
@@ -127,6 +148,11 @@ export class CalendarEntryModel {
           \`specialStatus\` = ?,
           \`color\` = ?,
           \`details\` = ?,
+          \`reviewStatus\` = ?,
+          \`reviewNotes\` = NULL,
+          \`reviewedBy\` = NULL,
+          \`reviewedByName\` = NULL,
+          \`reviewedAt\` = NULL,
           \`updatedAt\` = ?
         WHERE \`id\` = ? AND \`ownerAccountId\` = ?`,
         [
@@ -137,6 +163,7 @@ export class CalendarEntryModel {
           entry.specialStatus,
           entry.color,
           JSON.stringify(entry.details || {}),
+          'Pending',
           new Date(),
           id,
           entry.ownerAccountId,
@@ -163,6 +190,37 @@ export class CalendarEntryModel {
       );
 
       return result.affectedRows > 0;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async reviewEntry(id: string, status: 'Approved' | 'Returned', notes: string, reviewer: { id: string; name: string }): Promise<CalendarEntry | null> {
+    const conn = await pool.getConnection();
+    try {
+      const now = new Date();
+      const [result] = await conn.query<ResultSetHeader>(
+        `UPDATE calendar_entries SET
+          \`reviewStatus\` = ?,
+          \`reviewNotes\` = ?,
+          \`reviewedBy\` = ?,
+          \`reviewedByName\` = ?,
+          \`reviewedAt\` = ?,
+          \`updatedAt\` = ?
+        WHERE \`id\` = ? AND \`category\` = 'Trooper Daily'`,
+        [status, notes.trim(), reviewer.id, reviewer.name, now, now, id]
+      );
+
+      if (result.affectedRows === 0) {
+        return null;
+      }
+
+      const [rows] = await conn.query<CalendarEntryRow[]>(
+        'SELECT * FROM calendar_entries WHERE `id` = ? LIMIT 1',
+        [id]
+      );
+
+      return rows[0] ? toCalendarEntry(rows[0]) : null;
     } finally {
       conn.release();
     }

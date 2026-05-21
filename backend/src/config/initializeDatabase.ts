@@ -355,10 +355,16 @@ export async function initializeDatabase() {
   `);
   await ensureColumn('calendar_entries', 'ownerAccountId', '`ownerAccountId` VARCHAR(36)');
   await ensureColumn('calendar_entries', 'details', '`details` JSON');
+  await ensureColumn('calendar_entries', 'reviewStatus', "`reviewStatus` VARCHAR(30) NOT NULL DEFAULT 'Pending'");
+  await ensureColumn('calendar_entries', 'reviewNotes', '`reviewNotes` TEXT');
+  await ensureColumn('calendar_entries', 'reviewedBy', '`reviewedBy` VARCHAR(36)');
+  await ensureColumn('calendar_entries', 'reviewedByName', '`reviewedByName` VARCHAR(150)');
+  await ensureColumn('calendar_entries', 'reviewedAt', '`reviewedAt` DATETIME');
   await dropNonPrimaryUniqueIndexes('calendar_entries');
   await ensureIndex('calendar_entries', 'idx_calendar_category_date', '`category`, `entryDate`');
   await ensureIndex('calendar_entries', 'idx_calendar_district_date', '`districtWorked`, `entryDate`');
   await ensureIndex('calendar_entries', 'idx_calendar_owner_date', '`ownerAccountId`, `entryDate`');
+  await ensureIndex('calendar_entries', 'idx_calendar_review_status', '`reviewStatus`, `entryDate`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS calendar_shortcuts (

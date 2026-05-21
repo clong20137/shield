@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Download, Search, X } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, Download, RotateCcw, Search, X } from 'lucide-react';
 import { AuthAccount, reportService, TrooperDailyReportEntry } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import PerformanceEvaluationsPage from './PerformanceEvaluationsPage';
@@ -173,6 +173,9 @@ const ReportsPage: React.FC<{
   const [dailyExporting, setDailyExporting] = useState(false);
   const [dailyError, setDailyError] = useState<string | null>(null);
   const [selectedDaily, setSelectedDaily] = useState<TrooperDailyReportEntry | null>(null);
+  const [reviewNotes, setReviewNotes] = useState('');
+  const [isReviewSaving, setIsReviewSaving] = useState(false);
+  const canReviewTrooperDailies = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('reports:trooper-dailies'));
 
   const loadTrooperDailies = async (
     showLoading = true,
@@ -333,6 +336,7 @@ const ReportsPage: React.FC<{
 
   const openDailyReport = (entry: TrooperDailyReportEntry) => {
     setSelectedDaily(entry);
+    setReviewNotes(entry.reviewNotes || '');
   };
 
   const getDailyExportLabel = (entry: TrooperDailyReportEntry) => {
@@ -350,6 +354,37 @@ const ReportsPage: React.FC<{
       downloadTrooperDailiesXls([entry], label);
     }
     onToast('success', `Trooper Daily ${format.toUpperCase()} export ready.`);
+  };
+
+  const reviewSelectedDaily = async (status: 'Approved' | 'Returned') => {
+    if (!selectedDaily) return;
+    if (status === 'Returned' && !reviewNotes.trim()) {
+      onToast('error', 'Add return notes before sending this report back.');
+      return;
+    }
+
+    setIsReviewSaving(true);
+    setDailyError(null);
+    try {
+      const response = await reportService.reviewTrooperDaily(selectedDaily.id, status, reviewNotes);
+      const updatedDaily = response.data;
+      setSelectedDaily(updatedDaily);
+      setReviewNotes(updatedDaily.reviewNotes || '');
+      setTrooperDailies((items) => items.map((item) => (item.id === updatedDaily.id ? updatedDaily : item)));
+      onToast('success', `Trooper Daily ${status.toLowerCase()}.`);
+    } catch (err) {
+      const message = getErrorMessage(err, 'Failed to review Trooper Daily report.');
+      setDailyError(message);
+      onToast('error', message);
+    } finally {
+      setIsReviewSaving(false);
+    }
+  };
+
+  const getReviewBadgeClass = (status?: string) => {
+    if (status === 'Approved') return 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-200';
+    if (status === 'Returned') return 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200';
+    return 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-200';
   };
 
   const selectedDailyUserName = selectedDaily
@@ -463,7 +498,8 @@ const ReportsPage: React.FC<{
                   <th className="px-3 py-3 text-left font-semibold">User</th>
                   <th className="px-3 py-3 text-left font-semibold">District Worked</th>
                   <th className="px-3 py-3 text-left font-semibold">Hours</th>
-                  <th className="px-3 py-3 text-left font-semibold">Status</th>
+                  <th className="px-3 py-3 text-left font-semibold">Duty Status</th>
+                  <th className="px-3 py-3 text-left font-semibold">Review</th>
                   <th className="px-3 py-3 text-left font-semibold">Narrative</th>
                   <th className="px-3 py-3 text-left font-semibold">Download</th>
                 </tr>
@@ -471,7 +507,7 @@ const ReportsPage: React.FC<{
               <tbody>
                 {trooperDailies.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-gray-500 dark:text-gray-400">No submitted Trooper Dailies found.</td>
+                    <td colSpan={8} className="px-3 py-8 text-center text-gray-500 dark:text-gray-400">No submitted Trooper Dailies found.</td>
                   </tr>
                 ) : (
                   trooperDailies.map((entry) => {
@@ -500,6 +536,11 @@ const ReportsPage: React.FC<{
                         <td className="px-3 py-3">{entry.districtWorked}</td>
                         <td className="px-3 py-3 font-bold text-accent">{entry.dutyHours}</td>
                         <td className="px-3 py-3">{entry.specialStatus}</td>
+                        <td className="px-3 py-3">
+                          <span className={`rounded-full px-2 py-1 text-xs font-bold uppercase ${getReviewBadgeClass(entry.reviewStatus)}`}>
+                            {entry.reviewStatus || 'Pending'}
+                          </span>
+                        </td>
                         <td className="max-w-sm px-3 py-3 text-gray-600 dark:text-gray-400">
                           <p className="line-clamp-2">{entry.details?.narrative || 'No narrative'}</p>
                         </td>
@@ -588,7 +629,10 @@ const ReportsPage: React.FC<{
                   ['Home District', selectedDaily.user.district || ''],
                   ['District Worked', selectedDaily.districtWorked],
                   ['Special Status', selectedDaily.specialStatus],
+                  ['Review Status', selectedDaily.reviewStatus || 'Pending'],
+                  ['Reviewed By', selectedDaily.reviewedByName || 'Not reviewed'],
                   ['Submitted', new Date(selectedDaily.createdAt).toLocaleString()],
+                  ['Reviewed At', selectedDaily.reviewedAt ? new Date(selectedDaily.reviewedAt).toLocaleString() : 'Not reviewed'],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
                     <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">{label}</p>
@@ -596,6 +640,57 @@ const ReportsPage: React.FC<{
                   </div>
                 ))}
               </div>
+
+              <section className="mb-5 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Supervisor Review</h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      Current status: <span className={`rounded-full px-2 py-1 text-xs font-bold uppercase ${getReviewBadgeClass(selectedDaily.reviewStatus)}`}>{selectedDaily.reviewStatus || 'Pending'}</span>
+                    </p>
+                  </div>
+                  {canReviewTrooperDailies && (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => reviewSelectedDaily('Approved')}
+                        className="btn-success"
+                        disabled={isReviewSaving}
+                        aria-label="Approve Trooper Daily"
+                        title="Approve"
+                      >
+                        <CheckCircle2 size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => reviewSelectedDaily('Returned')}
+                        className="btn-danger"
+                        disabled={isReviewSaving}
+                        aria-label="Return Trooper Daily for correction"
+                        title="Return for Correction"
+                      >
+                        <RotateCcw size={16} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <label className="mt-4 block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Review Notes</span>
+                  {canReviewTrooperDailies ? (
+                    <textarea
+                      value={reviewNotes}
+                      onChange={(event) => setReviewNotes(event.target.value)}
+                      className="min-h-24 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                      placeholder="Add approval notes or explain what needs corrected."
+                      maxLength={2000}
+                    />
+                  ) : (
+                    <p className="min-h-20 whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
+                      {selectedDaily.reviewNotes || 'No review notes yet.'}
+                    </p>
+                  )}
+                </label>
+              </section>
 
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 {trooperDailySections.map((section) => (

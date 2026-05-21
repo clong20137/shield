@@ -193,6 +193,10 @@ function getExportRows(entries: TrooperDailyReportEntry[]) {
     'District Worked',
     'Duty Hours',
     'Special Status',
+    'Review Status',
+    'Review Notes',
+    'Reviewed By',
+    'Reviewed At',
     'Narrative',
     ...detailKeys.map((key) => fieldLabels.get(key) || key),
   ];
@@ -207,6 +211,10 @@ function getExportRows(entries: TrooperDailyReportEntry[]) {
     entry.districtWorked,
     entry.dutyHours,
     entry.specialStatus,
+    entry.reviewStatus || 'Pending',
+    entry.reviewNotes || '',
+    entry.reviewedByName || '',
+    entry.reviewedAt ? new Date(entry.reviewedAt).toLocaleString() : '',
     entry.details?.narrative || '',
     ...detailKeys.map((key) => entry.details?.[key] || ''),
   ]);
@@ -372,6 +380,9 @@ function buildDetailedReportPages(entry: TrooperDailyReportEntry, startPage: num
     ['District Worked', entry.districtWorked],
     ['Duty Hours', entry.dutyHours],
     ['Special Status', entry.specialStatus || 'None'],
+    ['Review Status', entry.reviewStatus || 'Pending'],
+    ['Reviewed By', entry.reviewedByName || 'Not reviewed'],
+    ['Reviewed At', entry.reviewedAt ? new Date(entry.reviewedAt).toLocaleString() : 'Not reviewed'],
     ['Submitted', new Date(entry.createdAt).toLocaleString()],
     ['Updated', new Date(entry.updatedAt).toLocaleString()],
   ].forEach(([label, value], index) => {
@@ -380,6 +391,22 @@ function buildDetailedReportPages(entry: TrooperDailyReportEntry, startPage: num
     addField(page, MARGIN + col * (fieldWidth + 9), y - row * 42, fieldWidth, label, value);
   });
   y -= 182;
+
+  const reviewLines = wrapText(entry.reviewNotes || 'No review notes entered.', 96);
+  const reviewHeight = Math.max(54, 32 + reviewLines.length * 12);
+  if (y - reviewHeight < 72) {
+    page = newPage(startPage + pages.length);
+    pages.push(page);
+    addHeader(page, 'Trooper Daily Report', subtitle);
+    y = PAGE_HEIGHT - 112;
+  }
+  page.commands.push(rect(MARGIN, y - reviewHeight, PAGE_WIDTH - MARGIN * 2, reviewHeight));
+  page.commands.push(`${ACCENT} rg ${MARGIN} ${y - 20} ${PAGE_WIDTH - MARGIN * 2} 20 re f`);
+  page.commands.push(textLine(MARGIN + 9, y - 14, 'Supervisor Review', 8.5, 'F2', '1 1 1'));
+  reviewLines.forEach((lineText, index) => {
+    page.commands.push(textLine(MARGIN + 9, y - 39 - index * 12, lineText, 8.5, 'F1', TEXT));
+  });
+  y -= reviewHeight + 12;
 
   reportSections.forEach((section) => {
     const neededRows = Math.ceil(section.fields.length / 3);

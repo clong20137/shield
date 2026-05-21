@@ -6,6 +6,7 @@ import { requireAuthenticated } from '../middleware/authSession';
 const router = Router();
 
 router.get('/trooper-dailies', requireAuthenticated(), ReportController.getTrooperDailies);
+router.put('/trooper-dailies/:id/review', requireAuthenticated(), ReportController.reviewTrooperDaily);
 router.get('/by-rank', requirePermission('users:view'), ReportController.getUsersByRank);
 router.get('/by-district', requirePermission('users:view'), ReportController.getUsersByDistrict);
 router.get('/by-employment-type', requirePermission('users:view'), ReportController.getUsersByEmploymentType);

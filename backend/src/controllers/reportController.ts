@@ -3,6 +3,11 @@ import { RowDataPacket } from 'mysql2';
 import pool from '../config/database';
 import { getSessionAccount } from '../middleware/authSession';
 import { AuthAccountModel } from '../models/AuthAccount';
+import { CalendarEntryModel } from '../models/CalendarEntry';
+import { AuditLogModel } from '../models/AuditLog';
+import { UserNotificationModel } from '../models/UserNotification';
+import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents';
+import { cleanMultiline, cleanString, isOneOf } from '../utils/validation';
 import { parsePagination } from '../utils/pagination';
 
 interface StatisticsRow extends RowDataPacket {
@@ -28,6 +33,11 @@ interface TrooperDailyReportRow extends RowDataPacket {
   specialStatus: string;
   color: string;
   details: string | Record<string, string> | null;
+  reviewStatus: 'Pending' | 'Approved' | 'Returned' | null;
+  reviewNotes: string | null;
+  reviewedBy: string | null;
+  reviewedByName: string | null;
+  reviewedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   firstName: string;
@@ -42,6 +52,8 @@ interface TrooperDailyReportRow extends RowDataPacket {
 interface CountRow extends RowDataPacket {
   total: number;
 }
+
+const reviewStatuses = ['Approved', 'Returned'] as const;
 
 function formatReportDate(value: Date | string): string {
   if (typeof value === 'string') {
@@ -156,6 +168,11 @@ export class ReportController {
         specialStatus: row.specialStatus,
         color: row.color,
         details: parseDetails(row.details),
+        reviewStatus: row.reviewStatus || 'Pending',
+        reviewNotes: row.reviewNotes || '',
+        reviewedBy: row.reviewedBy || null,
+        reviewedByName: row.reviewedByName || null,
+        reviewedAt: row.reviewedAt,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
         user: {
@@ -173,6 +190,108 @@ export class ReportController {
     } catch (error) {
       console.error('Trooper daily report error:', error);
       res.status(500).json({ error: 'Failed to load Trooper Daily reports' });
+    } finally {
+      conn?.release();
+    }
+  }
+
+  static async reviewTrooperDaily(req: Request, res: Response) {
+    let conn;
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const permissions = account.role === 'administrator' ? ['reports:trooper-dailies'] : await AuthAccountModel.getPermissionsForAccount(account.id);
+      if (account.role !== 'administrator' && !permissions.includes('reports:trooper-dailies')) {
+        return res.status(403).json({ error: 'Trooper Daily review permission required' });
+      }
+
+      const status = cleanString(req.body?.status, 30);
+      const notes = cleanMultiline(req.body?.notes, 2000);
+      if (!isOneOf(status, reviewStatuses)) {
+        return res.status(400).json({ error: 'Choose approve or return for the review status' });
+      }
+
+      if (status === 'Returned' && !notes) {
+        return res.status(400).json({ error: 'Return notes are required when sending a report back' });
+      }
+
+      conn = await pool.getConnection();
+      const [ownerRows] = await conn.query<TrooperDailyReportRow[]>(
+        `SELECT ce.*, u.\`firstName\`, u.\`lastName\`, u.\`email\`, u.\`peNumber\`, u.\`badgeNumber\`, u.\`rank\`, u.\`district\`
+         FROM calendar_entries ce
+         LEFT JOIN users u ON u.\`id\` = ce.\`ownerAccountId\`
+         WHERE ce.\`id\` = ? AND ce.\`category\` = 'Trooper Daily'
+         LIMIT 1`,
+        [req.params.id],
+      );
+      const existing = ownerRows[0];
+      if (!existing) {
+        return res.status(404).json({ error: 'Trooper Daily report not found' });
+      }
+
+      const reviewedEntry = await CalendarEntryModel.reviewEntry(req.params.id, status, notes, {
+        id: account.id,
+        name: account.displayName || account.email,
+      });
+
+      if (!reviewedEntry) {
+        return res.status(404).json({ error: 'Trooper Daily report not found' });
+      }
+
+      await AuditLogModel.create({
+        actorId: account.id,
+        actorName: account.displayName || account.email,
+        action: status === 'Approved' ? 'approved' : 'returned',
+        entityType: 'trooper_daily',
+        entityId: reviewedEntry.id,
+        details: JSON.stringify({ status, notes }),
+      });
+
+      await UserNotificationModel.create({
+        userId: reviewedEntry.ownerAccountId,
+        type: 'trooper_daily_review',
+        title: `Trooper Daily ${status.toLowerCase()}`,
+        message: status === 'Approved'
+          ? `Your Trooper Daily for ${reviewedEntry.date} was approved.`
+          : `Your Trooper Daily for ${reviewedEntry.date} was returned for correction.`,
+        entityType: 'trooper_daily',
+        entityId: reviewedEntry.id,
+      });
+
+      broadcastAccountEvent(reviewedEntry.ownerAccountId, { type: 'notification-created', entityId: reviewedEntry.id });
+      broadcastAppEvent({ type: 'calendar-updated', entityId: reviewedEntry.id });
+      res.json({
+        id: reviewedEntry.id,
+        ownerAccountId: reviewedEntry.ownerAccountId,
+        date: reviewedEntry.date,
+        dutyHours: reviewedEntry.dutyHours,
+        districtWorked: reviewedEntry.districtWorked,
+        specialStatus: reviewedEntry.specialStatus,
+        color: reviewedEntry.color,
+        details: reviewedEntry.details,
+        reviewStatus: reviewedEntry.reviewStatus,
+        reviewNotes: reviewedEntry.reviewNotes,
+        reviewedBy: reviewedEntry.reviewedBy,
+        reviewedByName: reviewedEntry.reviewedByName,
+        reviewedAt: reviewedEntry.reviewedAt,
+        createdAt: reviewedEntry.createdAt,
+        updatedAt: reviewedEntry.updatedAt,
+        user: {
+          firstName: existing.firstName || '',
+          lastName: existing.lastName || '',
+          email: existing.email || '',
+          peNumber: existing.peNumber || '',
+          badgeNumber: existing.badgeNumber || '',
+          rank: existing.rank || '',
+          district: existing.district || '',
+        },
+      });
+    } catch (error) {
+      console.error('Trooper daily review error:', error);
+      res.status(500).json({ error: 'Failed to review Trooper Daily report' });
     } finally {
       conn?.release();
     }
