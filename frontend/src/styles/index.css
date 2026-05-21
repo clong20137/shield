@@ -480,8 +480,10 @@
 
 input:not([type='checkbox']):not([type='radio']),
 textarea {
-  padding-left: 0.875rem !important;
-  padding-right: 0.875rem !important;
+  min-height: 2.75rem;
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+  background-clip: padding-box;
 }
 
 input.global-search-input.global-search-input {
@@ -490,8 +492,10 @@ input.global-search-input.global-search-input {
 }
 
 select {
-  padding-left: 0.875rem !important;
-  padding-right: 2.5rem !important;
+  min-height: 2.75rem;
+  padding-left: 1rem !important;
+  padding-right: 2.75rem !important;
+  background-clip: padding-box;
 }
 
 @media (max-width: 640px) {

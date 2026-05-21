@@ -856,6 +856,7 @@ function CalendarPage({ currentUser, onOpenCalculator, useMilitaryTime = false }
   const selectedEntries = selectedDate
     ? visibleEntries.filter((entry) => entry.date === selectedDate)
     : [];
+  const editingEntry = editingEntryId ? selectedEntries.find((entry) => entry.id === editingEntryId) : null;
 
   const monthStart = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
   const daysInMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
@@ -1024,16 +1025,27 @@ function CalendarPage({ currentUser, onOpenCalculator, useMilitaryTime = false }
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Trooper Daily</p>
-                <h2>{getReadableDate(selectedDate)}</h2>
+                <div className="mt-1 flex flex-wrap items-center gap-3">
+                  <h2>{getReadableDate(selectedDate)}</h2>
+                  <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] ${
+                    editingEntryId
+                      ? 'bg-accent/15 text-accent ring-1 ring-accent/30'
+                      : 'bg-green-50 text-green-700 ring-1 ring-green-200 dark:bg-green-950/40 dark:text-green-200 dark:ring-green-900'
+                  }`}>
+                    {editingEntryId ? 'Editing Entry' : 'Creating New Entry'}
+                  </span>
+                </div>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {editingEntryId ? 'Edit this daily activity report.' : `Add one or more daily activity reports for this date. ${selectedEntries.length} saved.`}
+                  {editingEntryId
+                    ? `Updating ${editingEntry?.dutyHours || entryForm.dutyHours || 'this'} hour report. Save or cancel before starting another entry.`
+                    : `Add one or more daily activity reports for this date. ${selectedEntries.length} saved.`}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   onClick={startNewEntryForSelectedDay}
-                  className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                  className="flex h-10 w-10 items-center justify-center rounded bg-accent text-white shadow-sm transition hover:bg-accent/90 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label="Start new entry for this day"
                   title="New Entry"
                   disabled={!editingEntryId && !entryForm.dutyHours && Object.keys(entryForm.details || {}).length === 0}
@@ -1064,6 +1076,26 @@ function CalendarPage({ currentUser, onOpenCalculator, useMilitaryTime = false }
             </div>
 
             <form onSubmit={saveEntry} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className={`rounded-lg border p-4 md:col-span-2 ${
+                editingEntryId
+                  ? 'border-accent/30 bg-accent/10'
+                  : 'border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/20'
+              }`}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className={`text-xs font-bold uppercase tracking-[0.18em] ${editingEntryId ? 'text-accent' : 'text-green-700 dark:text-green-200'}`}>
+                      {editingEntryId ? 'Edit Mode' : 'New Daily Entry'}
+                    </p>
+                    <h3 className="mt-1 text-base font-bold text-gray-900 dark:text-gray-100">
+                      {editingEntryId ? 'You are editing an existing Trooper Daily' : 'You are creating a new Trooper Daily'}
+                    </h3>
+                  </div>
+                  <button type="submit" className={editingEntryId ? 'btn-primary' : 'btn-success'} aria-label={editingEntryId ? 'Save calendar entry' : 'Add calendar entry'} title={editingEntryId ? 'Save Entry' : 'Add Entry'}>
+                    {editingEntryId ? <Save size={16} /> : <CalendarClock size={16} />}
+                  </button>
+                </div>
+              </div>
+
               <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 md:col-span-2">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -1320,8 +1352,11 @@ function CalendarPage({ currentUser, onOpenCalculator, useMilitaryTime = false }
                 </div>
               </div>
 
-              <div className="md:col-span-2">
-                <button type="submit" className="btn-primary" aria-label={editingEntryId ? 'Save calendar entry' : 'Add calendar entry'} title={editingEntryId ? 'Save Entry' : 'Add Entry'}>
+              <div className="flex flex-wrap items-center justify-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950 md:col-span-2">
+                <span className="mr-auto text-sm font-semibold text-gray-500 dark:text-gray-400">
+                  {editingEntryId ? 'Save changes to this entry' : 'Add this entry to the selected date'}
+                </span>
+                <button type="submit" className={editingEntryId ? 'btn-primary' : 'btn-success'} aria-label={editingEntryId ? 'Save calendar entry' : 'Add calendar entry'} title={editingEntryId ? 'Save Entry' : 'Add Entry'}>
                   {editingEntryId ? <Save size={16} /> : <CalendarClock size={16} />}
                 </button>
                 {editingEntryId && (
@@ -1338,10 +1373,15 @@ function CalendarPage({ currentUser, onOpenCalculator, useMilitaryTime = false }
             </form>
 
             <div className="mt-6">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <h3>Entries for this day</h3>
-                <button type="button" onClick={startNewEntryForSelectedDay} className="btn-secondary" aria-label="Add another entry for this day" title="Add Another Entry">
-                  <Plus size={16} />
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent/5 p-3">
+                <div>
+                  <h3>Entries for this day</h3>
+                  <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {selectedEntries.length} saved. Use the plus button to start a separate entry for this date.
+                  </p>
+                </div>
+                <button type="button" onClick={startNewEntryForSelectedDay} className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-white shadow-lg shadow-accent/20 transition hover:-translate-y-0.5 hover:bg-accent/90 hover:shadow-xl" aria-label="Add another entry for this day" title="Add Another Entry">
+                  <Plus size={22} />
                 </button>
               </div>
               {selectedEntries.length === 0 ? (
