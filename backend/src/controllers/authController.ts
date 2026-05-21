@@ -530,6 +530,7 @@ export class AuthController {
         maintenanceMode: await SystemSettingModel.getString('maintenanceMode', 'false') === 'true',
         loginWarningEnabled: await SystemSettingModel.getString('loginWarningEnabled', 'true') === 'true',
         loginWarningMessage: await SystemSettingModel.getString('loginWarningMessage', DEFAULT_LOGIN_WARNING_MESSAGE),
+        sessionTimeoutMinutes: Math.max(0, Number(await SystemSettingModel.getString('sessionTimeoutMinutes', '0')) || 0),
       });
     } catch (error) {
       console.error('Get registration settings error:', error);
@@ -539,10 +540,11 @@ export class AuthController {
 
   static async updateRegistrationSettings(req: Request, res: Response) {
     try {
-      const { mode, appBaseUrl, maintenanceMode, loginWarningEnabled, loginWarningMessage } = req.body as { mode?: string; appBaseUrl?: string; maintenanceMode?: boolean; loginWarningEnabled?: boolean; loginWarningMessage?: string };
+      const { mode, appBaseUrl, maintenanceMode, loginWarningEnabled, loginWarningMessage, sessionTimeoutMinutes } = req.body as { mode?: string; appBaseUrl?: string; maintenanceMode?: boolean; loginWarningEnabled?: boolean; loginWarningMessage?: string; sessionTimeoutMinutes?: number };
       const normalizedMode = normalizeRegistrationMode(cleanString(mode, 40));
       const normalizedUrl = cleanString(appBaseUrl, 300).replace(/\/+$/u, '');
       const normalizedWarningMessage = cleanMultiline(loginWarningMessage, 2000) || DEFAULT_LOGIN_WARNING_MESSAGE;
+      const normalizedSessionTimeoutMinutes = Math.max(0, Math.min(1440, Number(sessionTimeoutMinutes) || 0));
 
       if (normalizedUrl && !/^https?:\/\//iu.test(normalizedUrl)) {
         return res.status(400).json({ error: 'App URL must start with http:// or https://' });
@@ -552,6 +554,7 @@ export class AuthController {
       await SystemSettingModel.setString('maintenanceMode', maintenanceMode === true ? 'true' : 'false');
       await SystemSettingModel.setString('loginWarningEnabled', loginWarningEnabled === false ? 'false' : 'true');
       await SystemSettingModel.setString('loginWarningMessage', normalizedWarningMessage);
+      await SystemSettingModel.setString('sessionTimeoutMinutes', String(normalizedSessionTimeoutMinutes));
       if (normalizedUrl) {
         await SystemSettingModel.setString('appBaseUrl', normalizedUrl);
       }
@@ -563,6 +566,7 @@ export class AuthController {
         maintenanceMode: maintenanceMode === true,
         loginWarningEnabled: loginWarningEnabled !== false,
         loginWarningMessage: normalizedWarningMessage,
+        sessionTimeoutMinutes: normalizedSessionTimeoutMinutes,
       });
     } catch (error) {
       console.error('Update registration settings error:', error);

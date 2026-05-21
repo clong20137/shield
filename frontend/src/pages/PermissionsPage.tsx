@@ -52,9 +52,6 @@ function PermissionsPage({
     maintenanceMode: false,
     loginWarningEnabled: true,
     loginWarningMessage: 'This is a Indiana State Police computer application system that is for Official use only. This system is subject to monitoring. Therefore, no expectation of privacy is to be assumed. Individuals found performing unauthorized activities may be subject to disciplinary action including criminal prosecution.',
-    // optional field: sessionTimeoutMinutes (minutes of inactivity before auto-logout). 0 disables.
-    // will be read/saved to localStorage as a fallback for older backends.
-    // @ts-ignore
     sessionTimeoutMinutes: 0,
   });
   const [inviteEmail, setInviteEmail] = useState('');
@@ -79,16 +76,9 @@ function PermissionsPage({
       const invitesResponse = await authService.listInvites();
       setAccounts(response.data);
       setRoles(rolesResponse.data);
-      // merge any sessionTimeoutMinutes if the backend provides it
-      const reg = registrationResponse.data as unknown as { sessionTimeoutMinutes?: number };
-      setRegistrationSettings((current) => ({ ...(registrationResponse.data as RegistrationSettings), // base
-        // preserve existing keys
-        ...(reg.sessionTimeoutMinutes !== undefined ? { sessionTimeoutMinutes: reg.sessionTimeoutMinutes } : { sessionTimeoutMinutes: (current as any).sessionTimeoutMinutes }),
-      } as RegistrationSettings));
-      // also persist to localStorage as fallback
+      setRegistrationSettings(registrationResponse.data);
       try {
-        const val = reg.sessionTimeoutMinutes ?? (window.localStorage.getItem(SESSION_TIMEOUT_KEY) ? parseInt(window.localStorage.getItem(SESSION_TIMEOUT_KEY) as string, 10) : 0);
-        if (typeof val === 'number') window.localStorage.setItem(SESSION_TIMEOUT_KEY, String(val));
+        window.localStorage.setItem(SESSION_TIMEOUT_KEY, String(registrationResponse.data.sessionTimeoutMinutes || 0));
       } catch {}
       setInvites(invitesResponse.data);
     } catch (err) {
@@ -221,12 +211,9 @@ function PermissionsPage({
     try {
       const response = await authService.updateRegistrationSettings(registrationSettings);
       setRegistrationSettings(response.data);
-      // persist session timeout to localStorage as a fallback
       try {
-        // @ts-ignore
-        const minutes = (response.data && (response.data.sessionTimeoutMinutes ?? (registrationSettings as any).sessionTimeoutMinutes)) || 0;
+        const minutes = response.data.sessionTimeoutMinutes || 0;
         window.localStorage.setItem(SESSION_TIMEOUT_KEY, String(minutes));
-        // notify other components in the same window about the change
         try {
           window.dispatchEvent(new CustomEvent('shield:session-timeout-updated', { detail: { minutes } }));
         } catch {}
@@ -447,14 +434,17 @@ function PermissionsPage({
             <input
               type="number"
               min={0}
-              value={(registrationSettings as any).sessionTimeoutMinutes ?? 0}
-              onChange={(event) => setRegistrationSettings((settings) => ({ ...settings, // @ts-ignore
-                sessionTimeoutMinutes: Math.max(0, Number(event.target.value) || 0),
-              }))}
+              value={registrationSettings.sessionTimeoutMinutes}
+              onChange={(event) => setRegistrationSettings((settings) => ({ ...settings, sessionTimeoutMinutes: Math.max(0, Number(event.target.value) || 0) }))}
               className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Set minutes of inactivity before users are automatically signed out. Use 0 to disable.</p>
           </label>
+          <div className="flex justify-end lg:col-span-3">
+            <button type="submit" className="btn-primary" disabled={isSavingRegistration} aria-label="Save all registration settings" title={isSavingRegistration ? 'Saving' : 'Save Settings'}>
+              <Save size={16} />
+            </button>
+          </div>
         </form>
 
         <form onSubmit={createInvite} className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto]">

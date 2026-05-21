@@ -237,6 +237,7 @@ export interface RegistrationSettings {
   maintenanceMode: boolean;
   loginWarningEnabled: boolean;
   loginWarningMessage: string;
+  sessionTimeoutMinutes: number;
 }
 
 export interface AuthInvite {
