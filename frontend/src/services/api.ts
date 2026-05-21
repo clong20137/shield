@@ -342,7 +342,30 @@ export interface AuditLog {
   entityType: string;
   entityId: string | null;
   details: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
   createdAt: string;
+}
+
+export interface AuditLogFilters {
+  q?: string;
+  actorId?: string;
+  action?: string;
+  entityType?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface AuditLogResponse {
+  data: AuditLog[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  actions: string[];
+  entityTypes: string[];
 }
 
 export interface DeviceRecord {
@@ -678,8 +701,8 @@ export const calendarService = {
 };
 
 export const auditService = {
-  getAll: (limit = 100) =>
-    api.get<AuditLog[]>('/audit', { params: { limit } }),
+  getAll: (filters: AuditLogFilters = {}) =>
+    api.get<AuditLogResponse>('/audit', { params: filters }),
 };
 
 export const deviceService = {

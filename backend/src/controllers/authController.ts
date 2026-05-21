@@ -3,6 +3,7 @@ import { AuthAccountModel } from '../models/AuthAccount';
 import { AuthInviteModel } from '../models/AuthInvite';
 import { AuthPasswordResetModel } from '../models/AuthPasswordReset';
 import { AuthSessionModel } from '../models/AuthSession';
+import { AuditLogModel } from '../models/AuditLog';
 import { SystemSettingModel } from '../models/SystemSetting';
 import { getBearerToken, getSessionAccount } from '../middleware/authSession';
 import { broadcastAppEvent } from '../services/appEvents';
@@ -108,6 +109,13 @@ function cleanTotpCode(value: unknown): string {
   return cleanString(value, 20).replace(/\s/gu, '');
 }
 
+function requestAuditFields(req: Request) {
+  return {
+    ipAddress: cleanString(req.ip || req.socket.remoteAddress, 45) || null,
+    userAgent: cleanString(req.get('user-agent'), 255) || null,
+  };
+}
+
 function cleanRoleName(value: unknown): string {
   return cleanString(value, 40).toLowerCase().replace(/[^a-z0-9-]/gu, '-').replace(/-+/gu, '-').replace(/^-|-$/gu, '');
 }
@@ -199,6 +207,15 @@ export class AuthController {
       const token = await AuthSessionModel.createSession(account.id);
       broadcastAppEvent({ type: 'user-updated', entityId: account.id });
       broadcastAppEvent({ type: 'dashboard-updated', entityId: account.id });
+      await AuditLogModel.create({
+        actorId: account.id,
+        actorName: account.displayName || account.email,
+        action: 'auth.register',
+        entityType: 'user',
+        entityId: account.id,
+        details: JSON.stringify({ email: account.email, role: account.role, inviteAccepted: Boolean(inviteId) }),
+        ...requestAuditFields(req),
+      });
       res.status(201).json({ account: await withPermissions(account), token });
     } catch (error) {
       if (isDuplicateEmailError(error)) {
@@ -235,10 +252,28 @@ export class AuthController {
       );
 
       if (result.failureReason === 'inactive') {
+        await AuditLogModel.create({
+          actorId: result.account?.id || null,
+          actorName: result.account?.displayName || cleanString(email, 255),
+          action: 'auth.login_failed',
+          entityType: 'session',
+          entityId: result.account?.id || null,
+          details: JSON.stringify({ email: normalizeEmail(email), reason: 'inactive' }),
+          ...requestAuditFields(req),
+        });
         return res.status(403).json({ error: 'This account is inactive. Contact an administrator to restore access.' });
       }
 
       if (result.failureReason === 'maintenance') {
+        await AuditLogModel.create({
+          actorId: result.account?.id || null,
+          actorName: result.account?.displayName || cleanString(email, 255),
+          action: 'auth.login_failed',
+          entityType: 'session',
+          entityId: result.account?.id || null,
+          details: JSON.stringify({ email: normalizeEmail(email), reason: 'maintenance' }),
+          ...requestAuditFields(req),
+        });
         return res.status(503).json({ error: 'SHIELD is in maintenance mode. Only administrators can sign in right now.' });
       }
 
@@ -247,10 +282,28 @@ export class AuthController {
       }
 
       if (!result.account) {
+        await AuditLogModel.create({
+          actorId: null,
+          actorName: normalizeEmail(email),
+          action: 'auth.login_failed',
+          entityType: 'session',
+          entityId: null,
+          details: JSON.stringify({ email: normalizeEmail(email), reason: 'invalid_credentials' }),
+          ...requestAuditFields(req),
+        });
         return res.status(401).json({ error: 'Invalid email or password' });
       }
 
       const token = await AuthSessionModel.createSession(result.account.id);
+      await AuditLogModel.create({
+        actorId: result.account.id,
+        actorName: result.account.displayName || result.account.email,
+        action: 'auth.login',
+        entityType: 'session',
+        entityId: result.account.id,
+        details: JSON.stringify({ email: result.account.email, twoFactor: Boolean(result.account.twoFactorEnabled) }),
+        ...requestAuditFields(req),
+      });
       res.json({ account: await withPermissions(result.account), token });
     } catch (error) {
       console.error('Login error:', error);
@@ -289,6 +342,16 @@ export class AuthController {
         if (!didSend && process.env.ALLOW_CONSOLE_RESET_LINKS === 'true') {
           console.log(`SHIELD password reset for ${account.email}: ${resetUrl}`);
         }
+
+        await AuditLogModel.create({
+          actorId: account.id,
+          actorName: account.displayName || account.email,
+          action: 'auth.password_reset_requested',
+          entityType: 'user',
+          entityId: account.id,
+          details: JSON.stringify({ email: account.email, emailQueued: didSend }),
+          ...requestAuditFields(req),
+        });
       }
 
       res.json({ message: 'If that email has a SHIELD login, a reset link has been sent.' });
@@ -324,6 +387,15 @@ export class AuthController {
       await AuthPasswordResetModel.markUsed(reset.id);
       await AuthSessionModel.revokeAllSessions(reset.userId);
       broadcastAppEvent({ type: 'user-updated', entityId: reset.userId });
+      await AuditLogModel.create({
+        actorId: reset.userId,
+        actorName: reset.email,
+        action: 'auth.password_reset_completed',
+        entityType: 'user',
+        entityId: reset.userId,
+        details: JSON.stringify({ email: reset.email, sessionsRevoked: true }),
+        ...requestAuditFields(req),
+      });
       res.json({ message: 'Password reset successfully. Sign in with your new password.' });
     } catch (error) {
       console.error('Reset password error:', error);
@@ -355,6 +427,15 @@ export class AuthController {
         return res.status(401).json({ error: 'Current password is incorrect' });
       }
 
+      await AuditLogModel.create({
+        actorId: cleanAccountId,
+        actorName: cleanAccountId,
+        action: 'auth.password_changed',
+        entityType: 'user',
+        entityId: cleanAccountId,
+        details: JSON.stringify({ selfService: true }),
+        ...requestAuditFields(req),
+      });
       res.json({ message: 'Password updated successfully' });
     } catch (error) {
       console.error('Change password error:', error);
@@ -380,11 +461,21 @@ export class AuthController {
   static async logout(req: Request, res: Response) {
     try {
       const token = getBearerToken(req);
+      const account = await getSessionAccount(req);
 
       if (token) {
         await AuthSessionModel.revokeToken(token);
       }
 
+      await AuditLogModel.create({
+        actorId: account?.id || null,
+        actorName: account?.displayName || account?.email || null,
+        action: 'auth.logout',
+        entityType: 'session',
+        entityId: account?.id || null,
+        details: JSON.stringify({ tokenRevoked: Boolean(token) }),
+        ...requestAuditFields(req),
+      });
       res.json({ message: 'Signed out' });
     } catch (error) {
       console.error('Logout error:', error);
@@ -421,6 +512,15 @@ export class AuthController {
         return res.status(404).json({ error: 'Session not found' });
       }
 
+      await AuditLogModel.create({
+        actorId: account.id,
+        actorName: account.displayName || account.email,
+        action: 'auth.session_revoked',
+        entityType: 'session',
+        entityId: req.params.sessionId,
+        details: JSON.stringify({ accountId: account.id }),
+        ...requestAuditFields(req),
+      });
       res.json({ message: 'Session revoked' });
     } catch (error) {
       console.error('Revoke session error:', error);
@@ -437,6 +537,15 @@ export class AuthController {
       }
 
       const revokedCount = await AuthSessionModel.revokeOtherSessions(account.id, token);
+      await AuditLogModel.create({
+        actorId: account.id,
+        actorName: account.displayName || account.email,
+        action: 'auth.sessions_revoked',
+        entityType: 'session',
+        entityId: account.id,
+        details: JSON.stringify({ revokedCount }),
+        ...requestAuditFields(req),
+      });
       res.json({ revokedCount });
     } catch (error) {
       console.error('Revoke other sessions error:', error);
@@ -482,6 +591,15 @@ export class AuthController {
         return res.status(400).json({ error: 'Invalid verification code' });
       }
 
+      await AuditLogModel.create({
+        actorId: account.id,
+        actorName: account.displayName || account.email,
+        action: 'auth.2fa_enabled',
+        entityType: 'user',
+        entityId: account.id,
+        details: JSON.stringify({ email: account.email }),
+        ...requestAuditFields(req),
+      });
       res.json({ account: await withPermissions(account) });
     } catch (error) {
       console.error('Enable 2FA error:', error);
@@ -504,6 +622,15 @@ export class AuthController {
         return res.status(401).json({ error: 'Password is incorrect' });
       }
 
+      await AuditLogModel.create({
+        actorId: account.id,
+        actorName: account.displayName || account.email,
+        action: 'auth.2fa_disabled',
+        entityType: 'user',
+        entityId: account.id,
+        details: JSON.stringify({ email: account.email }),
+        ...requestAuditFields(req),
+      });
       res.json({ account: await withPermissions(account) });
     } catch (error) {
       console.error('Disable 2FA error:', error);
@@ -565,6 +692,22 @@ export class AuthController {
       }
 
       broadcastAppEvent({ type: 'permission-updated' });
+      const account = await getSessionAccount(req);
+      await AuditLogModel.create({
+        actorId: account?.id || null,
+        actorName: account?.displayName || account?.email || null,
+        action: 'settings.registration_updated',
+        entityType: 'settings',
+        entityId: 'registration',
+        details: JSON.stringify({
+          mode: normalizedMode,
+          maintenanceMode: maintenanceMode === true,
+          loginWarningEnabled: loginWarningEnabled !== false,
+          sessionTimeoutMinutes: normalizedSessionTimeoutMinutes,
+          appBaseUrl: normalizedUrl || undefined,
+        }),
+        ...requestAuditFields(req),
+      });
       res.json({
         mode: normalizedMode,
         appBaseUrl: normalizedUrl,
@@ -616,6 +759,15 @@ export class AuthController {
       const inviteUrl = `${appBaseUrl}/?invite=${encodeURIComponent(invite.token)}`;
 
       console.log(`SHIELD invite for ${cleanEmail}: ${inviteUrl}`);
+      await AuditLogModel.create({
+        actorId: account?.id || null,
+        actorName: account?.displayName || account?.email || null,
+        action: 'auth.invite_created',
+        entityType: 'invite',
+        entityId: invite.id,
+        details: JSON.stringify({ email: cleanEmail, expiresAt: invite.expiresAt }),
+        ...requestAuditFields(req),
+      });
       res.status(201).json(publicInvite(invite, inviteUrl));
     } catch (error) {
       console.error('Create invite error:', error);
@@ -657,6 +809,15 @@ export class AuthController {
 
       broadcastAppEvent({ type: 'permission-updated', entityId: accountId });
       broadcastAppEvent({ type: 'user-updated', entityId: accountId });
+      await AuditLogModel.create({
+        actorId: requester?.id || null,
+        actorName: requester?.displayName || requester?.email || null,
+        action: 'roles.assigned',
+        entityType: 'user',
+        entityId: accountId,
+        details: JSON.stringify({ previousRole: targetAccount.role, newRole: cleanRole }),
+        ...requestAuditFields(req),
+      });
       res.json({ account: await withPermissions(account) });
     } catch (error) {
       console.error('Update account role error:', error);
@@ -782,6 +943,15 @@ export class AuthController {
 
       const role = await AuthAccountModel.createRole(cleanName, cleanPermissions);
       broadcastAppEvent({ type: 'permission-updated', entityId: role.id });
+      await AuditLogModel.create({
+        actorId: requester?.id || null,
+        actorName: requester?.displayName || requester?.email || null,
+        action: 'roles.created',
+        entityType: 'role',
+        entityId: role.id,
+        details: JSON.stringify({ name: role.name, permissions: cleanPermissions }),
+        ...requestAuditFields(req),
+      });
       res.status(201).json(role);
     } catch (error) {
       if (isDuplicateEmailError(error)) {
@@ -818,6 +988,15 @@ export class AuthController {
       }
 
       broadcastAppEvent({ type: 'permission-updated', entityId: role.id });
+      await AuditLogModel.create({
+        actorId: requester?.id || null,
+        actorName: requester?.displayName || requester?.email || null,
+        action: 'roles.updated',
+        entityType: 'role',
+        entityId: role.id,
+        details: JSON.stringify({ name: role.name, permissions: cleanPermissions }),
+        ...requestAuditFields(req),
+      });
       res.json(role);
     } catch (error) {
       if (isDuplicateEmailError(error)) {

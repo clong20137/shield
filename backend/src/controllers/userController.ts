@@ -5,6 +5,7 @@ import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents'
 import { getSessionAccount } from '../middleware/authSession';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { AuthSessionModel } from '../models/AuthSession';
+import { AuditLogModel } from '../models/AuditLog';
 import { cleanMultiline, cleanString, isOneOf, isStrongPassword, isValidEmail, isValidPhone, normalizeEmail, normalizePhone } from '../utils/validation';
 import { isSafeUploadedImage } from '../middleware/profileUpload';
 import { parsePagination } from '../utils/pagination';
@@ -65,6 +66,27 @@ function getDuplicateUserMessage(error: unknown): string {
   }
 
   return 'A unique user identifier is already assigned to another user.';
+}
+
+function requestAuditFields(req: Request) {
+  return {
+    ipAddress: cleanString(req.ip || req.socket.remoteAddress, 45) || null,
+    userAgent: cleanString(req.get('user-agent'), 255) || null,
+  };
+}
+
+function safeUserDetails(user: User) {
+  return {
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    role: user.role,
+    district: user.district,
+    rank: user.rank,
+    peNumber: user.peNumber,
+    badgeNumber: user.badgeNumber,
+    isActive: user.isActive,
+  };
 }
 
 function validateUserPayload(body: Record<string, unknown>, isCreate: boolean): { value?: Record<string, unknown>; error?: string } {
@@ -257,6 +279,16 @@ export class UserController {
       const user = await UserModel.createUser({ ...validation.value, password, role } as Parameters<typeof UserModel.createUser>[0]);
       broadcastAppEvent({ type: 'user-updated', entityId: user.id });
       broadcastAppEvent({ type: 'dashboard-updated', entityId: user.id });
+      const actor = await getSessionAccount(req);
+      await AuditLogModel.create({
+        actorId: actor?.id || null,
+        actorName: actor?.displayName || actor?.email || null,
+        action: 'users.created',
+        entityType: 'user',
+        entityId: user.id,
+        details: JSON.stringify({ user: safeUserDetails(user), passwordAssigned: Boolean(password) }),
+        ...requestAuditFields(req),
+      });
       res.status(201).json(user);
     } catch (error) {
       if (isDuplicateUserError(error)) {
@@ -286,6 +318,7 @@ export class UserController {
         return res.status(400).json({ error: 'You cannot deactivate your own account' });
       }
 
+      const before = await UserModel.getUserById(id);
       const success = await UserModel.updateUser(id, validation.value);
 
       if (!success) {
@@ -299,6 +332,21 @@ export class UserController {
 
       broadcastAppEvent({ type: 'user-updated', entityId: id });
       broadcastAppEvent({ type: 'dashboard-updated', entityId: id });
+      const after = await UserModel.getUserById(id);
+      await AuditLogModel.create({
+        actorId: sessionAccount?.id || null,
+        actorName: sessionAccount?.displayName || sessionAccount?.email || null,
+        action: validation.value.isActive === false ? 'users.deactivated' : 'users.updated',
+        entityType: 'user',
+        entityId: id,
+        details: JSON.stringify({
+          changedFields: Object.keys(validation.value),
+          before: before ? safeUserDetails(before) : null,
+          after: after ? safeUserDetails(after) : null,
+          sessionsRevoked: validation.value.isActive === false,
+        }),
+        ...requestAuditFields(req),
+      });
 
       res.json({ message: 'User updated successfully' });
     } catch (error) {
@@ -322,6 +370,16 @@ export class UserController {
 
       broadcastAppEvent({ type: 'user-updated', entityId: id });
       broadcastAppEvent({ type: 'dashboard-updated', entityId: id });
+      const actor = await getSessionAccount(req);
+      await AuditLogModel.create({
+        actorId: actor?.id || null,
+        actorName: actor?.displayName || actor?.email || null,
+        action: 'users.deleted',
+        entityType: 'user',
+        entityId: id,
+        details: JSON.stringify({ id }),
+        ...requestAuditFields(req),
+      });
       res.json({ message: 'User deleted successfully' });
     } catch (error) {
       console.error('Delete user error:', error);
@@ -355,6 +413,16 @@ export class UserController {
       }
 
       broadcastAppEvent({ type: 'user-updated', entityId: req.params.id });
+      const actor = await getSessionAccount(req);
+      await AuditLogModel.create({
+        actorId: actor?.id || null,
+        actorName: actor?.displayName || actor?.email || null,
+        action: 'users.profile_picture_updated',
+        entityType: 'user',
+        entityId: req.params.id,
+        details: JSON.stringify({ profilePictureUrl }),
+        ...requestAuditFields(req),
+      });
       res.json({ profilePictureUrl, user });
     } catch (error) {
       console.error('Profile picture upload error:', error);
@@ -376,6 +444,16 @@ export class UserController {
       }
 
       broadcastAppEvent({ type: 'user-updated', entityId: req.params.id });
+      const actor = await getSessionAccount(req);
+      await AuditLogModel.create({
+        actorId: actor?.id || null,
+        actorName: actor?.displayName || actor?.email || null,
+        action: 'users.profile_picture_removed',
+        entityType: 'user',
+        entityId: req.params.id,
+        details: JSON.stringify({ id: req.params.id }),
+        ...requestAuditFields(req),
+      });
       res.json({ profilePictureUrl: '', user });
     } catch (error) {
       console.error('Profile picture remove error:', error);

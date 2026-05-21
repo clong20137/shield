@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Mail, Pencil, Plus, Save, ShieldCheck, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Mail, Pencil, Plus, Save, Search, ShieldCheck, X } from 'lucide-react';
 import { AuthAccount, AuthInvite, AuthRole, RegistrationSettings, authService } from '../services/api';
 
 interface PermissionsPageProps {
@@ -11,21 +11,145 @@ interface PermissionsPageProps {
   isModalView?: boolean;
 }
 
-const permissionOptions = [
-  { key: 'users:view', label: 'View users' },
-  { key: 'users:create', label: 'Create users' },
-  { key: 'users:edit', label: 'Edit users' },
-  { key: 'users:profile-picture', label: 'Edit profile photos' },
-  { key: 'devices:manage', label: 'Manage devices' },
-  { key: 'calendar:manage', label: 'Manage calendar' },
-  { key: 'reports:trooper-dailies', label: 'View Trooper Daily reports' },
-  { key: 'reports:cpar', label: 'Create CPAR reports' },
-  { key: 'audit:view', label: 'View audit log' },
-  { key: 'roles:manage', label: 'Manage roles' },
-  { key: 'messages:send', label: 'Send messages' },
-  { key: 'dashboard:manage', label: 'Manage dashboard posts' },
-  { key: 'bugs:manage', label: 'Manage bug tracker' },
+const permissionGroups = [
+  {
+    title: 'Users & Profiles',
+    description: 'Directory access, profile editing, and account creation.',
+    permissions: [
+      { key: 'users:view', label: 'View users' },
+      { key: 'users:create', label: 'Create users' },
+      { key: 'users:edit', label: 'Edit users' },
+      { key: 'users:profile-picture', label: 'Edit profile photos' },
+    ],
+  },
+  {
+    title: 'Operations',
+    description: 'Daily work tools and inventory operations.',
+    permissions: [
+      { key: 'devices:manage', label: 'Manage devices' },
+      { key: 'calendar:manage', label: 'Manage calendar' },
+      { key: 'messages:send', label: 'Send messages' },
+    ],
+  },
+  {
+    title: 'Reports & Reviews',
+    description: 'Submitted reports, CPAR workflows, and review access.',
+    permissions: [
+      { key: 'reports:trooper-dailies', label: 'View/review Trooper Daily reports' },
+      { key: 'reports:cpar', label: 'Create CPAR reports' },
+    ],
+  },
+  {
+    title: 'Administration',
+    description: 'System controls, audit history, posts, and issue tracking.',
+    permissions: [
+      { key: 'roles:manage', label: 'Manage roles' },
+      { key: 'audit:view', label: 'View audit log' },
+      { key: 'dashboard:manage', label: 'Manage dashboard posts' },
+      { key: 'bugs:manage', label: 'Manage bug tracker' },
+    ],
+  },
 ];
+
+function PermissionChecklist({
+  selectedPermissions,
+  onChange,
+}: {
+  selectedPermissions: string[];
+  onChange: (permissions: string[]) => void;
+}) {
+  const [permissionSearch, setPermissionSearch] = useState('');
+  const query = permissionSearch.trim().toLowerCase();
+  const selectedSet = useMemo(() => new Set(selectedPermissions), [selectedPermissions]);
+  const visibleGroups = permissionGroups
+    .map((group) => ({
+      ...group,
+      permissions: group.permissions.filter((permission) =>
+        !query ||
+        permission.label.toLowerCase().includes(query) ||
+        permission.key.toLowerCase().includes(query) ||
+        group.title.toLowerCase().includes(query),
+      ),
+    }))
+    .filter((group) => group.permissions.length > 0);
+
+  const togglePermission = (permissionKey: string, checked: boolean) => {
+    onChange(
+      checked
+        ? Array.from(new Set([...selectedPermissions, permissionKey]))
+        : selectedPermissions.filter((item) => item !== permissionKey),
+    );
+  };
+
+  const selectGroup = (keys: string[]) => {
+    onChange(Array.from(new Set([...selectedPermissions, ...keys])));
+  };
+
+  const clearGroup = (keys: string[]) => {
+    const clearSet = new Set(keys);
+    onChange(selectedPermissions.filter((item) => !clearSet.has(item)));
+  };
+
+  return (
+    <div className="space-y-3">
+      <label className="relative block">
+        <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+        <input
+          value={permissionSearch}
+          onChange={(event) => setPermissionSearch(event.target.value)}
+          placeholder="Search permissions..."
+          className="w-full rounded border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-gray-700 dark:bg-gray-950"
+        />
+      </label>
+
+      <div className="max-h-[48vh] space-y-3 overflow-y-auto pr-1">
+        {visibleGroups.length === 0 ? (
+          <div className="empty-state rounded border border-dashed border-gray-300 py-8 text-sm dark:border-gray-700">No permissions match that search.</div>
+        ) : visibleGroups.map((group) => {
+          const groupKeys = group.permissions.map((permission) => permission.key);
+          const selectedCount = groupKeys.filter((key) => selectedSet.has(key)).length;
+          return (
+            <section key={group.title} className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+              <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">{group.title}</h3>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{group.description}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded bg-white px-2 py-1 text-xs font-bold text-gray-500 ring-1 ring-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-800">
+                    {selectedCount}/{group.permissions.length}
+                  </span>
+                  <button type="button" onClick={() => selectGroup(groupKeys)} className="text-xs font-bold text-accent hover:underline">
+                    Select
+                  </button>
+                  <button type="button" onClick={() => clearGroup(groupKeys)} className="text-xs font-bold text-gray-500 hover:text-danger dark:text-gray-400">
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {group.permissions.map((permission) => (
+                  <label key={permission.key} className="flex items-start gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-800 dark:bg-gray-900">
+                    <input
+                      type="checkbox"
+                      checked={selectedSet.has(permission.key)}
+                      onChange={(event) => togglePermission(permission.key, event.target.checked)}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="block font-semibold text-gray-800 dark:text-gray-100">{permission.label}</span>
+                      <span className="mt-0.5 block text-xs text-gray-400">{permission.key}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function PermissionsPage({
   account,
@@ -305,12 +429,17 @@ function PermissionsPage({
       <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <h2>Account Roles</h2>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
             {roles.map((role) => (
-              <button key={role.id} type="button" onClick={() => openEditRole(role)} className="inline-flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold text-gray-700 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200" aria-label={`Edit ${role.name} role`} title={`Edit ${role.name}`}>
-                <ShieldCheck size={16} />
-                <span>{role.name}</span>
-                <Pencil size={16} />
+              <button key={role.id} type="button" onClick={() => openEditRole(role)} className="flex items-center justify-between gap-3 rounded border border-gray-200 bg-gray-50 px-3 py-3 text-left text-sm text-gray-700 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200" aria-label={`Edit ${role.name} role`} title={`Edit ${role.name}`}>
+                <span className="flex min-w-0 items-center gap-2">
+                  <ShieldCheck size={16} className="shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block truncate font-bold">{role.name}</span>
+                    <span className="mt-0.5 block text-xs text-gray-400">{role.permissions.length} permission{role.permissions.length === 1 ? '' : 's'}</span>
+                  </span>
+                </span>
+                <Pencil size={16} className="shrink-0" />
               </button>
             ))}
           </div>
@@ -535,25 +664,11 @@ function PermissionsPage({
             </label>
 
             <div>
-              <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Permissions</span>
-              <div className="grid max-h-[42vh] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-4">
-                {permissionOptions.map((permission) => (
-                  <label key={permission.key} className="flex items-center gap-2 rounded border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
-                    <input
-                      type="checkbox"
-                      checked={newRolePermissions.includes(permission.key)}
-                      onChange={(event) => {
-                        setNewRolePermissions((currentPermissions) =>
-                          event.target.checked
-                            ? [...currentPermissions, permission.key]
-                            : currentPermissions.filter((item) => item !== permission.key),
-                        );
-                      }}
-                    />
-                    {permission.label}
-                  </label>
-                ))}
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Permissions</span>
+                <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold text-accent">{newRolePermissions.length} selected</span>
               </div>
+              <PermissionChecklist selectedPermissions={newRolePermissions} onChange={setNewRolePermissions} />
             </div>
 
             <div className="mt-6 flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-800">
@@ -591,25 +706,11 @@ function PermissionsPage({
             </label>
 
             <div>
-              <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Permissions</span>
-              <div className="grid max-h-[42vh] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-4">
-                {permissionOptions.map((permission) => (
-                  <label key={permission.key} className="flex items-center gap-2 rounded border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
-                    <input
-                      type="checkbox"
-                      checked={editRolePermissions.includes(permission.key)}
-                      onChange={(event) => {
-                        setEditRolePermissions((currentPermissions) =>
-                          event.target.checked
-                            ? [...currentPermissions, permission.key]
-                            : currentPermissions.filter((item) => item !== permission.key),
-                        );
-                      }}
-                    />
-                    {permission.label}
-                  </label>
-                ))}
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Permissions</span>
+                <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold text-accent">{editRolePermissions.length} selected</span>
               </div>
+              <PermissionChecklist selectedPermissions={editRolePermissions} onChange={setEditRolePermissions} />
             </div>
 
             <div className="mt-6 flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-800">

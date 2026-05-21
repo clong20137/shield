@@ -247,12 +247,19 @@ export async function initializeDatabase() {
       \`entityType\` VARCHAR(100) NOT NULL,
       \`entityId\` VARCHAR(100),
       \`details\` TEXT,
+      \`ipAddress\` VARCHAR(45),
+      \`userAgent\` VARCHAR(255),
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       INDEX \`idx_audit_actor\` (\`actorId\`),
+      INDEX \`idx_audit_action\` (\`action\`),
       INDEX \`idx_audit_entity\` (\`entityType\`, \`entityId\`),
       INDEX \`idx_audit_created\` (\`createdAt\`)
     )
   `);
+  await ensureColumn('audit_logs', 'ipAddress', '`ipAddress` VARCHAR(45)');
+  await ensureColumn('audit_logs', 'userAgent', '`userAgent` VARCHAR(255)');
+  await ensureIndex('audit_logs', 'idx_audit_action', '`action`');
+  await ensureIndex('audit_logs', 'idx_audit_actor_created', '`actorId`, `createdAt`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS dashboard_posts (

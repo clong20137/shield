@@ -1,82 +1,395 @@
-import { useEffect, useState } from 'react';
-import { auditService, AuditLog } from '../services/api';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Download, Eye, RefreshCw, Search, X } from 'lucide-react';
+import { auditService, AuditLog, AuditLogFilters, AuditLogResponse } from '../services/api';
+
+const DEFAULT_RESPONSE: AuditLogResponse = {
+  data: [],
+  total: 0,
+  page: 1,
+  pageSize: 50,
+  totalPages: 1,
+  actions: [],
+  entityTypes: [],
+};
+
+function safeDetails(details: string | null) {
+  if (!details) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(details);
+  } catch {
+    return details;
+  }
+}
+
+function stringifyDetails(details: string | null) {
+  const parsed = safeDetails(details);
+  if (parsed === null) {
+    return 'N/A';
+  }
+
+  return typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2);
+}
+
+function csvCell(value: unknown) {
+  const text = String(value ?? '').replace(/\r?\n/gu, ' ');
+  return `"${text.replace(/"/gu, '""')}"`;
+}
+
+function downloadCsv(logs: AuditLog[]) {
+  const rows = [
+    ['Time', 'Actor', 'Action', 'Entity Type', 'Entity ID', 'IP Address', 'Details'],
+    ...logs.map((log) => [
+      new Date(log.createdAt).toLocaleString(),
+      log.actorName || log.actorId || 'System',
+      log.action,
+      log.entityType,
+      log.entityId || '',
+      log.ipAddress || '',
+      stringifyDetails(log.details),
+    ]),
+  ];
+  const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `shield-audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 
 function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
-  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [response, setResponse] = useState<AuditLogResponse>(DEFAULT_RESPONSE);
+  const [filters, setFilters] = useState<AuditLogFilters>({ page: 1, pageSize: 50 });
+  const [draftSearch, setDraftSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
-  const loadLogs = async (showLoading = true) => {
+  const loadLogs = useCallback(async (nextFilters = filters, showLoading = true) => {
     if (showLoading) {
       setLoading(true);
     }
     setError(null);
     try {
-      const response = await auditService.getAll(200);
-      setLogs(response.data);
+      const result = await auditService.getAll(nextFilters);
+      setResponse(result.data);
     } catch (err) {
       console.error(err);
       setError('Failed to load audit logs.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   useEffect(() => {
-    loadLogs();
-    const handleAuditUpdate = () => loadLogs(false);
+    loadLogs(filters);
+    const handleAuditUpdate = () => loadLogs(filters, false);
 
     window.addEventListener('shield:audit-updated', handleAuditUpdate);
     return () => window.removeEventListener('shield:audit-updated', handleAuditUpdate);
-  }, []);
+  }, [filters, loadLogs]);
+
+  const activeFilterCount = useMemo(() => {
+    return ['q', 'actorId', 'action', 'entityType', 'from', 'to'].filter((key) => Boolean(filters[key as keyof AuditLogFilters])).length;
+  }, [filters]);
+
+  const submitSearch = (event: FormEvent) => {
+    event.preventDefault();
+    setFilters((current) => ({ ...current, q: draftSearch.trim() || undefined, page: 1 }));
+  };
+
+  const updateFilter = (field: keyof AuditLogFilters, value: string | number | undefined) => {
+    setFilters((current) => ({ ...current, [field]: value || undefined, page: field === 'page' ? Number(value) : 1 }));
+  };
+
+  const clearFilters = () => {
+    setDraftSearch('');
+    setFilters({ page: 1, pageSize: filters.pageSize || 50 });
+  };
+
+  const exportFilteredLogs = async () => {
+    setExporting(true);
+    try {
+      const firstPage = await auditService.getAll({ ...filters, page: 1, pageSize: 500 });
+      const allLogs = [...firstPage.data.data];
+
+      for (let page = 2; page <= firstPage.data.totalPages; page += 1) {
+        const pageResult = await auditService.getAll({ ...filters, page, pageSize: 500 });
+        allLogs.push(...pageResult.data.data);
+      }
+
+      downloadCsv(allLogs);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to export audit logs.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const pageStart = response.total === 0 ? 0 : ((response.page - 1) * response.pageSize) + 1;
+  const pageEnd = Math.min(response.total, response.page * response.pageSize);
 
   return (
     <div>
       {!isModalView && (
-      <div className="mb-8">
-        <div>
-          <h1>Audit Log</h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Review administrative activity.</p>
+        <div className="mb-8">
+          <div>
+            <h1>Audit Log</h1>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Search, review, and export administrative activity.</p>
+          </div>
         </div>
-      </div>
       )}
 
       {error && <div className="error">{error}</div>}
 
       <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+        <div className="mb-5 flex flex-col gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <form onSubmit={submitSearch} className="flex min-w-0 flex-1 gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  value={draftSearch}
+                  onChange={(event) => setDraftSearch(event.target.value)}
+                  className="w-full rounded border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm dark:border-gray-700 dark:bg-gray-950"
+                  placeholder="Search actor, action, entity, details, or IP"
+                />
+              </div>
+              <button type="submit" className="btn-primary h-10 w-10 p-0" title="Search" aria-label="Search audit logs">
+                <Search size={18} />
+              </button>
+            </form>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => loadLogs(filters)}
+                className="btn-secondary h-10 w-10 p-0"
+                title="Refresh"
+                aria-label="Refresh audit logs"
+              >
+                <RefreshCw size={17} />
+              </button>
+              <button
+                type="button"
+                onClick={exportFilteredLogs}
+                disabled={exporting || response.total === 0}
+                className="btn-secondary h-10 w-10 p-0"
+                title="Export CSV"
+                aria-label="Export audit logs"
+              >
+                <Download size={17} />
+              </button>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className={`h-10 rounded border px-3 text-sm font-semibold transition ${
+                  activeFilterCount > 0
+                    ? 'border-red-300 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40'
+                    : 'border-gray-300 text-gray-500 dark:border-gray-700 dark:text-gray-400'
+                }`}
+              >
+                Clear {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <select
+              value={filters.action || ''}
+              onChange={(event) => updateFilter('action', event.target.value)}
+              className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+            >
+              <option value="">All actions</option>
+              {response.actions.map((action) => (
+                <option key={action} value={action}>{action}</option>
+              ))}
+            </select>
+
+            <select
+              value={filters.entityType || ''}
+              onChange={(event) => updateFilter('entityType', event.target.value)}
+              className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+            >
+              <option value="">All entity types</option>
+              {response.entityTypes.map((entityType) => (
+                <option key={entityType} value={entityType}>{entityType}</option>
+              ))}
+            </select>
+
+            <input
+              value={filters.actorId || ''}
+              onChange={(event) => updateFilter('actorId', event.target.value.trim())}
+              className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+              placeholder="Actor account ID"
+            />
+
+            <input
+              type="date"
+              value={filters.from || ''}
+              onChange={(event) => updateFilter('from', event.target.value)}
+              className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+              aria-label="From date"
+            />
+
+            <input
+              type="date"
+              value={filters.to || ''}
+              onChange={(event) => updateFilter('to', event.target.value)}
+              className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+              aria-label="To date"
+            />
+          </div>
+
+          <div className="flex flex-col gap-3 text-sm text-gray-500 dark:text-gray-400 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Showing {pageStart}-{pageEnd} of {response.total.toLocaleString()} entries
+            </span>
+            <div className="flex items-center gap-2">
+              <span>Rows</span>
+              <select
+                value={filters.pageSize || 50}
+                onChange={(event) => updateFilter('pageSize', Number(event.target.value))}
+                className="rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-950"
+              >
+                {[25, 50, 100, 250, 500].map((size) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
         {loading ? (
           <div className="loading">Loading audit logs...</div>
-        ) : logs.length === 0 ? (
-          <div className="empty-state">No audit log entries yet.</div>
+        ) : response.data.length === 0 ? (
+          <div className="empty-state">No audit log entries match those filters.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] border-collapse text-left">
+            <table className="w-full min-w-[1050px] border-collapse text-left">
               <thead>
                 <tr className="border-b border-gray-200 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
                   <th className="px-3 py-3">Time</th>
                   <th className="px-3 py-3">Actor</th>
                   <th className="px-3 py-3">Action</th>
                   <th className="px-3 py-3">Entity</th>
+                  <th className="px-3 py-3">IP</th>
                   <th className="px-3 py-3">Details</th>
+                  <th className="px-3 py-3 text-right">View</th>
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log) => (
+                {response.data.map((log) => (
                   <tr key={log.id} className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="px-3 py-4 text-sm">{new Date(log.createdAt).toLocaleString()}</td>
-                    <td className="px-3 py-4">{log.actorName || log.actorId || 'System'}</td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm">{new Date(log.createdAt).toLocaleString()}</td>
+                    <td className="px-3 py-4">
+                      <div className="font-semibold">{log.actorName || 'System'}</div>
+                      {log.actorId && <div className="text-xs text-gray-500 dark:text-gray-400">{log.actorId}</div>}
+                    </td>
                     <td className="px-3 py-4">
                       <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold uppercase text-accent">{log.action}</span>
                     </td>
-                    <td className="px-3 py-4">{log.entityType} {log.entityId ? `#${log.entityId}` : ''}</td>
-                    <td className="max-w-xl truncate px-3 py-4 text-sm text-gray-500 dark:text-gray-400">{log.details || 'N/A'}</td>
+                    <td className="px-3 py-4">
+                      <div>{log.entityType}</div>
+                      {log.entityId && <div className="text-xs text-gray-500 dark:text-gray-400">{log.entityId}</div>}
+                    </td>
+                    <td className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400">{log.ipAddress || 'N/A'}</td>
+                    <td className="max-w-xl truncate px-3 py-4 text-sm text-gray-500 dark:text-gray-400">{stringifyDetails(log.details)}</td>
+                    <td className="px-3 py-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedLog(log)}
+                        className="btn-secondary h-9 w-9 p-0"
+                        title="View details"
+                        aria-label="View audit log details"
+                      >
+                        <Eye size={16} />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => updateFilter('page', Math.max(1, response.page - 1))}
+            disabled={response.page <= 1}
+            className="btn-secondary h-10 w-10 p-0"
+            title="Previous page"
+            aria-label="Previous page"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">
+            Page {response.page} of {response.totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => updateFilter('page', Math.min(response.totalPages, response.page + 1))}
+            disabled={response.page >= response.totalPages}
+            className="btn-secondary h-10 w-10 p-0"
+            title="Next page"
+            aria-label="Next page"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
       </section>
+
+      {selectedLog && (
+        <div className="modal-backdrop" onClick={() => setSelectedLog(null)}>
+          <div className="modal max-w-3xl" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2>Audit Details</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{new Date(selectedLog.createdAt).toLocaleString()}</p>
+              </div>
+              <button type="button" className="btn-secondary h-9 w-9 p-0" onClick={() => setSelectedLog(null)} aria-label="Close audit details">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="grid gap-3 text-sm md:grid-cols-2">
+              <div className="rounded border border-gray-200 p-3 dark:border-gray-800">
+                <div className="text-xs font-bold uppercase text-gray-500">Actor</div>
+                <div className="mt-1 font-semibold">{selectedLog.actorName || 'System'}</div>
+                <div className="break-all text-gray-500 dark:text-gray-400">{selectedLog.actorId || 'N/A'}</div>
+              </div>
+              <div className="rounded border border-gray-200 p-3 dark:border-gray-800">
+                <div className="text-xs font-bold uppercase text-gray-500">Request</div>
+                <div className="mt-1">{selectedLog.ipAddress || 'N/A'}</div>
+                <div className="break-all text-gray-500 dark:text-gray-400">{selectedLog.userAgent || 'N/A'}</div>
+              </div>
+              <div className="rounded border border-gray-200 p-3 dark:border-gray-800">
+                <div className="text-xs font-bold uppercase text-gray-500">Action</div>
+                <div className="mt-1 font-semibold">{selectedLog.action}</div>
+              </div>
+              <div className="rounded border border-gray-200 p-3 dark:border-gray-800">
+                <div className="text-xs font-bold uppercase text-gray-500">Entity</div>
+                <div className="mt-1 font-semibold">{selectedLog.entityType}</div>
+                <div className="break-all text-gray-500 dark:text-gray-400">{selectedLog.entityId || 'N/A'}</div>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <div className="mb-2 text-xs font-bold uppercase text-gray-500">Details</div>
+              <pre className="max-h-[45vh] overflow-auto rounded bg-gray-950 p-4 text-xs text-gray-100">{stringifyDetails(selectedLog.details)}</pre>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
