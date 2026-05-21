@@ -164,9 +164,11 @@ function getErrorMessage(error: unknown, fallback: string): string {
 function LoginSplash({
   onLogin,
   onToast,
+  isExiting = false,
 }: {
   onLogin: (account: AuthAccount) => void;
   onToast: (type: ToastType, message: string) => void;
+  isExiting?: boolean;
 }) {
   const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset'>('login');
   const [email, setEmail] = useState('');
@@ -331,7 +333,7 @@ function LoginSplash({
     (registrationSettings?.mode === 'invite-only' && Boolean(inviteToken));
 
   return (
-    <div className="min-h-screen bg-gray-100 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+    <div className={`min-h-screen bg-gray-100 text-gray-900 dark:bg-gray-950 dark:text-gray-100 ${isExiting ? 'animate-login-exit pointer-events-none' : ''}`}>
       <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[minmax(0,1fr)_480px]">
         <section className="flex items-center bg-primary-500 px-8 py-12 text-white lg:px-16">
           <div className="max-w-3xl">
@@ -1830,6 +1832,7 @@ function ConfettiOverlay() {
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoginTransitioning, setIsLoginTransitioning] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthAccount | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -1845,6 +1848,7 @@ function App() {
     }
   });
   const inactivityTimerRef = useRef<number | null>(null);
+  const loginTransitionTimerRef = useRef<number | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
   const [userNotifications, setUserNotifications] = useState<UserNotification[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -1904,6 +1908,13 @@ function App() {
     if (inactivityTimerRef.current) {
       window.clearTimeout(inactivityTimerRef.current as unknown as number);
       inactivityTimerRef.current = null;
+    }
+  };
+
+  const clearLoginTransitionTimer = () => {
+    if (loginTransitionTimerRef.current) {
+      window.clearTimeout(loginTransitionTimerRef.current);
+      loginTransitionTimerRef.current = null;
     }
   };
 
@@ -2135,7 +2146,7 @@ function App() {
   const handleLogin = (account: AuthAccount) => {
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(account));
     setCurrentUser(account);
-    setIsAuthenticated(true);
+    setIsLoginTransitioning(true);
     showToast('success', `Signed in as ${account.email}.`);
 
     if (!account.hasCompletedOnboarding) {
@@ -2144,6 +2155,13 @@ function App() {
       }
       setShouldLaunchGuideAfterWelcome(true);
     }
+
+    clearLoginTransitionTimer();
+    loginTransitionTimerRef.current = window.setTimeout(() => {
+      setIsAuthenticated(true);
+      setIsLoginTransitioning(false);
+      loginTransitionTimerRef.current = null;
+    }, 380);
   };
 
   const handleLogout = async () => {
@@ -2152,10 +2170,12 @@ function App() {
     } catch {
       // Local sign out should still complete if the server is unreachable.
     }
+    clearLoginTransitionTimer();
     clearAuthToken();
     window.localStorage.removeItem(SESSION_KEY);
     setCurrentUser(null);
     setIsAuthenticated(false);
+    setIsLoginTransitioning(false);
     setIsWelcomeSplashOpen(false);
     setShouldLaunchGuideAfterWelcome(false);
     setIsFirstLoginGuideOpen(false);
@@ -2164,10 +2184,12 @@ function App() {
   };
 
   const handleForcedLogout = useCallback((message: string) => {
+    clearLoginTransitionTimer();
     clearAuthToken();
     window.localStorage.removeItem(SESSION_KEY);
     setCurrentUser(null);
     setIsAuthenticated(false);
+    setIsLoginTransitioning(false);
     setIsWelcomeSplashOpen(false);
     setShouldLaunchGuideAfterWelcome(false);
     setIsFirstLoginGuideOpen(false);
@@ -2484,9 +2506,9 @@ function App() {
       {isSessionLoading ? (
         <ShieldLoading />
       ) : !isAuthenticated ? (
-        <LoginSplash onLogin={handleLogin} onToast={showToast} />
+        <LoginSplash onLogin={handleLogin} onToast={showToast} isExiting={isLoginTransitioning} />
       ) : (
-        <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
+        <div className="animate-app-enter flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
           <aside className={`relative h-screen shrink-0 overflow-visible bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
             <button
               type="button"

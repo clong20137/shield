@@ -36,6 +36,32 @@
   }
 }
 
+@keyframes login-exit {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.025);
+    filter: blur(8px);
+  }
+}
+
+@keyframes app-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.992);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes welcome-pop {
   0% {
     opacity: 0;
@@ -349,6 +375,16 @@
     animation: welcome-pop 320ms ease-out both;
   }
 
+  .animate-login-exit {
+    animation: login-exit 380ms cubic-bezier(0.4, 0, 0.2, 1) both;
+    transform-origin: center;
+  }
+
+  .animate-app-enter {
+    animation: app-enter 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    transform-origin: center;
+  }
+
   .animate-welcome-ring {
     animation: welcome-ring 1.8s ease-in-out infinite;
   }
@@ -488,6 +524,8 @@ select {
   .modal-window-exit,
   .modal-backdrop,
   .modal-backdrop-exit,
+  .animate-login-exit,
+  .animate-app-enter,
   .onboarding-spotlight,
   .onboarding-tip,
   .onboarding-control-label,
