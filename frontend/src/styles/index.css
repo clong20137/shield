@@ -72,6 +72,19 @@
   }
 }
 
+@keyframes shield-flash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.35);
+    border-color: rgba(245, 158, 11, 0.8);
+  }
+
+  50% {
+    box-shadow: 0 0 0 16px rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 1);
+  }
+}
+
 @keyframes modal-backdrop-enter {
   0% {
     opacity: 0;
@@ -334,6 +347,10 @@
 
   .animate-welcome-glow {
     animation: welcome-glow 2s ease-in-out infinite;
+  }
+
+  .animate-shield-flash {
+    animation: shield-flash 1.8s ease-in-out infinite;
   }
 
   .modal-backdrop {

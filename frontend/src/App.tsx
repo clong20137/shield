@@ -1752,14 +1752,13 @@ function WelcomeSplash({
       <div className="relative w-full max-w-3xl overflow-hidden rounded-[2rem] border border-white/10 bg-white/95 p-8 shadow-[0_35px_120px_rgba(15,23,42,0.32)] ring-1 ring-white/10 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 dark:shadow-[0_35px_120px_rgba(15,23,42,0.6)] animate-welcome-pop">
         <div className="mb-6 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-400">Mission Briefing</p>
             <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-slate-950 dark:text-white sm:text-5xl">
               Welcome to Shield
             </h1>
           </div>
-          <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-primary-500 text-white shadow-[0_25px_80px_rgba(59,130,246,0.35)]">
-            <div className="absolute inset-0 rounded-3xl border border-white/20" />
-            <Shield size={32} className="relative z-10 animate-welcome-ring" />
+          <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-primary-500 text-white shadow-[0_25px_80px_rgba(59,130,246,0.35)] ring-2 ring-amber-300/80 animate-shield-flash">
+            <div className="absolute inset-0 rounded-3xl border border-amber-300/90" />
+            <Shield size={32} className="relative z-10" />
           </div>
         </div>
 
@@ -1769,22 +1768,9 @@ function WelcomeSplash({
             : `Hello ${account.email}, your SHIELD workspace is ready.`}
         </p>
         <p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-300">
-          You’re about to unlock mission control for security, teams, alerts, and rapid response.
-          Let’s make your first login unforgettable.
+          Welcome to the new Shield! To make sure you have a good understanding of how Shield works, it is strongly recommended you use the guide to find your way around.
+          Shield is currently in a beta phase so please report any bugs and provide feedback using the bug tracker.
         </p>
-
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          <div className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-slate-700 dark:bg-slate-900">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary-500 via-cyan-400 to-primary-500 opacity-60" />
-            <p className="text-sm font-semibold text-slate-900 dark:text-white">Command Center</p>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">See live alerts, team activity, and mission status right away.</p>
-          </div>
-          <div className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-slate-700 dark:bg-slate-900">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary-500 via-cyan-400 to-primary-500 opacity-60" />
-            <p className="text-sm font-semibold text-slate-900 dark:text-white">Quick Launch</p>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Customize shortcuts for instant access to search, messages, and reports.</p>
-          </div>
-        </div>
 
         <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
