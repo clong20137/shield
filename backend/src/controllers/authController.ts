@@ -138,21 +138,26 @@ function publicInvite(invite: Awaited<ReturnType<typeof AuthInviteModel.create>>
 export class AuthController {
   static async register(req: Request, res: Response) {
     try {
-      const { email, password, firstName, lastName, inviteToken } = req.body as {
+      const { email, password, firstName, lastName, displayName, inviteToken } = req.body as {
         email?: string;
         password?: string;
         firstName?: string;
         lastName?: string;
+        displayName?: string;
         inviteToken?: string;
       };
 
-      if (!email || !password || !firstName || !lastName) {
+      const nameParts = cleanString(displayName, 200).split(/\s+/u).filter(Boolean);
+      const submittedFirstName = firstName || nameParts[0] || '';
+      const submittedLastName = lastName || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : '');
+
+      if (!email || !password || !submittedFirstName || !submittedLastName) {
         return res.status(400).json({ error: 'Email, password, first name, and last name are required' });
       }
 
       const cleanEmail = normalizeEmail(email);
-      const cleanFirstName = cleanString(firstName, 100);
-      const cleanLastName = cleanString(lastName, 100);
+      const cleanFirstName = cleanString(submittedFirstName, 100);
+      const cleanLastName = cleanString(submittedLastName, 100);
 
       if (!isValidEmail(cleanEmail)) {
         return res.status(400).json({ error: 'Enter a valid email address' });

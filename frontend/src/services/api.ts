@@ -511,7 +511,7 @@ export type CreatePerformanceEvaluationPayload = Pick<
 
 export const authService = {
   register: (email: string, password: string, firstName: string, lastName: string, inviteToken?: string) =>
-    api.post<AuthResponse>('/auth/register', { email, password, firstName, lastName, inviteToken }),
+    api.post<AuthResponse>('/auth/register', { email, password, firstName, lastName, displayName: `${firstName} ${lastName}`.trim(), inviteToken }),
 
   login: (email: string, password: string, twoFactorCode?: string) =>
     api.post<AuthResponse>('/auth/login', { email, password, twoFactorCode }),
