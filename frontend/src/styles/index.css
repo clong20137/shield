@@ -310,6 +310,14 @@
 
   .toast-notification {
     animation: toast-lifecycle 4.5s ease-in-out both;
+    backdrop-filter: none;
+    filter: none;
+    isolation: isolate;
+  }
+
+  .toast-host {
+    isolation: isolate;
+    transform: translateZ(0);
   }
 
   .confetti-piece {

@@ -9,9 +9,9 @@ export interface ToastMessage {
 }
 
 const toastStyles: Record<ToastType, string> = {
-  success: 'border-success bg-green-50 text-success dark:bg-green-950 dark:text-green-200',
-  error: 'border-danger bg-red-50 text-danger dark:bg-red-950 dark:text-red-200',
-  info: 'border-primary-500 bg-blue-50 text-primary-500 dark:bg-slate-950 dark:text-blue-200',
+  success: 'border-green-500 bg-white text-green-700 ring-green-100 dark:bg-gray-950 dark:text-green-200 dark:ring-green-900/50',
+  error: 'border-danger bg-white text-danger ring-red-100 dark:bg-gray-950 dark:text-red-200 dark:ring-red-900/50',
+  info: 'border-accent bg-white text-primary-500 ring-blue-100 dark:bg-gray-950 dark:text-blue-200 dark:ring-blue-900/50',
 };
 
 const toastIcons: Record<ToastType, LucideIcon> = {
@@ -22,7 +22,7 @@ const toastIcons: Record<ToastType, LucideIcon> = {
 
 export function ToastHost({ toasts }: { toasts: ToastMessage[] }) {
   return (
-    <div className="fixed right-4 top-4 z-[110] flex w-full max-w-sm flex-col gap-3">
+    <div className="toast-host pointer-events-none fixed right-3 top-3 z-[2147483647] flex w-[calc(100vw-1.5rem)] max-w-sm flex-col gap-2 sm:right-5 sm:top-5 sm:w-full">
       {toasts.map((toast) => {
         const Icon = toastIcons[toast.type];
         const lines = toast.message.split('\n');
@@ -30,10 +30,10 @@ export function ToastHost({ toasts }: { toasts: ToastMessage[] }) {
         return (
           <div
             key={toast.id}
-            className={`toast-notification rounded border-l-4 px-4 py-3 text-sm shadow-lg ${toastStyles[toast.type]}`}
+            className={`toast-notification overflow-hidden rounded-lg border border-l-4 px-4 py-3 text-sm shadow-[0_18px_50px_rgba(15,23,42,0.18)] ring-1 ${toastStyles[toast.type]}`}
           >
             <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-current shadow-sm ring-1 ring-slate-200 dark:bg-slate-950/80 dark:ring-slate-700">
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-current/10 text-current ring-1 ring-current/15">
                 <Icon className="h-4 w-4" />
               </span>
               <div className="min-w-0">
