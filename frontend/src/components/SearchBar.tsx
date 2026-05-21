@@ -14,7 +14,7 @@ interface SearchBarProps {
 export const SearchBar: React.FC<SearchBarProps> = ({
   onSearch,
   onFilterChange,
-  placeholder = 'Search by name, PE #, Badge #, or ID...',
+  placeholder = 'Search by name, district, PE #, Badge #, or ID...',
   initialQuery = '',
 }) => {
   const employmentTypes = ['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inactive', 'Other', 'CPS'];

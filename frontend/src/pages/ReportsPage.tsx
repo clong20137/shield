@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Search, X } from 'lucide-react';
 import { AuthAccount, reportService, TrooperDailyReportEntry } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import PerformanceEvaluationsPage from './PerformanceEvaluationsPage';
+import { downloadTrooperDailiesCsv, downloadTrooperDailiesPdf } from '../utils/trooperDailyExport';
 
 const trooperDailySections = [
   {
@@ -165,6 +166,8 @@ const ReportsPage: React.FC<{
   const [dailyTotalPages, setDailyTotalPages] = useState(1);
   const [dailyScope, setDailyScope] = useState<'all' | 'own'>('own');
   const [dailyLoading, setDailyLoading] = useState(true);
+  const [dailyExportFormat, setDailyExportFormat] = useState<'csv' | 'pdf'>('csv');
+  const [dailyExporting, setDailyExporting] = useState(false);
   const [dailyError, setDailyError] = useState<string | null>(null);
   const [selectedDaily, setSelectedDaily] = useState<TrooperDailyReportEntry | null>(null);
 
@@ -270,6 +273,47 @@ const ReportsPage: React.FC<{
     });
   };
 
+  const loadAllTrooperDailiesForExport = async () => {
+    const pageSize = 500;
+    const baseFilters = {
+      q: dailySearch.trim() || undefined,
+      from: dailyFrom || undefined,
+      to: dailyTo || undefined,
+      district: dailyDistrict || undefined,
+      pageSize,
+    };
+    const firstResponse = await reportService.getTrooperDailies({ ...baseFilters, page: 1 });
+    const allEntries = [...firstResponse.data.data];
+
+    for (let page = 2; page <= firstResponse.data.totalPages; page += 1) {
+      const response = await reportService.getTrooperDailies({ ...baseFilters, page });
+      allEntries.push(...response.data.data);
+    }
+
+    return allEntries;
+  };
+
+  const exportTrooperDailies = async () => {
+    setDailyExporting(true);
+    setDailyError(null);
+    try {
+      const entries = await loadAllTrooperDailiesForExport();
+      const label = `trooper-dailies-${dailyFrom || 'start'}-${dailyTo || 'end'}-${dailyDistrict || 'all-districts'}`;
+      if (dailyExportFormat === 'csv') {
+        downloadTrooperDailiesCsv(entries, label);
+      } else {
+        downloadTrooperDailiesPdf(entries, label);
+      }
+      onToast('success', `Trooper Daily ${dailyExportFormat.toUpperCase()} export ready.`);
+    } catch (err) {
+      const message = getErrorMessage(err, 'Failed to export Trooper Daily reports.');
+      setDailyError(message);
+      onToast('error', message);
+    } finally {
+      setDailyExporting(false);
+    }
+  };
+
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -324,11 +368,11 @@ const ReportsPage: React.FC<{
           </span>
         </div>
 
-        <form onSubmit={searchTrooperDailies} className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))_auto_auto]">
+        <form onSubmit={searchTrooperDailies} className="mb-4 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))_auto_auto_auto]">
           <input
             value={dailySearch}
             onChange={(event) => setDailySearch(event.target.value)}
-            placeholder="Name, email, PE, badge, rank..."
+            placeholder="Name, email, PE, badge, rank, district..."
             className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
           />
           <input type="date" value={dailyFrom} onChange={(event) => setDailyFrom(event.target.value)} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
@@ -343,6 +387,20 @@ const ReportsPage: React.FC<{
           <button type="button" onClick={clearTrooperDailyFilters} className="btn-secondary" aria-label="Clear Trooper Daily filters" title="Clear">
             <X size={16} />
           </button>
+          <div className="flex gap-2">
+            <select
+              value={dailyExportFormat}
+              onChange={(event) => setDailyExportFormat(event.target.value as 'csv' | 'pdf')}
+              className="min-w-24 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+              aria-label="Export format"
+            >
+              <option value="csv">CSV</option>
+              <option value="pdf">PDF</option>
+            </select>
+            <button type="button" onClick={exportTrooperDailies} className="btn-secondary" disabled={dailyExporting} aria-label="Export Trooper Daily reports" title={dailyExporting ? 'Exporting' : 'Export'}>
+              <Download size={16} />
+            </button>
+          </div>
         </form>
 
         {dailyError && <div className="error">{dailyError}</div>}

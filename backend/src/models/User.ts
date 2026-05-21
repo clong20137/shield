@@ -142,15 +142,15 @@ export class UserModel {
       if (trimmedSearchTerm) {
         conditions.push(
           `(
-            \`firstName\` LIKE ? OR \`lastName\` LIKE ? OR CONCAT_WS(' ', \`firstName\`, \`lastName\`) LIKE ?
-            OR COALESCE(\`email\`, '') LIKE ? OR \`peNumber\` LIKE ? OR \`peopleSoftId\` LIKE ?
-            OR \`badgeNumber\` LIKE ? OR \`radioNumber\` LIKE ? OR \`publicSafetyId\` LIKE ?
-            OR \`district\` LIKE ? OR \`employmentType\` LIKE ? OR \`status\` LIKE ?
-            OR \`supervisor\` LIKE ? OR \`personalPhoneNumber\` LIKE ? OR \`departmentPhoneNumber\` LIKE ?
+            LOWER(COALESCE(\`firstName\`, '')) LIKE ? OR LOWER(COALESCE(\`lastName\`, '')) LIKE ? OR LOWER(CONCAT_WS(' ', \`firstName\`, \`lastName\`)) LIKE ?
+            OR LOWER(COALESCE(\`email\`, '')) LIKE ? OR LOWER(COALESCE(\`peNumber\`, '')) LIKE ? OR LOWER(COALESCE(\`peopleSoftId\`, '')) LIKE ?
+            OR LOWER(COALESCE(\`badgeNumber\`, '')) LIKE ? OR LOWER(COALESCE(\`radioNumber\`, '')) LIKE ? OR LOWER(COALESCE(\`publicSafetyId\`, '')) LIKE ?
+            OR LOWER(COALESCE(\`district\`, '')) LIKE ? OR LOWER(COALESCE(\`employmentType\`, '')) LIKE ? OR LOWER(COALESCE(\`status\`, '')) LIKE ?
+            OR LOWER(COALESCE(\`supervisor\`, '')) LIKE ? OR LOWER(COALESCE(\`personalPhoneNumber\`, '')) LIKE ? OR LOWER(COALESCE(\`departmentPhoneNumber\`, '')) LIKE ?
           )`
         );
 
-        const likeTerm = `%${trimmedSearchTerm}%`;
+        const likeTerm = `%${trimmedSearchTerm.toLowerCase()}%`;
         params.push(
           likeTerm,
           likeTerm,
