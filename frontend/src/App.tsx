@@ -1755,52 +1755,96 @@ function WelcomeSplash({
   onStart: () => void;
   onLater: () => void;
 }) {
+  const welcomeName = account.displayName || account.email;
+  const tourHighlights = [
+    { label: 'Find people', detail: 'Search profiles, districts, and contact details.', Icon: Search },
+    { label: 'Work faster', detail: 'Open messages, calendar, and dock tools quickly.', Icon: CalendarDays },
+    { label: 'Report issues', detail: 'Send bugs and feedback during the beta.', Icon: Bug },
+  ];
+
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-primary-950/90 to-slate-900/95 px-4 py-8">
-      <div className="pointer-events-none absolute inset-0 opacity-60">
-        <div className="absolute left-8 top-10 h-40 w-40 rounded-full bg-primary-500/20 blur-3xl animate-welcome-glow" />
-        <div className="absolute right-12 top-24 h-28 w-28 rounded-full bg-cyan-400/15 blur-3xl animate-welcome-glow" />
-        <div className="absolute left-1/2 top-1/4 h-72 w-72 -translate-x-1/2 rounded-full bg-white/5 blur-3xl" />
+    <div className="fixed inset-0 z-[95] flex items-center justify-center overflow-hidden bg-primary-500 px-4 py-8 text-white">
+      <div className="pointer-events-none absolute inset-0 welcome-grid opacity-55" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(156,134,92,0.34),transparent_30%),radial-gradient(circle_at_82%_18%,rgba(255,255,255,0.15),transparent_24%),linear-gradient(135deg,rgba(16,38,70,0.96),rgba(10,19,32,0.98))]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-white/10 to-transparent" />
+      <div className="pointer-events-none absolute inset-0 welcome-scanline" />
+
+      <div className="pointer-events-none absolute inset-0 opacity-80">
+        <div className="absolute -left-16 top-16 h-72 w-72 rounded-full bg-accent/25 blur-3xl animate-welcome-glow" />
+        <div className="absolute right-[-4rem] top-24 h-60 w-60 rounded-full bg-blue-300/15 blur-3xl animate-welcome-glow" />
+        <div className="absolute bottom-[-6rem] left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
       </div>
 
-      <div className="relative w-full max-w-3xl overflow-hidden rounded-[2rem] border border-white/10 bg-white/95 p-8 shadow-[0_35px_120px_rgba(15,23,42,0.32)] ring-1 ring-white/10 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 dark:shadow-[0_35px_120px_rgba(15,23,42,0.6)] animate-welcome-pop">
-        <div className="mb-6 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-slate-950 dark:text-white sm:text-5xl">
-              Welcome to Shield
+      <div className="relative w-full max-w-4xl overflow-hidden rounded-2xl border border-white/15 bg-white/[0.97] text-gray-900 shadow-[0_35px_120px_rgba(0,0,0,0.38)] ring-1 ring-white/20 backdrop-blur-xl dark:bg-gray-950/[0.96] dark:text-gray-100 animate-welcome-pop">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-accent via-white to-accent" />
+        <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)]">
+          <div className="relative overflow-hidden bg-primary-500 p-7 text-white">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(156,134,92,0.36),transparent_34%),linear-gradient(160deg,rgba(255,255,255,0.08),transparent_44%)]" />
+            <div className="relative flex min-h-full flex-col justify-between gap-8">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.24em] text-blue-100">First Login</p>
+                <div className="mt-8 flex justify-center">
+                  <div className="relative flex h-32 w-32 items-center justify-center rounded-3xl bg-white text-primary-500 shadow-[0_28px_90px_rgba(0,0,0,0.26)] welcome-shield-float">
+                    <div className="absolute -inset-4 rounded-[2rem] border border-accent/45 animate-welcome-ring" />
+                    <div className="absolute -inset-8 rounded-[2.5rem] border border-white/15" />
+                    <Shield size={58} className="relative z-10" />
+                  </div>
+                </div>
+              </div>
+              <div className="relative rounded-lg border border-white/15 bg-white/10 p-4 backdrop-blur">
+                <p className="text-sm font-bold">SHIELD is ready</p>
+                <p className="mt-2 text-sm leading-6 text-blue-100">
+                  Your secure workspace is set up. The guide will walk you through the areas that matter first.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-7 sm:p-9">
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-accent">Welcome to SHIELD</p>
+            <h1 className="mt-3 text-4xl font-extrabold leading-tight tracking-normal text-gray-950 dark:text-white sm:text-5xl">
+              Welcome, {welcomeName}
             </h1>
-          </div>
-          <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-primary-500 text-white shadow-[0_25px_80px_rgba(59,130,246,0.35)] ring-2 ring-amber-300/80 animate-shield-flash">
-            <div className="absolute inset-0 rounded-3xl border border-amber-300/90" />
-            <Shield size={32} className="relative z-10" />
-          </div>
-        </div>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-gray-600 dark:text-gray-300">
+              Before you start working, take a quick guided tour of the dashboard, navigation, notifications, messages, settings, and quick launch dock.
+            </p>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
+              SHIELD is in beta. If something feels off, use Report a Bug so admins can review and track it.
+            </p>
 
-        <p className="text-base leading-7 text-slate-600 dark:text-slate-300">
-          {account.displayName
-            ? `Hello ${account.displayName}, your SHIELD workspace is ready.`
-            : `Hello ${account.email}, your SHIELD workspace is ready.`}
-        </p>
-        <p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-300">
-          Welcome to the new Shield! To make sure you have a good understanding of how Shield works, it is strongly recommended you use the guide to find your way around.
-          Shield is currently in a beta phase so please report any bugs and provide feedback using the bug tracker.
-        </p>
+            <div className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {tourHighlights.map(({ label, detail, Icon }, index) => (
+                <div
+                  key={label}
+                  className="welcome-feature-card rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900"
+                  style={{ animationDelay: `${130 + index * 90}ms` }}
+                >
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded bg-accent/15 text-accent">
+                    <Icon size={18} />
+                  </div>
+                  <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{label}</p>
+                  <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{detail}</p>
+                </div>
+              ))}
+            </div>
 
-        <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={onLater}
-            className="btn-secondary w-full sm:w-auto"
-          >
-            Maybe later
-          </button>
-          <button
-            type="button"
-            onClick={onStart}
-            className="btn-primary w-full sm:w-auto"
-          >
-            Start the guide
-          </button>
+            <div className="mt-9 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                type="button"
+                onClick={onLater}
+                className="btn-secondary w-full sm:w-auto"
+              >
+                Maybe later
+              </button>
+              <button
+                type="button"
+                onClick={onStart}
+                className="btn-primary w-full shadow-lg shadow-primary-500/20 sm:w-auto"
+              >
+                Start the guide
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
