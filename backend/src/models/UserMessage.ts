@@ -17,10 +17,12 @@ export interface UserMessage {
   senderEmail?: string;
   senderRank?: string;
   senderProfilePictureUrl?: string;
+  senderLastSeenAt?: Date | null;
   recipientName?: string;
   recipientEmail?: string;
   recipientRank?: string;
   recipientProfilePictureUrl?: string;
+  recipientLastSeenAt?: Date | null;
   senderReceivesMessages?: boolean;
   recipientReceivesMessages?: boolean;
 }
@@ -40,10 +42,12 @@ interface UserMessageRow extends RowDataPacket {
   senderEmail?: string;
   senderRank?: string;
   senderProfilePictureUrl?: string;
+  senderLastSeenAt?: Date | null;
   recipientName?: string;
   recipientEmail?: string;
   recipientRank?: string;
   recipientProfilePictureUrl?: string;
+  recipientLastSeenAt?: Date | null;
   senderReceivesMessages?: boolean | number;
   recipientReceivesMessages?: boolean | number;
 }
@@ -64,10 +68,12 @@ function toUserMessage(row: UserMessageRow): UserMessage {
     senderEmail: row.senderEmail,
     senderRank: row.senderRank,
     senderProfilePictureUrl: row.senderProfilePictureUrl,
+    senderLastSeenAt: row.senderLastSeenAt,
     recipientName: row.recipientName,
     recipientEmail: row.recipientEmail,
     recipientRank: row.recipientRank,
     recipientProfilePictureUrl: row.recipientProfilePictureUrl,
+    recipientLastSeenAt: row.recipientLastSeenAt,
     senderReceivesMessages: row.senderReceivesMessages === undefined ? undefined : Boolean(row.senderReceivesMessages),
     recipientReceivesMessages: row.recipientReceivesMessages === undefined ? undefined : Boolean(row.recipientReceivesMessages),
   };
@@ -124,11 +130,13 @@ export class UserMessageModel {
           s.email as senderEmail,
           s.rank as senderRank,
           s.profilePictureUrl as senderProfilePictureUrl,
+          s.lastSeenAt as senderLastSeenAt,
           s.receivesMessages as senderReceivesMessages,
           COALESCE(r.displayName, CONCAT(r.firstName, ' ', r.lastName), r.email) as recipientName,
           r.email as recipientEmail,
           r.rank as recipientRank,
           r.profilePictureUrl as recipientProfilePictureUrl,
+          r.lastSeenAt as recipientLastSeenAt,
           r.receivesMessages as recipientReceivesMessages
         FROM user_messages m
         LEFT JOIN users s ON s.id = m.senderAccountId
@@ -156,11 +164,13 @@ export class UserMessageModel {
           s.email as senderEmail,
           s.rank as senderRank,
           s.profilePictureUrl as senderProfilePictureUrl,
+          s.lastSeenAt as senderLastSeenAt,
           s.receivesMessages as senderReceivesMessages,
           COALESCE(r.displayName, CONCAT(r.firstName, ' ', r.lastName), r.email) as recipientName,
           r.email as recipientEmail,
           r.rank as recipientRank,
           r.profilePictureUrl as recipientProfilePictureUrl,
+          r.lastSeenAt as recipientLastSeenAt,
           r.receivesMessages as recipientReceivesMessages
         FROM user_messages m
         LEFT JOIN users s ON s.id = m.senderAccountId
@@ -187,11 +197,13 @@ export class UserMessageModel {
           s.email as senderEmail,
           s.rank as senderRank,
           s.profilePictureUrl as senderProfilePictureUrl,
+          s.lastSeenAt as senderLastSeenAt,
           s.receivesMessages as senderReceivesMessages,
           COALESCE(r.displayName, CONCAT(r.firstName, ' ', r.lastName), r.email) as recipientName,
           r.email as recipientEmail,
           r.rank as recipientRank,
           r.profilePictureUrl as recipientProfilePictureUrl,
+          r.lastSeenAt as recipientLastSeenAt,
           r.receivesMessages as recipientReceivesMessages
         FROM user_messages m
         LEFT JOIN users s ON s.id = m.senderAccountId

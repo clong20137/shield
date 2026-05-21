@@ -16,6 +16,7 @@ interface MessageThread {
   contactEmail: string;
   contactRank: string;
   contactProfilePictureUrl: string;
+  contactLastSeenAt: string;
   contactReceivesMessages: boolean;
   subject: string;
   latestMessage: UserMessage;
@@ -41,7 +42,15 @@ function formatMessageTime(value: string): string {
 }
 
 function getPresenceLabel(value: string): string {
+  if (!value) {
+    return 'Last online unavailable';
+  }
+
   const lastActivityTime = new Date(value).getTime();
+  if (Number.isNaN(lastActivityTime)) {
+    return 'Last online unavailable';
+  }
+
   const isActive = Date.now() - lastActivityTime <= 5 * 60 * 1000;
 
   return isActive ? 'Active' : `Last online ${formatMessageTime(value)}`;
@@ -73,6 +82,12 @@ function getContactProfilePicture(message: UserMessage, currentUserId: string): 
   return message.senderAccountId === currentUserId
     ? message.recipientProfilePictureUrl || ''
     : message.senderProfilePictureUrl || '';
+}
+
+function getContactLastSeenAt(message: UserMessage, currentUserId: string): string {
+  return message.senderAccountId === currentUserId
+    ? message.recipientLastSeenAt || message.createdAt
+    : message.senderLastSeenAt || message.createdAt;
 }
 
 function getContactReceivesMessages(message: UserMessage, currentUserId: string): boolean {
@@ -167,6 +182,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
     eventSource?.addEventListener('message-read', handleRealtimeMessageUpdate);
     eventSource?.addEventListener('message-archived', handleRealtimeMessageUpdate);
     eventSource?.addEventListener('message-deleted', handleRealtimeMessageUpdate);
+    eventSource?.addEventListener('presence-updated', handleRealtimeMessageUpdate);
     eventSource?.addEventListener('error', (event) => {
       console.error('Message realtime connection error:', event);
     });
@@ -225,6 +241,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
           contactEmail: getContactEmail(message, currentUser.id),
           contactRank: getContactRank(message, currentUser.id),
           contactProfilePictureUrl: getContactProfilePicture(message, currentUser.id),
+          contactLastSeenAt: getContactLastSeenAt(message, currentUser.id),
           contactReceivesMessages: getContactReceivesMessages(message, currentUser.id),
           subject,
           latestMessage: message,
@@ -236,6 +253,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
 
       existingThread.messages.push(message);
       existingThread.latestMessage = message;
+      existingThread.contactLastSeenAt = getContactLastSeenAt(message, currentUser.id);
       existingThread.subject = existingThread.subject || subject;
       if (message.recipientUserId === currentUser.id && !message.isRead) {
         existingThread.unreadCount += 1;
@@ -596,7 +614,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <RankBadge rank={selectedThread.contactRank} compact subtle />
                       <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                        {getPresenceLabel(selectedThread.latestMessage.createdAt)}
+                        {getPresenceLabel(selectedThread.contactLastSeenAt)}
                       </span>
                     </div>
                     {!selectedThreadAcceptsMessages && (

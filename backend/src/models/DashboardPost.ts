@@ -369,6 +369,28 @@ export class DashboardPostModel {
     return comments.find((comment) => comment.id === commentId) || null;
   }
 
+  static async unflagComment(postId: string, commentId: string): Promise<DashboardPostComment | null> {
+    const conn = await pool.getConnection();
+    try {
+      const now = new Date();
+      const [result] = await conn.query<ResultSetHeader>(
+        `UPDATE dashboard_post_comments
+         SET \`isFlagged\` = 0, \`flaggedBy\` = NULL, \`flaggedAt\` = NULL, \`flagReason\` = NULL, \`updatedAt\` = ?
+         WHERE \`id\` = ? AND \`postId\` = ?`,
+        [now, commentId, postId],
+      );
+
+      if (result.affectedRows === 0) {
+        return null;
+      }
+    } finally {
+      conn.release();
+    }
+
+    const comments = await DashboardPostModel.listComments(postId);
+    return comments.find((comment) => comment.id === commentId) || null;
+  }
+
   static async setCommentPinned(postId: string, commentId: string, pinnedBy: string, isPinned: boolean): Promise<DashboardPostComment | null> {
     const conn = await pool.getConnection();
     try {

@@ -95,6 +95,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const globalQuery = useMemo(() => searchParams.get('q') ?? '', [searchParams]);
   const selectedUserId = useMemo(() => searchParams.get('userId') ?? '', [searchParams]);
   const isAdministrator = currentUser?.role === 'administrator';
+  const canEditProfilePictures = isAdministrator || currentUser?.permissions?.includes('users:profile-picture');
 
   const handleSearch = async (query: string) => {
     setCurrentQuery(query);
@@ -180,6 +181,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   };
 
   const updateProfilePicture = () => {
+    if (!canEditProfilePictures) {
+      onToast('error', 'Profile photo permission required.');
+      return;
+    }
+
     profilePictureInputRef.current?.click();
   };
 
@@ -187,6 +193,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     const file = event.target.files?.[0];
 
     if (!file || !editingUser) {
+      return;
+    }
+
+    if (!canEditProfilePictures) {
+      onToast('error', 'Profile photo permission required.');
       return;
     }
 
@@ -212,6 +223,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
 
   const removeProfilePicture = async () => {
     if (!editingUser) {
+      return;
+    }
+
+    if (!canEditProfilePictures) {
+      onToast('error', 'Profile photo permission required.');
       return;
     }
 
@@ -401,7 +417,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
               <button
                 type="button"
                 onClick={updateProfilePicture}
-                className="mb-6 flex items-center gap-4 rounded border border-gray-200 bg-gray-50 p-4 text-left hover:border-accent dark:border-gray-800 dark:bg-gray-950"
+                disabled={!canEditProfilePictures}
+                className="mb-6 flex items-center gap-4 rounded border border-gray-200 bg-gray-50 p-4 text-left hover:border-accent disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-800 dark:bg-gray-950"
               >
                 {editForm.profilePictureUrl ? (
                   <img
@@ -421,7 +438,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                     Profile Picture
                   </p>
                   <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {isUploadingPicture ? 'Uploading picture...' : 'Click to upload or change the profile picture.'}
+                    {isUploadingPicture ? 'Uploading picture...' : canEditProfilePictures ? 'Click to upload or change the profile picture.' : 'Profile photo permission required.'}
                   </p>
                 </div>
               </button>

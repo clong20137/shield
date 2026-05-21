@@ -221,6 +221,21 @@ export class DashboardPostController {
     }
   }
 
+  static async unflagComment(req: Request, res: Response) {
+    try {
+      const comment = await DashboardPostModel.unflagComment(req.params.id, req.params.commentId);
+      if (!comment) {
+        return res.status(404).json({ error: 'Comment not found' });
+      }
+
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: req.params.id });
+      res.json(comment);
+    } catch (error) {
+      console.error('Dashboard post comment unflag error:', error);
+      res.status(500).json({ error: 'Failed to unflag comment' });
+    }
+  }
+
   static async setCommentPinned(req: Request, res: Response) {
     try {
       const account = await getSessionAccount(req);

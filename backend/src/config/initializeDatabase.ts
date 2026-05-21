@@ -77,6 +77,7 @@ export async function initializeDatabase() {
       \`lastName\` VARCHAR(100) NOT NULL,
       \`email\` VARCHAR(255),
       \`profilePictureUrl\` TEXT,
+      \`lastSeenAt\` DATETIME,
       \`displayName\` VARCHAR(100),
       \`passwordHash\` VARCHAR(255),
       \`role\` VARCHAR(100) NOT NULL DEFAULT 'user',
@@ -122,6 +123,7 @@ export async function initializeDatabase() {
 
   await ensureColumn('users', 'email', '`email` VARCHAR(255)');
   await ensureColumn('users', 'profilePictureUrl', '`profilePictureUrl` TEXT');
+  await ensureColumn('users', 'lastSeenAt', '`lastSeenAt` DATETIME');
   await ensureColumn('users', 'displayName', '`displayName` VARCHAR(100)');
   await ensureColumn('users', 'passwordHash', '`passwordHash` VARCHAR(255)');
   await ensureColumn('users', 'role', "`role` VARCHAR(100) NOT NULL DEFAULT 'user'");
@@ -225,13 +227,13 @@ export async function initializeDatabase() {
   await pool.query(`
     INSERT IGNORE INTO roles (\`id\`, \`name\`, \`permissions\`)
     VALUES
-      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","devices:manage","calendar:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","dashboard:manage","bugs:manage"]'),
+      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","users:profile-picture","devices:manage","calendar:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","dashboard:manage","bugs:manage"]'),
       ('role-user', 'user', '["users:view","calendar:manage","messages:send"]')
   `);
 
   await pool.query(`
     UPDATE roles
-    SET \`permissions\` = '["users:view","users:create","users:edit","devices:manage","calendar:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","dashboard:manage","bugs:manage"]'
+    SET \`permissions\` = '["users:view","users:create","users:edit","users:profile-picture","devices:manage","calendar:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","dashboard:manage","bugs:manage"]'
     WHERE \`name\` = 'administrator'
   `);
 

@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { UserMessage } from '../models/UserMessage';
 
-export type MessageEventType = 'message-created' | 'message-read' | 'message-archived' | 'message-deleted';
+export type MessageEventType = 'message-created' | 'message-read' | 'message-archived' | 'message-deleted' | 'presence-updated';
 
 interface MessageEventPayload {
   type: MessageEventType;
@@ -50,6 +50,12 @@ export function broadcastMessageEvent(accountIds: string[], payload: MessageEven
       return;
     }
 
+    accountClients.forEach((client) => sendEvent(client, payload));
+  });
+}
+
+export function broadcastMessageEventToAll(payload: MessageEventPayload) {
+  clients.forEach((accountClients) => {
     accountClients.forEach((client) => sendEvent(client, payload));
   });
 }

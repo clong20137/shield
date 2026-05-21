@@ -11,6 +11,7 @@ export interface AuthAccount {
   displayName: string;
   profilePictureUrl: string;
   role: string;
+  permissions?: string[];
   district: string;
   isActive: boolean;
   receivesMessages: boolean;
@@ -601,6 +602,18 @@ export class AuthAccountModel {
       } catch {
         return [];
       }
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async updateLastSeen(accountId: string): Promise<void> {
+    const conn = await pool.getConnection();
+    try {
+      await conn.query<ResultSetHeader>(
+        'UPDATE users SET `lastSeenAt` = ? WHERE `id` = ?',
+        [new Date(), accountId],
+      );
     } finally {
       conn.release();
     }

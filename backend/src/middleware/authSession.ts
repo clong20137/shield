@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
+import { AuthAccountModel } from '../models/AuthAccount';
 import { AuthSessionModel } from '../models/AuthSession';
 
 export function getBearerToken(req: Request): string | null {
@@ -38,6 +39,10 @@ export function requireAuthenticated() {
       if (!account) {
         return res.status(401).json({ error: 'Sign in required' });
       }
+
+      void AuthAccountModel.updateLastSeen(account.id).catch((error) => {
+        console.error('Failed to update last seen:', error);
+      });
 
       return next();
     } catch (error) {

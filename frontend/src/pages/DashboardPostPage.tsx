@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { Flag, MessageSquare, Pin, PinOff, Send, Smile, Trash2, X } from 'lucide-react';
 import { UserDetail } from '../components/UserDetail';
-import { AuthAccount, DashboardPost, DashboardPostComment, User, dashboardPostService, getAssetUrl, handleAssetImageError, userService } from '../services/api';
+import { AuthAccount, DashboardPost, DashboardPostComment, User, dashboardPostService, getAppEventsUrl, getAssetUrl, handleAssetImageError, userService } from '../services/api';
 
 interface DashboardPostPageProps {
   currentUser: AuthAccount | null;
@@ -56,6 +56,26 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
     void loadPost();
   }, [postId]);
 
+  useEffect(() => {
+    if (!postId) return;
+
+    const eventsUrl = getAppEventsUrl();
+    const eventSource = eventsUrl ? new EventSource(eventsUrl) : null;
+    const handleDashboardUpdate = (event: Event) => {
+      try {
+        const payload = JSON.parse((event as MessageEvent).data || '{}') as { entityId?: string };
+        if (!payload.entityId || payload.entityId === postId) {
+          void loadPost();
+        }
+      } catch {
+        void loadPost();
+      }
+    };
+
+    eventSource?.addEventListener('dashboard-updated', handleDashboardUpdate);
+    return () => eventSource?.close();
+  }, [postId]);
+
   const submitComment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!post || !commentBody.trim()) return;
@@ -85,6 +105,21 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
     } catch (err) {
       console.error('Failed to flag comment:', err);
       setError('Failed to flag comment.');
+    } finally {
+      setModeratingCommentId(null);
+    }
+  };
+
+  const unflagComment = async (comment: DashboardPostComment) => {
+    if (!post) return;
+    setModeratingCommentId(comment.id);
+    setError(null);
+    try {
+      const response = await dashboardPostService.unflagComment(post.id, comment.id);
+      setComments((items) => sortComments(items.map((item) => (item.id === comment.id ? response.data : item))));
+    } catch (err) {
+      console.error('Failed to unflag comment:', err);
+      setError('Failed to unflag comment.');
     } finally {
       setModeratingCommentId(null);
     }
@@ -272,9 +307,15 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
                     {comment.isFlagged && <p className="mt-1 text-xs font-bold uppercase text-amber-600">Flagged for review</p>}
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => flagComment(comment)} disabled={moderatingCommentId === comment.id || comment.isFlagged} className="btn-secondary" aria-label="Flag comment" title={comment.isFlagged ? 'Already Flagged' : 'Flag Comment'}>
-                      <Flag size={16} />
-                    </button>
+                    {comment.isFlagged && isAdministrator ? (
+                      <button type="button" onClick={() => unflagComment(comment)} disabled={moderatingCommentId === comment.id} className="btn-secondary" aria-label="Unflag comment" title="Unflag Comment">
+                        <Flag size={16} />
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => flagComment(comment)} disabled={moderatingCommentId === comment.id || comment.isFlagged} className="btn-secondary" aria-label="Flag comment" title={comment.isFlagged ? 'Already Flagged' : 'Flag Comment'}>
+                        <Flag size={16} />
+                      </button>
+                    )}
                     {isAdministrator && (
                       <>
                         <button type="button" onClick={() => pinComment(comment)} disabled={moderatingCommentId === comment.id} className="btn-secondary" aria-label={comment.isPinned ? 'Unpin comment' : 'Pin comment'} title={comment.isPinned ? 'Unpin Comment' : 'Pin Comment'}>

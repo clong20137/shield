@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, ChevronLeft, ChevronRight, Heart, KeyRound, LucideIcon, MapPinned, Pencil, PartyPopper, Plus, Save, Send, ShieldCheck, ThumbsUp, Trash2, UserCheck, Users, UserX, X } from 'lucide-react';
+import { AlertCircle, ChevronLeft, ChevronRight, Heart, LucideIcon, Pencil, PartyPopper, Plus, Save, Send, ThumbsUp, Trash2, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, reportService, SystemStatistics } from '../services/api';
+import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>;
@@ -791,69 +791,7 @@ function DashboardNews({
   );
 }
 
-function SystemOverview({ stats }: { stats: SystemStatistics }) {
-  const activePercentage = stats.totalUsers
-    ? Math.round((Number(stats.activeUsers || 0) / Number(stats.totalUsers || 1)) * 100)
-    : 0;
-  const overviewItems = [
-    { label: 'Total Users', value: stats.totalUsers || 0, Icon: Users },
-    { label: 'Active Users', value: stats.activeUsers || 0, Icon: UserCheck },
-    { label: 'Inactive Users', value: stats.inactiveUsers || 0, Icon: UserX },
-    { label: 'Login Accounts', value: stats.totalAccounts || 0, Icon: KeyRound },
-  ];
-
-  return (
-    <section className="mb-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2>System Overview</h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Live account health and access summary.
-          </p>
-        </div>
-        <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold uppercase text-accent">
-          {activePercentage}% Active
-        </span>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {overviewItems.map(({ label, value, Icon }) => (
-          <div key={label} className="rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
-            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded bg-accent/10 text-accent">
-              <Icon size={19} />
-            </div>
-            <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">{label}</p>
-            <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-gray-100">{value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="rounded border border-gray-200 p-4 dark:border-gray-800">
-          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-200">
-            <ShieldCheck size={17} className="text-accent" />
-            Administrator Access
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.administratorAccounts || 0}</p>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {stats.standardAccounts || 0} standard user accounts
-          </p>
-        </div>
-        <div className="rounded border border-gray-200 p-4 dark:border-gray-800">
-          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-200">
-            <MapPinned size={17} className="text-accent" />
-            Coverage
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalDistricts || 0}</p>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Districts represented in user profiles</p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUser }) => {
-  const [stats, setStats] = useState<SystemStatistics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
@@ -886,9 +824,6 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
     }
     setError(null);
     try {
-      const statsRes = await reportService.getStatistics();
-
-      setStats(statsRes.data);
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
       setError('Failed to load dashboard data. Check that the backend is running and MySQL is available.');
@@ -925,8 +860,6 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
       </div>
 
       {error && <div className="error">{error}</div>}
-
-      {stats && <SystemOverview stats={stats} />}
 
       <DashboardNews currentUser={currentUser} />
     </div>

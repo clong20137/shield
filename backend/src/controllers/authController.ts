@@ -15,6 +15,7 @@ const allowedPermissions = [
   'users:view',
   'users:create',
   'users:edit',
+  'users:profile-picture',
   'devices:manage',
   'calendar:manage',
   'reports:trooper-dailies',
@@ -59,6 +60,14 @@ async function canListAccounts(account?: { id: string; role: string } | null): P
 
   const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
   return permissions.includes('roles:manage') || permissions.includes('devices:manage');
+}
+
+async function withPermissions<T extends { id: string; role: string }>(account: T): Promise<T & { permissions: string[] }> {
+  const permissions = account.role === 'administrator'
+    ? [...allowedPermissions]
+    : await AuthAccountModel.getPermissionsForAccount(account.id);
+
+  return { ...account, permissions };
 }
 
 const registrationModes = ['public', 'invite-only', 'disabled'] as const;
@@ -185,7 +194,7 @@ export class AuthController {
       const token = await AuthSessionModel.createSession(account.id);
       broadcastAppEvent({ type: 'user-updated', entityId: account.id });
       broadcastAppEvent({ type: 'dashboard-updated', entityId: account.id });
-      res.status(201).json({ account, token });
+      res.status(201).json({ account: await withPermissions(account), token });
     } catch (error) {
       if (isDuplicateEmailError(error)) {
         return res.status(409).json({ error: 'An account already exists for that email' });
@@ -237,7 +246,7 @@ export class AuthController {
       }
 
       const token = await AuthSessionModel.createSession(result.account.id);
-      res.json({ account: result.account, token });
+      res.json({ account: await withPermissions(result.account), token });
     } catch (error) {
       console.error('Login error:', error);
       res.status(500).json({ error: 'Failed to sign in' });
@@ -356,7 +365,7 @@ export class AuthController {
         return res.status(401).json({ error: 'Session expired or invalid' });
       }
 
-      res.json({ account });
+      res.json({ account: await withPermissions(account) });
     } catch (error) {
       console.error('Get session error:', error);
       res.status(500).json({ error: 'Failed to load session' });
@@ -468,7 +477,7 @@ export class AuthController {
         return res.status(400).json({ error: 'Invalid verification code' });
       }
 
-      res.json({ account });
+      res.json({ account: await withPermissions(account) });
     } catch (error) {
       console.error('Enable 2FA error:', error);
       res.status(500).json({ error: 'Failed to enable 2FA' });
@@ -490,7 +499,7 @@ export class AuthController {
         return res.status(401).json({ error: 'Password is incorrect' });
       }
 
-      res.json({ account });
+      res.json({ account: await withPermissions(account) });
     } catch (error) {
       console.error('Disable 2FA error:', error);
       res.status(500).json({ error: 'Failed to disable 2FA' });
@@ -633,9 +642,13 @@ export class AuthController {
       }
 
       const account = await AuthAccountModel.updateRole(accountId, cleanRole);
+      if (!account) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+
       broadcastAppEvent({ type: 'permission-updated', entityId: accountId });
       broadcastAppEvent({ type: 'user-updated', entityId: accountId });
-      res.json({ account });
+      res.json({ account: await withPermissions(account) });
     } catch (error) {
       console.error('Update account role error:', error);
       res.status(500).json({ error: 'Failed to update account role' });
@@ -663,7 +676,7 @@ export class AuthController {
       }
 
       broadcastAppEvent({ type: 'user-updated', entityId: accountId });
-      res.json({ account });
+      res.json({ account: await withPermissions(account) });
     } catch (error) {
       console.error('Update message preferences error:', error);
       res.status(500).json({ error: 'Failed to update message preferences' });
@@ -685,7 +698,7 @@ export class AuthController {
         return res.status(404).json({ error: 'Account not found' });
       }
 
-      res.json({ account });
+      res.json({ account: await withPermissions(account) });
     } catch (error) {
       console.error('Complete onboarding error:', error);
       res.status(500).json({ error: 'Failed to complete guide' });

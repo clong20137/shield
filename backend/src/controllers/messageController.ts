@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { AuthSessionModel } from '../models/AuthSession';
 import { UserMessageModel } from '../models/UserMessage';
-import { addMessageEventClient, broadcastMessageEvent } from '../services/messageEvents';
+import { addMessageEventClient, broadcastMessageEvent, broadcastMessageEventToAll } from '../services/messageEvents';
 import { cleanMultiline, cleanString } from '../utils/validation';
 import { isWellFormedSessionToken } from '../middleware/authSession';
 import { parsePagination } from '../utils/pagination';
@@ -17,6 +17,8 @@ export class MessageController {
         return res.status(401).json({ error: 'Session expired or invalid' });
       }
 
+      await AuthAccountModel.updateLastSeen(account.id);
+      broadcastMessageEventToAll({ type: 'presence-updated', actorAccountId: account.id });
       addMessageEventClient(account.id, res);
     } catch (error) {
       console.error('Message events error:', error);

@@ -211,6 +211,7 @@ export interface AuthAccount {
   displayName: string;
   profilePictureUrl: string;
   role: string;
+  permissions?: string[];
   district: string;
   isActive: boolean;
   receivesMessages: boolean;
@@ -380,10 +381,12 @@ export interface UserMessage {
   senderEmail?: string;
   senderRank?: string;
   senderProfilePictureUrl?: string;
+  senderLastSeenAt?: string | null;
   recipientName?: string;
   recipientEmail?: string;
   recipientRank?: string;
   recipientProfilePictureUrl?: string;
+  recipientLastSeenAt?: string | null;
   senderReceivesMessages?: boolean;
   recipientReceivesMessages?: boolean;
 }
@@ -732,6 +735,9 @@ export const dashboardPostService = {
 
   flagComment: (id: string, commentId: string, reason: string) =>
     api.post<DashboardPostComment>(`/dashboard-posts/${id}/comments/${commentId}/flag`, { reason }),
+
+  unflagComment: (id: string, commentId: string) =>
+    api.delete<DashboardPostComment>(`/dashboard-posts/${id}/comments/${commentId}/flag`),
 
   pinComment: (id: string, commentId: string, isPinned: boolean) =>
     api.put<DashboardPostComment>(`/dashboard-posts/${id}/comments/${commentId}/pin`, { isPinned }),
