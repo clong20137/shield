@@ -3,7 +3,7 @@ import { CalendarEntryModel } from '../models/CalendarEntry';
 import { CalendarShortcutModel } from '../models/CalendarShortcut';
 import { AuditLogModel } from '../models/AuditLog';
 import { getSessionAccount } from '../middleware/authSession';
-import { broadcastAccountEvent } from '../services/appEvents';
+import { broadcastAppEvent } from '../services/appEvents';
 import { cleanRecord, cleanString, isOneOf, isValidHexColor, isValidIsoDate } from '../utils/validation';
 import { parsePagination } from '../utils/pagination';
 
@@ -280,7 +280,7 @@ export class CalendarController {
         details: JSON.stringify(entry),
       });
 
-      broadcastAccountEvent(accountId, { type: 'calendar-updated', entityId: entry.id });
+      broadcastAppEvent({ type: 'calendar-updated', entityId: entry.id });
       res.status(201).json(entry);
     } catch (error) {
       if (typeof error === 'object' && error !== null && (error as { statusCode?: number }).statusCode === 403) {
@@ -325,7 +325,7 @@ export class CalendarController {
         details: JSON.stringify(entry),
       });
 
-      broadcastAccountEvent(accountId, { type: 'calendar-updated', entityId: entry.id });
+      broadcastAppEvent({ type: 'calendar-updated', entityId: entry.id });
       res.json(entry);
     } catch (error) {
       if (typeof error === 'object' && error !== null && (error as { statusCode?: number }).statusCode === 403) {
@@ -361,7 +361,7 @@ export class CalendarController {
         details: null,
       });
 
-      broadcastAccountEvent(accountId, { type: 'calendar-updated', entityId: req.params.id });
+      broadcastAppEvent({ type: 'calendar-updated', entityId: req.params.id });
       res.json({ message: 'Calendar entry deleted successfully' });
     } catch (error) {
       if (typeof error === 'object' && error !== null && (error as { statusCode?: number }).statusCode === 403) {

@@ -107,16 +107,33 @@ export function AccountSettingsPage({
     loadSessions();
   }, []);
 
-  useEffect(() => {
+  const loadAssignedDevices = () => {
     setIsAssignedDevicesLoading(true);
-    deviceService.getAssignedToMe()
+    return deviceService.getAssignedToMe()
       .then((response) => setAssignedDevices(response.data))
       .catch((error) => {
         console.error('Failed to load assigned devices:', error);
         onToast('error', getErrorMessage(error, 'Failed to load assigned devices.'));
       })
       .finally(() => setIsAssignedDevicesLoading(false));
+  };
+
+  useEffect(() => {
+    void loadAssignedDevices();
   }, [getErrorMessage, onToast]);
+
+  useEffect(() => {
+    const handleDeviceUpdate = () => {
+      void loadAssignedDevices();
+    };
+
+    window.addEventListener('shield:device-updated', handleDeviceUpdate);
+    window.addEventListener('shield:user-updated', handleDeviceUpdate);
+    return () => {
+      window.removeEventListener('shield:device-updated', handleDeviceUpdate);
+      window.removeEventListener('shield:user-updated', handleDeviceUpdate);
+    };
+  }, [account.id]);
 
   const revokeSession = async (sessionId: string) => {
     setIsRevokingSessions(true);

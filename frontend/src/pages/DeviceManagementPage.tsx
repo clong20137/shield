@@ -141,6 +141,32 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     return () => window.removeEventListener('shield:device-updated', handleDeviceUpdate);
   }, []);
 
+  useEffect(() => {
+    const handleUserUpdate = () => {
+      void loadRegisteredUsers();
+    };
+
+    window.addEventListener('shield:user-updated', handleUserUpdate);
+    window.addEventListener('shield:permission-updated', handleUserUpdate);
+    return () => {
+      window.removeEventListener('shield:user-updated', handleUserUpdate);
+      window.removeEventListener('shield:permission-updated', handleUserUpdate);
+    };
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!detailDevice) {
+      return;
+    }
+
+    const handleDeviceDetailUpdate = () => {
+      void loadDeviceHistory(detailDevice);
+    };
+
+    window.addEventListener('shield:device-updated', handleDeviceDetailUpdate);
+    return () => window.removeEventListener('shield:device-updated', handleDeviceDetailUpdate);
+  }, [detailDevice?.id]);
+
   const loadRegisteredUsers = async () => {
     if (!currentUser) {
       setRegisteredUsers([]);

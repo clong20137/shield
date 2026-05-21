@@ -2346,6 +2346,16 @@ function App() {
       void loadBugReports();
       dispatchAppUpdate('bug-updated');
     };
+    const syncCurrentAccount = async () => {
+      try {
+        const response = await authService.getSession();
+        if (response.data.account) {
+          handleAccountUpdate(response.data.account);
+        }
+      } catch (err) {
+        console.error('Failed to refresh current account:', err);
+      }
+    };
 
     eventSource.addEventListener('notification-created', handleNotificationUpdate);
     eventSource.addEventListener('notification-updated', handleNotificationUpdate);
@@ -2370,7 +2380,19 @@ function App() {
     });
     eventSource.addEventListener('quick-launch-updated', handleRealtimeAppUpdate('quick-launch-updated'));
     eventSource.addEventListener('session-revoked', () => handleForcedLogout('Your account has been deactivated. Please contact an administrator.'));
-    eventSource.addEventListener('user-updated', handleRealtimeAppUpdate('user-updated'));
+    eventSource.addEventListener('user-updated', (event) => {
+      let payload: { entityId?: string } = {};
+      try {
+        payload = JSON.parse((event as MessageEvent).data || '{}') as { entityId?: string };
+      } catch {
+        payload = {};
+      }
+
+      if (!payload.entityId || payload.entityId === currentUser.id) {
+        void syncCurrentAccount();
+      }
+      dispatchAppUpdate('user-updated', payload);
+    });
     eventSource.addEventListener('error', (event) => {
       console.error('Application realtime connection error:', event);
     });

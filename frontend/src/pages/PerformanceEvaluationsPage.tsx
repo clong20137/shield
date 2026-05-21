@@ -267,7 +267,7 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage, com
     return () => window.removeEventListener('shield:performance-evaluation-updated', handleUpdate);
   }, []);
 
-  useEffect(() => {
+  const loadEvaluationAccounts = () => {
     authService.getAccounts(currentUser.id)
       .then((response) => {
         setAccounts(response.data.filter((account) => account.id !== currentUser.id));
@@ -277,6 +277,23 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage, com
         console.error('Failed to load accounts for evaluations:', error);
         setCanCreateCpar(currentUser.role === 'administrator');
       });
+  };
+
+  useEffect(() => {
+    loadEvaluationAccounts();
+  }, [currentUser.id, currentUser.role]);
+
+  useEffect(() => {
+    const handleUserUpdate = () => {
+      loadEvaluationAccounts();
+    };
+
+    window.addEventListener('shield:user-updated', handleUserUpdate);
+    window.addEventListener('shield:permission-updated', handleUserUpdate);
+    return () => {
+      window.removeEventListener('shield:user-updated', handleUserUpdate);
+      window.removeEventListener('shield:permission-updated', handleUserUpdate);
+    };
   }, [currentUser.id, currentUser.role]);
 
   const sentCount = useMemo(() => evaluations.filter((evaluation) => evaluation.status === 'Sent').length, [evaluations]);

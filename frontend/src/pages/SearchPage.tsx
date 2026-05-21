@@ -334,6 +334,46 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   }, [globalQuery]);
 
   useEffect(() => {
+    const handleRealtimeUserUpdate = async (event: Event) => {
+      let entityId = '';
+      try {
+        entityId = ((event as CustomEvent<{ entityId?: string }>).detail?.entityId || '').trim();
+      } catch {
+        entityId = '';
+      }
+
+      await handleSearch(currentQuery);
+
+      if (selectedUser && (!entityId || entityId === selectedUser.id)) {
+        userService.getById(selectedUser.id)
+          .then((response) => setSelectedUser(response.data as User))
+          .catch((err) => console.error('Failed to refresh selected user:', err));
+      }
+
+      if (editingUser && (!entityId || entityId === editingUser.id)) {
+        userService.getById(editingUser.id)
+          .then((response) => {
+            const updatedUser = response.data as User;
+            setEditingUser(updatedUser);
+            setEditForm(updatedUser);
+          })
+          .catch((err) => console.error('Failed to refresh editing user:', err));
+      }
+
+      if (!entityId || supervisorOptions.some((user) => user.id === entityId)) {
+        void loadUserEditOptions();
+      }
+    };
+
+    window.addEventListener('shield:user-updated', handleRealtimeUserUpdate);
+    window.addEventListener('shield:permission-updated', handleRealtimeUserUpdate);
+    return () => {
+      window.removeEventListener('shield:user-updated', handleRealtimeUserUpdate);
+      window.removeEventListener('shield:permission-updated', handleRealtimeUserUpdate);
+    };
+  }, [currentQuery, editingUser, selectedUser, supervisorOptions]);
+
+  useEffect(() => {
     if (!selectedUserId) {
       return;
     }

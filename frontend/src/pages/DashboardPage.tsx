@@ -811,10 +811,18 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
     window.addEventListener('shield:dashboard-updated', handleDashboardUpdate);
     window.addEventListener('shield:device-updated', handleDashboardUpdate);
     window.addEventListener('shield:calendar-updated', handleDashboardUpdate);
+    window.addEventListener('shield:mileage-updated', handleDashboardUpdate);
+    window.addEventListener('shield:performance-evaluation-updated', handleDashboardUpdate);
+    window.addEventListener('shield:permission-updated', handleDashboardUpdate);
+    window.addEventListener('shield:user-updated', handleDashboardUpdate);
     return () => {
       window.removeEventListener('shield:dashboard-updated', handleDashboardUpdate);
       window.removeEventListener('shield:device-updated', handleDashboardUpdate);
       window.removeEventListener('shield:calendar-updated', handleDashboardUpdate);
+      window.removeEventListener('shield:mileage-updated', handleDashboardUpdate);
+      window.removeEventListener('shield:performance-evaluation-updated', handleDashboardUpdate);
+      window.removeEventListener('shield:permission-updated', handleDashboardUpdate);
+      window.removeEventListener('shield:user-updated', handleDashboardUpdate);
     };
   }, [isAdministrator]);
 
