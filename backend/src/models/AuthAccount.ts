@@ -6,6 +6,8 @@ import pool from '../config/database';
 export interface AuthAccount {
   id: string;
   email: string;
+  firstName: string;
+  lastName: string;
   displayName: string;
   profilePictureUrl: string;
   role: string;
@@ -153,7 +155,9 @@ function toPublicAccount(account: AuthAccountRow): AuthAccount {
   return {
     id: account.id,
     email: account.email,
-    displayName: account.displayName || fallbackName || account.email,
+    firstName: account.firstName || '',
+    lastName: account.lastName || '',
+    displayName: fallbackName || account.displayName || account.email,
     profilePictureUrl: account.profilePictureUrl || '',
     role: account.role || 'user',
     district: account.district || '',
@@ -172,23 +176,6 @@ export interface LoginResult {
   failureReason?: 'inactive' | 'maintenance';
 }
 
-function splitDisplayName(displayName: string): { firstName: string; lastName: string } {
-  const parts = displayName.trim().split(/\s+/u).filter(Boolean);
-
-  if (parts.length === 0) {
-    return { firstName: 'SHIELD', lastName: 'User' };
-  }
-
-  if (parts.length === 1) {
-    return { firstName: parts[0], lastName: 'User' };
-  }
-
-  return {
-    firstName: parts[0],
-    lastName: parts.slice(1).join(' '),
-  };
-}
-
 export class AuthAccountModel {
   static async countAccounts(): Promise<number> {
     const conn = await pool.getConnection();
@@ -202,12 +189,15 @@ export class AuthAccountModel {
     }
   }
 
-  static async createAccount(email: string, password: string, displayName: string): Promise<AuthAccount> {
+  static async createAccount(email: string, password: string, firstName: string, lastName: string): Promise<AuthAccount> {
     const conn = await pool.getConnection();
     try {
       const id = uuidv4();
       const now = new Date();
       const normalizedEmail = normalizeEmail(email);
+      const cleanFirstName = firstName.trim();
+      const cleanLastName = lastName.trim();
+      const displayName = `${cleanFirstName} ${cleanLastName}`.trim();
       const passwordHash = hashPassword(password);
       const [accountCountRows] = await conn.query<RowDataPacket[]>(
         'SELECT COUNT(*) as count FROM users WHERE `passwordHash` IS NOT NULL'
@@ -227,18 +217,22 @@ export class AuthAccountModel {
       if (existingUser) {
         await conn.query<ResultSetHeader>(
           `UPDATE users SET
+            \`firstName\` = ?,
+            \`lastName\` = ?,
             \`displayName\` = ?,
             \`passwordHash\` = ?,
             \`role\` = ?,
             \`updatedAt\` = ?
           WHERE \`id\` = ?`,
-          [displayName.trim(), passwordHash, role, now, existingUser.id]
+          [cleanFirstName, cleanLastName, displayName, passwordHash, role, now, existingUser.id]
         );
 
         return {
           id: existingUser.id,
           email: normalizedEmail,
-          displayName: displayName.trim(),
+          firstName: cleanFirstName,
+          lastName: cleanLastName,
+          displayName,
           profilePictureUrl: existingUser.profilePictureUrl || '',
           role,
           district: existingUser.district || '',
@@ -251,20 +245,20 @@ export class AuthAccountModel {
         };
       }
 
-      const { firstName, lastName } = splitDisplayName(displayName);
-
       await conn.query<ResultSetHeader>(
         `INSERT INTO users (
           \`id\`, \`firstName\`, \`lastName\`, \`email\`, \`displayName\`, \`passwordHash\`, \`role\`,
           \`isActive\`, \`employmentType\`, \`status\`, \`createdAt\`, \`updatedAt\`
         ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'Other', 'Active', ?, ?)`,
-        [id, firstName, lastName, normalizedEmail, displayName.trim(), passwordHash, role, now, now]
+        [id, cleanFirstName, cleanLastName, normalizedEmail, displayName, passwordHash, role, now, now]
       );
 
       return {
         id,
         email: normalizedEmail,
-        displayName: displayName.trim(),
+        firstName: cleanFirstName,
+        lastName: cleanLastName,
+        displayName,
         profilePictureUrl: '',
         role,
         district: '',

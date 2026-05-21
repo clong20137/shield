@@ -129,26 +129,28 @@ function publicInvite(invite: Awaited<ReturnType<typeof AuthInviteModel.create>>
 export class AuthController {
   static async register(req: Request, res: Response) {
     try {
-      const { email, password, displayName, inviteToken } = req.body as {
+      const { email, password, firstName, lastName, inviteToken } = req.body as {
         email?: string;
         password?: string;
-        displayName?: string;
+        firstName?: string;
+        lastName?: string;
         inviteToken?: string;
       };
 
-      if (!email || !password || !displayName) {
-        return res.status(400).json({ error: 'Email, password, and display name are required' });
+      if (!email || !password || !firstName || !lastName) {
+        return res.status(400).json({ error: 'Email, password, first name, and last name are required' });
       }
 
       const cleanEmail = normalizeEmail(email);
-      const cleanDisplayName = cleanString(displayName, 100);
+      const cleanFirstName = cleanString(firstName, 100);
+      const cleanLastName = cleanString(lastName, 100);
 
       if (!isValidEmail(cleanEmail)) {
         return res.status(400).json({ error: 'Enter a valid email address' });
       }
 
-      if (cleanDisplayName.length < 2) {
-        return res.status(400).json({ error: 'Display name must be at least 2 characters' });
+      if (cleanFirstName.length < 1 || cleanLastName.length < 1) {
+        return res.status(400).json({ error: 'First and last name are required' });
       }
 
       if (!isStrongPassword(password)) {
@@ -176,7 +178,7 @@ export class AuthController {
         inviteId = invite.id;
       }
 
-      const account = await AuthAccountModel.createAccount(cleanEmail, password, cleanDisplayName);
+      const account = await AuthAccountModel.createAccount(cleanEmail, password, cleanFirstName, cleanLastName);
       if (inviteId) {
         await AuthInviteModel.markAccepted(inviteId);
       }

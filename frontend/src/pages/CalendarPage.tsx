@@ -1224,17 +1224,17 @@ function CalendarPage({ currentUser, onOpenCalculator, useMilitaryTime = false }
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
                   {trooperDailySections.map((section) => {
                     const isCollapsed = collapsedDailySections.includes(section.title);
                     return (
                       <section
                         key={section.title}
-                        className={`rounded-lg border bg-white transition-all duration-300 overflow-hidden dark:bg-gray-950 ${
+                        className={`self-start rounded-lg border bg-white p-4 transition-all duration-300 overflow-hidden dark:bg-gray-950 ${
                           isSectionComplete(entryForm.details, section)
                             ? 'trooper-daily-match border-green-300 dark:border-green-800'
                             : 'border-gray-200 dark:border-gray-800'
-                        } ${isCollapsed ? 'pb-0' : 'p-4'}`}
+                        }`}
                       >
                         <div className={`${isCollapsed ? '' : 'mb-4'} flex items-center justify-between gap-3`}>
                           <button

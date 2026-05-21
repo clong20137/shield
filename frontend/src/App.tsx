@@ -173,7 +173,8 @@ function LoginSplash({
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [registrationSettings, setRegistrationSettings] = useState<RegistrationSettings | null>(null);
   const [inviteToken] = useState(() => new URLSearchParams(window.location.search).get('invite') || '');
   const [resetToken] = useState(() => new URLSearchParams(window.location.search).get('reset') || '');
@@ -276,8 +277,8 @@ function LoginSplash({
       return;
     }
 
-    if (mode === 'register' && !displayName.trim()) {
-      setError('Enter your display name.');
+    if (mode === 'register' && (!firstName.trim() || !lastName.trim())) {
+      setError('Enter your first and last name.');
       return;
     }
 
@@ -302,7 +303,7 @@ function LoginSplash({
     try {
       const response =
         mode === 'register'
-          ? await authService.register(email, password, displayName, inviteToken || undefined)
+          ? await authService.register(email, password, firstName, lastName, inviteToken || undefined)
           : await authService.login(email, password, requiresTwoFactor ? twoFactorCode : undefined);
 
       if (response.data.requiresTwoFactor) {
@@ -393,15 +394,26 @@ function LoginSplash({
             )}
 
             {mode === 'register' && (
-              <label className="mb-4 block">
-                <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Display name</span>
-                <input
-                  value={displayName}
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
-                  autoComplete="name"
-                />
-              </label>
+              <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">First name</span>
+                  <input
+                    value={firstName}
+                    onChange={(event) => setFirstName(event.target.value)}
+                    className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+                    autoComplete="given-name"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Last name</span>
+                  <input
+                    value={lastName}
+                    onChange={(event) => setLastName(event.target.value)}
+                    className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+                    autoComplete="family-name"
+                  />
+                </label>
+              </div>
             )}
 
             {mode !== 'forgot' && (

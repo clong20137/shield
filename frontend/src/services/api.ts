@@ -206,6 +206,8 @@ export interface ReportRow {
 export interface AuthAccount {
   id: string;
   email: string;
+  firstName: string;
+  lastName: string;
   displayName: string;
   profilePictureUrl: string;
   role: string;
@@ -504,8 +506,8 @@ export type CreatePerformanceEvaluationPayload = Pick<
 >;
 
 export const authService = {
-  register: (email: string, password: string, displayName: string, inviteToken?: string) =>
-    api.post<AuthResponse>('/auth/register', { email, password, displayName, inviteToken }),
+  register: (email: string, password: string, firstName: string, lastName: string, inviteToken?: string) =>
+    api.post<AuthResponse>('/auth/register', { email, password, firstName, lastName, inviteToken }),
 
   login: (email: string, password: string, twoFactorCode?: string) =>
     api.post<AuthResponse>('/auth/login', { email, password, twoFactorCode }),
