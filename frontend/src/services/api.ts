@@ -216,6 +216,7 @@ export interface AuthAccount {
   isActive: boolean;
   receivesMessages: boolean;
   hasCompletedOnboarding: boolean;
+  trooperDailyHiddenSections: string[];
   twoFactorEnabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -578,6 +579,9 @@ export const authService = {
 
   updateMessagePreferences: (accountId: string, receiveMessages: boolean) =>
     api.put<AuthResponse>(`/auth/accounts/${accountId}/message-preferences`, { receiveMessages }),
+
+  updateTrooperDailyPreferences: (accountId: string, hiddenSections: string[]) =>
+    api.put<AuthResponse>(`/auth/accounts/${accountId}/trooper-daily-preferences`, { hiddenSections }),
 
   completeOnboarding: (accountId: string) =>
     api.put<AuthResponse>(`/auth/accounts/${accountId}/onboarding-complete`),

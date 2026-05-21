@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Calculator, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCopy, Pencil, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
-import { AuthAccount, CalendarEntry, CalendarShortcut, calendarService } from '../services/api';
+import { Calculator, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCopy, Eye, EyeOff, Pencil, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { AuthAccount, CalendarEntry, CalendarShortcut, authService, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'createdAt' | 'updatedAt'>;
@@ -514,7 +514,17 @@ function calculateShiftHours(details: Record<string, string>): number {
   );
 }
 
-function CalendarPage({ currentUser, onOpenCalculator, useMilitaryTime = false }: { currentUser: AuthAccount; onOpenCalculator?: () => void; useMilitaryTime?: boolean }) {
+function CalendarPage({
+  currentUser,
+  onOpenCalculator,
+  onAccountUpdate,
+  useMilitaryTime = false,
+}: {
+  currentUser: AuthAccount;
+  onOpenCalculator?: () => void;
+  onAccountUpdate?: (account: AuthAccount) => void;
+  useMilitaryTime?: boolean;
+}) {
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -529,6 +539,7 @@ function CalendarPage({ currentUser, onOpenCalculator, useMilitaryTime = false }
   const [statusFilter, setStatusFilter] = useState('');
   const [entryPendingDelete, setEntryPendingDelete] = useState<CalendarEntry | null>(null);
   const [collapsedDailySections, setCollapsedDailySections] = useState<string[]>([]);
+  const [hiddenDailySections, setHiddenDailySections] = useState<string[]>(currentUser.trooperDailyHiddenSections || []);
   const [shortcuts, setShortcuts] = useState<CalendarShortcut[]>([]);
   const [shortcutName, setShortcutName] = useState('');
   const [editingShortcutId, setEditingShortcutId] = useState<string | null>(null);
@@ -577,6 +588,10 @@ function CalendarPage({ currentUser, onOpenCalculator, useMilitaryTime = false }
     window.addEventListener('shield:calendar-updated', handleCalendarUpdate);
     return () => window.removeEventListener('shield:calendar-updated', handleCalendarUpdate);
   }, [currentUser.id]);
+
+  useEffect(() => {
+    setHiddenDailySections(currentUser.trooperDailyHiddenSections || []);
+  }, [currentUser.trooperDailyHiddenSections]);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -811,6 +826,32 @@ function CalendarPage({ currentUser, onOpenCalculator, useMilitaryTime = false }
       console.error('Failed to delete shortcut:', err);
       setCalendarError(getApiErrorMessage(err, 'Failed to delete shortcut.'));
     }
+  };
+
+  const saveHiddenDailySections = async (sections: string[]) => {
+    setHiddenDailySections(sections);
+    try {
+      const response = await authService.updateTrooperDailyPreferences(currentUser.id, sections);
+      if (response.data.account) {
+        onAccountUpdate?.(response.data.account);
+      }
+    } catch (err) {
+      console.error('Failed to save Trooper Daily section preferences:', err);
+      setCalendarError(getApiErrorMessage(err, 'Failed to save section preferences.'));
+      setHiddenDailySections(currentUser.trooperDailyHiddenSections || []);
+    }
+  };
+
+  const hideDailySection = (sectionTitle: string) => {
+    if (hiddenDailySections.includes(sectionTitle)) {
+      return;
+    }
+
+    void saveHiddenDailySections([...hiddenDailySections, sectionTitle]);
+  };
+
+  const showDailySection = (sectionTitle: string) => {
+    void saveHiddenDailySections(hiddenDailySections.filter((title) => title !== sectionTitle));
   };
 
   const fillBlankNumericDetailsWithZero = () => {
@@ -1308,7 +1349,36 @@ function CalendarPage({ currentUser, onOpenCalculator, useMilitaryTime = false }
                 </div>
 
                 <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
-                  {trooperDailySections.map((section) => {
+                  {hiddenDailySections.length > 0 && (
+                    <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900 xl:col-span-2">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Hidden Sections</h3>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">These stay hidden for your account until you show them again.</p>
+                        </div>
+                        <Eye size={18} className="text-accent" />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {trooperDailySections
+                          .filter((section) => hiddenDailySections.includes(section.title))
+                          .map((section) => (
+                            <button
+                              key={section.title}
+                              type="button"
+                              onClick={() => showDailySection(section.title)}
+                              className="inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-primary-500 shadow-sm hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-950 dark:text-blue-100"
+                              aria-label={`Show ${section.title}`}
+                              title={`Show ${section.title}`}
+                            >
+                              <Eye size={15} />
+                              <span>{section.title}</span>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {trooperDailySections.filter((section) => !hiddenDailySections.includes(section.title)).map((section) => {
                     const isCollapsed = collapsedDailySections.includes(section.title);
                     return (
                       <section
@@ -1338,7 +1408,18 @@ function CalendarPage({ currentUser, onOpenCalculator, useMilitaryTime = false }
                               {isSectionComplete(entryForm.details, section) && <CheckCircle2 className="trooper-daily-check shrink-0 text-green-600 dark:text-green-300" size={18} />}
                             </h3>
                           </button>
-                          <span className={`h-1.5 w-10 shrink-0 rounded-full ${isSectionComplete(entryForm.details, section) ? 'bg-green-500' : 'bg-accent'}`} />
+                          <div className="flex shrink-0 items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => hideDailySection(section.title)}
+                              className="flex h-8 w-8 items-center justify-center rounded border border-gray-200 text-gray-500 hover:border-accent hover:text-accent dark:border-gray-800 dark:text-gray-400"
+                              aria-label={`Hide ${section.title}`}
+                              title={`Hide ${section.title}`}
+                            >
+                              <EyeOff size={15} />
+                            </button>
+                            <span className={`h-1.5 w-10 rounded-full ${isSectionComplete(entryForm.details, section) ? 'bg-green-500' : 'bg-accent'}`} />
+                          </div>
                         </div>
                         <div className={`overflow-hidden transition-all duration-300 ${isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[1200px] opacity-100'}`}>
                           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

@@ -692,6 +692,37 @@ export class AuthController {
     }
   }
 
+  static async updateTrooperDailyPreferences(req: Request, res: Response) {
+    try {
+      const { hiddenSections } = req.body as { hiddenSections?: unknown };
+      const { accountId } = req.params;
+      const sessionAccount = await getSessionAccount(req);
+
+      if (!sessionAccount || sessionAccount.id !== accountId) {
+        return res.status(403).json({ error: 'You can only update your own Trooper Daily preferences' });
+      }
+
+      if (!Array.isArray(hiddenSections)) {
+        return res.status(400).json({ error: 'Hidden sections are required' });
+      }
+
+      const cleanedSections = hiddenSections
+        .map((section) => cleanString(section, 80))
+        .filter(Boolean);
+      const account = await AuthAccountModel.updateTrooperDailyPreferences(accountId, cleanedSections);
+
+      if (!account) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+
+      broadcastAppEvent({ type: 'user-updated', entityId: accountId });
+      res.json({ account: await withPermissions(account) });
+    } catch (error) {
+      console.error('Update Trooper Daily preferences error:', error);
+      res.status(500).json({ error: 'Failed to update Trooper Daily preferences' });
+    }
+  }
+
   static async completeOnboarding(req: Request, res: Response) {
     try {
       const { accountId } = req.params;

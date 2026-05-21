@@ -130,6 +130,7 @@ export async function initializeDatabase() {
   await pool.query("ALTER TABLE `users` MODIFY COLUMN `role` VARCHAR(100) NOT NULL DEFAULT 'user'");
   await ensureColumn('users', 'receivesMessages', '`receivesMessages` BOOLEAN DEFAULT 1');
   await ensureColumn('users', 'hasCompletedOnboarding', '`hasCompletedOnboarding` BOOLEAN DEFAULT 0');
+  await ensureColumn('users', 'trooperDailyHiddenSections', '`trooperDailyHiddenSections` TEXT');
   await ensureColumn('users', 'twoFactorSecret', '`twoFactorSecret` VARCHAR(64)');
   await ensureColumn('users', 'twoFactorEnabled', '`twoFactorEnabled` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'peopleSoftId', '`peopleSoftId` VARCHAR(50)');
@@ -429,6 +430,7 @@ export async function initializeDatabase() {
       ('registrationMode', 'public'),
       ('appBaseUrl', 'http://localhost:3000'),
       ('maintenanceMode', 'false'),
+      ('sessionTimeoutMinutes', '0'),
       ('loginWarningEnabled', 'true'),
       ('loginWarningMessage', 'This is a Indiana State Police computer application system that is for Official use only. This system is subject to monitoring. Therefore, no expectation of privacy is to be assumed. Individuals found performing unauthorized activities may be subject to disciplinary action including criminal prosecution.')
   `);

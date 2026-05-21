@@ -16,6 +16,7 @@ export interface AuthAccount {
   isActive: boolean;
   receivesMessages: boolean;
   hasCompletedOnboarding: boolean;
+  trooperDailyHiddenSections: string[];
   twoFactorEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -41,6 +42,7 @@ interface AuthAccountRow extends RowDataPacket {
   isActive: boolean | number;
   receivesMessages: boolean | number;
   hasCompletedOnboarding: boolean | number;
+  trooperDailyHiddenSections: string | null;
   passwordHash: string | null;
   twoFactorSecret: string | null;
   twoFactorEnabled: boolean | number;
@@ -152,6 +154,15 @@ function verifyTotp(secret: string, code: string): boolean {
 
 function toPublicAccount(account: AuthAccountRow): AuthAccount {
   const fallbackName = `${account.firstName || ''} ${account.lastName || ''}`.trim();
+  let trooperDailyHiddenSections: string[] = [];
+  try {
+    const parsed = account.trooperDailyHiddenSections ? JSON.parse(account.trooperDailyHiddenSections) : [];
+    trooperDailyHiddenSections = Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string')
+      : [];
+  } catch {
+    trooperDailyHiddenSections = [];
+  }
 
   return {
     id: account.id,
@@ -165,6 +176,7 @@ function toPublicAccount(account: AuthAccountRow): AuthAccount {
     isActive: account.isActive !== false && account.isActive !== 0,
     receivesMessages: account.receivesMessages !== false && account.receivesMessages !== 0,
     hasCompletedOnboarding: Boolean(account.hasCompletedOnboarding),
+    trooperDailyHiddenSections,
     twoFactorEnabled: Boolean(account.twoFactorEnabled),
     createdAt: account.createdAt,
     updatedAt: account.updatedAt,
@@ -240,6 +252,7 @@ export class AuthAccountModel {
           isActive: existingUser.isActive !== false && existingUser.isActive !== 0,
           receivesMessages: existingUser.receivesMessages !== false && existingUser.receivesMessages !== 0,
           hasCompletedOnboarding: Boolean(existingUser.hasCompletedOnboarding),
+          trooperDailyHiddenSections: [],
           twoFactorEnabled: Boolean(existingUser.twoFactorEnabled),
           createdAt: existingUser.createdAt,
           updatedAt: now,
@@ -266,6 +279,7 @@ export class AuthAccountModel {
         isActive: true,
         receivesMessages: true,
         hasCompletedOnboarding: false,
+        trooperDailyHiddenSections: [],
         twoFactorEnabled: false,
         createdAt: now,
         updatedAt: now,
@@ -654,6 +668,25 @@ export class AuthAccountModel {
       const account = rows[0];
 
       return account ? toPublicAccount(account) : null;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async updateTrooperDailyPreferences(accountId: string, hiddenSections: string[]): Promise<AuthAccount | null> {
+    const conn = await pool.getConnection();
+    try {
+      const uniqueSections = Array.from(new Set(hiddenSections.map((section) => section.trim()).filter(Boolean))).slice(0, 40);
+      await conn.query<ResultSetHeader>(
+        'UPDATE users SET `trooperDailyHiddenSections` = ?, `updatedAt` = ? WHERE `id` = ?',
+        [JSON.stringify(uniqueSections), new Date(), accountId]
+      );
+
+      const [rows] = await conn.query<AuthAccountRow[]>(
+        'SELECT * FROM users WHERE `id` = ? AND `passwordHash` IS NOT NULL LIMIT 1',
+        [accountId]
+      );
+      return rows[0] ? toPublicAccount(rows[0]) : null;
     } finally {
       conn.release();
     }

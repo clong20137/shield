@@ -2054,6 +2054,17 @@ function App() {
     window.localStorage.setItem(MESSAGE_PREFERENCES_KEY, JSON.stringify(messagePreferences));
   }, [messagePreferences]);
 
+  const syncSessionTimeoutFromSettings = useCallback(async () => {
+    try {
+      const response = await authService.getRegistrationSettings();
+      const minutes = Number(response.data.sessionTimeoutMinutes) || 0;
+      setSessionTimeoutMinutes(minutes);
+      window.localStorage.setItem(SESSION_TIMEOUT_KEY, String(minutes));
+    } catch (err) {
+      console.error('Failed to sync session timeout setting:', err);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isNotificationsOpen) {
       return;
@@ -2193,6 +2204,7 @@ function App() {
           setCurrentUser(response.data.account);
           setIsAuthenticated(true);
           window.localStorage.setItem(SESSION_KEY, JSON.stringify(response.data.account));
+          void syncSessionTimeoutFromSettings();
 
           if (!response.data.account.hasCompletedOnboarding) {
             if (!hasSeenWelcomeSplash(response.data.account.id)) {
@@ -2207,12 +2219,13 @@ function App() {
         window.localStorage.removeItem(SESSION_KEY);
       })
       .finally(() => setIsSessionLoading(false));
-  }, []);
+  }, [syncSessionTimeoutFromSettings]);
 
   const handleLogin = (account: AuthAccount) => {
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(account));
     setCurrentUser(account);
     setIsLoginTransitioning(true);
+    void syncSessionTimeoutFromSettings();
     showToast('success', `Signed in as ${account.email}.`);
 
     if (!account.hasCompletedOnboarding) {
@@ -2351,7 +2364,10 @@ function App() {
     eventSource.addEventListener('device-updated', handleRealtimeAppUpdate('device-updated'));
     eventSource.addEventListener('mileage-updated', handleRealtimeAppUpdate('mileage-updated'));
     eventSource.addEventListener('performance-evaluation-updated', handleRealtimeAppUpdate('performance-evaluation-updated'));
-    eventSource.addEventListener('permission-updated', handleRealtimeAppUpdate('permission-updated'));
+    eventSource.addEventListener('permission-updated', (event) => {
+      void syncSessionTimeoutFromSettings();
+      handleRealtimeAppUpdate('permission-updated')(event);
+    });
     eventSource.addEventListener('quick-launch-updated', handleRealtimeAppUpdate('quick-launch-updated'));
     eventSource.addEventListener('session-revoked', () => handleForcedLogout('Your account has been deactivated. Please contact an administrator.'));
     eventSource.addEventListener('user-updated', handleRealtimeAppUpdate('user-updated'));
@@ -2360,7 +2376,7 @@ function App() {
     });
 
     return () => eventSource.close();
-  }, [currentUser, handleForcedLogout, loadBugReports, loadUserNotifications]);
+  }, [currentUser, handleForcedLogout, loadBugReports, loadUserNotifications, syncSessionTimeoutFromSettings]);
 
   const closeModal = (modal: 'messages' | 'calendar' | 'profile' | 'adminConsole' | 'reportBug' | 'bugTracker') => {
     setClosingModal(modal);
@@ -2901,7 +2917,7 @@ function App() {
                   </button>
                 </div>
                 <div className="min-h-0 flex-1">
-                  <CalendarPage currentUser={currentUser} onOpenCalculator={() => setIsCalculatorOpen(true)} useMilitaryTime={messagePreferences.useMilitaryTime} />
+                  <CalendarPage currentUser={currentUser} onOpenCalculator={() => setIsCalculatorOpen(true)} onAccountUpdate={handleAccountUpdate} useMilitaryTime={messagePreferences.useMilitaryTime} />
                 </div>
               </div>
             </div>
