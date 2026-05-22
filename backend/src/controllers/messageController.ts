@@ -3,6 +3,7 @@ import { AuthAccountModel } from '../models/AuthAccount';
 import { AuthSessionModel } from '../models/AuthSession';
 import { UserMessageModel } from '../models/UserMessage';
 import { addMessageEventClient, broadcastMessageEvent } from '../services/messageEvents';
+import { notifyMentions } from '../services/mentionService';
 import { cleanMultiline, cleanString } from '../utils/validation';
 import { isWellFormedSessionToken } from '../middleware/authSession';
 import { parsePagination } from '../utils/pagination';
@@ -60,6 +61,14 @@ export class MessageController {
       });
 
       const enrichedMessage = await UserMessageModel.getById(message.id);
+      await notifyMentions(body, {
+        actorId: senderAccountId,
+        actorName: enrichedMessage?.senderName || 'A user',
+        entityType: 'user_message',
+        entityId: message.id,
+        title: 'You were mentioned in a message',
+        message: `${enrichedMessage?.senderName || 'A user'} mentioned you in Messages.`,
+      });
       broadcastMessageEvent([senderAccountId, recipientUserId], {
         type: 'message-created',
         message: enrichedMessage || message,

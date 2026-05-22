@@ -2521,6 +2521,11 @@ function App() {
       return;
     }
 
+    if (notification.entityType === 'user_message') {
+      setIsMessagesModalOpen(true);
+      return;
+    }
+
     if (notification.entityType === 'bug_report') {
       openAdminConsole('bugs');
       return;

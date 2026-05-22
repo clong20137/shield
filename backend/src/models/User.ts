@@ -248,6 +248,41 @@ export class UserModel {
     }
   }
 
+  static async findMentionableUsers(tokens: string[], limit = 25): Promise<User[]> {
+    const normalizedTokens = Array.from(
+      new Set(
+        tokens
+          .map((token) => token.trim().toLowerCase().replace(/^@/u, '').replace(/[^a-z0-9._-]/gu, ''))
+          .filter((token) => token.length >= 2),
+      ),
+    ).slice(0, 20);
+
+    if (normalizedTokens.length === 0) {
+      return [];
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      const conditions = normalizedTokens.map(() => `(
+        LOWER(COALESCE(\`email\`, '')) = ? OR
+        LOWER(SUBSTRING_INDEX(COALESCE(\`email\`, ''), '@', 1)) = ? OR
+        LOWER(REPLACE(CONCAT_WS('', \`firstName\`, \`lastName\`), ' ', '')) = ? OR
+        LOWER(COALESCE(\`firstName\`, '')) = ? OR
+        LOWER(COALESCE(\`lastName\`, '')) = ? OR
+        LOWER(COALESCE(\`peNumber\`, '')) = ?
+      )`);
+      const params = normalizedTokens.flatMap((token) => [token, token, token, token, token, token]);
+      const [rows] = await conn.query(
+        `SELECT * FROM users WHERE (${conditions.join(' OR ')}) AND \`isActive\` = 1 ORDER BY \`lastName\`, \`firstName\` LIMIT ?`,
+        [...params, limit]
+      );
+
+      return rows as User[];
+    } finally {
+      conn.release();
+    }
+  }
+
   static async createUser(user: CreateUserInput): Promise<User> {
     const conn = await pool.getConnection();
     try {

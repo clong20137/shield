@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { Flag, MessageSquare, Pin, PinOff, Send, Smile, Trash2, X } from 'lucide-react';
 import { UserDetail } from '../components/UserDetail';
+import { MentionText } from '../components/MentionText';
 import { AuthAccount, DashboardPost, DashboardPostComment, User, dashboardPostService, getAssetUrl, handleAssetImageError, userService } from '../services/api';
 
 interface DashboardPostPageProps {
@@ -251,7 +252,7 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
               maxLength={1200}
             />
             <div className="mt-3 flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{commentBody.length}/1200</span>
+              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Use @name, @email, or @PE to mention someone - {commentBody.length}/1200</span>
               <div className="relative flex items-center gap-2">
                 <button
                   type="button"
@@ -328,7 +329,9 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
                     )}
                   </div>
                 </div>
-                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300">{comment.body}</p>
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300">
+                  <MentionText text={comment.body} />
+                </p>
               </div>
             </div>
           ))}

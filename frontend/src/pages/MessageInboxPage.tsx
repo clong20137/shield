@@ -3,6 +3,7 @@ import { Check, CheckCheck, Paperclip, Plus, Send, Trash2, X } from 'lucide-reac
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, userService, User, UserMessage } from '../services/api';
 import { RankBadge } from '../components/RankBadge';
+import { MentionText } from '../components/MentionText';
 
 interface MessageInboxPageProps {
   currentUser: AuthAccount;
@@ -725,7 +726,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                               ? 'rounded-br bg-accent text-white'
                               : 'rounded-bl bg-white text-gray-800 dark:bg-gray-900 dark:text-gray-100'
                           }`}>
-                            <p className="whitespace-pre-wrap text-left text-sm leading-6">{message.body}</p>
+                            <p className="whitespace-pre-wrap text-left text-sm leading-6">
+                              <MentionText text={message.body} />
+                            </p>
                           </div>
                           <div className={`mt-1 flex items-center gap-2 text-xs font-semibold text-gray-400 ${isMine ? 'justify-end' : 'justify-start'}`}>
                             <span>{formatMessageTime(message.createdAt)}</span>
@@ -789,7 +792,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                     value={replyBody}
                     onChange={(event) => setReplyBody(event.target.value)}
                     onKeyDown={handleReplyKeyDown}
-                    placeholder={selectedThreadAcceptsMessages ? 'Message' : 'Messages are disabled for this user'}
+                    placeholder={selectedThreadAcceptsMessages ? 'Message. Use @name to mention someone.' : 'Messages are disabled for this user'}
                     disabled={!selectedThreadAcceptsMessages}
                     rows={1}
                     className="min-h-10 flex-1 resize-none bg-transparent px-1 py-2 text-sm leading-5 outline-none sm:min-h-8 sm:py-1.5"
@@ -888,6 +891,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
               <textarea
                 value={composeBody}
                 onChange={(event) => setComposeBody(event.target.value)}
+                placeholder="Message. Use @name, @email, or @PE to mention someone."
                 className="min-h-40 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
               />
             </label>
