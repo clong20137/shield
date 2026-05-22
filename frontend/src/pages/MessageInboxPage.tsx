@@ -42,6 +42,23 @@ function formatMessageTime(value: string): string {
 }
 
 function getPresenceLabel(value: string): string {
+  return getPresenceDisplay(value, isOnlineFromLastSeen(value));
+}
+
+function isOnlineFromLastSeen(value: string, now = Date.now()): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const lastActivityTime = new Date(value).getTime();
+  if (Number.isNaN(lastActivityTime)) {
+    return false;
+  }
+
+  return now - lastActivityTime <= 5 * 60 * 1000;
+}
+
+function getPresenceDisplay(value: string, isOnline: boolean): string {
   if (!value) {
     return 'Last online unavailable';
   }
@@ -51,9 +68,19 @@ function getPresenceLabel(value: string): string {
     return 'Last online unavailable';
   }
 
-  const isActive = Date.now() - lastActivityTime <= 5 * 60 * 1000;
+  return isOnline ? 'Active' : `Last online ${formatMessageTime(value)}`;
+}
 
-  return isActive ? 'Active' : `Last online ${formatMessageTime(value)}`;
+function PresenceDot({ isOnline, className = '' }: { isOnline: boolean; className?: string }) {
+  return (
+    <span
+      className={`relative inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'} ${className}`}
+      title={isOnline ? 'Online' : 'Offline'}
+      aria-label={isOnline ? 'Online' : 'Offline'}
+    >
+      {isOnline && <span className="absolute inset-0 animate-ping rounded-full bg-green-400 opacity-75" />}
+    </span>
+  );
 }
 
 function getThreadId(message: UserMessage, currentUserId: string): string {
@@ -150,6 +177,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
   const [isRecipientSearching, setIsRecipientSearching] = useState(false);
   const [messagePendingDelete, setMessagePendingDelete] = useState<UserMessage | null>(null);
   const [threadPendingDelete, setThreadPendingDelete] = useState<MessageThread | null>(null);
+  const [presenceByAccount, setPresenceByAccount] = useState<Record<string, { online: boolean; lastSeenAt: string }>>({});
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
   const emojiButtonLabel = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
 
@@ -178,11 +206,35 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
     const eventsUrl = getMessageEventsUrl();
     const eventSource = eventsUrl ? new EventSource(eventsUrl) : null;
     const handleRealtimeMessageUpdate = () => loadMessages(false);
+    const handlePresenceUpdate = (event: MessageEvent<string>) => {
+      try {
+        const payload = JSON.parse(event.data) as {
+          actorAccountId?: string;
+          actorOnline?: boolean;
+          actorLastSeenAt?: string;
+        };
+        if (!payload.actorAccountId) {
+          loadMessages(false);
+          return;
+        }
+
+        setPresenceByAccount((current) => ({
+          ...current,
+          [payload.actorAccountId as string]: {
+            online: payload.actorOnline === true,
+            lastSeenAt: payload.actorLastSeenAt || new Date().toISOString(),
+          },
+        }));
+      } catch (err) {
+        console.error('Presence update parse error:', err);
+        loadMessages(false);
+      }
+    };
     eventSource?.addEventListener('message-created', handleRealtimeMessageUpdate);
     eventSource?.addEventListener('message-read', handleRealtimeMessageUpdate);
     eventSource?.addEventListener('message-archived', handleRealtimeMessageUpdate);
     eventSource?.addEventListener('message-deleted', handleRealtimeMessageUpdate);
-    eventSource?.addEventListener('presence-updated', handleRealtimeMessageUpdate);
+    eventSource?.addEventListener('presence-updated', handlePresenceUpdate);
     eventSource?.addEventListener('error', (event) => {
       console.error('Message realtime connection error:', event);
     });
@@ -281,6 +333,17 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
 
   const selectedThread = threads.find((thread) => thread.id === selectedThreadId) || null;
   const selectedThreadAcceptsMessages = selectedThread?.contactReceivesMessages !== false;
+  const getThreadPresence = (thread: MessageThread) => {
+    const realtimePresence = presenceByAccount[thread.id];
+    const lastSeenAt = realtimePresence?.lastSeenAt || thread.contactLastSeenAt;
+    const online = realtimePresence?.online === true;
+    return {
+      online,
+      lastSeenAt,
+      label: getPresenceDisplay(lastSeenAt, online),
+    };
+  };
+  const selectedPresence = selectedThread ? getThreadPresence(selectedThread) : null;
 
   useEffect(() => {
     if (!selectedThreadId && threads.length > 0) {
@@ -531,52 +594,56 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
             <div className="empty-state">No conversations found.</div>
           ) : (
             <div className="min-h-0 flex-1 divide-y divide-gray-200 overflow-y-auto pb-20 dark:divide-gray-800">
-              {filteredThreads.map((thread) => (
-                <div
-                  key={thread.id}
-                  className={`flex items-center gap-2 px-3 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 ${
-                    selectedThreadId === thread.id ? 'bg-accent/10' : ''
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setSelectedThreadId(thread.id)}
-                    className="min-h-11 min-w-0 flex-1 text-left"
+              {filteredThreads.map((thread) => {
+                const presence = getThreadPresence(thread);
+                return (
+                  <div
+                    key={thread.id}
+                    className={`flex items-center gap-2 px-3 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                      selectedThreadId === thread.id ? 'bg-accent/10' : ''
+                    }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className={`truncate text-sm ${thread.unreadCount > 0 ? 'font-bold text-primary-500' : 'font-semibold text-gray-800 dark:text-gray-100'}`}>
-                          {thread.contactName}
-                        </p>
-                        <p className="mt-0.5 truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
-                          {thread.subject}
-                        </p>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedThreadId(thread.id)}
+                      className="min-h-11 min-w-0 flex-1 text-left"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className={`flex min-w-0 items-center gap-2 truncate text-sm ${thread.unreadCount > 0 ? 'font-bold text-primary-500' : 'font-semibold text-gray-800 dark:text-gray-100'}`}>
+                            <PresenceDot isOnline={presence.online} />
+                            <span className="truncate">{thread.contactName}</span>
+                          </p>
+                          <p className="mt-0.5 truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
+                            {presence.label}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-xs text-gray-400">{formatMessageTime(thread.latestMessage.createdAt)}</span>
                       </div>
-                      <span className="shrink-0 text-xs text-gray-400">{formatMessageTime(thread.latestMessage.createdAt)}</span>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <p className="line-clamp-1 min-w-0 text-sm text-gray-500 dark:text-gray-400">
-                        {thread.latestMessage.senderAccountId === currentUser.id ? 'You: ' : ''}
-                        {thread.latestMessage.body}
-                      </p>
-                      {thread.unreadCount > 0 && (
-                        <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
-                          {thread.unreadCount > 9 ? '9+' : thread.unreadCount}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setThreadPendingDelete(thread)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-danger dark:hover:bg-red-950"
-                    aria-label="Delete conversation"
-                    title="Delete conversation"
-                  >
-                    <Trash2 size={17} />
-                  </button>
-                </div>
-              ))}
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <p className="line-clamp-1 min-w-0 text-sm text-gray-500 dark:text-gray-400">
+                          {thread.latestMessage.senderAccountId === currentUser.id ? 'You: ' : ''}
+                          {thread.latestMessage.body}
+                        </p>
+                        {thread.unreadCount > 0 && (
+                          <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
+                            {thread.unreadCount > 9 ? '9+' : thread.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setThreadPendingDelete(thread)}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-danger dark:hover:bg-red-950"
+                      aria-label="Delete conversation"
+                      title="Delete conversation"
+                    >
+                      <Trash2 size={17} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
           <button
@@ -597,24 +664,30 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
             <>
               <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-800">
                 <div className="flex items-center justify-center gap-3 text-center">
-                  {selectedThread.contactProfilePictureUrl ? (
-                    <img
-                      src={getAssetUrl(selectedThread.contactProfilePictureUrl)}
-                      alt={selectedThread.contactName}
-                      onError={handleAssetImageError}
-                      className="h-12 w-12 rounded-full border border-gray-200 object-cover shadow-sm dark:border-gray-700"
+                  <div className="relative shrink-0">
+                    {selectedThread.contactProfilePictureUrl ? (
+                      <img
+                        src={getAssetUrl(selectedThread.contactProfilePictureUrl)}
+                        alt={selectedThread.contactName}
+                        onError={handleAssetImageError}
+                        className="h-12 w-12 rounded-full border border-gray-200 object-cover shadow-sm dark:border-gray-700"
+                      />
+                    ) : (
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-accent/10 text-sm font-bold text-accent shadow-sm dark:border-gray-700">
+                        {getInitials(selectedThread.contactName)}
+                      </div>
+                    )}
+                    <PresenceDot
+                      isOnline={selectedPresence?.online === true}
+                      className="absolute bottom-0 right-0 h-3.5 w-3.5 border-2 border-white dark:border-gray-900"
                     />
-                  ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-accent/10 text-sm font-bold text-accent shadow-sm dark:border-gray-700">
-                      {getInitials(selectedThread.contactName)}
-                    </div>
-                  )}
+                  </div>
                   <div className="min-w-0 text-left">
                     <h2 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">{selectedThread.contactName}</h2>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <RankBadge rank={selectedThread.contactRank} compact subtle />
                       <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                        {getPresenceLabel(selectedThread.contactLastSeenAt)}
+                        {selectedPresence?.label || getPresenceLabel(selectedThread.contactLastSeenAt)}
                       </span>
                     </div>
                     {!selectedThreadAcceptsMessages && (

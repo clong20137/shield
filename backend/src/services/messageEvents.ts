@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { AuthAccountModel } from '../models/AuthAccount';
 import { UserMessage } from '../models/UserMessage';
 
 export type MessageEventType = 'message-created' | 'message-read' | 'message-archived' | 'message-deleted' | 'presence-updated';
@@ -8,6 +9,8 @@ interface MessageEventPayload {
   message?: UserMessage;
   messageId?: string;
   actorAccountId?: string;
+  actorOnline?: boolean;
+  actorLastSeenAt?: string;
 }
 
 const clients = new Map<string, Set<Response>>();
@@ -29,14 +32,46 @@ export function addMessageEventClient(accountId: string, response: Response) {
     'X-Accel-Buffering': 'no',
   });
   response.write(': connected\n\n');
+  clients.forEach((_accountClients, onlineAccountId) => {
+    sendEvent(response, {
+      type: 'presence-updated',
+      actorAccountId: onlineAccountId,
+      actorOnline: true,
+      actorLastSeenAt: new Date().toISOString(),
+    });
+  });
 
-  const keepAlive = windowlessInterval(() => response.write(': keep-alive\n\n'), 25000);
+  const announceOnline = () => {
+    const lastSeenAt = new Date().toISOString();
+    void AuthAccountModel.updateLastSeen(accountId).catch((error) => {
+      console.error('Failed to update message presence:', error);
+    });
+    broadcastMessageEventToAll({
+      type: 'presence-updated',
+      actorAccountId: accountId,
+      actorOnline: true,
+      actorLastSeenAt: lastSeenAt,
+    });
+  };
+
+  announceOnline();
+
+  const keepAlive = windowlessInterval(() => {
+    response.write(': keep-alive\n\n');
+    announceOnline();
+  }, 25000);
 
   response.on('close', () => {
     clearInterval(keepAlive);
     accountClients.delete(response);
     if (accountClients.size === 0) {
       clients.delete(accountId);
+      broadcastMessageEventToAll({
+        type: 'presence-updated',
+        actorAccountId: accountId,
+        actorOnline: false,
+        actorLastSeenAt: new Date().toISOString(),
+      });
     }
   });
 }
