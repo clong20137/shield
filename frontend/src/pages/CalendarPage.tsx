@@ -5,6 +5,7 @@ import { districtOptions } from '../constants/districts';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 type TimePeriod = 'AM' | 'PM';
+type CalendarView = 'day' | 'week' | 'month';
 
 const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty'];
 const narrativeCharacterLimit = 1000;
@@ -228,6 +229,20 @@ const formatDateKey = (date: Date) => {
 
 const getMonthLabel = (date: Date) =>
   date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+const addDays = (date: Date, days: number) => {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + days);
+  return nextDate;
+};
+
+const startOfWeek = (date: Date) => addDays(date, -date.getDay());
+
+const getDayLabel = (date: Date) =>
+  date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+const getShortDayLabel = (date: Date) =>
+  date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
 const getReadableDate = (dateKey: string) => {
   const [year, month, day] = dateKey.split('-').map(Number);
@@ -532,6 +547,8 @@ function CalendarPage({
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
+  const [calendarView, setCalendarView] = useState<CalendarView>('month');
+  const [calendarFocusDate, setCalendarFocusDate] = useState(() => new Date());
   const [entries, setEntries] = useState<CalendarEntry[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [entryForm, setEntryForm] = useState<CalendarEntryForm>(() =>
@@ -621,7 +638,9 @@ function CalendarPage({
   }, [entryPendingDelete, selectedDate]);
 
   const openDay = (dateKey: string) => {
+    const [year, month, day] = dateKey.split('-').map(Number);
     const existingEntry = entries.find((entry) => entry.date === dateKey);
+    setCalendarFocusDate(new Date(year, month - 1, day));
     setSelectedDate(dateKey);
     setEntryForm(existingEntry ? createEntryFormFromEntry(existingEntry) : createDefaultEntryForm(dateKey, currentUser));
     setIsDutyHoursManual(Boolean(existingEntry));
@@ -658,9 +677,29 @@ function CalendarPage({
     });
   };
 
+  const changeCalendarPeriod = (offset: number) => {
+    if (calendarView === 'month') {
+      changeMonth(offset);
+      setCalendarFocusDate((currentDate) => {
+        const nextDate = new Date(currentDate);
+        nextDate.setMonth(currentDate.getMonth() + offset);
+        return nextDate;
+      });
+      return;
+    }
+
+    const days = calendarView === 'week' ? offset * 7 : offset;
+    setCalendarFocusDate((currentDate) => {
+      const nextDate = addDays(currentDate, days);
+      setCalendarMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1));
+      return nextDate;
+    });
+  };
+
   const goToToday = () => {
     const today = new Date();
     setCalendarMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+    setCalendarFocusDate(today);
   };
 
   const saveEntry = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -932,7 +971,21 @@ function CalendarPage({
   const todayKey = formatDateKey(new Date());
   const monthKey = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}`;
   const monthEntries = visibleEntries.filter((entry) => entry.date.startsWith(monthKey));
-  const monthDutyHours = monthEntries.reduce((total, entry) => total + (Number(entry.dutyHours) || 0), 0);
+  const weekStart = startOfWeek(calendarFocusDate);
+  const weekDates = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+  const weekDateKeys = weekDates.map(formatDateKey);
+  const focusDateKey = formatDateKey(calendarFocusDate);
+  const activeViewEntries = calendarView === 'month'
+    ? monthEntries
+    : calendarView === 'week'
+      ? visibleEntries.filter((entry) => weekDateKeys.includes(entry.date))
+      : visibleEntries.filter((entry) => entry.date === focusDateKey);
+  const activeViewDutyHours = activeViewEntries.reduce((total, entry) => total + (Number(entry.dutyHours) || 0), 0);
+  const activeViewLabel = calendarView === 'month'
+    ? getMonthLabel(calendarMonth)
+    : calendarView === 'week'
+      ? `${getShortDayLabel(weekDates[0])} - ${getShortDayLabel(weekDates[6])}`
+      : getDayLabel(calendarFocusDate);
   const reportedDutyHours = Number(entryForm.dutyHours) || 0;
   const entryDetails = entryForm.details || {};
   const calculatedShiftHours = calculateShiftHours(entryDetails);
@@ -954,13 +1007,13 @@ function CalendarPage({
     <div className="flex h-full min-h-0 flex-col">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => changeMonth(-1)} className="btn-secondary" aria-label="Previous month" title="Previous">
+          <button type="button" onClick={() => changeCalendarPeriod(-1)} className="btn-secondary" aria-label="Previous calendar period" title="Previous">
             <ChevronLeft size={16} />
           </button>
           <div className="min-w-40 text-center text-xl font-bold text-primary-500 dark:text-blue-100 sm:text-2xl">
-            {getMonthLabel(calendarMonth)}
+            {activeViewLabel}
           </div>
-          <button type="button" onClick={() => changeMonth(1)} className="btn-secondary" aria-label="Next month" title="Next">
+          <button type="button" onClick={() => changeCalendarPeriod(1)} className="btn-secondary" aria-label="Next calendar period" title="Next">
             <ChevronRight size={16} />
           </button>
           <button type="button" onClick={goToToday} className="btn-secondary" aria-label="Go to today" title="Today">
@@ -970,6 +1023,23 @@ function CalendarPage({
         <p className="text-sm text-gray-500 dark:text-gray-400">
           Personal duty information for {currentUser.displayName || currentUser.email}.
         </p>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-2 rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-950">
+        {(['day', 'week', 'month'] as const).map((view) => (
+          <button
+            key={view}
+            type="button"
+            onClick={() => setCalendarView(view)}
+            className={`rounded px-3 py-2 text-sm font-bold capitalize transition ${
+              calendarView === view
+                ? 'bg-primary-500 text-white'
+                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-900'
+            }`}
+          >
+            {view}
+          </button>
+        ))}
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
@@ -997,12 +1067,12 @@ function CalendarPage({
 
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-950">
-          <p className="text-xs font-bold uppercase text-gray-400">This Month</p>
-          <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{monthEntries.length}</p>
+          <p className="text-xs font-bold uppercase text-gray-400">This {calendarView}</p>
+          <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{activeViewEntries.length}</p>
         </div>
         <div className="rounded border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-950">
           <p className="text-xs font-bold uppercase text-gray-400">Duty Hours</p>
-          <p className="mt-1 text-2xl font-bold text-accent">{monthDutyHours.toFixed(2).replace(/\.?0+$/u, '')}</p>
+          <p className="mt-1 text-2xl font-bold text-accent">{activeViewDutyHours.toFixed(2).replace(/\.?0+$/u, '')}</p>
         </div>
         <div className="rounded border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-950">
           <p className="text-xs font-bold uppercase text-gray-400">Visible Entries</p>
@@ -1014,6 +1084,8 @@ function CalendarPage({
       {isCalendarLoading && <div className="loading">Loading calendar entries...</div>}
 
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        {calendarView === 'month' && (
+        <>
         <div className="grid grid-cols-7 gap-2 text-center text-xs font-bold uppercase text-gray-500 dark:text-gray-400">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
             <div key={day}>{day}</div>
@@ -1077,6 +1149,85 @@ function CalendarPage({
             );
           })}
         </div>
+        </>
+        )}
+
+        {calendarView === 'week' && (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-7">
+            {weekDates.map((date) => {
+              const dateKey = formatDateKey(date);
+              const dayEntries = visibleEntries.filter((entry) => entry.date === dateKey);
+              const isToday = dateKey === todayKey;
+
+              return (
+                <button
+                  key={dateKey}
+                  type="button"
+                  onClick={() => openDay(dateKey)}
+                  className={`min-h-36 rounded-lg border bg-gray-50 p-3 text-left transition hover:border-accent hover:bg-accent/5 dark:bg-gray-950 ${
+                    isToday ? 'border-accent ring-2 ring-accent/20' : 'border-gray-200 dark:border-gray-800'
+                  }`}
+                >
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{getShortDayLabel(date)}</span>
+                    <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-bold text-accent">{dayEntries.length}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {dayEntries.length === 0 ? (
+                      <p className="text-xs font-semibold text-gray-400">No report</p>
+                    ) : dayEntries.map((entry) => (
+                      <div key={entry.id} className="rounded px-2 py-1.5 text-xs font-bold text-white" style={{ backgroundColor: entry.color }}>
+                        {entry.dutyHours}h<br />{entry.districtWorked}
+                      </div>
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {calendarView === 'day' && (
+          <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Daily View</p>
+                <h3 className="mt-1 text-xl font-bold text-gray-900 dark:text-gray-100">{getDayLabel(calendarFocusDate)}</h3>
+              </div>
+              <button type="button" onClick={() => openDay(focusDateKey)} className="btn-primary" aria-label="Open daily report" title="Open Daily Report">
+                <CalendarClock size={16} />
+              </button>
+            </div>
+            {activeViewEntries.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => openDay(focusDateKey)}
+                className="empty-state w-full rounded border border-dashed border-gray-300 py-10 text-left dark:border-gray-700"
+              >
+                No Trooper Daily report for this day. Click to create one.
+              </button>
+            ) : (
+              <div className="space-y-3">
+                {activeViewEntries.map((entry) => (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    onClick={() => openDay(entry.date)}
+                    className="w-full rounded border border-gray-200 p-4 text-left transition hover:border-accent hover:bg-accent/5 dark:border-gray-800"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-bold text-gray-900 dark:text-gray-100">{entry.districtWorked}</p>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{entry.dutyHours} duty hours - {entry.specialStatus}</p>
+                      </div>
+                      <span className="h-4 w-4 rounded-full" style={{ backgroundColor: entry.color }} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {selectedDate && (
