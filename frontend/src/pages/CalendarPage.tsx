@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Calculator, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCopy, Eye, EyeOff, Pencil, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { Calculator, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCopy, Eye, EyeOff, ListChecks, Pencil, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, CalendarShortcut, authService, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
@@ -420,11 +420,13 @@ function TimeDetailInput({
   onChange,
   isComplete = false,
   useMilitaryTime = false,
+  fieldId,
 }: {
   value: string;
   onChange: (value: string) => void;
   isComplete?: boolean;
   useMilitaryTime?: boolean;
+  fieldId?: string;
 }) {
   const parsedTime = parseTimeInput(value);
   const [displayTime, setDisplayTime] = useState(useMilitaryTime ? value : parsedTime.time);
@@ -469,6 +471,7 @@ function TimeDetailInput({
           placeholder={useMilitaryTime ? '00:00' : 'HH:MM'}
           inputMode="numeric"
           maxLength={5}
+          data-daily-field={fieldId}
           className={`w-full rounded border bg-white px-3 py-2 pr-8 text-sm transition dark:bg-gray-900 ${
             isComplete
               ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
@@ -548,6 +551,9 @@ function CalendarPage({
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [isDutyHoursManual, setIsDutyHoursManual] = useState(false);
   const lastAutoDutyHoursRef = useRef('');
+  const dailyFormRef = useRef<HTMLFormElement | null>(null);
+  const submitIntentRef = useRef<'save' | 'save-new'>('save');
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const actor = {
     actorId: currentUser.id,
@@ -635,6 +641,43 @@ function CalendarPage({
     setEditingEntryId(null);
   };
 
+  const focusFirstDailyField = () => {
+    window.setTimeout(() => {
+      const firstField = dailyFormRef.current?.querySelector<HTMLElement>('[data-daily-field]');
+      firstField?.focus();
+    }, 50);
+  };
+
+  const jumpToDailySection = (sectionTitle: string) => {
+    setCollapsedDailySections((sections) => sections.filter((title) => title !== sectionTitle));
+    sectionRefs.current[sectionTitle]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => {
+      const firstField = sectionRefs.current[sectionTitle]?.querySelector<HTMLElement>('[data-daily-field]');
+      firstField?.focus();
+    }, 260);
+  };
+
+  const handleDailyKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) {
+      return;
+    }
+
+    const fields = Array.from(dailyFormRef.current?.querySelectorAll<HTMLElement>('[data-daily-field]') || [])
+      .filter((field) => !field.hasAttribute('disabled'));
+    const currentIndex = fields.indexOf(target);
+    if (currentIndex === -1) {
+      return;
+    }
+
+    event.preventDefault();
+    fields[currentIndex + 1]?.focus();
+  };
+
   const changeMonth = (offset: number) => {
     setCalendarMonth((currentMonth) => {
       const nextMonth = new Date(currentMonth);
@@ -654,6 +697,7 @@ function CalendarPage({
     const hours = Number(entryForm.dutyHours);
 
     if (!entryForm.date || Number.isNaN(hours) || hours < 0) {
+      submitIntentRef.current = 'save';
       return;
     }
 
@@ -666,26 +710,48 @@ function CalendarPage({
         ...actor,
       };
 
+      const shouldStartNew = submitIntentRef.current === 'save-new';
+
       if (editingEntryId) {
         const response = await calendarService.update(editingEntryId, payload);
         setEntries((currentEntries) =>
           currentEntries.map((entry) => (entry.id === editingEntryId ? response.data : entry)),
         );
-        setEditingEntryId(response.data.id);
         setSelectedDate(response.data.date);
-        setEntryForm(createEntryFormFromEntry(response.data));
+        if (shouldStartNew) {
+          setEditingEntryId(null);
+          setEntryForm(createDefaultEntryForm(response.data.date, currentUser));
+          setIsDutyHoursManual(false);
+          lastAutoDutyHoursRef.current = '';
+          focusFirstDailyField();
+        } else {
+          setEditingEntryId(response.data.id);
+          setEntryForm(createEntryFormFromEntry(response.data));
+        }
       } else {
         const response = await calendarService.create(payload);
         setEntries((currentEntries) => [response.data, ...currentEntries]);
         setSelectedDate(response.data.date);
-        setEditingEntryId(response.data.id);
-        setEntryForm(createEntryFormFromEntry(response.data));
+        if (shouldStartNew) {
+          setEditingEntryId(null);
+          setEntryForm(createDefaultEntryForm(response.data.date, currentUser));
+          setIsDutyHoursManual(false);
+          lastAutoDutyHoursRef.current = '';
+          focusFirstDailyField();
+        } else {
+          setEditingEntryId(response.data.id);
+          setEntryForm(createEntryFormFromEntry(response.data));
+        }
       }
-      setIsDutyHoursManual(true);
-      lastAutoDutyHoursRef.current = '';
+      if (!shouldStartNew) {
+        setIsDutyHoursManual(true);
+        lastAutoDutyHoursRef.current = '';
+      }
     } catch (err) {
       console.error('Failed to save calendar entry:', err);
       setCalendarError(getApiErrorMessage(err, 'Failed to save calendar entry.'));
+    } finally {
+      submitIntentRef.current = 'save';
     }
   };
 
@@ -941,6 +1007,20 @@ function CalendarPage({
     ((hasShiftTime && Math.abs(calculatedShiftHours - reportedDutyHours) > 0.01) ||
       (attendanceHours > 0 && Math.abs(attendanceHours - reportedDutyHours) > 0.01) ||
       (dutyActivityHours > 0 && Math.abs(dutyActivityHours - reportedDutyHours) > 0.01));
+  const visibleDailySections = trooperDailySections.filter((section) => !hiddenDailySections.includes(section.title));
+  const completedVisibleSections = visibleDailySections.filter((section) => isSectionComplete(entryForm.details, section));
+  const incompleteVisibleSections = visibleDailySections.filter((section) => !isSectionComplete(entryForm.details, section));
+  const completionPercent = visibleDailySections.length > 0
+    ? Math.round((completedVisibleSections.length / visibleDailySections.length) * 100)
+    : 100;
+  const checklistItems = [
+    { label: 'Date', complete: Boolean(entryForm.date) },
+    { label: 'Duty hours', complete: Boolean(entryForm.dutyHours) },
+    { label: 'District', complete: Boolean(entryForm.districtWorked) },
+    { label: 'Status', complete: Boolean(entryForm.specialStatus) },
+    { label: 'Hours check', complete: !hasHourMismatch && hasReportedHours },
+    { label: 'Sections', complete: incompleteVisibleSections.length === 0 },
+  ];
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -1160,7 +1240,7 @@ function CalendarPage({
               </div>
             </div>
 
-            <form onSubmit={saveEntry} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <form ref={dailyFormRef} onSubmit={saveEntry} onKeyDown={handleDailyKeyDown} className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className={`rounded-lg border p-4 md:col-span-2 ${
                 editingEntryId
                   ? 'border-accent/30 bg-accent/10'
@@ -1181,11 +1261,61 @@ function CalendarPage({
                         <Trash2 size={16} />
                       </button>
                     )}
-                    <button type="submit" className={editingEntryId ? 'btn-primary' : 'btn-success'} aria-label={editingEntryId ? 'Save calendar entry' : 'Add calendar entry'} title={editingEntryId ? 'Save Entry' : 'Add Entry'}>
+                    <button type="submit" onClick={() => { submitIntentRef.current = 'save'; }} className={editingEntryId ? 'btn-primary' : 'btn-success'} aria-label={editingEntryId ? 'Save calendar entry' : 'Add calendar entry'} title={editingEntryId ? 'Save Entry' : 'Add Entry'}>
                       {editingEntryId ? <Save size={16} /> : <CalendarClock size={16} />}
+                    </button>
+                    <button type="submit" onClick={() => { submitIntentRef.current = 'save-new'; }} className="btn-secondary" aria-label="Save and start another report" title="Save And New">
+                      <Plus size={16} />
                     </button>
                   </div>
                 </div>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950 md:col-span-2">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <ListChecks className="text-accent" size={18} />
+                    <div>
+                      <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Entry Progress</h3>
+                      <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                        {completedVisibleSections.length}/{visibleDailySections.length} visible sections complete
+                      </p>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">{completionPercent}%</span>
+                </div>
+                <div className="mb-3 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                  <div className="h-full rounded-full bg-accent transition-all duration-300" style={{ width: `${completionPercent}%` }} />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {checklistItems.map((item) => (
+                    <span
+                      key={item.label}
+                      className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold ${
+                        item.complete
+                          ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-200'
+                          : 'border-gray-200 bg-gray-50 text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400'
+                      }`}
+                    >
+                      {item.complete && <CheckCircle2 size={13} />}
+                      {item.label}
+                    </span>
+                  ))}
+                </div>
+                {incompleteVisibleSections.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
+                    {incompleteVisibleSections.slice(0, 6).map((section) => (
+                      <button
+                        key={section.title}
+                        type="button"
+                        onClick={() => jumpToDailySection(section.title)}
+                        className="rounded border border-dashed border-gray-300 px-3 py-1.5 text-xs font-bold text-primary-500 hover:border-accent hover:text-accent dark:border-gray-700 dark:text-blue-100"
+                      >
+                        {section.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 md:col-span-2">
@@ -1255,6 +1385,7 @@ function CalendarPage({
                   onChange={(event) =>
                     setEntryForm((currentForm) => ({ ...currentForm, date: event.target.value }))
                   }
+                  data-daily-field="entryDate"
                   className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
                   required
                 />
@@ -1270,6 +1401,7 @@ function CalendarPage({
                     maxLength={dailyInputCharacterLimit}
                     value={entryForm.dutyHours}
                     onChange={(event) => updateDutyHours(event.target.value)}
+                    data-daily-field="dutyHours"
                     className={`w-full rounded border bg-white px-3 py-2 pr-9 transition dark:bg-gray-950 ${
                       entryForm.dutyHours
                         ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
@@ -1297,6 +1429,7 @@ function CalendarPage({
                   onChange={(event) =>
                     setEntryForm((currentForm) => ({ ...currentForm, districtWorked: event.target.value }))
                   }
+                  data-daily-field="districtWorked"
                   className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
                 >
                   {districtOptions.map((district) => (
@@ -1312,6 +1445,7 @@ function CalendarPage({
                   onChange={(event) =>
                     setEntryForm((currentForm) => ({ ...currentForm, specialStatus: event.target.value }))
                   }
+                  data-daily-field="specialStatus"
                   className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
                 >
                   {specialStatusOptions.map((status) => (
@@ -1325,6 +1459,7 @@ function CalendarPage({
                 <select
                   value={entryForm.color}
                   onChange={(event) => setEntryForm((currentForm) => ({ ...currentForm, color: event.target.value }))}
+                  data-daily-field="color"
                   className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
                 >
                   {entryColors.map((color) => (
@@ -1378,11 +1513,14 @@ function CalendarPage({
                     </div>
                   )}
 
-                  {trooperDailySections.filter((section) => !hiddenDailySections.includes(section.title)).map((section) => {
+                  {visibleDailySections.map((section) => {
                     const isCollapsed = collapsedDailySections.includes(section.title);
                     return (
                       <section
                         key={section.title}
+                        ref={(element) => {
+                          sectionRefs.current[section.title] = element;
+                        }}
                         className={`self-start rounded-lg border bg-white p-4 transition-all duration-300 overflow-hidden dark:bg-gray-950 ${
                           isSectionComplete(entryForm.details, section)
                             ? 'trooper-daily-match border-green-300 dark:border-green-800'
@@ -1435,6 +1573,7 @@ function CalendarPage({
                                       onChange={(value) => updateDailyDetail(key, value)}
                                       isComplete={isComplete}
                                       useMilitaryTime={useMilitaryTime}
+                                      fieldId={key}
                                     />
                                   ) : (
                                     <div className="relative">
@@ -1444,6 +1583,7 @@ function CalendarPage({
                                         maxLength={dailyInputCharacterLimit}
                                         value={entryForm.details?.[key] || ''}
                                         onChange={(event) => updateDailyDetail(key, event.target.value)}
+                                        data-daily-field={key}
                                         className={`w-full rounded border bg-white px-3 py-2 pr-8 text-sm transition dark:bg-gray-900 ${
                                           isComplete
                                             ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
@@ -1478,6 +1618,7 @@ function CalendarPage({
                       onChange={(event) => updateDailyDetail('narrative', event.target.value)}
                       placeholder="Type a narrative here"
                       maxLength={narrativeCharacterLimit}
+                      data-daily-field="narrative"
                       className="min-h-40 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
                     />
                   </section>
@@ -1488,8 +1629,11 @@ function CalendarPage({
                 <span className="mr-auto text-sm font-semibold text-gray-500 dark:text-gray-400">
                   {editingEntryId ? 'Save changes to this entry' : 'Add this entry to the selected date'}
                 </span>
-                <button type="submit" className={editingEntryId ? 'btn-primary' : 'btn-success'} aria-label={editingEntryId ? 'Save calendar entry' : 'Add calendar entry'} title={editingEntryId ? 'Save Entry' : 'Add Entry'}>
+                <button type="submit" onClick={() => { submitIntentRef.current = 'save'; }} className={editingEntryId ? 'btn-primary' : 'btn-success'} aria-label={editingEntryId ? 'Save calendar entry' : 'Add calendar entry'} title={editingEntryId ? 'Save Entry' : 'Add Entry'}>
                   {editingEntryId ? <Save size={16} /> : <CalendarClock size={16} />}
+                </button>
+                <button type="submit" onClick={() => { submitIntentRef.current = 'save-new'; }} className="btn-secondary" aria-label="Save and start another report" title="Save And New">
+                  <Plus size={16} />
                 </button>
                 {editingEntryId && (
                   <button type="button" onClick={() => {
