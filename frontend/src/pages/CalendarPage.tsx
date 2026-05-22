@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Calculator, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCopy, Eye, EyeOff, ListChecks, Pencil, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { Calculator, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCopy, Eye, EyeOff, Pencil, Save, Sparkles, Trash2, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, CalendarShortcut, authService, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
@@ -552,8 +552,6 @@ function CalendarPage({
   const [isDutyHoursManual, setIsDutyHoursManual] = useState(false);
   const lastAutoDutyHoursRef = useRef('');
   const dailyFormRef = useRef<HTMLFormElement | null>(null);
-  const submitIntentRef = useRef<'save' | 'save-new'>('save');
-  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const actor = {
     actorId: currentUser.id,
@@ -623,38 +621,12 @@ function CalendarPage({
   }, [entryPendingDelete, selectedDate]);
 
   const openDay = (dateKey: string) => {
+    const existingEntry = entries.find((entry) => entry.date === dateKey);
     setSelectedDate(dateKey);
-    setEntryForm(createDefaultEntryForm(dateKey, currentUser));
-    setIsDutyHoursManual(false);
+    setEntryForm(existingEntry ? createEntryFormFromEntry(existingEntry) : createDefaultEntryForm(dateKey, currentUser));
+    setIsDutyHoursManual(Boolean(existingEntry));
     lastAutoDutyHoursRef.current = '';
-    setEditingEntryId(null);
-  };
-
-  const startNewEntryForSelectedDay = () => {
-    if (!selectedDate) {
-      return;
-    }
-
-    setEntryForm(createDefaultEntryForm(selectedDate, currentUser));
-    setIsDutyHoursManual(false);
-    lastAutoDutyHoursRef.current = '';
-    setEditingEntryId(null);
-  };
-
-  const focusFirstDailyField = () => {
-    window.setTimeout(() => {
-      const firstField = dailyFormRef.current?.querySelector<HTMLElement>('[data-daily-field]');
-      firstField?.focus();
-    }, 50);
-  };
-
-  const jumpToDailySection = (sectionTitle: string) => {
-    setCollapsedDailySections((sections) => sections.filter((title) => title !== sectionTitle));
-    sectionRefs.current[sectionTitle]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    window.setTimeout(() => {
-      const firstField = sectionRefs.current[sectionTitle]?.querySelector<HTMLElement>('[data-daily-field]');
-      firstField?.focus();
-    }, 260);
+    setEditingEntryId(existingEntry?.id || null);
   };
 
   const handleDailyKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
@@ -697,7 +669,6 @@ function CalendarPage({
     const hours = Number(entryForm.dutyHours);
 
     if (!entryForm.date || Number.isNaN(hours) || hours < 0) {
-      submitIntentRef.current = 'save';
       return;
     }
 
@@ -710,48 +681,29 @@ function CalendarPage({
         ...actor,
       };
 
-      const shouldStartNew = submitIntentRef.current === 'save-new';
+      const existingEntryForDate = entries.find((entry) => entry.date === entryForm.date);
+      const targetEntryId = editingEntryId || existingEntryForDate?.id || null;
 
-      if (editingEntryId) {
-        const response = await calendarService.update(editingEntryId, payload);
+      if (targetEntryId) {
+        const response = await calendarService.update(targetEntryId, payload);
         setEntries((currentEntries) =>
-          currentEntries.map((entry) => (entry.id === editingEntryId ? response.data : entry)),
+          currentEntries.map((entry) => (entry.id === targetEntryId ? response.data : entry)),
         );
         setSelectedDate(response.data.date);
-        if (shouldStartNew) {
-          setEditingEntryId(null);
-          setEntryForm(createDefaultEntryForm(response.data.date, currentUser));
-          setIsDutyHoursManual(false);
-          lastAutoDutyHoursRef.current = '';
-          focusFirstDailyField();
-        } else {
-          setEditingEntryId(response.data.id);
-          setEntryForm(createEntryFormFromEntry(response.data));
-        }
+        setEditingEntryId(response.data.id);
+        setEntryForm(createEntryFormFromEntry(response.data));
       } else {
         const response = await calendarService.create(payload);
         setEntries((currentEntries) => [response.data, ...currentEntries]);
         setSelectedDate(response.data.date);
-        if (shouldStartNew) {
-          setEditingEntryId(null);
-          setEntryForm(createDefaultEntryForm(response.data.date, currentUser));
-          setIsDutyHoursManual(false);
-          lastAutoDutyHoursRef.current = '';
-          focusFirstDailyField();
-        } else {
-          setEditingEntryId(response.data.id);
-          setEntryForm(createEntryFormFromEntry(response.data));
-        }
+        setEditingEntryId(response.data.id);
+        setEntryForm(createEntryFormFromEntry(response.data));
       }
-      if (!shouldStartNew) {
-        setIsDutyHoursManual(true);
-        lastAutoDutyHoursRef.current = '';
-      }
+      setIsDutyHoursManual(true);
+      lastAutoDutyHoursRef.current = '';
     } catch (err) {
       console.error('Failed to save calendar entry:', err);
       setCalendarError(getApiErrorMessage(err, 'Failed to save calendar entry.'));
-    } finally {
-      submitIntentRef.current = 'save';
     }
   };
 
@@ -771,13 +723,6 @@ function CalendarPage({
       console.error('Failed to delete calendar entry:', err);
       setCalendarError(getApiErrorMessage(err, 'Failed to delete calendar entry.'));
     }
-  };
-
-  const editEntry = (entry: CalendarEntry) => {
-    setEditingEntryId(entry.id);
-    setEntryForm(createEntryFormFromEntry(entry));
-    setIsDutyHoursManual(true);
-    lastAutoDutyHoursRef.current = '';
   };
 
   const updateDailyDetail = (key: string, value: string) => {
@@ -970,11 +915,7 @@ function CalendarPage({
     return matchesDistrict && matchesStatus;
   });
 
-  const selectedEntries = selectedDate
-    ? visibleEntries.filter((entry) => entry.date === selectedDate)
-    : [];
-  const editingEntry = editingEntryId ? selectedEntries.find((entry) => entry.id === editingEntryId) : null;
-  const isCreatingEntry = !editingEntryId;
+  const editingEntry = editingEntryId ? entries.find((entry) => entry.id === editingEntryId) : null;
 
   const monthStart = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
   const daysInMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
@@ -1008,19 +949,6 @@ function CalendarPage({
       (attendanceHours > 0 && Math.abs(attendanceHours - reportedDutyHours) > 0.01) ||
       (dutyActivityHours > 0 && Math.abs(dutyActivityHours - reportedDutyHours) > 0.01));
   const visibleDailySections = trooperDailySections.filter((section) => !hiddenDailySections.includes(section.title));
-  const completedVisibleSections = visibleDailySections.filter((section) => isSectionComplete(entryForm.details, section));
-  const incompleteVisibleSections = visibleDailySections.filter((section) => !isSectionComplete(entryForm.details, section));
-  const completionPercent = visibleDailySections.length > 0
-    ? Math.round((completedVisibleSections.length / visibleDailySections.length) * 100)
-    : 100;
-  const checklistItems = [
-    { label: 'Date', complete: Boolean(entryForm.date) },
-    { label: 'Duty hours', complete: Boolean(entryForm.dutyHours) },
-    { label: 'District', complete: Boolean(entryForm.districtWorked) },
-    { label: 'Status', complete: Boolean(entryForm.specialStatus) },
-    { label: 'Hours check', complete: !hasHourMismatch && hasReportedHours },
-    { label: 'Sections', complete: incompleteVisibleSections.length === 0 },
-  ];
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -1157,20 +1085,9 @@ function CalendarPage({
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Trooper Daily</p>
-                <div className="mt-1 flex flex-wrap items-center gap-3">
-                  <h2>{getReadableDate(selectedDate)}</h2>
-                  <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] ${
-                    editingEntryId
-                      ? 'bg-accent/15 text-accent ring-1 ring-accent/30'
-                      : 'bg-green-50 text-green-700 ring-1 ring-green-200 dark:bg-green-950/40 dark:text-green-200 dark:ring-green-900'
-                  }`}>
-                    {editingEntryId ? 'Editing Entry' : 'Creating New Entry'}
-                  </span>
-                </div>
+                <h2 className="mt-1">{getReadableDate(selectedDate)}</h2>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {editingEntryId
-                    ? `Updating ${editingEntry?.dutyHours || entryForm.dutyHours || 'this'} hour report. Save or cancel before starting another entry.`
-                    : `Add one or more daily activity reports for this date. ${selectedEntries.length} saved.`}
+                  {editingEntryId ? 'Update this daily report.' : 'Fill out this daily report.'}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
@@ -1197,127 +1114,7 @@ function CalendarPage({
               </div>
             </div>
 
-            <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-950">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                {selectedEntries.map((entry, index) => {
-                  const isActive = editingEntryId === entry.id;
-                  return (
-                    <button
-                      key={entry.id}
-                      type="button"
-                      onClick={() => editEntry(entry)}
-                      className={`flex min-w-[9rem] items-center gap-2 rounded px-3 py-2 text-left text-sm font-bold transition ${
-                        isActive
-                          ? 'bg-primary-500 text-white shadow'
-                          : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100 dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-800 dark:hover:bg-gray-800'
-                      }`}
-                      title={`Report ${index + 1}`}
-                    >
-                      <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />
-                      <span className="min-w-0">
-                        <span className="block truncate">Report {index + 1}</span>
-                        <span className={`block truncate text-xs font-semibold ${isActive ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
-                          {entry.dutyHours} hrs
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={startNewEntryForSelectedDay}
-                  className={`flex min-w-[8rem] items-center justify-center gap-2 rounded px-3 py-2 text-sm font-bold transition ${
-                    isCreatingEntry
-                      ? 'bg-success text-white shadow'
-                      : 'border border-dashed border-accent/60 bg-accent/10 text-accent hover:bg-accent/15'
-                  }`}
-                  title="Add Report"
-                  aria-label="Add report tab"
-                >
-                  <Plus size={18} />
-                  <span>Add Tab</span>
-                </button>
-              </div>
-            </div>
-
             <form ref={dailyFormRef} onSubmit={saveEntry} onKeyDown={handleDailyKeyDown} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className={`rounded-lg border p-4 md:col-span-2 ${
-                editingEntryId
-                  ? 'border-accent/30 bg-accent/10'
-                  : 'border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/20'
-              }`}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className={`text-xs font-bold uppercase tracking-[0.18em] ${editingEntryId ? 'text-accent' : 'text-green-700 dark:text-green-200'}`}>
-                      {editingEntryId ? 'Edit Mode' : 'New Daily Entry'}
-                    </p>
-                    <h3 className="mt-1 text-base font-bold text-gray-900 dark:text-gray-100">
-                      {editingEntryId ? 'You are editing an existing Trooper Daily' : 'You are creating a new Trooper Daily'}
-                    </h3>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {editingEntry && (
-                      <button type="button" onClick={() => setEntryPendingDelete(editingEntry)} className="btn-danger" aria-label="Delete active report" title="Delete Report">
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                    <button type="submit" onClick={() => { submitIntentRef.current = 'save'; }} className={editingEntryId ? 'btn-primary' : 'btn-success'} aria-label={editingEntryId ? 'Save calendar entry' : 'Add calendar entry'} title={editingEntryId ? 'Save Entry' : 'Add Entry'}>
-                      {editingEntryId ? <Save size={16} /> : <CalendarClock size={16} />}
-                    </button>
-                    <button type="submit" onClick={() => { submitIntentRef.current = 'save-new'; }} className="btn-secondary" aria-label="Save and start another report" title="Save And New">
-                      <Plus size={16} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950 md:col-span-2">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <ListChecks className="text-accent" size={18} />
-                    <div>
-                      <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Entry Progress</h3>
-                      <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">
-                        {completedVisibleSections.length}/{visibleDailySections.length} visible sections complete
-                      </p>
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">{completionPercent}%</span>
-                </div>
-                <div className="mb-3 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-                  <div className="h-full rounded-full bg-accent transition-all duration-300" style={{ width: `${completionPercent}%` }} />
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {checklistItems.map((item) => (
-                    <span
-                      key={item.label}
-                      className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold ${
-                        item.complete
-                          ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-200'
-                          : 'border-gray-200 bg-gray-50 text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400'
-                      }`}
-                    >
-                      {item.complete && <CheckCircle2 size={13} />}
-                      {item.label}
-                    </span>
-                  ))}
-                </div>
-                {incompleteVisibleSections.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
-                    {incompleteVisibleSections.slice(0, 6).map((section) => (
-                      <button
-                        key={section.title}
-                        type="button"
-                        onClick={() => jumpToDailySection(section.title)}
-                        className="rounded border border-dashed border-gray-300 px-3 py-1.5 text-xs font-bold text-primary-500 hover:border-accent hover:text-accent dark:border-gray-700 dark:text-blue-100"
-                      >
-                        {section.title}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
               <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 md:col-span-2">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -1518,9 +1315,6 @@ function CalendarPage({
                     return (
                       <section
                         key={section.title}
-                        ref={(element) => {
-                          sectionRefs.current[section.title] = element;
-                        }}
                         className={`self-start rounded-lg border bg-white p-4 transition-all duration-300 overflow-hidden dark:bg-gray-950 ${
                           isSectionComplete(entryForm.details, section)
                             ? 'trooper-daily-match border-green-300 dark:border-green-800'
@@ -1627,24 +1421,16 @@ function CalendarPage({
 
               <div className="flex flex-wrap items-center justify-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950 md:col-span-2">
                 <span className="mr-auto text-sm font-semibold text-gray-500 dark:text-gray-400">
-                  {editingEntryId ? 'Save changes to this entry' : 'Add this entry to the selected date'}
+                  {editingEntryId ? 'Save changes to this daily report' : 'Save this daily report'}
                 </span>
-                <button type="submit" onClick={() => { submitIntentRef.current = 'save'; }} className={editingEntryId ? 'btn-primary' : 'btn-success'} aria-label={editingEntryId ? 'Save calendar entry' : 'Add calendar entry'} title={editingEntryId ? 'Save Entry' : 'Add Entry'}>
-                  {editingEntryId ? <Save size={16} /> : <CalendarClock size={16} />}
-                </button>
-                <button type="submit" onClick={() => { submitIntentRef.current = 'save-new'; }} className="btn-secondary" aria-label="Save and start another report" title="Save And New">
-                  <Plus size={16} />
-                </button>
-                {editingEntryId && (
-                  <button type="button" onClick={() => {
-                    setEditingEntryId(null);
-                    setEntryForm(createDefaultEntryForm(selectedDate, currentUser));
-                    setIsDutyHoursManual(false);
-                    lastAutoDutyHoursRef.current = '';
-                  }} className="btn-secondary ml-2" aria-label="Cancel edit" title="Cancel Edit">
-                    <X size={16} />
+                {editingEntry && (
+                  <button type="button" onClick={() => setEntryPendingDelete(editingEntry)} className="btn-danger" aria-label="Delete daily report" title="Delete Report">
+                    <Trash2 size={16} />
                   </button>
                 )}
+                <button type="submit" className={editingEntryId ? 'btn-primary' : 'btn-success'} aria-label={editingEntryId ? 'Save calendar entry' : 'Add calendar entry'} title={editingEntryId ? 'Save Entry' : 'Add Entry'}>
+                  {editingEntryId ? <Save size={16} /> : <CalendarClock size={16} />}
+                </button>
               </div>
             </form>
 
