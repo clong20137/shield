@@ -166,7 +166,7 @@ const ReportsPage: React.FC<{
   const [dailyPageSize, setDailyPageSize] = useState(25);
   const [dailyTotal, setDailyTotal] = useState(0);
   const [dailyTotalPages, setDailyTotalPages] = useState(1);
-  const [dailyScope, setDailyScope] = useState<'all' | 'own'>('own');
+  const [dailyScope, setDailyScope] = useState<'all' | 'own' | 'supervised'>('own');
   const [dailyLoading, setDailyLoading] = useState(true);
   const [dailyExportFormat, setDailyExportFormat] = useState<DailyExportFormat>('csv');
   const [selectedDailyExportFormat, setSelectedDailyExportFormat] = useState<DailyExportFormat>('pdf');
@@ -424,7 +424,9 @@ const ReportsPage: React.FC<{
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {dailyScope === 'all'
                 ? 'Search submitted Trooper Dailies by user, email, PE number, badge, rank, or district.'
-                : `Search your submitted Trooper Dailies${currentUser?.displayName ? `, ${currentUser.displayName}` : ''}.`}
+                : dailyScope === 'supervised'
+                  ? 'Search your Trooper Dailies and reports for users assigned to you.'
+                  : `Search your submitted Trooper Dailies${currentUser?.displayName ? `, ${currentUser.displayName}` : ''}.`}
             </p>
           </div>
           <span className="rounded bg-accent/10 px-3 py-1 text-sm font-bold text-accent">

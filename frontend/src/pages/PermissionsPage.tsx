@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Mail, Pencil, Plus, Save, Search, ShieldCheck, X } from 'lucide-react';
-import { AuthAccount, AuthInvite, AuthRole, RegistrationSettings, authService, mileageService } from '../services/api';
+import { AuthAccount, AuthInvite, AuthRole, RegistrationSettings, authService } from '../services/api';
 
 interface PermissionsPageProps {
   account: AuthAccount;
@@ -153,13 +153,11 @@ function PermissionChecklist({
 
 function PermissionsPage({
   account,
-  onAccountUpdate,
   onToast,
   getErrorMessage,
   section = 'all',
   isModalView = false,
 }: PermissionsPageProps) {
-  const [accounts, setAccounts] = useState<AuthAccount[]>([]);
   const [roles, setRoles] = useState<AuthRole[]>([]);
   const [newRoleName, setNewRoleName] = useState('');
   const [newRolePermissions, setNewRolePermissions] = useState<string[]>(['users:view']);
@@ -182,11 +180,8 @@ function PermissionsPage({
   const [invites, setInvites] = useState<AuthInvite[]>([]);
   const [latestInvite, setLatestInvite] = useState<AuthInvite | null>(null);
   const [isSavingRegistration, setIsSavingRegistration] = useState(false);
-  const [mileageMilestone, setMileageMilestone] = useState(1000);
-  const [isSavingMileageMilestone, setIsSavingMileageMilestone] = useState(false);
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [savingAccountId, setSavingAccountId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadAccounts = async (showLoading = true) => {
@@ -196,21 +191,17 @@ function PermissionsPage({
     setError(null);
 
     try {
-      const response = await authService.getAccounts(account.id);
       const rolesResponse = await authService.getRoles(account.id);
       const registrationResponse = await authService.getRegistrationSettings();
       const invitesResponse = await authService.listInvites();
-      const mileageResponse = await mileageService.getSummary();
-      setAccounts(response.data);
       setRoles(rolesResponse.data);
       setRegistrationSettings(registrationResponse.data);
       try {
         window.localStorage.setItem(SESSION_TIMEOUT_KEY, String(registrationResponse.data.sessionTimeoutMinutes || 0));
       } catch {}
       setInvites(invitesResponse.data);
-      setMileageMilestone(mileageResponse.data.milestone || 1000);
     } catch (err) {
-      const message = getErrorMessage(err, 'Failed to load accounts.');
+      const message = getErrorMessage(err, 'Failed to load admin settings.');
       setError(message);
       onToast('error', message);
     } finally {
@@ -249,35 +240,6 @@ function PermissionsPage({
     setEditingRole(role);
     setEditRoleName(role.name);
     setEditRolePermissions(role.permissions);
-  };
-
-  const updateRole = async (targetAccount: AuthAccount, role: string) => {
-    setSavingAccountId(targetAccount.id);
-    setError(null);
-
-    try {
-      const response = await authService.updateRole(account.id, targetAccount.id, role);
-
-      if (response.data.account) {
-        setAccounts((currentAccounts) =>
-          currentAccounts.map((item) =>
-            item.id === targetAccount.id ? response.data.account as AuthAccount : item,
-          ),
-        );
-
-        if (targetAccount.id === account.id) {
-          onAccountUpdate(response.data.account);
-        }
-      }
-
-      onToast('success', 'Permissions updated.');
-    } catch (err) {
-      const message = getErrorMessage(err, 'Failed to update permissions.');
-      setError(message);
-      onToast('error', message);
-    } finally {
-      setSavingAccountId(null);
-    }
   };
 
   const createRole = async (event?: React.FormEvent<HTMLFormElement>) => {
@@ -319,7 +281,6 @@ function PermissionsPage({
     try {
       const response = await authService.updateRoleDefinition(editingRole.id, editRoleName, editRolePermissions);
       setRoles((currentRoles) => currentRoles.map((role) => (role.id === editingRole.id ? response.data : role)).sort((a, b) => a.name.localeCompare(b.name)));
-      setAccounts((currentAccounts) => currentAccounts.map((item) => (item.role === editingRole.name ? { ...item, role: response.data.name } : item)));
       setEditingRole(null);
       onToast('success', 'Role updated.');
     } catch (err) {
@@ -381,32 +342,6 @@ function PermissionsPage({
     }
   };
 
-  const saveMileageMilestone = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!Number.isFinite(mileageMilestone) || mileageMilestone <= 0) {
-      onToast('error', 'Mileage milestone must be greater than zero.');
-      return;
-    }
-
-    setIsSavingMileageMilestone(true);
-    setError(null);
-    try {
-      const response = await mileageService.updateMilestone(mileageMilestone);
-      setMileageMilestone(response.data.milestone);
-      onToast('success', 'Mileage milestone saved.');
-    } catch (err) {
-      const message = getErrorMessage(err, 'Failed to save mileage milestone.');
-      setError(message);
-      onToast('error', message);
-    } finally {
-      setIsSavingMileageMilestone(false);
-    }
-  };
-
-  const administratorCount = accounts.filter((item) => item.role === 'administrator').length;
-  const standardCount = accounts.filter((item) => item.role === 'user').length;
-
   return (
     <div>
       {!isModalView && (
@@ -431,31 +366,19 @@ function PermissionsPage({
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Roles & Access</h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Assign account roles or adjust role permissions.</p>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Create roles and organize permission sets. Assign a role from the user profile edit modal.</p>
           </div>
           <button type="button" onClick={() => setIsCreateRoleModalOpen(true)} className="btn-primary" aria-label="Create role" title="Create Role">
             <Plus size={16} />
           </button>
         </div>
       )}
-      <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-          <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">Total Accounts</p>
-          <p className="mt-2 text-3xl font-bold text-primary-500 dark:text-blue-100">{accounts.length}</p>
-        </div>
-        <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-          <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">Administrators</p>
-          <p className="mt-2 text-3xl font-bold text-accent">{administratorCount}</p>
-        </div>
-        <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-          <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">Users</p>
-          <p className="mt-2 text-3xl font-bold text-primary-500 dark:text-blue-100">{standardCount}</p>
-        </div>
-      </div>
-
       <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <h2>Account Roles</h2>
+          <div>
+            <h2>Role Definitions</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Edit the permissions each role grants. User assignment now lives on each user profile.</p>
+          </div>
           <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
             {roles.map((role) => (
               <button key={role.id} type="button" onClick={() => openEditRole(role)} className="flex items-center justify-between gap-3 rounded border border-gray-200 bg-gray-50 px-3 py-3 text-left text-sm text-gray-700 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200" aria-label={`Edit ${role.name} role`} title={`Edit ${role.name}`}>
@@ -472,48 +395,12 @@ function PermissionsPage({
           </div>
         </div>
         {loading ? (
-          <div className="loading">Loading accounts...</div>
-        ) : accounts.length === 0 ? (
-          <div className="empty-state">No accounts found.</div>
+          <div className="loading">Loading roles...</div>
+        ) : roles.length === 0 ? (
+          <div className="empty-state">No roles found.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] border-collapse text-left">
-              <thead>
-                <tr className="border-b border-gray-200 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                  <th className="px-3 py-3">Name</th>
-                  <th className="px-3 py-3">Email</th>
-                  <th className="px-3 py-3">2FA</th>
-                  <th className="px-3 py-3">Role</th>
-                  <th className="px-3 py-3">Updated</th>
-                </tr>
-              </thead>
-              <tbody>
-                {accounts.map((item) => (
-                  <tr key={item.id} className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="px-3 py-4 font-semibold text-gray-800 dark:text-gray-100">{item.displayName}</td>
-                    <td className="px-3 py-4">{item.email}</td>
-                    <td className="px-3 py-4">{item.twoFactorEnabled ? 'Enabled' : 'Not enabled'}</td>
-                    <td className="px-3 py-4">
-                      <select
-                        value={item.role}
-                        onChange={(event) => updateRole(item, event.target.value)}
-                        disabled={savingAccountId === item.id}
-                        className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-                      >
-                        {roles.map((role) => (
-                          <option key={role.id} value={role.name}>
-                            {role.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400">
-                      {new Date(item.updatedAt).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="rounded border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+            Select a role card above to update its permission set. To assign a role, open a user profile and choose Edit.
           </div>
         )}
       </section>
@@ -601,24 +488,6 @@ function PermissionsPage({
               <Save size={16} />
             </button>
           </div>
-        </form>
-
-        <form onSubmit={saveMileageMilestone} className="mt-5 grid grid-cols-1 gap-3 rounded border border-gray-200 p-4 dark:border-gray-800 md:grid-cols-[minmax(0,1fr)_auto]">
-          <label>
-            <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Mileage milestone</span>
-            <input
-              type="number"
-              min={1}
-              step={1}
-              value={mileageMilestone}
-              onChange={(event) => setMileageMilestone(Math.max(1, Number(event.target.value) || 1))}
-              className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-            />
-            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">This controls the mileage progress bar shown on user profiles.</span>
-          </label>
-          <button type="submit" className="btn-primary self-end" disabled={isSavingMileageMilestone} aria-label="Save mileage milestone" title={isSavingMileageMilestone ? 'Saving' : 'Save Mileage Milestone'}>
-            <Save size={16} />
-          </button>
         </form>
 
         <form onSubmit={createInvite} className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto]">

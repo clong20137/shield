@@ -527,6 +527,17 @@ export interface UserNotification {
 export interface MileageSummary {
   mileage: number;
   milestone: number;
+  achievements?: MileageAchievement[];
+  nextAchievement?: MileageAchievement | null;
+}
+
+export interface MileageAchievement {
+  id: string;
+  title: string;
+  mileage: number;
+  icon: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type QuickLaunchExternalSlot = {
@@ -700,7 +711,7 @@ export const reportService = {
     api.get('/reports/detailed', { params: filters }),
 
   getTrooperDailies: (filters?: { q?: string; from?: string; to?: string; district?: string; page?: number; pageSize?: number }) =>
-    api.get<{ count: number; total: number; page: number; pageSize: number; totalPages: number; scope: 'all' | 'own'; data: TrooperDailyReportEntry[] }>('/reports/trooper-dailies', { params: filters }),
+    api.get<{ count: number; total: number; page: number; pageSize: number; totalPages: number; scope: 'all' | 'own' | 'supervised'; data: TrooperDailyReportEntry[] }>('/reports/trooper-dailies', { params: filters }),
 
   reviewTrooperDaily: (id: string, status: 'Approved' | 'Returned', notes: string) =>
     api.put<TrooperDailyReportEntry>(`/reports/trooper-dailies/${id}/review`, { status, notes }),
@@ -862,6 +873,18 @@ export const mileageService = {
 
   updateMilestone: (milestone: number) =>
     api.put<{ milestone: number }>('/mileage/milestone', { milestone }),
+
+  getAchievements: () =>
+    api.get<MileageAchievement[]>('/mileage/achievements'),
+
+  createAchievement: (achievement: Pick<MileageAchievement, 'title' | 'mileage' | 'icon'>) =>
+    api.post<MileageAchievement>('/mileage/achievements', achievement),
+
+  updateAchievement: (id: string, achievement: Pick<MileageAchievement, 'title' | 'mileage' | 'icon'>) =>
+    api.put<MileageAchievement>(`/mileage/achievements/${id}`, achievement),
+
+  deleteAchievement: (id: string) =>
+    api.delete(`/mileage/achievements/${id}`),
 };
 
 export const performanceEvaluationService = {

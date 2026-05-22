@@ -456,6 +456,23 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS mileage_achievements (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`title\` VARCHAR(120) NOT NULL,
+      \`mileage\` DECIMAL(10,2) NOT NULL,
+      \`icon\` VARCHAR(50) NOT NULL DEFAULT 'gauge',
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX \`idx_mileage_achievements_mileage\` (\`mileage\`)
+    )
+  `);
+
+  await pool.query(`
+    INSERT IGNORE INTO mileage_achievements (\`id\`, \`title\`, \`mileage\`, \`icon\`)
+    VALUES ('achievement-mileage-1000', '1,000 Mile Mark', 1000, 'gauge')
+  `);
+
+  await pool.query(`
     INSERT IGNORE INTO system_settings (\`settingKey\`, \`settingValue\`)
     VALUES
       ('registrationMode', 'public'),

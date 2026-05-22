@@ -4,6 +4,7 @@ import { AuthAccountModel } from '../models/AuthAccount';
 import { DashboardPostModel } from '../models/DashboardPost';
 import { UserNotificationModel } from '../models/UserNotification';
 import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents';
+import { notifyMentions } from '../services/mentionService';
 import { cleanMultiline, cleanString, isOneOf } from '../utils/validation';
 import { parsePagination } from '../utils/pagination';
 
@@ -162,6 +163,16 @@ export class DashboardPostController {
       if (!comment) {
         return res.status(404).json({ error: 'Post not found or comments are disabled' });
       }
+
+      const post = await DashboardPostModel.getPost(req.params.id, account.id);
+      await notifyMentions(body, {
+        actorId: account.id,
+        actorName: account.displayName || account.email,
+        entityType: 'dashboard_post',
+        entityId: req.params.id,
+        title: 'You were mentioned in a comment',
+        message: `${account.displayName || account.email} mentioned you on "${post?.title || 'an update'}".`,
+      });
 
       broadcastAppEvent({ type: 'dashboard-updated', entityId: req.params.id });
       res.status(201).json(comment);

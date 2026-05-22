@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Bug, ClipboardList, LockKeyhole, Settings, UserPlus } from 'lucide-react';
+import { AlertTriangle, Award, Bug, ClipboardList, LockKeyhole, Settings, UserPlus } from 'lucide-react';
 import { AuthAccount, BugReport, BugReportStatus, User } from '../services/api';
 import AuditLogPage from './AuditLogPage';
 import BugTrackerPage from './BugTrackerPage';
 import CreateUserPage from './CreateUserPage';
 import ErrorLogPage from './ErrorLogPage';
 import PermissionsPage from './PermissionsPage';
+import AchievementsPage from './AchievementsPage';
 
-export type AdminConsoleTab = 'general' | 'permissions' | 'create-user' | 'audit' | 'errors' | 'bugs';
+export type AdminConsoleTab = 'general' | 'permissions' | 'achievements' | 'create-user' | 'audit' | 'errors' | 'bugs';
 
 interface AdminConsolePageProps {
   account: AuthAccount;
@@ -23,6 +24,7 @@ interface AdminConsolePageProps {
 const tabs: Array<{ id: AdminConsoleTab; label: string; icon: typeof Settings }> = [
   { id: 'general', label: 'General', icon: Settings },
   { id: 'permissions', label: 'Permissions', icon: LockKeyhole },
+  { id: 'achievements', label: 'Achievements', icon: Award },
   { id: 'create-user', label: 'Create User', icon: UserPlus },
   { id: 'bugs', label: 'Bug Tracker', icon: Bug },
   { id: 'audit', label: 'Audit Log', icon: ClipboardList },
@@ -96,6 +98,13 @@ export function AdminConsolePage({
             onToast={onToast}
             isModalView
             onCreated={onUserCreated}
+          />
+        )}
+
+        {activeTab === 'achievements' && (
+          <AchievementsPage
+            onToast={onToast}
+            getErrorMessage={getErrorMessage}
           />
         )}
 

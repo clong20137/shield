@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Camera, Save, Send, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { useSearchParams } from 'react-router-dom';
-import { AuthAccount, getAssetUrl, handleAssetImageError, messageService, userService, User, UserFilters } from '../services/api';
+import { AuthAccount, AuthRole, authService, getAssetUrl, handleAssetImageError, messageService, userService, User, UserFilters } from '../services/api';
 import { SearchBar } from '../components/SearchBar';
 import { UserTable } from '../components/UserTable';
 import { UserDetail } from '../components/UserDetail';
@@ -87,6 +87,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState<Partial<User>>({});
   const [supervisorOptions, setSupervisorOptions] = useState<User[]>([]);
+  const [roleOptions, setRoleOptions] = useState<AuthRole[]>([]);
   const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
@@ -158,12 +159,14 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const loadUserEditOptions = async () => {
     try {
       const response = await userService.getAll(1, 500);
+      const roleResponse = currentUser ? await authService.getRoles(currentUser.id) : null;
       const loadedUsers = response.data.data;
       const addresses = loadedUsers
         .flatMap((user) => [user.residentialAddress, user.mailingAddress])
         .filter((address): address is string => Boolean(address?.trim()));
 
       setSupervisorOptions(loadedUsers);
+      setRoleOptions(roleResponse?.data || []);
       setAddressSuggestions(Array.from(new Set(addresses)).slice(0, 100));
     } catch (err) {
       console.error('Failed to load user edit options:', err);
@@ -179,7 +182,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
 
     setEditingUser(user);
     setEditForm(user);
-    if (supervisorOptions.length === 0 || addressSuggestions.length === 0) {
+    if (supervisorOptions.length === 0 || addressSuggestions.length === 0 || roleOptions.length === 0) {
       void loadUserEditOptions();
     }
   };
@@ -292,6 +295,9 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
         return updates;
       }, {});
       await userService.update(editingUser.id, payload);
+      if (editForm.role && editForm.role !== editingUser.role && currentUser) {
+        await authService.updateRole(currentUser.id, editingUser.id, String(editForm.role));
+      }
       const response = await userService.getById(editingUser.id);
       const updatedUser = response.data as User;
       setUsers((currentUsers) =>
@@ -588,6 +594,14 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                     checked={editForm.isActive !== false}
                     onChange={(event) => updateEditField('isActive', event.target.checked)}
                   />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Role</span>
+                  <select value={String(editForm.role || 'user')} onChange={(event) => updateEditField('role', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                    {(roleOptions.length > 0 ? roleOptions : [{ id: 'role-user', name: 'user', permissions: [], createdAt: '', updatedAt: '' }, { id: 'role-administrator', name: 'administrator', permissions: [], createdAt: '', updatedAt: '' }]).map((role) => (
+                      <option key={role.id} value={role.name}>{role.name}</option>
+                    ))}
+                  </select>
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">District</span>

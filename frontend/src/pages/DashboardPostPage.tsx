@@ -4,6 +4,8 @@ import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { Flag, MessageSquare, Pin, PinOff, Send, Smile, Trash2, X } from 'lucide-react';
 import { UserDetail } from '../components/UserDetail';
 import { FormattedText } from '../components/FormattedText';
+import { MentionTextarea } from '../components/MentionTextarea';
+import { MentionText } from '../components/MentionText';
 import { AuthAccount, DashboardPost, DashboardPostComment, User, dashboardPostService, getAssetUrl, handleAssetImageError, userService } from '../services/api';
 
 interface DashboardPostPageProps {
@@ -173,6 +175,30 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
     }
   };
 
+  const openMentionProfile = async (mention: string) => {
+    const query = mention.replace(/^@/u, '').replace(/\s+/gu, ' ').trim();
+    if (!query) return;
+
+    setError(null);
+    try {
+      const response = await userService.search(query);
+      const users = Array.isArray(response.data) ? response.data : response.data.data;
+      const normalizedQuery = query.toLowerCase();
+      const user = (users as User[]).find((item) =>
+        `${item.firstName || ''} ${item.lastName || ''}`.trim().toLowerCase() === normalizedQuery ||
+        item.email?.toLowerCase().startsWith(normalizedQuery) ||
+        item.peNumber?.toLowerCase() === normalizedQuery,
+      ) || users[0];
+
+      if (user) {
+        setSelectedCommentUser(user);
+      }
+    } catch (err) {
+      console.error('Failed to load mentioned user:', err);
+      setError('Failed to load that profile.');
+    }
+  };
+
   const addEmoji = (emojiData: EmojiClickData) => {
     setCommentBody((body) => `${body}${emojiData.emoji}`.slice(0, 1200));
     setIsEmojiPickerOpen(false);
@@ -243,16 +269,17 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
           <div className="empty-state mt-4 rounded border border-dashed border-gray-300 dark:border-gray-700">Comments are disabled for this update.</div>
         ) : (
           <form onSubmit={submitComment} className="mt-4 rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
-            <textarea
+            <MentionTextarea
               value={commentBody}
-              onChange={(event) => setCommentBody(event.target.value)}
+              onChange={setCommentBody}
+              wrapperClassName="w-full"
               className="min-h-24 w-full resize-y rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900"
-              placeholder={currentUser ? 'Add a comment...' : 'Sign in to comment'}
+              placeholder={currentUser ? 'Add a comment... use @ to mention someone' : 'Sign in to comment'}
               disabled={!currentUser}
               maxLength={1200}
             />
             <div className="mt-3 flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{commentBody.length}/1200</span>
+              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">@ mentions notify users · {commentBody.length}/1200</span>
               <div className="relative flex items-center gap-2">
                 <button
                   type="button"
@@ -329,7 +356,12 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
                     )}
                   </div>
                 </div>
-                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300">{comment.body}</p>
+                <MentionText
+                  text={comment.body}
+                  onMentionClick={openMentionProfile}
+                  className="mt-3 block whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300"
+                  mentionClassName="font-bold text-primary-500 underline underline-offset-2 dark:text-blue-200"
+                />
               </div>
             </div>
           ))}

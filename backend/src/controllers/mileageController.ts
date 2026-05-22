@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { CalendarEntryModel } from '../models/CalendarEntry';
 import { AuthAccountModel } from '../models/AuthAccount';
+import { MileageAchievementModel } from '../models/MileageAchievement';
 import { SystemSettingModel } from '../models/SystemSetting';
 import { getSessionAccount } from '../middleware/authSession';
 import { broadcastAppEvent } from '../services/appEvents';
@@ -23,9 +24,12 @@ export class MileageController {
       }
 
       const mileage = await CalendarEntryModel.getMileageTotal(accountId);
-      const milestone = await SystemSettingModel.getNumber(MILEAGE_SETTING, 1000);
+      const achievements = await MileageAchievementModel.list();
+      const fallbackMilestone = await SystemSettingModel.getNumber(MILEAGE_SETTING, 1000);
+      const nextAchievement = achievements.find((achievement) => achievement.mileage >= mileage) || achievements[achievements.length - 1] || null;
+      const milestone = nextAchievement?.mileage || fallbackMilestone;
 
-      res.json({ mileage, milestone });
+      res.json({ mileage, milestone, achievements, nextAchievement });
     } catch (error) {
       console.error('Mileage summary error:', error);
       res.status(500).json({ error: 'Failed to load mileage summary' });
@@ -62,6 +66,80 @@ export class MileageController {
     } catch (error) {
       console.error('Mileage milestone error:', error);
       res.status(500).json({ error: 'Failed to save mileage milestone' });
+    }
+  }
+
+  static async listAchievements(req: Request, res: Response) {
+    try {
+      res.json(await MileageAchievementModel.list());
+    } catch (error) {
+      console.error('Mileage achievements list error:', error);
+      res.status(500).json({ error: 'Failed to load achievements' });
+    }
+  }
+
+  static async createAchievement(req: Request, res: Response) {
+    try {
+      const title = cleanString(req.body?.title, 120);
+      const icon = cleanString(req.body?.icon, 50) || 'gauge';
+      const mileage = Number(req.body?.mileage);
+
+      if (!title) {
+        return res.status(400).json({ error: 'Achievement title is required' });
+      }
+
+      if (!Number.isFinite(mileage) || mileage <= 0) {
+        return res.status(400).json({ error: 'Achievement mileage must be greater than zero' });
+      }
+
+      const achievement = await MileageAchievementModel.create({ title, mileage, icon });
+      broadcastAppEvent({ type: 'mileage-updated' });
+      res.status(201).json(achievement);
+    } catch (error) {
+      console.error('Mileage achievement create error:', error);
+      res.status(500).json({ error: 'Failed to create achievement' });
+    }
+  }
+
+  static async updateAchievement(req: Request, res: Response) {
+    try {
+      const title = cleanString(req.body?.title, 120);
+      const icon = cleanString(req.body?.icon, 50) || 'gauge';
+      const mileage = Number(req.body?.mileage);
+
+      if (!title) {
+        return res.status(400).json({ error: 'Achievement title is required' });
+      }
+
+      if (!Number.isFinite(mileage) || mileage <= 0) {
+        return res.status(400).json({ error: 'Achievement mileage must be greater than zero' });
+      }
+
+      const achievement = await MileageAchievementModel.update(req.params.id, { title, mileage, icon });
+      if (!achievement) {
+        return res.status(404).json({ error: 'Achievement not found' });
+      }
+
+      broadcastAppEvent({ type: 'mileage-updated' });
+      res.json(achievement);
+    } catch (error) {
+      console.error('Mileage achievement update error:', error);
+      res.status(500).json({ error: 'Failed to update achievement' });
+    }
+  }
+
+  static async deleteAchievement(req: Request, res: Response) {
+    try {
+      const deleted = await MileageAchievementModel.delete(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Achievement not found' });
+      }
+
+      broadcastAppEvent({ type: 'mileage-updated' });
+      res.json({ message: 'Achievement deleted' });
+    } catch (error) {
+      console.error('Mileage achievement delete error:', error);
+      res.status(500).json({ error: 'Failed to delete achievement' });
     }
   }
 }

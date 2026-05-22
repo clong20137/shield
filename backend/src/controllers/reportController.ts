@@ -89,6 +89,13 @@ export class ReportController {
 
       const permissions = account.role === 'administrator' ? ['reports:trooper-dailies'] : await AuthAccountModel.getPermissionsForAccount(account.id);
       const canViewAllReports = account.role === 'administrator' || permissions.includes('reports:trooper-dailies');
+      const supervisorNames = Array.from(new Set([
+        account.displayName,
+        `${account.firstName || ''} ${account.lastName || ''}`.trim(),
+        account.email,
+      ]
+        .map((value) => value?.trim().toLowerCase())
+        .filter((value): value is string => Boolean(value))));
       const { q, from, to, district } = req.query;
       const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
       const pageSize = Math.min(100, Math.max(10, Number.parseInt(String(req.query.pageSize || '25'), 10) || 25));
@@ -97,8 +104,13 @@ export class ReportController {
       const whereParts = ["ce.`category` = 'Trooper Daily'"];
 
       if (!canViewAllReports) {
-        whereParts.push('ce.`ownerAccountId` = ?');
-        params.push(account.id);
+        if (supervisorNames.length > 0) {
+          whereParts.push(`(ce.\`ownerAccountId\` = ? OR LOWER(COALESCE(u.\`supervisor\`, '')) IN (${supervisorNames.map(() => '?').join(', ')}))`);
+          params.push(account.id, ...supervisorNames);
+        } else {
+          whereParts.push('ce.`ownerAccountId` = ?');
+          params.push(account.id);
+        }
       }
 
       if (typeof q === 'string' && q.trim()) {
@@ -186,7 +198,8 @@ export class ReportController {
         },
       }));
 
-      res.json({ count: data.length, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)), scope: canViewAllReports ? 'all' : 'own', data });
+      const supervisorScope = !canViewAllReports && data.some((entry) => entry.ownerAccountId !== account.id);
+      res.json({ count: data.length, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)), scope: canViewAllReports ? 'all' : supervisorScope ? 'supervised' : 'own', data });
     } catch (error) {
       console.error('Trooper daily report error:', error);
       res.status(500).json({ error: 'Failed to load Trooper Daily reports' });

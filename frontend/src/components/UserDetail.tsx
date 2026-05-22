@@ -81,6 +81,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
 
   const mileage = mileageSummary?.mileage || 0;
   const milestone = mileageSummary?.milestone || 0;
+  const nextAchievement = mileageSummary?.nextAchievement || null;
   const mileagePercent = milestone > 0 ? Math.min(100, Math.round((mileage / milestone) * 100)) : 0;
 
   return (
@@ -150,7 +151,9 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
                 <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${mileagePercent}%` }} />
               </div>
               {milestone > 0 && (
-                <p className="mt-1 text-xs font-semibold text-blue-100">{mileagePercent}% of {milestone.toLocaleString()} mi milestone</p>
+                <p className="mt-1 text-xs font-semibold text-blue-100">
+                  {mileagePercent}% of {nextAchievement?.title || `${milestone.toLocaleString()} mi milestone`}
+                </p>
               )}
             </div>
           <button
