@@ -262,6 +262,24 @@ export async function initializeDatabase() {
   await ensureIndex('audit_logs', 'idx_audit_actor_created', '`actorId`, `createdAt`');
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS error_logs (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`level\` VARCHAR(30) NOT NULL DEFAULT 'error',
+      \`message\` TEXT NOT NULL,
+      \`stack\` TEXT,
+      \`route\` VARCHAR(255),
+      \`method\` VARCHAR(20),
+      \`userId\` VARCHAR(36),
+      \`ipAddress\` VARCHAR(45),
+      \`userAgent\` VARCHAR(255),
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX \`idx_error_logs_level\` (\`level\`),
+      INDEX \`idx_error_logs_created\` (\`createdAt\`),
+      INDEX \`idx_error_logs_route\` (\`route\`)
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS dashboard_posts (
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`title\` VARCHAR(200) NOT NULL,

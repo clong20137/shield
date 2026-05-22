@@ -368,6 +368,35 @@ export interface AuditLogResponse {
   entityTypes: string[];
 }
 
+export interface ErrorLog {
+  id: string;
+  level: string;
+  message: string;
+  stack: string | null;
+  route: string | null;
+  method: string | null;
+  userId: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
+
+export interface ErrorLogFilters {
+  q?: string;
+  level?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ErrorLogResponse {
+  data: ErrorLog[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface DeviceRecord {
   id: string;
   type: 'Cell Phone' | 'MiFi Device' | 'Computer' | 'Radio' | 'Cradlepoint';
@@ -706,6 +735,11 @@ export const calendarService = {
 export const auditService = {
   getAll: (filters: AuditLogFilters = {}) =>
     api.get<AuditLogResponse>('/audit', { params: filters }),
+};
+
+export const errorLogService = {
+  getAll: (filters: ErrorLogFilters = {}) =>
+    api.get<ErrorLogResponse>('/errors', { params: filters }),
 };
 
 export const deviceService = {

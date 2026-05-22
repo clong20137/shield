@@ -4,6 +4,7 @@ import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, userService, User, UserMessage } from '../services/api';
 import { RankBadge } from '../components/RankBadge';
 import { MentionText } from '../components/MentionText';
+import { MentionTextarea } from '../components/MentionTextarea';
 
 interface MessageInboxPageProps {
   currentUser: AuthAccount;
@@ -788,9 +789,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                       onChange={(event) => setReplyAttachments(Array.from(event.target.files || []))}
                     />
                   </label>
-                  <textarea
+                  <MentionTextarea
                     value={replyBody}
-                    onChange={(event) => setReplyBody(event.target.value)}
+                    onChange={setReplyBody}
                     onKeyDown={handleReplyKeyDown}
                     placeholder={selectedThreadAcceptsMessages ? 'Message. Use @name to mention someone.' : 'Messages are disabled for this user'}
                     disabled={!selectedThreadAcceptsMessages}
@@ -888,9 +889,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
 
             <label className="mb-4 block">
               <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Message</span>
-              <textarea
+              <MentionTextarea
                 value={composeBody}
-                onChange={(event) => setComposeBody(event.target.value)}
+                onChange={setComposeBody}
                 placeholder="Message. Use @name, @email, or @PE to mention someone."
                 className="min-h-40 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
               />

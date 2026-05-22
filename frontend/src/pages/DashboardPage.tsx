@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { AlertCircle, ChevronLeft, ChevronRight, Heart, LucideIcon, Pencil, PartyPopper, Plus, Save, Send, ThumbsUp, Trash2, X } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { AlertCircle, Bold, ChevronLeft, ChevronRight, Heart, Italic, List, LucideIcon, Pencil, PartyPopper, Plus, Save, Send, ThumbsUp, Trash2, Underline, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction } from '../services/api';
 import { districtOptions } from '../constants/districts';
+import { FormattedText } from '../components/FormattedText';
+import { MentionTextarea } from '../components/MentionTextarea';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 type DashboardPostForm = Pick<DashboardPost, 'title' | 'body' | 'category' | 'allowComments'>;
@@ -35,6 +37,19 @@ const reactionOptions: Array<{
   { key: 'important', label: 'Important', Icon: AlertCircle },
   { key: 'thanks', label: 'Thanks', Icon: Heart },
 ];
+
+function wrapSelection(textarea: HTMLTextAreaElement | null, before: string, after = before, placeholder = 'text') {
+  if (!textarea) return null;
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const value = textarea.value;
+  const selectedText = value.slice(start, end) || placeholder;
+  const nextValue = `${value.slice(0, start)}${before}${selectedText}${after}${value.slice(end)}`;
+  const nextSelectionStart = start + before.length;
+  const nextSelectionEnd = nextSelectionStart + selectedText.length;
+
+  return { nextValue, nextSelectionStart, nextSelectionEnd };
+}
 
 const createDefaultEntryForm = (date: string): CalendarEntryForm => ({
   category: 'General Information',
@@ -493,7 +508,36 @@ function DashboardNews({
   const [editingPost, setEditingPost] = useState<DashboardPost | null>(null);
   const [postPendingDelete, setPostPendingDelete] = useState<DashboardPost | null>(null);
   const [postError, setPostError] = useState<string | null>(null);
+  const postBodyRef = useRef<HTMLTextAreaElement | null>(null);
   const isAdministrator = currentUser?.role === 'administrator';
+
+  const applyPostFormat = (before: string, after = before, placeholder = 'text') => {
+    const result = wrapSelection(postBodyRef.current, before, after, placeholder);
+    if (!result) return;
+
+    setPostForm((form) => ({ ...form, body: result.nextValue }));
+    window.setTimeout(() => {
+      postBodyRef.current?.focus();
+      postBodyRef.current?.setSelectionRange(result.nextSelectionStart, result.nextSelectionEnd);
+    }, 0);
+  };
+
+  const addPostList = () => {
+    const textarea = postBodyRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const value = textarea.value;
+    const prefix = start > 0 && !value.slice(0, start).endsWith('\n') ? '\n' : '';
+    const insertion = `${prefix}- List item`;
+    const nextValue = `${value.slice(0, start)}${insertion}${value.slice(textarea.selectionEnd)}`;
+    const nextCursor = start + insertion.length;
+
+    setPostForm((form) => ({ ...form, body: nextValue }));
+    window.setTimeout(() => {
+      postBodyRef.current?.focus();
+      postBodyRef.current?.setSelectionRange(nextCursor, nextCursor);
+    }, 0);
+  };
 
   const loadPosts = async (showLoading = true) => {
     if (showLoading) {
@@ -663,7 +707,7 @@ function DashboardNews({
                   </div>
                 )}
               </div>
-              <p className="whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300">{post.body}</p>
+              <FormattedText text={post.body} className="text-sm leading-6 text-gray-700 dark:text-gray-300" />
               <div className="mt-4">
                 <Link to={`/updates/${post.id}`} className="inline-flex items-center rounded border border-accent/30 px-3 py-2 text-sm font-bold text-accent hover:bg-accent/10">
                   Read More
@@ -740,10 +784,26 @@ function DashboardNews({
               </div>
               <label className="block">
                 <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Post</span>
-                <textarea
+                <div className="mb-2 flex flex-wrap gap-2 rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-950">
+                  <button type="button" onClick={() => applyPostFormat('**', '**', 'bold text')} className="btn-secondary" aria-label="Bold selected text" title="Bold">
+                    <Bold size={16} />
+                  </button>
+                  <button type="button" onClick={() => applyPostFormat('*', '*', 'italic text')} className="btn-secondary" aria-label="Italicize selected text" title="Italic">
+                    <Italic size={16} />
+                  </button>
+                  <button type="button" onClick={() => applyPostFormat('++', '++', 'underlined text')} className="btn-secondary" aria-label="Underline selected text" title="Underline">
+                    <Underline size={16} />
+                  </button>
+                  <button type="button" onClick={addPostList} className="btn-secondary" aria-label="Add list item" title="List">
+                    <List size={16} />
+                  </button>
+                </div>
+                <MentionTextarea
+                  ref={postBodyRef}
                   value={postForm.body}
-                  onChange={(event) => setPostForm((form) => ({ ...form, body: event.target.value }))}
+                  onChange={(body) => setPostForm((form) => ({ ...form, body }))}
                   className="min-h-32 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                  placeholder="Write the update. Use the toolbar for bold, italics, underline, and lists."
                 />
               </label>
               <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-3 dark:border-gray-800">

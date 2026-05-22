@@ -11,6 +11,7 @@ import calendarRoutes from './routes/calendarRoutes';
 import deviceRoutes from './routes/deviceRoutes';
 import messageRoutes from './routes/messageRoutes';
 import auditRoutes from './routes/auditRoutes';
+import errorLogRoutes from './routes/errorLogRoutes';
 import dashboardPostRoutes from './routes/dashboardPostRoutes';
 import bugReportRoutes from './routes/bugReportRoutes';
 import notificationRoutes from './routes/notificationRoutes';
@@ -21,6 +22,7 @@ import performanceEvaluationRoutes from './routes/performanceEvaluationRoutes';
 import { startSecurityCleanupJob } from './services/securityCleanup';
 import { rateLimit } from './middleware/rateLimit';
 import { requestTimeout } from './middleware/requestTimeout';
+import { ErrorLogModel } from './models/ErrorLog';
 
 dotenv.config();
 
@@ -94,6 +96,7 @@ app.use('/api/calendar', calendarRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/errors', errorLogRoutes);
 app.use('/api/dashboard-posts', dashboardPostRoutes);
 app.use('/api/bugs', bugReportRoutes);
 app.use('/api/notifications', notificationRoutes);
@@ -132,6 +135,16 @@ app.use((error: Error, req: Request, res: Response, next: express.NextFunction) 
   }
 
   console.error('Unhandled request error:', error);
+  ErrorLogModel.create({
+    level: 'error',
+    message: error.message || 'Unhandled request error',
+    stack: error.stack || null,
+    route: req.originalUrl || req.path,
+    method: req.method,
+    userId: null,
+    ipAddress: req.ip || req.socket.remoteAddress || null,
+    userAgent: req.get('user-agent') || null,
+  }).catch((logError) => console.error('Failed to write error log:', logError));
   res.status(500).json({ error: 'Internal server error' });
 });
 

@@ -4,6 +4,8 @@ import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { Flag, MessageSquare, Pin, PinOff, Send, Smile, Trash2, X } from 'lucide-react';
 import { UserDetail } from '../components/UserDetail';
 import { MentionText } from '../components/MentionText';
+import { FormattedText } from '../components/FormattedText';
+import { MentionTextarea } from '../components/MentionTextarea';
 import { AuthAccount, DashboardPost, DashboardPostComment, User, dashboardPostService, getAssetUrl, handleAssetImageError, userService } from '../services/api';
 
 interface DashboardPostPageProps {
@@ -224,7 +226,7 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
             Posted by {post.authorName || 'Administrator'} on {new Date(post.createdAt).toLocaleString()}
           </p>
         </div>
-        <p className="mt-6 whitespace-pre-wrap text-base leading-8 text-gray-700 dark:text-gray-300">{post.body}</p>
+        <FormattedText text={post.body} className="mt-6 text-base leading-8 text-gray-700 dark:text-gray-300" />
       </article>
 
       <section className="mt-6 rounded-lg bg-white p-4 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:p-6">
@@ -243,9 +245,9 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
           <div className="empty-state mt-4 rounded border border-dashed border-gray-300 dark:border-gray-700">Comments are disabled for this update.</div>
         ) : (
           <form onSubmit={submitComment} className="mt-4 rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
-            <textarea
+            <MentionTextarea
               value={commentBody}
-              onChange={(event) => setCommentBody(event.target.value)}
+              onChange={(value) => setCommentBody(value.slice(0, 1200))}
               className="min-h-24 w-full resize-y rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900"
               placeholder={currentUser ? 'Add a comment...' : 'Sign in to comment'}
               disabled={!currentUser}
