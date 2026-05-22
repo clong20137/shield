@@ -1951,13 +1951,25 @@ function App() {
   const [bugReports, setBugReports] = useState<BugReport[]>([]);
   const previousMessageUnreadCount = useRef<number | null>(null);
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
+  const rateLimitToastRef = useRef(0);
+  const notificationRequestRef = useRef(0);
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
 
-  const showToast = (type: ToastType, message: string) => {
+  const showToast = (type: ToastType, message: string, options: { saveToNotifications?: boolean } = {}) => {
+    if (/too many|rate limit/iu.test(message)) {
+      const now = Date.now();
+      if (now - rateLimitToastRef.current < 10000) {
+        return;
+      }
+      rateLimitToastRef.current = now;
+    }
+
     const id = Date.now();
     const toast = { id, type, message };
     setToasts((currentToasts) => [...currentToasts, toast]);
-    setNotifications((currentNotifications) => [toast, ...currentNotifications].slice(0, 20));
+    if (options.saveToNotifications !== false) {
+      setNotifications((currentNotifications) => [toast, ...currentNotifications].slice(0, 20));
+    }
     window.setTimeout(() => {
       setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== id));
     }, 4500);
@@ -2095,6 +2107,8 @@ function App() {
   }, [currentUser?.id, currentUser?.receivesMessages]);
 
   const loadUserNotifications = useCallback(async () => {
+    const requestId = notificationRequestRef.current + 1;
+    notificationRequestRef.current = requestId;
     if (!currentUser) {
       setUserNotifications([]);
       return;
@@ -2102,6 +2116,9 @@ function App() {
 
     try {
       const response = await notificationService.getAll();
+      if (requestId !== notificationRequestRef.current) {
+        return;
+      }
       setUserNotifications(response.data);
     } catch (err) {
       console.error('Failed to load notifications:', err);
@@ -2237,9 +2254,11 @@ function App() {
   const handleLogin = (account: AuthAccount) => {
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(account));
     setCurrentUser(account);
+    setNotifications([]);
+    setUserNotifications([]);
+    notificationRequestRef.current += 1;
     setIsLoginTransitioning(true);
     void syncSessionTimeoutFromSettings();
-    showToast('success', `Signed in as ${account.email}.`);
 
     if (!account.hasCompletedOnboarding) {
       if (!hasSeenWelcomeSplash(account.id)) {
@@ -2271,8 +2290,12 @@ function App() {
     setIsWelcomeSplashOpen(false);
     setShouldLaunchGuideAfterWelcome(false);
     setIsFirstLoginGuideOpen(false);
+    setNotifications([]);
+    setUserNotifications([]);
+    notificationRequestRef.current += 1;
+    setMessageUnreadCount(0);
+    previousMessageUnreadCount.current = null;
     clearInactivityTimer();
-    showToast('info', 'Signed out.');
   };
 
   const handleForcedLogout = useCallback((message: string) => {
@@ -2285,6 +2308,11 @@ function App() {
     setIsWelcomeSplashOpen(false);
     setShouldLaunchGuideAfterWelcome(false);
     setIsFirstLoginGuideOpen(false);
+    setNotifications([]);
+    setUserNotifications([]);
+    notificationRequestRef.current += 1;
+    setMessageUnreadCount(0);
+    previousMessageUnreadCount.current = null;
     showToast('error', message);
   }, []);
 
@@ -2871,6 +2899,17 @@ function App() {
                       className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
                     >
                       <Bug size={16} /> Report a Bug
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsWelcomeSplashOpen(true);
+                        setShouldLaunchGuideAfterWelcome(true);
+                        setIsAccountMenuOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                    >
+                      <Shield size={16} /> Replay Guide
                     </button>
                     <button
                       type="button"

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Bug, ClipboardList, LockKeyhole, Settings, UserPlus } from 'lucide-react';
+import { AlertTriangle, Bug, ClipboardList, LockKeyhole, Settings, UserPlus } from 'lucide-react';
 import { AuthAccount, BugReport, BugReportStatus, User } from '../services/api';
 import AuditLogPage from './AuditLogPage';
 import BugTrackerPage from './BugTrackerPage';
 import CreateUserPage from './CreateUserPage';
+import ErrorLogPage from './ErrorLogPage';
 import PermissionsPage from './PermissionsPage';
 
-export type AdminConsoleTab = 'general' | 'permissions' | 'create-user' | 'audit' | 'bugs';
+export type AdminConsoleTab = 'general' | 'permissions' | 'create-user' | 'audit' | 'errors' | 'bugs';
 
 interface AdminConsolePageProps {
   account: AuthAccount;
@@ -25,6 +26,7 @@ const tabs: Array<{ id: AdminConsoleTab; label: string; icon: typeof Settings }>
   { id: 'create-user', label: 'Create User', icon: UserPlus },
   { id: 'bugs', label: 'Bug Tracker', icon: Bug },
   { id: 'audit', label: 'Audit Log', icon: ClipboardList },
+  { id: 'errors', label: 'Error Log', icon: AlertTriangle },
 ];
 
 export function AdminConsolePage({
@@ -98,6 +100,8 @@ export function AdminConsolePage({
         )}
 
         {activeTab === 'audit' && <AuditLogPage isModalView />}
+
+        {activeTab === 'errors' && <ErrorLogPage />}
 
         {activeTab === 'bugs' && (
           onBugStatusChange ? (

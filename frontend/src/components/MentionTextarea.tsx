@@ -4,6 +4,7 @@ import { User, userService } from '../services/api';
 type MentionTextareaProps = Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange'> & {
   value: string;
   onChange: (value: string) => void;
+  wrapperClassName?: string;
 };
 
 function getMentionQuery(value: string, cursor: number) {
@@ -22,12 +23,12 @@ function getMentionLabel(user: User) {
 }
 
 function getMentionValue(user: User) {
-  const nameToken = `${user.firstName || ''}${user.lastName || ''}`.replace(/[^a-zA-Z0-9._-]/gu, '');
+  const nameToken = `${user.firstName || ''} ${user.lastName || ''}`.trim().replace(/[^a-zA-Z0-9._ -]/gu, '');
   return nameToken || (user.email || '').split('@')[0] || user.peNumber || 'user';
 }
 
 export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaProps>(function MentionTextarea(
-  { value, onChange, className = '', onKeyDown, onBlur, ...props },
+  { value, onChange, wrapperClassName = 'w-full flex-1', className = '', onKeyDown, onBlur, ...props },
   ref,
 ) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -56,16 +57,14 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
       window.clearTimeout(searchTimerRef.current);
     }
 
-    if (mention.token.length === 0) {
-      setResults([]);
-      return;
-    }
-
     setIsSearching(true);
     searchTimerRef.current = window.setTimeout(async () => {
       try {
-        const response = await userService.search(mention.token);
-        setResults(response.data.slice(0, 6));
+        const response = mention.token.length === 0
+          ? await userService.getAll(1, 6)
+          : await userService.search(mention.token);
+        const users = Array.isArray(response.data) ? response.data : response.data.data;
+        setResults(users.slice(0, 6));
       } catch (error) {
         console.error('Mention search failed:', error);
         setResults([]);
@@ -93,7 +92,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
   };
 
   return (
-    <div className="relative w-full flex-1">
+    <div className={`relative ${wrapperClassName}`}>
       <textarea
         {...props}
         ref={textareaRef}
@@ -108,7 +107,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
           window.setTimeout(closeResults, 150);
           onBlur?.(event);
         }}
-        className={className}
+        className={`w-full ${className}`}
       />
       {(results.length > 0 || isSearching) && (
         <div className="absolute left-2 right-2 top-full z-50 mt-1 overflow-hidden rounded border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">

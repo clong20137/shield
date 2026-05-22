@@ -11,7 +11,7 @@ type MentionContext = {
   message: string;
 };
 
-const mentionRegex = /(^|\s)@([a-zA-Z0-9._-]{2,80})/gu;
+const mentionRegex = /(^|\s)@([a-zA-Z0-9._-]{2,80})(?:\s+([a-zA-Z][a-zA-Z0-9._-]{1,80}))?/gu;
 
 export function extractMentionTokens(text: string): string[] {
   const tokens = new Set<string>();
@@ -19,6 +19,9 @@ export function extractMentionTokens(text: string): string[] {
 
   while ((match = mentionRegex.exec(text)) !== null) {
     tokens.add(match[2].toLowerCase());
+    if (match[3]) {
+      tokens.add(`${match[2]}${match[3]}`.toLowerCase());
+    }
   }
 
   return Array.from(tokens);

@@ -3,9 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { Flag, MessageSquare, Pin, PinOff, Send, Smile, Trash2, X } from 'lucide-react';
 import { UserDetail } from '../components/UserDetail';
-import { MentionText } from '../components/MentionText';
 import { FormattedText } from '../components/FormattedText';
-import { MentionTextarea } from '../components/MentionTextarea';
 import { AuthAccount, DashboardPost, DashboardPostComment, User, dashboardPostService, getAssetUrl, handleAssetImageError, userService } from '../services/api';
 
 interface DashboardPostPageProps {
@@ -245,16 +243,16 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
           <div className="empty-state mt-4 rounded border border-dashed border-gray-300 dark:border-gray-700">Comments are disabled for this update.</div>
         ) : (
           <form onSubmit={submitComment} className="mt-4 rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
-            <MentionTextarea
+            <textarea
               value={commentBody}
-              onChange={(value) => setCommentBody(value.slice(0, 1200))}
+              onChange={(event) => setCommentBody(event.target.value)}
               className="min-h-24 w-full resize-y rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900"
               placeholder={currentUser ? 'Add a comment...' : 'Sign in to comment'}
               disabled={!currentUser}
               maxLength={1200}
             />
             <div className="mt-3 flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Use @name, @email, or @PE to mention someone - {commentBody.length}/1200</span>
+              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{commentBody.length}/1200</span>
               <div className="relative flex items-center gap-2">
                 <button
                   type="button"
@@ -331,9 +329,7 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
                     )}
                   </div>
                 </div>
-                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300">
-                  <MentionText text={comment.body} />
-                </p>
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300">{comment.body}</p>
               </div>
             </div>
           ))}

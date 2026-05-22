@@ -5,6 +5,7 @@ import { AuthAccount, getAssetUrl, getMessageEventsUrl, handleAssetImageError, m
 import { RankBadge } from '../components/RankBadge';
 import { MentionText } from '../components/MentionText';
 import { MentionTextarea } from '../components/MentionTextarea';
+import { UserDetail } from '../components/UserDetail';
 
 interface MessageInboxPageProps {
   currentUser: AuthAccount;
@@ -179,6 +180,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
   const [isRecipientSearching, setIsRecipientSearching] = useState(false);
   const [messagePendingDelete, setMessagePendingDelete] = useState<UserMessage | null>(null);
   const [threadPendingDelete, setThreadPendingDelete] = useState<MessageThread | null>(null);
+  const [selectedMentionUser, setSelectedMentionUser] = useState<User | null>(null);
   const [presenceByAccount, setPresenceByAccount] = useState<Record<string, { online: boolean; lastSeenAt: string }>>({});
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
   const emojiButtonLabel = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
@@ -548,6 +550,26 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
     }
   };
 
+  const openMentionProfile = async (mention: string) => {
+    try {
+      const response = await userService.search(mention);
+      const normalizedMention = mention.toLowerCase().replace(/\s+/gu, '');
+      const user = response.data.find((item: User) => {
+        const fullName = `${item.firstName || ''}${item.lastName || ''}`.toLowerCase();
+        return fullName === normalizedMention || item.email?.toLowerCase().startsWith(normalizedMention) || item.peNumber?.toLowerCase() === normalizedMention;
+      }) || response.data[0];
+
+      if (user) {
+        setSelectedMentionUser(user);
+      } else {
+        onToast('info', 'No matching user found for that mention.');
+      }
+    } catch (error) {
+      console.error('Failed to open mention profile:', error);
+      onToast('error', 'Failed to open mentioned profile.');
+    }
+  };
+
   return (
     <div className={isModalView ? 'flex h-full min-h-0 flex-col' : ''}>
       {!isModalView && (
@@ -728,7 +750,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                               : 'rounded-bl bg-white text-gray-800 dark:bg-gray-900 dark:text-gray-100'
                           }`}>
                             <p className="whitespace-pre-wrap text-left text-sm leading-6">
-                              <MentionText text={message.body} />
+                              <MentionText
+                                text={message.body}
+                                mentionClassName={isMine ? 'font-bold text-white underline decoration-white/80 underline-offset-2' : 'font-bold text-blue-700 underline underline-offset-2 dark:text-blue-300'}
+                                onMentionClick={openMentionProfile}
+                              />
                             </p>
                           </div>
                           <div className={`mt-1 flex items-center gap-2 text-xs font-semibold text-gray-400 ${isMine ? 'justify-end' : 'justify-start'}`}>
@@ -792,11 +818,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                   <MentionTextarea
                     value={replyBody}
                     onChange={setReplyBody}
+                    wrapperClassName="min-w-0 flex-1"
                     onKeyDown={handleReplyKeyDown}
                     placeholder={selectedThreadAcceptsMessages ? 'Message. Use @name to mention someone.' : 'Messages are disabled for this user'}
                     disabled={!selectedThreadAcceptsMessages}
                     rows={1}
-                    className="min-h-10 flex-1 resize-none bg-transparent px-1 py-2 text-sm leading-5 outline-none sm:min-h-8 sm:py-1.5"
+                    className="min-h-10 resize-none overflow-hidden border-0 bg-transparent px-1 py-2 text-sm leading-5 outline-none ring-0 focus:border-0 focus:ring-0 dark:bg-transparent sm:min-h-8 sm:py-1.5"
                   />
                   <button type="submit" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9" disabled={isSending || !selectedThreadAcceptsMessages} aria-label="Send message">
                     <Send size={17} />
@@ -991,6 +1018,17 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onClick={() => setIsEmojiPickerOpen(false)}>
           <div className="max-h-[80dvh] max-w-[calc(100vw-1rem)] overflow-auto rounded-lg bg-white p-2 shadow-xl sm:max-h-[90vh]" onClick={(event) => event.stopPropagation()}>
             <EmojiPicker onEmojiClick={isComposeOpen ? (emojiData) => setComposeBody((body) => `${body}${emojiData.emoji}`) : addEmojiToReply} />
+          </div>
+        </div>
+      )}
+      {selectedMentionUser && (
+        <div className="modal-backdrop fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4">
+          <div className="modal-window max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-lg">
+            <UserDetail
+              user={selectedMentionUser}
+              onClose={() => setSelectedMentionUser(null)}
+              canEdit={currentUser.role === 'administrator'}
+            />
           </div>
         </div>
       )}

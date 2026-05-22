@@ -5,7 +5,7 @@
 @keyframes toast-lifecycle {
   0% {
     opacity: 0;
-    transform: translateX(18px) translateY(-6px) scale(0.98);
+    transform: translateX(18px) translateY(16px) scale(0.98);
   }
 
   12%,
@@ -16,7 +16,7 @@
 
   100% {
     opacity: 0;
-    transform: translateX(18px) translateY(-6px) scale(0.98);
+    transform: translateX(18px) translateY(-14px) scale(0.98);
   }
 }
 
@@ -404,7 +404,7 @@
 
   .toast-notification {
     --toast-status: #9C865C;
-    @apply relative overflow-hidden rounded-lg border border-gray-200 bg-white text-gray-900 shadow-[0_18px_45px_rgba(15,23,42,0.18)] ring-1 ring-black/5 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 dark:ring-white/10;
+    @apply relative overflow-hidden rounded-lg border border-gray-200 bg-white text-gray-900 shadow-[0_18px_45px_rgba(15,23,42,0.18)] ring-1 ring-black/5 transition-all duration-300 ease-out dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 dark:ring-white/10;
     animation: toast-lifecycle 4.5s ease-in-out both;
     backdrop-filter: none;
     filter: none;

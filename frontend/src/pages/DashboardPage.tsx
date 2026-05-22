@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { FormattedText } from '../components/FormattedText';
-import { MentionTextarea } from '../components/MentionTextarea';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 type DashboardPostForm = Pick<DashboardPost, 'title' | 'body' | 'category' | 'allowComments'>;
@@ -38,7 +37,7 @@ const reactionOptions: Array<{
   { key: 'thanks', label: 'Thanks', Icon: Heart },
 ];
 
-function wrapSelection(textarea: HTMLTextAreaElement | null, before: string, after = before, placeholder = 'text') {
+function wrapSelection(textarea: HTMLTextAreaElement | null, before: string, after = before, placeholder = '') {
   if (!textarea) return null;
   const start = textarea.selectionStart;
   const end = textarea.selectionEnd;
@@ -528,7 +527,7 @@ function DashboardNews({
     const start = textarea.selectionStart;
     const value = textarea.value;
     const prefix = start > 0 && !value.slice(0, start).endsWith('\n') ? '\n' : '';
-    const insertion = `${prefix}- List item`;
+    const insertion = `${prefix}- `;
     const nextValue = `${value.slice(0, start)}${insertion}${value.slice(textarea.selectionEnd)}`;
     const nextCursor = start + insertion.length;
 
@@ -785,23 +784,23 @@ function DashboardNews({
               <label className="block">
                 <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Post</span>
                 <div className="mb-2 flex flex-wrap gap-2 rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-950">
-                  <button type="button" onClick={() => applyPostFormat('**', '**', 'bold text')} className="btn-secondary" aria-label="Bold selected text" title="Bold">
+                  <button type="button" onClick={() => applyPostFormat('**', '**')} className="btn-secondary" aria-label="Bold selected text" title="Bold">
                     <Bold size={16} />
                   </button>
-                  <button type="button" onClick={() => applyPostFormat('*', '*', 'italic text')} className="btn-secondary" aria-label="Italicize selected text" title="Italic">
+                  <button type="button" onClick={() => applyPostFormat('*', '*')} className="btn-secondary" aria-label="Italicize selected text" title="Italic">
                     <Italic size={16} />
                   </button>
-                  <button type="button" onClick={() => applyPostFormat('++', '++', 'underlined text')} className="btn-secondary" aria-label="Underline selected text" title="Underline">
+                  <button type="button" onClick={() => applyPostFormat('++', '++')} className="btn-secondary" aria-label="Underline selected text" title="Underline">
                     <Underline size={16} />
                   </button>
                   <button type="button" onClick={addPostList} className="btn-secondary" aria-label="Add list item" title="List">
                     <List size={16} />
                   </button>
                 </div>
-                <MentionTextarea
+                <textarea
                   ref={postBodyRef}
                   value={postForm.body}
-                  onChange={(body) => setPostForm((form) => ({ ...form, body }))}
+                  onChange={(event) => setPostForm((form) => ({ ...form, body: event.target.value }))}
                   className="min-h-32 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
                   placeholder="Write the update. Use the toolbar for bold, italics, underline, and lists."
                 />

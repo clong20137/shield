@@ -5,7 +5,7 @@ interface FormattedTextProps {
   className?: string;
 }
 
-const inlinePattern = /(\*\*[^*]+\*\*|\*[^*]+\*|\+\+[^+]+\+\+|@[a-zA-Z0-9._-]{2,80})/gu;
+const inlinePattern = /(\*\*[^*]+\*\*|\*[^*]+\*|\+\+[^+]+\+\+)/gu;
 
 function renderInline(text: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
@@ -26,8 +26,6 @@ function renderInline(text: string): React.ReactNode[] {
       parts.push(<em key={key}>{value.slice(1, -1)}</em>);
     } else if (value.startsWith('++') && value.endsWith('++')) {
       parts.push(<span key={key} className="underline decoration-2 underline-offset-2">{value.slice(2, -2)}</span>);
-    } else if (value.startsWith('@')) {
-      parts.push(<span key={key} className="font-bold text-accent">{value}</span>);
     }
 
     lastIndex = match.index + value.length;

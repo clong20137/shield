@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Mail, Pencil, Plus, Save, Search, ShieldCheck, X } from 'lucide-react';
-import { AuthAccount, AuthInvite, AuthRole, RegistrationSettings, authService } from '../services/api';
+import { AuthAccount, AuthInvite, AuthRole, RegistrationSettings, authService, mileageService } from '../services/api';
 
 interface PermissionsPageProps {
   account: AuthAccount;
@@ -182,6 +182,8 @@ function PermissionsPage({
   const [invites, setInvites] = useState<AuthInvite[]>([]);
   const [latestInvite, setLatestInvite] = useState<AuthInvite | null>(null);
   const [isSavingRegistration, setIsSavingRegistration] = useState(false);
+  const [mileageMilestone, setMileageMilestone] = useState(1000);
+  const [isSavingMileageMilestone, setIsSavingMileageMilestone] = useState(false);
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingAccountId, setSavingAccountId] = useState<string | null>(null);
@@ -198,6 +200,7 @@ function PermissionsPage({
       const rolesResponse = await authService.getRoles(account.id);
       const registrationResponse = await authService.getRegistrationSettings();
       const invitesResponse = await authService.listInvites();
+      const mileageResponse = await mileageService.getSummary();
       setAccounts(response.data);
       setRoles(rolesResponse.data);
       setRegistrationSettings(registrationResponse.data);
@@ -205,6 +208,7 @@ function PermissionsPage({
         window.localStorage.setItem(SESSION_TIMEOUT_KEY, String(registrationResponse.data.sessionTimeoutMinutes || 0));
       } catch {}
       setInvites(invitesResponse.data);
+      setMileageMilestone(mileageResponse.data.milestone || 1000);
     } catch (err) {
       const message = getErrorMessage(err, 'Failed to load accounts.');
       setError(message);
@@ -374,6 +378,29 @@ function PermissionsPage({
       onToast('error', message);
     } finally {
       setIsSendingInvite(false);
+    }
+  };
+
+  const saveMileageMilestone = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!Number.isFinite(mileageMilestone) || mileageMilestone <= 0) {
+      onToast('error', 'Mileage milestone must be greater than zero.');
+      return;
+    }
+
+    setIsSavingMileageMilestone(true);
+    setError(null);
+    try {
+      const response = await mileageService.updateMilestone(mileageMilestone);
+      setMileageMilestone(response.data.milestone);
+      onToast('success', 'Mileage milestone saved.');
+    } catch (err) {
+      const message = getErrorMessage(err, 'Failed to save mileage milestone.');
+      setError(message);
+      onToast('error', message);
+    } finally {
+      setIsSavingMileageMilestone(false);
     }
   };
 
@@ -574,6 +601,24 @@ function PermissionsPage({
               <Save size={16} />
             </button>
           </div>
+        </form>
+
+        <form onSubmit={saveMileageMilestone} className="mt-5 grid grid-cols-1 gap-3 rounded border border-gray-200 p-4 dark:border-gray-800 md:grid-cols-[minmax(0,1fr)_auto]">
+          <label>
+            <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Mileage milestone</span>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={mileageMilestone}
+              onChange={(event) => setMileageMilestone(Math.max(1, Number(event.target.value) || 1))}
+              className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+            />
+            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">This controls the mileage progress bar shown on user profiles.</span>
+          </label>
+          <button type="submit" className="btn-primary self-end" disabled={isSavingMileageMilestone} aria-label="Save mileage milestone" title={isSavingMileageMilestone ? 'Saving' : 'Save Mileage Milestone'}>
+            <Save size={16} />
+          </button>
         </form>
 
         <form onSubmit={createInvite} className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
