@@ -6,6 +6,7 @@ import { requirePermission } from '../middleware/permissions';
 const router = Router();
 
 router.get('/assigned/me', requireAuthenticated(), DeviceController.listAssignedDevices);
+router.get('/assigned/:accountId', requireAuthenticated(), DeviceController.listAssignedDevicesForUser);
 router.get('/', requirePermission('devices:manage'), DeviceController.listDevices);
 router.post('/', requirePermission('devices:manage'), DeviceController.createDevice);
 router.get('/:id/history', requirePermission('devices:manage'), DeviceController.listDeviceEvents);

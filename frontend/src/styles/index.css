@@ -602,6 +602,12 @@
     will-change: transform, opacity, left, top;
   }
 
+  [contenteditable][data-placeholder]:empty::before {
+    content: attr(data-placeholder);
+    color: rgb(156 163 175);
+    pointer-events: none;
+  }
+
   .trooper-daily-match {
     animation: trooper-daily-match-pop 520ms ease-out both;
   }

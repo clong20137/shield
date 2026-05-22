@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { DeviceModel } from '../models/Device';
+import { AuthAccountModel } from '../models/AuthAccount';
+import { UserModel } from '../models/User';
 import { broadcastAppEvent } from '../services/appEvents';
 import { getSessionAccount } from '../middleware/authSession';
 import { cleanMultiline, cleanString, isOneOf, isValidIsoDate, isValidPhone, normalizePhone } from '../utils/validation';
@@ -93,6 +95,37 @@ export class DeviceController {
       res.json(devices);
     } catch (error) {
       console.error('Assigned device list error:', error);
+      res.status(500).json({ error: 'Failed to load assigned devices' });
+    }
+  }
+
+  static async listAssignedDevicesForUser(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const targetUser = await UserModel.getUserById(req.params.accountId);
+      if (!targetUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const permissions = account.role === 'administrator' ? ['users:view', 'devices:manage'] : await AuthAccountModel.getPermissionsForAccount(account.id);
+      const canViewTarget = account.id === targetUser.id || account.role === 'administrator' || permissions.includes('users:view') || permissions.includes('devices:manage');
+      if (!canViewTarget) {
+        return res.status(403).json({ error: 'User profile permission required' });
+      }
+
+      const pagination = parsePagination(req.query, { defaultPageSize: 100, maxPageSize: 200 });
+      const displayName = `${targetUser.firstName || ''} ${targetUser.lastName || ''}`.trim() || targetUser.email || targetUser.id;
+      const devices = await DeviceModel.listAssignedDevices({
+        email: targetUser.email || '',
+        displayName,
+      }, pagination.pageSize, pagination.offset);
+      res.json(devices);
+    } catch (error) {
+      console.error('Assigned user device list error:', error);
       res.status(500).json({ error: 'Failed to load assigned devices' });
     }
   }

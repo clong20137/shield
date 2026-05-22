@@ -6,6 +6,35 @@ interface FormattedTextProps {
 }
 
 const inlinePattern = /(\*\*[^*]+\*\*|\*[^*]+\*|\+\+[^+]+\+\+)/gu;
+const htmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span)\b[^>]*>/iu;
+
+function sanitizeFormattedHtml(html: string): string {
+  if (typeof window === 'undefined' || !htmlPattern.test(html)) {
+    return '';
+  }
+
+  const parser = new DOMParser();
+  const document = parser.parseFromString(`<div>${html}</div>`, 'text/html');
+  const allowedTags = new Set(['P', 'DIV', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'UL', 'OL', 'LI', 'SPAN']);
+
+  const cleanNode = (node: Node) => {
+    Array.from(node.childNodes).forEach((child) => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const element = child as HTMLElement;
+        if (!allowedTags.has(element.tagName)) {
+          element.replaceWith(document.createTextNode(element.textContent || ''));
+          return;
+        }
+
+        Array.from(element.attributes).forEach((attribute) => element.removeAttribute(attribute.name));
+        cleanNode(element);
+      }
+    });
+  };
+
+  cleanNode(document.body);
+  return document.body.firstElementChild?.innerHTML || '';
+}
 
 function renderInline(text: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
@@ -39,6 +68,16 @@ function renderInline(text: string): React.ReactNode[] {
 }
 
 export function FormattedText({ text, className = '' }: FormattedTextProps) {
+  const sanitizedHtml = sanitizeFormattedHtml(text);
+  if (sanitizedHtml) {
+    return (
+      <div
+        className={`space-y-2 whitespace-normal ${className}`}
+        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+      />
+    );
+  }
+
   const lines = text.split(/\r?\n/u);
   const blocks: React.ReactNode[] = [];
   let listItems: React.ReactNode[] = [];

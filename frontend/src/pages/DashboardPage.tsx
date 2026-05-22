@@ -37,19 +37,6 @@ const reactionOptions: Array<{
   { key: 'thanks', label: 'Thanks', Icon: Heart },
 ];
 
-function wrapSelection(textarea: HTMLTextAreaElement | null, before: string, after = before, placeholder = '') {
-  if (!textarea) return null;
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const value = textarea.value;
-  const selectedText = value.slice(start, end) || placeholder;
-  const nextValue = `${value.slice(0, start)}${before}${selectedText}${after}${value.slice(end)}`;
-  const nextSelectionStart = start + before.length;
-  const nextSelectionEnd = nextSelectionStart + selectedText.length;
-
-  return { nextValue, nextSelectionStart, nextSelectionEnd };
-}
-
 const createDefaultEntryForm = (date: string): CalendarEntryForm => ({
   category: 'General Information',
   date,
@@ -80,6 +67,111 @@ const getReadableDate = (dateKey: string) => {
     year: 'numeric',
   });
 };
+
+const postHtmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span)\b[^>]*>/iu;
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/gu, '&amp;')
+    .replace(/</gu, '&lt;')
+    .replace(/>/gu, '&gt;');
+}
+
+function renderLegacyInlineFormatting(value: string): string {
+  return escapeHtml(value)
+    .replace(/\+\+([^+]+)\+\+/gu, '<u>$1</u>')
+    .replace(/\*\*([^*]+)\*\*/gu, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/gu, '<em>$1</em>');
+}
+
+function legacyPostBodyToHtml(value: string): string {
+  if (postHtmlPattern.test(value)) {
+    return value;
+  }
+
+  const blocks: string[] = [];
+  let listItems: string[] = [];
+  const flushList = () => {
+    if (listItems.length === 0) return;
+    blocks.push(`<ul>${listItems.join('')}</ul>`);
+    listItems = [];
+  };
+
+  value.split(/\r?\n/u).forEach((line) => {
+    const listMatch = line.match(/^\s*[-*]\s+(.+)$/u);
+    if (listMatch) {
+      listItems.push(`<li>${renderLegacyInlineFormatting(listMatch[1])}</li>`);
+      return;
+    }
+
+    flushList();
+    blocks.push(line.trim() ? `<p>${renderLegacyInlineFormatting(line)}</p>` : '<p><br></p>');
+  });
+
+  flushList();
+  return blocks.join('');
+}
+
+function getPostBodyText(value: string): string {
+  if (!postHtmlPattern.test(value)) {
+    return value.trim();
+  }
+
+  const container = document.createElement('div');
+  container.innerHTML = value;
+  return (container.textContent || '').trim();
+}
+
+function RichPostEditor({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const editorRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value;
+    }
+  }, [value]);
+
+  const runCommand = (command: string) => {
+    editorRef.current?.focus();
+    document.execCommand(command, false);
+    onChange(editorRef.current?.innerHTML || '');
+  };
+
+  return (
+    <div>
+      <div className="mb-2 flex flex-wrap gap-2 rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-950">
+        <button type="button" onClick={() => runCommand('bold')} className="btn-secondary" aria-label="Bold selected text" title="Bold">
+          <Bold size={16} />
+        </button>
+        <button type="button" onClick={() => runCommand('italic')} className="btn-secondary" aria-label="Italicize selected text" title="Italic">
+          <Italic size={16} />
+        </button>
+        <button type="button" onClick={() => runCommand('underline')} className="btn-secondary" aria-label="Underline selected text" title="Underline">
+          <Underline size={16} />
+        </button>
+        <button type="button" onClick={() => runCommand('insertUnorderedList')} className="btn-secondary" aria-label="Add list item" title="List">
+          <List size={16} />
+        </button>
+      </div>
+      <div
+        ref={editorRef}
+        contentEditable
+        role="textbox"
+        aria-multiline="true"
+        onInput={(event) => onChange(event.currentTarget.innerHTML)}
+        onBlur={(event) => onChange(event.currentTarget.innerHTML)}
+        className="min-h-36 w-full overflow-y-auto rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+        data-placeholder="Write the update. Highlight text and use the toolbar, or click a style before typing."
+      />
+    </div>
+  );
+}
 
 export function DashboardCalendar() {
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -507,36 +599,7 @@ function DashboardNews({
   const [editingPost, setEditingPost] = useState<DashboardPost | null>(null);
   const [postPendingDelete, setPostPendingDelete] = useState<DashboardPost | null>(null);
   const [postError, setPostError] = useState<string | null>(null);
-  const postBodyRef = useRef<HTMLTextAreaElement | null>(null);
   const isAdministrator = currentUser?.role === 'administrator';
-
-  const applyPostFormat = (before: string, after = before, placeholder = 'text') => {
-    const result = wrapSelection(postBodyRef.current, before, after, placeholder);
-    if (!result) return;
-
-    setPostForm((form) => ({ ...form, body: result.nextValue }));
-    window.setTimeout(() => {
-      postBodyRef.current?.focus();
-      postBodyRef.current?.setSelectionRange(result.nextSelectionStart, result.nextSelectionEnd);
-    }, 0);
-  };
-
-  const addPostList = () => {
-    const textarea = postBodyRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const value = textarea.value;
-    const prefix = start > 0 && !value.slice(0, start).endsWith('\n') ? '\n' : '';
-    const insertion = `${prefix}- `;
-    const nextValue = `${value.slice(0, start)}${insertion}${value.slice(textarea.selectionEnd)}`;
-    const nextCursor = start + insertion.length;
-
-    setPostForm((form) => ({ ...form, body: nextValue }));
-    window.setTimeout(() => {
-      postBodyRef.current?.focus();
-      postBodyRef.current?.setSelectionRange(nextCursor, nextCursor);
-    }, 0);
-  };
 
   const loadPosts = async (showLoading = true) => {
     if (showLoading) {
@@ -565,7 +628,7 @@ function DashboardNews({
   const createPost = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!currentUser || !postForm.title.trim() || !postForm.body.trim()) {
+    if (!currentUser || !postForm.title.trim() || !getPostBodyText(postForm.body)) {
       setPostError('Title and body are required.');
       return;
     }
@@ -609,7 +672,7 @@ function DashboardNews({
     setEditingPost(post);
     setPostForm({
       title: post.title,
-      body: post.body,
+      body: legacyPostBodyToHtml(post.body),
       category: post.category,
       allowComments: post.allowComments,
     });
@@ -625,7 +688,7 @@ function DashboardNews({
   const updatePost = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!editingPost || !postForm.title.trim() || !postForm.body.trim()) {
+    if (!editingPost || !postForm.title.trim() || !getPostBodyText(postForm.body)) {
       setPostError('Title and body are required.');
       return;
     }
@@ -783,26 +846,9 @@ function DashboardNews({
               </div>
               <label className="block">
                 <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Post</span>
-                <div className="mb-2 flex flex-wrap gap-2 rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-950">
-                  <button type="button" onClick={() => applyPostFormat('**', '**')} className="btn-secondary" aria-label="Bold selected text" title="Bold">
-                    <Bold size={16} />
-                  </button>
-                  <button type="button" onClick={() => applyPostFormat('*', '*')} className="btn-secondary" aria-label="Italicize selected text" title="Italic">
-                    <Italic size={16} />
-                  </button>
-                  <button type="button" onClick={() => applyPostFormat('++', '++')} className="btn-secondary" aria-label="Underline selected text" title="Underline">
-                    <Underline size={16} />
-                  </button>
-                  <button type="button" onClick={addPostList} className="btn-secondary" aria-label="Add list item" title="List">
-                    <List size={16} />
-                  </button>
-                </div>
-                <textarea
-                  ref={postBodyRef}
+                <RichPostEditor
                   value={postForm.body}
-                  onChange={(event) => setPostForm((form) => ({ ...form, body: event.target.value }))}
-                  className="min-h-32 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-                  placeholder="Write the update. Use the toolbar for bold, italics, underline, and lists."
+                  onChange={(body) => setPostForm((form) => ({ ...form, body }))}
                 />
               </label>
               <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-3 dark:border-gray-800">
