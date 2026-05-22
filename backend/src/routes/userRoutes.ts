@@ -7,6 +7,7 @@ const router = Router();
 
 router.get('/search', requirePermission('users:view'), UserController.searchUsers);
 router.get('/all', requirePermission('users:view'), UserController.getAllUsers);
+router.get('/address-suggestions', requirePermission('users:view'), UserController.suggestAddresses);
 router.post('/', requirePermission('users:create'), UserController.createUser);
 router.post('/:id/profile-picture', requireSelfOrPermission((req) => req.params.id, 'users:profile-picture'), profilePictureUpload.single('profilePicture'), UserController.uploadProfilePicture);
 router.delete('/:id/profile-picture', requireSelfOrPermission((req) => req.params.id, 'users:profile-picture'), UserController.removeProfilePicture);

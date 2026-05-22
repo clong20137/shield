@@ -192,6 +192,52 @@ function includesProtectedSelfUpdate(body: Record<string, unknown>): boolean {
 }
 
 export class UserController {
+  static async suggestAddresses(req: Request, res: Response) {
+    try {
+      const query = cleanString(req.query.q, 200);
+      if (query.length < 3) {
+        return res.json([]);
+      }
+
+      const url = new URL('https://geocoding.geo.census.gov/geocoder/locations/onelineaddress');
+      url.searchParams.set('address', query);
+      url.searchParams.set('benchmark', 'Public_AR_Current');
+      url.searchParams.set('format', 'json');
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+
+      try {
+        const response = await fetch(url, {
+          signal: controller.signal,
+          headers: { Accept: 'application/json' },
+        });
+
+        if (!response.ok) {
+          return res.json([]);
+        }
+
+        const data = await response.json() as {
+          result?: { addressMatches?: Array<{ matchedAddress?: string }> };
+        };
+        const suggestions = Array.from(
+          new Set(
+            (data.result?.addressMatches || [])
+              .map((match) => cleanString(match.matchedAddress, 300))
+              .filter(Boolean),
+          ),
+        ).slice(0, 8);
+
+        return res.json(suggestions);
+      } finally {
+        clearTimeout(timeout);
+      }
+    } catch (error) {
+      console.error('Address suggestion error:', error);
+      return res.json([]);
+    }
+  }
+
   static async searchUsers(req: Request, res: Response) {
     try {
       const { q, rank, district, active, employmentType, status, sex, supervisor, badgeNumber, radioNumber, peNumber } = req.query;

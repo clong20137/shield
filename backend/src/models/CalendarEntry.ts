@@ -40,6 +40,10 @@ interface CalendarEntryRow extends RowDataPacket {
   updatedAt: Date;
 }
 
+interface MileageTotalRow extends RowDataPacket {
+  mileage: number | string | null;
+}
+
 export type CalendarEntryInput = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 
 function formatDate(value: Date | string): string {
@@ -78,6 +82,22 @@ function toCalendarEntry(row: CalendarEntryRow): CalendarEntry {
 }
 
 export class CalendarEntryModel {
+  static async getMileageTotal(ownerAccountId: string): Promise<number> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<MileageTotalRow[]>(
+        `SELECT COALESCE(SUM(CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(\`details\`, '$.regularDutyMiles')), '') AS DECIMAL(10,2))), 0) AS mileage
+         FROM calendar_entries
+         WHERE \`ownerAccountId\` = ? AND \`category\` = 'Trooper Daily'`,
+        [ownerAccountId]
+      );
+
+      return Number(rows[0]?.mileage || 0);
+    } finally {
+      conn.release();
+    }
+  }
+
   static async listEntries(ownerAccountId: string, limit = 1000, offset = 0): Promise<CalendarEntry[]> {
     const conn = await pool.getConnection();
     try {

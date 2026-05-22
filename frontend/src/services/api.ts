@@ -631,6 +631,9 @@ export const userService = {
   
   getById: (id: string) =>
     api.get(`/users/${id}`),
+
+  getAddressSuggestions: (query: string) =>
+    api.get<string[]>('/users/address-suggestions', { params: { q: query } }),
   
   create: (user: CreateUserPayload) =>
     api.post('/users', user),

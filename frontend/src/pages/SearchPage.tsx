@@ -91,6 +91,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
+  const searchRequestRef = useRef(0);
+  const [addressLookupQuery, setAddressLookupQuery] = useState('');
   const [searchParams] = useSearchParams();
   const globalQuery = useMemo(() => searchParams.get('q') ?? '', [searchParams]);
   const selectedUserId = useMemo(() => searchParams.get('userId') ?? '', [searchParams]);
@@ -98,22 +100,28 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const canEditProfilePictures = isAdministrator || currentUser?.permissions?.includes('users:profile-picture');
 
   const handleSearch = async (query: string) => {
+    const requestId = searchRequestRef.current + 1;
+    searchRequestRef.current = requestId;
     setCurrentQuery(query);
     setLoading(true);
     setError(null);
     try {
       if (!query.trim()) {
         const response = await userService.getAll(1, 100);
+        if (requestId !== searchRequestRef.current) return;
         setUsers(response.data.data);
       } else {
         const response = await userService.search(query);
+        if (requestId !== searchRequestRef.current) return;
         setUsers(response.data);
       }
     } catch (err) {
       setError('Failed to search users. Please try again.');
       console.error(err);
     } finally {
-      setLoading(false);
+      if (requestId === searchRequestRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -178,6 +186,16 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
 
   const updateEditField = (field: keyof User, value: string | boolean) => {
     setEditForm((currentForm) => ({ ...currentForm, [field]: value }));
+  };
+
+  const updateAddressField = (field: 'residentialAddress' | 'mailingAddress', value: string) => {
+    updateEditField(field, value);
+    setAddressLookupQuery(value);
+  };
+
+  const openSelectedUser = (user: User) => {
+    setSelectedUser(null);
+    window.setTimeout(() => setSelectedUser({ ...user }), 0);
   };
 
   const updateProfilePicture = () => {
@@ -334,6 +352,33 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   }, [globalQuery]);
 
   useEffect(() => {
+    const query = addressLookupQuery.trim();
+    if (query.length < 3) {
+      return;
+    }
+
+    let isMounted = true;
+    const timer = window.setTimeout(() => {
+      userService.getAddressSuggestions(query)
+        .then((response) => {
+          if (!isMounted) {
+            return;
+          }
+
+          setAddressSuggestions((currentSuggestions) =>
+            Array.from(new Set([...response.data, ...currentSuggestions])).slice(0, 100),
+          );
+        })
+        .catch((err) => console.error('Failed to load address suggestions:', err));
+    }, 300);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timer);
+    };
+  }, [addressLookupQuery]);
+
+  useEffect(() => {
     const handleRealtimeUserUpdate = async (event: Event) => {
       let entityId = '';
       try {
@@ -414,7 +459,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       <UserTable
         users={users}
         loading={loading}
-        onUserSelect={setSelectedUser}
+        onUserSelect={openSelectedUser}
         onEdit={openEditUser}
         onDelete={handleDelete}
         canEdit={isAdministrator}
@@ -601,11 +646,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                 </label>
                 <label className="block md:col-span-2 xl:col-span-3">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Residential Address</span>
-                  <input value={String(editForm.residentialAddress || '')} onChange={(event) => updateEditField('residentialAddress', event.target.value)} autoComplete="street-address" list="shield-edit-addresses" className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  <input value={String(editForm.residentialAddress || '')} onChange={(event) => updateAddressField('residentialAddress', event.target.value)} autoComplete="street-address" list="shield-edit-addresses" className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
                 </label>
                 <label className="block md:col-span-2 xl:col-span-3">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Mailing Address</span>
-                  <input value={String(editForm.mailingAddress || '')} onChange={(event) => updateEditField('mailingAddress', event.target.value)} autoComplete="street-address" list="shield-edit-addresses" className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  <input value={String(editForm.mailingAddress || '')} onChange={(event) => updateAddressField('mailingAddress', event.target.value)} autoComplete="street-address" list="shield-edit-addresses" className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Emergency Contact Name</span>

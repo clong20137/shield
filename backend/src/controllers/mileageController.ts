@@ -22,8 +22,7 @@ export class MileageController {
         return res.status(403).json({ error: 'User profile permission required' });
       }
 
-      const entries = await CalendarEntryModel.listEntries(accountId);
-      const mileage = entries.reduce((total, entry) => total + (Number(entry.details?.regularDutyMiles) || 0), 0);
+      const mileage = await CalendarEntryModel.getMileageTotal(accountId);
       const milestone = await SystemSettingModel.getNumber(MILEAGE_SETTING, 1000);
 
       res.json({ mileage, milestone });

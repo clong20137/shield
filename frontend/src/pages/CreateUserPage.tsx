@@ -70,6 +70,7 @@ const emptyUserForm: UserForm = {
 function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserPageProps) {
   const [form, setForm] = useState<UserForm>(emptyUserForm);
   const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
+  const [addressLookupQuery, setAddressLookupQuery] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
 
@@ -87,6 +88,38 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
   const updateField = (field: keyof UserForm, value: string | boolean) => {
     setForm((currentForm) => ({ ...currentForm, [field]: value }));
   };
+
+  const updateAddressField = (field: 'residentialAddress' | 'mailingAddress', value: string) => {
+    updateField(field, value);
+    setAddressLookupQuery(value);
+  };
+
+  useEffect(() => {
+    const query = addressLookupQuery.trim();
+    if (query.length < 3) {
+      return;
+    }
+
+    let isMounted = true;
+    const timer = window.setTimeout(() => {
+      userService.getAddressSuggestions(query)
+        .then((response) => {
+          if (!isMounted) {
+            return;
+          }
+
+          setAddressSuggestions((currentSuggestions) =>
+            Array.from(new Set([...response.data, ...currentSuggestions])).slice(0, 50),
+          );
+        })
+        .catch(() => undefined);
+    }, 300);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timer);
+    };
+  }, [addressLookupQuery]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -219,11 +252,11 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
           </label>
           <label className="block md:col-span-2 xl:col-span-3">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Residential Address</span>
-            <input value={form.residentialAddress} onChange={(event) => updateField('residentialAddress', event.target.value)} autoComplete="street-address" list="shield-addresses" className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+            <input value={form.residentialAddress} onChange={(event) => updateAddressField('residentialAddress', event.target.value)} autoComplete="street-address" list="shield-addresses" className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
           </label>
           <label className="block md:col-span-2 xl:col-span-3">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Mailing Address</span>
-            <input value={form.mailingAddress} onChange={(event) => updateField('mailingAddress', event.target.value)} autoComplete="street-address" list="shield-addresses" className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+            <input value={form.mailingAddress} onChange={(event) => updateAddressField('mailingAddress', event.target.value)} autoComplete="street-address" list="shield-addresses" className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Emergency Contact Name</span>

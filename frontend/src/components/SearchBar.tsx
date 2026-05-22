@@ -19,6 +19,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 }) => {
   const employmentTypes = ['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inactive', 'Other', 'CPS'];
   const [query, setQuery] = React.useState(initialQuery);
+  const onSearchRef = React.useRef(onSearch);
   const [showFilters, setShowFilters] = React.useState(false);
   const [filters, setFilters] = React.useState({
     rank: '',
@@ -41,6 +42,18 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   React.useEffect(() => {
     setQuery(initialQuery);
   }, [initialQuery]);
+
+  React.useEffect(() => {
+    onSearchRef.current = onSearch;
+  }, [onSearch]);
+
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => {
+      onSearchRef.current(query);
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [query]);
 
   const handleFilterChange = (field: keyof UserFilters, value: string) => {
     const newFilters = { ...filters, [field]: value };

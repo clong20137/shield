@@ -53,21 +53,29 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
 
   useEffect(() => {
     let isMounted = true;
-    mileageService.getSummary(user.id)
-      .then((response) => {
-        if (isMounted) {
-          setMileageSummary(response.data);
-        }
-      })
-      .catch((error) => {
-        console.error('Failed to load profile mileage:', error);
-        if (isMounted) {
-          setMileageSummary(null);
-        }
-      });
+    const loadMileageSummary = () => {
+      mileageService.getSummary(user.id)
+        .then((response) => {
+          if (isMounted) {
+            setMileageSummary(response.data);
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to load profile mileage:', error);
+          if (isMounted) {
+            setMileageSummary(null);
+          }
+        });
+    };
+
+    loadMileageSummary();
+    window.addEventListener('shield:calendar-updated', loadMileageSummary);
+    window.addEventListener('shield:mileage-updated', loadMileageSummary);
 
     return () => {
       isMounted = false;
+      window.removeEventListener('shield:calendar-updated', loadMileageSummary);
+      window.removeEventListener('shield:mileage-updated', loadMileageSummary);
     };
   }, [user.id]);
 
