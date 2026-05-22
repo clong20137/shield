@@ -38,6 +38,7 @@ const districtOptions = [
   'Digital Forensics Unit',
 ] as const;
 const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty'] as const;
+const submissionStatusOptions = ['Draft', 'Submitted'] as const;
 
 function getAuditActor(account: { id: string; displayName: string; email: string } | null) {
   return {
@@ -66,6 +67,7 @@ function validateCalendarEntryPayload(body: Record<string, unknown>) {
   const districtWorked = cleanString(body.districtWorked, 100);
   const specialStatus = cleanString(body.specialStatus, 80) || 'None';
   const color = cleanString(body.color, 20) || '#9C865C';
+  const submissionStatus = cleanString(body.submissionStatus, 30) || 'Draft';
   const hours = Number(body.dutyHours);
 
   if (!isOneOf(category, calendarCategories)) {
@@ -92,6 +94,10 @@ function validateCalendarEntryPayload(body: Record<string, unknown>) {
     return { error: 'Choose a valid calendar color' };
   }
 
+  if (!isOneOf(submissionStatus, submissionStatusOptions)) {
+    return { error: 'Choose save draft or submit for this Trooper Daily' };
+  }
+
   return {
     value: {
       category,
@@ -100,6 +106,7 @@ function validateCalendarEntryPayload(body: Record<string, unknown>) {
       districtWorked,
       specialStatus,
       color,
+      submissionStatus,
       details: cleanRecord(body.details, 160, 1000),
     },
   };

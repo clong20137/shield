@@ -101,7 +101,7 @@ export class ReportController {
       const pageSize = Math.min(100, Math.max(10, Number.parseInt(String(req.query.pageSize || '25'), 10) || 25));
       const offset = (page - 1) * pageSize;
       const params: Array<string | number> = [];
-      const whereParts = ["ce.`category` = 'Trooper Daily'"];
+      const whereParts = ["ce.`category` = 'Trooper Daily'", "COALESCE(ce.`submissionStatus`, 'Submitted') = 'Submitted'"];
 
       if (!canViewAllReports) {
         if (supervisorNames.length > 0) {

@@ -283,6 +283,7 @@ export interface CalendarEntry {
   specialStatus: string;
   color: string;
   details: Record<string, string>;
+  submissionStatus: 'Draft' | 'Submitted';
   reviewStatus: 'Pending' | 'Approved' | 'Returned';
   reviewNotes: string;
   reviewedBy: string | null;

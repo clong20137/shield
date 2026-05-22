@@ -381,6 +381,7 @@ export async function initializeDatabase() {
   await ensureColumn('calendar_entries', 'ownerAccountId', '`ownerAccountId` VARCHAR(36)');
   await ensureColumn('calendar_entries', 'details', '`details` JSON');
   await ensureColumn('calendar_entries', 'reviewStatus', "`reviewStatus` VARCHAR(30) NOT NULL DEFAULT 'Pending'");
+  await ensureColumn('calendar_entries', 'submissionStatus', "`submissionStatus` VARCHAR(30) NOT NULL DEFAULT 'Submitted'");
   await ensureColumn('calendar_entries', 'reviewNotes', '`reviewNotes` TEXT');
   await ensureColumn('calendar_entries', 'reviewedBy', '`reviewedBy` VARCHAR(36)');
   await ensureColumn('calendar_entries', 'reviewedByName', '`reviewedByName` VARCHAR(150)');

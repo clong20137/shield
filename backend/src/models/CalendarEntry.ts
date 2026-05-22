@@ -12,6 +12,7 @@ export interface CalendarEntry {
   specialStatus: string;
   color: string;
   details: Record<string, string>;
+  submissionStatus: 'Draft' | 'Submitted';
   reviewStatus: 'Pending' | 'Approved' | 'Returned';
   reviewNotes: string;
   reviewedBy: string | null;
@@ -31,6 +32,7 @@ interface CalendarEntryRow extends RowDataPacket {
   specialStatus: string;
   color: string;
   details: string | Record<string, string> | null;
+  submissionStatus: 'Draft' | 'Submitted' | null;
   reviewStatus: 'Pending' | 'Approved' | 'Returned' | null;
   reviewNotes: string | null;
   reviewedBy: string | null;
@@ -71,6 +73,7 @@ function toCalendarEntry(row: CalendarEntryRow): CalendarEntry {
     specialStatus: row.specialStatus,
     color: row.color,
     details,
+    submissionStatus: row.submissionStatus || 'Submitted',
     reviewStatus: row.reviewStatus || 'Pending',
     reviewNotes: row.reviewNotes || '',
     reviewedBy: row.reviewedBy || null,
@@ -88,7 +91,7 @@ export class CalendarEntryModel {
       const [rows] = await conn.query<MileageTotalRow[]>(
         `SELECT COALESCE(SUM(CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(\`details\`, '$.regularDutyMiles')), '') AS DECIMAL(10,2))), 0) AS mileage
          FROM calendar_entries
-         WHERE \`ownerAccountId\` = ? AND \`category\` = 'Trooper Daily'`,
+         WHERE \`ownerAccountId\` = ? AND \`category\` = 'Trooper Daily' AND COALESCE(\`submissionStatus\`, 'Submitted') = 'Submitted'`,
         [ownerAccountId]
       );
 
@@ -121,8 +124,8 @@ export class CalendarEntryModel {
       await conn.query<ResultSetHeader>(
         `INSERT INTO calendar_entries (
           \`id\`, \`ownerAccountId\`, \`category\`, \`entryDate\`, \`dutyHours\`, \`districtWorked\`,
-          \`specialStatus\`, \`color\`, \`details\`, \`reviewStatus\`, \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          \`specialStatus\`, \`color\`, \`details\`, \`submissionStatus\`, \`reviewStatus\`, \`createdAt\`, \`updatedAt\`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           entry.ownerAccountId,
@@ -133,6 +136,7 @@ export class CalendarEntryModel {
           entry.specialStatus,
           entry.color,
           JSON.stringify(entry.details || {}),
+          entry.submissionStatus,
           'Pending',
           now,
           now,
@@ -143,6 +147,7 @@ export class CalendarEntryModel {
         ...entry,
         dutyHours: String(entry.dutyHours),
         id,
+        submissionStatus: entry.submissionStatus,
         reviewStatus: 'Pending',
         reviewNotes: '',
         reviewedBy: null,
@@ -168,6 +173,7 @@ export class CalendarEntryModel {
           \`specialStatus\` = ?,
           \`color\` = ?,
           \`details\` = ?,
+          \`submissionStatus\` = ?,
           \`reviewStatus\` = ?,
           \`reviewNotes\` = NULL,
           \`reviewedBy\` = NULL,
@@ -183,6 +189,7 @@ export class CalendarEntryModel {
           entry.specialStatus,
           entry.color,
           JSON.stringify(entry.details || {}),
+          entry.submissionStatus,
           'Pending',
           new Date(),
           id,

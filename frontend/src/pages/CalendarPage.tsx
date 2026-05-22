@@ -206,6 +206,7 @@ const createDefaultEntryForm = (date: string, currentUser?: AuthAccount): Calend
   districtWorked: getDefaultDistrict(currentUser),
   specialStatus: specialStatusOptions[0],
   color: entryColors[0].value,
+  submissionStatus: 'Draft',
   details: {},
 });
 
@@ -216,6 +217,7 @@ const createEntryFormFromEntry = (entry: CalendarEntry): CalendarEntryForm => ({
   districtWorked: entry.districtWorked,
   specialStatus: entry.specialStatus,
   color: entry.color,
+  submissionStatus: entry.submissionStatus || 'Submitted',
   details: entry.details || {},
 });
 
@@ -702,7 +704,7 @@ function CalendarPage({
     setCalendarFocusDate(today);
   };
 
-  const saveEntry = async (event: React.FormEvent<HTMLFormElement>) => {
+  const saveEntry = async (event: React.FormEvent<HTMLFormElement>, submissionStatus: CalendarEntry['submissionStatus'] = 'Draft') => {
     event.preventDefault();
 
     const hours = Number(entryForm.dutyHours);
@@ -715,6 +717,7 @@ function CalendarPage({
     try {
       const payload = {
         ...entryForm,
+        submissionStatus,
         dutyHours: hours.toFixed(2).replace(/\.?0+$/u, ''),
         accountId: currentUser.id,
         ...actor,
@@ -1002,6 +1005,7 @@ function CalendarPage({
       (attendanceHours > 0 && Math.abs(attendanceHours - reportedDutyHours) > 0.01) ||
       (dutyActivityHours > 0 && Math.abs(dutyActivityHours - reportedDutyHours) > 0.01));
   const visibleDailySections = trooperDailySections.filter((section) => !hiddenDailySections.includes(section.title));
+  const editingSubmissionStatus = editingEntry?.submissionStatus || entryForm.submissionStatus || 'Draft';
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -1129,7 +1133,7 @@ function CalendarPage({
                       style={{ backgroundColor: entry.color }}
                       title={`${entry.dutyHours} hours - ${entry.districtWorked}`}
                     >
-                      {entry.dutyHours}h {entry.districtWorked}
+                      {entry.submissionStatus === 'Draft' ? 'Draft - ' : ''}{entry.dutyHours}h {entry.districtWorked}
                     </div>
                   ))}
                   {dayEntries.length > 3 && (
@@ -1177,6 +1181,7 @@ function CalendarPage({
                       <p className="text-xs font-semibold text-gray-400">No report</p>
                     ) : dayEntries.map((entry) => (
                       <div key={entry.id} className="rounded px-2 py-1.5 text-xs font-bold text-white" style={{ backgroundColor: entry.color }}>
+                        {entry.submissionStatus === 'Draft' && <span className="mb-1 inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] uppercase">Draft</span>}
                         {entry.dutyHours}h<br />{entry.districtWorked}
                       </div>
                     ))}
@@ -1218,7 +1223,9 @@ function CalendarPage({
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="font-bold text-gray-900 dark:text-gray-100">{entry.districtWorked}</p>
-                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{entry.dutyHours} duty hours - {entry.specialStatus}</p>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                          {entry.submissionStatus === 'Draft' ? 'Draft - ' : 'Submitted - '}{entry.dutyHours} duty hours - {entry.specialStatus}
+                        </p>
                       </div>
                       <span className="h-4 w-4 rounded-full" style={{ backgroundColor: entry.color }} />
                     </div>
@@ -1240,6 +1247,13 @@ function CalendarPage({
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   {editingEntryId ? 'Update this daily report.' : 'Fill out this daily report.'}
                 </p>
+                <span className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase ${
+                  editingSubmissionStatus === 'Submitted'
+                    ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-200'
+                    : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-200'
+                }`}>
+                  {editingSubmissionStatus === 'Submitted' ? 'Submitted report' : 'Saved draft'}
+                </span>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {onOpenCalculator && (
