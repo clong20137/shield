@@ -10,10 +10,12 @@ interface AccountSettingsPageProps {
   messagePreferences: {
     receiveMessages: boolean;
     playMessageSound: boolean;
+    messageSound: 'classic' | 'soft' | 'chime';
     useMilitaryTime: boolean;
   };
   onReceiveMessagesChange: (receiveMessages: boolean) => void;
   onMessageSoundChange: (playMessageSound: boolean) => void;
+  onMessageSoundSelect: (messageSound: 'classic' | 'soft' | 'chime') => void;
   onMilitaryTimeChange: (useMilitaryTime: boolean) => void;
   onOpenEvaluations?: () => void;
   onAccountUpdate: (account: AuthAccount) => void;
@@ -37,6 +39,7 @@ export function AccountSettingsPage({
   messagePreferences,
   onReceiveMessagesChange,
   onMessageSoundChange,
+  onMessageSoundSelect,
   onMilitaryTimeChange,
   onOpenEvaluations,
   onAccountUpdate,
@@ -626,6 +629,21 @@ export function AccountSettingsPage({
               checked={messagePreferences.receiveMessages}
               onChange={(event) => onReceiveMessagesChange(event.target.checked)}
             />
+          </label>
+
+          <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
+            <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Message sound</span>
+            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose the ping used when new unread messages arrive.</span>
+            <select
+              value={messagePreferences.messageSound}
+              disabled={!messagePreferences.receiveMessages || !messagePreferences.playMessageSound}
+              onChange={(event) => onMessageSoundSelect(event.target.value as 'classic' | 'soft' | 'chime')}
+              className="mt-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+            >
+              <option value="classic">Classic two-tone</option>
+              <option value="soft">Soft alert</option>
+              <option value="chime">Bright chime</option>
+            </select>
           </label>
 
           <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">

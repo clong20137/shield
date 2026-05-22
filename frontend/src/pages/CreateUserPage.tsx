@@ -104,7 +104,7 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
     setIsSaving(true);
     try {
       const response = await userService.create(form);
-      onToast('success', 'User created.');
+      onToast('success', 'User created\nThe account is ready to use.');
       if (onCreated) {
         onCreated(response.data);
       } else {

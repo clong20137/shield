@@ -79,7 +79,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
     <div className="bg-white rounded-lg shadow-xl overflow-hidden dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
       <div className="bg-primary-500 text-white px-5 py-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-4">
           {user.profilePictureUrl ? (
             <img
               src={getAssetUrl(user.profilePictureUrl)}
@@ -127,7 +127,10 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
             </div>
             <p className="mt-2 text-sm text-blue-100">{user.email || 'No email on file'}</p>
             <p className="mt-1 text-sm text-blue-100">PE {user.peNumber || 'N/A'} - {user.district || 'No district'}</p>
-            <div className="mt-3 max-w-sm rounded border border-white/15 bg-white/10 p-3">
+          </div>
+        </div>
+          <div className="ml-auto flex items-start gap-3">
+            <div className="w-full min-w-52 max-w-xs rounded border border-white/15 bg-white/10 p-3">
               <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-white">
                 <span className="inline-flex items-center gap-2">
                   <Gauge size={15} />
@@ -142,8 +145,6 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
                 <p className="mt-1 text-xs font-semibold text-blue-100">{mileagePercent}% of {milestone.toLocaleString()} mi milestone</p>
               )}
             </div>
-          </div>
-        </div>
           <button
             className="icon-close-button border-white/20 bg-white/10 text-white hover:bg-white/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
             onClick={onClose}
@@ -153,6 +154,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           >
             <X size={20} />
           </button>
+          </div>
         </div>
         <div className="mt-5 flex flex-wrap gap-2 border-t border-white/15 pt-4">
           {tabs.map(([tab, label]) => (

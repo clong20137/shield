@@ -282,7 +282,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       setSelectedUser(updatedUser);
       setEditingUser(null);
       setEditForm({});
-      onToast('success', 'User updated.');
+      onToast('success', 'Profile saved\nThe user record has been updated.');
     } catch (err) {
       console.error(err);
       onToast('error', getErrorMessage(err, 'Failed to update user.'));

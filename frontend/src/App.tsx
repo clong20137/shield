@@ -26,6 +26,7 @@ const MODAL_CLOSE_MS = 220;
 interface MessagePreferences {
   receiveMessages: boolean;
   playMessageSound: boolean;
+  messageSound: 'classic' | 'soft' | 'chime';
   useMilitaryTime: boolean;
 }
 
@@ -44,6 +45,7 @@ interface QuickLaunchApp {
 const defaultMessagePreferences: MessagePreferences = {
   receiveMessages: true,
   playMessageSound: true,
+  messageSound: 'classic',
   useMilitaryTime: false,
 };
 
@@ -2126,26 +2128,37 @@ function App() {
       if (!AudioContextClass) return;
 
       const audioContext = new AudioContextClass();
-      const firstTone = audioContext.createOscillator();
-      const secondTone = audioContext.createOscillator();
       const gain = audioContext.createGain();
-      firstTone.type = 'triangle';
-      secondTone.type = 'sine';
-      firstTone.frequency.value = 659.25;
-      secondTone.frequency.value = 987.77;
+      const tones = {
+        classic: [
+          { type: 'triangle' as OscillatorType, frequency: 659.25, start: 0, duration: 0.14, volume: 0.12 },
+          { type: 'sine' as OscillatorType, frequency: 987.77, start: 0.16, duration: 0.2, volume: 0.1 },
+        ],
+        soft: [
+          { type: 'sine' as OscillatorType, frequency: 523.25, start: 0, duration: 0.18, volume: 0.08 },
+          { type: 'sine' as OscillatorType, frequency: 659.25, start: 0.14, duration: 0.22, volume: 0.07 },
+        ],
+        chime: [
+          { type: 'triangle' as OscillatorType, frequency: 784, start: 0, duration: 0.12, volume: 0.1 },
+          { type: 'triangle' as OscillatorType, frequency: 1046.5, start: 0.11, duration: 0.16, volume: 0.09 },
+          { type: 'sine' as OscillatorType, frequency: 1318.51, start: 0.24, duration: 0.18, volume: 0.07 },
+        ],
+      }[messagePreferences.messageSound || 'classic'];
+
       gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.12, audioContext.currentTime + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.14);
-      gain.gain.setValueAtTime(0.0001, audioContext.currentTime + 0.16);
-      gain.gain.exponentialRampToValueAtTime(0.1, audioContext.currentTime + 0.18);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.36);
-      firstTone.connect(gain);
-      secondTone.connect(gain);
       gain.connect(audioContext.destination);
-      firstTone.start(audioContext.currentTime);
-      firstTone.stop(audioContext.currentTime + 0.14);
-      secondTone.start(audioContext.currentTime + 0.16);
-      secondTone.stop(audioContext.currentTime + 0.36);
+
+      tones.forEach((tone) => {
+        const oscillator = audioContext.createOscillator();
+        oscillator.type = tone.type;
+        oscillator.frequency.value = tone.frequency;
+        oscillator.connect(gain);
+        gain.gain.setValueAtTime(0.0001, audioContext.currentTime + tone.start);
+        gain.gain.exponentialRampToValueAtTime(tone.volume, audioContext.currentTime + tone.start + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + tone.start + tone.duration);
+        oscillator.start(audioContext.currentTime + tone.start);
+        oscillator.stop(audioContext.currentTime + tone.start + tone.duration);
+      });
     } catch (err) {
       console.error('Failed to play message ping:', err);
     }
@@ -2195,7 +2208,7 @@ function App() {
       window.removeEventListener('shield:messages-updated', loadUnreadCount);
       eventSource?.close();
     };
-  }, [currentUser, messagePreferences.receiveMessages]);
+  }, [currentUser, messagePreferences.receiveMessages, messagePreferences.playMessageSound, messagePreferences.messageSound]);
 
   useEffect(() => {
     authService.getSession()
@@ -2761,19 +2774,35 @@ function App() {
                                 key={notification.id}
                                 type="button"
                                 onClick={() => openNotification(notification)}
-                                className={`mb-1 block w-full rounded px-3 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${notification.isRead ? '' : 'bg-accent/10'}`}
+                                className={`mb-1 block w-full rounded border px-3 py-3 text-left text-sm transition ${
+                                  notification.isRead
+                                    ? 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-800'
+                                    : 'border-accent/40 bg-accent/10 shadow-sm ring-1 ring-accent/15 hover:bg-accent/15'
+                                }`}
                               >
-                                <p className="font-semibold text-gray-800 dark:text-gray-100">{notification.title}</p>
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="font-bold text-gray-800 dark:text-gray-100">{notification.title}</p>
+                                  {!notification.isRead && <span className="mt-1 h-2 w-2 rounded-full bg-accent" aria-label="New notification" />}
+                                </div>
                                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{notification.message}</p>
-                                <p className="mt-1 text-xs uppercase text-gray-400">{new Date(notification.createdAt).toLocaleString()}</p>
+                                <p className="mt-2 text-xs font-bold uppercase tracking-wide text-accent">
+                                  {notification.isRead ? 'Seen' : 'New'} - {new Date(notification.createdAt).toLocaleString()}
+                                </p>
                               </button>
                             ))}
-                            {notifications.map((notification) => (
-                              <div key={notification.id} className="rounded px-3 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800">
-                                <p className="font-semibold text-gray-800 dark:text-gray-100">{notification.message}</p>
-                                <p className="mt-1 text-xs uppercase text-gray-400">{notification.type}</p>
+                            {notifications.map((notification) => {
+                              const title = notification.type === 'success' ? 'Done' : notification.type === 'error' ? 'Needs attention' : 'Heads up';
+                              return (
+                              <div key={notification.id} className="mb-1 rounded border border-accent/20 bg-accent/5 px-3 py-3 text-sm hover:bg-accent/10">
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="font-bold text-gray-800 dark:text-gray-100">{title}</p>
+                                  <span className="mt-1 h-2 w-2 rounded-full bg-accent" aria-label="New notification" />
+                                </div>
+                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{notification.message}</p>
+                                <p className="mt-2 text-xs font-bold uppercase tracking-wide text-accent">Just now</p>
                               </div>
-                            ))}
+                              );
+                            })}
                           </>
                         )}
                       </div>
@@ -2970,6 +2999,12 @@ function App() {
                       setMessagePreferences((preferences) => ({
                         ...preferences,
                         playMessageSound,
+                      }))
+                    }
+                    onMessageSoundSelect={(messageSound) =>
+                      setMessagePreferences((preferences) => ({
+                        ...preferences,
+                        messageSound,
                       }))
                     }
                     onMilitaryTimeChange={(useMilitaryTime) =>
