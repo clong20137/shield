@@ -52,6 +52,26 @@ export class UserNotificationModel {
     }
   }
 
+  static async hasRecent(type: string, entityType: string, entityId: string, since: Date): Promise<boolean> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<Array<RowDataPacket & { count: number }>>(
+        `SELECT COUNT(*) as count
+         FROM user_notifications
+         WHERE \`type\` = ?
+           AND \`entityType\` = ?
+           AND \`entityId\` = ?
+           AND \`createdAt\` >= ?
+         LIMIT 1`,
+        [type, entityType, entityId, since],
+      );
+
+      return Number(rows[0]?.count || 0) > 0;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async listForUser(userId: string): Promise<UserNotification[]> {
     const conn = await pool.getConnection();
     try {

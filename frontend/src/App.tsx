@@ -2326,6 +2326,7 @@ function App() {
     markWelcomeSplashSeen(currentUser.id);
     setIsWelcomeSplashOpen(false);
     setShouldLaunchGuideAfterWelcome(true);
+    window.setTimeout(() => setIsFirstLoginGuideOpen(true), 80);
   };
 
   const handleWelcomeLater = () => {
@@ -2335,6 +2336,14 @@ function App() {
 
     setIsWelcomeSplashOpen(false);
     setShouldLaunchGuideAfterWelcome(false);
+  };
+
+  const replayGuide = () => {
+    setIsAccountMenuOpen(false);
+    setIsWelcomeSplashOpen(false);
+    setShouldLaunchGuideAfterWelcome(false);
+    closeModal('profile');
+    window.setTimeout(() => setIsFirstLoginGuideOpen(true), MODAL_CLOSE_MS + 40);
   };
 
   const handleAccountUpdate = (account: AuthAccount) => {
@@ -2903,17 +2912,6 @@ function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        setIsWelcomeSplashOpen(true);
-                        setShouldLaunchGuideAfterWelcome(true);
-                        setIsAccountMenuOpen(false);
-                      }}
-                      className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
-                    >
-                      <Shield size={16} /> Replay Guide
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
                         setIsAccountMenuOpen(false);
                         handleLogout();
                       }}
@@ -3057,6 +3055,7 @@ function App() {
                         useMilitaryTime,
                       }))
                     }
+                    onReplayGuide={replayGuide}
                     onOpenEvaluations={() => closeModal('profile')}
                     onAccountUpdate={handleAccountUpdate}
                     onToast={showToast}

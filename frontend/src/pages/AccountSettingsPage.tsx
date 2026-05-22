@@ -18,6 +18,7 @@ interface AccountSettingsPageProps {
   onMessageSoundSelect: (messageSound: 'classic' | 'soft' | 'chime') => void;
   onMilitaryTimeChange: (useMilitaryTime: boolean) => void;
   onOpenEvaluations?: () => void;
+  onReplayGuide?: () => void;
   onAccountUpdate: (account: AuthAccount) => void;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
   getErrorMessage: (error: unknown, fallback: string) => string;
@@ -42,6 +43,7 @@ export function AccountSettingsPage({
   onMessageSoundSelect,
   onMilitaryTimeChange,
   onOpenEvaluations,
+  onReplayGuide,
   onAccountUpdate,
   onToast,
   getErrorMessage,
@@ -670,6 +672,18 @@ export function AccountSettingsPage({
               onChange={(event) => onMilitaryTimeChange(event.target.checked)}
             />
           </label>
+
+          {onReplayGuide && (
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
+              <span>
+                <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Guided tour</span>
+                <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Replay the spotlight guide for navigation, alerts, messages, settings, and quick launch.</span>
+              </span>
+              <button type="button" onClick={onReplayGuide} className="btn-primary" aria-label="Replay guided tour" title="Replay Guide">
+                <ShieldCheck size={16} />
+              </button>
+            </div>
+          )}
         </section>
       )}
     </div>

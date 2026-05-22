@@ -10,6 +10,7 @@ import { parsePagination } from '../utils/pagination';
 
 const dashboardCategories = ['Update', 'News', 'Alert'] as const;
 const dashboardReactions = ['like', 'celebrate', 'important', 'thanks'] as const;
+const commentFlagNotificationCooldownMs = 15 * 60 * 1000;
 
 export class DashboardPostController {
   static async listPosts(req: Request, res: Response) {
@@ -211,18 +212,23 @@ export class DashboardPostController {
       }
 
       const post = await DashboardPostModel.getPost(req.params.id, account.id);
-      const admins = (await AuthAccountModel.listAccounts()).filter((item) => item.role === 'administrator');
-      await Promise.all(admins.map(async (admin) => {
-        await UserNotificationModel.create({
-          userId: admin.id,
-          type: 'comment_flag',
-          title: 'Comment flagged',
-          message: `${account.displayName || account.email} flagged a comment on "${post?.title || 'an update'}".`,
-          entityType: 'dashboard_post',
-          entityId: req.params.id,
-        });
-        broadcastAccountEvent(admin.id, { type: 'notification-created', entityId: comment.id });
-      }));
+      const cooldownSince = new Date(Date.now() - commentFlagNotificationCooldownMs);
+      const hasRecentFlagNotice = await UserNotificationModel.hasRecent('comment_flag', 'dashboard_post', req.params.id, cooldownSince);
+
+      if (!hasRecentFlagNotice) {
+        const admins = (await AuthAccountModel.listAccounts()).filter((item) => item.role === 'administrator');
+        await Promise.all(admins.map(async (admin) => {
+          await UserNotificationModel.create({
+            userId: admin.id,
+            type: 'comment_flag',
+            title: 'Comment flagged',
+            message: `${account.displayName || account.email} flagged a comment on "${post?.title || 'an update'}".`,
+            entityType: 'dashboard_post',
+            entityId: req.params.id,
+          });
+          broadcastAccountEvent(admin.id, { type: 'notification-created', entityId: comment.id });
+        }));
+      }
 
       broadcastAppEvent({ type: 'dashboard-updated', entityId: req.params.id });
       res.json(comment);
