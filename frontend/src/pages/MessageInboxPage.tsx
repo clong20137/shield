@@ -610,8 +610,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className={`flex min-w-0 items-center gap-2 truncate text-sm ${thread.unreadCount > 0 ? 'font-bold text-primary-500' : 'font-semibold text-gray-800 dark:text-gray-100'}`}>
-                            <PresenceDot isOnline={presence.online} />
+                          <p className={`truncate text-sm ${thread.unreadCount > 0 ? 'font-bold text-primary-500' : 'font-semibold text-gray-800 dark:text-gray-100'}`}>
                             <span className="truncate">{thread.contactName}</span>
                           </p>
                           <p className="mt-0.5 truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
@@ -677,13 +676,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                         {getInitials(selectedThread.contactName)}
                       </div>
                     )}
-                    <PresenceDot
-                      isOnline={selectedPresence?.online === true}
-                      className="absolute bottom-0 right-0 h-3.5 w-3.5 border-2 border-white dark:border-gray-900"
-                    />
                   </div>
                   <div className="min-w-0 text-left">
-                    <h2 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">{selectedThread.contactName}</h2>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <h2 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">{selectedThread.contactName}</h2>
+                      <PresenceDot isOnline={selectedPresence?.online === true} />
+                    </div>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <RankBadge rank={selectedThread.contactRank} compact subtle />
                       <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">

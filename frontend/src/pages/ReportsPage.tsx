@@ -170,6 +170,7 @@ const ReportsPage: React.FC<{
   const [dailyLoading, setDailyLoading] = useState(true);
   const [dailyExportFormat, setDailyExportFormat] = useState<DailyExportFormat>('csv');
   const [selectedDailyExportFormat, setSelectedDailyExportFormat] = useState<DailyExportFormat>('pdf');
+  const [rowDailyExportFormats, setRowDailyExportFormats] = useState<Record<string, DailyExportFormat>>({});
   const [dailyExporting, setDailyExporting] = useState(false);
   const [dailyError, setDailyError] = useState<string | null>(null);
   const [selectedDaily, setSelectedDaily] = useState<TrooperDailyReportEntry | null>(null);
@@ -355,6 +356,8 @@ const ReportsPage: React.FC<{
     }
     onToast('success', `Trooper Daily ${format.toUpperCase()} export ready.`);
   };
+
+  const getRowDailyExportFormat = (entryId: string): DailyExportFormat => rowDailyExportFormats[entryId] || 'pdf';
 
   const reviewSelectedDaily = async (status: 'Approved' | 'Returned') => {
     if (!selectedDaily) return;
@@ -545,18 +548,37 @@ const ReportsPage: React.FC<{
                           <p className="line-clamp-2">{entry.details?.narrative || 'No narrative'}</p>
                         </td>
                         <td className="px-3 py-3">
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={getRowDailyExportFormat(entry.id)}
+                              onClick={(event) => event.stopPropagation()}
+                              onChange={(event) => {
+                                event.stopPropagation();
+                                setRowDailyExportFormats((formats) => ({
+                                  ...formats,
+                                  [entry.id]: event.target.value as DailyExportFormat,
+                                }));
+                              }}
+                              className="rounded border border-gray-300 bg-white px-2 py-2 text-xs font-semibold dark:border-gray-700 dark:bg-gray-950"
+                              aria-label="Individual report download format"
+                            >
+                              <option value="pdf">PDF</option>
+                              <option value="csv">CSV</option>
+                              <option value="xls">XLS</option>
+                            </select>
                           <button
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
-                              exportSingleDaily(entry, 'pdf');
+                              exportSingleDaily(entry, getRowDailyExportFormat(entry.id));
                             }}
                             className="btn-secondary"
                             aria-label="Download this Trooper Daily report"
-                            title="Download PDF"
+                            title="Download"
                           >
                             <Download size={16} />
                           </button>
+                          </div>
                         </td>
                       </tr>
                     );

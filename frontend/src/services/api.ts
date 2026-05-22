@@ -820,8 +820,8 @@ export const quickLaunchService = {
 };
 
 export const mileageService = {
-  getSummary: () =>
-    api.get<MileageSummary>('/mileage/summary'),
+  getSummary: (accountId?: string) =>
+    api.get<MileageSummary>(accountId ? `/mileage/summary/${accountId}` : '/mileage/summary'),
 
   updateMilestone: (milestone: number) =>
     api.put<{ milestone: number }>('/mileage/milestone', { milestone }),

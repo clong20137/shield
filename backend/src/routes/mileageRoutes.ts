@@ -6,6 +6,7 @@ import { requirePermission } from '../middleware/permissions';
 const router = Router();
 
 router.get('/summary', requireAuthenticated(), MileageController.getSummary);
+router.get('/summary/:accountId', requireAuthenticated(), MileageController.getSummaryForAccount);
 router.put('/milestone', requirePermission('roles:manage'), MileageController.updateMilestone);
 
 export default router;

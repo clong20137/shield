@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Mail, Pencil, Phone, Send, X } from 'lucide-react';
-import { getAssetUrl, handleAssetImageError, User } from '../services/api';
+import React, { useEffect, useState } from 'react';
+import { Gauge, Mail, Pencil, Phone, Send, X } from 'lucide-react';
+import { getAssetUrl, handleAssetImageError, MileageSummary, mileageService, User } from '../services/api';
 import { RankBadge } from './RankBadge';
 
 interface UserDetailProps {
@@ -42,6 +42,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const callHref = callNumber ? `tel:${callNumber.replace(/[^\d+]/gu, '')}` : undefined;
   const emailHref = user.email ? `mailto:${user.email}` : undefined;
   const [activeTab, setActiveTab] = useState<'personal' | 'identification' | 'employment' | 'contact' | 'additional'>('personal');
+  const [mileageSummary, setMileageSummary] = useState<MileageSummary | null>(null);
   const tabs = [
     ['personal', 'Personal'],
     ['identification', 'Identification'],
@@ -49,6 +50,30 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
     ['contact', 'Contact'],
     ['additional', 'Additional'],
   ] as const;
+
+  useEffect(() => {
+    let isMounted = true;
+    mileageService.getSummary(user.id)
+      .then((response) => {
+        if (isMounted) {
+          setMileageSummary(response.data);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load profile mileage:', error);
+        if (isMounted) {
+          setMileageSummary(null);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user.id]);
+
+  const mileage = mileageSummary?.mileage || 0;
+  const milestone = mileageSummary?.milestone || 0;
+  const mileagePercent = milestone > 0 ? Math.min(100, Math.round((mileage / milestone) * 100)) : 0;
 
   return (
     <div className="bg-white rounded-lg shadow-xl overflow-hidden dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
@@ -102,6 +127,21 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
             </div>
             <p className="mt-2 text-sm text-blue-100">{user.email || 'No email on file'}</p>
             <p className="mt-1 text-sm text-blue-100">PE {user.peNumber || 'N/A'} - {user.district || 'No district'}</p>
+            <div className="mt-3 max-w-sm rounded border border-white/15 bg-white/10 p-3">
+              <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-white">
+                <span className="inline-flex items-center gap-2">
+                  <Gauge size={15} />
+                  Mileage
+                </span>
+                <span>{mileage.toLocaleString()} mi</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-white/20">
+                <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${mileagePercent}%` }} />
+              </div>
+              {milestone > 0 && (
+                <p className="mt-1 text-xs font-semibold text-blue-100">{mileagePercent}% of {milestone.toLocaleString()} mi milestone</p>
+              )}
+            </div>
           </div>
         </div>
           <button
