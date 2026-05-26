@@ -584,8 +584,8 @@ function ForcePasswordChange({
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-10 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
-      <form onSubmit={handleSubmit} className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
+    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/65 px-4 py-10 text-gray-900 backdrop-blur-sm dark:text-gray-100">
+      <form onSubmit={handleSubmit} className="modal-window w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-800 dark:bg-gray-900">
         <div className="mb-6 flex items-start gap-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-primary-500 text-white">
             <LockKeyhole size={22} />
@@ -2471,6 +2471,9 @@ function App() {
   const isAdministrator = currentUser?.role === 'administrator';
   const openBugCount = bugReports.filter((report) => report.status === 'New' || report.status === 'Pending').length;
   const unreadNotificationCount = userNotifications.filter((notification) => !notification.isRead).length;
+  const shouldShowForcedPasswordModal = Boolean(
+    currentUser?.mustChangePassword && !isWelcomeSplashOpen && !isFirstLoginGuideOpen,
+  );
 
   const loadBugReports = useCallback(async () => {
     if (!isAdministrator) return;
@@ -2791,8 +2794,6 @@ function App() {
         <ShieldLoading />
       ) : !isAuthenticated ? (
         <LoginSplash onLogin={handleLogin} onToast={showToast} isExiting={isLoginTransitioning} />
-      ) : currentUser?.mustChangePassword ? (
-        <ForcePasswordChange account={currentUser} onChanged={handleAccountUpdate} onLogout={handleLogout} onToast={showToast} />
       ) : (
         <div className="animate-app-enter flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
           <aside className={`relative h-screen shrink-0 overflow-visible bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
@@ -3282,6 +3283,9 @@ function App() {
               onFinish={finishFirstLoginGuide}
               onLater={() => setIsFirstLoginGuideOpen(false)}
             />
+          )}
+          {shouldShowForcedPasswordModal && currentUser && (
+            <ForcePasswordChange account={currentUser} onChanged={handleAccountUpdate} onLogout={handleLogout} onToast={showToast} />
           )}
         </div>
       )}

@@ -6,12 +6,20 @@ export async function getRequestAccount(req: Request) {
   return getSessionAccount(req);
 }
 
-function shouldAllowPasswordChange(req: Request, accountId: string): boolean {
-  return req.method === 'POST' && req.path === '/change-password' && req.body?.accountId === accountId;
+function shouldAllowRequiredAccountSetup(req: Request, accountId: string): boolean {
+  if (req.method === 'POST' && req.path === '/change-password' && req.body?.accountId === accountId) {
+    return true;
+  }
+
+  if (req.method === 'PUT' && req.path === `/accounts/${accountId}/onboarding-complete`) {
+    return true;
+  }
+
+  return false;
 }
 
 function blockUntilPasswordChanged(req: Request, res: Response, account: { id: string; mustChangePassword?: boolean }): boolean {
-  if (!account.mustChangePassword || shouldAllowPasswordChange(req, account.id)) {
+  if (!account.mustChangePassword || shouldAllowRequiredAccountSetup(req, account.id)) {
     return false;
   }
 
