@@ -14,6 +14,7 @@ export interface AuthAccount {
   permissions?: string[];
   district: string;
   isActive: boolean;
+  mustChangePassword: boolean;
   receivesMessages: boolean;
   hasCompletedOnboarding: boolean;
   trooperDailyHiddenSections: string[];
@@ -40,6 +41,7 @@ interface AuthAccountRow extends RowDataPacket {
   role: string;
   district: string | null;
   isActive: boolean | number;
+  mustChangePassword: boolean | number;
   receivesMessages: boolean | number;
   hasCompletedOnboarding: boolean | number;
   trooperDailyHiddenSections: string | null;
@@ -174,6 +176,7 @@ function toPublicAccount(account: AuthAccountRow): AuthAccount {
     role: account.role || 'user',
     district: account.district || '',
     isActive: account.isActive !== false && account.isActive !== 0,
+    mustChangePassword: Boolean(account.mustChangePassword),
     receivesMessages: account.receivesMessages !== false && account.receivesMessages !== 0,
     hasCompletedOnboarding: Boolean(account.hasCompletedOnboarding),
     trooperDailyHiddenSections,
@@ -234,6 +237,7 @@ export class AuthAccountModel {
             \`lastName\` = ?,
             \`displayName\` = ?,
             \`passwordHash\` = ?,
+            \`mustChangePassword\` = 0,
             \`role\` = ?,
             \`updatedAt\` = ?
           WHERE \`id\` = ?`,
@@ -250,6 +254,7 @@ export class AuthAccountModel {
           role,
           district: existingUser.district || '',
           isActive: existingUser.isActive !== false && existingUser.isActive !== 0,
+          mustChangePassword: false,
           receivesMessages: existingUser.receivesMessages !== false && existingUser.receivesMessages !== 0,
           hasCompletedOnboarding: Boolean(existingUser.hasCompletedOnboarding),
           trooperDailyHiddenSections: [],
@@ -261,9 +266,9 @@ export class AuthAccountModel {
 
       await conn.query<ResultSetHeader>(
         `INSERT INTO users (
-          \`id\`, \`firstName\`, \`lastName\`, \`email\`, \`displayName\`, \`passwordHash\`, \`role\`,
+          \`id\`, \`firstName\`, \`lastName\`, \`email\`, \`displayName\`, \`passwordHash\`, \`role\`, \`mustChangePassword\`,
           \`isActive\`, \`employmentType\`, \`status\`, \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'Other', 'Active', ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1, 'Other', 'Active', ?, ?)`,
         [id, cleanFirstName, cleanLastName, normalizedEmail, displayName, passwordHash, role, now, now]
       );
 
@@ -277,6 +282,7 @@ export class AuthAccountModel {
         role,
         district: '',
         isActive: true,
+        mustChangePassword: false,
         receivesMessages: true,
         hasCompletedOnboarding: false,
         trooperDailyHiddenSections: [],
@@ -346,7 +352,7 @@ export class AuthAccountModel {
       }
 
       await conn.query<ResultSetHeader>(
-        'UPDATE users SET `passwordHash` = ?, `updatedAt` = ? WHERE `id` = ?',
+        'UPDATE users SET `passwordHash` = ?, `mustChangePassword` = 0, `updatedAt` = ? WHERE `id` = ?',
         [hashPassword(newPassword), new Date(), accountId]
       );
 
@@ -360,7 +366,7 @@ export class AuthAccountModel {
     const conn = await pool.getConnection();
     try {
       const [result] = await conn.query<ResultSetHeader>(
-        'UPDATE users SET `passwordHash` = ?, `updatedAt` = ? WHERE `id` = ? AND `passwordHash` IS NOT NULL',
+        'UPDATE users SET `passwordHash` = ?, `mustChangePassword` = 0, `updatedAt` = ? WHERE `id` = ? AND `passwordHash` IS NOT NULL',
         [hashPassword(newPassword), new Date(), accountId]
       );
 

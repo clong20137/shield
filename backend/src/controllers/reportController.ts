@@ -236,7 +236,7 @@ export class ReportController {
         `SELECT ce.*, u.\`firstName\`, u.\`lastName\`, u.\`email\`, u.\`peNumber\`, u.\`badgeNumber\`, u.\`rank\`, u.\`district\`
          FROM calendar_entries ce
          LEFT JOIN users u ON u.\`id\` = ce.\`ownerAccountId\`
-         WHERE ce.\`id\` = ? AND ce.\`category\` = 'Trooper Daily'
+         WHERE ce.\`id\` = ? AND ce.\`category\` = 'Trooper Daily' AND COALESCE(ce.\`submissionStatus\`, 'Submitted') = 'Submitted'
          LIMIT 1`,
         [req.params.id],
       );

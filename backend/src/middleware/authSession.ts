@@ -40,6 +40,10 @@ export function requireAuthenticated() {
         return res.status(401).json({ error: 'Sign in required' });
       }
 
+      if (account.mustChangePassword) {
+        return res.status(403).json({ error: 'Password change required before continuing', mustChangePassword: true });
+      }
+
       void AuthAccountModel.updateLastSeen(account.id).catch((error) => {
         console.error('Failed to update last seen:', error);
       });

@@ -214,6 +214,7 @@ export interface AuthAccount {
   permissions?: string[];
   district: string;
   isActive: boolean;
+  mustChangePassword: boolean;
   receivesMessages: boolean;
   hasCompletedOnboarding: boolean;
   trooperDailyHiddenSections: string[];

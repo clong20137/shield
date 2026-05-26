@@ -81,6 +81,7 @@ export async function initializeDatabase() {
       \`displayName\` VARCHAR(100),
       \`passwordHash\` VARCHAR(255),
       \`role\` VARCHAR(100) NOT NULL DEFAULT 'user',
+      \`mustChangePassword\` BOOLEAN DEFAULT 0,
       \`receivesMessages\` BOOLEAN DEFAULT 1,
       \`hasCompletedOnboarding\` BOOLEAN DEFAULT 0,
       \`twoFactorSecret\` VARCHAR(64),
@@ -128,6 +129,7 @@ export async function initializeDatabase() {
   await ensureColumn('users', 'passwordHash', '`passwordHash` VARCHAR(255)');
   await ensureColumn('users', 'role', "`role` VARCHAR(100) NOT NULL DEFAULT 'user'");
   await pool.query("ALTER TABLE `users` MODIFY COLUMN `role` VARCHAR(100) NOT NULL DEFAULT 'user'");
+  await ensureColumn('users', 'mustChangePassword', '`mustChangePassword` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'receivesMessages', '`receivesMessages` BOOLEAN DEFAULT 1');
   await ensureColumn('users', 'hasCompletedOnboarding', '`hasCompletedOnboarding` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'trooperDailyHiddenSections', '`trooperDailyHiddenSections` TEXT');
@@ -372,6 +374,7 @@ export async function initializeDatabase() {
       \`specialStatus\` VARCHAR(50) NOT NULL DEFAULT 'None',
       \`color\` VARCHAR(20) NOT NULL DEFAULT '#9C865C',
       \`details\` JSON,
+      \`submissionStatus\` VARCHAR(30) NOT NULL DEFAULT 'Submitted',
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX \`idx_calendar_owner\` (\`ownerAccountId\`),
@@ -391,6 +394,7 @@ export async function initializeDatabase() {
   await ensureIndex('calendar_entries', 'idx_calendar_district_date', '`districtWorked`, `entryDate`');
   await ensureIndex('calendar_entries', 'idx_calendar_owner_date', '`ownerAccountId`, `entryDate`');
   await ensureIndex('calendar_entries', 'idx_calendar_review_status', '`reviewStatus`, `entryDate`');
+  await ensureIndex('calendar_entries', 'idx_calendar_submission_status', '`submissionStatus`, `entryDate`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS calendar_shortcuts (

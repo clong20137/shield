@@ -35,6 +35,7 @@ export interface User {
   emergencyContactRelationship: string;
   emergencyContactPhone: string;
   role: string;
+  mustChangePassword?: boolean;
   receivesMessages: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -291,13 +292,13 @@ export class UserModel {
 
       await conn.query(
         `INSERT INTO users (
-          \`id\`, \`firstName\`, \`lastName\`, \`email\`, \`profilePictureUrl\`, \`displayName\`, \`passwordHash\`, \`role\`, \`peNumber\`, \`peopleSoftId\`, \`carNumber\`, \`badgeNumber\`,
+          \`id\`, \`firstName\`, \`lastName\`, \`email\`, \`profilePictureUrl\`, \`displayName\`, \`passwordHash\`, \`role\`, \`mustChangePassword\`, \`peNumber\`, \`peopleSoftId\`, \`carNumber\`, \`badgeNumber\`,
           \`radioNumber\`, \`personalPhoneNumber\`, \`departmentPhoneNumber\`, \`assignedTo\`, \`district\`, \`rank\`,
           \`isActive\`, \`employmentType\`, \`typeDetails\`, \`status\`, \`supervisor\`, \`specialtyCertifications\`,
           \`publicSafetyId\`, \`race\`, \`sex\`, \`maritalStatus\`, \`residentialAddress\`, \`mailingAddress\`,
           \`emergencyContactName\`, \`emergencyContactRelationship\`, \`emergencyContactPhone\`,
           \`receivesMessages\`, \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           user.firstName,
@@ -307,6 +308,7 @@ export class UserModel {
           `${user.firstName} ${user.lastName}`.trim(),
           user.password ? createPasswordHash(user.password) : null,
           user.role || 'user',
+          user.password ? 1 : 0,
           UserModel.blankToNull(user.peNumber),
           user.peopleSoftId,
           user.carNumber,

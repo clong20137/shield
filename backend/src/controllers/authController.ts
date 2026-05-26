@@ -421,6 +421,10 @@ export class AuthController {
         return res.status(400).json({ error: 'New password must be at least 8 characters and include uppercase, lowercase, and a number' });
       }
 
+      if (currentPassword === newPassword) {
+        return res.status(400).json({ error: 'New password must be different from the current password' });
+      }
+
       const changed = await AuthAccountModel.changePassword(cleanAccountId, currentPassword, newPassword);
 
       if (!changed) {

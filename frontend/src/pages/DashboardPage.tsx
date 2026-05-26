@@ -44,6 +44,7 @@ const createDefaultEntryForm = (date: string): CalendarEntryForm => ({
   districtWorked: districtOptions[0],
   specialStatus: specialStatusOptions[0],
   color: entryColors[0].value,
+  submissionStatus: 'Draft',
   details: {},
 });
 
@@ -295,6 +296,7 @@ export function DashboardCalendar() {
       districtWorked: entry.districtWorked,
       specialStatus: entry.specialStatus,
       color: entry.color,
+      submissionStatus: entry.submissionStatus || 'Submitted',
       details: entry.details || {},
     });
   };

@@ -529,6 +529,123 @@ function LoginSplash({
   );
 }
 
+function ForcePasswordChange({
+  account,
+  onChanged,
+  onLogout,
+  onToast,
+}: {
+  account: AuthAccount;
+  onChanged: (account: AuthAccount) => void;
+  onLogout: () => void;
+  onToast: (type: ToastType, message: string) => void;
+}) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setError('Enter your current password and new password.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError('New passwords do not match.');
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      setError('New password must be different from the temporary password.');
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await authService.changePassword(account.id, currentPassword, newPassword);
+      const response = await authService.getSession();
+      if (response.data.account) {
+        onChanged(response.data.account);
+      }
+      onToast('success', 'Password updated. Welcome to SHIELD.');
+    } catch (err) {
+      const message = getErrorMessage(err, 'Failed to update password.');
+      setError(message);
+      onToast('error', message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-10 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+      <form onSubmit={handleSubmit} className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
+        <div className="mb-6 flex items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-primary-500 text-white">
+            <LockKeyhole size={22} />
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Password Required</p>
+            <h1 className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">Change temporary password</h1>
+            <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">
+              Your account was created by an administrator. Set your own password before continuing.
+            </p>
+          </div>
+        </div>
+
+        {error && <div className="error">{error}</div>}
+
+        <label className="mb-4 block">
+          <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Current password</span>
+          <input
+            type="password"
+            value={currentPassword}
+            onChange={(event) => setCurrentPassword(event.target.value)}
+            className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+            autoComplete="current-password"
+            autoFocus
+          />
+        </label>
+
+        <label className="mb-4 block">
+          <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">New password</span>
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(event) => setNewPassword(event.target.value)}
+            className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+            autoComplete="new-password"
+          />
+        </label>
+
+        <label className="mb-6 block">
+          <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Confirm new password</span>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+            autoComplete="new-password"
+          />
+        </label>
+
+        <button type="submit" className="btn-primary w-full py-3" disabled={isSaving}>
+          {isSaving ? 'Updating...' : 'Update Password'}
+        </button>
+        <button type="button" onClick={onLogout} className="mt-4 w-full text-sm font-semibold text-gray-500 hover:text-primary-500 dark:text-gray-400">
+          Sign out
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function getInitials(name?: string, email?: string): string {
   const source = name?.trim() || email?.trim() || 'SHIELD User';
   const parts = source.split(/\s+/u).filter(Boolean);
@@ -2674,6 +2791,8 @@ function App() {
         <ShieldLoading />
       ) : !isAuthenticated ? (
         <LoginSplash onLogin={handleLogin} onToast={showToast} isExiting={isLoginTransitioning} />
+      ) : currentUser?.mustChangePassword ? (
+        <ForcePasswordChange account={currentUser} onChanged={handleAccountUpdate} onLogout={handleLogout} onToast={showToast} />
       ) : (
         <div className="animate-app-enter flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
           <aside className={`relative h-screen shrink-0 overflow-visible bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>

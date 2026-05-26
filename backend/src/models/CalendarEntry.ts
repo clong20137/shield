@@ -234,7 +234,7 @@ export class CalendarEntryModel {
           \`reviewedByName\` = ?,
           \`reviewedAt\` = ?,
           \`updatedAt\` = ?
-        WHERE \`id\` = ? AND \`category\` = 'Trooper Daily'`,
+        WHERE \`id\` = ? AND \`category\` = 'Trooper Daily' AND COALESCE(\`submissionStatus\`, 'Submitted') = 'Submitted'`,
         [status, notes.trim(), reviewer.id, reviewer.name, now, now, id]
       );
 

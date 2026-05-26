@@ -6,6 +6,19 @@ export async function getRequestAccount(req: Request) {
   return getSessionAccount(req);
 }
 
+function shouldAllowPasswordChange(req: Request, accountId: string): boolean {
+  return req.method === 'POST' && req.path === '/change-password' && req.body?.accountId === accountId;
+}
+
+function blockUntilPasswordChanged(req: Request, res: Response, account: { id: string; mustChangePassword?: boolean }): boolean {
+  if (!account.mustChangePassword || shouldAllowPasswordChange(req, account.id)) {
+    return false;
+  }
+
+  res.status(403).json({ error: 'Password change required before continuing', mustChangePassword: true });
+  return true;
+}
+
 export function requirePermission(permission: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -13,6 +26,10 @@ export function requirePermission(permission: string) {
 
       if (!account) {
         return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      if (blockUntilPasswordChanged(req, res, account)) {
+        return;
       }
 
       if (account.role === 'administrator') {
@@ -41,6 +58,10 @@ export function requireAnyPermission(requiredPermissions: string[]) {
         return res.status(401).json({ error: 'Sign in required' });
       }
 
+      if (blockUntilPasswordChanged(req, res, account)) {
+        return;
+      }
+
       if (account.role === 'administrator') {
         return next();
       }
@@ -65,6 +86,10 @@ export function requireSelfOrPermission(getTargetId: (req: Request) => string | 
 
       if (!account) {
         return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      if (blockUntilPasswordChanged(req, res, account)) {
+        return;
       }
 
       if (account.id === getTargetId(req) || account.role === 'administrator') {

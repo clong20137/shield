@@ -704,7 +704,7 @@ function CalendarPage({
     setCalendarFocusDate(today);
   };
 
-  const saveEntry = async (event: React.FormEvent<HTMLFormElement>, submissionStatus: CalendarEntry['submissionStatus'] = 'Draft') => {
+  const saveEntry = async (event: React.SyntheticEvent, submissionStatus: CalendarEntry['submissionStatus'] = 'Draft') => {
     event.preventDefault();
 
     const hours = Number(entryForm.dutyHours);
@@ -945,6 +945,7 @@ function CalendarPage({
       districtWorked: previousEntry.districtWorked || getDefaultDistrict(currentUser),
       specialStatus: previousEntry.specialStatus,
       color: previousEntry.color,
+      submissionStatus: 'Draft',
       details: { ...(previousEntry.details || {}) },
     });
     setIsDutyHoursManual(true);
@@ -1279,7 +1280,7 @@ function CalendarPage({
               </div>
             </div>
 
-            <form ref={dailyFormRef} onSubmit={saveEntry} onKeyDown={handleDailyKeyDown} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <form ref={dailyFormRef} onSubmit={(event) => saveEntry(event, 'Draft')} onKeyDown={handleDailyKeyDown} className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 md:col-span-2">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -1586,15 +1587,20 @@ function CalendarPage({
 
               <div className="flex flex-wrap items-center justify-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950 md:col-span-2">
                 <span className="mr-auto text-sm font-semibold text-gray-500 dark:text-gray-400">
-                  {editingEntryId ? 'Save changes to this daily report' : 'Save this daily report'}
+                  Save keeps this as a draft. Submit sends the final report.
                 </span>
                 {editingEntry && (
                   <button type="button" onClick={() => setEntryPendingDelete(editingEntry)} className="btn-danger" aria-label="Delete daily report" title="Delete Report">
                     <Trash2 size={16} />
                   </button>
                 )}
-                <button type="submit" className={editingEntryId ? 'btn-primary' : 'btn-success'} aria-label={editingEntryId ? 'Save calendar entry' : 'Add calendar entry'} title={editingEntryId ? 'Save Entry' : 'Add Entry'}>
-                  {editingEntryId ? <Save size={16} /> : <CalendarClock size={16} />}
+                <button type="submit" className="btn-secondary" aria-label="Save daily report as draft" title="Save Draft">
+                  <Save size={16} />
+                  <span>Save Draft</span>
+                </button>
+                <button type="button" onClick={(event) => saveEntry(event, 'Submitted')} className="btn-success" aria-label="Submit daily report" title="Submit Report">
+                  <CheckCircle2 size={16} />
+                  <span>Submit</span>
                 </button>
               </div>
             </form>
