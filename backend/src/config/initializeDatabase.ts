@@ -82,6 +82,9 @@ export async function initializeDatabase() {
       \`passwordHash\` VARCHAR(255),
       \`role\` VARCHAR(100) NOT NULL DEFAULT 'user',
       \`mustChangePassword\` BOOLEAN DEFAULT 0,
+      \`ssoProvider\` VARCHAR(50),
+      \`microsoftUserId\` VARCHAR(100),
+      \`lastSsoLoginAt\` DATETIME,
       \`receivesMessages\` BOOLEAN DEFAULT 1,
       \`hasCompletedOnboarding\` BOOLEAN DEFAULT 0,
       \`twoFactorSecret\` VARCHAR(64),
@@ -130,6 +133,9 @@ export async function initializeDatabase() {
   await ensureColumn('users', 'role', "`role` VARCHAR(100) NOT NULL DEFAULT 'user'");
   await pool.query("ALTER TABLE `users` MODIFY COLUMN `role` VARCHAR(100) NOT NULL DEFAULT 'user'");
   await ensureColumn('users', 'mustChangePassword', '`mustChangePassword` BOOLEAN DEFAULT 0');
+  await ensureColumn('users', 'ssoProvider', '`ssoProvider` VARCHAR(50)');
+  await ensureColumn('users', 'microsoftUserId', '`microsoftUserId` VARCHAR(100)');
+  await ensureColumn('users', 'lastSsoLoginAt', '`lastSsoLoginAt` DATETIME');
   await ensureColumn('users', 'receivesMessages', '`receivesMessages` BOOLEAN DEFAULT 1');
   await ensureColumn('users', 'hasCompletedOnboarding', '`hasCompletedOnboarding` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'trooperDailyHiddenSections', '`trooperDailyHiddenSections` TEXT');
@@ -146,6 +152,7 @@ export async function initializeDatabase() {
   await ensureColumn('users', 'emergencyContactRelationship', '`emergencyContactRelationship` VARCHAR(100)');
   await ensureColumn('users', 'emergencyContactPhone', '`emergencyContactPhone` VARCHAR(50)');
   await ensureIndex('users', 'idx_users_email', '`email`');
+  await ensureIndex('users', 'idx_users_microsoft_id', '`microsoftUserId`');
   await ensureIndex('users', 'idx_users_rank', '`rank`');
   await ensureIndex('users', 'idx_users_name', '`lastName`, `firstName`');
 

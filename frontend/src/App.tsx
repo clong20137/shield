@@ -180,8 +180,11 @@ function LoginSplash({
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [registrationSettings, setRegistrationSettings] = useState<RegistrationSettings | null>(null);
+  const [isMicrosoftSsoEnabled, setIsMicrosoftSsoEnabled] = useState(false);
   const [inviteToken] = useState(() => new URLSearchParams(window.location.search).get('invite') || '');
   const [resetToken] = useState(() => new URLSearchParams(window.location.search).get('reset') || '');
+  const [ssoToken] = useState(() => new URLSearchParams(window.location.search).get('ssoToken') || '');
+  const [ssoError] = useState(() => new URLSearchParams(window.location.search).get('ssoError') || '');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
@@ -205,6 +208,46 @@ function LoginSplash({
         console.error('Failed to load registration settings:', err);
       });
   }, [inviteToken, resetToken]);
+
+  useEffect(() => {
+    authService.getMicrosoftSsoStatus()
+      .then((response) => setIsMicrosoftSsoEnabled(response.data.enabled))
+      .catch((err) => {
+        console.error('Failed to load Microsoft SSO status:', err);
+        setIsMicrosoftSsoEnabled(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (ssoError) {
+      setError(ssoError);
+      onToast('error', ssoError);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
+    if (!ssoToken) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    setAuthToken(ssoToken);
+    authService.getSession()
+      .then((response) => {
+        if (response.data.account) {
+          onLogin(response.data.account);
+        }
+        window.history.replaceState({}, document.title, window.location.pathname);
+      })
+      .catch((err) => {
+        clearAuthToken();
+        const message = getErrorMessage(err, 'Microsoft sign in failed.');
+        setError(message);
+        onToast('error', message);
+      })
+      .finally(() => setIsSubmitting(false));
+  }, [onLogin, onToast, ssoError, ssoToken]);
 
   useEffect(() => {
     const cleanCode = twoFactorCode.replace(/\D/gu, '');
@@ -380,6 +423,27 @@ function LoginSplash({
             {registrationSettings?.maintenanceMode && mode === 'login' && (
               <div className="mb-4 rounded border border-accent/30 bg-accent/10 px-3 py-2 text-sm font-semibold text-accent">
                 Maintenance mode is active. Only administrators can sign in.
+              </div>
+            )}
+
+            {mode === 'login' && isMicrosoftSsoEnabled && (
+              <div className="mb-5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.assign(authService.getMicrosoftSsoStartUrl(`${window.location.pathname}${window.location.search}` || '/'));
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-primary-500 shadow-sm transition hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-950 dark:text-blue-100"
+                  disabled={isSubmitting}
+                >
+                  <Shield size={17} />
+                  Sign in with Microsoft
+                </button>
+                <div className="my-4 flex items-center gap-3">
+                  <span className="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
+                  <span className="text-xs font-bold uppercase tracking-[0.18em] text-gray-400">Backup Login</span>
+                  <span className="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
+                </div>
               </div>
             )}
 

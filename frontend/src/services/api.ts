@@ -216,6 +216,9 @@ export interface AuthAccount {
   district: string;
   isActive: boolean;
   mustChangePassword: boolean;
+  ssoProvider?: string | null;
+  microsoftUserId?: string | null;
+  lastSsoLoginAt?: string | null;
   receivesMessages: boolean;
   hasCompletedOnboarding: boolean;
   trooperDailyHiddenSections: string[];
@@ -241,6 +244,10 @@ export interface RegistrationSettings {
   loginWarningEnabled: boolean;
   loginWarningMessage: string;
   sessionTimeoutMinutes: number;
+}
+
+export interface MicrosoftSsoStatus {
+  enabled: boolean;
 }
 
 export interface AuthInvite {
@@ -594,6 +601,10 @@ export const authService = {
 
   login: (email: string, password: string, twoFactorCode?: string) =>
     api.post<AuthResponse>('/auth/login', { email, password, twoFactorCode }),
+  getMicrosoftSsoStatus: () =>
+    api.get<MicrosoftSsoStatus>('/auth/microsoft/status'),
+  getMicrosoftSsoStartUrl: (returnTo = '/') =>
+    `${API_BASE_URL}/auth/microsoft/start?returnTo=${encodeURIComponent(returnTo)}`,
 
   requestPasswordReset: (email: string) =>
     api.post<{ message: string }>('/auth/password-reset/request', { email }),

@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import crypto from 'crypto';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { AuthInviteModel } from '../models/AuthInvite';
 import { AuthPasswordResetModel } from '../models/AuthPasswordReset';
@@ -114,6 +115,111 @@ function requestAuditFields(req: Request) {
     ipAddress: cleanString(req.ip || req.socket.remoteAddress, 45) || null,
     userAgent: cleanString(req.get('user-agent'), 255) || null,
   };
+}
+
+function getMicrosoftSsoConfig(req?: Request) {
+  const tenantId = process.env.MICROSOFT_TENANT_ID || process.env.AZURE_TENANT_ID || '';
+  const clientId = process.env.MICROSOFT_CLIENT_ID || process.env.AZURE_CLIENT_ID || '';
+  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET || process.env.AZURE_CLIENT_SECRET || '';
+  const redirectUri = process.env.MICROSOFT_REDIRECT_URI || (req ? `${req.protocol}://${req.get('host')}/api/auth/microsoft/callback` : '');
+  const enabled = Boolean(tenantId && clientId && clientSecret);
+
+  return { tenantId, clientId, clientSecret, redirectUri, enabled };
+}
+
+function createSsoState(returnTo: string): string {
+  const secret = process.env.SSO_STATE_SECRET || process.env.JWT_SECRET || process.env.MICROSOFT_CLIENT_SECRET || 'shield-sso-state';
+  const payload = Buffer.from(JSON.stringify({
+    nonce: Math.random().toString(36).slice(2),
+    returnTo,
+    createdAt: Date.now(),
+  })).toString('base64url');
+  const signature = Buffer.from(crypto.createHmac('sha256', secret).update(payload).digest('hex')).toString('base64url');
+
+  return `${payload}.${signature}`;
+}
+
+function verifySsoState(value: unknown): { returnTo: string } | null {
+  const state = cleanString(value, 1000);
+  const [payload, signature] = state.split('.');
+  if (!payload || !signature) {
+    return null;
+  }
+
+  const secret = process.env.SSO_STATE_SECRET || process.env.JWT_SECRET || process.env.MICROSOFT_CLIENT_SECRET || 'shield-sso-state';
+  const expected = Buffer.from(crypto.createHmac('sha256', secret).update(payload).digest('hex')).toString('base64url');
+
+  if (signature !== expected) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { returnTo?: string; createdAt?: number };
+    if (!parsed.createdAt || Date.now() - parsed.createdAt > 10 * 60 * 1000) {
+      return null;
+    }
+
+    return { returnTo: typeof parsed.returnTo === 'string' ? parsed.returnTo : '/' };
+  } catch {
+    return null;
+  }
+}
+
+function getSafeReturnTo(value: unknown): string {
+  const raw = cleanString(value, 500);
+  if (!raw || raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('//')) {
+    return '/';
+  }
+
+  return raw.startsWith('/') ? raw : '/';
+}
+
+function appendQueryParam(path: string, key: string, value: string): string {
+  const separator = path.includes('?') ? '&' : '?';
+  return `${path}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+}
+
+async function exchangeMicrosoftCode(code: string, req: Request): Promise<{ id: string; email: string; displayName: string }> {
+  const config = getMicrosoftSsoConfig(req);
+  const tokenResponse = await fetch(`https://login.microsoftonline.com/${encodeURIComponent(config.tenantId)}/oauth2/v2.0/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+      code,
+      redirect_uri: config.redirectUri,
+      grant_type: 'authorization_code',
+      scope: 'openid profile email User.Read',
+    }),
+  });
+
+  if (!tokenResponse.ok) {
+    throw new Error(`Microsoft token exchange failed with ${tokenResponse.status}`);
+  }
+
+  const tokenData = await tokenResponse.json() as { access_token?: string };
+  if (!tokenData.access_token) {
+    throw new Error('Microsoft token response did not include an access token');
+  }
+
+  const profileResponse = await fetch('https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName', {
+    headers: { Authorization: `Bearer ${tokenData.access_token}` },
+  });
+
+  if (!profileResponse.ok) {
+    throw new Error(`Microsoft profile lookup failed with ${profileResponse.status}`);
+  }
+
+  const profile = await profileResponse.json() as { id?: string; displayName?: string; mail?: string; userPrincipalName?: string };
+  const email = normalizeEmail(profile.mail || profile.userPrincipalName || '');
+  const id = cleanString(profile.id, 100);
+
+  if (!id || !email || !isValidEmail(email)) {
+    throw new Error('Microsoft profile did not include a usable id and email');
+  }
+
+  return { id, email, displayName: cleanString(profile.displayName, 150) || email };
 }
 
 function cleanRoleName(value: unknown): string {
@@ -308,6 +414,99 @@ export class AuthController {
     } catch (error) {
       console.error('Login error:', error);
       res.status(500).json({ error: 'Failed to sign in' });
+    }
+  }
+
+  static async getMicrosoftSsoStatus(req: Request, res: Response) {
+    try {
+      res.json({ enabled: getMicrosoftSsoConfig(req).enabled });
+    } catch (error) {
+      console.error('Microsoft SSO status error:', error);
+      res.status(500).json({ error: 'Failed to load Microsoft SSO status' });
+    }
+  }
+
+  static async startMicrosoftSso(req: Request, res: Response) {
+    try {
+      const config = getMicrosoftSsoConfig(req);
+      if (!config.enabled) {
+        return res.status(503).json({ error: 'Microsoft SSO is not configured' });
+      }
+
+      const returnTo = getSafeReturnTo(req.query.returnTo);
+      const state = createSsoState(returnTo);
+      const authorizationUrl = new URL(`https://login.microsoftonline.com/${encodeURIComponent(config.tenantId)}/oauth2/v2.0/authorize`);
+      authorizationUrl.searchParams.set('client_id', config.clientId);
+      authorizationUrl.searchParams.set('response_type', 'code');
+      authorizationUrl.searchParams.set('redirect_uri', config.redirectUri);
+      authorizationUrl.searchParams.set('response_mode', 'query');
+      authorizationUrl.searchParams.set('scope', 'openid profile email User.Read');
+      authorizationUrl.searchParams.set('state', state);
+      authorizationUrl.searchParams.set('prompt', 'select_account');
+
+      return res.redirect(authorizationUrl.toString());
+    } catch (error) {
+      console.error('Microsoft SSO start error:', error);
+      res.status(500).json({ error: 'Failed to start Microsoft SSO' });
+    }
+  }
+
+  static async completeMicrosoftSso(req: Request, res: Response) {
+    const appBaseUrl = await getAppBaseUrl(req);
+    const verifiedState = verifySsoState(req.query.state);
+    const returnTo = getSafeReturnTo(verifiedState?.returnTo);
+    const redirectWithError = (message: string) => res.redirect(`${appBaseUrl}/?ssoError=${encodeURIComponent(message)}`);
+
+    try {
+      if (!verifiedState) {
+        return redirectWithError('Microsoft sign in expired. Try again.');
+      }
+
+      const code = cleanString(req.query.code, 2000);
+      if (!code) {
+        return redirectWithError('Microsoft sign in was cancelled or did not return a code.');
+      }
+
+      const maintenanceMode = await SystemSettingModel.getString('maintenanceMode', 'false') === 'true';
+      const profile = await exchangeMicrosoftCode(code, req);
+      const account = await AuthAccountModel.findOrLinkMicrosoftAccount({ id: profile.id, email: profile.email });
+
+      if (!account) {
+        await AuditLogModel.create({
+          actorId: null,
+          actorName: profile.email,
+          action: 'auth.sso_failed',
+          entityType: 'session',
+          entityId: null,
+          details: JSON.stringify({ provider: 'microsoft', email: profile.email, reason: 'no_matching_user' }),
+          ...requestAuditFields(req),
+        });
+        return redirectWithError('No active SHIELD user is linked to that Microsoft account.');
+      }
+
+      if (!account.isActive) {
+        return redirectWithError('This SHIELD account is inactive. Contact an administrator.');
+      }
+
+      if (maintenanceMode && account.role !== 'administrator') {
+        return redirectWithError('SHIELD is in maintenance mode. Only administrators can sign in right now.');
+      }
+
+      const token = await AuthSessionModel.createSession(account.id);
+      await AuditLogModel.create({
+        actorId: account.id,
+        actorName: account.displayName || account.email,
+        action: 'auth.sso_login',
+        entityType: 'session',
+        entityId: account.id,
+        details: JSON.stringify({ provider: 'microsoft', email: account.email, microsoftUserId: profile.id }),
+        ...requestAuditFields(req),
+      });
+
+      return res.redirect(`${appBaseUrl}${appendQueryParam(returnTo || '/', 'ssoToken', token)}`);
+    } catch (error) {
+      console.error('Microsoft SSO callback error:', error);
+      return redirectWithError('Microsoft sign in failed. Use local login or contact an administrator.');
     }
   }
 

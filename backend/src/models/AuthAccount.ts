@@ -15,6 +15,9 @@ export interface AuthAccount {
   district: string;
   isActive: boolean;
   mustChangePassword: boolean;
+  ssoProvider: string | null;
+  microsoftUserId: string | null;
+  lastSsoLoginAt: Date | null;
   receivesMessages: boolean;
   hasCompletedOnboarding: boolean;
   trooperDailyHiddenSections: string[];
@@ -42,6 +45,9 @@ interface AuthAccountRow extends RowDataPacket {
   district: string | null;
   isActive: boolean | number;
   mustChangePassword: boolean | number;
+  ssoProvider: string | null;
+  microsoftUserId: string | null;
+  lastSsoLoginAt: Date | null;
   receivesMessages: boolean | number;
   hasCompletedOnboarding: boolean | number;
   trooperDailyHiddenSections: string | null;
@@ -177,6 +183,9 @@ function toPublicAccount(account: AuthAccountRow): AuthAccount {
     district: account.district || '',
     isActive: account.isActive !== false && account.isActive !== 0,
     mustChangePassword: Boolean(account.mustChangePassword),
+    ssoProvider: account.ssoProvider || null,
+    microsoftUserId: account.microsoftUserId || null,
+    lastSsoLoginAt: account.lastSsoLoginAt || null,
     receivesMessages: account.receivesMessages !== false && account.receivesMessages !== 0,
     hasCompletedOnboarding: Boolean(account.hasCompletedOnboarding),
     trooperDailyHiddenSections,
@@ -255,6 +264,9 @@ export class AuthAccountModel {
           district: existingUser.district || '',
           isActive: existingUser.isActive !== false && existingUser.isActive !== 0,
           mustChangePassword: false,
+          ssoProvider: existingUser.ssoProvider || null,
+          microsoftUserId: existingUser.microsoftUserId || null,
+          lastSsoLoginAt: existingUser.lastSsoLoginAt || null,
           receivesMessages: existingUser.receivesMessages !== false && existingUser.receivesMessages !== 0,
           hasCompletedOnboarding: Boolean(existingUser.hasCompletedOnboarding),
           trooperDailyHiddenSections: [],
@@ -283,6 +295,9 @@ export class AuthAccountModel {
         district: '',
         isActive: true,
         mustChangePassword: false,
+        ssoProvider: null,
+        microsoftUserId: null,
+        lastSsoLoginAt: null,
         receivesMessages: true,
         hasCompletedOnboarding: false,
         trooperDailyHiddenSections: [],
@@ -499,6 +514,45 @@ export class AuthAccountModel {
       const account = rows[0];
 
       return account ? toPublicAccount(account) : null;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async findOrLinkMicrosoftAccount(profile: { id: string; email: string }): Promise<AuthAccount | null> {
+    const conn = await pool.getConnection();
+    try {
+      const now = new Date();
+      const normalizedEmail = normalizeEmail(profile.email);
+      const [linkedRows] = await conn.query<AuthAccountRow[]>(
+        'SELECT * FROM users WHERE `microsoftUserId` = ? AND `isActive` = 1 LIMIT 1',
+        [profile.id],
+      );
+      let account = linkedRows[0];
+
+      if (!account) {
+        const [emailRows] = await conn.query<AuthAccountRow[]>(
+          'SELECT * FROM users WHERE LOWER(`email`) = ? AND `isActive` = 1 LIMIT 1',
+          [normalizedEmail],
+        );
+        account = emailRows[0];
+      }
+
+      if (!account) {
+        return null;
+      }
+
+      await conn.query<ResultSetHeader>(
+        'UPDATE users SET `ssoProvider` = ?, `microsoftUserId` = ?, `lastSsoLoginAt` = ?, `lastSeenAt` = ?, `updatedAt` = ? WHERE `id` = ?',
+        ['microsoft', profile.id, now, now, now, account.id],
+      );
+
+      const [rows] = await conn.query<AuthAccountRow[]>(
+        'SELECT * FROM users WHERE `id` = ? LIMIT 1',
+        [account.id],
+      );
+
+      return rows[0] ? toPublicAccount(rows[0]) : null;
     } finally {
       conn.release();
     }

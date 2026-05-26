@@ -10,6 +10,9 @@ const passwordResetLimiter = rateLimit({ keyPrefix: 'password-reset', windowMs: 
 
 router.post('/register', authLimiter, AuthController.register);
 router.post('/login', authLimiter, AuthController.login);
+router.get('/microsoft/status', AuthController.getMicrosoftSsoStatus);
+router.get('/microsoft/start', authLimiter, AuthController.startMicrosoftSso);
+router.get('/microsoft/callback', authLimiter, AuthController.completeMicrosoftSso);
 router.post('/password-reset/request', passwordResetLimiter, AuthController.requestPasswordReset);
 router.post('/password-reset/confirm', passwordResetLimiter, AuthController.resetPassword);
 router.get('/session', AuthController.getSession);
