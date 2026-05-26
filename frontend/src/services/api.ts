@@ -156,6 +156,7 @@ export interface User {
   emergencyContactPhone: string;
   role: string;
   receivesMessages: boolean;
+  lastSeenAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

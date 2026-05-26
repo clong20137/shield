@@ -3,7 +3,7 @@ import { CheckCircle2, ChevronLeft, ChevronRight, Download, RotateCcw, Search, X
 import { AuthAccount, reportService, TrooperDailyReportEntry } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import PerformanceEvaluationsPage from './PerformanceEvaluationsPage';
-import { downloadTrooperDailiesChartSvg, downloadTrooperDailiesCsv, downloadTrooperDailiesPdf, downloadTrooperDailiesXls } from '../utils/trooperDailyExport';
+import { downloadTrooperDailiesCsv, downloadTrooperDailiesPdf, downloadTrooperDailiesXls } from '../utils/trooperDailyExport';
 
 const trooperDailySections = [
   {
@@ -136,7 +136,7 @@ const trooperDailySections = [
   },
 ] as const;
 
-type DailyExportFormat = 'csv' | 'pdf' | 'xls' | 'pie' | 'bar';
+type DailyExportFormat = 'csv' | 'pdf' | 'xls';
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (
@@ -310,8 +310,6 @@ const ReportsPage: React.FC<{
         downloadTrooperDailiesCsv(entries, label);
       } else if (dailyExportFormat === 'pdf') {
         downloadTrooperDailiesPdf(entries, label);
-      } else if (dailyExportFormat === 'pie' || dailyExportFormat === 'bar') {
-        downloadTrooperDailiesChartSvg(entries, dailyExportFormat, label);
       } else {
         downloadTrooperDailiesXls(entries, label);
       }
@@ -353,8 +351,6 @@ const ReportsPage: React.FC<{
       downloadTrooperDailiesCsv([entry], label);
     } else if (format === 'pdf') {
       downloadTrooperDailiesPdf([entry], label);
-    } else if (format === 'pie' || format === 'bar') {
-      downloadTrooperDailiesChartSvg([entry], format, label);
     } else {
       downloadTrooperDailiesXls([entry], label);
     }
@@ -463,8 +459,6 @@ const ReportsPage: React.FC<{
               <option value="csv">CSV</option>
               <option value="pdf">PDF</option>
               <option value="xls">XLS</option>
-              <option value="pie">Pie Chart</option>
-              <option value="bar">Bar Graph</option>
             </select>
             <button type="button" onClick={exportTrooperDailies} className="btn-secondary" disabled={dailyExporting} aria-label="Export Trooper Daily reports" title={dailyExporting ? 'Exporting' : 'Export'}>
               <Download size={16} />
@@ -573,8 +567,6 @@ const ReportsPage: React.FC<{
                               <option value="pdf">PDF</option>
                               <option value="csv">CSV</option>
                               <option value="xls">XLS</option>
-                              <option value="pie">Pie</option>
-                              <option value="bar">Bar</option>
                             </select>
                           <button
                             type="button"
@@ -629,8 +621,6 @@ const ReportsPage: React.FC<{
                   <option value="pdf">PDF</option>
                   <option value="csv">CSV</option>
                   <option value="xls">XLS</option>
-                  <option value="pie">Pie Chart</option>
-                  <option value="bar">Bar Graph</option>
                 </select>
                 <button
                   type="button"

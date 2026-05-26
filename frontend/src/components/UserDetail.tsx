@@ -37,6 +37,19 @@ function getInitials(user: User): string {
   return `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U';
 }
 
+function isUserOnline(lastSeenAt?: string | null): boolean {
+  if (!lastSeenAt) {
+    return false;
+  }
+
+  const value = new Date(lastSeenAt).getTime();
+  if (Number.isNaN(value)) {
+    return false;
+  }
+
+  return Date.now() - value < 2 * 60 * 1000;
+}
+
 export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, onMessage, canEdit = false }) => {
   const callNumber = user.departmentPhoneNumber || user.personalPhoneNumber;
   const callHref = callNumber ? `tel:${callNumber.replace(/[^\d+]/gu, '')}` : undefined;
@@ -150,24 +163,31 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const milestone = mileageSummary?.milestone || 0;
   const nextAchievement = mileageSummary?.nextAchievement || null;
   const mileagePercent = milestone > 0 ? Math.min(100, Math.round((mileage / milestone) * 100)) : 0;
+  const isOnline = isUserOnline(user.lastSeenAt);
+  const profileRingClass = isOnline
+    ? 'border-green-400 shadow-[0_0_0_4px_rgba(34,197,94,0.22)]'
+    : 'border-white';
 
   return (
     <div className="bg-white rounded-lg shadow-xl overflow-hidden dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
       <div className="bg-primary-500 text-white px-5 py-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 flex-1 items-center gap-4">
+          <div className="relative shrink-0">
+            {isOnline && <span className="absolute inset-0 animate-ping rounded-full border-4 border-green-300 opacity-60" />}
           {user.profilePictureUrl ? (
             <img
               src={getAssetUrl(user.profilePictureUrl)}
               alt={`${user.firstName} ${user.lastName}`}
               onError={handleAssetImageError}
-              className="h-20 w-20 rounded-full border-2 border-white object-cover"
+              className={`relative h-20 w-20 rounded-full border-2 object-cover ${profileRingClass}`}
             />
           ) : (
-            <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-white bg-white text-2xl font-bold text-primary-500">
+            <div className={`relative flex h-20 w-20 items-center justify-center rounded-full border-2 bg-white text-2xl font-bold text-primary-500 ${profileRingClass}`}>
               {getInitials(user)}
             </div>
           )}
+          </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="m-0 text-2xl font-bold text-white">{user.firstName} {user.lastName}</h2>
