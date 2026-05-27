@@ -12,7 +12,6 @@ import MessageInboxPage from './pages/MessageInboxPage';
 import CalendarPage from './pages/CalendarPage';
 import PerformanceEvaluationsPage from './pages/PerformanceEvaluationsPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
-import { RankBadge } from './components/RankBadge';
 import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, clearAuthToken, getAppEventsUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, notificationService, quickLaunchService, RegistrationSettings, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SESSION_KEY = 'shield_session';
@@ -863,9 +862,9 @@ function GlobalSearch({ compact }: { compact: boolean }) {
                   key={user.id}
                   type="button"
                   onClick={() => openSearchResult(user)}
-                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
+                  className="flex w-full min-w-0 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold">
                       {user.firstName} {user.lastName}
                     </p>
@@ -873,7 +872,6 @@ function GlobalSearch({ compact }: { compact: boolean }) {
                         {user.email || `PE ${user.peNumber || 'N/A'}`} - {user.district || 'No district'}
                       </p>
                   </div>
-                  <RankBadge rank={user.rank} compact subtle />
                 </button>
               ))}
             </div>
@@ -2781,6 +2779,7 @@ function App() {
       if (response.data.account) {
         handleAccountUpdate(response.data.account);
       }
+      window.dispatchEvent(new CustomEvent('shield:dashboard-updated'));
       showToast('success', 'Welcome to Shield\nFor completing the Shield guide walkthrough.');
       setShowConfetti(true);
     } catch (err) {

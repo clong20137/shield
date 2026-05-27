@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { AlertCircle, Bold, ChevronLeft, ChevronRight, Heart, Italic, List, LucideIcon, Pencil, PartyPopper, Plus, Save, Send, ThumbsUp, Trash2, Underline, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction } from '../services/api';
@@ -603,7 +603,12 @@ function DashboardNews({
   const [postError, setPostError] = useState<string | null>(null);
   const isAdministrator = currentUser?.role === 'administrator';
 
-  const loadPosts = async (showLoading = true) => {
+  const loadPosts = useCallback(async (showLoading = true) => {
+    if (currentUser?.mustChangePassword) {
+      setIsLoadingPosts(false);
+      return;
+    }
+
     if (showLoading) {
       setIsLoadingPosts(true);
     }
@@ -617,7 +622,7 @@ function DashboardNews({
     } finally {
       setIsLoadingPosts(false);
     }
-  };
+  }, [currentUser?.mustChangePassword]);
 
   useEffect(() => {
     loadPosts();
@@ -625,7 +630,7 @@ function DashboardNews({
 
     window.addEventListener('shield:dashboard-updated', handleDashboardUpdate);
     return () => window.removeEventListener('shield:dashboard-updated', handleDashboardUpdate);
-  }, []);
+  }, [loadPosts]);
 
   const createPost = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
