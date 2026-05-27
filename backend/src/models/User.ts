@@ -249,6 +249,40 @@ export class UserModel {
     }
   }
 
+  static async findByImportIdentity(email: string, peNumber: string): Promise<User | null> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPeNumber = peNumber.trim().toLowerCase();
+
+    if (!normalizedEmail && !normalizedPeNumber) {
+      return null;
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      const conditions: string[] = [];
+      const params: string[] = [];
+
+      if (normalizedEmail) {
+        conditions.push('LOWER(COALESCE(`email`, \'\')) = ?');
+        params.push(normalizedEmail);
+      }
+
+      if (normalizedPeNumber) {
+        conditions.push('LOWER(COALESCE(`peNumber`, \'\')) = ?');
+        params.push(normalizedPeNumber);
+      }
+
+      const [rows] = await conn.query(
+        `SELECT * FROM users WHERE ${conditions.join(' OR ')} LIMIT 1`,
+        params
+      );
+      const users = rows as User[];
+      return users.length > 0 ? users[0] : null;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async findMentionableUsers(tokens: string[], limit = 25): Promise<User[]> {
     const normalizedTokens = Array.from(
       new Set(

@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react';
-import { RotateCcw, UserPlus } from 'lucide-react';
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
+import { RotateCcw, Upload, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CreateUserPayload, User, userService } from '../services/api';
 import { rankOptions } from '../constants/ranks';
@@ -72,6 +72,9 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
   const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
   const [addressLookupQuery, setAddressLookupQuery] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importSummary, setImportSummary] = useState<{ createdCount: number; skippedRows: Array<{ rowNumber: number; reason: string }> } | null>(null);
+  const spreadsheetInputRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -151,6 +154,31 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
     }
   };
 
+  const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    setIsImporting(true);
+    setImportSummary(null);
+    try {
+      const response = await userService.importSpreadsheet(file);
+      setImportSummary({
+        createdCount: response.data.createdCount,
+        skippedRows: response.data.skippedRows,
+      });
+      onToast('success', `${response.data.createdCount} account${response.data.createdCount === 1 ? '' : 's'} imported\nDefault password: ${response.data.defaultPassword}`);
+    } catch (err) {
+      console.error(err);
+      onToast('error', 'Failed to import spreadsheet.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <div>
       {!isModalView && (
@@ -159,6 +187,32 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Add a new personnel profile.</p>
       </div>
       )}
+
+      <div className={isModalView ? 'mb-5 rounded border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900' : 'mb-5 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800'}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-bold text-gray-900 dark:text-white">Import Roster</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Creates new accounts with the default password and required password change.</p>
+          </div>
+          <button type="button" onClick={() => spreadsheetInputRef.current?.click()} className="btn-secondary" disabled={isImporting} aria-label="Import Excel roster" title={isImporting ? 'Importing' : 'Import Excel roster'}>
+            <Upload size={16} />
+          </button>
+          <input ref={spreadsheetInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
+        </div>
+        {importSummary && (
+          <div className="mt-4 rounded border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-gray-950">
+            <p className="font-semibold text-gray-900 dark:text-white">{importSummary.createdCount} account{importSummary.createdCount === 1 ? '' : 's'} created.</p>
+            {importSummary.skippedRows.length > 0 && (
+              <div className="mt-2 max-h-40 overflow-auto text-gray-600 dark:text-gray-300">
+                {importSummary.skippedRows.slice(0, 20).map((row) => (
+                  <p key={`${row.rowNumber}-${row.reason}`}>Row {row.rowNumber}: {row.reason}</p>
+                ))}
+                {importSummary.skippedRows.length > 20 && <p>{importSummary.skippedRows.length - 20} more skipped rows.</p>}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <form onSubmit={handleSubmit} className={isModalView ? '' : 'rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800'}>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">

@@ -185,6 +185,15 @@ export interface UserListResponse {
   count: number;
 }
 
+export interface UserImportResponse {
+  totalRows: number;
+  createdCount: number;
+  skippedCount: number;
+  defaultPassword: string;
+  createdUsers: Array<Pick<User, 'id' | 'firstName' | 'lastName' | 'email' | 'peNumber'>>;
+  skippedRows: Array<{ rowNumber: number; reason: string }>;
+}
+
 export interface SystemStatistics {
   totalUsers: number;
   activeUsers: number;
@@ -691,6 +700,12 @@ export const userService = {
   
   create: (user: CreateUserPayload) =>
     api.post('/users', user),
+
+  importSpreadsheet: (file: File) => {
+    const formData = new FormData();
+    formData.append('spreadsheet', file);
+    return api.post<UserImportResponse>('/users/import', formData, { timeout: 30000 });
+  },
   
   update: (id: string, updates: Partial<User>) =>
     api.put(`/users/${id}`, updates),

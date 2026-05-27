@@ -130,6 +130,10 @@ app.use((error: Error, req: Request, res: Response, next: express.NextFunction) 
     return res.status(400).json({ error: error.message });
   }
 
+  if (error.message === 'Only Excel spreadsheets are allowed') {
+    return res.status(400).json({ error: error.message });
+  }
+
   if (error.message === 'Not allowed by CORS') {
     return res.status(403).json({ error: 'Origin not allowed' });
   }

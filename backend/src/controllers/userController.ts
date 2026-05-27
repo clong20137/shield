@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import fs from 'fs';
+import * as XLSX from 'xlsx';
 import { User, UserModel } from '../models/User';
 import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents';
 import { getSessionAccount } from '../middleware/authSession';
@@ -14,6 +15,7 @@ const employmentTypes = ['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inact
 const userStatuses = ['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Administrative Duty', 'Inactive'] as const;
 const sexOptions = ['Male', 'Female'] as const;
 const maritalStatuses = ['Single', 'Married', 'Divorced', 'Widowed'] as const;
+const DEFAULT_IMPORT_PASSWORD = 'ISP08isp!';
 const selfEditableFields = new Set([
   'profilePictureUrl',
   'personalPhoneNumber',
@@ -86,6 +88,83 @@ function safeUserDetails(user: User) {
     peNumber: user.peNumber,
     badgeNumber: user.badgeNumber,
     isActive: user.isActive,
+  };
+}
+
+type ImportRow = Record<string, unknown>;
+
+function normalizeImportHeader(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]/gu, '');
+}
+
+function getImportValue(row: ImportRow, aliases: string[], maxLength: number): string {
+  for (const alias of aliases) {
+    const value = row[alias];
+    if (value !== undefined && value !== null) {
+      const cleanedValue = cleanString(String(value), maxLength);
+      if (cleanedValue) {
+        return cleanedValue;
+      }
+    }
+  }
+
+  return '';
+}
+
+function buildSupervisorName(row: ImportRow): string {
+  const supervisorFirstName = getImportValue(row, ['supervisorfirstname'], 100);
+  const supervisorPe = getImportValue(row, ['supervisorpe'], 50);
+
+  if (supervisorFirstName && supervisorPe) {
+    return `${supervisorFirstName} (PE ${supervisorPe})`;
+  }
+
+  return supervisorFirstName || (supervisorPe ? `PE ${supervisorPe}` : '');
+}
+
+function isImportUserActive(status: string): boolean {
+  const normalizedStatus = status.trim().toLowerCase();
+  return !['inactive', 'terminated', 'separated', 'retired'].includes(normalizedStatus);
+}
+
+function mapImportRow(row: ImportRow) {
+  const status = getImportValue(row, ['status'], 100) || 'Active';
+  const departmentCell = normalizePhone(getImportValue(row, ['departmentcell'], 50));
+  const officePhone = normalizePhone(getImportValue(row, ['officephone'], 50));
+
+  return {
+    firstName: getImportValue(row, ['firstname'], 100),
+    lastName: getImportValue(row, ['lastname'], 100),
+    email: normalizeEmail(getImportValue(row, ['email'], 255)),
+    profilePictureUrl: '',
+    peNumber: getImportValue(row, ['pe'], 50),
+    peopleSoftId: getImportValue(row, ['peoplesoftnumber'], 50),
+    carNumber: '',
+    badgeNumber: '',
+    radioNumber: '',
+    personalPhoneNumber: '',
+    departmentPhoneNumber: departmentCell || officePhone,
+    assignedTo: getImportValue(row, ['assignedto'], 150),
+    district: getImportValue(row, ['assignmentlocation'], 100) || getImportValue(row, ['physicallocation'], 100),
+    rank: getImportValue(row, ['rank'], 100) || getImportValue(row, ['title'], 100),
+    isActive: isImportUserActive(status),
+    employmentType: getImportValue(row, ['employementtype', 'employmenttype'], 100) || 'Other',
+    typeDetails: getImportValue(row, ['employementtypedetails', 'employmenttypedetails'], 100),
+    status,
+    supervisor: buildSupervisorName(row),
+    specialtyCertifications: '',
+    publicSafetyId: '',
+    race: '',
+    sex: '',
+    maritalStatus: '',
+    residentialAddress: '',
+    mailingAddress: '',
+    emergencyContactName: '',
+    emergencyContactRelationship: '',
+    emergencyContactPhone: '',
+    role: 'user',
+    receivesMessages: true,
+    password: DEFAULT_IMPORT_PASSWORD,
   };
 }
 
@@ -343,6 +422,121 @@ export class UserController {
 
       console.error('Create user error:', error);
       res.status(500).json({ error: 'Failed to create user' });
+    }
+  }
+
+  static async importUsers(req: Request, res: Response) {
+    try {
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ error: 'XLSX file is required' });
+      }
+
+      const workbook = XLSX.read(file.buffer, { type: 'buffer', cellDates: false });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = firstSheetName ? workbook.Sheets[firstSheetName] : null;
+
+      if (!worksheet) {
+        return res.status(400).json({ error: 'The workbook does not contain any sheets' });
+      }
+
+      const rows = XLSX.utils.sheet_to_json<ImportRow>(worksheet, {
+        defval: '',
+        raw: false,
+      }).map((row) => Object.entries(row).reduce<ImportRow>((normalizedRow, [key, value]) => {
+        normalizedRow[normalizeImportHeader(key)] = value;
+        return normalizedRow;
+      }, {}));
+
+      const actor = await getSessionAccount(req);
+      const createdUsers: Array<Pick<User, 'id' | 'firstName' | 'lastName' | 'email' | 'peNumber'>> = [];
+      const skippedRows: Array<{ rowNumber: number; reason: string }> = [];
+      const seenEmails = new Set<string>();
+      const seenPeNumbers = new Set<string>();
+
+      for (const [index, row] of rows.entries()) {
+        const rowNumber = index + 2;
+        const importUser = mapImportRow(row);
+        const normalizedEmail = importUser.email.toLowerCase();
+        const normalizedPeNumber = importUser.peNumber.toLowerCase();
+
+        if (!importUser.firstName || !importUser.lastName || !importUser.email) {
+          skippedRows.push({ rowNumber, reason: 'First name, last name, and email are required' });
+          continue;
+        }
+
+        if (!isValidEmail(importUser.email)) {
+          skippedRows.push({ rowNumber, reason: 'Email is invalid' });
+          continue;
+        }
+
+        if (seenEmails.has(normalizedEmail) || (normalizedPeNumber && seenPeNumbers.has(normalizedPeNumber))) {
+          skippedRows.push({ rowNumber, reason: 'Duplicate email or PE number in the import file' });
+          continue;
+        }
+
+        const existingUser = await UserModel.findByImportIdentity(importUser.email, importUser.peNumber);
+        if (existingUser) {
+          skippedRows.push({ rowNumber, reason: 'A user with that email or PE number already exists' });
+          continue;
+        }
+
+        try {
+          const createdUser = await UserModel.createUser(importUser);
+          createdUsers.push({
+            id: createdUser.id,
+            firstName: createdUser.firstName,
+            lastName: createdUser.lastName,
+            email: createdUser.email,
+            peNumber: createdUser.peNumber,
+          });
+          seenEmails.add(normalizedEmail);
+          if (normalizedPeNumber) {
+            seenPeNumbers.add(normalizedPeNumber);
+          }
+        } catch (error) {
+          skippedRows.push({
+            rowNumber,
+            reason: isDuplicateUserError(error) ? getDuplicateUserMessage(error) : 'Failed to create user',
+          });
+        }
+      }
+
+      if (createdUsers.length > 0) {
+        broadcastAppEvent({ type: 'user-updated' });
+        broadcastAppEvent({ type: 'dashboard-updated' });
+      }
+
+      await AuditLogModel.create({
+        actorId: actor?.id || null,
+        actorName: actor?.displayName || actor?.email || null,
+        action: 'users.imported',
+        entityType: 'user',
+        entityId: null,
+        details: JSON.stringify({
+          fileName: file.originalname,
+          totalRows: rows.length,
+          createdCount: createdUsers.length,
+          skippedCount: skippedRows.length,
+          defaultPasswordAssigned: true,
+          mustChangePassword: true,
+          hasCompletedOnboarding: false,
+        }),
+        ...requestAuditFields(req),
+      });
+
+      res.status(201).json({
+        totalRows: rows.length,
+        createdCount: createdUsers.length,
+        skippedCount: skippedRows.length,
+        createdUsers,
+        skippedRows,
+        defaultPassword: DEFAULT_IMPORT_PASSWORD,
+      });
+    } catch (error) {
+      console.error('Import users error:', error);
+      res.status(500).json({ error: 'Failed to import users' });
     }
   }
 
