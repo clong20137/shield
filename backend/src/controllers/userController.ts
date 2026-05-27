@@ -543,6 +543,10 @@ export class UserController {
       });
     } catch (error) {
       console.error('Import users error:', error);
+      if (res.headersSent) {
+        return;
+      }
+
       res.status(500).json({ error: 'Failed to import users' });
     }
   }

@@ -86,7 +86,7 @@ app.use('/api', rateLimit({
 app.use('/api', requestTimeout({
   timeoutMs: Number.isFinite(apiRequestTimeoutMs) && apiRequestTimeoutMs > 0 ? apiRequestTimeoutMs : 30 * 1000,
   message: 'The request took too long. Try again shortly.',
-  skipPaths: ['/api/events', '/api/messages/events'],
+  skipPaths: ['/api/events', '/api/messages/events', '/api/users/import'],
 }));
 
 app.use('/api/auth', authRoutes);
