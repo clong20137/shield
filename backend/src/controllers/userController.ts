@@ -127,14 +127,21 @@ function isImportUserActive(status: string): boolean {
   return !['inactive', 'terminated', 'separated', 'retired'].includes(normalizedStatus);
 }
 
+function formatImportedName(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\b[a-z]/gu, (letter) => letter.toUpperCase());
+}
+
 function mapImportRow(row: ImportRow) {
   const status = getImportValue(row, ['status'], 100) || 'Active';
   const departmentCell = normalizePhone(getImportValue(row, ['departmentcell'], 50));
   const officePhone = normalizePhone(getImportValue(row, ['officephone'], 50));
 
   return {
-    firstName: getImportValue(row, ['firstname'], 100),
-    lastName: getImportValue(row, ['lastname'], 100),
+    firstName: formatImportedName(getImportValue(row, ['firstname'], 100)),
+    lastName: formatImportedName(getImportValue(row, ['lastname'], 100)),
     email: normalizeEmail(getImportValue(row, ['email'], 255)),
     profilePictureUrl: '',
     peNumber: getImportValue(row, ['pe'], 50),
