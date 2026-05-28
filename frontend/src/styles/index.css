@@ -229,6 +229,27 @@
   }
 }
 
+@keyframes profile-online-pulse {
+  0% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.18;
+    transform: scale(1.04);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.12);
+  }
+}
+
+.profile-online-ring {
+  animation: profile-online-pulse 2.4s ease-out infinite;
+}
+
 @keyframes onboarding-pulse {
   0% {
     opacity: 0.85;

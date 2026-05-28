@@ -174,7 +174,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 flex-1 items-center gap-4">
           <div className="relative shrink-0">
-            {isOnline && <span className="absolute inset-0 animate-ping rounded-full border-4 border-green-300 opacity-60" />}
+            {isOnline && <span className="profile-online-ring absolute inset-0 rounded-full border-2 border-green-300/70" />}
           {user.profilePictureUrl ? (
             <img
               src={getAssetUrl(user.profilePictureUrl)}
