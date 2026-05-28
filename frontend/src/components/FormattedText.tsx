@@ -6,7 +6,12 @@ interface FormattedTextProps {
 }
 
 const inlinePattern = /(\*\*[^*]+\*\*|\*[^*]+\*|\+\+[^+]+\+\+)/gu;
-const htmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span)\b[^>]*>/iu;
+const htmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span|h1|h2|h3|blockquote)\b[^>]*>/iu;
+
+function getSafeTextAlign(value: string | null): '' | 'left' | 'center' | 'right' {
+  const cleanValue = (value || '').trim().toLowerCase();
+  return cleanValue === 'left' || cleanValue === 'center' || cleanValue === 'right' ? cleanValue : '';
+}
 
 function sanitizeFormattedHtml(html: string): string {
   if (typeof window === 'undefined' || !htmlPattern.test(html)) {
@@ -15,7 +20,7 @@ function sanitizeFormattedHtml(html: string): string {
 
   const parser = new DOMParser();
   const document = parser.parseFromString(`<div>${html}</div>`, 'text/html');
-  const allowedTags = new Set(['P', 'DIV', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'UL', 'OL', 'LI', 'SPAN']);
+  const allowedTags = new Set(['P', 'DIV', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'UL', 'OL', 'LI', 'SPAN', 'H1', 'H2', 'H3', 'BLOCKQUOTE']);
 
   const cleanNode = (node: Node) => {
     Array.from(node.childNodes).forEach((child) => {
@@ -26,7 +31,11 @@ function sanitizeFormattedHtml(html: string): string {
           return;
         }
 
+        const textAlign = getSafeTextAlign(element.style.textAlign || element.getAttribute('align'));
         Array.from(element.attributes).forEach((attribute) => element.removeAttribute(attribute.name));
+        if (textAlign) {
+          element.style.textAlign = textAlign;
+        }
         cleanNode(element);
       }
     });
@@ -72,7 +81,7 @@ export function FormattedText({ text, className = '' }: FormattedTextProps) {
   if (sanitizedHtml) {
     return (
       <div
-        className={`space-y-2 whitespace-normal ${className}`}
+        className={`formatted-content space-y-2 whitespace-normal ${className}`}
         dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
       />
     );
@@ -111,5 +120,5 @@ export function FormattedText({ text, className = '' }: FormattedTextProps) {
 
   flushList();
 
-  return <div className={`space-y-2 whitespace-normal ${className}`}>{blocks}</div>;
+  return <div className={`formatted-content space-y-2 whitespace-normal ${className}`}>{blocks}</div>;
 }

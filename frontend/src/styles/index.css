@@ -608,6 +608,41 @@
     pointer-events: none;
   }
 
+  .rich-post-editor h1,
+  .formatted-content h1 {
+    @apply my-3 text-2xl font-bold leading-tight text-gray-900 dark:text-gray-100;
+  }
+
+  .rich-post-editor h2,
+  .formatted-content h2 {
+    @apply my-3 text-xl font-bold leading-snug text-gray-900 dark:text-gray-100;
+  }
+
+  .rich-post-editor h3,
+  .formatted-content h3 {
+    @apply my-2 text-lg font-bold leading-snug text-gray-900 dark:text-gray-100;
+  }
+
+  .rich-post-editor p,
+  .formatted-content p {
+    @apply my-2;
+  }
+
+  .rich-post-editor ul,
+  .formatted-content ul {
+    @apply my-3 list-disc space-y-1 pl-6;
+  }
+
+  .rich-post-editor ol,
+  .formatted-content ol {
+    @apply my-3 list-decimal space-y-1 pl-6;
+  }
+
+  .rich-post-editor blockquote,
+  .formatted-content blockquote {
+    @apply my-3 border-l-4 border-accent/50 pl-4 italic text-gray-600 dark:text-gray-300;
+  }
+
   .trooper-daily-match {
     animation: trooper-daily-match-pop 520ms ease-out both;
   }

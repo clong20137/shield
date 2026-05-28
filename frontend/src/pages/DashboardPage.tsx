@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
-import { AlertCircle, Bold, ChevronLeft, ChevronRight, Heart, Italic, List, LucideIcon, Pencil, PartyPopper, Plus, Save, Send, ThumbsUp, Trash2, Underline, X } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bold, ChevronLeft, ChevronRight, Heading1, Heading2, Heart, Indent, Italic, List, ListOrdered, LucideIcon, Outdent, Pencil, PartyPopper, Plus, Quote, Save, Send, ThumbsUp, Trash2, Underline, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction } from '../services/api';
 import { districtOptions } from '../constants/districts';
@@ -69,7 +69,7 @@ const getReadableDate = (dateKey: string) => {
   });
 };
 
-const postHtmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span)\b[^>]*>/iu;
+const postHtmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span|h1|h2|h3|blockquote)\b[^>]*>/iu;
 
 function escapeHtml(value: string): string {
   return value
@@ -138,15 +138,32 @@ function RichPostEditor({
     }
   }, [value]);
 
-  const runCommand = (command: string) => {
+  const runCommand = (command: string, commandValue = '') => {
     editorRef.current?.focus();
-    document.execCommand(command, false);
+    document.execCommand(command, false, commandValue);
     onChange(editorRef.current?.innerHTML || '');
+  };
+
+  const applyBlockStyle = (block: string) => {
+    runCommand('formatBlock', block);
   };
 
   return (
     <div>
-      <div className="mb-2 flex flex-wrap gap-2 rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-950">
+      <div className="mb-2 flex flex-wrap items-center gap-2 rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-950">
+        <select
+          onChange={(event) => applyBlockStyle(event.target.value)}
+          defaultValue="p"
+          className="h-10 rounded border border-gray-300 bg-white px-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+          aria-label="Text style"
+          title="Text Style"
+        >
+          <option value="p">Paragraph</option>
+          <option value="h1">Heading 1</option>
+          <option value="h2">Heading 2</option>
+          <option value="h3">Heading 3</option>
+          <option value="blockquote">Quote</option>
+        </select>
         <button type="button" onClick={() => runCommand('bold')} className="btn-secondary" aria-label="Bold selected text" title="Bold">
           <Bold size={16} />
         </button>
@@ -156,8 +173,35 @@ function RichPostEditor({
         <button type="button" onClick={() => runCommand('underline')} className="btn-secondary" aria-label="Underline selected text" title="Underline">
           <Underline size={16} />
         </button>
-        <button type="button" onClick={() => runCommand('insertUnorderedList')} className="btn-secondary" aria-label="Add list item" title="List">
+        <button type="button" onClick={() => runCommand('justifyLeft')} className="btn-secondary" aria-label="Align text left" title="Align Left">
+          <AlignLeft size={16} />
+        </button>
+        <button type="button" onClick={() => runCommand('justifyCenter')} className="btn-secondary" aria-label="Align text center" title="Align Center">
+          <AlignCenter size={16} />
+        </button>
+        <button type="button" onClick={() => runCommand('justifyRight')} className="btn-secondary" aria-label="Align text right" title="Align Right">
+          <AlignRight size={16} />
+        </button>
+        <button type="button" onClick={() => runCommand('insertUnorderedList')} className="btn-secondary" aria-label="Add bulleted list" title="Bulleted List">
           <List size={16} />
+        </button>
+        <button type="button" onClick={() => runCommand('insertOrderedList')} className="btn-secondary" aria-label="Add numbered list" title="Numbered List">
+          <ListOrdered size={16} />
+        </button>
+        <button type="button" onClick={() => runCommand('outdent')} className="btn-secondary" aria-label="Outdent text" title="Outdent">
+          <Outdent size={16} />
+        </button>
+        <button type="button" onClick={() => runCommand('indent')} className="btn-secondary" aria-label="Indent text" title="Indent">
+          <Indent size={16} />
+        </button>
+        <button type="button" onClick={() => applyBlockStyle('h1')} className="btn-secondary" aria-label="Apply heading one" title="Heading 1">
+          <Heading1 size={16} />
+        </button>
+        <button type="button" onClick={() => applyBlockStyle('h2')} className="btn-secondary" aria-label="Apply heading two" title="Heading 2">
+          <Heading2 size={16} />
+        </button>
+        <button type="button" onClick={() => applyBlockStyle('blockquote')} className="btn-secondary" aria-label="Apply quote style" title="Quote">
+          <Quote size={16} />
         </button>
       </div>
       <div
@@ -167,7 +211,7 @@ function RichPostEditor({
         aria-multiline="true"
         onInput={(event) => onChange(event.currentTarget.innerHTML)}
         onBlur={(event) => onChange(event.currentTarget.innerHTML)}
-        className="min-h-36 w-full overflow-y-auto rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+        className="rich-post-editor min-h-36 w-full overflow-y-auto rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
         data-placeholder="Write the update. Highlight text and use the toolbar, or click a style before typing."
       />
     </div>
