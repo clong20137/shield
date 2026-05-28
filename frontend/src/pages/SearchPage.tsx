@@ -80,6 +80,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(25);
+  const [sortKey, setSortKey] = useState<'lastName' | 'firstName' | 'peNumber' | 'district' | 'rank'>('lastName');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentQuery, setCurrentQuery] = useState('');
@@ -106,10 +108,46 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
 
   const totalResults = users.length;
   const totalPages = Math.max(1, Math.ceil(totalResults / pageSize));
+  const sortedUsers = useMemo(() => {
+    const sorted = [...users].sort((left, right) => {
+      const leftValue = String(left[sortKey] || '').trim().toLowerCase();
+      const rightValue = String(right[sortKey] || '').trim().toLowerCase();
+
+      if (leftValue === rightValue) {
+        return String(left.lastName || '').trim().toLowerCase().localeCompare(String(right.lastName || '').trim().toLowerCase());
+      }
+
+      return leftValue.localeCompare(rightValue);
+    });
+
+    return sortDirection === 'desc' ? sorted.reverse() : sorted;
+  }, [sortDirection, sortKey, users]);
+
   const pagedUsers = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return users.slice(start, start + pageSize);
-  }, [users, page, pageSize]);
+    return sortedUsers.slice(start, start + pageSize);
+  }, [page, pageSize, sortedUsers]);
+
+  useEffect(() => {
+    const storedSortKey = window.localStorage.getItem('shield_search_sort_key');
+    const storedSortDirection = window.localStorage.getItem('shield_search_sort_direction');
+
+    if (storedSortKey === 'lastName' || storedSortKey === 'firstName' || storedSortKey === 'peNumber' || storedSortKey === 'district' || storedSortKey === 'rank') {
+      setSortKey(storedSortKey);
+    }
+
+    if (storedSortDirection === 'asc' || storedSortDirection === 'desc') {
+      setSortDirection(storedSortDirection);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem('shield_search_sort_key', sortKey);
+  }, [sortKey]);
+
+  useEffect(() => {
+    window.localStorage.setItem('shield_search_sort_direction', sortDirection);
+  }, [sortDirection]);
 
   useEffect(() => {
     setPage(1);
@@ -491,6 +529,32 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+            <span>Sort</span>
+            <select
+              value={sortKey}
+              onChange={(event) => setSortKey(event.target.value as 'lastName' | 'firstName' | 'peNumber' | 'district' | 'rank')}
+              className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-950"
+            >
+              <option value="lastName">Last Name</option>
+              <option value="firstName">First Name</option>
+              <option value="peNumber">PE #</option>
+              <option value="district">District</option>
+              <option value="rank">Rank</option>
+            </select>
+          </label>
+
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+            <span>Direction</span>
+            <select
+              value={sortDirection}
+              onChange={(event) => setSortDirection(event.target.value as 'asc' | 'desc')}
+              className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-950"
+            >
+              <option value="asc">A-Z</option>
+              <option value="desc">Z-A</option>
+            </select>
+          </label>
           <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
             <span>Per page</span>
             <select
