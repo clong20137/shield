@@ -148,6 +148,10 @@ function RichPostEditor({
     runCommand('formatBlock', block);
   };
 
+  const preserveEditorFocus = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+  };
+
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center gap-2 rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-950">
@@ -164,54 +168,57 @@ function RichPostEditor({
           <option value="h3">Heading 3</option>
           <option value="blockquote">Quote</option>
         </select>
-        <button type="button" onClick={() => runCommand('bold')} className="btn-secondary" aria-label="Bold selected text" title="Bold">
+        <button type="button" onMouseDown={preserveEditorFocus} onClick={() => runCommand('bold')} className="btn-secondary" aria-label="Bold selected text" title="Bold">
           <Bold size={16} />
         </button>
-        <button type="button" onClick={() => runCommand('italic')} className="btn-secondary" aria-label="Italicize selected text" title="Italic">
+        <button type="button" onMouseDown={preserveEditorFocus} onClick={() => runCommand('italic')} className="btn-secondary" aria-label="Italicize selected text" title="Italic">
           <Italic size={16} />
         </button>
-        <button type="button" onClick={() => runCommand('underline')} className="btn-secondary" aria-label="Underline selected text" title="Underline">
+        <button type="button" onMouseDown={preserveEditorFocus} onClick={() => runCommand('underline')} className="btn-secondary" aria-label="Underline selected text" title="Underline">
           <Underline size={16} />
         </button>
-        <button type="button" onClick={() => runCommand('justifyLeft')} className="btn-secondary" aria-label="Align text left" title="Align Left">
+        <button type="button" onMouseDown={preserveEditorFocus} onClick={() => runCommand('justifyLeft')} className="btn-secondary" aria-label="Align text left" title="Align Left">
           <AlignLeft size={16} />
         </button>
-        <button type="button" onClick={() => runCommand('justifyCenter')} className="btn-secondary" aria-label="Align text center" title="Align Center">
+        <button type="button" onMouseDown={preserveEditorFocus} onClick={() => runCommand('justifyCenter')} className="btn-secondary" aria-label="Align text center" title="Align Center">
           <AlignCenter size={16} />
         </button>
-        <button type="button" onClick={() => runCommand('justifyRight')} className="btn-secondary" aria-label="Align text right" title="Align Right">
+        <button type="button" onMouseDown={preserveEditorFocus} onClick={() => runCommand('justifyRight')} className="btn-secondary" aria-label="Align text right" title="Align Right">
           <AlignRight size={16} />
         </button>
-        <button type="button" onClick={() => runCommand('insertUnorderedList')} className="btn-secondary" aria-label="Add bulleted list" title="Bulleted List">
+        <button type="button" onMouseDown={preserveEditorFocus} onClick={() => runCommand('insertUnorderedList')} className="btn-secondary" aria-label="Add bulleted list" title="Bulleted List">
           <List size={16} />
         </button>
-        <button type="button" onClick={() => runCommand('insertOrderedList')} className="btn-secondary" aria-label="Add numbered list" title="Numbered List">
+        <button type="button" onMouseDown={preserveEditorFocus} onClick={() => runCommand('insertOrderedList')} className="btn-secondary" aria-label="Add numbered list" title="Numbered List">
           <ListOrdered size={16} />
         </button>
-        <button type="button" onClick={() => runCommand('outdent')} className="btn-secondary" aria-label="Outdent text" title="Outdent">
+        <button type="button" onMouseDown={preserveEditorFocus} onClick={() => runCommand('outdent')} className="btn-secondary" aria-label="Outdent text" title="Outdent">
           <Outdent size={16} />
         </button>
-        <button type="button" onClick={() => runCommand('indent')} className="btn-secondary" aria-label="Indent text" title="Indent">
+        <button type="button" onMouseDown={preserveEditorFocus} onClick={() => runCommand('indent')} className="btn-secondary" aria-label="Indent text" title="Indent">
           <Indent size={16} />
         </button>
-        <button type="button" onClick={() => applyBlockStyle('h1')} className="btn-secondary" aria-label="Apply heading one" title="Heading 1">
+        <button type="button" onMouseDown={preserveEditorFocus} onClick={() => applyBlockStyle('h1')} className="btn-secondary" aria-label="Apply heading one" title="Heading 1">
           <Heading1 size={16} />
         </button>
-        <button type="button" onClick={() => applyBlockStyle('h2')} className="btn-secondary" aria-label="Apply heading two" title="Heading 2">
+        <button type="button" onMouseDown={preserveEditorFocus} onClick={() => applyBlockStyle('h2')} className="btn-secondary" aria-label="Apply heading two" title="Heading 2">
           <Heading2 size={16} />
         </button>
-        <button type="button" onClick={() => applyBlockStyle('blockquote')} className="btn-secondary" aria-label="Apply quote style" title="Quote">
+        <button type="button" onMouseDown={preserveEditorFocus} onClick={() => applyBlockStyle('blockquote')} className="btn-secondary" aria-label="Apply quote style" title="Quote">
           <Quote size={16} />
         </button>
       </div>
       <div
         ref={editorRef}
         contentEditable
+        suppressContentEditableWarning
+        tabIndex={0}
         role="textbox"
         aria-multiline="true"
+        onClick={() => editorRef.current?.focus()}
         onInput={(event) => onChange(event.currentTarget.innerHTML)}
         onBlur={(event) => onChange(event.currentTarget.innerHTML)}
-        className="rich-post-editor min-h-36 w-full overflow-y-auto rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+        className="rich-post-editor min-h-64 w-full overflow-y-auto rounded border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
         data-placeholder="Write the update. Highlight text and use the toolbar, or click a style before typing."
       />
     </div>
@@ -859,7 +866,7 @@ function DashboardNews({
       )}
       {(isCreatePostOpen || editingPost) && (
         <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="modal-window w-full max-w-xl rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+          <div className="modal-window max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900 sm:p-6">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{editingPost ? 'Edit Update' : 'Create Update'}</h2>
@@ -895,13 +902,13 @@ function DashboardNews({
                   />
                 </label>
               </div>
-              <label className="block">
+              <div className="block">
                 <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Post</span>
                 <RichPostEditor
                   value={postForm.body}
                   onChange={(body) => setPostForm((form) => ({ ...form, body }))}
                 />
-              </label>
+              </div>
               <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-3 dark:border-gray-800">
                 <span>
                   <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Allow comments</span>
