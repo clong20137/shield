@@ -356,7 +356,7 @@ export class UserController {
 
   static async getAllUsers(req: Request, res: Response) {
     try {
-      const { page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 50, maxPageSize: 250 });
+      const { page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 250, maxPageSize: 1000 });
 
       const users = await UserModel.getAllUsers(pageSize, offset);
       res.json({

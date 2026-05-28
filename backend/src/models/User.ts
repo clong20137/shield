@@ -216,7 +216,7 @@ export class UserModel {
         query += ` WHERE ${conditions.join(' AND ')}`;
       }
 
-      query += ' ORDER BY `lastName`, `firstName` LIMIT 100';
+      query += ' ORDER BY `lastName`, `firstName`';
 
       const [rows] = await conn.query(query, params);
       return rows as User[];

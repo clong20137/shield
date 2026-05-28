@@ -130,7 +130,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     setError(null);
     try {
       if (!query.trim()) {
-        const response = await userService.getAll(1, 100);
+        const response = await userService.getAll(1, 1000);
         if (requestId !== searchRequestRef.current) return;
         setUsers(response.data.data);
       } else {
