@@ -1,7 +1,16 @@
-import { ShieldCheck } from 'lucide-react';
+import { BadgeCheck, Crown, Shield, ShieldCheck, Star } from 'lucide-react';
 import { leadershipRanks } from '../constants/ranks';
 
 const importantRanks = new Map(leadershipRanks.map((rank) => [rank.toLowerCase(), rank]));
+
+const rankIconMap: Record<string, typeof ShieldCheck> = {
+  sergeant: Shield,
+  'first sergeant': ShieldCheck,
+  lieutenant: BadgeCheck,
+  captain: ShieldCheck,
+  colonel: Crown,
+  superintendent: Star,
+};
 
 function normalizeRank(rank?: string | null): string {
   return (rank || '').trim().replace(/\s+/gu, ' ').toLowerCase();
@@ -27,6 +36,7 @@ export function RankBadge({
 }) {
   const displayRank = getDisplayRank(rank);
   const important = isImportantRank(rank);
+  const RankIcon = important ? rankIconMap[normalizeRank(rank)] || ShieldCheck : ShieldCheck;
 
   if (!important && subtle) {
     return (
@@ -47,7 +57,7 @@ export function RankBadge({
       }`}
       title={important ? `${displayRank} leadership rank` : displayRank}
     >
-      {important && <ShieldCheck size={compact ? 13 : 14} className="shrink-0" />}
+      {important && <RankIcon size={compact ? 13 : 14} className="shrink-0" />}
       <span className="truncate">{displayRank}</span>
     </span>
   );
