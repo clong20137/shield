@@ -1,12 +1,12 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
-import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bold, ChevronLeft, ChevronRight, Heading1, Heading2, Heart, Indent, Italic, List, ListOrdered, LucideIcon, Outdent, Pencil, PartyPopper, Plus, Quote, Save, Send, ThumbsUp, Trash2, Underline, X } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bold, ChevronLeft, ChevronRight, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, Outdent, Pencil, PartyPopper, Plus, Quote, Save, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction } from '../services/api';
+import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, getAssetUrl, handleAssetImageError } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { FormattedText } from '../components/FormattedText';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
-type DashboardPostForm = Pick<DashboardPost, 'title' | 'body' | 'category' | 'allowComments'>;
+type DashboardPostForm = Pick<DashboardPost, 'title' | 'body' | 'category' | 'imageUrl' | 'allowComments'>;
 
 const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty'];
 
@@ -23,6 +23,7 @@ const defaultPostForm: DashboardPostForm = {
   title: '',
   body: '',
   category: 'Update',
+  imageUrl: '',
   allowComments: true,
 };
 
@@ -648,11 +649,15 @@ function DashboardNews({
   const [postForm, setPostForm] = useState<DashboardPostForm>(defaultPostForm);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isSavingPost, setIsSavingPost] = useState(false);
+  const [isUploadingPostImage, setIsUploadingPostImage] = useState(false);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<DashboardPost | null>(null);
   const [postPendingDelete, setPostPendingDelete] = useState<DashboardPost | null>(null);
   const [postError, setPostError] = useState<string | null>(null);
-  const isAdministrator = currentUser?.role === 'administrator';
+  const canManageDashboard = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('dashboard:manage'));
+  const canCreateDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:create'));
+  const canEditDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:edit'));
+  const canDeleteDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:delete'));
 
   const loadPosts = useCallback(async (showLoading = true) => {
     if (currentUser?.mustChangePassword) {
@@ -732,6 +737,7 @@ function DashboardNews({
       title: post.title,
       body: legacyPostBodyToHtml(post.body),
       category: post.category,
+      imageUrl: post.imageUrl || '',
       allowComments: post.allowComments,
     });
     setIsCreatePostOpen(false);
@@ -741,6 +747,20 @@ function DashboardNews({
     setIsCreatePostOpen(false);
     setEditingPost(null);
     setPostForm(defaultPostForm);
+  };
+
+  const uploadPostImage = async (file: File) => {
+    setIsUploadingPostImage(true);
+    setPostError(null);
+    try {
+      const response = await dashboardPostService.uploadImage(file);
+      setPostForm((form) => ({ ...form, imageUrl: response.data.imageUrl }));
+    } catch (err) {
+      console.error('Failed to upload dashboard post image:', err);
+      setPostError('Failed to upload image.');
+    } finally {
+      setIsUploadingPostImage(false);
+    }
   };
 
   const updatePost = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -788,7 +808,7 @@ function DashboardNews({
           <h2>Updates & News</h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Administrative posts for everyone using SHIELD.</p>
         </div>
-        {isAdministrator && (
+        {canCreateDashboardPosts && (
           <button
             type="button"
             onClick={() => setIsCreatePostOpen(true)}
@@ -816,17 +836,31 @@ function DashboardNews({
                   <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold uppercase text-accent">{post.category}</span>
                   <h3 className="mt-3 text-base">{post.title}</h3>
                 </div>
-                {isAdministrator && (
+                {(canEditDashboardPosts || canDeleteDashboardPosts) && (
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => openEditPost(post)} className="btn-secondary" aria-label="Edit post" title="Edit">
-                      <Pencil size={16} />
-                    </button>
-                    <button type="button" onClick={() => setPostPendingDelete(post)} className="btn-danger" aria-label="Delete post" title="Delete">
-                      <Trash2 size={16} />
-                    </button>
+                    {canEditDashboardPosts && (
+                      <button type="button" onClick={() => openEditPost(post)} className="btn-secondary" aria-label="Edit post" title="Edit">
+                        <Pencil size={16} />
+                      </button>
+                    )}
+                    {canDeleteDashboardPosts && (
+                      <button type="button" onClick={() => setPostPendingDelete(post)} className="btn-danger" aria-label="Delete post" title="Delete">
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
+              {post.imageUrl && (
+                <div className="mb-4 overflow-hidden rounded border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-950">
+                  <img
+                    src={getAssetUrl(post.imageUrl)}
+                    alt=""
+                    onError={handleAssetImageError}
+                    className="h-44 w-full object-cover"
+                  />
+                </div>
+              )}
               <FormattedText text={post.body} className="text-sm leading-6 text-gray-700 dark:text-gray-300" />
               <div className="mt-4">
                 <Link to={`/updates/${post.id}`} className="inline-flex items-center rounded border border-accent/30 px-3 py-2 text-sm font-bold text-accent hover:bg-accent/10">
@@ -908,6 +942,46 @@ function DashboardNews({
                   value={postForm.body}
                   onChange={(body) => setPostForm((form) => ({ ...form, body }))}
                 />
+              </div>
+              <div className="rounded border border-gray-200 p-3 dark:border-gray-800">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Thumbnail image</span>
+                    <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Shown with this update on the dashboard.</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <label className="btn-secondary cursor-pointer" aria-label="Upload dashboard post image" title={isUploadingPostImage ? 'Uploading' : 'Upload Image'}>
+                      <Upload size={16} />
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/gif,image/webp"
+                        className="hidden"
+                        disabled={isUploadingPostImage}
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = '';
+                          if (file) {
+                            void uploadPostImage(file);
+                          }
+                        }}
+                      />
+                    </label>
+                    {postForm.imageUrl && (
+                      <button type="button" onClick={() => setPostForm((form) => ({ ...form, imageUrl: '' }))} className="btn-secondary" aria-label="Remove dashboard post image" title="Remove Image">
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {postForm.imageUrl ? (
+                  <div className="mt-3 overflow-hidden rounded border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-950">
+                    <img src={getAssetUrl(postForm.imageUrl)} alt="" onError={handleAssetImageError} className="h-48 w-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="mt-3 flex h-28 items-center justify-center rounded border border-dashed border-gray-300 text-gray-400 dark:border-gray-700">
+                    <Image size={24} />
+                  </div>
+                )}
               </div>
               <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-3 dark:border-gray-800">
                 <span>

@@ -26,6 +26,9 @@ const allowedPermissions = [
   'roles:manage',
   'messages:send',
   'dashboard:manage',
+  'dashboard:create',
+  'dashboard:edit',
+  'dashboard:delete',
   'bugs:manage',
 ] as const;
 

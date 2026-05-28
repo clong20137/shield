@@ -237,13 +237,13 @@ export async function initializeDatabase() {
   await pool.query(`
     INSERT IGNORE INTO roles (\`id\`, \`name\`, \`permissions\`)
     VALUES
-      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","users:profile-picture","devices:manage","calendar:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","dashboard:manage","bugs:manage"]'),
+      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","users:profile-picture","devices:manage","calendar:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","bugs:manage"]'),
       ('role-user', 'user', '["users:view","calendar:manage","messages:send"]')
   `);
 
   await pool.query(`
     UPDATE roles
-    SET \`permissions\` = '["users:view","users:create","users:edit","users:profile-picture","devices:manage","calendar:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","dashboard:manage","bugs:manage"]'
+    SET \`permissions\` = '["users:view","users:create","users:edit","users:profile-picture","devices:manage","calendar:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","bugs:manage"]'
     WHERE \`name\` = 'administrator'
   `);
 
@@ -294,6 +294,7 @@ export async function initializeDatabase() {
       \`title\` VARCHAR(200) NOT NULL,
       \`body\` TEXT NOT NULL,
       \`category\` VARCHAR(50) NOT NULL DEFAULT 'Update',
+      \`imageUrl\` VARCHAR(500),
       \`allowComments\` BOOLEAN DEFAULT 1,
       \`authorId\` VARCHAR(36),
       \`authorName\` VARCHAR(150),
@@ -305,6 +306,7 @@ export async function initializeDatabase() {
   `);
 
   await ensureColumn('dashboard_posts', 'allowComments', '`allowComments` BOOLEAN DEFAULT 1');
+  await ensureColumn('dashboard_posts', 'imageUrl', '`imageUrl` VARCHAR(500)');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS dashboard_post_reactions (

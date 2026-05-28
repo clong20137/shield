@@ -250,6 +250,11 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
             Posted by {post.authorName || 'Administrator'} on {new Date(post.createdAt).toLocaleString()}
           </p>
         </div>
+        {post.imageUrl && (
+          <div className="mt-6 overflow-hidden rounded border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-950">
+            <img src={getAssetUrl(post.imageUrl)} alt="" onError={handleAssetImageError} className="max-h-[520px] w-full object-cover" />
+          </div>
+        )}
         <FormattedText text={post.body} className="mt-6 text-base leading-8 text-gray-700 dark:text-gray-300" />
       </article>
 

@@ -481,6 +481,7 @@ export interface DashboardPost {
   title: string;
   body: string;
   category: 'Update' | 'News' | 'Alert';
+  imageUrl: string | null;
   allowComments: boolean;
   authorId: string | null;
   authorName: string | null;
@@ -838,11 +839,17 @@ export const dashboardPostService = {
   getById: (id: string) =>
     api.get<DashboardPost>(`/dashboard-posts/${id}`),
 
-  create: (post: Pick<DashboardPost, 'title' | 'body' | 'category' | 'allowComments'> & { requesterId?: string; authorName?: string }) =>
+  create: (post: Pick<DashboardPost, 'title' | 'body' | 'category' | 'imageUrl' | 'allowComments'> & { requesterId?: string; authorName?: string }) =>
     api.post<DashboardPost>('/dashboard-posts', post),
 
-  update: (id: string, post: Pick<DashboardPost, 'title' | 'body' | 'category' | 'allowComments'>) =>
+  update: (id: string, post: Pick<DashboardPost, 'title' | 'body' | 'category' | 'imageUrl' | 'allowComments'>) =>
     api.put<DashboardPost>(`/dashboard-posts/${id}`, post),
+
+  uploadImage: (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    return api.post<{ imageUrl: string }>('/dashboard-posts/images', formData, { timeout: 30000 });
+  },
 
   delete: (id: string, requesterId?: string) =>
     api.delete(`/dashboard-posts/${id}`, { data: { requesterId } }),

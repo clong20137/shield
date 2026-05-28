@@ -7,6 +7,7 @@ export interface DashboardPost {
   title: string;
   body: string;
   category: string;
+  imageUrl: string | null;
   allowComments: boolean | number;
   authorId: string | null;
   authorName: string | null;
@@ -55,6 +56,7 @@ export interface DashboardPostInput {
   title: string;
   body: string;
   category: string;
+  imageUrl?: string | null;
   allowComments?: boolean;
   authorId?: string;
   authorName?: string;
@@ -154,13 +156,14 @@ export class DashboardPostModel {
 
       await conn.query<ResultSetHeader>(
         `INSERT INTO dashboard_posts (
-          \`id\`, \`title\`, \`body\`, \`category\`, \`allowComments\`, \`authorId\`, \`authorName\`, \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          \`id\`, \`title\`, \`body\`, \`category\`, \`imageUrl\`, \`allowComments\`, \`authorId\`, \`authorName\`, \`createdAt\`, \`updatedAt\`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           input.title.trim(),
           input.body.trim(),
           input.category || 'Update',
+          input.imageUrl || null,
           input.allowComments === false ? 0 : 1,
           input.authorId || null,
           input.authorName || null,
@@ -174,6 +177,7 @@ export class DashboardPostModel {
         title: input.title.trim(),
         body: input.body.trim(),
         category: input.category || 'Update',
+        imageUrl: input.imageUrl || null,
         allowComments: input.allowComments !== false,
         authorId: input.authorId || null,
         authorName: input.authorName || null,
@@ -193,12 +197,13 @@ export class DashboardPostModel {
       const now = new Date();
       const [result] = await conn.query<ResultSetHeader>(
         `UPDATE dashboard_posts
-         SET \`title\` = ?, \`body\` = ?, \`category\` = ?, \`allowComments\` = ?, \`updatedAt\` = ?
+         SET \`title\` = ?, \`body\` = ?, \`category\` = ?, \`imageUrl\` = ?, \`allowComments\` = ?, \`updatedAt\` = ?
          WHERE \`id\` = ?`,
         [
           input.title.trim(),
           input.body.trim(),
           input.category || 'Update',
+          input.imageUrl || null,
           input.allowComments === false ? 0 : 1,
           now,
           id,

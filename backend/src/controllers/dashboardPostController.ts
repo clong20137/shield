@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
+import fs from 'fs';
 import { getSessionAccount } from '../middleware/authSession';
+import { isSafeDashboardPostImage } from '../middleware/dashboardPostUpload';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { DashboardPostModel } from '../models/DashboardPost';
 import { UserNotificationModel } from '../models/UserNotification';
@@ -11,6 +13,11 @@ import { parsePagination } from '../utils/pagination';
 const dashboardCategories = ['Update', 'News', 'Alert'] as const;
 const dashboardReactions = ['like', 'celebrate', 'important', 'thanks'] as const;
 const commentFlagNotificationCooldownMs = 15 * 60 * 1000;
+
+function cleanDashboardPostImageUrl(value: unknown): string {
+  const imageUrl = cleanString(value, 500);
+  return imageUrl.startsWith('/uploads/dashboard-posts/') ? imageUrl : '';
+}
 
 export class DashboardPostController {
   static async listPosts(req: Request, res: Response) {
@@ -36,6 +43,7 @@ export class DashboardPostController {
       const title = cleanString(req.body?.title, 160);
       const body = cleanMultiline(req.body?.body, 5000);
       const category = cleanString(req.body?.category, 40) || 'Update';
+      const imageUrl = cleanDashboardPostImageUrl(req.body?.imageUrl);
       const allowComments = req.body?.allowComments !== false;
 
       if (!title || !body) {
@@ -50,6 +58,7 @@ export class DashboardPostController {
         title,
         body,
         category,
+        imageUrl,
         allowComments,
         authorId: account.id,
         authorName: account.displayName || account.email,
@@ -102,6 +111,7 @@ export class DashboardPostController {
       const title = cleanString(req.body?.title, 160);
       const body = cleanMultiline(req.body?.body, 5000);
       const category = cleanString(req.body?.category, 40) || 'Update';
+      const imageUrl = cleanDashboardPostImageUrl(req.body?.imageUrl);
       const allowComments = req.body?.allowComments !== false;
 
       if (!title || !body) {
@@ -116,6 +126,7 @@ export class DashboardPostController {
         title,
         body,
         category,
+        imageUrl,
         allowComments,
       }, account.id);
 
@@ -128,6 +139,26 @@ export class DashboardPostController {
     } catch (error) {
       console.error('Dashboard post update error:', error);
       res.status(500).json({ error: 'Failed to update dashboard post' });
+    }
+  }
+
+  static async uploadImage(req: Request, res: Response) {
+    try {
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ error: 'Image file is required' });
+      }
+
+      if (!isSafeDashboardPostImage(file.path)) {
+        fs.rmSync(file.path, { force: true });
+        return res.status(400).json({ error: 'Only valid image uploads are allowed' });
+      }
+
+      res.status(201).json({ imageUrl: `/uploads/dashboard-posts/${file.filename}` });
+    } catch (error) {
+      console.error('Dashboard post image upload error:', error);
+      res.status(500).json({ error: 'Failed to upload dashboard post image' });
     }
   }
 
