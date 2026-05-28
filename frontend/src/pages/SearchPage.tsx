@@ -97,6 +97,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
+  const [passwordResetTarget, setPasswordResetTarget] = useState<{ user: User; password: string } | null>(null);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
   const searchRequestRef = useRef(0);
   const [addressLookupQuery, setAddressLookupQuery] = useState('');
@@ -198,6 +199,27 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (user: User) => {
+    if (!isAdministrator) {
+      onToast('error', 'Administrator permission required.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Generate a temporary password for ${user.firstName} ${user.lastName}? The user will be required to change it on their next sign-in.`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await authService.adminResetPassword(user.id);
+      setPasswordResetTarget({ user, password: response.data.password });
+      onToast('success', 'Temporary password generated successfully.');
+    } catch (err) {
+      console.error(err);
+      onToast('error', getErrorMessage(err, 'Failed to reset password.'));
     }
   };
 
@@ -599,9 +621,43 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
         loading={loading}
         onUserSelect={openSelectedUser}
         onEdit={openEditUser}
+        onResetPassword={handleResetPassword}
         onDelete={handleDelete}
         canEdit={isAdministrator}
       />
+
+      {passwordResetTarget && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Temporary Password Generated</h2>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+              A temporary password was created for {passwordResetTarget.user.firstName} {passwordResetTarget.user.lastName}. They will be asked to change it at their next sign-in.
+            </p>
+            <div className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/50 dark:text-amber-100">
+              <div className="font-semibold">Temporary password</div>
+              <code className="mt-1 block break-all rounded bg-white/70 px-2 py-1 font-mono text-base dark:bg-black/30">{passwordResetTarget.password}</code>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setPasswordResetTarget(null)} className="btn-secondary">Close</button>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(passwordResetTarget.password);
+                    onToast('success', 'Password copied to clipboard.');
+                  } catch (error) {
+                    console.error('Failed to copy generated password:', error);
+                    onToast('error', 'Copy failed. Please copy it manually.');
+                  }
+                }}
+                className="btn-primary"
+              >
+                Copy Password
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

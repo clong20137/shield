@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pencil, Trash2, X } from 'lucide-react';
+import { LockKeyhole, Pencil, Trash2, X } from 'lucide-react';
 import { getAssetUrl, handleAssetImageError, User } from '../services/api';
 import { RankBadge, isImportantRank } from './RankBadge';
 
@@ -8,6 +8,7 @@ interface UserTableProps {
   loading?: boolean;
   onUserSelect?: (user: User) => void;
   onEdit?: (user: User) => void;
+  onResetPassword?: (user: User) => void;
   onDelete?: (userId: string) => void;
   canEdit?: boolean;
 }
@@ -17,6 +18,7 @@ export const UserTable: React.FC<UserTableProps> = ({
   loading = false,
   onUserSelect,
   onEdit,
+  onResetPassword,
   onDelete,
   canEdit = false,
 }) => {
@@ -94,6 +96,17 @@ export const UserTable: React.FC<UserTableProps> = ({
                       }}
                     >
                       <Pencil size={14} />
+                    </button>
+                    <button
+                      className="btn btn-secondary text-xs"
+                      aria-label={`Reset password for ${user.firstName} ${user.lastName}`}
+                      title="Reset Password"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onResetPassword?.(user);
+                      }}
+                    >
+                      <LockKeyhole size={14} />
                     </button>
                     <button
                       className="btn btn-danger text-xs"

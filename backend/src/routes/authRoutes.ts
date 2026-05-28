@@ -30,6 +30,7 @@ router.post('/2fa/enable', requireSelfOrPermission((req) => req.body?.accountId,
 router.post('/2fa/disable', requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.disableTwoFactor);
 router.get('/accounts', requireAnyPermission(['roles:manage', 'devices:manage', 'reports:cpar']), AuthController.listAccounts);
 router.put('/accounts/:accountId/role', requirePermission('roles:manage'), AuthController.updateRole);
+router.post('/accounts/:accountId/reset-password', requirePermission('roles:manage'), AuthController.adminResetPassword);
 router.put('/accounts/:accountId/message-preferences', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), AuthController.updateMessagePreferences);
 router.put('/accounts/:accountId/trooper-daily-preferences', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), AuthController.updateTrooperDailyPreferences);
 router.put('/accounts/:accountId/onboarding-complete', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), AuthController.completeOnboarding);

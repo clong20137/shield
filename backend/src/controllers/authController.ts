@@ -13,6 +13,24 @@ import { cleanMultiline, cleanString, isOneOf, isStrongPassword, isValidEmail, n
 
 const DEFAULT_LOGIN_WARNING_MESSAGE = 'This is a Indiana State Police computer application system that is for Official use only. This system is subject to monitoring. Therefore, no expectation of privacy is to be assumed. Individuals found performing unauthorized activities may be subject to disciplinary action including criminal prosecution.';
 
+function generateTemporaryPassword(length = 14): string {
+  const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lowercase = 'abcdefghjkmnpqrstuvwxyz';
+  const digits = '23456789';
+  const allChars = `${uppercase}${lowercase}${digits}`;
+
+  const randomPart = () => allChars[crypto.randomInt(0, allChars.length)];
+
+  const password = [
+    uppercase[crypto.randomInt(0, uppercase.length)],
+    lowercase[crypto.randomInt(0, lowercase.length)],
+    digits[crypto.randomInt(0, digits.length)],
+    ...Array.from({ length: Math.max(0, length - 3) }, randomPart),
+  ];
+
+  return password.sort(() => 0.5 - Math.random()).join('');
+}
+
 const allowedPermissions = [
   'users:view',
   'users:create',
@@ -602,6 +620,46 @@ export class AuthController {
     } catch (error) {
       console.error('Reset password error:', error);
       res.status(500).json({ error: 'Failed to reset password' });
+    }
+  }
+
+  static async adminResetPassword(req: Request, res: Response) {
+    try {
+      const cleanAccountId = cleanString(req.params.accountId, 36);
+
+      if (!cleanAccountId) {
+        return res.status(400).json({ error: 'Account id is required' });
+      }
+
+      const account = await AuthAccountModel.getAccountById(cleanAccountId);
+      if (!account) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+
+      const temporaryPassword = generateTemporaryPassword();
+      const updated = await AuthAccountModel.adminResetPassword(cleanAccountId, temporaryPassword);
+
+      if (!updated) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+
+      const actor = await getSessionAccount(req);
+      await AuthSessionModel.revokeAllSessions(cleanAccountId);
+      broadcastAppEvent({ type: 'user-updated', entityId: cleanAccountId });
+      await AuditLogModel.create({
+        actorId: actor?.id || cleanAccountId,
+        actorName: actor?.displayName || actor?.email || 'Administrator',
+        action: 'auth.admin_password_reset',
+        entityType: 'user',
+        entityId: cleanAccountId,
+        details: JSON.stringify({ email: account.email, sessionsRevoked: true, mustChangePassword: true }),
+        ...requestAuditFields(req),
+      });
+
+      return res.json({ message: 'Temporary password generated successfully', password: temporaryPassword });
+    } catch (error) {
+      console.error('Admin reset password error:', error);
+      return res.status(500).json({ error: 'Failed to reset user password' });
     }
   }
 
