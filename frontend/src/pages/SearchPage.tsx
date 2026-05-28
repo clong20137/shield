@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
-import { Camera, Save, Send, X } from 'lucide-react';
+import { Camera, ChevronLeft, ChevronRight, Save, Send, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { useSearchParams } from 'react-router-dom';
 import { AuthAccount, AuthRole, authService, getAssetUrl, handleAssetImageError, messageService, userService, User, UserFilters } from '../services/api';
@@ -73,9 +73,13 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+
 const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(25);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentQuery, setCurrentQuery] = useState('');
@@ -100,10 +104,28 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const isAdministrator = currentUser?.role === 'administrator';
   const canEditProfilePictures = isAdministrator || currentUser?.permissions?.includes('users:profile-picture');
 
+  const totalResults = users.length;
+  const totalPages = Math.max(1, Math.ceil(totalResults / pageSize));
+  const pagedUsers = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return users.slice(start, start + pageSize);
+  }, [users, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
   const handleSearch = async (query: string) => {
     const requestId = searchRequestRef.current + 1;
     searchRequestRef.current = requestId;
     setCurrentQuery(query);
+    setPage(1);
     setLoading(true);
     setError(null);
     try {
@@ -127,6 +149,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   };
 
   const handleFilterChange = async (filters: UserFilters) => {
+    setPage(1);
     setLoading(true);
     setError(null);
     try {
@@ -462,8 +485,53 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
         placeholder="Search by email, name, PE #, district, badge, radio, phone, or ID..."
       />
 
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <div className="text-sm text-gray-600 dark:text-gray-300">
+          Showing {totalResults === 0 ? 0 : (page - 1) * pageSize + 1}-{Math.min(page * pageSize, totalResults)} of {totalResults} users
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+            <span>Per page</span>
+            <select
+              value={pageSize}
+              onChange={(event) => setPageSize(Number(event.target.value))}
+              className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-950"
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+          </label>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+              disabled={page === 1}
+              className="inline-flex h-9 w-9 items-center justify-center rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:hover:bg-gray-800"
+              aria-label="Previous page"
+              title="Previous page"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-sm text-gray-700 dark:text-gray-200">Page {page} of {totalPages}</span>
+            <button
+              type="button"
+              onClick={() => setPage((currentPage) => Math.min(totalPages, currentPage + 1))}
+              disabled={page === totalPages}
+              className="inline-flex h-9 w-9 items-center justify-center rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:hover:bg-gray-800"
+              aria-label="Next page"
+              title="Next page"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+
       <UserTable
-        users={users}
+        users={pagedUsers}
         loading={loading}
         onUserSelect={openSelectedUser}
         onEdit={openEditUser}
