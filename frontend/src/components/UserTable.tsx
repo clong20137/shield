@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pencil, Trash2, X } from 'lucide-react';
-import { User } from '../services/api';
+import { getAssetUrl, handleAssetImageError, User } from '../services/api';
 import { RankBadge, isImportantRank } from './RankBadge';
 
 interface UserTableProps {
@@ -37,12 +37,11 @@ export const UserTable: React.FC<UserTableProps> = ({
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-primary-500 text-white">
+              <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Photo</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Last Name</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">First Name</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">PE #</th>
-              <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Badge #</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Rank</th>
-              <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Employee Type</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">District</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Status</th>
               {canEdit && <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Actions</th>}
@@ -59,14 +58,20 @@ export const UserTable: React.FC<UserTableProps> = ({
                     : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                 }`}
               >
+                <td className="px-4 py-3">
+                  <img
+                    src={getAssetUrl(user.profilePictureUrl)}
+                    alt={`${user.firstName} ${user.lastName}`}
+                    onError={handleAssetImageError}
+                    className="h-10 w-10 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-700"
+                  />
+                </td>
                 <td className="px-4 py-3">{user.lastName}</td>
                 <td className="px-4 py-3">{user.firstName}</td>
                 <td className="px-4 py-3">{user.peNumber}</td>
-                <td className="px-4 py-3">{user.badgeNumber}</td>
                 <td className="px-4 py-3">
                   <RankBadge rank={user.rank} compact subtle />
                 </td>
-                <td className="px-4 py-3">{user.employmentType}</td>
                 <td className="px-4 py-3">{user.district}</td>
                 <td className="px-4 py-3">
                   <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${

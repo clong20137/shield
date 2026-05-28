@@ -864,13 +864,19 @@ function GlobalSearch({ compact }: { compact: boolean }) {
                   onClick={() => openSearchResult(user)}
                   className="flex w-full min-w-0 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
                 >
+                  <img
+                    src={getAssetUrl(user.profilePictureUrl)}
+                    alt={`${user.firstName} ${user.lastName}`}
+                    onError={handleAssetImageError}
+                    className="mr-3 h-10 w-10 flex-shrink-0 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-700"
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold">
                       {user.firstName} {user.lastName}
                     </p>
-                      <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-                        {user.email || `PE ${user.peNumber || 'N/A'}`} - {user.district || 'No district'}
-                      </p>
+                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                      {user.email || `PE ${user.peNumber || 'N/A'}`} - {user.district || 'No district'}
+                    </p>
                   </div>
                 </button>
               ))}
