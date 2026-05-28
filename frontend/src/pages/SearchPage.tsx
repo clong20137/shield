@@ -612,6 +612,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
               onEdit={openEditUser}
               onMessage={setMessageRecipient}
               onOpenUser={openSelectedUser}
+              onToast={onToast}
               canEdit={isAdministrator}
             />
           </div>

@@ -9,6 +9,7 @@ interface UserDetailProps {
   onEdit?: (user: User) => void;
   onMessage?: (user: User) => void;
   onOpenUser?: (user: User) => void;
+  onToast?: (type: 'success' | 'error' | 'info', message: string) => void;
   canEdit?: boolean;
 }
 
@@ -17,11 +18,13 @@ function DetailRow({
   value,
   copyValue,
   onClick,
+  onToast,
 }: {
   label: string;
   value?: string | boolean | null;
   copyValue?: string | null;
   onClick?: () => void;
+  onToast?: (type: 'success' | 'error' | 'info', message: string) => void;
 }) {
   const displayValue = value === true ? 'Yes' : value === false ? 'No' : value || 'N/A';
 
@@ -40,22 +43,37 @@ function DetailRow({
         ) : (
           <span className="text-right text-gray-600 dark:text-gray-300">{displayValue}</span>
         )}
-        {copyValue && <CopyValueButton value={copyValue} />}
+        {copyValue && <CopyValueButton value={copyValue} onToast={onToast} />}
       </div>
     </div>
   );
 }
 
-function CopyValueButton({ value }: { value: string }) {
+function CopyValueButton({ value, onToast }: { value: string; onToast?: (type: 'success' | 'error' | 'info', message: string) => void }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(value);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const helper = document.createElement('textarea');
+        helper.value = value;
+        helper.setAttribute('readonly', '');
+        helper.style.position = 'fixed';
+        helper.style.top = '-9999px';
+        document.body.appendChild(helper);
+        helper.select();
+        document.execCommand('copy');
+        document.body.removeChild(helper);
+      }
+
       setCopied(true);
+      onToast?.('success', 'Copied to clipboard');
       window.setTimeout(() => setCopied(false), 1200);
     } catch (error) {
       console.error('Failed to copy value:', error);
+      onToast?.('error', 'Copy failed. Please try again.');
     }
   };
 
@@ -100,7 +118,7 @@ function isUserOnline(lastSeenAt?: string | null): boolean {
   return Date.now() - value < 2 * 60 * 1000;
 }
 
-export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, onMessage, onOpenUser, canEdit = false }) => {
+export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, onMessage, onOpenUser, onToast, canEdit = false }) => {
   const callNumber = user.departmentPhoneNumber || user.personalPhoneNumber;
   const callHref = callNumber ? `tel:${callNumber.replace(/[^\d+]/gu, '')}` : undefined;
   const emailHref = user.email ? `mailto:${user.email}` : undefined;
@@ -345,7 +363,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
       <div className="px-5 py-6 max-h-[70vh] overflow-y-auto">
         {activeTab === 'personal' && <DetailSection title="Personal Information">
           <DetailRow label="Name" value={`${user.firstName} ${user.lastName}`} />
-          <DetailRow label="Email" value={user.email} copyValue={user.email || null} />
+          <DetailRow label="Email" value={user.email} copyValue={user.email || null} onToast={onToast} />
           <DetailRow label="Sex" value={user.sex} />
           <DetailRow label="Marital Status" value={user.maritalStatus} />
           <DetailRow label="Race" value={user.race} />
@@ -371,19 +389,19 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
             </span>
           </div>
           <DetailRow label="Assigned To" value={user.assignedTo} />
-          <DetailRow label="Supervisor" value={user.supervisor} onClick={onOpenUser ? openSupervisorProfile : undefined} />
+          <DetailRow label="Supervisor" value={user.supervisor} onClick={onOpenUser ? openSupervisorProfile : undefined} onToast={onToast} />
           <DetailRow label="Active" value={user.isActive} />
           <DetailRow label="Type Details" value={user.typeDetails} />
         </DetailSection>}
 
         {activeTab === 'contact' && <DetailSection title="Contact">
-          <DetailRow label="Personal Phone" value={user.personalPhoneNumber} copyValue={user.personalPhoneNumber || null} />
-          <DetailRow label="Department Phone" value={user.departmentPhoneNumber} copyValue={user.departmentPhoneNumber || null} />
+          <DetailRow label="Personal Phone" value={user.personalPhoneNumber} copyValue={user.personalPhoneNumber || null} onToast={onToast} />
+          <DetailRow label="Department Phone" value={user.departmentPhoneNumber} copyValue={user.departmentPhoneNumber || null} onToast={onToast} />
           <DetailRow label="Residential Address" value={user.residentialAddress} />
           <DetailRow label="Mailing Address" value={user.mailingAddress} />
           <DetailRow label="Emergency Contact" value={user.emergencyContactName} />
           <DetailRow label="Emergency Relationship" value={user.emergencyContactRelationship} />
-          <DetailRow label="Emergency Phone" value={user.emergencyContactPhone} copyValue={user.emergencyContactPhone || null} />
+          <DetailRow label="Emergency Phone" value={user.emergencyContactPhone} copyValue={user.emergencyContactPhone || null} onToast={onToast} />
         </DetailSection>}
 
         {activeTab === 'devices' && <DetailSection title="Assigned Devices">
