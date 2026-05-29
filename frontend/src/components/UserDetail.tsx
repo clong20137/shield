@@ -49,7 +49,7 @@ function DetailRow({
   );
 }
 
-function CopyValueButton({ value, onToast }: { value: string; onToast?: (type: 'success' | 'error' | 'info', message: string) => void }) {
+function CopyValueButton({ value, onToast, className }: { value: string; onToast?: (type: 'success' | 'error' | 'info', message: string) => void; className?: string; }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -81,7 +81,7 @@ function CopyValueButton({ value, onToast }: { value: string; onToast?: (type: '
     <button
       type="button"
       onClick={handleCopy}
-      className="inline-flex h-7 w-7 items-center justify-center rounded border border-gray-300 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+      className={['inline-flex h-7 w-7 items-center justify-center rounded border border-gray-300 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800', className].filter(Boolean).join(' ')}
       aria-label="Copy value"
       title="Copy value"
     >
@@ -313,7 +313,10 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
             <div className="mt-2">
               <RankBadge rank={user.rank} />
             </div>
-            <p className="mt-2 text-sm text-blue-100">{user.email || 'No email on file'}</p>
+            <div className="mt-2 flex items-center gap-2">
+              <p className="text-sm text-blue-100">{user.email || 'No email on file'}</p>
+              {user.email && <CopyValueButton value={user.email} onToast={onToast} className="border border-white/20 bg-white/10 text-white hover:bg-white/20" />}
+            </div>
             <p className="mt-1 text-sm text-blue-100">PE {user.peNumber || 'N/A'} - {user.district || 'No district'}</p>
           </div>
         </div>
