@@ -278,7 +278,7 @@ export function AccountSettingsPage({
           ['general', 'General'],
           ['devices', 'Devices'],
           ['reports', 'Reports & Data'],
-          ['preferences', 'Preferences'],
+          ['preferences', 'Notifications'],
         ].map(([id, label]) => (
           <button
             key={id}
@@ -620,11 +620,14 @@ export function AccountSettingsPage({
 
       {activeTab === 'preferences' && (
         <section className="space-y-3 rounded-lg border border-gray-200 p-4 dark:border-gray-800">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Preferences</h3>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Notification Preferences</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Control how SHIELD alerts you about new messages and in-app notifications.</p>
+          </div>
           <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
             <span>
-              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Receive messages</span>
-              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Show message badges and message notifications.</span>
+              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Enable notifications</span>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Turn in-app message notifications on or off for your account.</span>
             </span>
             <input
               type="checkbox"
@@ -634,8 +637,8 @@ export function AccountSettingsPage({
           </label>
 
           <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
-            <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Message sound</span>
-            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose the ping used when new unread messages arrive.</span>
+            <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Notification sound</span>
+            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose the sound used when a new message notification arrives.</span>
             <select
               value={messagePreferences.messageSound}
               disabled={!messagePreferences.receiveMessages || !messagePreferences.playMessageSound}
@@ -650,8 +653,8 @@ export function AccountSettingsPage({
 
           <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
             <span>
-              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Message ping sound</span>
-              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Play a short sound when new unread messages arrive.</span>
+              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Play notification sound</span>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Play a short sound whenever a new message notification arrives.</span>
             </span>
             <input
               type="checkbox"
