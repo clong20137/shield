@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Download, Eye, RefreshCw, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, FileSpreadsheet, Eye, RefreshCw, Search, X } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { auditService, AuditLog, AuditLogFilters, AuditLogResponse } from '../services/api';
 
 const DEFAULT_RESPONSE: AuditLogResponse = {
@@ -33,9 +34,56 @@ function stringifyDetails(details: string | null) {
   return typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2);
 }
 
+function formatActionLabel(action: string): string {
+  return action
+    .replace(/_/gu, ' ')
+    .replace(/([a-z])([A-Z])/gu, '$1 $2')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function summarizeDetails(details: string | null): string {
+  const rendered = stringifyDetails(details);
+
+  if (rendered === 'N/A') {
+    return 'No additional details provided.';
+  }
+
+  return rendered.length > 140 ? `${rendered.slice(0, 137)}…` : rendered;
+}
+
 function csvCell(value: unknown) {
   const text = String(value ?? '').replace(/\r?\n/gu, ' ');
   return `"${text.replace(/"/gu, '""')}"`;
+}
+
+function downloadXlsx(logs: AuditLog[]) {
+  const rows = [
+    ['Time', 'Actor', 'Action', 'Entity Type', 'Entity ID', 'IP Address', 'Details'],
+    ...logs.map((log) => [
+      new Date(log.createdAt).toLocaleString(),
+      log.actorName || log.actorId || 'System',
+      formatActionLabel(log.action),
+      log.entityType,
+      log.entityId || '',
+      log.ipAddress || '',
+      stringifyDetails(log.details),
+    ]),
+  ];
+
+  const worksheet = XLSX.utils.aoa_to_sheet(rows);
+  worksheet['!cols'] = [
+    { wch: 22 },
+    { wch: 24 },
+    { wch: 28 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 60 },
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Audit Log');
+  XLSX.writeFile(workbook, `shield-audit-log-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 function downloadCsv(logs: AuditLog[]) {
@@ -114,7 +162,7 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
     setFilters({ page: 1, pageSize: filters.pageSize || 50 });
   };
 
-  const exportFilteredLogs = async () => {
+  const exportFilteredLogs = async (format: 'csv' | 'xlsx') => {
     setExporting(true);
     try {
       const firstPage = await auditService.getAll({ ...filters, page: 1, pageSize: 500 });
@@ -125,7 +173,11 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
         allLogs.push(...pageResult.data.data);
       }
 
-      downloadCsv(allLogs);
+      if (format === 'xlsx') {
+        downloadXlsx(allLogs);
+      } else {
+        downloadCsv(allLogs);
+      }
     } catch (err) {
       console.error(err);
       setError('Failed to export audit logs.');
@@ -180,13 +232,23 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
               </button>
               <button
                 type="button"
-                onClick={exportFilteredLogs}
+                onClick={() => exportFilteredLogs('csv')}
                 disabled={exporting || response.total === 0}
-                className="btn-secondary h-10 w-10 p-0"
+                className="btn-secondary h-10 px-3 text-sm font-semibold"
                 title="Export CSV"
-                aria-label="Export audit logs"
+                aria-label="Export audit logs as CSV"
               >
-                <Download size={17} />
+                <Download size={16} className="mr-2" /> CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => exportFilteredLogs('xlsx')}
+                disabled={exporting || response.total === 0}
+                className="btn-primary h-10 px-3 text-sm font-semibold"
+                title="Export XLSX"
+                aria-label="Export audit logs as XLSX"
+              >
+                <FileSpreadsheet size={16} className="mr-2" /> XLSX
               </button>
               <button
                 type="button"
@@ -295,14 +357,16 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
                       {log.actorId && <div className="text-xs text-gray-500 dark:text-gray-400">{log.actorId}</div>}
                     </td>
                     <td className="px-3 py-4">
-                      <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold uppercase text-accent">{log.action}</span>
+                      <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold uppercase text-accent">{formatActionLabel(log.action)}</span>
                     </td>
                     <td className="px-3 py-4">
                       <div>{log.entityType}</div>
                       {log.entityId && <div className="text-xs text-gray-500 dark:text-gray-400">{log.entityId}</div>}
                     </td>
                     <td className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400">{log.ipAddress || 'N/A'}</td>
-                    <td className="max-w-xl truncate px-3 py-4 text-sm text-gray-500 dark:text-gray-400">{stringifyDetails(log.details)}</td>
+                    <td className="max-w-xl px-3 py-4 text-sm text-gray-500 dark:text-gray-400">
+                      <div className="truncate" title={stringifyDetails(log.details)}>{summarizeDetails(log.details)}</div>
+                    </td>
                     <td className="px-3 py-4 text-right">
                       <button
                         type="button"
