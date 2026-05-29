@@ -90,6 +90,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [messageBody, setMessageBody] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [isDraggingMessageModal, setIsDraggingMessageModal] = useState(false);
+  const [messageModalPosition, setMessageModalPosition] = useState({ x: 0, y: 0 });
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState<Partial<User>>({});
   const [supervisorOptions, setSupervisorOptions] = useState<User[]>([]);
@@ -99,6 +101,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const [passwordResetTarget, setPasswordResetTarget] = useState<{ user: User; password: string } | null>(null);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
+  const messageModalRef = useRef<HTMLFormElement | null>(null);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
   const searchRequestRef = useRef(0);
   const [addressLookupQuery, setAddressLookupQuery] = useState('');
   const [searchParams] = useSearchParams();
@@ -106,6 +110,80 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const selectedUserId = useMemo(() => searchParams.get('userId') ?? '', [searchParams]);
   const isAdministrator = currentUser?.role === 'administrator';
   const canEditProfilePictures = isAdministrator || currentUser?.permissions?.includes('users:profile-picture');
+
+  useEffect(() => {
+    if (!messageRecipient) {
+      setMessageModalPosition({ x: Math.max(12, window.innerWidth - 420), y: 112 });
+      return;
+    }
+
+    setMessageModalPosition((current) => ({
+      x: current.x || Math.max(12, window.innerWidth - 420),
+      y: current.y || 112,
+    }));
+  }, [messageRecipient]);
+
+  useEffect(() => {
+    if (!isDraggingMessageModal) {
+      return undefined;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const width = messageModalRef.current?.offsetWidth || 384;
+      const height = messageModalRef.current?.offsetHeight || 500;
+      const maxX = Math.max(12, window.innerWidth - width - 12);
+      const maxY = Math.max(12, window.innerHeight - height - 12);
+      const nextX = Math.min(Math.max(12, event.clientX - dragOffsetRef.current.x), maxX);
+      const nextY = Math.min(Math.max(12, event.clientY - dragOffsetRef.current.y), maxY);
+
+      setMessageModalPosition({ x: nextX, y: nextY });
+    };
+
+    const stopDragging = () => setIsDraggingMessageModal(false);
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', stopDragging);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', stopDragging);
+    };
+  }, [isDraggingMessageModal]);
+
+  useEffect(() => {
+    const keepInView = () => {
+      const width = messageModalRef.current?.offsetWidth || 384;
+      const height = messageModalRef.current?.offsetHeight || 500;
+      const maxX = Math.max(12, window.innerWidth - width - 12);
+      const maxY = Math.max(12, window.innerHeight - height - 12);
+
+      setMessageModalPosition((current) => ({
+        x: Math.min(Math.max(12, current.x), maxX),
+        y: Math.min(Math.max(12, current.y), maxY),
+      }));
+    };
+
+    window.addEventListener('resize', keepInView);
+
+    return () => window.removeEventListener('resize', keepInView);
+  }, []);
+
+  const startMessageModalDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    const rect = messageModalRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return;
+    }
+
+    dragOffsetRef.current = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+    setIsDraggingMessageModal(true);
+  };
 
   const totalResults = users.length;
   const totalPages = Math.max(1, Math.ceil(totalResults / pageSize));
@@ -887,16 +965,24 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       )}
 
       {messageRecipient && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-          <form onSubmit={handleSendMessage} className="w-full max-w-xl rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900">
-            <div className="mb-5 flex items-start justify-between gap-4">
+        <div className="pointer-events-none fixed inset-0 z-[60] bg-black/60">
+          <form
+            ref={messageModalRef}
+            onSubmit={handleSendMessage}
+            className="pointer-events-auto fixed w-[min(100vw-1rem,28rem)] max-w-md rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900"
+            style={{ left: messageModalPosition.x, top: messageModalPosition.y }}
+          >
+            <div
+              onPointerDown={startMessageModalDrag}
+              className={`mb-5 flex cursor-grab touch-none items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800 ${isDraggingMessageModal ? 'cursor-grabbing' : ''}`}
+            >
               <div>
                 <h2>Send Message</h2>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   To {messageRecipient.firstName} {messageRecipient.lastName}
                 </p>
               </div>
-              <button type="button" onClick={() => setMessageRecipient(null)} className="icon-close-button" aria-label="Close message modal" title="Close">
+              <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={() => setMessageRecipient(null)} className="icon-close-button" aria-label="Close message modal" title="Close">
                 <X size={20} />
               </button>
             </div>
