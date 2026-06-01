@@ -761,6 +761,64 @@ function SidebarLink({ to, label, compact, icon: Icon }: SidebarLinkProps) {
   );
 }
 
+const adminNavigationItems: Array<{ tab: AdminConsoleTab; label: string; icon: LucideIcon; to: string }> = [
+  { tab: 'general', label: 'General', icon: Settings, to: '/admin' },
+  { tab: 'permissions', label: 'Permissions', icon: LockKeyhole, to: '/admin?tab=permissions' },
+  { tab: 'achievements', label: 'Achievements', icon: Shield, to: '/admin?tab=achievements' },
+  { tab: 'create-user', label: 'Create User', icon: UserPlus, to: '/admin?tab=create-user' },
+  { tab: 'bugs', label: 'Bug Tracker', icon: Bug, to: '/admin?tab=bugs' },
+  { tab: 'audit', label: 'Audit Log', icon: ClipboardList, to: '/admin?tab=audit' },
+  { tab: 'errors', label: 'Error Log', icon: Bell, to: '/admin?tab=errors' },
+];
+
+function SidebarNavigation({ compact, isAdministrator }: { compact: boolean; isAdministrator: boolean }) {
+  const location = useLocation();
+  const isAdminArea = location.pathname === '/admin';
+  const activeAdminTab = getAdminTabFromLocation(location.pathname, location.search);
+
+  if (isAdminArea) {
+    return (
+      <nav data-onboarding-target="navigation" className="flex flex-1 flex-col gap-2 px-3 py-3">
+        <SidebarLink to="/" label="Dashboard" compact={compact} icon={LayoutDashboard} />
+        {!compact && (
+          <div className="px-3 pb-1 pt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-blue-100">
+            Admin Navigation
+          </div>
+        )}
+        {adminNavigationItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeAdminTab === item.tab;
+          return (
+            <NavLink
+              key={item.tab}
+              to={item.to}
+              className={[
+                'flex h-11 items-center rounded px-3 text-sm font-semibold transition',
+                compact ? 'justify-center' : 'justify-start',
+                isActive ? 'bg-white text-primary-500 shadow' : 'text-blue-50 hover:bg-white/10',
+              ].join(' ')}
+              title={compact ? item.label : undefined}
+            >
+              <Icon className={compact ? '' : 'mr-3'} size={19} />
+              {!compact && <span>{item.label}</span>}
+            </NavLink>
+          );
+        })}
+      </nav>
+    );
+  }
+
+  return (
+    <nav data-onboarding-target="navigation" className="flex flex-1 flex-col gap-2 px-3 py-3">
+      <SidebarLink to="/" label="Dashboard" compact={compact} icon={LayoutDashboard} />
+      <SidebarLink to="/calendar" label="Calendar" compact={compact} icon={CalendarDays} />
+      {isAdministrator && <SidebarLink to="/devices" label="Devices" compact={compact} icon={Laptop} />}
+      <SidebarLink to="/reports" label="Reports" compact={compact} icon={BarChart3} />
+      {isAdministrator && <SidebarLink to="/admin" label="Admin" compact={compact} icon={Shield} />}
+    </nav>
+  );
+}
+
 function GlobalSearch({ compact }: { compact: boolean }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<User[]>([]);
@@ -1567,6 +1625,7 @@ function ShieldAdminPage({
           bugReports={bugReports}
           onBugStatusChange={onBugStatusChange}
           onTabChange={(tab) => navigate(tab === 'general' ? '/admin' : `/admin?tab=${encodeURIComponent(tab)}`, { replace: true })}
+          hideTabs
         />
       </div>
     </section>
@@ -3045,13 +3104,7 @@ function App() {
               </button>
             </div>
 
-            <nav data-onboarding-target="navigation" className="flex flex-1 flex-col gap-2 px-3 py-3">
-              <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
-              <SidebarLink to="/calendar" label="Calendar" compact={isSidebarCollapsed} icon={CalendarDays} />
-              {isAdministrator && <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />}
-              <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
-              {isAdministrator && <SidebarLink to="/admin" label="Admin" compact={isSidebarCollapsed} icon={Shield} />}
-            </nav>
+            <SidebarNavigation compact={isSidebarCollapsed} isAdministrator={isAdministrator} />
 
             <div className="shrink-0 border-t border-white/10 p-3" />
             </div>
