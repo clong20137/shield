@@ -22,7 +22,7 @@ interface MessageThread {
   contactLastSeenAt: string;
   contactReceivesMessages: boolean;
   subject: string;
-  latestMessage: UserMessage;
+  latestMessage?: UserMessage;
   messages: UserMessage[];
   unreadCount: number;
 }
@@ -174,9 +174,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [recipientQuery, setRecipientQuery] = useState('');
   const [recipientResults, setRecipientResults] = useState<User[]>([]);
-  const [selectedRecipients, setSelectedRecipients] = useState<User[]>([]);
-  const [composeBody, setComposeBody] = useState('');
-  const [composeAttachments, setComposeAttachments] = useState<File[]>([]);
+  const [draftRecipient, setDraftRecipient] = useState<User | null>(null);
   const [isRecipientSearching, setIsRecipientSearching] = useState(false);
   const [messagePendingDelete, setMessagePendingDelete] = useState<UserMessage | null>(null);
   const [threadPendingDelete, setThreadPendingDelete] = useState<MessageThread | null>(null);
@@ -260,7 +258,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
         if (isMounted) {
           setRecipientResults(
             response.data
-              .filter((user: User) => !selectedRecipients.some((recipient) => recipient.id === user.id))
+              .filter((user: User) => user.id !== currentUser.id)
               .slice(0, 8),
           );
         }
@@ -277,7 +275,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       isMounted = false;
       window.clearTimeout(timer);
     };
-  }, [isComposeOpen, recipientQuery, selectedRecipients]);
+  }, [currentUser.id, isComposeOpen, recipientQuery]);
 
   const threads = useMemo<MessageThread[]>(() => {
     const threadMap = new Map<string, MessageThread>();
@@ -317,25 +315,41 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
     });
 
     return Array.from(threadMap.values()).sort(
-      (a, b) => new Date(b.latestMessage.createdAt).getTime() - new Date(a.latestMessage.createdAt).getTime(),
+      (a, b) => new Date(b.latestMessage?.createdAt || 0).getTime() - new Date(a.latestMessage?.createdAt || 0).getTime(),
     );
   }, [currentUser.id, inboxMessages, sentMessages]);
 
   const filteredThreads = useMemo(() => {
+    const existingDraftThread = draftRecipient && threads.some((thread) => thread.id === draftRecipient.id);
+    const draftThread: MessageThread | null = draftRecipient && !existingDraftThread
+      ? {
+          id: draftRecipient.id,
+          contactName: `${draftRecipient.firstName || ''} ${draftRecipient.lastName || ''}`.trim() || draftRecipient.email || 'New Chat',
+          contactEmail: draftRecipient.email || '',
+          contactRank: draftRecipient.rank || '',
+          contactProfilePictureUrl: draftRecipient.profilePictureUrl || '',
+          contactLastSeenAt: draftRecipient.lastSeenAt || new Date().toISOString(),
+          contactReceivesMessages: draftRecipient.receivesMessages !== false,
+          subject: 'Message',
+          messages: [],
+          unreadCount: 0,
+        }
+      : null;
+    const visibleThreads = draftThread ? [draftThread, ...threads] : threads;
     const term = searchTerm.trim().toLowerCase();
-    if (!term) return threads;
+    if (!term) return visibleThreads;
 
-    return threads.filter((thread) =>
+    return visibleThreads.filter((thread) =>
       [
         thread.contactName,
         thread.contactEmail,
         thread.subject,
-        thread.latestMessage.body,
+        thread.latestMessage?.body || '',
       ].join(' ').toLowerCase().includes(term),
     );
-  }, [searchTerm, threads]);
+  }, [draftRecipient, searchTerm, threads]);
 
-  const selectedThread = threads.find((thread) => thread.id === selectedThreadId) || null;
+  const selectedThread = filteredThreads.find((thread) => thread.id === selectedThreadId) || null;
   const selectedThreadAcceptsMessages = selectedThread?.contactReceivesMessages !== false;
   const getThreadPresence = (thread: MessageThread) => {
     const realtimePresence = presenceByAccount[thread.id];
@@ -414,6 +428,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
         event.stopImmediatePropagation();
         setIsComposeOpen(false);
         setIsEmojiPickerOpen(false);
+        setRecipientQuery('');
+        setRecipientResults([]);
       }
     };
 
@@ -457,49 +473,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       });
       setReplyBody('');
       setReplyAttachments([]);
-      await loadMessages(false);
-      window.dispatchEvent(new CustomEvent('shield:messages-updated'));
-    } catch (err) {
-      console.error(err);
-      onToast('error', getApiErrorMessage(err, 'Failed to send message.'));
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const sendNewMessage = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (selectedRecipients.length === 0 || !composeBody.trim()) {
-      onToast('error', 'Choose at least one recipient and enter a message.');
-      return;
-    }
-
-    const blockedRecipients = selectedRecipients.filter((recipient) => recipient.receivesMessages === false);
-    if (blockedRecipients.length > 0) {
-      onToast('error', `${blockedRecipients.map((recipient) => `${recipient.firstName} ${recipient.lastName}`.trim() || recipient.email).join(', ')} not accepting messages.`);
-      return;
-    }
-
-    setIsSending(true);
-    try {
-      await Promise.all(
-        selectedRecipients.map((recipient) =>
-          messageService.send({
-            senderAccountId: currentUser.id,
-            recipientUserId: recipient.id,
-            subject: 'Message',
-            body: withAttachmentSummary(composeBody, composeAttachments),
-          }),
-        ),
-      );
-      setSelectedThreadId(selectedRecipients[0].id);
-      setSelectedRecipients([]);
-      setRecipientQuery('');
-      setComposeBody('');
-      setComposeAttachments([]);
-      setIsComposeOpen(false);
-      setIsEmojiPickerOpen(false);
+      setDraftRecipient(null);
       await loadMessages(false);
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
     } catch (err) {
@@ -612,6 +586,75 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
               />
             </div>
           )}
+          {isComposeOpen && (
+            <div className="border-b border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-sm font-bold text-gray-900 dark:text-gray-100">New Chat</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsComposeOpen(false);
+                    setRecipientQuery('');
+                    setRecipientResults([]);
+                  }}
+                  className="icon-close-button h-8 w-8"
+                  aria-label="Close new chat search"
+                  title="Close"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <input
+                value={recipientQuery}
+                onChange={(event) => setRecipientQuery(event.target.value)}
+                placeholder="Type a name"
+                className="w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-900"
+              />
+              {(recipientResults.length > 0 || isRecipientSearching) && (
+                <div className="mt-3 max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                  {isRecipientSearching ? (
+                    <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>
+                  ) : (
+                    recipientResults.map((user) => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        disabled={user.receivesMessages === false}
+                        onClick={() => {
+                          setDraftRecipient(user);
+                          setSelectedThreadId(user.id);
+                          setRecipientQuery('');
+                          setRecipientResults([]);
+                          setIsComposeOpen(false);
+                          setReplyBody('');
+                          setReplyAttachments([]);
+                        }}
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-red-50 disabled:text-danger dark:hover:bg-gray-800 dark:disabled:bg-red-950"
+                      >
+                        {user.profilePictureUrl ? (
+                          <img
+                            src={getAssetUrl(user.profilePictureUrl)}
+                            alt={`${user.firstName} ${user.lastName}`}
+                            onError={handleAssetImageError}
+                            className="h-9 w-9 rounded-full object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-xs font-bold text-accent">
+                            {getInitials(`${user.firstName} ${user.lastName}`)}
+                          </span>
+                        )}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold">{user.firstName} {user.lastName}</span>
+                          <span className="block truncate text-xs text-gray-500">{user.email || user.peNumber}</span>
+                        </span>
+                        {user.receivesMessages === false && <span className="text-xs font-bold text-danger">Off</span>}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           {isLoading ? (
             <div className="loading">Loading conversations...</div>
           ) : filteredThreads.length === 0 ? (
@@ -641,12 +684,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                             {presence.label}
                           </p>
                         </div>
-                        <span className="shrink-0 text-xs text-gray-400">{formatMessageTime(thread.latestMessage.createdAt)}</span>
+                        <span className="shrink-0 text-xs text-gray-400">{thread.latestMessage ? formatMessageTime(thread.latestMessage.createdAt) : 'New'}</span>
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <p className="line-clamp-1 min-w-0 text-sm text-gray-500 dark:text-gray-400">
-                          {thread.latestMessage.senderAccountId === currentUser.id ? 'You: ' : ''}
-                          {thread.latestMessage.body}
+                          {thread.latestMessage ? `${thread.latestMessage.senderAccountId === currentUser.id ? 'You: ' : ''}${thread.latestMessage.body}` : 'Start typing on the right'}
                         </p>
                         {thread.unreadCount > 0 && (
                           <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
@@ -658,6 +700,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                     <button
                       type="button"
                       onClick={() => setThreadPendingDelete(thread)}
+                      disabled={!thread.latestMessage}
                       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-danger dark:hover:bg-red-950"
                       aria-label="Delete conversation"
                       title="Delete conversation"
@@ -671,12 +714,16 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
           )}
           <button
             type="button"
-            onClick={() => setIsComposeOpen(true)}
+            onClick={() => {
+              setIsComposeOpen((value) => !value);
+              setRecipientQuery('');
+              setRecipientResults([]);
+            }}
             className="absolute bottom-4 right-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary-500 text-white shadow-lg hover:bg-primary-600"
             aria-label="New message"
             title="New message"
           >
-            <Plus size={22} />
+            {isComposeOpen ? <X size={22} /> : <Plus size={22} />}
           </button>
         </section>
 
@@ -722,6 +769,14 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
               </div>
 
               <div className="flex-1 space-y-4 overflow-y-auto bg-gray-50 p-3 dark:bg-gray-950 sm:p-4">
+                {selectedThread.messages.length === 0 && (
+                  <div className="flex h-full min-h-48 items-center justify-center text-center">
+                    <div>
+                      <p className="text-sm font-bold text-gray-700 dark:text-gray-200">New chat with {selectedThread.contactName}</p>
+                      <p className="mt-1 text-xs font-semibold text-gray-400">Type below to send the first message.</p>
+                    </div>
+                  </div>
+                )}
                 {selectedThread.messages.map((message, index) => {
                   const isMine = message.senderAccountId === currentUser.id;
                   const previousMessage = selectedThread.messages[index - 1];
@@ -835,154 +890,6 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
         </section>
       </div>
 
-      {isComposeOpen && (
-        <div className="pointer-events-none absolute inset-x-3 bottom-3 z-[60] flex justify-end sm:right-5">
-          <form
-            onSubmit={sendNewMessage}
-            className="pointer-events-auto flex max-h-[min(680px,calc(100dvh-7rem))] w-full max-w-[440px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.28)] dark:border-gray-800 dark:bg-gray-900"
-          >
-            <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-950">
-              <div className="min-w-0">
-                <h2 className="truncate text-base font-bold text-gray-900 dark:text-gray-100">New Chat</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsComposeOpen(false);
-                  setIsEmojiPickerOpen(false);
-                }}
-                className="icon-close-button"
-                aria-label="Close compose message"
-                title="Close"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-              <label className="flex items-center gap-2">
-                <span className="shrink-0 text-xs font-bold uppercase text-gray-400">To</span>
-                <input
-                  value={recipientQuery}
-                  onChange={(event) => {
-                    setRecipientQuery(event.target.value);
-                  }}
-                  placeholder={selectedRecipients.length > 0 ? 'Add another person' : 'Search by name'}
-                  className="min-w-0 flex-1 border-0 bg-transparent px-0 py-1 text-sm font-semibold text-gray-900 outline-none placeholder:text-gray-400 focus:ring-0 dark:text-gray-100"
-                />
-              </label>
-              {selectedRecipients.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {selectedRecipients.map((recipient) => (
-                    <span key={recipient.id} className={`inline-flex items-center gap-2 rounded-full py-1 pl-1 pr-2 text-xs font-bold ${recipient.receivesMessages === false ? 'bg-red-100 text-danger dark:bg-red-950 dark:text-red-200' : 'bg-accent/10 text-accent'}`}>
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-[10px] shadow-sm dark:bg-gray-950">
-                        {getInitials(`${recipient.firstName} ${recipient.lastName}`)}
-                      </span>
-                      <span>{recipient.firstName} {recipient.lastName}</span>
-                      {recipient.receivesMessages === false && ' - Not accepting messages'}
-                      <button
-                        type="button"
-                        onClick={() => setSelectedRecipients((recipients) => recipients.filter((item) => item.id !== recipient.id))}
-                        className="text-accent hover:text-danger"
-                        aria-label={`Remove ${recipient.firstName} ${recipient.lastName}`}
-                      >
-                        <X size={12} />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-              {(recipientResults.length > 0 || isRecipientSearching) && (
-                <div className="mt-3 max-h-52 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow dark:border-gray-700 dark:bg-gray-950">
-                  {isRecipientSearching ? (
-                    <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>
-                  ) : (
-                    recipientResults.map((user) => (
-                      <button
-                        key={user.id}
-                        type="button"
-                        disabled={user.receivesMessages === false}
-                        onClick={() => {
-                          setSelectedRecipients((recipients) => [...recipients, user]);
-                          setRecipientQuery('');
-                          setRecipientResults([]);
-                        }}
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-red-50 disabled:text-danger dark:hover:bg-gray-800 dark:disabled:bg-red-950"
-                      >
-                        {user.profilePictureUrl ? (
-                          <img
-                            src={getAssetUrl(user.profilePictureUrl)}
-                            alt={`${user.firstName} ${user.lastName}`}
-                            onError={handleAssetImageError}
-                            className="h-9 w-9 rounded-full object-cover"
-                          />
-                        ) : (
-                          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-xs font-bold text-accent">
-                            {getInitials(`${user.firstName} ${user.lastName}`)}
-                          </span>
-                        )}
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-semibold">{user.firstName} {user.lastName}</span>
-                          <span className="block truncate text-xs text-gray-500">{user.email || user.peNumber}</span>
-                        </span>
-                        {user.receivesMessages === false && <span className="text-xs font-bold text-danger">Off</span>}
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-
-            <label className="min-h-0 flex-1 bg-gray-50 p-4 dark:bg-gray-950">
-              <MentionTextarea
-                value={composeBody}
-                onChange={setComposeBody}
-                placeholder="iMessage"
-                className="h-44 min-h-44 w-full resize-none rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm leading-6 shadow-sm dark:border-gray-800 dark:bg-gray-900"
-              />
-            </label>
-
-            {composeAttachments.length > 0 && (
-              <div className="border-t border-gray-100 px-4 py-2 dark:border-gray-800">
-                <div className="flex flex-wrap gap-2">
-                {composeAttachments.map((file) => (
-                  <span key={`${file.name}-${file.size}`} className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">
-                    {file.name}
-                  </span>
-                ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center gap-2 border-t border-gray-200 px-3 py-3 dark:border-gray-800">
-              <button
-                type="button"
-                onClick={() => setIsEmojiPickerOpen(true)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl hover:bg-gray-100 dark:hover:bg-gray-800"
-                aria-label="Add emoji"
-              >
-                {emojiButtonLabel}
-              </button>
-              <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800" title="Attach files">
-                <Paperclip size={18} />
-                <input
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={(event) => setComposeAttachments(Array.from(event.target.files || []))}
-                />
-              </label>
-              <div className="min-w-0 flex-1 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-400 dark:border-gray-700 dark:bg-gray-950">
-                <span className="block truncate">{composeBody.trim() || 'Ready to send'}</span>
-              </div>
-              <button type="submit" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50" disabled={isSending} aria-label="Send message" title={isSending ? 'Sending' : 'Send Message'}>
-                <Send size={16} />
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
       {threadPendingDelete && (
         <div className="modal-backdrop fixed inset-0 z-[70] flex items-end justify-center bg-black/45 sm:items-center">
           <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
@@ -1039,7 +946,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       {isEmojiPickerOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onClick={() => setIsEmojiPickerOpen(false)}>
           <div className="max-h-[80dvh] max-w-[calc(100vw-1rem)] overflow-auto rounded-lg bg-white p-2 shadow-xl sm:max-h-[90vh]" onClick={(event) => event.stopPropagation()}>
-            <EmojiPicker onEmojiClick={isComposeOpen ? (emojiData) => setComposeBody((body) => `${body}${emojiData.emoji}`) : addEmojiToReply} />
+            <EmojiPicker onEmojiClick={addEmojiToReply} />
           </div>
         </div>
       )}

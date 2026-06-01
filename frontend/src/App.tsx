@@ -1550,7 +1550,7 @@ function NotFoundPage() {
 }
 
 function getInitialMessagesModalPosition() {
-  const width = Math.min(window.innerWidth - 16, 768);
+  const width = Math.min(window.innerWidth - 16, 900);
   return {
     x: Math.max(8, (window.innerWidth - width) / 2),
     y: Math.max(8, window.innerHeight * 0.08),
@@ -2150,8 +2150,8 @@ function App() {
     }
 
     const handlePointerMove = (event: PointerEvent) => {
-      const width = messagesModalRef.current?.offsetWidth || Math.min(window.innerWidth - 16, 768);
-      const height = messagesModalRef.current?.offsetHeight || Math.min(window.innerHeight - 16, 620);
+      const width = messagesModalRef.current?.offsetWidth || Math.min(window.innerWidth - 16, 900);
+      const height = messagesModalRef.current?.offsetHeight || Math.min(window.innerHeight - 16, 680);
       const maxX = Math.max(8, window.innerWidth - width - 8);
       const maxY = Math.max(8, window.innerHeight - height - 8);
       const nextX = Math.min(Math.max(8, event.clientX - messagesModalDragOffsetRef.current.x), maxX);
@@ -2172,8 +2172,8 @@ function App() {
 
   useEffect(() => {
     const keepMessagesModalInView = () => {
-      const width = messagesModalRef.current?.offsetWidth || Math.min(window.innerWidth - 16, 768);
-      const height = messagesModalRef.current?.offsetHeight || Math.min(window.innerHeight - 16, 620);
+      const width = messagesModalRef.current?.offsetWidth || Math.min(window.innerWidth - 16, 900);
+      const height = messagesModalRef.current?.offsetHeight || Math.min(window.innerHeight - 16, 680);
       const maxX = Math.max(8, window.innerWidth - width - 8);
       const maxY = Math.max(8, window.innerHeight - height - 8);
       setMessagesModalPosition((currentPosition) => ({
@@ -3241,7 +3241,7 @@ function App() {
             <div className="pointer-events-none fixed inset-0 z-50">
               <div
                 ref={messagesModalRef}
-                className={getModalWindowClass(closingModal === 'messages', `pointer-events-auto fixed flex h-[74dvh] w-[calc(100vw-1rem)] max-w-3xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:h-[72vh] sm:p-4 ${isDraggingMessagesModal ? 'cursor-grabbing' : ''}`)}
+                className={getModalWindowClass(closingModal === 'messages', `pointer-events-auto fixed flex h-[72dvh] max-h-[calc(100dvh-1rem)] min-h-[420px] w-[min(900px,calc(100vw-1rem))] min-w-[min(360px,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] resize flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:p-4 ${isDraggingMessagesModal ? 'cursor-grabbing' : ''}`)}
                 style={{ left: messagesModalPosition.x, top: messagesModalPosition.y }}
               >
                 <div
@@ -3250,7 +3250,7 @@ function App() {
                 >
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Messages</h2>
-                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Drag to move. Conversations update automatically.</p>
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Drag to move. Resize from the corner.</p>
                   </div>
                   <button
                     type="button"
