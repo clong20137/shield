@@ -1,5 +1,5 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Download, Eye, FileSpreadsheet, RefreshCw, Search, X } from 'lucide-react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { ChevronDown, ChevronLeft, ChevronRight, Download, Eye, FileSpreadsheet, Search, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { auditService, AuditLog, AuditLogFilters, AuditLogResponse } from '../services/api';
 
@@ -109,6 +109,7 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
   const [draftSearch, setDraftSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
@@ -136,9 +137,16 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
     return () => window.removeEventListener('shield:audit-updated', handleAuditUpdate);
   }, [filters, loadLogs]);
 
-  const activeFilterCount = useMemo(() => {
-    return ['q', 'actorId', 'action', 'entityType', 'from', 'to'].filter((key) => Boolean(filters[key as keyof AuditLogFilters])).length;
-  }, [filters]);
+  useEffect(() => {
+    if (!isExportMenuOpen) {
+      return undefined;
+    }
+
+    const closeExportMenu = () => setIsExportMenuOpen(false);
+    window.addEventListener('click', closeExportMenu);
+
+    return () => window.removeEventListener('click', closeExportMenu);
+  }, [isExportMenuOpen]);
 
   const submitSearch = (event: FormEvent) => {
     event.preventDefault();
@@ -149,12 +157,8 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
     setFilters((current) => ({ ...current, [field]: value || undefined, page: field === 'page' ? Number(value) : 1 }));
   };
 
-  const clearFilters = () => {
-    setDraftSearch('');
-    setFilters({ page: 1, pageSize: filters.pageSize || 50 });
-  };
-
   const exportFilteredLogs = async (format: 'csv' | 'xlsx') => {
+    setIsExportMenuOpen(false);
     setExporting(true);
     try {
       const firstPage = await auditService.getAll({ ...filters, page: 1, pageSize: 500 });
@@ -199,11 +203,11 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <form onSubmit={submitSearch} className="flex min-w-0 flex-1 gap-2">
               <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
                 <input
                   value={draftSearch}
                   onChange={(event) => setDraftSearch(event.target.value)}
-                  className="w-full rounded border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm dark:border-gray-700 dark:bg-gray-950"
+                  className="w-full rounded border border-gray-300 bg-white py-2 pl-12 pr-3 text-sm dark:border-gray-700 dark:bg-gray-950"
                   placeholder="Search actor, action, entity, details, or IP"
                 />
               </div>
@@ -212,47 +216,50 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
               </button>
             </form>
 
-            <div className="flex items-center gap-2">
+            <div className="relative flex items-center justify-end">
               <button
                 type="button"
-                onClick={() => loadLogs(filters)}
-                className="btn-secondary h-10 w-10 p-0"
-                title="Refresh"
-                aria-label="Refresh audit logs"
-              >
-                <RefreshCw size={17} />
-              </button>
-              <button
-                type="button"
-                onClick={() => exportFilteredLogs('csv')}
-                disabled={exporting || response.total === 0}
-                className="btn-secondary h-10 px-3 text-sm font-semibold"
-                title="Export CSV"
-                aria-label="Export audit logs as CSV"
-              >
-                <Download size={16} className="mr-2" /> CSV
-              </button>
-              <button
-                type="button"
-                onClick={() => exportFilteredLogs('xlsx')}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setIsExportMenuOpen((value) => !value);
+                }}
                 disabled={exporting || response.total === 0}
                 className="btn-primary h-10 px-3 text-sm font-semibold"
-                title="Export XLSX"
-                aria-label="Export audit logs as XLSX"
+                aria-expanded={isExportMenuOpen}
+                aria-haspopup="menu"
+                aria-label="Export audit logs"
+                title={exporting ? 'Exporting' : 'Export audit logs'}
               >
-                <FileSpreadsheet size={16} className="mr-2" /> XLSX
+                <Download size={16} className="mr-2" />
+                Export
+                <ChevronDown size={15} className="ml-2" />
               </button>
-              <button
-                type="button"
-                onClick={clearFilters}
-                className={`h-10 rounded border px-3 text-sm font-semibold transition ${
-                  activeFilterCount > 0
-                    ? 'border-red-300 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40'
-                    : 'border-gray-300 text-gray-500 dark:border-gray-700 dark:text-gray-400'
-                }`}
-              >
-                Clear {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
-              </button>
+              {isExportMenuOpen && (
+                <div className="absolute right-0 top-12 z-20 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-950" role="menu">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void exportFilteredLogs('csv');
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+                    role="menuitem"
+                  >
+                    <Download size={15} /> CSV
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void exportFilteredLogs('xlsx');
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+                    role="menuitem"
+                  >
+                    <FileSpreadsheet size={15} /> XLSX
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
