@@ -571,11 +571,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       <div
         className={
           isModalView
-            ? 'grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-[340px_minmax(0,1fr)]'
-            : 'grid min-h-[70vh] grid-cols-1 gap-4 xl:h-[calc(100vh-230px)] xl:grid-cols-[380px_minmax(0,1fr)]'
+            ? 'grid min-h-0 flex-1 grid-cols-1 gap-2 xl:grid-cols-[minmax(150px,34%)_minmax(0,1fr)]'
+            : 'grid min-h-[70vh] grid-cols-1 gap-4 xl:h-[calc(100vh-230px)] xl:grid-cols-[minmax(260px,30%)_minmax(0,1fr)]'
         }
       >
-        <section className="relative flex max-h-[34vh] min-h-[14rem] flex-col overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 xl:max-h-none">
+        <section className="relative flex max-h-[34vh] min-h-[14rem] min-w-0 flex-col overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 xl:max-h-none">
           {isModalView && (
             <div className="border-b border-gray-200 p-3 dark:border-gray-800">
               <input
@@ -629,17 +629,17 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                           setReplyBody('');
                           setReplyAttachments([]);
                         }}
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-red-50 disabled:text-danger dark:hover:bg-gray-800 dark:disabled:bg-red-950"
+                    className="flex w-full items-center gap-2 px-2 py-2 text-left text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-red-50 disabled:text-danger dark:hover:bg-gray-800 dark:disabled:bg-red-950 sm:gap-3 sm:px-3"
                       >
                         {user.profilePictureUrl ? (
                           <img
                             src={getAssetUrl(user.profilePictureUrl)}
                             alt={`${user.firstName} ${user.lastName}`}
                             onError={handleAssetImageError}
-                            className="h-9 w-9 rounded-full object-cover"
+                            className="h-8 w-8 rounded-full object-cover sm:h-9 sm:w-9"
                           />
                         ) : (
-                          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-xs font-bold text-accent">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/10 text-xs font-bold text-accent sm:h-9 sm:w-9">
                             {getInitials(`${user.firstName} ${user.lastName}`)}
                           </span>
                         )}
@@ -666,7 +666,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                 return (
                   <div
                     key={thread.id}
-                    className={`flex items-center gap-2 px-3 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                    className={`flex min-w-0 items-center gap-1.5 px-2 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 sm:gap-2 sm:px-3 sm:py-3 ${
                       selectedThreadId === thread.id ? 'bg-accent/10' : ''
                     }`}
                   >
@@ -675,7 +675,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                       onClick={() => setSelectedThreadId(thread.id)}
                       className="min-h-11 min-w-0 flex-1 text-left"
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className={`truncate text-sm ${thread.unreadCount > 0 ? 'font-bold text-primary-500' : 'font-semibold text-gray-800 dark:text-gray-100'}`}>
                             <span className="truncate">{thread.contactName}</span>
@@ -684,7 +684,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                             {presence.label}
                           </p>
                         </div>
-                        <span className="shrink-0 text-xs text-gray-400">{thread.latestMessage ? formatMessageTime(thread.latestMessage.createdAt) : 'New'}</span>
+                        <span className="shrink-0 text-[11px] text-gray-400 sm:text-xs">{thread.latestMessage ? formatMessageTime(thread.latestMessage.createdAt) : 'New'}</span>
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <p className="line-clamp-1 min-w-0 text-sm text-gray-500 dark:text-gray-400">
@@ -701,7 +701,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                       type="button"
                       onClick={() => setThreadPendingDelete(thread)}
                       disabled={!thread.latestMessage}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-danger dark:hover:bg-red-950"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-danger dark:hover:bg-red-950 sm:h-9 sm:w-9"
                       aria-label="Delete conversation"
                       title="Delete conversation"
                     >
@@ -727,7 +727,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
           </button>
         </section>
 
-        <section className="flex min-h-0 flex-col rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+        <section className="flex min-h-0 min-w-0 flex-col rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
           {!selectedThread ? (
             <div className="empty-state">Select a conversation to view it.</div>
           ) : (
