@@ -868,7 +868,7 @@ function GlobalSearch({ compact }: { compact: boolean }) {
                     src={getAssetUrl(user.profilePictureUrl)}
                     alt={`${user.firstName} ${user.lastName}`}
                     onError={handleAssetImageError}
-                    className="mr-3 h-10 w-10 flex-shrink-0 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-700"
+                    className="mr-3 h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-700"
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold">
@@ -1548,6 +1548,14 @@ function NotFoundPage() {
   );
 }
 
+function getInitialMessagesModalPosition() {
+  const width = Math.min(window.innerWidth - 24, 1024);
+  return {
+    x: Math.max(12, (window.innerWidth - width) / 2),
+    y: Math.max(12, window.innerHeight * 0.06),
+  };
+}
+
 function getModalBackdropClass(isClosing: boolean, tint = 'bg-black/50') {
   return `${isClosing ? 'modal-backdrop-exit' : 'modal-backdrop'} fixed inset-0 z-50 flex items-end justify-center sm:items-center ${tint}`;
 }
@@ -2110,6 +2118,8 @@ function App() {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
+  const [messagesModalPosition, setMessagesModalPosition] = useState(getInitialMessagesModalPosition);
+  const [isDraggingMessagesModal, setIsDraggingMessagesModal] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [isAdminConsoleOpen, setIsAdminConsoleOpen] = useState(false);
   const [adminConsoleTab, setAdminConsoleTab] = useState<AdminConsoleTab>('general');
@@ -2132,6 +2142,49 @@ function App() {
 
     return () => window.removeEventListener('resize', collapseSidebarOnMobile);
   }, []);
+
+  useEffect(() => {
+    if (!isDraggingMessagesModal) {
+      return undefined;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const width = messagesModalRef.current?.offsetWidth || Math.min(window.innerWidth - 24, 1024);
+      const height = messagesModalRef.current?.offsetHeight || Math.min(window.innerHeight - 24, 760);
+      const maxX = Math.max(12, window.innerWidth - width - 12);
+      const maxY = Math.max(12, window.innerHeight - height - 12);
+      const nextX = Math.min(Math.max(12, event.clientX - messagesModalDragOffsetRef.current.x), maxX);
+      const nextY = Math.min(Math.max(12, event.clientY - messagesModalDragOffsetRef.current.y), maxY);
+      setMessagesModalPosition({ x: nextX, y: nextY });
+    };
+
+    const stopDragging = () => setIsDraggingMessagesModal(false);
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', stopDragging);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', stopDragging);
+    };
+  }, [isDraggingMessagesModal]);
+
+  useEffect(() => {
+    const keepMessagesModalInView = () => {
+      const width = messagesModalRef.current?.offsetWidth || Math.min(window.innerWidth - 24, 1024);
+      const height = messagesModalRef.current?.offsetHeight || Math.min(window.innerHeight - 24, 760);
+      const maxX = Math.max(12, window.innerWidth - width - 12);
+      const maxY = Math.max(12, window.innerHeight - height - 12);
+      setMessagesModalPosition((currentPosition) => ({
+        x: Math.min(Math.max(12, currentPosition.x), maxX),
+        y: Math.min(Math.max(12, currentPosition.y), maxY),
+      }));
+    };
+
+    window.addEventListener('resize', keepMessagesModalInView);
+
+    return () => window.removeEventListener('resize', keepMessagesModalInView);
+  }, []);
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const [bugReports, setBugReports] = useState<BugReport[]>([]);
   const previousMessageUnreadCount = useRef<number | null>(null);
@@ -2139,6 +2192,8 @@ function App() {
   const rateLimitToastRef = useRef(0);
   const notificationRequestRef = useRef(0);
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
+  const messagesModalRef = useRef<HTMLDivElement | null>(null);
+  const messagesModalDragOffsetRef = useRef({ x: 0, y: 0 });
 
   const showToast = (type: ToastType, message: string, options: { saveToNotifications?: boolean } = {}) => {
     if (/too many|rate limit/iu.test(message)) {
@@ -2657,7 +2712,25 @@ function App() {
       return;
     }
 
+    setMessagesModalPosition(getInitialMessagesModalPosition());
     setIsMessagesModalOpen(true);
+  };
+
+  const startDraggingMessagesModal = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    const rect = messagesModalRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return;
+    }
+
+    messagesModalDragOffsetRef.current = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+    setIsDraggingMessagesModal(true);
   };
 
   const toggleCalendarModal = () => {
@@ -3160,14 +3233,22 @@ function App() {
           </div>
           {isMessagesModalOpen && currentUser && (
             <div className={getModalBackdropClass(closingModal === 'messages', 'bg-black/60')}>
-              <div className={getModalWindowClass(closingModal === 'messages', 'flex h-[96dvh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:h-[94vh] sm:p-4')}>
-                <div className="mb-3 flex items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
+              <div
+                ref={messagesModalRef}
+                className={getModalWindowClass(closingModal === 'messages', `fixed flex h-[90dvh] w-[calc(100vw-1.5rem)] max-w-5xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:h-[86vh] sm:p-4 ${isDraggingMessagesModal ? 'cursor-grabbing' : ''}`)}
+                style={{ left: messagesModalPosition.x, top: messagesModalPosition.y }}
+              >
+                <div
+                  onPointerDown={startDraggingMessagesModal}
+                  className={`mb-3 flex touch-none cursor-grab select-none items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800 ${isDraggingMessagesModal ? 'cursor-grabbing' : ''}`}
+                >
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Messages</h2>
-                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Conversations update automatically.</p>
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Drag to move. Conversations update automatically.</p>
                   </div>
                   <button
                     type="button"
+                    onPointerDown={(event) => event.stopPropagation()}
                     onClick={() => closeModal('messages')}
                     className="icon-close-button"
                     aria-label="Close messages"

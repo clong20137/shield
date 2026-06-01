@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LockKeyhole, Pencil, Trash2, X } from 'lucide-react';
+import { Pencil, Trash2, X } from 'lucide-react';
 import { getAssetUrl, handleAssetImageError, User } from '../services/api';
 import { RankBadge, isImportantRank } from './RankBadge';
 
@@ -8,7 +8,6 @@ interface UserTableProps {
   loading?: boolean;
   onUserSelect?: (user: User) => void;
   onEdit?: (user: User) => void;
-  onResetPassword?: (user: User) => void;
   onDelete?: (userId: string) => void;
   canEdit?: boolean;
 }
@@ -18,7 +17,6 @@ export const UserTable: React.FC<UserTableProps> = ({
   loading = false,
   onUserSelect,
   onEdit,
-  onResetPassword,
   onDelete,
   canEdit = false,
 }) => {
@@ -39,7 +37,6 @@ export const UserTable: React.FC<UserTableProps> = ({
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-primary-500 text-white">
-              <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Photo</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Last Name</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">First Name</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">PE #</th>
@@ -61,14 +58,16 @@ export const UserTable: React.FC<UserTableProps> = ({
                 }`}
               >
                 <td className="px-4 py-3">
-                  <img
-                    src={getAssetUrl(user.profilePictureUrl)}
-                    alt={`${user.firstName} ${user.lastName}`}
-                    onError={handleAssetImageError}
-                    className="h-10 w-10 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-700"
-                  />
+                  <div className="flex min-w-0 items-center gap-3">
+                    <img
+                      src={getAssetUrl(user.profilePictureUrl)}
+                      alt={`${user.firstName} ${user.lastName}`}
+                      onError={handleAssetImageError}
+                      className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-700"
+                    />
+                    <span className="truncate font-semibold">{user.lastName}</span>
+                  </div>
                 </td>
-                <td className="px-4 py-3">{user.lastName}</td>
                 <td className="px-4 py-3">{user.firstName}</td>
                 <td className="px-4 py-3">{user.peNumber}</td>
                 <td className="px-4 py-3">
@@ -96,17 +95,6 @@ export const UserTable: React.FC<UserTableProps> = ({
                       }}
                     >
                       <Pencil size={14} />
-                    </button>
-                    <button
-                      className="btn btn-secondary text-xs"
-                      aria-label={`Reset password for ${user.firstName} ${user.lastName}`}
-                      title="Reset Password"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onResetPassword?.(user);
-                      }}
-                    >
-                      <LockKeyhole size={14} />
                     </button>
                     <button
                       className="btn btn-danger text-xs"

@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Download, FileSpreadsheet, Eye, RefreshCw, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Eye, FileSpreadsheet, RefreshCw, Search, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { auditService, AuditLog, AuditLogFilters, AuditLogResponse } from '../services/api';
 
@@ -36,19 +36,20 @@ function stringifyDetails(details: string | null) {
 
 function formatActionLabel(action: string): string {
   return action
-    .replace(/_/gu, ' ')
+    .replace(/[._-]/gu, ' ')
     .replace(/([a-z])([A-Z])/gu, '$1 $2')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .replace(/\b\w/gu, (char) => char.toUpperCase());
 }
 
 function summarizeDetails(details: string | null): string {
   const rendered = stringifyDetails(details);
-
   if (rendered === 'N/A') {
-    return 'No additional details provided.';
+    return 'No extra details.';
   }
 
-  return rendered.length > 140 ? `${rendered.slice(0, 137)}…` : rendered;
+  return rendered.length > 140 ? `${rendered.slice(0, 137)}...` : rendered;
 }
 
 function csvCell(value: unknown) {
@@ -56,8 +57,8 @@ function csvCell(value: unknown) {
   return `"${text.replace(/"/gu, '""')}"`;
 }
 
-function downloadXlsx(logs: AuditLog[]) {
-  const rows = [
+function getExportRows(logs: AuditLog[]) {
+  return [
     ['Time', 'Actor', 'Action', 'Entity Type', 'Entity ID', 'IP Address', 'Details'],
     ...logs.map((log) => [
       new Date(log.createdAt).toLocaleString(),
@@ -69,36 +70,10 @@ function downloadXlsx(logs: AuditLog[]) {
       stringifyDetails(log.details),
     ]),
   ];
-
-  const worksheet = XLSX.utils.aoa_to_sheet(rows);
-  worksheet['!cols'] = [
-    { wch: 22 },
-    { wch: 24 },
-    { wch: 28 },
-    { wch: 18 },
-    { wch: 18 },
-    { wch: 18 },
-    { wch: 60 },
-  ];
-
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Audit Log');
-  XLSX.writeFile(workbook, `shield-audit-log-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 function downloadCsv(logs: AuditLog[]) {
-  const rows = [
-    ['Time', 'Actor', 'Action', 'Entity Type', 'Entity ID', 'IP Address', 'Details'],
-    ...logs.map((log) => [
-      new Date(log.createdAt).toLocaleString(),
-      log.actorName || log.actorId || 'System',
-      log.action,
-      log.entityType,
-      log.entityId || '',
-      log.ipAddress || '',
-      stringifyDetails(log.details),
-    ]),
-  ];
+  const rows = getExportRows(logs);
   const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -109,6 +84,23 @@ function downloadCsv(logs: AuditLog[]) {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function downloadXlsx(logs: AuditLog[]) {
+  const worksheet = XLSX.utils.aoa_to_sheet(getExportRows(logs));
+  worksheet['!cols'] = [
+    { wch: 22 },
+    { wch: 26 },
+    { wch: 30 },
+    { wch: 18 },
+    { wch: 20 },
+    { wch: 18 },
+    { wch: 70 },
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Audit Log');
+  XLSX.writeFile(workbook, `shield-audit-log-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
@@ -438,7 +430,7 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
               </div>
               <div className="rounded border border-gray-200 p-3 dark:border-gray-800">
                 <div className="text-xs font-bold uppercase text-gray-500">Action</div>
-                <div className="mt-1 font-semibold">{selectedLog.action}</div>
+                <div className="mt-1 font-semibold">{formatActionLabel(selectedLog.action)}</div>
               </div>
               <div className="rounded border border-gray-200 p-3 dark:border-gray-800">
                 <div className="text-xs font-bold uppercase text-gray-500">Entity</div>

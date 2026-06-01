@@ -391,20 +391,6 @@ export class AuthAccountModel {
     }
   }
 
-  static async adminResetPassword(accountId: string, newPassword: string): Promise<boolean> {
-    const conn = await pool.getConnection();
-    try {
-      const [result] = await conn.query<ResultSetHeader>(
-        'UPDATE users SET `passwordHash` = ?, `mustChangePassword` = 1, `updatedAt` = ? WHERE `id` = ? AND `passwordHash` IS NOT NULL',
-        [hashPassword(newPassword), new Date(), accountId]
-      );
-
-      return result.affectedRows > 0;
-    } finally {
-      conn.release();
-    }
-  }
-
   static async createTwoFactorSetup(accountId: string): Promise<{ secret: string; otpauthUrl: string } | null> {
     const conn = await pool.getConnection();
     try {

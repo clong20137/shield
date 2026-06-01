@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
-import { Camera, ChevronLeft, ChevronRight, Save, Send, X } from 'lucide-react';
+import { Camera, Save, Send, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { useSearchParams } from 'react-router-dom';
 import { AuthAccount, AuthRole, authService, getAssetUrl, handleAssetImageError, messageService, userService, User, UserFilters } from '../services/api';
@@ -73,15 +73,9 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
-
 const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number>(25);
-  const [sortKey, setSortKey] = useState<'lastName' | 'firstName' | 'peNumber' | 'district' | 'rank'>('lastName');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentQuery, setCurrentQuery] = useState('');
@@ -90,8 +84,6 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [messageBody, setMessageBody] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
-  const [isDraggingMessageModal, setIsDraggingMessageModal] = useState(false);
-  const [messageModalPosition, setMessageModalPosition] = useState({ x: 0, y: 0 });
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState<Partial<User>>({});
   const [supervisorOptions, setSupervisorOptions] = useState<User[]>([]);
@@ -99,10 +91,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
-  const [passwordResetTarget, setPasswordResetTarget] = useState<{ user: User; password: string } | null>(null);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
-  const messageModalRef = useRef<HTMLFormElement | null>(null);
-  const dragOffsetRef = useRef({ x: 0, y: 0 });
   const searchRequestRef = useRef(0);
   const [addressLookupQuery, setAddressLookupQuery] = useState('');
   const [searchParams] = useSearchParams();
@@ -111,143 +100,15 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const isAdministrator = currentUser?.role === 'administrator';
   const canEditProfilePictures = isAdministrator || currentUser?.permissions?.includes('users:profile-picture');
 
-  useEffect(() => {
-    if (!messageRecipient) {
-      setMessageModalPosition({ x: Math.max(12, window.innerWidth - 420), y: 112 });
-      return;
-    }
-
-    setMessageModalPosition((current) => ({
-      x: current.x || Math.max(12, window.innerWidth - 420),
-      y: current.y || 112,
-    }));
-  }, [messageRecipient]);
-
-  useEffect(() => {
-    if (!isDraggingMessageModal) {
-      return undefined;
-    }
-
-    const handlePointerMove = (event: PointerEvent) => {
-      const width = messageModalRef.current?.offsetWidth || 384;
-      const height = messageModalRef.current?.offsetHeight || 500;
-      const maxX = Math.max(12, window.innerWidth - width - 12);
-      const maxY = Math.max(12, window.innerHeight - height - 12);
-      const nextX = Math.min(Math.max(12, event.clientX - dragOffsetRef.current.x), maxX);
-      const nextY = Math.min(Math.max(12, event.clientY - dragOffsetRef.current.y), maxY);
-
-      setMessageModalPosition({ x: nextX, y: nextY });
-    };
-
-    const stopDragging = () => setIsDraggingMessageModal(false);
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', stopDragging);
-
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', stopDragging);
-    };
-  }, [isDraggingMessageModal]);
-
-  useEffect(() => {
-    const keepInView = () => {
-      const width = messageModalRef.current?.offsetWidth || 384;
-      const height = messageModalRef.current?.offsetHeight || 500;
-      const maxX = Math.max(12, window.innerWidth - width - 12);
-      const maxY = Math.max(12, window.innerHeight - height - 12);
-
-      setMessageModalPosition((current) => ({
-        x: Math.min(Math.max(12, current.x), maxX),
-        y: Math.min(Math.max(12, current.y), maxY),
-      }));
-    };
-
-    window.addEventListener('resize', keepInView);
-
-    return () => window.removeEventListener('resize', keepInView);
-  }, []);
-
-  const startMessageModalDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) {
-      return;
-    }
-
-    const rect = messageModalRef.current?.getBoundingClientRect();
-    if (!rect) {
-      return;
-    }
-
-    dragOffsetRef.current = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    };
-    setIsDraggingMessageModal(true);
-  };
-
-  const totalResults = users.length;
-  const totalPages = Math.max(1, Math.ceil(totalResults / pageSize));
-  const sortedUsers = useMemo(() => {
-    const sorted = [...users].sort((left, right) => {
-      const leftValue = String(left[sortKey] || '').trim().toLowerCase();
-      const rightValue = String(right[sortKey] || '').trim().toLowerCase();
-
-      if (leftValue === rightValue) {
-        return String(left.lastName || '').trim().toLowerCase().localeCompare(String(right.lastName || '').trim().toLowerCase());
-      }
-
-      return leftValue.localeCompare(rightValue);
-    });
-
-    return sortDirection === 'desc' ? sorted.reverse() : sorted;
-  }, [sortDirection, sortKey, users]);
-
-  const pagedUsers = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return sortedUsers.slice(start, start + pageSize);
-  }, [page, pageSize, sortedUsers]);
-
-  useEffect(() => {
-    const storedSortKey = window.localStorage.getItem('shield_search_sort_key');
-    const storedSortDirection = window.localStorage.getItem('shield_search_sort_direction');
-
-    if (storedSortKey === 'lastName' || storedSortKey === 'firstName' || storedSortKey === 'peNumber' || storedSortKey === 'district' || storedSortKey === 'rank') {
-      setSortKey(storedSortKey);
-    }
-
-    if (storedSortDirection === 'asc' || storedSortDirection === 'desc') {
-      setSortDirection(storedSortDirection);
-    }
-  }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem('shield_search_sort_key', sortKey);
-  }, [sortKey]);
-
-  useEffect(() => {
-    window.localStorage.setItem('shield_search_sort_direction', sortDirection);
-  }, [sortDirection]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [pageSize]);
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
-
   const handleSearch = async (query: string) => {
     const requestId = searchRequestRef.current + 1;
     searchRequestRef.current = requestId;
     setCurrentQuery(query);
-    setPage(1);
     setLoading(true);
     setError(null);
     try {
       if (!query.trim()) {
-        const response = await userService.getAll(1, 1000);
+        const response = await userService.getAll(1, 100);
         if (requestId !== searchRequestRef.current) return;
         setUsers(response.data.data);
       } else {
@@ -266,7 +127,6 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   };
 
   const handleFilterChange = async (filters: UserFilters) => {
-    setPage(1);
     setLoading(true);
     setError(null);
     try {
@@ -277,27 +137,6 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       console.error(err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleResetPassword = async (user: User) => {
-    if (!isAdministrator) {
-      onToast('error', 'Administrator permission required.');
-      return;
-    }
-
-    const confirmed = window.confirm(`Generate a temporary password for ${user.firstName} ${user.lastName}? The user will be required to change it on their next sign-in.`);
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      const response = await authService.adminResetPassword(user.id);
-      setPasswordResetTarget({ user, password: response.data.password });
-      onToast('success', 'Temporary password generated successfully.');
-    } catch (err) {
-      console.error(err);
-      onToast('error', getErrorMessage(err, 'Failed to reset password.'));
     }
   };
 
@@ -623,119 +462,14 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
         placeholder="Search by email, name, PE #, district, badge, radio, phone, or ID..."
       />
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <div className="text-sm text-gray-600 dark:text-gray-300">
-          Showing {totalResults === 0 ? 0 : (page - 1) * pageSize + 1}-{Math.min(page * pageSize, totalResults)} of {totalResults} users
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
-            <span>Sort</span>
-            <select
-              value={sortKey}
-              onChange={(event) => setSortKey(event.target.value as 'lastName' | 'firstName' | 'peNumber' | 'district' | 'rank')}
-              className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-950"
-            >
-              <option value="lastName">Last Name</option>
-              <option value="firstName">First Name</option>
-              <option value="peNumber">PE #</option>
-              <option value="district">District</option>
-              <option value="rank">Rank</option>
-            </select>
-          </label>
-
-          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
-            <span>Direction</span>
-            <select
-              value={sortDirection}
-              onChange={(event) => setSortDirection(event.target.value as 'asc' | 'desc')}
-              className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-950"
-            >
-              <option value="asc">A-Z</option>
-              <option value="desc">Z-A</option>
-            </select>
-          </label>
-          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
-            <span>Per page</span>
-            <select
-              value={pageSize}
-              onChange={(event) => setPageSize(Number(event.target.value))}
-              className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-950"
-            >
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <option key={size} value={size}>{size}</option>
-              ))}
-            </select>
-          </label>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
-              disabled={page === 1}
-              className="inline-flex h-9 w-9 items-center justify-center rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:hover:bg-gray-800"
-              aria-label="Previous page"
-              title="Previous page"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="text-sm text-gray-700 dark:text-gray-200">Page {page} of {totalPages}</span>
-            <button
-              type="button"
-              onClick={() => setPage((currentPage) => Math.min(totalPages, currentPage + 1))}
-              disabled={page === totalPages}
-              className="inline-flex h-9 w-9 items-center justify-center rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:hover:bg-gray-800"
-              aria-label="Next page"
-              title="Next page"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
-
       <UserTable
-        users={pagedUsers}
+        users={users}
         loading={loading}
         onUserSelect={openSelectedUser}
         onEdit={openEditUser}
-        onResetPassword={handleResetPassword}
         onDelete={handleDelete}
         canEdit={isAdministrator}
       />
-
-      {passwordResetTarget && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Temporary Password Generated</h2>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-              A temporary password was created for {passwordResetTarget.user.firstName} {passwordResetTarget.user.lastName}. They will be asked to change it at their next sign-in.
-            </p>
-            <div className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/50 dark:text-amber-100">
-              <div className="font-semibold">Temporary password</div>
-              <code className="mt-1 block break-all rounded bg-white/70 px-2 py-1 font-mono text-base dark:bg-black/30">{passwordResetTarget.password}</code>
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setPasswordResetTarget(null)} className="btn-secondary">Close</button>
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(passwordResetTarget.password);
-                    onToast('success', 'Password copied to clipboard.');
-                  } catch (error) {
-                    console.error('Failed to copy generated password:', error);
-                    onToast('error', 'Copy failed. Please copy it manually.');
-                  }
-                }}
-                className="btn-primary"
-              >
-                Copy Password
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -745,8 +479,6 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
               onClose={() => setSelectedUser(null)}
               onEdit={openEditUser}
               onMessage={setMessageRecipient}
-              onOpenUser={openSelectedUser}
-              onToast={onToast}
               canEdit={isAdministrator}
             />
           </div>
@@ -965,24 +697,16 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       )}
 
       {messageRecipient && (
-        <div className="pointer-events-none fixed inset-0 z-[60] bg-black/60">
-          <form
-            ref={messageModalRef}
-            onSubmit={handleSendMessage}
-            className="pointer-events-auto fixed w-[min(100vw-1rem,28rem)] max-w-md rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900"
-            style={{ left: messageModalPosition.x, top: messageModalPosition.y }}
-          >
-            <div
-              onPointerDown={startMessageModalDrag}
-              className={`mb-5 flex cursor-grab touch-none items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800 ${isDraggingMessageModal ? 'cursor-grabbing' : ''}`}
-            >
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <form onSubmit={handleSendMessage} className="w-full max-w-xl rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900">
+            <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2>Send Message</h2>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   To {messageRecipient.firstName} {messageRecipient.lastName}
                 </p>
               </div>
-              <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={() => setMessageRecipient(null)} className="icon-close-button" aria-label="Close message modal" title="Close">
+              <button type="button" onClick={() => setMessageRecipient(null)} className="icon-close-button" aria-label="Close message modal" title="Close">
                 <X size={20} />
               </button>
             </div>

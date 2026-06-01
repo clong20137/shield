@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Check, Copy, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
-import { DeviceRecord, deviceService, getAssetUrl, handleAssetImageError, MileageSummary, mileageService, userService, User } from '../services/api';
+import { Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
+import { DeviceRecord, deviceService, getAssetUrl, handleAssetImageError, MileageSummary, mileageService, User } from '../services/api';
 import { RankBadge } from './RankBadge';
 
 interface UserDetailProps {
@@ -8,85 +8,17 @@ interface UserDetailProps {
   onClose?: () => void;
   onEdit?: (user: User) => void;
   onMessage?: (user: User) => void;
-  onOpenUser?: (user: User) => void;
-  onToast?: (type: 'success' | 'error' | 'info', message: string) => void;
   canEdit?: boolean;
 }
 
-function DetailRow({
-  label,
-  value,
-  copyValue,
-  onClick,
-  onToast,
-}: {
-  label: string;
-  value?: string | boolean | null;
-  copyValue?: string | null;
-  onClick?: () => void;
-  onToast?: (type: 'success' | 'error' | 'info', message: string) => void;
-}) {
+function DetailRow({ label, value }: { label: string; value?: string | boolean | null }) {
   const displayValue = value === true ? 'Yes' : value === false ? 'No' : value || 'N/A';
 
   return (
     <div className="flex justify-between gap-4 py-2 border-b border-gray-200 dark:border-gray-800">
       <span className="font-semibold text-gray-700 dark:text-gray-300">{label}:</span>
-      <div className="flex items-center gap-2 text-right">
-        {onClick ? (
-          <button
-            type="button"
-            onClick={onClick}
-            className="text-right text-primary-500 hover:underline dark:text-blue-100"
-          >
-            {displayValue}
-          </button>
-        ) : (
-          <span className="text-right text-gray-600 dark:text-gray-300">{displayValue}</span>
-        )}
-        {copyValue && <CopyValueButton value={copyValue} onToast={onToast} />}
-      </div>
+      <span className="text-right text-gray-600 dark:text-gray-300">{displayValue}</span>
     </div>
-  );
-}
-
-function CopyValueButton({ value, onToast, className }: { value: string; onToast?: (type: 'success' | 'error' | 'info', message: string) => void; className?: string; }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(value);
-      } else {
-        const helper = document.createElement('textarea');
-        helper.value = value;
-        helper.setAttribute('readonly', '');
-        helper.style.position = 'fixed';
-        helper.style.top = '-9999px';
-        document.body.appendChild(helper);
-        helper.select();
-        document.execCommand('copy');
-        document.body.removeChild(helper);
-      }
-
-      setCopied(true);
-      onToast?.('success', 'Copied to clipboard');
-      window.setTimeout(() => setCopied(false), 1200);
-    } catch (error) {
-      console.error('Failed to copy value:', error);
-      onToast?.('error', 'Copy failed. Please try again.');
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      className={['inline-flex h-7 w-7 items-center justify-center rounded border border-gray-300 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800', className].filter(Boolean).join(' ')}
-      aria-label="Copy value"
-      title="Copy value"
-    >
-      {copied ? <Check size={14} className="text-green-600 dark:text-green-400" /> : <Copy size={14} />}
-    </button>
   );
 }
 
@@ -118,7 +50,7 @@ function isUserOnline(lastSeenAt?: string | null): boolean {
   return Date.now() - value < 2 * 60 * 1000;
 }
 
-export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, onMessage, onOpenUser, onToast, canEdit = false }) => {
+export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, onMessage, canEdit = false }) => {
   const callNumber = user.departmentPhoneNumber || user.personalPhoneNumber;
   const callHref = callNumber ? `tel:${callNumber.replace(/[^\d+]/gu, '')}` : undefined;
   const emailHref = user.email ? `mailto:${user.email}` : undefined;
@@ -236,37 +168,13 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
     ? 'border-green-400 shadow-[0_0_0_4px_rgba(34,197,94,0.22)]'
     : 'border-white';
 
-  const openSupervisorProfile = async () => {
-    if (!user.supervisor || !onOpenUser) {
-      return;
-    }
-
-    try {
-      const response = await userService.search(user.supervisor.trim());
-      const candidates = Array.isArray(response.data) ? response.data : [];
-      const supervisor = candidates.find((candidate) => candidate.id !== user.id && [
-        `${candidate.firstName} ${candidate.lastName}`,
-        candidate.email,
-        candidate.badgeNumber,
-        candidate.peNumber,
-        candidate.id,
-      ].map((value) => value?.trim().toLowerCase()).includes(user.supervisor.trim().toLowerCase())) || candidates[0];
-
-      if (supervisor) {
-        onOpenUser(supervisor);
-      }
-    } catch (error) {
-      console.error('Failed to open supervisor profile:', error);
-    }
-  };
-
   return (
     <div className="bg-white rounded-lg shadow-xl overflow-hidden dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
       <div className="bg-primary-500 text-white px-5 py-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 flex-1 items-center gap-4">
           <div className="relative shrink-0">
-            {isOnline && <span className="profile-online-ring absolute inset-0 rounded-full border-2 border-green-300/70" />}
+            {isOnline && <span className="absolute inset-0 animate-ping rounded-full border-4 border-green-300 opacity-60" />}
           {user.profilePictureUrl ? (
             <img
               src={getAssetUrl(user.profilePictureUrl)}
@@ -313,10 +221,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
             <div className="mt-2">
               <RankBadge rank={user.rank} />
             </div>
-            <div className="mt-2 flex items-center gap-2">
-              <p className="text-sm text-blue-100">{user.email || 'No email on file'}</p>
-              {user.email && <CopyValueButton value={user.email} onToast={onToast} className="border border-white/20 bg-white/10 text-white hover:bg-white/20" />}
-            </div>
+            <p className="mt-2 text-sm text-blue-100">{user.email || 'No email on file'}</p>
             <p className="mt-1 text-sm text-blue-100">PE {user.peNumber || 'N/A'} - {user.district || 'No district'}</p>
           </div>
         </div>
@@ -366,7 +271,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
       <div className="px-5 py-6 max-h-[70vh] overflow-y-auto">
         {activeTab === 'personal' && <DetailSection title="Personal Information">
           <DetailRow label="Name" value={`${user.firstName} ${user.lastName}`} />
-          <DetailRow label="Email" value={user.email} copyValue={user.email || null} onToast={onToast} />
+          <DetailRow label="Email" value={user.email} />
           <DetailRow label="Sex" value={user.sex} />
           <DetailRow label="Marital Status" value={user.maritalStatus} />
           <DetailRow label="Race" value={user.race} />
@@ -392,19 +297,19 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
             </span>
           </div>
           <DetailRow label="Assigned To" value={user.assignedTo} />
-          <DetailRow label="Supervisor" value={user.supervisor} onClick={onOpenUser ? openSupervisorProfile : undefined} onToast={onToast} />
+          <DetailRow label="Supervisor" value={user.supervisor} />
           <DetailRow label="Active" value={user.isActive} />
           <DetailRow label="Type Details" value={user.typeDetails} />
         </DetailSection>}
 
         {activeTab === 'contact' && <DetailSection title="Contact">
-          <DetailRow label="Personal Phone" value={user.personalPhoneNumber} copyValue={user.personalPhoneNumber || null} onToast={onToast} />
-          <DetailRow label="Department Phone" value={user.departmentPhoneNumber} copyValue={user.departmentPhoneNumber || null} onToast={onToast} />
+          <DetailRow label="Personal Phone" value={user.personalPhoneNumber} />
+          <DetailRow label="Department Phone" value={user.departmentPhoneNumber} />
           <DetailRow label="Residential Address" value={user.residentialAddress} />
           <DetailRow label="Mailing Address" value={user.mailingAddress} />
           <DetailRow label="Emergency Contact" value={user.emergencyContactName} />
           <DetailRow label="Emergency Relationship" value={user.emergencyContactRelationship} />
-          <DetailRow label="Emergency Phone" value={user.emergencyContactPhone} copyValue={user.emergencyContactPhone || null} onToast={onToast} />
+          <DetailRow label="Emergency Phone" value={user.emergencyContactPhone} />
         </DetailSection>}
 
         {activeTab === 'devices' && <DetailSection title="Assigned Devices">
