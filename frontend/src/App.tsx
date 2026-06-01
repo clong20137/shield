@@ -1,18 +1,20 @@
-import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Bell, Bug, Calculator, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import SearchPage from './pages/SearchPage';
-import ReportsPage from './pages/ReportsPage';
-import DashboardPage from './pages/DashboardPage';
-import DashboardPostPage from './pages/DashboardPostPage';
-import { AccountSettingsPage } from './pages/AccountSettingsPage';
-import AdminConsolePage, { AdminConsoleTab } from './pages/AdminConsolePage';
-import DeviceManagementPage from './pages/DeviceManagementPage';
-import MessageInboxPage from './pages/MessageInboxPage';
-import CalendarPage from './pages/CalendarPage';
-import PerformanceEvaluationsPage from './pages/PerformanceEvaluationsPage';
+import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, clearAuthToken, getAppEventsUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, notificationService, quickLaunchService, RegistrationSettings, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+
+const SearchPage = lazy(() => import('./pages/SearchPage'));
+const ReportsPage = lazy(() => import('./pages/ReportsPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const DashboardPostPage = lazy(() => import('./pages/DashboardPostPage'));
+const AccountSettingsPage = lazy(() => import('./pages/AccountSettingsPage').then((module) => ({ default: module.AccountSettingsPage })));
+const AdminConsolePage = lazy(() => import('./pages/AdminConsolePage'));
+const DeviceManagementPage = lazy(() => import('./pages/DeviceManagementPage'));
+const MessageInboxPage = lazy(() => import('./pages/MessageInboxPage'));
+const CalendarPage = lazy(() => import('./pages/CalendarPage'));
+const PerformanceEvaluationsPage = lazy(() => import('./pages/PerformanceEvaluationsPage'));
 
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
@@ -1545,6 +1547,14 @@ function NotFoundPage() {
           Back to Dashboard
         </NavLink>
       </section>
+    </div>
+  );
+}
+
+function PageLoader({ label = 'Loading...' }: { label?: string }) {
+  return (
+    <div className="flex min-h-48 items-center justify-center">
+      <div className="loading">{label}</div>
     </div>
   );
 }
@@ -3189,34 +3199,36 @@ function App() {
 
             <main className="flex-1 overflow-y-auto px-3 pb-36 pt-5 dark:bg-gray-950 sm:px-6 sm:pb-48 sm:pt-8">
               <div data-onboarding-target="workspace" className="min-h-[calc(100vh-12rem)]">
-                <Routes>
-                  <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
-                  {currentUser && <Route path="/updates/:postId" element={<DashboardPostPage currentUser={currentUser} />} />}
-                  {currentUser && <Route path="/messages" element={<MessagesRouteRedirect onOpenMessages={() => setIsMessagesModalOpen(true)} />} />}
-                  {currentUser && <Route path="/calendar" element={<CalendarRouteRedirect onOpenCalendar={() => setIsCalendarModalOpen(true)} />} />}
-                  <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
-                  {currentUser && (
-                    <Route
-                      path="/evaluations"
-                      element={<PerformanceEvaluationsPage currentUser={currentUser} onToast={showToast} getErrorMessage={getErrorMessage} />}
-                    />
-                  )}
-                  <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
-                  {currentUser && isAdministrator && (
-                    <Route path="/admin" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('general')} />} />
-                  )}
-                  {currentUser && isAdministrator && (
-                    <Route path="/users/create" element={<CreateUserRouteRedirect onOpenCreateUser={() => openAdminConsole('create-user')} />} />
-                  )}
-                  <Route path="/reports" element={<ReportsPage currentUser={currentUser} onToast={showToast} getErrorMessage={getErrorMessage} />} />
-                  {currentUser && isAdministrator && (
-                    <Route path="/audit" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('audit')} />} />
-                  )}
-                  {currentUser && isAdministrator && (
-                    <Route path="/permissions" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('permissions')} />} />
-                  )}
-                  <Route path="*" element={<NotFoundPage />} />
-                </Routes>
+                <Suspense fallback={<PageLoader label="Loading page..." />}>
+                  <Routes>
+                    <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
+                    {currentUser && <Route path="/updates/:postId" element={<DashboardPostPage currentUser={currentUser} />} />}
+                    {currentUser && <Route path="/messages" element={<MessagesRouteRedirect onOpenMessages={() => setIsMessagesModalOpen(true)} />} />}
+                    {currentUser && <Route path="/calendar" element={<CalendarRouteRedirect onOpenCalendar={() => setIsCalendarModalOpen(true)} />} />}
+                    <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
+                    {currentUser && (
+                      <Route
+                        path="/evaluations"
+                        element={<PerformanceEvaluationsPage currentUser={currentUser} onToast={showToast} getErrorMessage={getErrorMessage} />}
+                      />
+                    )}
+                    <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
+                    {currentUser && isAdministrator && (
+                      <Route path="/admin" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('general')} />} />
+                    )}
+                    {currentUser && isAdministrator && (
+                      <Route path="/users/create" element={<CreateUserRouteRedirect onOpenCreateUser={() => openAdminConsole('create-user')} />} />
+                    )}
+                    <Route path="/reports" element={<ReportsPage currentUser={currentUser} onToast={showToast} getErrorMessage={getErrorMessage} />} />
+                    {currentUser && isAdministrator && (
+                      <Route path="/audit" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('audit')} />} />
+                    )}
+                    {currentUser && isAdministrator && (
+                      <Route path="/permissions" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('permissions')} />} />
+                    )}
+                    <Route path="*" element={<NotFoundPage />} />
+                  </Routes>
+                </Suspense>
               </div>
               <QuickLaunchTray
                 isAdministrator={isAdministrator}
@@ -3263,7 +3275,9 @@ function App() {
                   </button>
                 </div>
                 <div className="min-h-0 flex-1">
-                  <MessageInboxPage currentUser={currentUser} onToast={showToast} isModalView />
+                  <Suspense fallback={<PageLoader label="Loading messages..." />}>
+                    <MessageInboxPage currentUser={currentUser} onToast={showToast} isModalView />
+                  </Suspense>
                 </div>
               </div>
             </div>
@@ -3286,7 +3300,9 @@ function App() {
                   </button>
                 </div>
                 <div className="min-h-0 flex-1">
-                  <CalendarPage currentUser={currentUser} onOpenCalculator={() => setIsCalculatorOpen(true)} onAccountUpdate={handleAccountUpdate} useMilitaryTime={messagePreferences.useMilitaryTime} />
+                  <Suspense fallback={<PageLoader label="Loading calendar..." />}>
+                    <CalendarPage currentUser={currentUser} onOpenCalculator={() => setIsCalculatorOpen(true)} onAccountUpdate={handleAccountUpdate} useMilitaryTime={messagePreferences.useMilitaryTime} />
+                  </Suspense>
                 </div>
               </div>
             </div>
@@ -3309,34 +3325,36 @@ function App() {
                   </button>
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-                  <AccountSettingsPage
-                    account={currentUser}
-                    messagePreferences={messagePreferences}
-                    onReceiveMessagesChange={handleReceiveMessagesChange}
-                    onMessageSoundChange={(playMessageSound) =>
-                      setMessagePreferences((preferences) => ({
-                        ...preferences,
-                        playMessageSound,
-                      }))
-                    }
-                    onMessageSoundSelect={(messageSound) =>
-                      setMessagePreferences((preferences) => ({
-                        ...preferences,
-                        messageSound,
-                      }))
-                    }
-                    onMilitaryTimeChange={(useMilitaryTime) =>
-                      setMessagePreferences((preferences) => ({
-                        ...preferences,
-                        useMilitaryTime,
-                      }))
-                    }
-                    onReplayGuide={replayGuide}
-                    onOpenEvaluations={() => closeModal('profile')}
-                    onAccountUpdate={handleAccountUpdate}
-                    onToast={showToast}
-                    getErrorMessage={getErrorMessage}
-                  />
+                  <Suspense fallback={<PageLoader label="Loading account settings..." />}>
+                    <AccountSettingsPage
+                      account={currentUser}
+                      messagePreferences={messagePreferences}
+                      onReceiveMessagesChange={handleReceiveMessagesChange}
+                      onMessageSoundChange={(playMessageSound) =>
+                        setMessagePreferences((preferences) => ({
+                          ...preferences,
+                          playMessageSound,
+                        }))
+                      }
+                      onMessageSoundSelect={(messageSound) =>
+                        setMessagePreferences((preferences) => ({
+                          ...preferences,
+                          messageSound,
+                        }))
+                      }
+                      onMilitaryTimeChange={(useMilitaryTime) =>
+                        setMessagePreferences((preferences) => ({
+                          ...preferences,
+                          useMilitaryTime,
+                        }))
+                      }
+                      onReplayGuide={replayGuide}
+                      onOpenEvaluations={() => closeModal('profile')}
+                      onAccountUpdate={handleAccountUpdate}
+                      onToast={showToast}
+                      getErrorMessage={getErrorMessage}
+                    />
+                  </Suspense>
                 </div>
               </div>
             </div>
@@ -3359,18 +3377,20 @@ function App() {
                   </button>
                 </div>
                 <div className="min-h-0 flex-1">
-                  <AdminConsolePage
-                    account={currentUser}
-                    initialTab={adminConsoleTab}
-                    onAccountUpdate={handleAccountUpdate}
-                    onToast={showToast}
-                    getErrorMessage={getErrorMessage}
-                    onUserCreated={() => {
-                      setAdminConsoleTab('permissions');
-                    }}
-                    bugReports={bugReports}
-                    onBugStatusChange={updateBugStatus}
-                  />
+                  <Suspense fallback={<PageLoader label="Loading admin console..." />}>
+                    <AdminConsolePage
+                      account={currentUser}
+                      initialTab={adminConsoleTab}
+                      onAccountUpdate={handleAccountUpdate}
+                      onToast={showToast}
+                      getErrorMessage={getErrorMessage}
+                      onUserCreated={() => {
+                        setAdminConsoleTab('permissions');
+                      }}
+                      bugReports={bugReports}
+                      onBugStatusChange={updateBugStatus}
+                    />
+                  </Suspense>
                 </div>
               </div>
             </div>
