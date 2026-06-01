@@ -571,7 +571,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
   };
 
   return (
-    <div className={isModalView ? 'flex h-full min-h-0 flex-col' : ''}>
+    <div className={isModalView ? 'relative flex h-full min-h-0 flex-col' : 'relative'}>
       {!isModalView && (
       <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -836,12 +836,14 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       </div>
 
       {isComposeOpen && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center">
-          <form onSubmit={sendNewMessage} className="modal-window max-h-[96dvh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-4 shadow-xl dark:bg-gray-900 sm:max-h-[92vh] sm:p-6">
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <h2>New Message</h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Type a name and start a conversation.</p>
+        <div className="pointer-events-none absolute inset-x-3 bottom-3 z-[60] flex justify-end sm:right-5">
+          <form
+            onSubmit={sendNewMessage}
+            className="pointer-events-auto flex max-h-[min(680px,calc(100dvh-7rem))] w-full max-w-[440px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.28)] dark:border-gray-800 dark:bg-gray-900"
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-950">
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-bold text-gray-900 dark:text-gray-100">New Chat</h2>
               </div>
               <button
                 type="button"
@@ -853,17 +855,30 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                 aria-label="Close compose message"
                 title="Close"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <label className="mb-4 block">
-              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">To</span>
+            <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+              <label className="flex items-center gap-2">
+                <span className="shrink-0 text-xs font-bold uppercase text-gray-400">To</span>
+                <input
+                  value={recipientQuery}
+                  onChange={(event) => {
+                    setRecipientQuery(event.target.value);
+                  }}
+                  placeholder={selectedRecipients.length > 0 ? 'Add another person' : 'Search by name'}
+                  className="min-w-0 flex-1 border-0 bg-transparent px-0 py-1 text-sm font-semibold text-gray-900 outline-none placeholder:text-gray-400 focus:ring-0 dark:text-gray-100"
+                />
+              </label>
               {selectedRecipients.length > 0 && (
-                <div className="mb-2 flex flex-wrap gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   {selectedRecipients.map((recipient) => (
-                    <span key={recipient.id} className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${recipient.receivesMessages === false ? 'bg-red-100 text-danger dark:bg-red-950 dark:text-red-200' : 'bg-accent/10 text-accent'}`}>
-                      {recipient.firstName} {recipient.lastName}
+                    <span key={recipient.id} className={`inline-flex items-center gap-2 rounded-full py-1 pl-1 pr-2 text-xs font-bold ${recipient.receivesMessages === false ? 'bg-red-100 text-danger dark:bg-red-950 dark:text-red-200' : 'bg-accent/10 text-accent'}`}>
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-[10px] shadow-sm dark:bg-gray-950">
+                        {getInitials(`${recipient.firstName} ${recipient.lastName}`)}
+                      </span>
+                      <span>{recipient.firstName} {recipient.lastName}</span>
                       {recipient.receivesMessages === false && ' - Not accepting messages'}
                       <button
                         type="button"
@@ -877,16 +892,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                   ))}
                 </div>
               )}
-              <input
-                value={recipientQuery}
-                onChange={(event) => {
-                  setRecipientQuery(event.target.value);
-                }}
-                placeholder="Type a name to send a message..."
-                className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-              />
               {(recipientResults.length > 0 || isRecipientSearching) && (
-                <div className="mt-2 overflow-hidden rounded border border-gray-200 bg-white shadow dark:border-gray-700 dark:bg-gray-950">
+                <div className="mt-3 max-h-52 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow dark:border-gray-700 dark:bg-gray-950">
                   {isRecipientSearching ? (
                     <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>
                   ) : (
@@ -900,50 +907,63 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                           setRecipientQuery('');
                           setRecipientResults([]);
                         }}
-                        className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-red-50 disabled:text-danger dark:hover:bg-gray-800 dark:disabled:bg-red-950"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-red-50 disabled:text-danger dark:hover:bg-gray-800 dark:disabled:bg-red-950"
                       >
-                        <span className="font-semibold">{user.firstName} {user.lastName}</span>
-                        <span className="ml-2 text-gray-500">{user.email || user.peNumber}</span>
-                        {user.receivesMessages === false && (
-                          <span className="ml-2 text-xs font-bold text-danger">Not accepting messages</span>
+                        {user.profilePictureUrl ? (
+                          <img
+                            src={getAssetUrl(user.profilePictureUrl)}
+                            alt={`${user.firstName} ${user.lastName}`}
+                            onError={handleAssetImageError}
+                            className="h-9 w-9 rounded-full object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-xs font-bold text-accent">
+                            {getInitials(`${user.firstName} ${user.lastName}`)}
+                          </span>
                         )}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold">{user.firstName} {user.lastName}</span>
+                          <span className="block truncate text-xs text-gray-500">{user.email || user.peNumber}</span>
+                        </span>
+                        {user.receivesMessages === false && <span className="text-xs font-bold text-danger">Off</span>}
                       </button>
                     ))
                   )}
                 </div>
               )}
-            </label>
+            </div>
 
-            <label className="mb-4 block">
-              <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Message</span>
+            <label className="min-h-0 flex-1 bg-gray-50 p-4 dark:bg-gray-950">
               <MentionTextarea
                 value={composeBody}
                 onChange={setComposeBody}
-                placeholder="Message. Use @name, @email, or @PE to mention someone."
-                className="min-h-40 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                placeholder="iMessage"
+                className="h-44 min-h-44 w-full resize-none rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm leading-6 shadow-sm dark:border-gray-800 dark:bg-gray-900"
               />
             </label>
 
             {composeAttachments.length > 0 && (
-              <div className="mb-3 flex flex-wrap gap-2">
+              <div className="border-t border-gray-100 px-4 py-2 dark:border-gray-800">
+                <div className="flex flex-wrap gap-2">
                 {composeAttachments.map((file) => (
                   <span key={`${file.name}-${file.size}`} className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">
                     {file.name}
                   </span>
                 ))}
+                </div>
               </div>
             )}
 
-            <div className="mb-4 flex items-center gap-2">
+            <div className="flex items-center gap-2 border-t border-gray-200 px-3 py-3 dark:border-gray-800">
               <button
                 type="button"
                 onClick={() => setIsEmojiPickerOpen(true)}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-xl hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl hover:bg-gray-100 dark:hover:bg-gray-800"
                 aria-label="Add emoji"
               >
                 {emojiButtonLabel}
               </button>
-              <label className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-gray-100 text-primary-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700" title="Attach files">
+              <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800" title="Attach files">
                 <Paperclip size={18} />
                 <input
                   type="file"
@@ -952,11 +972,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                   onChange={(event) => setComposeAttachments(Array.from(event.target.files || []))}
                 />
               </label>
+              <div className="min-w-0 flex-1 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-400 dark:border-gray-700 dark:bg-gray-950">
+                <span className="block truncate">{composeBody.trim() || 'Ready to send'}</span>
+              </div>
+              <button type="submit" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50" disabled={isSending} aria-label="Send message" title={isSending ? 'Sending' : 'Send Message'}>
+                <Send size={16} />
+              </button>
             </div>
-
-            <button type="submit" className="btn-primary" disabled={isSending} aria-label="Send message" title={isSending ? 'Sending' : 'Send Message'}>
-              <Send size={16} />
-            </button>
           </form>
         </div>
       )}

@@ -1,4 +1,4 @@
-import { CSSProperties, FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Bell, Bug, Calculator, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
@@ -1114,7 +1114,7 @@ function QuickLaunchTray({
   isAdministrator,
   isSidebarCollapsed,
   badgeCounts,
-  activeModalApp,
+  activeModalApps,
   storageKey,
   accountId,
   onOpenMessages,
@@ -1125,7 +1125,7 @@ function QuickLaunchTray({
   isAdministrator: boolean;
   isSidebarCollapsed: boolean;
   badgeCounts: Partial<Record<QuickLaunchAppId, number>>;
-  activeModalApp: QuickLaunchAppId | null;
+  activeModalApps: QuickLaunchAppId[];
   storageKey: string;
   accountId?: string;
   onOpenMessages: () => void;
@@ -1148,9 +1148,10 @@ function QuickLaunchTray({
       .filter((slot): slot is QuickLaunchAppId => typeof slot === 'string'),
   );
   const editingExternalSlot = editingSlot !== null && isExternalQuickLaunchSlot(slots[editingSlot]) ? slots[editingSlot] : null;
+  const activeModalAppSet = useMemo(() => new Set(activeModalApps), [activeModalApps]);
 
   const isAppActive = (app: QuickLaunchApp) => {
-    if (app.id === activeModalApp) {
+    if (activeModalAppSet.has(app.id)) {
       return true;
     }
 
@@ -3221,7 +3222,12 @@ function App() {
                 isAdministrator={isAdministrator}
                 isSidebarCollapsed={isSidebarCollapsed}
                 badgeCounts={{ messages: messageUnreadCount }}
-                activeModalApp={isMessagesModalOpen ? 'messages' : isCalendarModalOpen ? 'calendar' : isCalculatorOpen ? 'calculator' : isAdminConsoleOpen && adminConsoleTab === 'create-user' ? 'create-user' : null}
+                activeModalApps={[
+                  ...(isMessagesModalOpen ? (['messages'] as const) : []),
+                  ...(isCalendarModalOpen ? (['calendar'] as const) : []),
+                  ...(isCalculatorOpen ? (['calculator'] as const) : []),
+                  ...(isAdminConsoleOpen && adminConsoleTab === 'create-user' ? (['create-user'] as const) : []),
+                ]}
                 storageKey={getQuickLaunchStorageKey(currentUser?.id || 'anonymous')}
                 accountId={currentUser?.id}
                 onOpenMessages={toggleMessagesModal}
