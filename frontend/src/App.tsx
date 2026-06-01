@@ -1549,10 +1549,10 @@ function NotFoundPage() {
 }
 
 function getInitialMessagesModalPosition() {
-  const width = Math.min(window.innerWidth - 24, 1024);
+  const width = Math.min(window.innerWidth - 16, 768);
   return {
-    x: Math.max(12, (window.innerWidth - width) / 2),
-    y: Math.max(12, window.innerHeight * 0.06),
+    x: Math.max(8, (window.innerWidth - width) / 2),
+    y: Math.max(8, window.innerHeight * 0.08),
   };
 }
 
@@ -2149,12 +2149,12 @@ function App() {
     }
 
     const handlePointerMove = (event: PointerEvent) => {
-      const width = messagesModalRef.current?.offsetWidth || Math.min(window.innerWidth - 24, 1024);
-      const height = messagesModalRef.current?.offsetHeight || Math.min(window.innerHeight - 24, 760);
-      const maxX = Math.max(12, window.innerWidth - width - 12);
-      const maxY = Math.max(12, window.innerHeight - height - 12);
-      const nextX = Math.min(Math.max(12, event.clientX - messagesModalDragOffsetRef.current.x), maxX);
-      const nextY = Math.min(Math.max(12, event.clientY - messagesModalDragOffsetRef.current.y), maxY);
+      const width = messagesModalRef.current?.offsetWidth || Math.min(window.innerWidth - 16, 768);
+      const height = messagesModalRef.current?.offsetHeight || Math.min(window.innerHeight - 16, 620);
+      const maxX = Math.max(8, window.innerWidth - width - 8);
+      const maxY = Math.max(8, window.innerHeight - height - 8);
+      const nextX = Math.min(Math.max(8, event.clientX - messagesModalDragOffsetRef.current.x), maxX);
+      const nextY = Math.min(Math.max(8, event.clientY - messagesModalDragOffsetRef.current.y), maxY);
       setMessagesModalPosition({ x: nextX, y: nextY });
     };
 
@@ -2171,13 +2171,13 @@ function App() {
 
   useEffect(() => {
     const keepMessagesModalInView = () => {
-      const width = messagesModalRef.current?.offsetWidth || Math.min(window.innerWidth - 24, 1024);
-      const height = messagesModalRef.current?.offsetHeight || Math.min(window.innerHeight - 24, 760);
-      const maxX = Math.max(12, window.innerWidth - width - 12);
-      const maxY = Math.max(12, window.innerHeight - height - 12);
+      const width = messagesModalRef.current?.offsetWidth || Math.min(window.innerWidth - 16, 768);
+      const height = messagesModalRef.current?.offsetHeight || Math.min(window.innerHeight - 16, 620);
+      const maxX = Math.max(8, window.innerWidth - width - 8);
+      const maxY = Math.max(8, window.innerHeight - height - 8);
       setMessagesModalPosition((currentPosition) => ({
-        x: Math.min(Math.max(12, currentPosition.x), maxX),
-        y: Math.min(Math.max(12, currentPosition.y), maxY),
+        x: Math.min(Math.max(8, currentPosition.x), maxX),
+        y: Math.min(Math.max(8, currentPosition.y), maxY),
       }));
     };
 
@@ -3232,10 +3232,10 @@ function App() {
             </main>
           </div>
           {isMessagesModalOpen && currentUser && (
-            <div className={getModalBackdropClass(closingModal === 'messages', 'bg-black/60')}>
+            <div className="pointer-events-none fixed inset-0 z-50">
               <div
                 ref={messagesModalRef}
-                className={getModalWindowClass(closingModal === 'messages', `fixed flex h-[90dvh] w-[calc(100vw-1.5rem)] max-w-5xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:h-[86vh] sm:p-4 ${isDraggingMessagesModal ? 'cursor-grabbing' : ''}`)}
+                className={getModalWindowClass(closingModal === 'messages', `pointer-events-auto fixed flex h-[74dvh] w-[calc(100vw-1rem)] max-w-3xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:h-[72vh] sm:p-4 ${isDraggingMessagesModal ? 'cursor-grabbing' : ''}`)}
                 style={{ left: messagesModalPosition.x, top: messagesModalPosition.y }}
               >
                 <div
