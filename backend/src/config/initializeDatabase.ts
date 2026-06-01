@@ -89,6 +89,7 @@ export async function initializeDatabase() {
       \`hasCompletedOnboarding\` BOOLEAN DEFAULT 0,
       \`twoFactorSecret\` VARCHAR(64),
       \`twoFactorEnabled\` BOOLEAN DEFAULT 0,
+      \`twoFactorRecoveryCodes\` TEXT,
       \`peNumber\` VARCHAR(50) UNIQUE,
       \`peopleSoftId\` VARCHAR(50),
       \`carNumber\` VARCHAR(50),
@@ -141,6 +142,7 @@ export async function initializeDatabase() {
   await ensureColumn('users', 'trooperDailyHiddenSections', '`trooperDailyHiddenSections` TEXT');
   await ensureColumn('users', 'twoFactorSecret', '`twoFactorSecret` VARCHAR(64)');
   await ensureColumn('users', 'twoFactorEnabled', '`twoFactorEnabled` BOOLEAN DEFAULT 0');
+  await ensureColumn('users', 'twoFactorRecoveryCodes', '`twoFactorRecoveryCodes` TEXT');
   await ensureColumn('users', 'peopleSoftId', '`peopleSoftId` VARCHAR(50)');
   await ensureColumn('users', 'radioNumber', '`radioNumber` VARCHAR(50)');
   await ensureColumn('users', 'personalPhoneNumber', '`personalPhoneNumber` VARCHAR(50)');
@@ -159,6 +161,7 @@ export async function initializeDatabase() {
   if (await tableExists('auth_accounts')) {
     await ensureColumn('auth_accounts', 'twoFactorSecret', '`twoFactorSecret` VARCHAR(64)');
     await ensureColumn('auth_accounts', 'twoFactorEnabled', '`twoFactorEnabled` BOOLEAN DEFAULT 0');
+    await ensureColumn('auth_accounts', 'twoFactorRecoveryCodes', '`twoFactorRecoveryCodes` TEXT');
     await ensureColumn('auth_accounts', 'role', "`role` VARCHAR(20) NOT NULL DEFAULT 'user'");
 
     await pool.query(`
@@ -173,13 +176,14 @@ export async function initializeDatabase() {
         u.twoFactorEnabled = CASE
           WHEN u.twoFactorEnabled = 1 THEN 1
           ELSE COALESCE(a.twoFactorEnabled, 0)
-        END
+        END,
+        u.twoFactorRecoveryCodes = COALESCE(u.twoFactorRecoveryCodes, a.twoFactorRecoveryCodes)
     `);
 
     await pool.query(`
       INSERT INTO users (
         \`id\`, \`firstName\`, \`lastName\`, \`email\`, \`displayName\`, \`passwordHash\`, \`role\`,
-        \`receivesMessages\`, \`twoFactorSecret\`, \`twoFactorEnabled\`, \`isActive\`, \`employmentType\`, \`status\`,
+        \`receivesMessages\`, \`twoFactorSecret\`, \`twoFactorEnabled\`, \`twoFactorRecoveryCodes\`, \`isActive\`, \`employmentType\`, \`status\`,
         \`createdAt\`, \`updatedAt\`
       )
       SELECT
@@ -197,6 +201,7 @@ export async function initializeDatabase() {
         1,
         a.\`twoFactorSecret\`,
         COALESCE(a.\`twoFactorEnabled\`, 0),
+        a.\`twoFactorRecoveryCodes\`,
         1,
         'Other',
         'Active',

@@ -284,6 +284,7 @@ export interface AuthResponse {
   account?: AuthAccount;
   requiresTwoFactor?: boolean;
   token?: string;
+  recoveryCodes?: string[];
 }
 
 export interface TwoFactorSetupResponse {

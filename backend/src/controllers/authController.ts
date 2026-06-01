@@ -791,22 +791,22 @@ export class AuthController {
         return res.status(400).json({ error: 'Account and verification code are required' });
       }
 
-      const account = await AuthAccountModel.enableTwoFactor(cleanAccountId, cleanCode);
+      const result = await AuthAccountModel.enableTwoFactor(cleanAccountId, cleanCode);
 
-      if (!account) {
+      if (!result) {
         return res.status(400).json({ error: 'Invalid verification code' });
       }
 
       await AuditLogModel.create({
-        actorId: account.id,
-        actorName: account.displayName || account.email,
+        actorId: result.account.id,
+        actorName: result.account.displayName || result.account.email,
         action: 'auth.2fa_enabled',
         entityType: 'user',
-        entityId: account.id,
-        details: JSON.stringify({ email: account.email }),
+        entityId: result.account.id,
+        details: JSON.stringify({ email: result.account.email, recoveryCodesIssued: result.recoveryCodes.length }),
         ...requestAuditFields(req),
       });
-      res.json({ account: await withPermissions(account) });
+      res.json({ account: await withPermissions(result.account), recoveryCodes: result.recoveryCodes });
     } catch (error) {
       console.error('Enable 2FA error:', error);
       res.status(500).json({ error: 'Failed to enable 2FA' });

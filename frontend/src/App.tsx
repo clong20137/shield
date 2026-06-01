@@ -251,10 +251,11 @@ function LoginSplash({
   }, [onLogin, onToast, ssoError, ssoToken]);
 
   useEffect(() => {
-    const cleanCode = twoFactorCode.replace(/\D/gu, '');
+    const cleanCode = twoFactorCode.replace(/[^A-Z0-9]/giu, '');
+    const isNumericCode = /^\d+$/u.test(cleanCode);
 
-    if (!requiresTwoFactor || mode !== 'login' || cleanCode.length !== 6 || isSubmitting) {
-      if (cleanCode.length !== 6) {
+    if (!requiresTwoFactor || mode !== 'login' || cleanCode.length !== 6 || !isNumericCode || isSubmitting) {
+      if (cleanCode.length !== 6 || !isNumericCode) {
         lastAutoSubmittedTwoFactorCodeRef.current = '';
       }
       return;
@@ -336,7 +337,7 @@ function LoginSplash({
     }
 
     if (requiresTwoFactor && !twoFactorCode.trim()) {
-      setError('Enter your 2FA code.');
+      setError('Enter your MFA code.');
       return;
     }
 
@@ -513,14 +514,14 @@ function LoginSplash({
 
             {requiresTwoFactor && mode === 'login' && (
               <label className="mb-6 block">
-                <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">2FA code</span>
+                <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">MFA code or recovery code</span>
                 <input
                   value={twoFactorCode}
-                  onChange={(event) => setTwoFactorCode(event.target.value.replace(/\D/gu, '').slice(0, 6))}
+                  onChange={(event) => setTwoFactorCode(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/gu, '').slice(0, 12))}
                   className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
                   autoComplete="one-time-code"
-                  inputMode="numeric"
-                  maxLength={6}
+                  inputMode="text"
+                  maxLength={12}
                 />
               </label>
             )}
@@ -1843,7 +1844,7 @@ const onboardingSteps: OnboardingStep[] = [
     target: 'profile-card',
     eyebrow: 'Profile',
     title: 'Open your profile',
-    body: 'Click your profile picture to update your photo, review your account, change your password, or set up authenticator app 2FA.',
+    body: 'Click your profile picture to update your photo, review your account, change your password, or set up authenticator app MFA.',
   },
   {
     target: 'navigation',
@@ -3098,7 +3099,7 @@ function App() {
                 </div>
                 {!isSidebarCollapsed && (
                   <div className="mt-3 rounded bg-black/15 px-3 py-2 text-xs font-semibold text-white">
-                    {currentUser?.role || 'user'} - {currentUser?.twoFactorEnabled ? '2FA enabled' : '2FA not enabled'}
+                    {currentUser?.role || 'user'} - {currentUser?.twoFactorEnabled ? 'MFA enabled' : 'MFA not enabled'}
                   </div>
                 )}
               </button>

@@ -54,6 +54,7 @@ interface AuthAccountRow extends RowDataPacket {
   passwordHash: string | null;
   twoFactorSecret: string | null;
   twoFactorEnabled: boolean | number;
+  twoFactorRecoveryCodes: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -64,6 +65,7 @@ const HASH_DIGEST = 'sha512';
 const TOTP_STEP_SECONDS = 30;
 const TOTP_DIGITS = 6;
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+const RECOVERY_CODE_COUNT = 10;
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -158,6 +160,41 @@ function verifyTotp(secret: string, code: string): boolean {
   }
 
   return false;
+}
+
+function normalizeRecoveryCode(code: string): string {
+  return code.toUpperCase().replace(/[^A-Z0-9]/gu, '');
+}
+
+function hashRecoveryCode(code: string): string {
+  return crypto.createHash('sha256').update(normalizeRecoveryCode(code)).digest('hex');
+}
+
+function generateRecoveryCodes(): string[] {
+  return Array.from({ length: RECOVERY_CODE_COUNT }, () => {
+    const value = crypto.randomBytes(5).toString('hex').toUpperCase();
+    return `${value.slice(0, 5)}-${value.slice(5)}`;
+  });
+}
+
+function parseRecoveryCodeHashes(value: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function isRecoveryCodeMatch(storedHash: string, attemptedHash: string): boolean {
+  const stored = Buffer.from(storedHash, 'hex');
+  const attempted = Buffer.from(attemptedHash, 'hex');
+
+  return stored.length === attempted.length && crypto.timingSafeEqual(stored, attempted);
 }
 
 function toPublicAccount(account: AuthAccountRow): AuthAccount {
@@ -342,8 +379,20 @@ export class AuthAccountModel {
           return { account: null, requiresTwoFactor: true };
         }
 
-        if (!verifyTotp(account.twoFactorSecret, twoFactorCode)) {
-          return { account: null, requiresTwoFactor: false };
+        const isValidTotp = verifyTotp(account.twoFactorSecret, twoFactorCode);
+        if (!isValidTotp) {
+          const attemptedRecoveryHash = hashRecoveryCode(twoFactorCode);
+          const recoveryCodeHashes = parseRecoveryCodeHashes(account.twoFactorRecoveryCodes);
+          const matchedRecoveryCode = recoveryCodeHashes.find((storedHash) => isRecoveryCodeMatch(storedHash, attemptedRecoveryHash));
+
+          if (!matchedRecoveryCode) {
+            return { account: null, requiresTwoFactor: false };
+          }
+
+          await conn.query<ResultSetHeader>(
+            'UPDATE users SET `twoFactorRecoveryCodes` = ?, `updatedAt` = ? WHERE `id` = ?',
+            [JSON.stringify(recoveryCodeHashes.filter((storedHash) => storedHash !== matchedRecoveryCode)), new Date(), account.id]
+          );
         }
       }
 
@@ -422,7 +471,7 @@ export class AuthAccountModel {
     }
   }
 
-  static async enableTwoFactor(accountId: string, code: string): Promise<AuthAccount | null> {
+  static async enableTwoFactor(accountId: string, code: string): Promise<{ account: AuthAccount; recoveryCodes: string[] } | null> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<AuthAccountRow[]>(
@@ -435,14 +484,20 @@ export class AuthAccountModel {
         return null;
       }
 
+      const recoveryCodes = generateRecoveryCodes();
+      const recoveryCodeHashes = recoveryCodes.map(hashRecoveryCode);
+
       await conn.query<ResultSetHeader>(
-        'UPDATE users SET `twoFactorEnabled` = 1, `updatedAt` = ? WHERE `id` = ?',
-        [new Date(), accountId]
+        'UPDATE users SET `twoFactorEnabled` = 1, `twoFactorRecoveryCodes` = ?, `updatedAt` = ? WHERE `id` = ?',
+        [JSON.stringify(recoveryCodeHashes), new Date(), accountId]
       );
 
       return {
-        ...toPublicAccount(account),
-        twoFactorEnabled: true,
+        account: {
+          ...toPublicAccount(account),
+          twoFactorEnabled: true,
+        },
+        recoveryCodes,
       };
     } finally {
       conn.release();
@@ -463,7 +518,7 @@ export class AuthAccountModel {
       }
 
       await conn.query<ResultSetHeader>(
-        'UPDATE users SET `twoFactorEnabled` = 0, `twoFactorSecret` = NULL, `updatedAt` = ? WHERE `id` = ?',
+        'UPDATE users SET `twoFactorEnabled` = 0, `twoFactorSecret` = NULL, `twoFactorRecoveryCodes` = NULL, `updatedAt` = ? WHERE `id` = ?',
         [new Date(), accountId]
       );
 

@@ -53,6 +53,7 @@ export function AccountSettingsPage({
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [twoFactorSetup, setTwoFactorSetup] = useState<TwoFactorSetupResponse | null>(null);
   const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [disablePassword, setDisablePassword] = useState('');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [isPasswordSaving, setIsPasswordSaving] = useState(false);
@@ -86,7 +87,7 @@ export function AccountSettingsPage({
       })
       .catch(() => {
         if (isMounted) {
-          onToast('error', 'Failed to generate 2FA QR code.');
+          onToast('error', 'Failed to generate MFA QR code.');
         }
       });
 
@@ -197,7 +198,7 @@ export function AccountSettingsPage({
       setTwoFactorSetup(response.data);
       onToast('info', 'Add the secret to your authenticator app, then enter the code.');
     } catch (error) {
-      onToast('error', getErrorMessage(error, 'Failed to start 2FA setup.'));
+      onToast('error', getErrorMessage(error, 'Failed to start MFA setup.'));
     } finally {
       setIsTwoFactorSaving(false);
     }
@@ -232,7 +233,8 @@ export function AccountSettingsPage({
       }
       setTwoFactorSetup(null);
       setTwoFactorCode('');
-      onToast('success', 'Two-factor authentication enabled.');
+      setRecoveryCodes(response.data.recoveryCodes || []);
+      onToast('success', 'MFA enabled. Save your recovery codes.');
     } catch (error) {
       onToast('error', getErrorMessage(error, 'Invalid verification code.'));
     } finally {
@@ -250,9 +252,10 @@ export function AccountSettingsPage({
         onAccountUpdate(response.data.account);
       }
       setDisablePassword('');
-      onToast('success', 'Two-factor authentication disabled.');
+      setRecoveryCodes([]);
+      onToast('success', 'MFA disabled.');
     } catch (error) {
-      onToast('error', getErrorMessage(error, 'Failed to disable 2FA.'));
+      onToast('error', getErrorMessage(error, 'Failed to disable MFA.'));
     } finally {
       setIsTwoFactorSaving(false);
     }
@@ -350,7 +353,7 @@ export function AccountSettingsPage({
                   : 'bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
               }`}
             >
-              {account.twoFactorEnabled ? '2FA enabled' : '2FA off'}
+              {account.twoFactorEnabled ? 'MFA enabled' : 'MFA off'}
             </span>
           </div>
         </div>
@@ -414,7 +417,7 @@ export function AccountSettingsPage({
               <ShieldCheck size={19} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Authenticator App</h3>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Multi-Factor Authentication</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400">Use Google Authenticator, Microsoft Authenticator, or another TOTP app.</p>
             </div>
           </div>
@@ -460,16 +463,42 @@ export function AccountSettingsPage({
                 />
               </label>
 
-              <button type="submit" className="btn-primary" disabled={isTwoFactorSaving} aria-label="Enable two-factor authentication" title={isTwoFactorSaving ? 'Verifying' : 'Enable 2FA'}>
+              <button type="submit" className="btn-primary" disabled={isTwoFactorSaving} aria-label="Enable multi-factor authentication" title={isTwoFactorSaving ? 'Verifying' : 'Enable MFA'}>
                 <ShieldCheck size={16} />
               </button>
             </form>
           )}
 
+          {account.twoFactorEnabled && recoveryCodes.length > 0 && (
+            <div className="mt-4 rounded border border-accent/30 bg-accent/10 p-4">
+              <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-bold text-primary-500 dark:text-blue-100">Recovery Codes</p>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">Save these one-time codes now. Each code can be used once if your authenticator is unavailable.</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(recoveryCodes.join('\n'));
+                    onToast('success', 'Recovery codes copied.');
+                  }}
+                >
+                  <Download size={16} />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {recoveryCodes.map((code) => (
+                  <code key={code} className="rounded bg-white px-3 py-2 text-sm font-bold tracking-wide dark:bg-gray-900">{code}</code>
+                ))}
+              </div>
+            </div>
+          )}
+
           {account.twoFactorEnabled && (
             <form onSubmit={handleDisableTwoFactor} className="space-y-4">
               <div className="rounded border border-green-200 bg-green-50 p-4 text-sm text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-100">
-                Authenticator app 2FA is currently enabled for this account.
+                Authenticator app MFA is currently enabled for this account.
               </div>
 
               <label className="block max-w-md">
@@ -483,7 +512,7 @@ export function AccountSettingsPage({
                 />
               </label>
 
-              <button type="submit" className="btn-danger" disabled={isTwoFactorSaving} aria-label="Disable two-factor authentication" title={isTwoFactorSaving ? 'Disabling' : 'Disable 2FA'}>
+              <button type="submit" className="btn-danger" disabled={isTwoFactorSaving} aria-label="Disable multi-factor authentication" title={isTwoFactorSaving ? 'Disabling' : 'Disable MFA'}>
                 <X size={16} />
               </button>
             </form>
