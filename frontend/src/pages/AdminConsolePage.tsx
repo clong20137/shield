@@ -19,6 +19,7 @@ interface AdminConsolePageProps {
   onUserCreated?: (user: User) => void;
   bugReports?: BugReport[];
   onBugStatusChange?: (report: BugReport, status: BugReportStatus, adminNotes: string) => void;
+  onTabChange?: (tab: AdminConsoleTab) => void;
 }
 
 const tabs: Array<{ id: AdminConsoleTab; label: string; icon: typeof Settings }> = [
@@ -40,6 +41,7 @@ export function AdminConsolePage({
   onUserCreated,
   bugReports = [],
   onBugStatusChange,
+  onTabChange,
 }: AdminConsolePageProps) {
   const [activeTab, setActiveTab] = useState<AdminConsoleTab>(initialTab);
 
@@ -56,7 +58,10 @@ export function AdminConsolePage({
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                onTabChange?.(tab.id);
+              }}
               className={`flex items-center gap-2 rounded px-3 py-2 text-sm font-bold transition ${
                 activeTab === tab.id
                   ? 'bg-primary-500 text-white'

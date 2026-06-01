@@ -58,9 +58,9 @@ const quickLaunchApps: QuickLaunchApp[] = [
   { id: 'calculator', label: 'Calculator', icon: Calculator },
   { id: 'search', label: 'Search Users', path: '/search', icon: Search },
   { id: 'reports', label: 'Reports', path: '/reports', icon: BarChart3 },
-  { id: 'create-user', label: 'Create User', path: '/users/create', adminOnly: true, icon: UserPlus },
-  { id: 'audit', label: 'Audit Log', path: '/audit', adminOnly: true, icon: ClipboardList },
-  { id: 'permissions', label: 'Permissions', path: '/permissions', adminOnly: true, icon: LockKeyhole },
+  { id: 'create-user', label: 'Create User', path: '/admin?tab=create-user', adminOnly: true, icon: UserPlus },
+  { id: 'audit', label: 'Audit Log', path: '/admin?tab=audit', adminOnly: true, icon: ClipboardList },
+  { id: 'permissions', label: 'Permissions', path: '/admin?tab=permissions', adminOnly: true, icon: LockKeyhole },
 ];
 
 function loadMessagePreferences(): MessagePreferences {
@@ -1122,7 +1122,6 @@ function QuickLaunchTray({
   onOpenMessages,
   onOpenCalendar,
   onOpenCalculator,
-  onOpenCreateUser,
 }: {
   isAdministrator: boolean;
   isSidebarCollapsed: boolean;
@@ -1133,7 +1132,6 @@ function QuickLaunchTray({
   onOpenMessages: () => void;
   onOpenCalendar: () => void;
   onOpenCalculator: () => void;
-  onOpenCreateUser: () => void;
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -1151,6 +1149,7 @@ function QuickLaunchTray({
   );
   const editingExternalSlot = editingSlot !== null && isExternalQuickLaunchSlot(slots[editingSlot]) ? slots[editingSlot] : null;
   const activeModalAppSet = useMemo(() => new Set(activeModalApps), [activeModalApps]);
+  const isAdminArea = location.pathname === '/admin';
 
   const isAppActive = (app: QuickLaunchApp) => {
     if (activeModalAppSet.has(app.id)) {
@@ -1256,13 +1255,11 @@ function QuickLaunchTray({
       return;
     }
 
-    if (app.id === 'create-user') {
-      onOpenCreateUser();
-      return;
-    }
-
     if (app.path) {
-      navigate(location.pathname === app.path ? '/' : app.path);
+      const [path, search = ''] = app.path.split('?');
+      const destination = `${path}${search ? `?${search}` : ''}`;
+      const currentLocation = `${location.pathname}${location.search}`;
+      navigate(currentLocation === destination ? '/' : destination);
     }
   };
 
@@ -1294,6 +1291,10 @@ function QuickLaunchTray({
     nextSlots.splice(toIndex, 0, movedSlot);
     void saveQuickLaunchSlots(nextSlots);
   };
+
+  if (isAdminArea) {
+    return null;
+  }
 
   return (
     <section className={`fixed bottom-3 left-3 right-3 z-30 transition-all duration-200 sm:bottom-5 sm:right-6 ${isSidebarCollapsed ? 'sm:left-24' : 'sm:left-[19.5rem]'}`}>
@@ -1515,20 +1516,61 @@ function CalendarRouteRedirect({ onOpenCalendar }: { onOpenCalendar: () => void 
   return <Navigate to="/" replace />;
 }
 
-function CreateUserRouteRedirect({ onOpenCreateUser }: { onOpenCreateUser: () => void }) {
-  useEffect(() => {
-    onOpenCreateUser();
-  }, [onOpenCreateUser]);
+const adminTabs: AdminConsoleTab[] = ['general', 'permissions', 'achievements', 'create-user', 'audit', 'errors', 'bugs'];
 
-  return <Navigate to="/" replace />;
+function getAdminTabFromLocation(pathname: string, search: string): AdminConsoleTab {
+  const tab = new URLSearchParams(search).get('tab');
+  if (tab && adminTabs.includes(tab as AdminConsoleTab)) {
+    return tab as AdminConsoleTab;
+  }
+
+  if (pathname === '/users/create') return 'create-user';
+  if (pathname === '/audit') return 'audit';
+  if (pathname === '/permissions') return 'permissions';
+  return 'general';
 }
 
-function AdminRouteRedirect({ onOpenAdmin }: { onOpenAdmin: () => void }) {
-  useEffect(() => {
-    onOpenAdmin();
-  }, [onOpenAdmin]);
+function ShieldAdminPage({
+  account,
+  bugReports,
+  getErrorMessage,
+  onAccountUpdate,
+  onBugStatusChange,
+  onToast,
+}: {
+  account: AuthAccount;
+  bugReports: BugReport[];
+  getErrorMessage: (error: unknown, fallback: string) => string;
+  onAccountUpdate: (account: AuthAccount) => void;
+  onBugStatusChange: (report: BugReport, status: BugReportStatus, adminNotes: string) => void;
+  onToast: (type: ToastType, message: string) => void;
+}) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const initialTab = getAdminTabFromLocation(location.pathname, location.search);
 
-  return <Navigate to="/" replace />;
+  return (
+    <section className="flex min-h-[calc(100vh-12rem)] flex-col rounded-lg bg-white p-4 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:p-5">
+      <div className="mb-4 shrink-0 border-b border-gray-200 pb-4 dark:border-gray-800">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Shield Admin</p>
+        <h1 className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">Admin Console</h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage settings, permissions, users, bug reports, and audit history.</p>
+      </div>
+      <div className="min-h-0 flex-1">
+        <AdminConsolePage
+          account={account}
+          initialTab={initialTab}
+          onAccountUpdate={onAccountUpdate}
+          onToast={onToast}
+          getErrorMessage={getErrorMessage}
+          onUserCreated={() => navigate('/admin?tab=permissions', { replace: true })}
+          bugReports={bugReports}
+          onBugStatusChange={onBugStatusChange}
+          onTabChange={(tab) => navigate(tab === 'general' ? '/admin' : `/admin?tab=${encodeURIComponent(tab)}`, { replace: true })}
+        />
+      </div>
+    </section>
+  );
 }
 
 function NotFoundPage() {
@@ -2132,14 +2174,12 @@ function App() {
   const [messagesModalPosition, setMessagesModalPosition] = useState(getInitialMessagesModalPosition);
   const [isDraggingMessagesModal, setIsDraggingMessagesModal] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
-  const [isAdminConsoleOpen, setIsAdminConsoleOpen] = useState(false);
-  const [adminConsoleTab, setAdminConsoleTab] = useState<AdminConsoleTab>('general');
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
   const [isBugTrackerOpen, setIsBugTrackerOpen] = useState(false);
   const [isFirstLoginGuideOpen, setIsFirstLoginGuideOpen] = useState(false);
   const [isWelcomeSplashOpen, setIsWelcomeSplashOpen] = useState(false);
   const [shouldLaunchGuideAfterWelcome, setShouldLaunchGuideAfterWelcome] = useState(false);
-  const [closingModal, setClosingModal] = useState<'messages' | 'calendar' | 'profile' | 'adminConsole' | 'reportBug' | 'bugTracker' | null>(null);
+  const [closingModal, setClosingModal] = useState<'messages' | 'calendar' | 'profile' | 'reportBug' | 'bugTracker' | null>(null);
 
   useEffect(() => {
     const collapseSidebarOnMobile = () => {
@@ -2704,13 +2744,12 @@ function App() {
     return () => eventSource.close();
   }, [currentUser, handleForcedLogout, loadBugReports, loadUserNotifications, syncSessionTimeoutFromSettings]);
 
-  const closeModal = (modal: 'messages' | 'calendar' | 'profile' | 'adminConsole' | 'reportBug' | 'bugTracker') => {
+  const closeModal = (modal: 'messages' | 'calendar' | 'profile' | 'reportBug' | 'bugTracker') => {
     setClosingModal(modal);
     window.setTimeout(() => {
       if (modal === 'messages') setIsMessagesModalOpen(false);
       if (modal === 'calendar') setIsCalendarModalOpen(false);
       if (modal === 'profile') setIsProfileModalOpen(false);
-      if (modal === 'adminConsole') setIsAdminConsoleOpen(false);
       if (modal === 'reportBug') setIsReportBugOpen(false);
       if (modal === 'bugTracker') setIsBugTrackerOpen(false);
       setClosingModal(null);
@@ -2753,20 +2792,11 @@ function App() {
     setIsCalendarModalOpen(true);
   };
 
-  const toggleCreateUserModal = () => {
-    if (isAdminConsoleOpen && adminConsoleTab === 'create-user') {
-      closeModal('adminConsole');
-      return;
-    }
-
-    setAdminConsoleTab('create-user');
-    setIsAdminConsoleOpen(true);
-  };
-
-  const openAdminConsole = (tab: AdminConsoleTab = 'general') => {
-    setAdminConsoleTab(tab);
+  const openAdminPage = (tab: AdminConsoleTab = 'general') => {
     setIsAccountMenuOpen(false);
-    setIsAdminConsoleOpen(true);
+    const destination = tab === 'general' ? '/admin' : `/admin?tab=${encodeURIComponent(tab)}`;
+    window.history.pushState(null, '', destination);
+    window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
   const handleReceiveMessagesChange = async (receiveMessages: boolean) => {
@@ -2796,7 +2826,7 @@ function App() {
 
   const openBugTrackerFromNotification = () => {
     setIsNotificationsOpen(false);
-    openAdminConsole('bugs');
+    openAdminPage('bugs');
   };
 
   const markNotificationRead = async (notification: UserNotification) => {
@@ -2836,7 +2866,7 @@ function App() {
     }
 
     if (notification.entityType === 'bug_report') {
-      openAdminConsole('bugs');
+      openAdminPage('bugs');
       return;
     }
 
@@ -2914,11 +2944,6 @@ function App() {
         return;
       }
 
-      if (isAdminConsoleOpen) {
-        closeModal('adminConsole');
-        return;
-      }
-
       if (isCalendarModalOpen) {
         closeModal('calendar');
         return;
@@ -2937,7 +2962,7 @@ function App() {
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isAccountMenuOpen, isAdminConsoleOpen, isBugTrackerOpen, isCalculatorOpen, isCalendarModalOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isProfileModalOpen, isReportBugOpen]);
+  }, [isAccountMenuOpen, isBugTrackerOpen, isCalculatorOpen, isCalendarModalOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isProfileModalOpen, isReportBugOpen]);
 
   return (
     <Router>
@@ -3166,7 +3191,7 @@ function App() {
                     {isAdministrator && (
                       <button
                         type="button"
-                        onClick={() => openAdminConsole('general')}
+                        onClick={() => openAdminPage('general')}
                         className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
                       >
                         <Shield size={16} /> Admin Console
@@ -3214,18 +3239,24 @@ function App() {
                     )}
                     <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
                     {currentUser && isAdministrator && (
-                      <Route path="/admin" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('general')} />} />
+                      <Route
+                        path="/admin"
+                        element={(
+                          <ShieldAdminPage
+                            account={currentUser}
+                            bugReports={bugReports}
+                            onAccountUpdate={handleAccountUpdate}
+                            onToast={showToast}
+                            getErrorMessage={getErrorMessage}
+                            onBugStatusChange={updateBugStatus}
+                          />
+                        )}
+                      />
                     )}
-                    {currentUser && isAdministrator && (
-                      <Route path="/users/create" element={<CreateUserRouteRedirect onOpenCreateUser={() => openAdminConsole('create-user')} />} />
-                    )}
+                    {currentUser && isAdministrator && <Route path="/users/create" element={<Navigate to="/admin?tab=create-user" replace />} />}
                     <Route path="/reports" element={<ReportsPage currentUser={currentUser} onToast={showToast} getErrorMessage={getErrorMessage} />} />
-                    {currentUser && isAdministrator && (
-                      <Route path="/audit" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('audit')} />} />
-                    )}
-                    {currentUser && isAdministrator && (
-                      <Route path="/permissions" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('permissions')} />} />
-                    )}
+                    {currentUser && isAdministrator && <Route path="/audit" element={<Navigate to="/admin?tab=audit" replace />} />}
+                    {currentUser && isAdministrator && <Route path="/permissions" element={<Navigate to="/admin?tab=permissions" replace />} />}
                     <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </Suspense>
@@ -3238,14 +3269,12 @@ function App() {
                   ...(isMessagesModalOpen ? (['messages'] as const) : []),
                   ...(isCalendarModalOpen ? (['calendar'] as const) : []),
                   ...(isCalculatorOpen ? (['calculator'] as const) : []),
-                  ...(isAdminConsoleOpen && adminConsoleTab === 'create-user' ? (['create-user'] as const) : []),
                 ]}
                 storageKey={getQuickLaunchStorageKey(currentUser?.id || 'anonymous')}
                 accountId={currentUser?.id}
                 onOpenMessages={toggleMessagesModal}
                 onOpenCalendar={toggleCalendarModal}
                 onOpenCalculator={() => setIsCalculatorOpen(true)}
-                onOpenCreateUser={toggleCreateUserModal}
               />
             </main>
           </div>
@@ -3353,42 +3382,6 @@ function App() {
                       onAccountUpdate={handleAccountUpdate}
                       onToast={showToast}
                       getErrorMessage={getErrorMessage}
-                    />
-                  </Suspense>
-                </div>
-              </div>
-            </div>
-          )}
-          {isAdminConsoleOpen && currentUser && isAdministrator && (
-            <div className={getModalBackdropClass(closingModal === 'adminConsole', 'bg-black/60')}>
-              <div className={getModalWindowClass(closingModal === 'adminConsole', 'flex h-[96dvh] w-full max-w-7xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:h-[94vh] sm:p-5')}>
-                <div className="mb-3 flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 sm:text-2xl">Admin Console</h2>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage settings, permissions, users, bug reports, and audit history from one place.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => closeModal('adminConsole')}
-                    className="icon-close-button"
-                    aria-label="Close admin console"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-                <div className="min-h-0 flex-1">
-                  <Suspense fallback={<PageLoader label="Loading admin console..." />}>
-                    <AdminConsolePage
-                      account={currentUser}
-                      initialTab={adminConsoleTab}
-                      onAccountUpdate={handleAccountUpdate}
-                      onToast={showToast}
-                      getErrorMessage={getErrorMessage}
-                      onUserCreated={() => {
-                        setAdminConsoleTab('permissions');
-                      }}
-                      bugReports={bugReports}
-                      onBugStatusChange={updateBugStatus}
                     />
                   </Suspense>
                 </div>
