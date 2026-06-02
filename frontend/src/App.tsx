@@ -762,6 +762,74 @@ function SidebarLink({ to, label, compact, icon: Icon }: SidebarLinkProps) {
   );
 }
 
+interface MobileNavigationProps {
+  isAdministrator: boolean;
+  unreadMessages: number;
+  isMessagesOpen: boolean;
+  isCalendarOpen: boolean;
+  onOpenMessages: () => void;
+  onOpenCalendar: () => void;
+}
+
+function MobileNavigation({
+  isAdministrator,
+  unreadMessages,
+  isMessagesOpen,
+  isCalendarOpen,
+  onOpenMessages,
+  onOpenCalendar,
+}: MobileNavigationProps) {
+  const navItems = [
+    { to: '/', label: 'Home', icon: LayoutDashboard },
+    isAdministrator
+      ? { to: '/devices', label: 'Devices', icon: Laptop }
+      : { to: '/search', label: 'Search', icon: Search },
+    { to: '/reports', label: 'Reports', icon: BarChart3 },
+  ];
+
+  const linkClassName = ({ isActive }: { isActive: boolean }) =>
+    [
+      'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-bold transition',
+      isActive ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
+    ].join(' ');
+
+  const actionClassName = (isActive: boolean) =>
+    [
+      'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-bold transition',
+      isActive ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
+    ].join(' ');
+
+  return (
+    <nav
+      data-onboarding-target="navigation"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/95 md:hidden"
+      aria-label="Mobile navigation"
+    >
+      <div data-onboarding-target="quick-launch" className="mx-auto flex max-w-lg items-stretch gap-1">
+        {navItems.map(({ to, label, icon: Icon }) => (
+          <NavLink key={to} to={to} className={linkClassName}>
+            <Icon size={19} />
+            <span className="truncate">{label}</span>
+          </NavLink>
+        ))}
+        <button type="button" onClick={onOpenMessages} className={actionClassName(isMessagesOpen)} aria-label="Open messages">
+          <Mail size={19} />
+          <span>Messages</span>
+          {unreadMessages > 0 && (
+            <span className="absolute right-2 top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">
+              {unreadMessages > 9 ? '9+' : unreadMessages}
+            </span>
+          )}
+        </button>
+        <button type="button" onClick={onOpenCalendar} className={actionClassName(isCalendarOpen)} aria-label="Open calendar">
+          <CalendarDays size={19} />
+          <span>Calendar</span>
+        </button>
+      </div>
+    </nav>
+  );
+}
+
 function getEntryDateKey(entry: CalendarEntry): string {
   return entry.date.slice(0, 10);
 }
@@ -1469,7 +1537,7 @@ function QuickLaunchTray({
   };
 
   return (
-    <section className={`pointer-events-none fixed bottom-3 left-3 right-3 z-30 select-none transition-all duration-200 sm:bottom-5 sm:right-6 ${isSidebarCollapsed ? 'sm:left-24' : 'sm:left-[19.5rem]'}`}>
+    <section className={`pointer-events-none fixed bottom-3 left-3 right-3 z-30 hidden select-none transition-all duration-200 sm:bottom-5 sm:right-6 md:block ${isSidebarCollapsed ? 'sm:left-24' : 'sm:left-[19.5rem]'}`}>
       <div data-onboarding-target="quick-launch" className="pointer-events-auto mx-auto w-fit max-w-full rounded-2xl border border-gray-200 bg-white/85 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/80 sm:p-3">
         <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 sm:gap-2">
         {slots.map((slot, index) => {
@@ -1975,13 +2043,21 @@ const onboardingSteps: OnboardingStep[] = [
     target: 'quick-launch',
     eyebrow: 'Quick Launch',
     title: 'Customize your dock',
-    body: 'Click an empty box or the small plus on an app to choose what it opens. Drag apps left or right to reorder the dock, and watch badges for items like unread messages.',
+    body: 'Use the dock on larger screens or the bottom navigation on mobile to jump between core tools. Badges show items like unread messages.',
     placement: 'right',
   },
 ];
 
-const findOnboardingElement = (target: string) =>
-  document.querySelector<HTMLElement>(`[data-onboarding-target="${target}"], [data-onboarding-control="${target}"]`);
+const findOnboardingElement = (target: string) => {
+  const candidates = Array.from(
+    document.querySelectorAll<HTMLElement>(`[data-onboarding-target="${target}"], [data-onboarding-control="${target}"]`)
+  );
+
+  return candidates.find((candidate) => {
+    const rect = candidate.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }) || candidates[0] || null;
+};
 
 function FirstLoginGuide({
   account,
@@ -3311,7 +3387,7 @@ function App() {
         <LoginSplash onLogin={handleLogin} onToast={showToast} isExiting={isLoginTransitioning} />
       ) : (
         <div className="animate-app-enter flex h-[100dvh] overflow-hidden bg-gray-50 dark:bg-gray-950">
-          <aside className={`relative h-[100dvh] shrink-0 overflow-visible bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
+          <aside className={`relative hidden h-[100dvh] shrink-0 overflow-visible bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 md:block ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed((value) => !value)}
@@ -3411,11 +3487,36 @@ function App() {
           </aside>
 
           <div className="flex h-[100dvh] min-w-0 flex-1 flex-col overflow-hidden">
-            <header className="flex min-h-20 shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-3 py-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:px-6">
-              <div>
-                <p className="hidden text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 sm:block">Internal System</p>
-                <h2 className="text-xl font-bold text-primary-500 sm:text-2xl">Agency Workspace</h2>
-              </div>
+            <header className="flex shrink-0 flex-col gap-3 border-b border-gray-200 bg-white px-3 py-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:px-6 md:min-h-20">
+              <div className="flex w-full items-center justify-between gap-3">
+                <button
+                  data-onboarding-target="profile-card"
+                  type="button"
+                  onClick={() => setIsProfileModalOpen(true)}
+                  className="flex min-w-0 items-center gap-2 rounded-lg px-1 py-1 text-left md:hidden"
+                  title="Open profile"
+                >
+                  {currentUser?.profilePictureUrl ? (
+                    <img
+                      src={getAssetUrl(currentUser.profilePictureUrl)}
+                      alt={currentUser.displayName}
+                      onError={handleAssetImageError}
+                      className="h-10 w-10 shrink-0 rounded-full border border-gray-200 bg-white object-cover shadow-sm dark:border-gray-700"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-sm font-bold text-primary-500 shadow-sm dark:border-gray-700">
+                      {currentUser ? getInitials(currentUser.displayName, currentUser.email) : <UserCircle size={24} />}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-gray-900 dark:text-gray-100">{currentUser?.displayName || 'SHIELD'}</p>
+                    <p className="truncate text-xs font-semibold text-gray-500 dark:text-gray-400">Agency Workspace</p>
+                  </div>
+                </button>
+                <div className="hidden md:block">
+                  <p className="hidden text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 sm:block">Internal System</p>
+                  <h2 className="text-xl font-bold text-primary-500 sm:text-2xl">Agency Workspace</h2>
+                </div>
               <div data-onboarding-target="header-actions" className="relative flex items-center gap-2 sm:gap-3">
                 <div ref={notificationsMenuRef} className="relative">
                   <button
@@ -3573,9 +3674,13 @@ function App() {
                   </div>
                 )}
               </div>
+              </div>
+              <div className="md:hidden">
+                <GlobalSearch compact={false} />
+              </div>
             </header>
 
-            <main className="flex-1 overflow-y-auto px-3 pb-36 pt-5 dark:bg-gray-950 sm:px-6 sm:pb-48 sm:pt-8">
+            <main className="flex-1 overflow-y-auto px-3 pb-28 pt-5 dark:bg-gray-950 sm:px-6 sm:pb-48 sm:pt-8 md:pb-48">
               <div data-onboarding-target="workspace" className="min-h-[calc(100dvh-12rem)]">
                 <Suspense fallback={<PageLoader label="Loading page..." />}>
                   <Routes>
@@ -3627,6 +3732,14 @@ function App() {
               />
             </main>
           </div>
+          <MobileNavigation
+            isAdministrator={isAdministrator}
+            unreadMessages={messageUnreadCount}
+            isMessagesOpen={isMessagesModalOpen}
+            isCalendarOpen={isCalendarModalOpen}
+            onOpenMessages={toggleMessagesModal}
+            onOpenCalendar={toggleCalendarModal}
+          />
           {isMessagesModalOpen && currentUser && (
             <div className="pointer-events-none fixed inset-0" style={{ zIndex: activeFloatingApp === 'messages' ? 70 : 55 }}>
               <div
