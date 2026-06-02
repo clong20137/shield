@@ -740,6 +740,10 @@ function isMobileViewport() {
   return window.innerWidth < 768;
 }
 
+function announceFloatingFocus(app: string) {
+  window.dispatchEvent(new CustomEvent('shield:floating-focus', { detail: { app } }));
+}
+
 interface SidebarLinkProps {
   to: string;
   label: string;
@@ -3166,6 +3170,7 @@ function App() {
     }
 
     setMessagesModalPosition(getInitialMessagesModalPosition());
+    announceFloatingFocus('messages');
     setActiveFloatingApp('messages');
     setIsMessagesModalOpen(true);
   };
@@ -3174,6 +3179,7 @@ function App() {
     if (event.button !== 0 || isMobileFloatingLayout) {
       return;
     }
+    announceFloatingFocus('messages');
     setActiveFloatingApp('messages');
 
     const rect = messagesModalRef.current?.getBoundingClientRect();
@@ -3192,6 +3198,7 @@ function App() {
     if (event.button !== 0 || isMobileFloatingLayout) {
       return;
     }
+    announceFloatingFocus('calendar');
     setActiveFloatingApp('calendar');
 
     const rect = calendarModalRef.current?.getBoundingClientRect();
@@ -3213,11 +3220,13 @@ function App() {
     }
 
     setCalendarModalPosition(getInitialCalendarModalPosition());
+    announceFloatingFocus('calendar');
     setActiveFloatingApp('calendar');
     setIsCalendarModalOpen(true);
   };
 
   const openCalculator = () => {
+    announceFloatingFocus('calculator');
     setActiveFloatingApp('calculator');
     setIsCalculatorOpen(true);
   };
@@ -3777,7 +3786,10 @@ function App() {
                 ref={messagesModalRef}
                 className={getModalWindowClass(closingModal === 'messages', `pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[72dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(420px,calc(100dvh-1rem))] md:w-[min(900px,calc(100vw-1rem))] md:min-w-[min(360px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4 ${isDraggingMessagesModal ? 'md:cursor-grabbing' : ''}`)}
                 style={isMobileFloatingLayout ? undefined : { left: messagesModalPosition.x, top: messagesModalPosition.y }}
-                onMouseDownCapture={() => setActiveFloatingApp('messages')}
+                onMouseDownCapture={() => {
+                  announceFloatingFocus('messages');
+                  setActiveFloatingApp('messages');
+                }}
               >
                 <div
                   onPointerDown={startDraggingMessagesModal}
@@ -3812,7 +3824,10 @@ function App() {
                 ref={calendarModalRef}
                 className={getModalWindowClass(closingModal === 'calendar', `pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[82dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(480px,calc(100dvh-1rem))] md:w-[min(1120px,calc(100vw-1rem))] md:min-w-[min(420px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4 ${isDraggingCalendarModal ? 'md:cursor-grabbing' : ''}`)}
                 style={isMobileFloatingLayout ? undefined : { left: calendarModalPosition.x, top: calendarModalPosition.y }}
-                onMouseDownCapture={() => setActiveFloatingApp('calendar')}
+                onMouseDownCapture={() => {
+                  announceFloatingFocus('calendar');
+                  setActiveFloatingApp('calendar');
+                }}
               >
                 <div
                   onPointerDown={startDraggingCalendarModal}
@@ -3930,7 +3945,14 @@ function App() {
             </div>
           )}
           {isCalculatorOpen && (
-            <CalculatorModal onClose={() => setIsCalculatorOpen(false)} onFocus={() => setActiveFloatingApp('calculator')} zIndex={activeFloatingApp === 'calculator' ? 70 : 55} />
+            <CalculatorModal
+              onClose={() => setIsCalculatorOpen(false)}
+              onFocus={() => {
+                announceFloatingFocus('calculator');
+                setActiveFloatingApp('calculator');
+              }}
+              zIndex={activeFloatingApp === 'calculator' ? 70 : 55}
+            />
           )}
           {isReportBugOpen && (
             <div className={getModalBackdropClass(closingModal === 'reportBug')}>

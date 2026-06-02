@@ -73,10 +73,26 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function isMobileViewport() {
+  return window.innerWidth < 768;
+}
+
+function getInitialProfileWindowPosition() {
+  const width = Math.min(window.innerWidth - 24, 920);
+  return {
+    x: Math.max(12, Math.round((window.innerWidth - width) / 2)),
+    y: Math.max(12, Math.round(window.innerHeight * 0.08)),
+  };
+}
+
 const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [profileWindowPosition, setProfileWindowPosition] = useState(getInitialProfileWindowPosition);
+  const [isProfileDragging, setIsProfileDragging] = useState(false);
+  const [isMobileProfileLayout, setIsMobileProfileLayout] = useState(() => isMobileViewport());
+  const [profileZIndex, setProfileZIndex] = useState(85);
   const [error, setError] = useState<string | null>(null);
   const [currentQuery, setCurrentQuery] = useState('');
   const [messageRecipient, setMessageRecipient] = useState<User | null>(null);
@@ -92,6 +108,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
+  const profileWindowRef = useRef<HTMLDivElement | null>(null);
+  const profileDragOffsetRef = useRef({ x: 0, y: 0 });
   const searchRequestRef = useRef(0);
   const [addressLookupQuery, setAddressLookupQuery] = useState('');
   const [searchParams] = useSearchParams();
@@ -99,6 +117,78 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const selectedUserId = useMemo(() => searchParams.get('userId') ?? '', [searchParams]);
   const isAdministrator = currentUser?.role === 'administrator';
   const canEditProfilePictures = isAdministrator || currentUser?.permissions?.includes('users:profile-picture');
+
+  useEffect(() => {
+    const syncProfileLayout = () => {
+      const nextIsMobile = isMobileViewport();
+      setIsMobileProfileLayout(nextIsMobile);
+      if (nextIsMobile) {
+        setIsProfileDragging(false);
+      }
+    };
+
+    syncProfileLayout();
+    window.addEventListener('resize', syncProfileLayout);
+
+    return () => window.removeEventListener('resize', syncProfileLayout);
+  }, []);
+
+  useEffect(() => {
+    const handleFloatingFocus = (event: Event) => {
+      const detail = (event as CustomEvent<{ app?: string }>).detail;
+      setProfileZIndex(detail?.app === 'profile' ? 85 : 58);
+    };
+
+    window.addEventListener('shield:floating-focus', handleFloatingFocus);
+    return () => window.removeEventListener('shield:floating-focus', handleFloatingFocus);
+  }, []);
+
+  useEffect(() => {
+    if (!isProfileDragging || isMobileProfileLayout) {
+      return undefined;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const width = profileWindowRef.current?.offsetWidth || Math.min(window.innerWidth - 24, 920);
+      const height = profileWindowRef.current?.offsetHeight || Math.min(window.innerHeight - 24, 760);
+      const maxX = Math.max(12, window.innerWidth - width - 12);
+      const maxY = Math.max(12, window.innerHeight - height - 12);
+      setProfileWindowPosition({
+        x: Math.min(Math.max(12, event.clientX - profileDragOffsetRef.current.x), maxX),
+        y: Math.min(Math.max(12, event.clientY - profileDragOffsetRef.current.y), maxY),
+      });
+    };
+
+    const stopDragging = () => setIsProfileDragging(false);
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', stopDragging);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', stopDragging);
+    };
+  }, [isProfileDragging, isMobileProfileLayout]);
+
+  useEffect(() => {
+    const keepProfileInView = () => {
+      if (isMobileViewport()) {
+        return;
+      }
+
+      const width = profileWindowRef.current?.offsetWidth || Math.min(window.innerWidth - 24, 920);
+      const height = profileWindowRef.current?.offsetHeight || Math.min(window.innerHeight - 24, 760);
+      const maxX = Math.max(12, window.innerWidth - width - 12);
+      const maxY = Math.max(12, window.innerHeight - height - 12);
+      setProfileWindowPosition((current) => ({
+        x: Math.min(Math.max(12, current.x), maxX),
+        y: Math.min(Math.max(12, current.y), maxY),
+      }));
+    };
+
+    window.addEventListener('resize', keepProfileInView);
+    return () => window.removeEventListener('resize', keepProfileInView);
+  }, []);
 
   const handleSearch = async (query: string) => {
     const requestId = searchRequestRef.current + 1;
@@ -197,8 +287,38 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   };
 
   const openSelectedUser = (user: User) => {
+    setProfileZIndex(85);
+    window.dispatchEvent(new CustomEvent('shield:floating-focus', { detail: { app: 'profile' } }));
     setSelectedUser(null);
     window.setTimeout(() => setSelectedUser({ ...user }), 0);
+  };
+
+  const focusProfileWindow = () => {
+    setProfileZIndex(85);
+    window.dispatchEvent(new CustomEvent('shield:floating-focus', { detail: { app: 'profile' } }));
+  };
+
+  const startDraggingProfile = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || isMobileProfileLayout) {
+      return;
+    }
+
+    if ((event.target as HTMLElement).closest('button,a,input,select,textarea')) {
+      return;
+    }
+
+    focusProfileWindow();
+
+    const rect = profileWindowRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return;
+    }
+
+    profileDragOffsetRef.current = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+    setIsProfileDragging(true);
   };
 
   const updateProfilePicture = () => {
@@ -435,6 +555,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       .then((response) => {
         if (isMounted) {
           setSelectedUser(response.data);
+          focusProfileWindow();
         }
       })
       .catch((err) => {
@@ -472,8 +593,13 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       />
 
       {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/50 sm:items-center sm:p-4">
-          <div className="w-full sm:max-w-4xl">
+        <div className="pointer-events-none fixed inset-0" style={{ zIndex: profileZIndex }}>
+          <div
+            ref={profileWindowRef}
+            className={`pointer-events-auto fixed inset-0 h-[100dvh] w-full resize-none overflow-hidden rounded-none shadow-[0_30px_90px_rgba(15,23,42,0.42)] ring-1 ring-black/10 dark:ring-white/10 md:inset-auto md:h-[min(92dvh,780px)] md:min-h-[min(560px,calc(100dvh-1.5rem))] md:w-[min(920px,calc(100vw-1.5rem))] md:min-w-[min(420px,calc(100vw-1.5rem))] md:resize md:rounded-lg ${isProfileDragging ? 'md:cursor-grabbing' : ''}`}
+            style={isMobileProfileLayout ? undefined : { left: profileWindowPosition.x, top: profileWindowPosition.y }}
+            onMouseDownCapture={focusProfileWindow}
+          >
             <UserDetail
               user={selectedUser}
               onClose={() => setSelectedUser(null)}
@@ -481,6 +607,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
               onMessage={setMessageRecipient}
               onToast={onToast}
               canEdit={isAdministrator}
+              onHeaderPointerDown={startDraggingProfile}
+              isFloatingProfile
             />
           </div>
         </div>

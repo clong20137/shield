@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Check, Copy, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
 import { DeviceRecord, deviceService, getAssetUrl, handleAssetImageError, MileageSummary, mileageService, User } from '../services/api';
 import { RankBadge } from './RankBadge';
@@ -10,6 +10,8 @@ interface UserDetailProps {
   onMessage?: (user: User) => void;
   onToast?: (type: 'success' | 'error', message: string) => void;
   canEdit?: boolean;
+  onHeaderPointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void;
+  isFloatingProfile?: boolean;
 }
 
 function DetailRow({
@@ -77,7 +79,40 @@ function isUserOnline(lastSeenAt?: string | null): boolean {
   return Date.now() - value < 2 * 60 * 1000;
 }
 
-export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, onMessage, onToast, canEdit = false }) => {
+function getLastOnlineLabel(lastSeenAt?: string | null): string {
+  if (!lastSeenAt) {
+    return 'Last online: Never';
+  }
+
+  const value = new Date(lastSeenAt).getTime();
+  if (Number.isNaN(value)) {
+    return 'Last online: Unknown';
+  }
+
+  const diffMs = Date.now() - value;
+  if (diffMs < 2 * 60 * 1000) {
+    return 'Online now';
+  }
+
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 60) {
+    return `Last online ${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `Last online ${hours} hour${hours === 1 ? '' : 's'} ago`;
+  }
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) {
+    return `Last online ${days} day${days === 1 ? '' : 's'} ago`;
+  }
+
+  return `Last online ${new Date(lastSeenAt).toLocaleString()}`;
+}
+
+export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, onMessage, onToast, canEdit = false, onHeaderPointerDown, isFloatingProfile = false }) => {
   const callNumber = user.departmentPhoneNumber || user.personalPhoneNumber;
   const callHref = callNumber ? `tel:${callNumber.replace(/[^\d+]/gu, '')}` : undefined;
   const emailHref = user.email ? `mailto:${user.email}` : undefined;
@@ -89,6 +124,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const [deviceEditForm, setDeviceEditForm] = useState<Partial<DeviceRecord>>({});
   const [deviceError, setDeviceError] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [presenceTick, setPresenceTick] = useState(0);
   const tabs = [
     ['personal', 'Personal'],
     ['identification', 'Identification'],
@@ -125,6 +161,11 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
       window.removeEventListener('shield:mileage-updated', loadMileageSummary);
     };
   }, [user.id]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setPresenceTick((current) => current + 1), 60000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -223,13 +264,17 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const nextAchievement = mileageSummary?.nextAchievement || null;
   const mileagePercent = milestone > 0 ? Math.min(100, Math.round((mileage / milestone) * 100)) : 0;
   const isOnline = isUserOnline(user.lastSeenAt);
+  const lastOnlineLabel = useMemo(() => getLastOnlineLabel(user.lastSeenAt), [presenceTick, user.lastSeenAt]);
   const profileRingClass = isOnline
     ? 'border-green-400 shadow-[0_0_0_4px_rgba(34,197,94,0.22)]'
     : 'border-white';
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden rounded-none bg-white shadow-xl dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:h-auto sm:max-h-[92dvh] sm:rounded-lg">
-      <div className="shrink-0 bg-primary-500 px-4 py-4 text-white sm:px-5 sm:py-5">
+      <div
+        onPointerDown={onHeaderPointerDown}
+        className={`shrink-0 select-none bg-primary-500 px-4 py-4 text-white sm:px-5 sm:py-5 ${isFloatingProfile ? 'md:cursor-grab' : ''}`}
+      >
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 flex-col items-center gap-3 text-center sm:flex-row sm:items-center sm:gap-4 sm:text-left">
           <div className="relative shrink-0">
@@ -282,6 +327,8 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
             </div>
             <p className="mt-2 max-w-full truncate text-sm text-blue-100">{user.email || 'No email on file'}</p>
             <p className="mt-1 text-sm text-blue-100">PE {user.peNumber || 'N/A'} - {user.district || 'No district'}</p>
+            <p className={`mt-1 text-xs font-bold ${isOnline ? 'text-green-100' : 'text-blue-100'}`}>{lastOnlineLabel}</p>
+            {isFloatingProfile && <p className="mt-1 hidden text-xs text-blue-100 md:block">Drag to move. Resize from the corner.</p>}
           </div>
         </div>
           <div className="flex w-full items-start gap-3 lg:ml-auto lg:w-auto">
