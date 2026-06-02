@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
+import { Check, Copy, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
 import { DeviceRecord, deviceService, getAssetUrl, handleAssetImageError, MileageSummary, mileageService, User } from '../services/api';
 import { RankBadge } from './RankBadge';
 
@@ -11,13 +11,39 @@ interface UserDetailProps {
   canEdit?: boolean;
 }
 
-function DetailRow({ label, value }: { label: string; value?: string | boolean | null }) {
+function DetailRow({
+  label,
+  value,
+  copyValue,
+  onCopy,
+  isCopied = false,
+}: {
+  label: string;
+  value?: string | boolean | null;
+  copyValue?: string | null;
+  onCopy?: (label: string, value: string) => void;
+  isCopied?: boolean;
+}) {
   const displayValue = value === true ? 'Yes' : value === false ? 'No' : value || 'N/A';
+  const canCopy = typeof copyValue === 'string' && copyValue.trim().length > 0 && Boolean(onCopy);
 
   return (
-    <div className="flex justify-between gap-4 py-2 border-b border-gray-200 dark:border-gray-800">
+    <div className="flex items-center justify-between gap-4 border-b border-gray-200 py-2 dark:border-gray-800">
       <span className="font-semibold text-gray-700 dark:text-gray-300">{label}:</span>
-      <span className="text-right text-gray-600 dark:text-gray-300">{displayValue}</span>
+      <span className="flex min-w-0 items-center justify-end gap-2 text-right text-gray-600 dark:text-gray-300">
+        <span className="truncate">{displayValue}</span>
+        {canCopy && (
+          <button
+            type="button"
+            onClick={() => onCopy?.(label, copyValue.trim())}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-gray-200 bg-white text-gray-500 transition hover:border-primary-500 hover:text-primary-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-blue-200 dark:hover:text-blue-100"
+            aria-label={`Copy ${label}`}
+            title={isCopied ? 'Copied' : `Copy ${label}`}
+          >
+            {isCopied ? <Check size={14} /> : <Copy size={14} />}
+          </button>
+        )}
+      </span>
     </div>
   );
 }
@@ -61,6 +87,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const [editingDevice, setEditingDevice] = useState<DeviceRecord | null>(null);
   const [deviceEditForm, setDeviceEditForm] = useState<Partial<DeviceRecord>>({});
   const [deviceError, setDeviceError] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const tabs = [
     ['personal', 'Personal'],
     ['identification', 'Identification'],
@@ -156,6 +183,16 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
     } catch (error) {
       console.error('Failed to update profile device:', error);
       setDeviceError('Failed to update device.');
+    }
+  };
+
+  const copyProfileValue = async (label: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedField(label);
+      window.setTimeout(() => setCopiedField((current) => (current === label ? null : current)), 1600);
+    } catch (error) {
+      console.error(`Failed to copy ${label}:`, error);
     }
   };
 
@@ -271,15 +308,15 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
       <div className="px-5 py-6 max-h-[70vh] overflow-y-auto">
         {activeTab === 'personal' && <DetailSection title="Personal Information">
           <DetailRow label="Name" value={`${user.firstName} ${user.lastName}`} />
-          <DetailRow label="Email" value={user.email} />
+          <DetailRow label="Email" value={user.email} copyValue={user.email} onCopy={copyProfileValue} isCopied={copiedField === 'Email'} />
           <DetailRow label="Sex" value={user.sex} />
           <DetailRow label="Marital Status" value={user.maritalStatus} />
           <DetailRow label="Race" value={user.race} />
         </DetailSection>}
 
         {activeTab === 'identification' && <DetailSection title="Identification">
-          <DetailRow label="PE Number" value={user.peNumber} />
-          <DetailRow label="PeopleSoft ID" value={user.peopleSoftId} />
+          <DetailRow label="PE Number" value={user.peNumber} copyValue={user.peNumber} onCopy={copyProfileValue} isCopied={copiedField === 'PE Number'} />
+          <DetailRow label="PeopleSoft ID" value={user.peopleSoftId} copyValue={user.peopleSoftId} onCopy={copyProfileValue} isCopied={copiedField === 'PeopleSoft ID'} />
           <DetailRow label="Badge Number" value={user.badgeNumber} />
           <DetailRow label="Radio Number" value={user.radioNumber} />
           <DetailRow label="Public Safety ID" value={user.publicSafetyId} />
@@ -303,8 +340,8 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
         </DetailSection>}
 
         {activeTab === 'contact' && <DetailSection title="Contact">
-          <DetailRow label="Personal Phone" value={user.personalPhoneNumber} />
-          <DetailRow label="Department Phone" value={user.departmentPhoneNumber} />
+          <DetailRow label="Personal Phone" value={user.personalPhoneNumber} copyValue={user.personalPhoneNumber} onCopy={copyProfileValue} isCopied={copiedField === 'Personal Phone'} />
+          <DetailRow label="Department Phone" value={user.departmentPhoneNumber} copyValue={user.departmentPhoneNumber} onCopy={copyProfileValue} isCopied={copiedField === 'Department Phone'} />
           <DetailRow label="Residential Address" value={user.residentialAddress} />
           <DetailRow label="Mailing Address" value={user.mailingAddress} />
           <DetailRow label="Emergency Contact" value={user.emergencyContactName} />

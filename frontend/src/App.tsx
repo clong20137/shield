@@ -21,6 +21,7 @@ const THEME_KEY = 'shield_theme';
 const MESSAGE_PREFERENCES_KEY = 'shield_message_preferences';
 const SESSION_TIMEOUT_KEY = 'shield_session_timeout_minutes';
 const QUICK_LAUNCH_KEY = 'shield_quick_launch';
+const SIDEBAR_REMINDERS_KEY = 'shield_sidebar_reminders';
 const QUICK_LAUNCH_SLOT_COUNT = 8;
 const MODAL_CLOSE_MS = 220;
 
@@ -29,6 +30,13 @@ interface MessagePreferences {
   playMessageSound: boolean;
   messageSound: 'classic' | 'soft' | 'chime';
   useMilitaryTime: boolean;
+}
+
+interface SidebarReminder {
+  id: string;
+  title: string;
+  createdAt: string;
+  completedAt?: string | null;
 }
 
 type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'calculator' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
@@ -126,6 +134,53 @@ function saveLegacyQuickLaunchSlots(storageKey: string, slots: QuickLaunchSlot[]
     window.localStorage.setItem(storageKey, JSON.stringify(normalizeQuickLaunchSlots(slots)));
   } catch {
     // Local storage is only a fallback for quick launch preferences.
+  }
+}
+
+function getSidebarRemindersStorageKey(accountId: string): string {
+  return `${SIDEBAR_REMINDERS_KEY}_${accountId}`;
+}
+
+function normalizeSidebarReminders(rawReminders: unknown): SidebarReminder[] {
+  const reminders = Array.isArray(rawReminders) ? rawReminders : [];
+
+  return reminders
+    .map((reminder): SidebarReminder | null => {
+      if (typeof reminder !== 'object' || reminder === null) {
+        return null;
+      }
+
+      const item = reminder as Partial<SidebarReminder>;
+      if (typeof item.id !== 'string' || typeof item.title !== 'string' || !item.title.trim()) {
+        return null;
+      }
+
+      return {
+        id: item.id,
+        title: item.title.trim(),
+        createdAt: typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString(),
+        completedAt: typeof item.completedAt === 'string' ? item.completedAt : null,
+      };
+    })
+    .filter((reminder): reminder is SidebarReminder => Boolean(reminder))
+    .sort((a, b) => Number(Boolean(a.completedAt)) - Number(Boolean(b.completedAt)) || b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 25);
+}
+
+function loadSidebarReminders(accountId: string): SidebarReminder[] {
+  try {
+    const storedReminders = window.localStorage.getItem(getSidebarRemindersStorageKey(accountId));
+    return normalizeSidebarReminders(storedReminders ? JSON.parse(storedReminders) : []);
+  } catch {
+    return [];
+  }
+}
+
+function saveSidebarReminders(accountId: string, reminders: SidebarReminder[]) {
+  try {
+    window.localStorage.setItem(getSidebarRemindersStorageKey(accountId), JSON.stringify(normalizeSidebarReminders(reminders)));
+  } catch {
+    // Reminders stay local to this browser session if storage is unavailable.
   }
 }
 
@@ -853,6 +908,129 @@ function SidebarCalendarWidget({
         )}
       </div>
     </button>
+  );
+}
+
+function SidebarRemindersWidget({
+  compact,
+  reminders,
+  draft,
+  isCreating,
+  onDraftChange,
+  onStartCreate,
+  onCancelCreate,
+  onSubmit,
+  onToggle,
+  onDelete,
+}: {
+  compact: boolean;
+  reminders: SidebarReminder[];
+  draft: string;
+  isCreating: boolean;
+  onDraftChange: (value: string) => void;
+  onStartCreate: () => void;
+  onCancelCreate: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const activeReminders = reminders.filter((reminder) => !reminder.completedAt);
+  const visibleReminders = activeReminders.slice(0, 3);
+
+  if (compact) {
+    return (
+      <button
+        type="button"
+        onClick={onStartCreate}
+        className="relative mb-3 flex h-11 w-full items-center justify-center rounded bg-white/10 text-white transition hover:bg-white/15"
+        aria-label="Create reminder"
+        title="Create reminder"
+      >
+        <ClipboardList size={20} />
+        {activeReminders.length > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
+            {activeReminders.length > 9 ? '9+' : activeReminders.length}
+          </span>
+        )}
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className="mb-3 rounded-lg border border-white/10 bg-white/10 p-3 text-white"
+      onClick={() => {
+        if (!isCreating) {
+          onStartCreate();
+        }
+      }}
+    >
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-100">Reminders</p>
+          <p className="truncate text-sm font-bold">{activeReminders.length > 0 ? `${activeReminders.length} active` : 'All clear'}</p>
+        </div>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onStartCreate();
+          }}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-white/10 text-white transition hover:bg-white/20"
+          aria-label="New reminder"
+          title="New Reminder"
+        >
+          <Plus size={16} />
+        </button>
+      </div>
+
+      {isCreating && (
+        <form
+          onSubmit={onSubmit}
+          className="mb-3 flex gap-1.5"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <input
+            value={draft}
+            onChange={(event) => onDraftChange(event.target.value)}
+            className="min-w-0 flex-1 rounded border border-white/15 bg-black/20 px-2 py-1.5 text-xs font-semibold text-white outline-none placeholder:text-blue-100 focus:border-white/45"
+            placeholder="New reminder"
+            maxLength={90}
+            autoFocus
+          />
+          <button type="submit" className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-accent text-white hover:bg-accent/90" aria-label="Save reminder" title="Save Reminder">
+            <Save size={14} />
+          </button>
+          <button type="button" onClick={onCancelCreate} className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-white/10 text-white hover:bg-white/20" aria-label="Cancel reminder" title="Cancel">
+            <X size={14} />
+          </button>
+        </form>
+      )}
+
+      <div className="space-y-1.5">
+        {visibleReminders.length > 0 ? (
+          visibleReminders.map((reminder) => (
+            <div key={reminder.id} className="flex min-w-0 items-center gap-2 rounded bg-black/15 px-2 py-1.5" onClick={(event) => event.stopPropagation()}>
+              <input
+                type="checkbox"
+                checked={Boolean(reminder.completedAt)}
+                onChange={() => onToggle(reminder.id)}
+                className="h-4 w-4 shrink-0 accent-primary-500"
+                aria-label={`Complete ${reminder.title}`}
+              />
+              <span className="min-w-0 flex-1 truncate text-xs font-bold text-white">{reminder.title}</span>
+              <button type="button" onClick={() => onDelete(reminder.id)} className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-blue-100 hover:bg-white/10 hover:text-white" aria-label={`Delete ${reminder.title}`} title="Delete Reminder">
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))
+        ) : (
+          <p className="rounded bg-black/15 px-2 py-2 text-xs font-semibold text-blue-100">
+            No reminders yet
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -2300,6 +2478,9 @@ function App() {
   const [bugReports, setBugReports] = useState<BugReport[]>([]);
   const [sidebarCalendarEntries, setSidebarCalendarEntries] = useState<CalendarEntry[]>([]);
   const [isSidebarCalendarLoading, setIsSidebarCalendarLoading] = useState(false);
+  const [sidebarReminders, setSidebarReminders] = useState<SidebarReminder[]>([]);
+  const [isReminderComposerOpen, setIsReminderComposerOpen] = useState(false);
+  const [reminderDraft, setReminderDraft] = useState('');
   const previousMessageUnreadCount = useRef<number | null>(null);
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
   const rateLimitToastRef = useRef(0);
@@ -2326,6 +2507,74 @@ function App() {
     window.setTimeout(() => {
       setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== id));
     }, 4500);
+  };
+
+  useEffect(() => {
+    if (!currentUser) {
+      setSidebarReminders([]);
+      setReminderDraft('');
+      setIsReminderComposerOpen(false);
+      return;
+    }
+
+    setSidebarReminders(loadSidebarReminders(currentUser.id));
+    setReminderDraft('');
+    setIsReminderComposerOpen(false);
+  }, [currentUser?.id]);
+
+  const updateSidebarReminders = (updater: (currentReminders: SidebarReminder[]) => SidebarReminder[]) => {
+    if (!currentUser) {
+      return;
+    }
+
+    setSidebarReminders((currentReminders) => {
+      const nextReminders = normalizeSidebarReminders(updater(currentReminders));
+      saveSidebarReminders(currentUser.id, nextReminders);
+      return nextReminders;
+    });
+  };
+
+  const createSidebarReminder = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const title = reminderDraft.trim();
+
+    if (!title) {
+      return;
+    }
+
+    updateSidebarReminders((currentReminders) => [
+      {
+        id: `reminder-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        title,
+        createdAt: new Date().toISOString(),
+        completedAt: null,
+      },
+      ...currentReminders,
+    ]);
+    setReminderDraft('');
+    setIsReminderComposerOpen(false);
+    showToast('success', 'Reminder added.', { saveToNotifications: false });
+  };
+
+  const toggleSidebarReminder = (id: string) => {
+    updateSidebarReminders((currentReminders) =>
+      currentReminders.map((reminder) =>
+        reminder.id === id
+          ? { ...reminder, completedAt: reminder.completedAt ? null : new Date().toISOString() }
+          : reminder
+      )
+    );
+  };
+
+  const deleteSidebarReminder = (id: string) => {
+    updateSidebarReminders((currentReminders) => currentReminders.filter((reminder) => reminder.id !== id));
+  };
+
+  const openReminderComposer = () => {
+    if (isSidebarCollapsed) {
+      setIsSidebarCollapsed(false);
+    }
+    setIsReminderComposerOpen(true);
   };
 
   useEffect(() => {
@@ -3163,13 +3412,27 @@ function App() {
 
             <nav data-onboarding-target="navigation" className="flex flex-1 flex-col gap-2 px-3 py-3">
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
-              <SidebarLink to="/calendar" label="Calendar" compact={isSidebarCollapsed} icon={CalendarDays} />
               {isAdministrator && <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />}
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
               {isAdministrator && <SidebarLink to="/admin" label="Admin" compact={isSidebarCollapsed} icon={Shield} />}
             </nav>
 
             <div className={`shrink-0 border-t border-white/10 pt-3 ${isSidebarCollapsed ? 'px-3' : 'px-4'}`}>
+              <SidebarRemindersWidget
+                compact={isSidebarCollapsed}
+                reminders={sidebarReminders}
+                draft={reminderDraft}
+                isCreating={isReminderComposerOpen}
+                onDraftChange={setReminderDraft}
+                onStartCreate={openReminderComposer}
+                onCancelCreate={() => {
+                  setReminderDraft('');
+                  setIsReminderComposerOpen(false);
+                }}
+                onSubmit={createSidebarReminder}
+                onToggle={toggleSidebarReminder}
+                onDelete={deleteSidebarReminder}
+              />
               <SidebarCalendarWidget
                 compact={isSidebarCollapsed}
                 entries={sidebarCalendarEntries}
