@@ -8,6 +8,7 @@ interface UserDetailProps {
   onClose?: () => void;
   onEdit?: (user: User) => void;
   onMessage?: (user: User) => void;
+  onToast?: (type: 'success' | 'error', message: string) => void;
   canEdit?: boolean;
 }
 
@@ -76,7 +77,7 @@ function isUserOnline(lastSeenAt?: string | null): boolean {
   return Date.now() - value < 2 * 60 * 1000;
 }
 
-export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, onMessage, canEdit = false }) => {
+export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, onMessage, onToast, canEdit = false }) => {
   const callNumber = user.departmentPhoneNumber || user.personalPhoneNumber;
   const callHref = callNumber ? `tel:${callNumber.replace(/[^\d+]/gu, '')}` : undefined;
   const emailHref = user.email ? `mailto:${user.email}` : undefined;
@@ -188,11 +189,32 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
 
   const copyProfileValue = async (label: string, value: string) => {
     try {
-      await navigator.clipboard.writeText(value);
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = value;
+        textArea.setAttribute('readonly', '');
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const copied = document.execCommand('copy');
+        document.body.removeChild(textArea);
+
+        if (!copied) {
+          throw new Error('Fallback copy failed');
+        }
+      }
+
       setCopiedField(label);
+      onToast?.('success', `${label} copied to clipboard.`);
       window.setTimeout(() => setCopiedField((current) => (current === label ? null : current)), 1600);
     } catch (error) {
       console.error(`Failed to copy ${label}:`, error);
+      onToast?.('error', `Could not copy ${label}.`);
     }
   };
 

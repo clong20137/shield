@@ -956,6 +956,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
             <UserDetail
               user={selectedMentionUser}
               onClose={() => setSelectedMentionUser(null)}
+              onToast={onToast}
               canEdit={currentUser.role === 'administrator'}
             />
           </div>

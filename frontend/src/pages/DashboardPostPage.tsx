@@ -10,6 +10,7 @@ import { AuthAccount, DashboardPost, DashboardPostComment, User, dashboardPostSe
 
 interface DashboardPostPageProps {
   currentUser: AuthAccount | null;
+  onToast: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
 const sortComments = (items: DashboardPostComment[]) =>
@@ -21,7 +22,7 @@ const sortComments = (items: DashboardPostComment[]) =>
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
 
-export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
+export function DashboardPostPage({ currentUser, onToast }: DashboardPostPageProps) {
   const { postId = '' } = useParams();
   const navigate = useNavigate();
   const [post, setPost] = useState<DashboardPost | null>(null);
@@ -395,6 +396,7 @@ export function DashboardPostPage({ currentUser }: DashboardPostPageProps) {
               user={selectedCommentUser}
               onClose={() => setSelectedCommentUser(null)}
               canEdit={isAdministrator}
+              onToast={onToast}
               onEdit={(user) => {
                 setSelectedCommentUser(null);
                 navigate(`/search?userId=${encodeURIComponent(user.id)}&q=${encodeURIComponent(`${user.firstName} ${user.lastName}`.trim() || user.email || user.id)}`);

@@ -19,6 +19,7 @@ import mileageRoutes from './routes/mileageRoutes';
 import quickLaunchRoutes from './routes/quickLaunchRoutes';
 import eventRoutes from './routes/eventRoutes';
 import performanceEvaluationRoutes from './routes/performanceEvaluationRoutes';
+import reminderRoutes from './routes/reminderRoutes';
 import { startSecurityCleanupJob } from './services/securityCleanup';
 import { rateLimit } from './middleware/rateLimit';
 import { requestTimeout } from './middleware/requestTimeout';
@@ -104,6 +105,7 @@ app.use('/api/mileage', mileageRoutes);
 app.use('/api/quick-launch', quickLaunchRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/performance-evaluations', performanceEvaluationRoutes);
+app.use('/api/reminders', reminderRoutes);
 
 const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
 app.use(express.static(frontendDistPath));

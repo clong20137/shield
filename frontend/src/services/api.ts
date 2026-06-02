@@ -545,6 +545,15 @@ export interface UserNotification {
   createdAt: string;
 }
 
+export interface Reminder {
+  id: string;
+  accountId: string;
+  title: string;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface MileageSummary {
   mileage: number;
   milestone: number;
@@ -905,6 +914,20 @@ export const quickLaunchService = {
 
   save: (slots: QuickLaunchSlot[]) =>
     api.put<QuickLaunchResponse>('/quick-launch', { slots }),
+};
+
+export const reminderService = {
+  getAll: () =>
+    api.get<Reminder[]>('/reminders'),
+
+  create: (title: string) =>
+    api.post<Reminder>('/reminders', { title }),
+
+  update: (id: string, updates: { title?: string; completed?: boolean }) =>
+    api.put<Reminder>(`/reminders/${id}`, updates),
+
+  delete: (id: string) =>
+    api.delete<{ message: string }>(`/reminders/${id}`),
 };
 
 export const mileageService = {

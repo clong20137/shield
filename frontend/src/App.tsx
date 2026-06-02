@@ -3,7 +3,7 @@ import { BarChart3, Bell, Bug, Calculator, CalendarDays, ChevronLeft, ChevronRig
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, getAppEventsUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, notificationService, quickLaunchService, RegistrationSettings, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, getAppEventsUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
@@ -21,7 +21,6 @@ const THEME_KEY = 'shield_theme';
 const MESSAGE_PREFERENCES_KEY = 'shield_message_preferences';
 const SESSION_TIMEOUT_KEY = 'shield_session_timeout_minutes';
 const QUICK_LAUNCH_KEY = 'shield_quick_launch';
-const SIDEBAR_REMINDERS_KEY = 'shield_sidebar_reminders';
 const QUICK_LAUNCH_SLOT_COUNT = 8;
 const MODAL_CLOSE_MS = 220;
 
@@ -30,13 +29,6 @@ interface MessagePreferences {
   playMessageSound: boolean;
   messageSound: 'classic' | 'soft' | 'chime';
   useMilitaryTime: boolean;
-}
-
-interface SidebarReminder {
-  id: string;
-  title: string;
-  createdAt: string;
-  completedAt?: string | null;
 }
 
 type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'calculator' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
@@ -134,53 +126,6 @@ function saveLegacyQuickLaunchSlots(storageKey: string, slots: QuickLaunchSlot[]
     window.localStorage.setItem(storageKey, JSON.stringify(normalizeQuickLaunchSlots(slots)));
   } catch {
     // Local storage is only a fallback for quick launch preferences.
-  }
-}
-
-function getSidebarRemindersStorageKey(accountId: string): string {
-  return `${SIDEBAR_REMINDERS_KEY}_${accountId}`;
-}
-
-function normalizeSidebarReminders(rawReminders: unknown): SidebarReminder[] {
-  const reminders = Array.isArray(rawReminders) ? rawReminders : [];
-
-  return reminders
-    .map((reminder): SidebarReminder | null => {
-      if (typeof reminder !== 'object' || reminder === null) {
-        return null;
-      }
-
-      const item = reminder as Partial<SidebarReminder>;
-      if (typeof item.id !== 'string' || typeof item.title !== 'string' || !item.title.trim()) {
-        return null;
-      }
-
-      return {
-        id: item.id,
-        title: item.title.trim(),
-        createdAt: typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString(),
-        completedAt: typeof item.completedAt === 'string' ? item.completedAt : null,
-      };
-    })
-    .filter((reminder): reminder is SidebarReminder => Boolean(reminder))
-    .sort((a, b) => Number(Boolean(a.completedAt)) - Number(Boolean(b.completedAt)) || b.createdAt.localeCompare(a.createdAt))
-    .slice(0, 25);
-}
-
-function loadSidebarReminders(accountId: string): SidebarReminder[] {
-  try {
-    const storedReminders = window.localStorage.getItem(getSidebarRemindersStorageKey(accountId));
-    return normalizeSidebarReminders(storedReminders ? JSON.parse(storedReminders) : []);
-  } catch {
-    return [];
-  }
-}
-
-function saveSidebarReminders(accountId: string, reminders: SidebarReminder[]) {
-  try {
-    window.localStorage.setItem(getSidebarRemindersStorageKey(accountId), JSON.stringify(normalizeSidebarReminders(reminders)));
-  } catch {
-    // Reminders stay local to this browser session if storage is unavailable.
   }
 }
 
@@ -914,6 +859,7 @@ function SidebarCalendarWidget({
 function SidebarRemindersWidget({
   compact,
   reminders,
+  isLoading,
   draft,
   isCreating,
   onDraftChange,
@@ -924,7 +870,8 @@ function SidebarRemindersWidget({
   onDelete,
 }: {
   compact: boolean;
-  reminders: SidebarReminder[];
+  reminders: Reminder[];
+  isLoading: boolean;
   draft: string;
   isCreating: boolean;
   onDraftChange: (value: string) => void;
@@ -968,7 +915,7 @@ function SidebarRemindersWidget({
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-100">Reminders</p>
-          <p className="truncate text-sm font-bold">{activeReminders.length > 0 ? `${activeReminders.length} active` : 'All clear'}</p>
+          <p className="truncate text-sm font-bold">{isLoading ? 'Loading' : activeReminders.length > 0 ? `${activeReminders.length} active` : 'All clear'}</p>
         </div>
         <button
           type="button"
@@ -1008,7 +955,11 @@ function SidebarRemindersWidget({
       )}
 
       <div className="space-y-1.5">
-        {visibleReminders.length > 0 ? (
+        {isLoading ? (
+          <p className="rounded bg-black/15 px-2 py-2 text-xs font-semibold text-blue-100">
+            Loading reminders...
+          </p>
+        ) : visibleReminders.length > 0 ? (
           visibleReminders.map((reminder) => (
             <div key={reminder.id} className="flex min-w-0 items-center gap-2 rounded bg-black/15 px-2 py-1.5" onClick={(event) => event.stopPropagation()}>
               <input
@@ -2478,7 +2429,8 @@ function App() {
   const [bugReports, setBugReports] = useState<BugReport[]>([]);
   const [sidebarCalendarEntries, setSidebarCalendarEntries] = useState<CalendarEntry[]>([]);
   const [isSidebarCalendarLoading, setIsSidebarCalendarLoading] = useState(false);
-  const [sidebarReminders, setSidebarReminders] = useState<SidebarReminder[]>([]);
+  const [sidebarReminders, setSidebarReminders] = useState<Reminder[]>([]);
+  const [isSidebarRemindersLoading, setIsSidebarRemindersLoading] = useState(false);
   const [isReminderComposerOpen, setIsReminderComposerOpen] = useState(false);
   const [reminderDraft, setReminderDraft] = useState('');
   const previousMessageUnreadCount = useRef<number | null>(null);
@@ -2509,32 +2461,42 @@ function App() {
     }, 4500);
   };
 
-  useEffect(() => {
+  const loadSidebarReminders = useCallback(async (showLoading = false) => {
     if (!currentUser) {
       setSidebarReminders([]);
-      setReminderDraft('');
-      setIsReminderComposerOpen(false);
+      setIsSidebarRemindersLoading(false);
       return;
     }
 
-    setSidebarReminders(loadSidebarReminders(currentUser.id));
+    if (showLoading) {
+      setIsSidebarRemindersLoading(true);
+    }
+
+    try {
+      const response = await reminderService.getAll();
+      setSidebarReminders(response.data);
+    } catch (error) {
+      console.error('Failed to load reminders:', error);
+      showToast('error', getErrorMessage(error, 'Failed to load reminders.'), { saveToNotifications: false });
+    } finally {
+      setIsSidebarRemindersLoading(false);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
     setReminderDraft('');
     setIsReminderComposerOpen(false);
-  }, [currentUser?.id]);
+    void loadSidebarReminders(true);
 
-  const updateSidebarReminders = (updater: (currentReminders: SidebarReminder[]) => SidebarReminder[]) => {
-    if (!currentUser) {
-      return;
-    }
+    const handleReminderUpdate = () => {
+      void loadSidebarReminders(false);
+    };
 
-    setSidebarReminders((currentReminders) => {
-      const nextReminders = normalizeSidebarReminders(updater(currentReminders));
-      saveSidebarReminders(currentUser.id, nextReminders);
-      return nextReminders;
-    });
-  };
+    window.addEventListener('shield:reminder-updated', handleReminderUpdate);
+    return () => window.removeEventListener('shield:reminder-updated', handleReminderUpdate);
+  }, [loadSidebarReminders]);
 
-  const createSidebarReminder = (event: FormEvent<HTMLFormElement>) => {
+  const createSidebarReminder = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const title = reminderDraft.trim();
 
@@ -2542,32 +2504,41 @@ function App() {
       return;
     }
 
-    updateSidebarReminders((currentReminders) => [
-      {
-        id: `reminder-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        title,
-        createdAt: new Date().toISOString(),
-        completedAt: null,
-      },
-      ...currentReminders,
-    ]);
-    setReminderDraft('');
-    setIsReminderComposerOpen(false);
-    showToast('success', 'Reminder added.', { saveToNotifications: false });
+    try {
+      const response = await reminderService.create(title);
+      setSidebarReminders((currentReminders) => [response.data, ...currentReminders].slice(0, 50));
+      setReminderDraft('');
+      setIsReminderComposerOpen(false);
+      showToast('success', 'Reminder added.', { saveToNotifications: false });
+    } catch (error) {
+      console.error('Failed to create reminder:', error);
+      showToast('error', getErrorMessage(error, 'Failed to add reminder.'), { saveToNotifications: false });
+    }
   };
 
-  const toggleSidebarReminder = (id: string) => {
-    updateSidebarReminders((currentReminders) =>
-      currentReminders.map((reminder) =>
-        reminder.id === id
-          ? { ...reminder, completedAt: reminder.completedAt ? null : new Date().toISOString() }
-          : reminder
-      )
-    );
+  const toggleSidebarReminder = async (id: string) => {
+    const reminder = sidebarReminders.find((item) => item.id === id);
+    if (!reminder) {
+      return;
+    }
+
+    try {
+      const response = await reminderService.update(id, { completed: !reminder.completedAt });
+      setSidebarReminders((currentReminders) => currentReminders.map((item) => (item.id === id ? response.data : item)));
+    } catch (error) {
+      console.error('Failed to update reminder:', error);
+      showToast('error', getErrorMessage(error, 'Failed to update reminder.'), { saveToNotifications: false });
+    }
   };
 
-  const deleteSidebarReminder = (id: string) => {
-    updateSidebarReminders((currentReminders) => currentReminders.filter((reminder) => reminder.id !== id));
+  const deleteSidebarReminder = async (id: string) => {
+    try {
+      await reminderService.delete(id);
+      setSidebarReminders((currentReminders) => currentReminders.filter((reminder) => reminder.id !== id));
+    } catch (error) {
+      console.error('Failed to delete reminder:', error);
+      showToast('error', getErrorMessage(error, 'Failed to delete reminder.'), { saveToNotifications: false });
+    }
   };
 
   const openReminderComposer = () => {
@@ -3066,6 +3037,7 @@ function App() {
       handleRealtimeAppUpdate('permission-updated')(event);
     });
     eventSource.addEventListener('quick-launch-updated', handleRealtimeAppUpdate('quick-launch-updated'));
+    eventSource.addEventListener('reminder-updated', handleRealtimeAppUpdate('reminder-updated'));
     eventSource.addEventListener('session-revoked', () => handleForcedLogout('Your account has been deactivated. Please contact an administrator.'));
     eventSource.addEventListener('user-updated', (event) => {
       let payload: { entityId?: string } = {};
@@ -3414,13 +3386,13 @@ function App() {
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
               {isAdministrator && <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />}
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
-              {isAdministrator && <SidebarLink to="/admin" label="Admin" compact={isSidebarCollapsed} icon={Shield} />}
             </nav>
 
             <div className={`shrink-0 border-t border-white/10 pt-3 ${isSidebarCollapsed ? 'px-3' : 'px-4'}`}>
               <SidebarRemindersWidget
                 compact={isSidebarCollapsed}
                 reminders={sidebarReminders}
+                isLoading={isSidebarRemindersLoading}
                 draft={reminderDraft}
                 isCreating={isReminderComposerOpen}
                 onDraftChange={setReminderDraft}
@@ -3613,7 +3585,7 @@ function App() {
                 <Suspense fallback={<PageLoader label="Loading page..." />}>
                   <Routes>
                     <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
-                    {currentUser && <Route path="/updates/:postId" element={<DashboardPostPage currentUser={currentUser} />} />}
+                    {currentUser && <Route path="/updates/:postId" element={<DashboardPostPage currentUser={currentUser} onToast={showToast} />} />}
                     {currentUser && <Route path="/messages" element={<MessagesRouteRedirect onOpenMessages={() => setIsMessagesModalOpen(true)} />} />}
                     {currentUser && <Route path="/calendar" element={<CalendarRouteRedirect onOpenCalendar={() => setIsCalendarModalOpen(true)} />} />}
                     <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />

@@ -541,6 +541,19 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS reminders (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`accountId\` VARCHAR(36) NOT NULL,
+      \`title\` VARCHAR(90) NOT NULL,
+      \`completedAt\` TIMESTAMP NULL,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX \`idx_reminders_account\` (\`accountId\`),
+      INDEX \`idx_reminders_completed\` (\`completedAt\`)
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS performance_evaluations (
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`employeeAccountId\` VARCHAR(36) NOT NULL,
