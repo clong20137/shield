@@ -1077,6 +1077,18 @@ function getInitials(firstName?: string, lastName?: string, email?: string): str
   return parts.length > 1 ? `${parts[0][0]}${parts[1][0]}`.toUpperCase() : source.slice(0, 2).toUpperCase();
 }
 
+function isMobileViewport() {
+  return window.innerWidth < 768;
+}
+
+function getInitialProfileWindowPosition() {
+  const width = Math.min(window.innerWidth - 24, 920);
+  return {
+    x: Math.max(12, Math.round((window.innerWidth - width) / 2)),
+    y: Math.max(12, Math.round(window.innerHeight * 0.08)),
+  };
+}
+
 function PinnedProfilesWidget({ currentUser, onOpenProfile }: { currentUser: AuthAccount | null; onOpenProfile: (user: User) => void }) {
   const [profiles, setProfiles] = useState<PinnedProfile[]>([]);
   const [query, setQuery] = useState('');
@@ -1084,6 +1096,7 @@ function PinnedProfilesWidget({ currentUser, onOpenProfile }: { currentUser: Aut
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pinnedRailRef = useRef<HTMLDivElement | null>(null);
 
   const loadProfiles = useCallback(async () => {
     if (!currentUser) {
@@ -1165,6 +1178,18 @@ function PinnedProfilesWidget({ currentUser, onOpenProfile }: { currentUser: Aut
     }
   };
 
+  const slidePinnedProfiles = (direction: -1 | 1) => {
+    const rail = pinnedRailRef.current;
+    if (!rail) {
+      return;
+    }
+
+    rail.scrollBy({
+      left: direction * Math.max(rail.clientWidth * 0.82, 180),
+      behavior: 'smooth',
+    });
+  };
+
   return (
     <section className="mb-8 rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -1218,26 +1243,50 @@ function PinnedProfilesWidget({ currentUser, onOpenProfile }: { currentUser: Aut
           Pin frequently used profiles and they will stay here.
         </div>
       ) : (
-        <div className="flex snap-x gap-3 overflow-x-auto pb-2">
-          {profiles.map((profile) => (
-            <article key={profile.id} className="group relative w-28 shrink-0 snap-start rounded-lg border border-gray-200 bg-gray-50 p-3 text-center transition hover:-translate-y-1 hover:scale-[1.04] hover:border-accent hover:bg-white hover:shadow-lg dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900 sm:w-32">
-              <button type="button" onClick={() => onOpenProfile(profile)} className="block w-full" aria-label={`Open ${profile.firstName} ${profile.lastName}`}>
-                <span className="mx-auto block h-16 w-16 overflow-hidden rounded-full border-2 border-white bg-primary-500 shadow group-hover:ring-4 group-hover:ring-accent/20 sm:h-[4.5rem] sm:w-[4.5rem]">
-                  {profile.profilePictureUrl ? (
-                    <img src={getAssetUrl(profile.profilePictureUrl)} alt={`${profile.firstName} ${profile.lastName}`} onError={handleAssetImageError} className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="flex h-full w-full items-center justify-center text-sm font-bold text-white">
-                      {getInitials(profile.firstName, profile.lastName, profile.email)}
-                    </span>
-                  )}
-                </span>
-                <span className="mt-2 block truncate text-sm font-bold text-gray-900 dark:text-gray-100">{profile.firstName} {profile.lastName}</span>
+        <div className="relative">
+          {profiles.length > 4 && (
+            <>
+              <button
+                type="button"
+                onClick={() => slidePinnedProfiles(-1)}
+                className="absolute left-0 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-primary-500 shadow-lg transition hover:scale-105 hover:border-accent dark:border-gray-700 dark:bg-gray-900/95 dark:text-blue-100"
+                aria-label="Show previous pinned profiles"
+                title="Previous"
+              >
+                <ChevronLeft size={20} />
               </button>
-              <button type="button" onClick={() => void unpinProfile(profile.id)} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 opacity-100 shadow-sm hover:border-danger hover:text-danger dark:border-gray-700 dark:bg-gray-900 sm:opacity-0 sm:group-hover:opacity-100" aria-label={`Unpin ${profile.firstName} ${profile.lastName}`} title="Unpin">
-                <PinOff size={14} />
+              <button
+                type="button"
+                onClick={() => slidePinnedProfiles(1)}
+                className="absolute right-0 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-primary-500 shadow-lg transition hover:scale-105 hover:border-accent dark:border-gray-700 dark:bg-gray-900/95 dark:text-blue-100"
+                aria-label="Show more pinned profiles"
+                title="Next"
+              >
+                <ChevronRight size={20} />
               </button>
-            </article>
-          ))}
+            </>
+          )}
+          <div ref={pinnedRailRef} className="shield-scrollbar-hidden flex snap-x gap-3 overflow-x-auto scroll-smooth px-1 py-1 sm:px-12">
+            {profiles.map((profile) => (
+              <article key={profile.id} className="group relative w-28 shrink-0 snap-start rounded-lg border border-gray-200 bg-gray-50 p-3 text-center transition hover:-translate-y-1 hover:scale-[1.04] hover:border-accent hover:bg-white hover:shadow-lg dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900 sm:w-32">
+                <button type="button" onClick={() => onOpenProfile(profile)} className="block w-full" aria-label={`Open ${profile.firstName} ${profile.lastName}`}>
+                  <span className="mx-auto block h-16 w-16 overflow-hidden rounded-full border-2 border-white bg-primary-500 shadow group-hover:ring-4 group-hover:ring-accent/20 sm:h-[4.5rem] sm:w-[4.5rem]">
+                    {profile.profilePictureUrl ? (
+                      <img src={getAssetUrl(profile.profilePictureUrl)} alt={`${profile.firstName} ${profile.lastName}`} onError={handleAssetImageError} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center text-sm font-bold text-white">
+                        {getInitials(profile.firstName, profile.lastName, profile.email)}
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-2 block truncate text-sm font-bold text-gray-900 dark:text-gray-100">{profile.firstName} {profile.lastName}</span>
+                </button>
+                <button type="button" onClick={() => void unpinProfile(profile.id)} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 opacity-100 shadow-sm hover:border-danger hover:text-danger dark:border-gray-700 dark:bg-gray-900 sm:opacity-0 sm:group-hover:opacity-100" aria-label={`Unpin ${profile.firstName} ${profile.lastName}`} title="Unpin">
+                  <PinOff size={14} />
+                </button>
+              </article>
+            ))}
+          </div>
         </div>
       )}
     </section>
@@ -1322,7 +1371,119 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [selectedProfile, setSelectedProfile] = useState<User | null>(null);
+  const [profileWindowPosition, setProfileWindowPosition] = useState(getInitialProfileWindowPosition);
+  const [isProfileDragging, setIsProfileDragging] = useState(false);
+  const [isMobileProfileLayout, setIsMobileProfileLayout] = useState(() => isMobileViewport());
+  const [profileZIndex, setProfileZIndex] = useState(85);
+  const profileWindowRef = useRef<HTMLDivElement | null>(null);
+  const profileDragOffsetRef = useRef({ x: 0, y: 0 });
   const isAdministrator = currentUser?.role === 'administrator';
+
+  useEffect(() => {
+    const syncProfileLayout = () => {
+      const nextIsMobile = isMobileViewport();
+      setIsMobileProfileLayout(nextIsMobile);
+      if (nextIsMobile) {
+        setIsProfileDragging(false);
+      }
+    };
+
+    syncProfileLayout();
+    window.addEventListener('resize', syncProfileLayout);
+
+    return () => window.removeEventListener('resize', syncProfileLayout);
+  }, []);
+
+  useEffect(() => {
+    const handleFloatingFocus = (event: Event) => {
+      const detail = (event as CustomEvent<{ app?: string }>).detail;
+      setProfileZIndex(detail?.app === 'profile' ? 85 : 58);
+    };
+
+    window.addEventListener('shield:floating-focus', handleFloatingFocus);
+    return () => window.removeEventListener('shield:floating-focus', handleFloatingFocus);
+  }, []);
+
+  useEffect(() => {
+    if (!isProfileDragging || isMobileProfileLayout) {
+      return undefined;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const width = profileWindowRef.current?.offsetWidth || Math.min(window.innerWidth - 24, 920);
+      const height = profileWindowRef.current?.offsetHeight || Math.min(window.innerHeight - 24, 760);
+      const maxX = Math.max(12, window.innerWidth - width - 12);
+      const maxY = Math.max(12, window.innerHeight - height - 12);
+      setProfileWindowPosition({
+        x: Math.min(Math.max(12, event.clientX - profileDragOffsetRef.current.x), maxX),
+        y: Math.min(Math.max(12, event.clientY - profileDragOffsetRef.current.y), maxY),
+      });
+    };
+
+    const stopDragging = () => setIsProfileDragging(false);
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', stopDragging);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', stopDragging);
+    };
+  }, [isProfileDragging, isMobileProfileLayout]);
+
+  useEffect(() => {
+    const keepProfileInView = () => {
+      if (isMobileViewport()) {
+        return;
+      }
+
+      const width = profileWindowRef.current?.offsetWidth || Math.min(window.innerWidth - 24, 920);
+      const height = profileWindowRef.current?.offsetHeight || Math.min(window.innerHeight - 24, 760);
+      const maxX = Math.max(12, window.innerWidth - width - 12);
+      const maxY = Math.max(12, window.innerHeight - height - 12);
+      setProfileWindowPosition((current) => ({
+        x: Math.min(Math.max(12, current.x), maxX),
+        y: Math.min(Math.max(12, current.y), maxY),
+      }));
+    };
+
+    window.addEventListener('resize', keepProfileInView);
+    return () => window.removeEventListener('resize', keepProfileInView);
+  }, []);
+
+  const focusProfileWindow = () => {
+    setProfileZIndex(85);
+    window.dispatchEvent(new CustomEvent('shield:floating-focus', { detail: { app: 'profile' } }));
+  };
+
+  const openPinnedProfile = (user: User) => {
+    focusProfileWindow();
+    setSelectedProfile(null);
+    window.setTimeout(() => setSelectedProfile({ ...user }), 0);
+  };
+
+  const startDraggingProfile = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || isMobileProfileLayout) {
+      return;
+    }
+
+    if ((event.target as HTMLElement).closest('button,a,input,select,textarea')) {
+      return;
+    }
+
+    focusProfileWindow();
+
+    const rect = profileWindowRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return;
+    }
+
+    profileDragOffsetRef.current = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+    setIsProfileDragging(true);
+  };
 
   useEffect(() => {
     if (!isAdministrator) {
@@ -1372,24 +1533,37 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
     return <div className="loading">Loading dashboard...</div>;
   }
 
+  const profileWindow = selectedProfile ? (
+    <div className="pointer-events-none fixed inset-0" style={{ zIndex: profileZIndex }}>
+      <div
+        ref={profileWindowRef}
+        className={`pointer-events-auto fixed inset-0 h-[100dvh] w-full resize-none overflow-hidden rounded-none shadow-[0_30px_90px_rgba(15,23,42,0.42)] ring-1 ring-black/10 dark:ring-white/10 md:inset-auto md:h-[min(92dvh,780px)] md:min-h-[min(560px,calc(100dvh-1.5rem))] md:w-[min(920px,calc(100vw-1.5rem))] md:min-w-[min(420px,calc(100vw-1.5rem))] md:resize md:rounded-lg ${isProfileDragging ? 'md:cursor-grabbing' : ''}`}
+        style={isMobileProfileLayout ? undefined : { left: profileWindowPosition.x, top: profileWindowPosition.y }}
+        onMouseDownCapture={focusProfileWindow}
+      >
+        <UserDetail
+          user={selectedProfile}
+          onClose={() => setSelectedProfile(null)}
+          canEdit={isAdministrator}
+          onHeaderPointerDown={startDraggingProfile}
+          isFloatingProfile
+        />
+      </div>
+    </div>
+  ) : null;
+
   if (!isAdministrator) {
     return (
       <div>
         <div className="mb-8">
           <h1>Dashboard</h1>
         </div>
-        <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={setSelectedProfile} />
+        <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} />
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.4fr)]">
           <QuickNotesWidget currentUser={currentUser} />
           <DashboardNews currentUser={currentUser} />
         </div>
-        {selectedProfile && (
-          <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/50 sm:items-center sm:p-4">
-            <div className="w-full sm:max-w-4xl">
-              <UserDetail user={selectedProfile} onClose={() => setSelectedProfile(null)} />
-            </div>
-          </div>
-        )}
+        {profileWindow}
       </div>
     );
   }
@@ -1407,18 +1581,12 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
 
       {error && <div className="error">{error}</div>}
 
-      <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={setSelectedProfile} />
+      <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.4fr)]">
         <QuickNotesWidget currentUser={currentUser} />
         <DashboardNews currentUser={currentUser} />
       </div>
-      {selectedProfile && (
-        <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/50 sm:items-center sm:p-4">
-          <div className="w-full sm:max-w-4xl">
-            <UserDetail user={selectedProfile} onClose={() => setSelectedProfile(null)} />
-          </div>
-        </div>
-      )}
+      {profileWindow}
     </div>
   );
 };
