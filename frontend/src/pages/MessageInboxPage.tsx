@@ -11,6 +11,7 @@ interface MessageInboxPageProps {
   currentUser: AuthAccount;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
   isModalView?: boolean;
+  targetRecipient?: User | null;
 }
 
 interface MessageThread {
@@ -182,7 +183,7 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-function MessageInboxPage({ currentUser, onToast, isModalView = false }: MessageInboxPageProps) {
+function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRecipient = null }: MessageInboxPageProps) {
   const [inboxMessages, setInboxMessages] = useState<UserMessage[]>([]);
   const [sentMessages, setSentMessages] = useState<UserMessage[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
@@ -215,6 +216,26 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
   const lastTypingSentRef = useRef(0);
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
   const emojiButtonLabel = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
+
+  useEffect(() => {
+    if (!targetRecipient || targetRecipient.id === currentUser.id) {
+      return;
+    }
+
+    if (targetRecipient.receivesMessages === false) {
+      onToast('error', `${targetRecipient.firstName} ${targetRecipient.lastName}`.trim() || 'This user does not receive messages.');
+      return;
+    }
+
+    setDraftRecipient(targetRecipient);
+    setSelectedThreadId(targetRecipient.id);
+    setIsComposeOpen(false);
+    setRecipientQuery('');
+    setRecipientResults([]);
+    setReplyBody('');
+    setReplyAttachments([]);
+    setSearchTerm('');
+  }, [currentUser.id, onToast, targetRecipient]);
 
   const loadMessages = async (showLoading = false) => {
     if (showLoading) {

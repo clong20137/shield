@@ -2743,6 +2743,7 @@ function App() {
   const lastActivityRef = useRef<number>(Date.now());
   const [userNotifications, setUserNotifications] = useState<UserNotification[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notificationCenterTab, setNotificationCenterTab] = useState<'unread' | 'bugs' | 'recent'>('unread');
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -2753,6 +2754,7 @@ function App() {
   const [messagesModalPosition, setMessagesModalPosition] = useState(getInitialMessagesModalPosition);
   const [isDraggingMessagesModal, setIsDraggingMessagesModal] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [messageTargetUser, setMessageTargetUser] = useState<User | null>(null);
   const [calendarModalPosition, setCalendarModalPosition] = useState(getInitialCalendarModalPosition);
   const [isDraggingCalendarModal, setIsDraggingCalendarModal] = useState(false);
   const [isMobileFloatingLayout, setIsMobileFloatingLayout] = useState(() => isMobileViewport());
@@ -3378,6 +3380,7 @@ function App() {
   const isAdministrator = currentUser?.role === 'administrator';
   const openBugCount = bugReports.filter((report) => report.status === 'New' || report.status === 'Pending').length;
   const unreadNotificationCount = userNotifications.filter((notification) => !notification.isRead).length;
+  const unreadUserNotifications = userNotifications.filter((notification) => !notification.isRead);
   const recentNotificationCount = notifications.length;
   const totalNotificationCount = recentNotificationCount + unreadNotificationCount + (isAdministrator ? openBugCount : 0);
   const hasNotificationCenterItems = totalNotificationCount > 0 || userNotifications.length > 0;
@@ -3503,6 +3506,22 @@ function App() {
     setActiveFloatingApp('messages');
     setIsMessagesModalOpen(true);
   };
+
+  useEffect(() => {
+    const openMessageThread = (event: Event) => {
+      const user = (event as CustomEvent<User>).detail;
+      if (!user?.id) {
+        return;
+      }
+
+      setMessageTargetUser(user);
+      openMessagesModal();
+    };
+
+    window.addEventListener('shield:open-message-thread', openMessageThread);
+
+    return () => window.removeEventListener('shield:open-message-thread', openMessageThread);
+  }, [isMessagesModalOpen]);
 
   const toggleMessagesModal = () => {
     if (isMessagesModalOpen) {
@@ -3929,9 +3948,6 @@ function App() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="text-base font-bold text-primary-500 dark:text-blue-100">Notification Center</p>
-                            <p className="mt-1 truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
-                              {totalNotificationCount > 0 ? `${totalNotificationCount} item${totalNotificationCount === 1 ? '' : 's'} need attention` : 'All caught up'}
-                            </p>
                           </div>
                           {hasNotificationCenterItems && (
                             <button
@@ -3943,10 +3959,25 @@ function App() {
                             </button>
                           )}
                         </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-primary-500 ring-1 ring-gray-200 dark:bg-gray-900 dark:text-blue-100 dark:ring-gray-700">{unreadNotificationCount} unread</span>
-                          {isAdministrator && <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-danger ring-1 ring-red-100 dark:bg-gray-900 dark:ring-red-900">{openBugCount} bugs</span>}
-                          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-gray-600 ring-1 ring-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-700">{recentNotificationCount} recent</span>
+                        <div className="mt-3 grid grid-cols-3 gap-1 rounded border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900">
+                          {[
+                            { id: 'unread' as const, label: 'Unread', count: unreadNotificationCount },
+                            { id: 'bugs' as const, label: 'Bugs', count: isAdministrator ? openBugCount : 0 },
+                            { id: 'recent' as const, label: 'Recent', count: recentNotificationCount },
+                          ].map((tab) => (
+                            <button
+                              key={tab.id}
+                              type="button"
+                              onClick={() => setNotificationCenterTab(tab.id)}
+                              className={`rounded px-2 py-2 text-xs font-bold transition ${
+                                notificationCenterTab === tab.id
+                                  ? 'bg-primary-500 text-white shadow-sm'
+                                  : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'
+                              }`}
+                            >
+                              {tab.label} <span className={notificationCenterTab === tab.id ? 'text-blue-100' : 'text-gray-400'}>{tab.count}</span>
+                            </button>
+                          ))}
                         </div>
                       </div>
                       <div className="max-h-[70dvh] overflow-y-auto p-2">
@@ -3960,7 +3991,7 @@ function App() {
                           </div>
                         ) : (
                           <>
-                            {isAdministrator && openBugCount > 0 && (
+                            {notificationCenterTab === 'bugs' && isAdministrator && openBugCount > 0 && (
                               <button
                                 type="button"
                                 onClick={openBugTrackerFromNotification}
@@ -3975,7 +4006,13 @@ function App() {
                                 </span>
                               </button>
                             )}
-                            {userNotifications.map((notification) => (
+                            {notificationCenterTab === 'bugs' && (!isAdministrator || openBugCount === 0) && (
+                              <div className="px-5 py-8 text-center text-sm font-semibold text-gray-500 dark:text-gray-400">No bug reports need review.</div>
+                            )}
+                            {notificationCenterTab === 'unread' && unreadUserNotifications.length === 0 && (
+                              <div className="px-5 py-8 text-center text-sm font-semibold text-gray-500 dark:text-gray-400">No unread notifications.</div>
+                            )}
+                            {notificationCenterTab === 'unread' && unreadUserNotifications.map((notification) => (
                               <button
                                 key={notification.id}
                                 type="button"
@@ -4001,7 +4038,10 @@ function App() {
                                 </span>
                               </button>
                             ))}
-                            {notifications.map((notification) => {
+                            {notificationCenterTab === 'recent' && notifications.length === 0 && (
+                              <div className="px-5 py-8 text-center text-sm font-semibold text-gray-500 dark:text-gray-400">No recent activity.</div>
+                            )}
+                            {notificationCenterTab === 'recent' && notifications.map((notification) => {
                               const title = notification.type === 'success' ? 'Done' : notification.type === 'error' ? 'Needs attention' : 'Heads up';
                               const notificationTone = notification.type === 'success'
                                 ? 'bg-green-50 text-green-700 ring-green-100 dark:bg-green-950/40 dark:text-green-200 dark:ring-green-900'
@@ -4185,7 +4225,7 @@ function App() {
             }}
           />
           {isMessagesModalOpen && currentUser && (
-            <div className="pointer-events-none fixed inset-0" style={{ zIndex: activeFloatingApp === 'messages' ? 70 : 55 }}>
+            <div className="pointer-events-none fixed inset-0" style={{ zIndex: activeFloatingApp === 'messages' ? 95 : 55 }}>
               <div
                 ref={messagesModalRef}
                 className={getModalWindowClass(closingModal === 'messages', `pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[72dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(420px,calc(100dvh-1rem))] md:w-[min(900px,calc(100vw-1rem))] md:min-w-[min(360px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4 ${isDraggingMessagesModal ? 'md:cursor-grabbing' : ''}`)}
@@ -4216,14 +4256,14 @@ function App() {
                 </div>
                 <div className="min-h-0 flex-1">
                   <Suspense fallback={<PageLoader label="Loading messages..." />}>
-                    <MessageInboxPage currentUser={currentUser} onToast={showToast} isModalView />
+                    <MessageInboxPage currentUser={currentUser} onToast={showToast} isModalView targetRecipient={messageTargetUser} />
                   </Suspense>
                 </div>
               </div>
             </div>
           )}
           {isCalendarModalOpen && currentUser && (
-            <div className="pointer-events-none fixed inset-0" style={{ zIndex: activeFloatingApp === 'calendar' ? 70 : 55 }}>
+            <div className="pointer-events-none fixed inset-0" style={{ zIndex: activeFloatingApp === 'calendar' ? 95 : 55 }}>
               <div
                 ref={calendarModalRef}
                 className={getModalWindowClass(closingModal === 'calendar', `pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[82dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(480px,calc(100dvh-1rem))] md:w-[min(1120px,calc(100vw-1rem))] md:min-w-[min(420px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4 ${isDraggingCalendarModal ? 'md:cursor-grabbing' : ''}`)}
@@ -4355,7 +4395,7 @@ function App() {
                 announceFloatingFocus('calculator');
                 setActiveFloatingApp('calculator');
               }}
-              zIndex={activeFloatingApp === 'calculator' ? 70 : 55}
+              zIndex={activeFloatingApp === 'calculator' ? 95 : 55}
             />
           )}
           {isReportBugOpen && (

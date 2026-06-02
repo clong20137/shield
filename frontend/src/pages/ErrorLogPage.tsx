@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { RefreshCw, Search, X } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Check, Copy, Search, X } from 'lucide-react';
 import { ErrorLog, ErrorLogFilters, errorLogService } from '../services/api';
 
 function getErrorText(error: ErrorLog) {
@@ -13,26 +13,77 @@ export function ErrorLogPage() {
   const [selectedLog, setSelectedLog] = useState<ErrorLog | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [copiedErrorId, setCopiedErrorId] = useState<string | null>(null);
 
-  const loadLogs = async (nextFilters = filters, showLoading = true) => {
+  const loadLogs = useCallback(async (nextFilters = filters, showLoading = true) => {
     if (showLoading) setLoading(true);
     setError(null);
     try {
       const response = await errorLogService.getAll(nextFilters);
       setLogs(response.data.data);
       setTotal(response.data.total);
-      setFilters((current) => ({ ...current, page: response.data.page, pageSize: response.data.pageSize }));
+      setFilters((current) => {
+        if (current.page === response.data.page && current.pageSize === response.data.pageSize) {
+          return current;
+        }
+
+        return { ...current, page: response.data.page, pageSize: response.data.pageSize };
+      });
     } catch (err) {
       console.error('Failed to load error logs:', err);
       setError('Failed to load error logs.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   useEffect(() => {
     void loadLogs();
-  }, []);
+    const handleErrorUpdate = () => {
+      void loadLogs(filters, false);
+    };
+
+    window.addEventListener('shield:error-updated', handleErrorUpdate);
+
+    return () => window.removeEventListener('shield:error-updated', handleErrorUpdate);
+  }, [filters, loadLogs]);
+
+  const copyErrorLog = async (log: ErrorLog) => {
+    const text = [
+      `Time: ${new Date(log.createdAt).toLocaleString()}`,
+      `Level: ${log.level}`,
+      `Route: ${log.method || 'N/A'} ${log.route || 'N/A'}`,
+      `User: ${log.userId || 'N/A'}`,
+      `IP: ${log.ipAddress || 'N/A'}`,
+      `User Agent: ${log.userAgent || 'N/A'}`,
+      getErrorText(log),
+    ].join('\n');
+
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const copied = document.execCommand('copy');
+        textArea.remove();
+        if (!copied) {
+          throw new Error('Fallback copy failed');
+        }
+      }
+      setCopiedErrorId(log.id);
+      window.setTimeout(() => setCopiedErrorId((currentId) => (currentId === log.id ? null : currentId)), 1800);
+    } catch (err) {
+      console.error('Failed to copy error log:', err);
+      setError('Failed to copy error log.');
+    }
+  };
 
   const searchLogs = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -46,9 +97,6 @@ export function ErrorLogPage() {
           <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Error Log</h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Unhandled backend errors captured for troubleshooting.</p>
         </div>
-        <button type="button" onClick={() => loadLogs(filters, true)} className="btn-secondary" aria-label="Refresh error logs" title="Refresh">
-          <RefreshCw size={16} />
-        </button>
       </div>
 
       {error && <div className="error">{error}</div>}
@@ -114,9 +162,14 @@ export function ErrorLogPage() {
                 <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Error Details</h2>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{new Date(selectedLog.createdAt).toLocaleString()}</p>
               </div>
-              <button type="button" onClick={() => setSelectedLog(null)} className="icon-close-button" aria-label="Close error details" title="Close">
-                <X size={18} />
-              </button>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => void copyErrorLog(selectedLog)} className="btn-secondary h-9 w-9 p-0" aria-label="Copy error details" title="Copy error details">
+                  {copiedErrorId === selectedLog.id ? <Check size={18} /> : <Copy size={18} />}
+                </button>
+                <button type="button" onClick={() => setSelectedLog(null)} className="icon-close-button" aria-label="Close error details" title="Close">
+                  <X size={18} />
+                </button>
+              </div>
             </div>
             <pre className="max-h-[60vh] overflow-auto rounded bg-gray-950 p-4 text-xs leading-5 text-gray-100">{getErrorText(selectedLog)}</pre>
           </div>

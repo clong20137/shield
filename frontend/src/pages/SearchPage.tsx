@@ -473,6 +473,10 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     setMessageBody((body) => `${body}${emojiData.emoji}`);
   };
 
+  const openMessageThread = (user: User) => {
+    window.dispatchEvent(new CustomEvent('shield:open-message-thread', { detail: user }));
+  };
+
   useEffect(() => {
     handleSearch(globalQuery);
   }, [globalQuery]);
@@ -604,7 +608,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
               user={selectedUser}
               onClose={() => setSelectedUser(null)}
               onEdit={openEditUser}
-              onMessage={setMessageRecipient}
+              onMessage={openMessageThread}
               onToast={onToast}
               canEdit={isAdministrator}
               onHeaderPointerDown={startDraggingProfile}

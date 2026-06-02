@@ -241,23 +241,23 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
 
       <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
         <div className="mb-5 flex flex-col gap-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
             <form onSubmit={submitSearch} className="flex min-w-0 flex-1 gap-2">
               <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
+                <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
                 <input
                   value={draftSearch}
                   onChange={(event) => setDraftSearch(event.target.value)}
-                  className="w-full rounded border border-gray-300 bg-white py-2 pl-12 pr-3 text-sm dark:border-gray-700 dark:bg-gray-950"
+                  className="h-12 w-full rounded-lg border border-gray-300 bg-white py-2 pl-11 pr-3 text-sm font-semibold shadow-sm outline-none transition placeholder:font-normal focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 dark:border-gray-700 dark:bg-gray-950"
                   placeholder="Search actor, action, entity, details, or IP"
                 />
               </div>
-              <button type="submit" className="btn-primary h-10 w-10 p-0" title="Search" aria-label="Search audit logs">
+              <button type="submit" className="btn-primary h-12 w-12 shrink-0 rounded-lg p-0" title="Search" aria-label="Search audit logs">
                 <Search size={18} />
               </button>
             </form>
 
-            <div className="relative flex items-center justify-end">
+            <div className="relative flex items-stretch justify-end">
               <button
                 type="button"
                 onClick={(event) => {
@@ -265,17 +265,17 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
                   setIsExportMenuOpen((value) => !value);
                 }}
                 disabled={exporting || response.total === 0}
-                className="btn-primary relative h-10 w-10 p-0"
+                className="btn-primary relative h-12 w-12 shrink-0 rounded-lg p-0"
                 aria-expanded={isExportMenuOpen}
                 aria-haspopup="menu"
                 aria-label="Export audit logs"
                 title={exporting ? 'Exporting' : 'Export audit logs'}
               >
                 {exporting ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <Download size={16} />}
-                <ChevronDown size={13} className="absolute bottom-1 right-1" />
+                <ChevronDown size={13} className="absolute bottom-1.5 right-1.5" />
               </button>
               {isExportMenuOpen && (
-                <div className="absolute right-0 top-12 z-20 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-950" role="menu">
+                <div className="absolute right-0 top-14 z-20 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-950" role="menu">
                   <button
                     type="button"
                     onClick={(event) => {
