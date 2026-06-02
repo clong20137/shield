@@ -3452,6 +3452,7 @@ function App() {
     eventSource.addEventListener('calendar-updated', handleRealtimeAppUpdate('calendar-updated'));
     eventSource.addEventListener('dashboard-updated', handleRealtimeAppUpdate('dashboard-updated'));
     eventSource.addEventListener('device-updated', handleRealtimeAppUpdate('device-updated'));
+    eventSource.addEventListener('error-updated', handleRealtimeAppUpdate('error-updated'));
     eventSource.addEventListener('mileage-updated', handleRealtimeAppUpdate('mileage-updated'));
     eventSource.addEventListener('performance-evaluation-updated', handleRealtimeAppUpdate('performance-evaluation-updated'));
     eventSource.addEventListener('permission-updated', (event) => {

@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Download, Eye, FileSpreadsheet, Search, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, Eye, FileSpreadsheet, Search, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { auditService, AuditLog, AuditLogFilters, AuditLogResponse } from '../services/api';
 
@@ -32,6 +32,18 @@ function stringifyDetails(details: string | null) {
   }
 
   return typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2);
+}
+
+function buildAuditCopyText(log: AuditLog) {
+  return [
+    `Time: ${new Date(log.createdAt).toLocaleString()}`,
+    `Actor: ${log.actorName || log.actorId || 'System'}`,
+    `Action: ${formatActionLabel(log.action)}`,
+    `Entity: ${log.entityType}${log.entityId ? ` (${log.entityId})` : ''}`,
+    `IP: ${log.ipAddress || 'N/A'}`,
+    `User Agent: ${log.userAgent || 'N/A'}`,
+    `Details: ${stringifyDetails(log.details)}`,
+  ].join('\n');
 }
 
 function formatActionLabel(action: string): string {
@@ -112,6 +124,7 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  const [copiedLogId, setCopiedLogId] = useState<string | null>(null);
 
   const loadLogs = useCallback(async (nextFilters = filters, showLoading = true) => {
     if (showLoading) {
@@ -182,6 +195,34 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
     }
   };
 
+  const copyAuditLog = async (log: AuditLog) => {
+    const text = buildAuditCopyText(log);
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const copied = document.execCommand('copy');
+        textArea.remove();
+        if (!copied) {
+          throw new Error('Fallback copy failed');
+        }
+      }
+      setCopiedLogId(log.id);
+      window.setTimeout(() => setCopiedLogId((currentId) => (currentId === log.id ? null : currentId)), 1800);
+    } catch (err) {
+      console.error('Failed to copy audit log:', err);
+      setError('Failed to copy audit log.');
+    }
+  };
+
   const pageStart = response.total === 0 ? 0 : ((response.page - 1) * response.pageSize) + 1;
   const pageEnd = Math.min(response.total, response.page * response.pageSize);
 
@@ -224,15 +265,14 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
                   setIsExportMenuOpen((value) => !value);
                 }}
                 disabled={exporting || response.total === 0}
-                className="btn-primary h-10 px-3 text-sm font-semibold"
+                className="btn-primary relative h-10 w-10 p-0"
                 aria-expanded={isExportMenuOpen}
                 aria-haspopup="menu"
                 aria-label="Export audit logs"
                 title={exporting ? 'Exporting' : 'Export audit logs'}
               >
-                <Download size={16} className="mr-2" />
-                Export
-                <ChevronDown size={15} className="ml-2" />
+                {exporting ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <Download size={16} />}
+                <ChevronDown size={13} className="absolute bottom-1 right-1" />
               </button>
               {isExportMenuOpen && (
                 <div className="absolute right-0 top-12 z-20 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-950" role="menu">
@@ -335,47 +375,58 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
           <div className="empty-state">No audit log entries match those filters.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1050px] border-collapse text-left">
-              <thead>
-                <tr className="border-b border-gray-200 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+            <table className="w-full min-w-[1050px] border-collapse text-left text-sm">
+              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-950 dark:text-gray-400">
+                <tr className="border-b border-gray-200 dark:border-gray-800">
                   <th className="px-3 py-3">Time</th>
                   <th className="px-3 py-3">Actor</th>
                   <th className="px-3 py-3">Action</th>
                   <th className="px-3 py-3">Entity</th>
                   <th className="px-3 py-3">IP</th>
                   <th className="px-3 py-3">Details</th>
-                  <th className="px-3 py-3 text-right">View</th>
+                  <th className="px-3 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {response.data.map((log) => (
-                  <tr key={log.id} className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="whitespace-nowrap px-3 py-4 text-sm">{new Date(log.createdAt).toLocaleString()}</td>
+                  <tr key={log.id} className="border-b border-gray-100 align-top transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-950">
+                    <td className="whitespace-nowrap px-3 py-4 text-gray-700 dark:text-gray-200">{new Date(log.createdAt).toLocaleString()}</td>
                     <td className="px-3 py-4">
-                      <div className="font-semibold">{log.actorName || 'System'}</div>
+                      <div className="font-bold text-gray-900 dark:text-gray-100">{log.actorName || 'System'}</div>
                       {log.actorId && <div className="text-xs text-gray-500 dark:text-gray-400">{log.actorId}</div>}
                     </td>
                     <td className="px-3 py-4">
-                      <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold uppercase text-accent">{formatActionLabel(log.action)}</span>
+                      <span className="inline-flex rounded-full bg-accent/10 px-2.5 py-1 text-xs font-bold text-accent ring-1 ring-accent/20">{formatActionLabel(log.action)}</span>
                     </td>
                     <td className="px-3 py-4">
-                      <div>{log.entityType}</div>
+                      <div className="font-semibold text-gray-800 dark:text-gray-100">{log.entityType}</div>
                       {log.entityId && <div className="text-xs text-gray-500 dark:text-gray-400">{log.entityId}</div>}
                     </td>
                     <td className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400">{log.ipAddress || 'N/A'}</td>
                     <td className="max-w-xl px-3 py-4 text-sm text-gray-500 dark:text-gray-400">
-                      <div className="truncate" title={stringifyDetails(log.details)}>{summarizeDetails(log.details)}</div>
+                      <div className="line-clamp-2 leading-5" title={stringifyDetails(log.details)}>{summarizeDetails(log.details)}</div>
                     </td>
                     <td className="px-3 py-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedLog(log)}
-                        className="btn-secondary h-9 w-9 p-0"
-                        title="View details"
-                        aria-label="View audit log details"
-                      >
-                        <Eye size={16} />
-                      </button>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void copyAuditLog(log)}
+                          className="btn-secondary h-9 w-9 p-0"
+                          title="Copy audit log"
+                          aria-label="Copy audit log"
+                        >
+                          {copiedLogId === log.id ? <Check size={16} /> : <Copy size={16} />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLog(log)}
+                          className="btn-secondary h-9 w-9 p-0"
+                          title="View details"
+                          aria-label="View audit log details"
+                        >
+                          <Eye size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -419,9 +470,14 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
                 <h2>Audit Details</h2>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{new Date(selectedLog.createdAt).toLocaleString()}</p>
               </div>
-              <button type="button" className="btn-secondary h-9 w-9 p-0" onClick={() => setSelectedLog(null)} aria-label="Close audit details">
-                <X size={18} />
-              </button>
+              <div className="flex gap-2">
+                <button type="button" className="btn-secondary h-9 w-9 p-0" onClick={() => void copyAuditLog(selectedLog)} aria-label="Copy audit details" title="Copy audit details">
+                  {copiedLogId === selectedLog.id ? <Check size={18} /> : <Copy size={18} />}
+                </button>
+                <button type="button" className="btn-secondary h-9 w-9 p-0" onClick={() => setSelectedLog(null)} aria-label="Close audit details">
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             <div className="grid gap-3 text-sm md:grid-cols-2">

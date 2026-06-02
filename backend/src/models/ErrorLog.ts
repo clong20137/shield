@@ -1,6 +1,7 @@
 import { RowDataPacket } from 'mysql2';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database';
+import { broadcastAppEvent } from '../services/appEvents';
 
 export interface ErrorLog {
   id: string;
@@ -35,12 +36,13 @@ export class ErrorLogModel {
   static async create(log: Omit<ErrorLog, 'id' | 'createdAt'>): Promise<void> {
     const conn = await pool.getConnection();
     try {
+      const id = uuidv4();
       await conn.query(
         `INSERT INTO error_logs (
           \`id\`, \`level\`, \`message\`, \`stack\`, \`route\`, \`method\`, \`userId\`, \`ipAddress\`, \`userAgent\`
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          uuidv4(),
+          id,
           log.level,
           log.message,
           log.stack,
@@ -51,6 +53,7 @@ export class ErrorLogModel {
           log.userAgent,
         ]
       );
+      broadcastAppEvent({ type: 'error-updated', entityId: id });
     } finally {
       conn.release();
     }
