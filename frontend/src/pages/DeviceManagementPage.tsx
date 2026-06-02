@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Ban, CheckCircle2, Download, Eye, FileText, Laptop, Pencil, Plus, Printer, QrCode, Radio, Router, Save, Smartphone, Trash2, Upload, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, deviceService, DeviceEvent, DeviceRecord } from '../services/api';
 
@@ -122,6 +122,18 @@ function isDueSoon(value: string): boolean {
   return target <= Date.now() + thirtyDays;
 }
 
+function isMobileViewport() {
+  return window.innerWidth < 768;
+}
+
+function getInitialDeviceModalPosition() {
+  const width = Math.min(window.innerWidth - 16, 1152);
+  return {
+    x: Math.max(8, Math.round((window.innerWidth - width) / 2)),
+    y: Math.max(8, Math.round(window.innerHeight * 0.04)),
+  };
+}
+
 function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null }) {
   const [devices, setDevices] = useState<DeviceRecord[]>([]);
   const [registeredUsers, setRegisteredUsers] = useState<AuthAccount[]>([]);
@@ -139,6 +151,11 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [eventNotes, setEventNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deviceModalPosition, setDeviceModalPosition] = useState(getInitialDeviceModalPosition);
+  const [isDeviceModalDragging, setIsDeviceModalDragging] = useState(false);
+  const [isMobileDeviceModal, setIsMobileDeviceModal] = useState(() => isMobileViewport());
+  const deviceModalRef = useRef<HTMLDivElement | null>(null);
+  const deviceModalDragOffsetRef = useRef({ x: 0, y: 0 });
 
   const canManageDevices = currentUser?.role === 'administrator';
   const actor = { actorId: currentUser?.id, actorName: currentUser?.displayName || currentUser?.email };
@@ -179,6 +196,68 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     window.addEventListener('shield:device-updated', handleDeviceDetailUpdate);
     return () => window.removeEventListener('shield:device-updated', handleDeviceDetailUpdate);
   }, [detailDevice?.id]);
+
+  useEffect(() => {
+    const syncDeviceModalLayout = () => {
+      const nextIsMobile = isMobileViewport();
+      setIsMobileDeviceModal(nextIsMobile);
+      if (nextIsMobile) {
+        setIsDeviceModalDragging(false);
+      }
+    };
+
+    syncDeviceModalLayout();
+    window.addEventListener('resize', syncDeviceModalLayout);
+    return () => window.removeEventListener('resize', syncDeviceModalLayout);
+  }, []);
+
+  useEffect(() => {
+    if (!isDeviceModalDragging || isMobileDeviceModal) {
+      return undefined;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const width = deviceModalRef.current?.offsetWidth || Math.min(window.innerWidth - 16, 1152);
+      const height = deviceModalRef.current?.offsetHeight || Math.min(window.innerHeight - 16, 760);
+      const maxX = Math.max(8, window.innerWidth - width - 8);
+      const maxY = Math.max(8, window.innerHeight - height - 8);
+
+      setDeviceModalPosition({
+        x: Math.min(Math.max(8, event.clientX - deviceModalDragOffsetRef.current.x), maxX),
+        y: Math.min(Math.max(8, event.clientY - deviceModalDragOffsetRef.current.y), maxY),
+      });
+    };
+
+    const stopDragging = () => setIsDeviceModalDragging(false);
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', stopDragging);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', stopDragging);
+    };
+  }, [isDeviceModalDragging, isMobileDeviceModal]);
+
+  useEffect(() => {
+    const keepDeviceModalInView = () => {
+      if (isMobileViewport()) {
+        return;
+      }
+
+      const width = deviceModalRef.current?.offsetWidth || Math.min(window.innerWidth - 16, 1152);
+      const height = deviceModalRef.current?.offsetHeight || Math.min(window.innerHeight - 16, 760);
+      const maxX = Math.max(8, window.innerWidth - width - 8);
+      const maxY = Math.max(8, window.innerHeight - height - 8);
+      setDeviceModalPosition((current) => ({
+        x: Math.min(Math.max(8, current.x), maxX),
+        y: Math.min(Math.max(8, current.y), maxY),
+      }));
+    };
+
+    window.addEventListener('resize', keepDeviceModalInView);
+    return () => window.removeEventListener('resize', keepDeviceModalInView);
+  }, []);
 
   const loadRegisteredUsers = async () => {
     if (!currentUser) {
@@ -310,6 +389,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setEditingId(device.id);
     setForm(toDeviceForm(device));
     setEventNotes('');
+    setDeviceModalPosition(getInitialDeviceModalPosition());
     setIsDeviceFormOpen(true);
   };
 
@@ -317,6 +397,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setEditingId(null);
     setForm(defaultDeviceForm);
     setEventNotes('');
+    setDeviceModalPosition(getInitialDeviceModalPosition());
     setIsDeviceFormOpen(true);
   };
 
@@ -325,6 +406,28 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setEditingId(null);
     setForm(defaultDeviceForm);
     setEventNotes('');
+    setIsDeviceModalDragging(false);
+  };
+
+  const startDraggingDeviceModal = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || isMobileDeviceModal) {
+      return;
+    }
+
+    if ((event.target as HTMLElement).closest('button,a,input,select,textarea,label')) {
+      return;
+    }
+
+    const rect = deviceModalRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return;
+    }
+
+    deviceModalDragOffsetRef.current = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+    setIsDeviceModalDragging(true);
   };
 
   const updateDeviceStatus = async (device: DeviceRecord, status: DeviceStatus, action: string) => {
@@ -644,17 +747,26 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       </section>
 
       {canManageDevices && isDeviceFormOpen && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="modal-window flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-6">
-            <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
+        <div className="pointer-events-none fixed inset-0 z-50 bg-black/50 md:bg-black/25">
+          <div
+            ref={deviceModalRef}
+            className={`pointer-events-auto modal-window fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-4 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[82dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(520px,calc(100dvh-1rem))] md:w-[min(1152px,calc(100vw-1rem))] md:min-w-[min(520px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg sm:p-6 ${isDeviceModalDragging ? 'md:cursor-grabbing' : ''}`}
+            style={isMobileDeviceModal ? undefined : { left: deviceModalPosition.x, top: deviceModalPosition.y }}
+          >
+            <div
+              onPointerDown={startDraggingDeviceModal}
+              className={`mb-5 flex select-none items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800 md:touch-none md:cursor-grab ${isDeviceModalDragging ? 'md:cursor-grabbing' : ''}`}
+            >
               <div>
                 <h2>{editingId ? 'Edit Device' : 'Add Device'}</h2>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   Track assignment, identifiers, lifecycle dates, and device condition.
+                  <span className="hidden md:inline"> Drag to move. Resize from the corner.</span>
                 </p>
               </div>
               <button
                 type="button"
+                onPointerDown={(event) => event.stopPropagation()}
                 onClick={closeDeviceFormModal}
                 className="icon-close-button"
                 aria-label="Close device form"
