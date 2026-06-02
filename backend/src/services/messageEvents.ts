@@ -2,13 +2,16 @@ import { Response } from 'express';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { UserMessage } from '../models/UserMessage';
 
-export type MessageEventType = 'message-created' | 'message-read' | 'message-archived' | 'message-deleted' | 'presence-updated';
+export type MessageEventType = 'message-created' | 'message-read' | 'message-archived' | 'message-deleted' | 'message-reaction' | 'message-typing' | 'presence-updated';
 
 interface MessageEventPayload {
   type: MessageEventType;
   message?: UserMessage;
   messageId?: string;
   actorAccountId?: string;
+  typingThreadId?: string;
+  typingName?: string;
+  typingIsActive?: boolean;
   actorOnline?: boolean;
   actorLastSeenAt?: string;
 }

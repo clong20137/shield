@@ -162,6 +162,66 @@ export class MessageController {
     }
   }
 
+  static async setReaction(req: Request, res: Response) {
+    try {
+      const accountId = cleanString(req.body?.accountId, 36);
+      const rawReaction = cleanString(req.body?.reaction, 30);
+      const allowedReactions = new Set(['thumbsUp', 'check', 'laugh', 'heart', 'eyes']);
+      const reaction = rawReaction && allowedReactions.has(rawReaction) ? rawReaction : null;
+
+      if (!accountId) {
+        return res.status(400).json({ error: 'Account is required' });
+      }
+
+      const updated = await UserMessageModel.setReaction(req.params.id, accountId, reaction);
+      if (!updated) {
+        return res.status(404).json({ error: 'Message not found' });
+      }
+
+      const message = await UserMessageModel.getById(req.params.id);
+      broadcastMessageEvent(
+        message ? [message.senderAccountId, message.recipientUserId] : [accountId],
+        {
+          type: 'message-reaction',
+          ...(message ? { message } : {}),
+          messageId: req.params.id,
+          actorAccountId: accountId,
+        }
+      );
+
+      res.json(message || { message: 'Reaction updated' });
+    } catch (error) {
+      console.error('Message reaction error:', error);
+      res.status(500).json({ error: 'Failed to update reaction' });
+    }
+  }
+
+  static async typing(req: Request, res: Response) {
+    try {
+      const senderAccountId = cleanString(req.body?.senderAccountId, 36);
+      const recipientUserId = cleanString(req.body?.recipientUserId, 36);
+      const typingName = cleanString(req.body?.typingName, 150);
+      const typingIsActive = req.body?.isTyping !== false;
+
+      if (!senderAccountId || !recipientUserId) {
+        return res.status(400).json({ error: 'Sender and recipient are required' });
+      }
+
+      broadcastMessageEvent([recipientUserId], {
+        type: 'message-typing',
+        actorAccountId: senderAccountId,
+        typingThreadId: senderAccountId,
+        typingName: typingName || 'Someone',
+        typingIsActive,
+      });
+
+      res.json({ message: 'Typing status sent' });
+    } catch (error) {
+      console.error('Message typing error:', error);
+      res.status(500).json({ error: 'Failed to update typing status' });
+    }
+  }
+
   static async archiveMessage(req: Request, res: Response) {
     try {
       const recipientUserId = cleanString(req.body?.recipientUserId, 36);

@@ -472,6 +472,8 @@ export interface UserMessage {
   subject: string;
   body: string;
   isRead: boolean;
+  senderReaction?: string | null;
+  recipientReaction?: string | null;
   createdAt: string;
   senderName?: string;
   senderEmail?: string;
@@ -846,6 +848,12 @@ export const messageService = {
 
   markRead: (messageId: string, recipientUserId: string) =>
     api.put(`/messages/${messageId}/read`, { recipientUserId }),
+
+  react: (messageId: string, accountId: string, reaction: string | null) =>
+    api.put<UserMessage>(`/messages/${messageId}/reaction`, { accountId, reaction }),
+
+  sendTyping: (senderAccountId: string, recipientUserId: string, typingName: string, isTyping = true) =>
+    api.post('/messages/typing', { senderAccountId, recipientUserId, typingName, isTyping }),
 
   archive: (messageId: string, recipientUserId: string) =>
     api.put(`/messages/${messageId}/archive`, { recipientUserId }),

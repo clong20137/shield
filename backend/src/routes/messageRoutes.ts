@@ -9,7 +9,9 @@ router.post('/', requirePermission('messages:send'), requireSelfOrPermission((re
 router.get('/inbox/:accountId', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), MessageController.listInbox);
 router.get('/sent/:accountId', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), MessageController.listSent);
 router.get('/user/:userId', requireSelfOrPermission((req) => req.params.userId, 'roles:manage'), MessageController.listMessagesForUser);
+router.post('/typing', requireSelfOrPermission((req) => req.body?.senderAccountId, 'roles:manage'), MessageController.typing);
 router.put('/:id/read', requireSelfOrPermission((req) => req.body?.recipientUserId, 'roles:manage'), MessageController.markRead);
+router.put('/:id/reaction', requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), MessageController.setReaction);
 router.put('/:id/archive', requireSelfOrPermission((req) => req.body?.recipientUserId, 'roles:manage'), MessageController.archiveMessage);
 router.delete('/:id', requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), MessageController.deleteMessage);
 

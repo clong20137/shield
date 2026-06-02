@@ -376,6 +376,8 @@ export async function initializeDatabase() {
   await ensureColumn('user_messages', 'isArchived', '`isArchived` BOOLEAN DEFAULT 0');
   await ensureColumn('user_messages', 'senderDeleted', '`senderDeleted` BOOLEAN DEFAULT 0');
   await ensureColumn('user_messages', 'recipientDeleted', '`recipientDeleted` BOOLEAN DEFAULT 0');
+  await ensureColumn('user_messages', 'senderReaction', '`senderReaction` VARCHAR(30)');
+  await ensureColumn('user_messages', 'recipientReaction', '`recipientReaction` VARCHAR(30)');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS calendar_entries (

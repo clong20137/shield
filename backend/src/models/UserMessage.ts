@@ -12,6 +12,8 @@ export interface UserMessage {
   isArchived: boolean;
   senderDeleted: boolean;
   recipientDeleted: boolean;
+  senderReaction?: string | null;
+  recipientReaction?: string | null;
   createdAt: Date;
   senderName?: string;
   senderEmail?: string;
@@ -37,6 +39,8 @@ interface UserMessageRow extends RowDataPacket {
   isArchived: boolean | number;
   senderDeleted: boolean | number;
   recipientDeleted: boolean | number;
+  senderReaction?: string | null;
+  recipientReaction?: string | null;
   createdAt: Date;
   senderName?: string;
   senderEmail?: string;
@@ -63,6 +67,8 @@ function toUserMessage(row: UserMessageRow): UserMessage {
     isArchived: Boolean(row.isArchived),
     senderDeleted: Boolean(row.senderDeleted),
     recipientDeleted: Boolean(row.recipientDeleted),
+    senderReaction: row.senderReaction || null,
+    recipientReaction: row.recipientReaction || null,
     createdAt: row.createdAt,
     senderName: row.senderName,
     senderEmail: row.senderEmail,
@@ -225,6 +231,24 @@ export class UserMessageModel {
       const [result] = await conn.query<ResultSetHeader>(
         'UPDATE user_messages SET `isRead` = 1 WHERE `id` = ? AND `recipientUserId` = ?',
         [messageId, recipientUserId]
+      );
+
+      return result.affectedRows > 0;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async setReaction(messageId: string, accountId: string, reaction: string | null): Promise<boolean> {
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>(
+        `UPDATE user_messages
+        SET
+          \`senderReaction\` = CASE WHEN \`senderAccountId\` = ? THEN ? ELSE \`senderReaction\` END,
+          \`recipientReaction\` = CASE WHEN \`recipientUserId\` = ? THEN ? ELSE \`recipientReaction\` END
+        WHERE \`id\` = ? AND (\`senderAccountId\` = ? OR \`recipientUserId\` = ?)`,
+        [accountId, reaction, accountId, reaction, messageId, accountId, accountId]
       );
 
       return result.affectedRows > 0;

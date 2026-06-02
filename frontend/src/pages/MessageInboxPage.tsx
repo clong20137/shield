@@ -1,5 +1,5 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, CheckCheck, Paperclip, Plus, Send, Trash2, X } from 'lucide-react';
+import { Check, CheckCheck, Pin, PinOff, Search, Share2, SmilePlus, Paperclip, Plus, Send, Trash2, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, userService, User, UserMessage } from '../services/api';
 import { RankBadge } from '../components/RankBadge';
@@ -26,6 +26,15 @@ interface MessageThread {
   messages: UserMessage[];
   unreadCount: number;
 }
+
+const PINNED_THREADS_KEY_PREFIX = 'shield_pinned_message_threads';
+const messageReactionOptions = [
+  { key: 'thumbsUp', label: 'Thumbs up', icon: '👍' },
+  { key: 'check', label: 'Check', icon: '✅' },
+  { key: 'laugh', label: 'Laugh', icon: '😂' },
+  { key: 'heart', label: 'Heart', icon: '❤️' },
+  { key: 'eyes', label: 'Eyes', icon: '👀' },
+] as const;
 
 function formatMessageTime(value: string): string {
   const date = new Date(value);
@@ -144,6 +153,18 @@ function getDeliveryLabel(message: UserMessage): string {
   return message.isRead ? 'Read' : 'Delivered';
 }
 
+function getMessageReactionForUser(message: UserMessage, accountId: string): string | null {
+  return message.senderAccountId === accountId ? message.senderReaction || null : message.recipientReaction || null;
+}
+
+function getMessageReactionForOtherUser(message: UserMessage, accountId: string): string | null {
+  return message.senderAccountId === accountId ? message.recipientReaction || null : message.senderReaction || null;
+}
+
+function getReactionIcon(reaction?: string | null): string {
+  return messageReactionOptions.find((option) => option.key === reaction)?.icon || '';
+}
+
 function normalizeSubject(subject: string): string {
   return subject.replace(/^(re:\s*)+/iu, '').trim() || 'Message';
 }
@@ -170,6 +191,16 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [threadSearchTerm, setThreadSearchTerm] = useState('');
+  const [unreadDividerMessageId, setUnreadDividerMessageId] = useState<string | null>(null);
+  const [pinnedThreadIds, setPinnedThreadIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(`${PINNED_THREADS_KEY_PREFIX}_${currentUser.id}`) || '[]') as string[];
+    } catch {
+      return [];
+    }
+  });
+  const [typingByThread, setTypingByThread] = useState<Record<string, { name: string; expiresAt: number }>>({});
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [recipientQuery, setRecipientQuery] = useState('');
@@ -180,6 +211,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
   const [threadPendingDelete, setThreadPendingDelete] = useState<MessageThread | null>(null);
   const [selectedMentionUser, setSelectedMentionUser] = useState<User | null>(null);
   const [presenceByAccount, setPresenceByAccount] = useState<Record<string, { online: boolean; lastSeenAt: string }>>({});
+  const typingStopTimerRef = useRef<number | null>(null);
+  const lastTypingSentRef = useRef(0);
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
   const emojiButtonLabel = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
 
@@ -208,6 +241,48 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
     const eventsUrl = getMessageEventsUrl();
     const eventSource = eventsUrl ? new EventSource(eventsUrl) : null;
     const handleRealtimeMessageUpdate = () => loadMessages(false);
+    const handleMessageUpdate = (event: MessageEvent<string>) => {
+      try {
+        const payload = JSON.parse(event.data) as { message?: UserMessage };
+        if (!payload.message) {
+          void loadMessages(false);
+          return;
+        }
+        setInboxMessages((messages) => messages.map((message) => (message.id === payload.message?.id ? payload.message : message)));
+        setSentMessages((messages) => messages.map((message) => (message.id === payload.message?.id ? payload.message : message)));
+      } catch (err) {
+        console.error('Message update parse error:', err);
+        void loadMessages(false);
+      }
+    };
+    const handleTypingUpdate = (event: MessageEvent<string>) => {
+      try {
+        const payload = JSON.parse(event.data) as {
+          actorAccountId?: string;
+          typingThreadId?: string;
+          typingName?: string;
+          typingIsActive?: boolean;
+        };
+        if (!payload.actorAccountId || payload.actorAccountId === currentUser.id) {
+          return;
+        }
+        const threadId = payload.typingThreadId || payload.actorAccountId;
+        setTypingByThread((current) => {
+          const next = { ...current };
+          if (payload.typingIsActive === false) {
+            delete next[threadId];
+          } else {
+            next[threadId] = {
+              name: payload.typingName || 'Someone',
+              expiresAt: Date.now() + 3500,
+            };
+          }
+          return next;
+        });
+      } catch (err) {
+        console.error('Typing update parse error:', err);
+      }
+    };
     const handlePresenceUpdate = (event: MessageEvent<string>) => {
       try {
         const payload = JSON.parse(event.data) as {
@@ -234,6 +309,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
     };
     eventSource?.addEventListener('message-created', handleRealtimeMessageUpdate);
     eventSource?.addEventListener('message-read', handleRealtimeMessageUpdate);
+    eventSource?.addEventListener('message-reaction', handleMessageUpdate);
+    eventSource?.addEventListener('message-typing', handleTypingUpdate);
     eventSource?.addEventListener('message-archived', handleRealtimeMessageUpdate);
     eventSource?.addEventListener('message-deleted', handleRealtimeMessageUpdate);
     eventSource?.addEventListener('presence-updated', handlePresenceUpdate);
@@ -243,6 +320,22 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
 
     return () => eventSource?.close();
   }, [currentUser.id]);
+
+  useEffect(() => {
+    window.localStorage.setItem(`${PINNED_THREADS_KEY_PREFIX}_${currentUser.id}`, JSON.stringify(pinnedThreadIds));
+  }, [currentUser.id, pinnedThreadIds]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      setTypingByThread((current) => {
+        const entries = Object.entries(current).filter(([, value]) => value.expiresAt > now);
+        return entries.length === Object.keys(current).length ? current : Object.fromEntries(entries);
+      });
+    }, 1200);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!isComposeOpen || recipientQuery.trim().length < 2) {
@@ -314,10 +407,16 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       }
     });
 
-    return Array.from(threadMap.values()).sort(
-      (a, b) => new Date(b.latestMessage?.createdAt || 0).getTime() - new Date(a.latestMessage?.createdAt || 0).getTime(),
-    );
-  }, [currentUser.id, inboxMessages, sentMessages]);
+    return Array.from(threadMap.values()).sort((a, b) => {
+      const aPinned = pinnedThreadIds.includes(a.id);
+      const bPinned = pinnedThreadIds.includes(b.id);
+      if (aPinned !== bPinned) {
+        return aPinned ? -1 : 1;
+      }
+
+      return new Date(b.latestMessage?.createdAt || 0).getTime() - new Date(a.latestMessage?.createdAt || 0).getTime();
+    });
+  }, [currentUser.id, inboxMessages, pinnedThreadIds, sentMessages]);
 
   const filteredThreads = useMemo(() => {
     const existingDraftThread = draftRecipient && threads.some((thread) => thread.id === draftRecipient.id);
@@ -345,12 +444,34 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
         thread.contactEmail,
         thread.subject,
         thread.latestMessage?.body || '',
+        ...thread.messages.map((message) => message.body),
       ].join(' ').toLowerCase().includes(term),
     );
   }, [draftRecipient, searchTerm, threads]);
 
   const selectedThread = filteredThreads.find((thread) => thread.id === selectedThreadId) || null;
   const selectedThreadAcceptsMessages = selectedThread?.contactReceivesMessages !== false;
+  const selectedTyping = selectedThreadId ? typingByThread[selectedThreadId] : null;
+  const displayedMessages = useMemo(() => {
+    if (!selectedThread) {
+      return [];
+    }
+
+    const term = threadSearchTerm.trim().toLowerCase();
+    if (!term) {
+      return selectedThread.messages;
+    }
+
+    return selectedThread.messages.filter((message) =>
+      [
+        message.body,
+        message.senderName || '',
+        message.senderEmail || '',
+        message.recipientName || '',
+        message.recipientEmail || '',
+      ].join(' ').toLowerCase().includes(term),
+    );
+  }, [selectedThread, threadSearchTerm]);
   const getThreadPresence = (thread: MessageThread) => {
     const realtimePresence = presenceByAccount[thread.id];
     const lastSeenAt = realtimePresence?.lastSeenAt || thread.contactLastSeenAt;
@@ -372,6 +493,18 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
   useEffect(() => {
     latestMessageRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
   }, [selectedThreadId, selectedThread?.messages.length]);
+
+  useEffect(() => {
+    if (!selectedThread) {
+      setUnreadDividerMessageId(null);
+      setThreadSearchTerm('');
+      return;
+    }
+
+    const firstUnread = selectedThread.messages.find((message) => message.recipientUserId === currentUser.id && !message.isRead);
+    setUnreadDividerMessageId(firstUnread?.id || null);
+    setThreadSearchTerm('');
+  }, [currentUser.id, selectedThreadId]);
 
   useEffect(() => {
     if (!selectedThread) return;
@@ -450,6 +583,92 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
     setReplyBody((body) => `${body}${emojiData.emoji}`);
   };
 
+  const togglePinnedThread = (threadId: string) => {
+    setPinnedThreadIds((current) => (
+      current.includes(threadId) ? current.filter((id) => id !== threadId) : [threadId, ...current]
+    ));
+  };
+
+  const updateReplyBody = (value: string) => {
+    setReplyBody(value);
+
+    if (!selectedThread || !selectedThreadAcceptsMessages) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastTypingSentRef.current > 1600) {
+      lastTypingSentRef.current = now;
+      messageService.sendTyping(
+        currentUser.id,
+        selectedThread.id,
+        currentUser.displayName || currentUser.email || 'Someone',
+        true,
+      ).catch((err) => console.error('Failed to send typing status:', err));
+    }
+
+    if (typingStopTimerRef.current) {
+      window.clearTimeout(typingStopTimerRef.current);
+    }
+
+    typingStopTimerRef.current = window.setTimeout(() => {
+      messageService.sendTyping(
+        currentUser.id,
+        selectedThread.id,
+        currentUser.displayName || currentUser.email || 'Someone',
+        false,
+      ).catch((err) => console.error('Failed to clear typing status:', err));
+    }, 1800);
+  };
+
+  const reactToMessage = async (message: UserMessage, reaction: string) => {
+    const currentReaction = getMessageReactionForUser(message, currentUser.id);
+    const nextReaction = currentReaction === reaction ? null : reaction;
+    try {
+      const response = await messageService.react(message.id, currentUser.id, nextReaction);
+      const updatedMessage = response.data;
+      setInboxMessages((messages) => messages.map((item) => (item.id === updatedMessage.id ? updatedMessage : item)));
+      setSentMessages((messages) => messages.map((item) => (item.id === updatedMessage.id ? updatedMessage : item)));
+    } catch (err) {
+      console.error('Failed to react to message:', err);
+      onToast('error', 'Failed to update reaction.');
+    }
+  };
+
+  const shareSelectedProfile = async () => {
+    if (!selectedThread) {
+      return;
+    }
+
+    if (!selectedThreadAcceptsMessages) {
+      onToast('error', `${selectedThread.contactName} is not accepting messages right now.`);
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      await messageService.send({
+        senderAccountId: currentUser.id,
+        recipientUserId: selectedThread.id,
+        subject: selectedThread.subject,
+        body: [
+          'Shared profile',
+          selectedThread.contactName,
+          selectedThread.contactRank ? `Rank: ${selectedThread.contactRank}` : '',
+          selectedThread.contactEmail ? `Email: ${selectedThread.contactEmail}` : '',
+        ].filter(Boolean).join('\n'),
+      });
+      await loadMessages(false);
+      window.dispatchEvent(new CustomEvent('shield:messages-updated'));
+      onToast('success', 'Profile shared.');
+    } catch (err) {
+      console.error('Failed to share profile:', err);
+      onToast('error', 'Failed to share profile.');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   const sendReply = async (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
 
@@ -473,6 +692,15 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       });
       setReplyBody('');
       setReplyAttachments([]);
+      if (typingStopTimerRef.current) {
+        window.clearTimeout(typingStopTimerRef.current);
+      }
+      messageService.sendTyping(
+        currentUser.id,
+        selectedThread.id,
+        currentUser.displayName || currentUser.email || 'Someone',
+        false,
+      ).catch((err) => console.error('Failed to clear typing status:', err));
       setDraftRecipient(null);
       await loadMessages(false);
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
@@ -665,6 +893,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
             <div className="min-h-0 flex-1 divide-y divide-gray-200 overflow-y-auto pb-20 dark:divide-gray-800">
               {filteredThreads.map((thread) => {
                 const presence = getThreadPresence(thread);
+                const isPinned = pinnedThreadIds.includes(thread.id);
                 return (
                   <div
                     key={thread.id}
@@ -680,7 +909,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                       <div className="flex min-w-0 items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className={`truncate text-sm ${thread.unreadCount > 0 ? 'font-bold text-primary-500' : 'font-semibold text-gray-800 dark:text-gray-100'}`}>
-                            <span className="truncate">{thread.contactName}</span>
+                            <span className="truncate">{isPinned ? 'Pinned ' : ''}{thread.contactName}</span>
                           </p>
                           <p className="mt-0.5 truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
                             {presence.label}
@@ -698,6 +927,15 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                           </span>
                         )}
                       </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => togglePinnedThread(thread.id)}
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-accent/10 ${isPinned ? 'text-accent' : 'text-gray-500'} sm:h-9 sm:w-9`}
+                      aria-label={isPinned ? 'Unpin conversation' : 'Pin conversation'}
+                      title={isPinned ? 'Unpin conversation' : 'Pin conversation'}
+                    >
+                      {isPinned ? <PinOff size={16} /> : <Pin size={16} />}
                     </button>
                     <button
                       type="button"
@@ -735,7 +973,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
           ) : (
             <>
               <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-800">
-                <div className="flex items-center justify-center gap-3 text-center">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
                   <div className="relative shrink-0">
                     {selectedThread.contactProfilePictureUrl ? (
                       <img
@@ -767,7 +1006,41 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                       </p>
                     )}
                   </div>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => togglePinnedThread(selectedThread.id)}
+                      className="btn-secondary"
+                      aria-label={pinnedThreadIds.includes(selectedThread.id) ? 'Unpin conversation' : 'Pin conversation'}
+                      title={pinnedThreadIds.includes(selectedThread.id) ? 'Unpin Conversation' : 'Pin Conversation'}
+                    >
+                      {pinnedThreadIds.includes(selectedThread.id) ? <PinOff size={16} /> : <Pin size={16} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={shareSelectedProfile}
+                      className="btn-secondary"
+                      disabled={isSending || !selectedThreadAcceptsMessages}
+                      aria-label="Share profile"
+                      title="Share Profile"
+                    >
+                      <Share2 size={16} />
+                    </button>
+                  </div>
                 </div>
+                <div className="mt-3 flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-950">
+                  <Search size={15} className="shrink-0 text-gray-400" />
+                  <input
+                    value={threadSearchTerm}
+                    onChange={(event) => setThreadSearchTerm(event.target.value)}
+                    placeholder="Search this conversation"
+                    className="min-h-0 flex-1 border-0 bg-transparent p-0 text-sm outline-none focus:ring-0 dark:bg-transparent"
+                  />
+                </div>
+                {selectedTyping && (
+                  <p className="mt-2 text-xs font-semibold text-accent">{selectedTyping.name} is typing...</p>
+                )}
               </div>
 
               <div className="flex-1 space-y-4 overflow-y-auto bg-gray-50 p-3 dark:bg-gray-950 sm:p-4">
@@ -779,15 +1052,29 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                     </div>
                   </div>
                 )}
-                {selectedThread.messages.map((message, index) => {
+                {selectedThread.messages.length > 0 && displayedMessages.length === 0 && (
+                  <div className="flex h-full min-h-48 items-center justify-center text-center text-sm font-semibold text-gray-500">
+                    No messages match this search.
+                  </div>
+                )}
+                {displayedMessages.map((message, index) => {
                   const isMine = message.senderAccountId === currentUser.id;
-                  const previousMessage = selectedThread.messages[index - 1];
+                  const previousMessage = displayedMessages[index - 1];
+                  const myReaction = getMessageReactionForUser(message, currentUser.id);
+                  const otherReaction = getMessageReactionForOtherUser(message, currentUser.id);
                   const showTimestamp =
                     !previousMessage ||
                     new Date(message.createdAt).getTime() - new Date(previousMessage.createdAt).getTime() > 10 * 60 * 1000;
 
                   return (
-                    <div key={message.id} ref={index === selectedThread.messages.length - 1 ? latestMessageRef : undefined}>
+                    <div key={message.id} ref={index === displayedMessages.length - 1 ? latestMessageRef : undefined}>
+                      {unreadDividerMessageId === message.id && !threadSearchTerm.trim() && (
+                        <div className="my-3 flex items-center gap-3">
+                          <span className="h-px flex-1 bg-accent/30" />
+                          <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold uppercase text-accent">Unread</span>
+                          <span className="h-px flex-1 bg-accent/30" />
+                        </div>
+                      )}
                       {showTimestamp && (
                         <div className="mb-3 text-center text-xs font-semibold text-gray-400">
                           {new Date(message.createdAt).toLocaleString(undefined, {
@@ -814,7 +1101,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                               />
                             </p>
                           </div>
-                          <div className={`mt-1 flex items-center gap-2 text-xs font-semibold text-gray-400 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                          {(myReaction || otherReaction) && (
+                            <div className={`mt-1 flex gap-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                              {otherReaction && <span className="rounded-full bg-white px-2 py-0.5 text-xs shadow dark:bg-gray-900">{getReactionIcon(otherReaction)}</span>}
+                              {myReaction && <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs text-accent shadow">{getReactionIcon(myReaction)}</span>}
+                            </div>
+                          )}
+                          <div className={`mt-1 flex flex-wrap items-center gap-1.5 text-xs font-semibold text-gray-400 ${isMine ? 'justify-end' : 'justify-start'}`}>
                             <span>{formatMessageTime(message.createdAt)}</span>
                             {isMine && (
                               <span className="inline-flex items-center gap-1">
@@ -831,12 +1124,34 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                             >
                               <Trash2 size={13} />
                             </button>
+                            <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+                              <SmilePlus size={13} />
+                              {messageReactionOptions.map((reaction) => (
+                                <button
+                                  key={reaction.key}
+                                  type="button"
+                                  onClick={() => void reactToMessage(message, reaction.key)}
+                                  className={`rounded-full px-1.5 py-0.5 hover:bg-accent/10 ${myReaction === reaction.key ? 'bg-accent/10 text-accent' : ''}`}
+                                  aria-label={reaction.label}
+                                  title={reaction.label}
+                                >
+                                  {reaction.icon}
+                                </button>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
                   );
                 })}
+                {selectedTyping && (
+                  <div className="flex justify-start">
+                    <div className="rounded-2xl rounded-bl bg-white px-4 py-3 text-sm font-semibold text-gray-500 shadow-sm dark:bg-gray-900">
+                      typing...
+                    </div>
+                  </div>
+                )}
               </div>
 
               <form onSubmit={sendReply} className="border-t border-gray-200 p-3 dark:border-gray-800 sm:p-4">
@@ -874,7 +1189,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                   </label>
                   <MentionTextarea
                     value={replyBody}
-                    onChange={setReplyBody}
+                    onChange={updateReplyBody}
                     wrapperClassName="min-w-0 flex-1"
                     onKeyDown={handleReplyKeyDown}
                     placeholder={selectedThreadAcceptsMessages ? 'Message. Use @name to mention someone.' : 'Messages are disabled for this user'}
