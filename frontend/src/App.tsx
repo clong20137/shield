@@ -1932,6 +1932,18 @@ const onboardingSteps: OnboardingStep[] = [
     body: 'Use the left navigation for dashboard, calendar, devices, reports, and admin tools based on your permissions.',
   },
   {
+    target: 'sidebar-reminders',
+    eyebrow: 'Reminders',
+    title: 'Track date reminders',
+    body: 'Review upcoming reminders here. Create reminders from the calendar on the date you want, and SHIELD will notify you when they are due.',
+  },
+  {
+    target: 'sidebar-calendar',
+    eyebrow: 'Calendar',
+    title: 'Open your calendar widget',
+    body: 'Use the sidebar calendar widget to see today and upcoming calendar activity, then open the floating calendar app when you need the full view.',
+  },
+  {
     target: 'notifications',
     eyebrow: 'Alerts',
     title: 'Check notifications',
@@ -3377,19 +3389,23 @@ function App() {
             </nav>
 
             <div className={`shrink-0 border-t border-white/10 pt-3 ${isSidebarCollapsed ? 'px-3' : 'px-4'}`}>
-              <SidebarRemindersWidget
-                compact={isSidebarCollapsed}
-                reminders={sidebarReminders}
-                isLoading={isSidebarRemindersLoading}
-                onToggle={toggleSidebarReminder}
-                onDelete={deleteSidebarReminder}
-              />
-              <SidebarCalendarWidget
-                compact={isSidebarCollapsed}
-                entries={sidebarCalendarEntries}
-                isLoading={isSidebarCalendarLoading}
-                onOpenCalendar={toggleCalendarModal}
-              />
+              <div data-onboarding-target="sidebar-reminders">
+                <SidebarRemindersWidget
+                  compact={isSidebarCollapsed}
+                  reminders={sidebarReminders}
+                  isLoading={isSidebarRemindersLoading}
+                  onToggle={toggleSidebarReminder}
+                  onDelete={deleteSidebarReminder}
+                />
+              </div>
+              <div data-onboarding-target="sidebar-calendar">
+                <SidebarCalendarWidget
+                  compact={isSidebarCollapsed}
+                  entries={sidebarCalendarEntries}
+                  isLoading={isSidebarCalendarLoading}
+                  onOpenCalendar={toggleCalendarModal}
+                />
+              </div>
             </div>
             </div>
           </aside>
