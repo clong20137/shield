@@ -29,15 +29,15 @@ function DetailRow({
   const canCopy = typeof copyValue === 'string' && copyValue.trim().length > 0 && Boolean(onCopy);
 
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-gray-200 py-2 dark:border-gray-800">
-      <span className="font-semibold text-gray-700 dark:text-gray-300">{label}:</span>
-      <span className="flex min-w-0 items-center justify-end gap-2 text-right text-gray-600 dark:text-gray-300">
-        <span className="truncate">{displayValue}</span>
+    <div className="flex flex-col gap-1 border-b border-gray-200 py-3 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-2">
+      <span className="text-xs font-bold uppercase tracking-wide text-gray-400 sm:text-sm sm:normal-case sm:tracking-normal sm:text-gray-700 sm:dark:text-gray-300">{label}</span>
+      <span className="flex min-w-0 items-center justify-between gap-2 text-left text-gray-700 dark:text-gray-200 sm:justify-end sm:text-right sm:text-gray-600 sm:dark:text-gray-300">
+        <span className="min-w-0 break-words sm:truncate">{displayValue}</span>
         {canCopy && (
           <button
             type="button"
             onClick={() => onCopy?.(label, copyValue.trim())}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-gray-200 bg-white text-gray-500 transition hover:border-primary-500 hover:text-primary-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-blue-200 dark:hover:text-blue-100"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-gray-200 bg-white text-gray-500 transition hover:border-primary-500 hover:text-primary-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-blue-200 dark:hover:text-blue-100 sm:h-7 sm:w-7"
             aria-label={`Copy ${label}`}
             title={isCopied ? 'Copied' : `Copy ${label}`}
           >
@@ -51,8 +51,8 @@ function DetailRow({
 
 function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mb-6">
-      <h3 className="text-primary-500 text-base mb-4 pb-2 border-b-2 border-gray-300 font-bold dark:text-blue-100 dark:border-gray-700">
+    <div className="mb-6 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 sm:border-0 sm:p-0">
+      <h3 className="mb-2 border-b border-gray-200 pb-2 text-base font-bold text-primary-500 dark:border-gray-700 dark:text-blue-100 sm:mb-4 sm:border-b-2">
         {title}
       </h3>
       {children}
@@ -228,10 +228,10 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
     : 'border-white';
 
   return (
-    <div className="bg-white rounded-lg shadow-xl overflow-hidden dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-      <div className="bg-primary-500 text-white px-5 py-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 flex-1 items-center gap-4">
+    <div className="flex h-[100dvh] flex-col overflow-hidden rounded-none bg-white shadow-xl dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:h-auto sm:max-h-[92dvh] sm:rounded-lg">
+      <div className="shrink-0 bg-primary-500 px-4 py-4 text-white sm:px-5 sm:py-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 flex-col items-center gap-3 text-center sm:flex-row sm:items-center sm:gap-4 sm:text-left">
           <div className="relative shrink-0">
             {isOnline && <span className="absolute inset-0 animate-ping rounded-full border-4 border-green-300 opacity-60" />}
           {user.profilePictureUrl ? (
@@ -239,17 +239,17 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
               src={getAssetUrl(user.profilePictureUrl)}
               alt={`${user.firstName} ${user.lastName}`}
               onError={handleAssetImageError}
-              className={`relative h-20 w-20 rounded-full border-2 object-cover ${profileRingClass}`}
+              className={`relative h-20 w-20 rounded-full border-2 object-cover sm:h-20 sm:w-20 ${profileRingClass}`}
             />
           ) : (
-            <div className={`relative flex h-20 w-20 items-center justify-center rounded-full border-2 bg-white text-2xl font-bold text-primary-500 ${profileRingClass}`}>
+            <div className={`relative flex h-20 w-20 items-center justify-center rounded-full border-2 bg-white text-2xl font-bold text-primary-500 sm:h-20 sm:w-20 ${profileRingClass}`}>
               {getInitials(user)}
             </div>
           )}
           </div>
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="m-0 text-2xl font-bold text-white">{user.firstName} {user.lastName}</h2>
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+              <h2 className="m-0 text-xl font-bold text-white sm:text-2xl">{user.firstName} {user.lastName}</h2>
               <div className="flex gap-2">
                 <a
                   className={`flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white hover:bg-white/20 ${emailHref ? '' : 'pointer-events-none opacity-50'}`}
@@ -280,12 +280,12 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
             <div className="mt-2">
               <RankBadge rank={user.rank} />
             </div>
-            <p className="mt-2 text-sm text-blue-100">{user.email || 'No email on file'}</p>
+            <p className="mt-2 max-w-full truncate text-sm text-blue-100">{user.email || 'No email on file'}</p>
             <p className="mt-1 text-sm text-blue-100">PE {user.peNumber || 'N/A'} - {user.district || 'No district'}</p>
           </div>
         </div>
-          <div className="ml-auto flex items-start gap-3">
-            <div className="w-full min-w-52 max-w-xs rounded border border-white/15 bg-white/10 p-3">
+          <div className="flex w-full items-start gap-3 lg:ml-auto lg:w-auto">
+            <div className="min-w-0 flex-1 rounded border border-white/15 bg-white/10 p-3 lg:min-w-52 lg:max-w-xs">
               <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-white">
                 <span className="inline-flex items-center gap-2">
                   <Gauge size={15} />
@@ -313,13 +313,13 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           </button>
           </div>
         </div>
-        <div className="mt-5 flex flex-wrap gap-2 border-t border-white/15 pt-4">
+        <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto border-t border-white/15 px-4 pt-3 sm:mx-0 sm:mt-5 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pt-4">
           {tabs.map(([tab, label]) => (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`rounded px-3 py-2 text-sm font-bold transition ${activeTab === tab ? 'bg-white text-primary-500' : 'bg-white/10 text-white hover:bg-white/20'}`}
+              className={`shrink-0 rounded px-3 py-2 text-sm font-bold transition ${activeTab === tab ? 'bg-white text-primary-500' : 'bg-white/10 text-white hover:bg-white/20'}`}
             >
               {label}
             </button>
@@ -327,7 +327,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
         </div>
       </div>
 
-      <div className="px-5 py-6 max-h-[70vh] overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-gray-50 px-3 py-4 dark:bg-gray-950 sm:bg-transparent sm:px-5 sm:py-6 sm:dark:bg-transparent">
         {activeTab === 'personal' && <DetailSection title="Personal Information">
           <DetailRow label="Name" value={`${user.firstName} ${user.lastName}`} />
           <DetailRow label="Email" value={user.email} copyValue={user.email} onCopy={copyProfileValue} isCopied={copiedField === 'Email'} />
@@ -349,9 +349,9 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           <DetailRow label="Employee Type" value={user.employmentType} />
           <DetailRow label="Status" value={user.status} />
           <DetailRow label="District" value={user.district} />
-          <div className="flex justify-between gap-4 border-b border-gray-200 py-2 dark:border-gray-800">
-            <span className="font-semibold text-gray-700 dark:text-gray-300">Rank:</span>
-            <span className="max-w-[60%] text-right">
+          <div className="flex flex-col gap-1 border-b border-gray-200 py-3 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-2">
+            <span className="text-xs font-bold uppercase tracking-wide text-gray-400 sm:text-sm sm:normal-case sm:tracking-normal sm:text-gray-700 sm:dark:text-gray-300">Rank</span>
+            <span className="text-left sm:max-w-[60%] sm:text-right">
               <RankBadge rank={user.rank} compact />
             </span>
           </div>
@@ -419,8 +419,8 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
         </DetailSection>}
       </div>
       {editingDevice && (
-        <div className="modal-backdrop fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4">
-          <form onSubmit={saveDeviceEdit} className="modal-window w-full max-w-2xl rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+        <div className="modal-backdrop fixed inset-0 z-[80] flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
+          <form onSubmit={saveDeviceEdit} className="modal-window max-h-[96dvh] w-full overflow-y-auto rounded-t-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:max-w-2xl sm:rounded-lg sm:p-5">
             <div className="mb-4 flex items-start justify-between gap-3 border-b border-gray-200 pb-3 dark:border-gray-800">
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Edit Device</h2>

@@ -276,7 +276,7 @@ export function AccountSettingsPage({
 
   return (
     <div className="space-y-3 pb-1">
-      <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-3 dark:border-gray-800">
+      <div className="-mx-3 flex gap-2 overflow-x-auto border-b border-gray-200 px-3 pb-3 dark:border-gray-800 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
         {[
           ['general', 'General'],
           ['devices', 'Devices'],
@@ -287,7 +287,7 @@ export function AccountSettingsPage({
             key={id}
             type="button"
             onClick={() => setActiveTab(id as typeof activeTab)}
-            className={`rounded px-3 py-2 text-sm font-bold transition ${
+            className={`shrink-0 rounded px-3 py-2 text-sm font-bold transition ${
               activeTab === id
                 ? 'bg-primary-500 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
@@ -302,7 +302,7 @@ export function AccountSettingsPage({
       <>
       <section className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950 sm:p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-center gap-4">
+          <div className="flex min-w-0 flex-col items-center gap-3 text-center sm:flex-row sm:gap-4 sm:text-left">
             <button
               type="button"
               onClick={() => profilePictureInputRef.current?.click()}
@@ -342,7 +342,7 @@ export function AccountSettingsPage({
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap justify-center gap-2 sm:justify-end">
             <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold uppercase text-accent">
               {account.role || 'user'}
             </span>
@@ -543,12 +543,12 @@ export function AccountSettingsPage({
         ) : (
           <div className="space-y-2">
             {sessions.map((session) => (
-              <div key={session.id} className="flex flex-wrap items-center justify-between gap-3 rounded border border-gray-200 p-3 dark:border-gray-800">
-                <div>
+              <div key={session.id} className="flex flex-col gap-3 rounded border border-gray-200 p-3 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
                   <p className="text-sm font-bold text-gray-800 dark:text-gray-100">
                     {session.isCurrent ? 'Current session' : 'Signed-in session'}
                   </p>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 break-words text-xs text-gray-500 dark:text-gray-400">
                     Created {new Date(session.createdAt).toLocaleString()} - Expires {new Date(session.expiresAt).toLocaleString()}
                   </p>
                 </div>

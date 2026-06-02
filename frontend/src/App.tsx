@@ -3843,7 +3843,7 @@ function App() {
           )}
           {isProfileModalOpen && currentUser && (
             <div className={getModalBackdropClass(closingModal === 'profile')}>
-              <div className={getModalWindowClass(closingModal === 'profile', 'flex h-[96dvh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:h-auto sm:max-h-[88vh] sm:p-4')}>
+              <div className={getModalWindowClass(closingModal === 'profile', 'flex h-[100dvh] w-full flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 sm:h-auto sm:max-h-[88vh] sm:max-w-4xl sm:rounded-lg sm:p-4')}>
                 <div className="mb-3 flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 sm:text-2xl">Account Settings</h2>

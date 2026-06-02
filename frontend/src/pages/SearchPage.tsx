@@ -472,8 +472,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       />
 
       {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-4xl">
+        <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/50 sm:items-center sm:p-4">
+          <div className="w-full sm:max-w-4xl">
             <UserDetail
               user={selectedUser}
               onClose={() => setSelectedUser(null)}
@@ -487,11 +487,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       )}
 
       {editingUser && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
-          <form onSubmit={handleSaveUser} className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-lg bg-white shadow-xl dark:bg-gray-900">
-            <div className="flex items-center justify-between gap-4 bg-primary-500 px-5 py-4 text-white">
-              <div>
-                <h2 className="text-2xl font-bold text-white">Edit User</h2>
+        <div className="fixed inset-0 z-[70] flex items-stretch justify-center bg-black/60 sm:items-center sm:p-4">
+          <form onSubmit={handleSaveUser} className="flex h-[100dvh] w-full flex-col overflow-hidden rounded-none bg-white shadow-xl dark:bg-gray-900 sm:max-h-[92vh] sm:max-w-5xl sm:rounded-lg">
+            <div className="flex shrink-0 items-center justify-between gap-4 bg-primary-500 px-4 py-4 text-white sm:px-5">
+              <div className="min-w-0">
+                <h2 className="truncate text-xl font-bold text-white sm:text-2xl">Edit User</h2>
                 <p className="mt-1 text-sm text-blue-100">{editingUser.firstName} {editingUser.lastName}</p>
               </div>
               <button
@@ -505,27 +505,27 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
               </button>
             </div>
 
-            <div className="p-5">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
               <button
                 type="button"
                 onClick={updateProfilePicture}
                 disabled={!canEditProfilePictures}
-                className="mb-6 flex items-center gap-4 rounded border border-gray-200 bg-gray-50 p-4 text-left hover:border-accent disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-800 dark:bg-gray-950"
+                className="mb-6 flex w-full flex-col items-center gap-3 rounded border border-gray-200 bg-gray-50 p-4 text-center hover:border-accent disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-800 dark:bg-gray-950 sm:flex-row sm:gap-4 sm:text-left"
               >
                 {editForm.profilePictureUrl ? (
                   <img
                     src={getAssetUrl(String(editForm.profilePictureUrl))}
                     alt="Profile"
                     onError={handleAssetImageError}
-                    className="h-20 w-20 rounded-full object-cover"
+                  className="h-20 w-20 shrink-0 rounded-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary-500 text-2xl font-bold text-white">
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-primary-500 text-2xl font-bold text-white">
                     {String(editForm.firstName || 'U').slice(0, 1)}{String(editForm.lastName || '').slice(0, 1)}
                   </div>
                 )}
-                <div>
-                  <p className="flex items-center gap-2 font-bold text-gray-800 dark:text-gray-100">
+                <div className="min-w-0">
+                  <p className="flex items-center justify-center gap-2 font-bold text-gray-800 dark:text-gray-100 sm:justify-start">
                     <Camera size={18} className="text-accent" />
                     Profile Picture
                   </p>
@@ -685,7 +685,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
               </datalist>
             </div>
 
-            <div className="flex flex-wrap gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-800">
+            <div className="flex shrink-0 flex-wrap justify-end gap-3 border-t border-gray-200 px-4 py-4 dark:border-gray-800 sm:px-5">
               <button type="submit" className="btn-primary" disabled={isSavingUser} aria-label="Save user" title={isSavingUser ? 'Saving' : 'Save User'}>
                 <Save size={16} />
               </button>
