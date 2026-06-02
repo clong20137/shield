@@ -105,6 +105,19 @@
   }
 }
 
+@keyframes shield-online-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.18;
+    transform: scale(1.06);
+  }
+}
+
 @keyframes welcome-glow {
   0%,
   100% {
@@ -697,6 +710,10 @@
 
   .shield-scrollbar-hidden::-webkit-scrollbar {
     display: none;
+  }
+
+  .shield-online-pulse {
+    animation: shield-online-pulse 2.8s ease-in-out infinite;
   }
 }
 

@@ -266,7 +266,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const isOnline = isUserOnline(user.lastSeenAt);
   const lastOnlineLabel = useMemo(() => getLastOnlineLabel(user.lastSeenAt), [presenceTick, user.lastSeenAt]);
   const profileRingClass = isOnline
-    ? 'border-green-400 shadow-[0_0_0_4px_rgba(34,197,94,0.22)]'
+    ? 'border-green-300/80 shadow-[0_0_0_2px_rgba(34,197,94,0.14)]'
     : 'border-white';
 
   return (
@@ -278,7 +278,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 flex-col items-center gap-3 text-center sm:flex-row sm:items-center sm:gap-4 sm:text-left">
           <div className="relative shrink-0">
-            {isOnline && <span className="absolute inset-0 animate-ping rounded-full border-4 border-green-300 opacity-60" />}
+            {isOnline && <span className="pointer-events-none absolute -inset-1 rounded-full border border-green-300/45 shield-online-pulse" />}
           {user.profilePictureUrl ? (
             <img
               src={getAssetUrl(user.profilePictureUrl)}
@@ -327,7 +327,10 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
             </div>
             <p className="mt-2 max-w-full truncate text-sm text-blue-100">{user.email || 'No email on file'}</p>
             <p className="mt-1 text-sm text-blue-100">PE {user.peNumber || 'N/A'} - {user.district || 'No district'}</p>
-            <p className={`mt-1 text-xs font-bold ${isOnline ? 'text-green-100' : 'text-blue-100'}`}>{lastOnlineLabel}</p>
+            <p className={`mt-1 inline-flex items-center gap-1.5 text-xs font-semibold ${isOnline ? 'text-green-100/90' : 'text-blue-100'}`}>
+              {isOnline && <span className="h-1.5 w-1.5 rounded-full bg-green-300/80" />}
+              {lastOnlineLabel}
+            </p>
             {isFloatingProfile && <p className="mt-1 hidden text-xs text-blue-100 md:block">Drag to move. Resize from the corner.</p>}
           </div>
         </div>

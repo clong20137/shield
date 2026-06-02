@@ -1080,6 +1080,15 @@ function getInitials(firstName?: string, lastName?: string, email?: string): str
   return parts.length > 1 ? `${parts[0][0]}${parts[1][0]}`.toUpperCase() : source.slice(0, 2).toUpperCase();
 }
 
+function isProfileOnline(lastSeenAt?: string | null): boolean {
+  if (!lastSeenAt) {
+    return false;
+  }
+
+  const value = new Date(lastSeenAt).getTime();
+  return !Number.isNaN(value) && Date.now() - value < 2 * 60 * 1000;
+}
+
 function isMobileViewport() {
   return window.innerWidth < 768;
 }
@@ -1273,14 +1282,19 @@ function PinnedProfilesWidget({ currentUser, onOpenProfile }: { currentUser: Aut
             {profiles.map((profile) => (
               <article key={profile.id} className="group relative w-28 shrink-0 snap-start rounded-lg border border-gray-200 bg-gray-50 p-3 text-center transition hover:-translate-y-1 hover:scale-[1.04] hover:border-accent hover:bg-white hover:shadow-lg dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900 sm:w-32">
                 <button type="button" onClick={() => onOpenProfile(profile)} className="block w-full" aria-label={`Open ${profile.firstName} ${profile.lastName}`}>
-                  <span className="mx-auto block h-16 w-16 overflow-hidden rounded-full border-2 border-white bg-primary-500 shadow group-hover:ring-4 group-hover:ring-accent/20 sm:h-[4.5rem] sm:w-[4.5rem]">
-                    {profile.profilePictureUrl ? (
-                      <img src={getAssetUrl(profile.profilePictureUrl)} alt={`${profile.firstName} ${profile.lastName}`} onError={handleAssetImageError} className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="flex h-full w-full items-center justify-center text-sm font-bold text-white">
-                        {getInitials(profile.firstName, profile.lastName, profile.email)}
-                      </span>
+                  <span className="relative mx-auto block h-16 w-16 rounded-full sm:h-[4.5rem] sm:w-[4.5rem]">
+                    {isProfileOnline(profile.lastSeenAt) && (
+                      <span className="pointer-events-none absolute -inset-1 rounded-full border border-green-400/45 shadow-[0_0_0_1px_rgba(34,197,94,0.12)] shield-online-pulse" />
                     )}
+                    <span className="relative block h-full w-full overflow-hidden rounded-full border-2 border-white bg-primary-500 shadow group-hover:ring-4 group-hover:ring-accent/20">
+                      {profile.profilePictureUrl ? (
+                        <img src={getAssetUrl(profile.profilePictureUrl)} alt={`${profile.firstName} ${profile.lastName}`} onError={handleAssetImageError} className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-sm font-bold text-white">
+                          {getInitials(profile.firstName, profile.lastName, profile.email)}
+                        </span>
+                      )}
+                    </span>
                   </span>
                   <span className="mt-2 block truncate text-sm font-bold text-gray-900 dark:text-gray-100">{profile.firstName} {profile.lastName}</span>
                 </button>
