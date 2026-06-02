@@ -1058,18 +1058,27 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                       )}
                       <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                         <div className={`group flex max-w-[90%] flex-col sm:max-w-[78%] ${isMine ? 'items-end text-right' : 'items-start text-left'}`}>
-                          <div className={`inline-block w-fit max-w-full rounded-2xl px-4 py-3 shadow-sm ${
+                          <div className={`inline-block w-fit max-w-full rounded-[1.35rem] px-4 py-2.5 shadow-sm ${
                             isMine
-                              ? 'rounded-br bg-accent text-white'
-                              : 'rounded-bl bg-white text-gray-800 dark:bg-gray-900 dark:text-gray-100'
+                              ? 'rounded-br-md bg-[#007AFF] text-white'
+                              : 'rounded-bl-md border border-gray-200 bg-white text-gray-900 dark:border-gray-800 dark:bg-white dark:text-gray-900'
                           }`}>
                             <p className="whitespace-pre-wrap text-left text-sm leading-6">
                               <MentionText
                                 text={message.body}
-                                mentionClassName={isMine ? 'font-bold text-white underline decoration-white/80 underline-offset-2' : 'font-bold text-blue-700 underline underline-offset-2 dark:text-blue-300'}
+                                mentionClassName={isMine ? 'font-bold text-white underline decoration-white/80 underline-offset-2' : 'font-bold text-blue-700 underline underline-offset-2'}
                                 onMentionClick={openMentionProfile}
                               />
                             </p>
+                          </div>
+                          <div className={`mt-1 flex items-center gap-1.5 px-1 text-[11px] font-semibold text-gray-400 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                            <span>{formatMessageTime(message.createdAt)}</span>
+                            {isMine && (
+                              <span className="inline-flex items-center gap-1">
+                                {message.isRead ? <CheckCheck size={12} /> : <Check size={12} />}
+                                {getDeliveryLabel(message)}
+                              </span>
+                            )}
                           </div>
                           {(myReaction || otherReaction) && (
                             <div className={`mt-1 flex gap-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
@@ -1078,13 +1087,6 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                             </div>
                           )}
                           <div className={`mt-1 flex flex-wrap items-center gap-1.5 text-xs font-semibold text-gray-400 ${isMine ? 'justify-end' : 'justify-start'}`}>
-                            <span>{formatMessageTime(message.createdAt)}</span>
-                            {isMine && (
-                              <span className="inline-flex items-center gap-1">
-                                {message.isRead ? <CheckCheck size={13} /> : <Check size={13} />}
-                                {getDeliveryLabel(message)}
-                              </span>
-                            )}
                             <button
                               type="button"
                               onClick={() => setMessagePendingDelete(message)}
@@ -1117,7 +1119,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                 })}
                 {selectedTyping && (
                   <div className="flex justify-start">
-                    <div className="rounded-2xl rounded-bl bg-white px-4 py-3 text-sm font-semibold text-gray-500 shadow-sm dark:bg-gray-900">
+                    <div className="rounded-[1.35rem] rounded-bl-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-500 shadow-sm dark:border-gray-800">
                       typing...
                     </div>
                   </div>
@@ -1149,8 +1151,15 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                     {emojiButtonLabel}
                   </button>
                   {isEmojiPickerOpen && (
-                    <div className="absolute bottom-[calc(100%+0.75rem)] left-0 z-40 max-h-[min(28rem,70dvh)] max-w-[calc(100vw-2rem)] overflow-auto rounded-lg border border-gray-200 bg-white p-2 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
-                      <EmojiPicker onEmojiClick={addEmojiToReply} />
+                    <div className="absolute bottom-[calc(100%+0.75rem)] left-0 z-40 overflow-hidden rounded-lg border border-gray-200 bg-white p-2 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+                      <EmojiPicker
+                        onEmojiClick={addEmojiToReply}
+                        width={280}
+                        height={320}
+                        previewConfig={{ showPreview: false }}
+                        searchDisabled={false}
+                        skinTonesDisabled
+                      />
                     </div>
                   )}
                   <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800 sm:h-8 sm:w-8" title="Attach files">
