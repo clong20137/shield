@@ -1469,8 +1469,8 @@ function QuickLaunchTray({
   };
 
   return (
-    <section className={`fixed bottom-3 left-3 right-3 z-30 transition-all duration-200 sm:bottom-5 sm:right-6 ${isSidebarCollapsed ? 'sm:left-24' : 'sm:left-[19.5rem]'}`}>
-      <div data-onboarding-target="quick-launch" className="mx-auto w-fit max-w-full rounded-2xl border border-gray-200 bg-white/85 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/80 sm:p-3">
+    <section className={`pointer-events-none fixed bottom-3 left-3 right-3 z-30 select-none transition-all duration-200 sm:bottom-5 sm:right-6 ${isSidebarCollapsed ? 'sm:left-24' : 'sm:left-[19.5rem]'}`}>
+      <div data-onboarding-target="quick-launch" className="pointer-events-auto mx-auto w-fit max-w-full rounded-2xl border border-gray-200 bg-white/85 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/80 sm:p-3">
         <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 sm:gap-2">
         {slots.map((slot, index) => {
           const app = typeof slot === 'string' ? availableApps.find((item) => item.id === slot) || null : null;
@@ -1579,7 +1579,7 @@ function QuickLaunchTray({
       </div>
 
       {editingSlot !== null && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center">
+        <div className="modal-backdrop pointer-events-auto fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center">
           <div className="modal-window w-full max-w-lg overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-6">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
@@ -1732,12 +1732,20 @@ function PageLoader({ label = 'Loading...' }: { label?: string }) {
   );
 }
 
-function getInitialMessagesModalPosition() {
-  const width = Math.min(window.innerWidth - 16, 900);
+function getInitialFloatingModalPosition(maxWidth: number, yRatio = 0.08) {
+  const width = Math.min(window.innerWidth - 16, maxWidth);
   return {
     x: Math.max(8, (window.innerWidth - width) / 2),
-    y: Math.max(8, window.innerHeight * 0.08),
+    y: Math.max(8, window.innerHeight * yRatio),
   };
+}
+
+function getInitialMessagesModalPosition() {
+  return getInitialFloatingModalPosition(900, 0.08);
+}
+
+function getInitialCalendarModalPosition() {
+  return getInitialFloatingModalPosition(1120, 0.03);
 }
 
 function getModalBackdropClass(isClosing: boolean, tint = 'bg-black/50') {
@@ -2302,10 +2310,12 @@ function App() {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
-  const [activeFloatingApp, setActiveFloatingApp] = useState<'messages' | 'calculator'>('messages');
+  const [activeFloatingApp, setActiveFloatingApp] = useState<'messages' | 'calendar' | 'calculator'>('messages');
   const [messagesModalPosition, setMessagesModalPosition] = useState(getInitialMessagesModalPosition);
   const [isDraggingMessagesModal, setIsDraggingMessagesModal] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [calendarModalPosition, setCalendarModalPosition] = useState(getInitialCalendarModalPosition);
+  const [isDraggingCalendarModal, setIsDraggingCalendarModal] = useState(false);
   const [isAdminConsoleOpen, setIsAdminConsoleOpen] = useState(false);
   const [adminConsoleTab, setAdminConsoleTab] = useState<AdminConsoleTab>('general');
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
@@ -2355,7 +2365,33 @@ function App() {
   }, [isDraggingMessagesModal]);
 
   useEffect(() => {
-    const keepMessagesModalInView = () => {
+    if (!isDraggingCalendarModal) {
+      return undefined;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const width = calendarModalRef.current?.offsetWidth || Math.min(window.innerWidth - 16, 1120);
+      const height = calendarModalRef.current?.offsetHeight || Math.min(window.innerHeight - 16, 780);
+      const maxX = Math.max(8, window.innerWidth - width - 8);
+      const maxY = Math.max(8, window.innerHeight - height - 8);
+      const nextX = Math.min(Math.max(8, event.clientX - calendarModalDragOffsetRef.current.x), maxX);
+      const nextY = Math.min(Math.max(8, event.clientY - calendarModalDragOffsetRef.current.y), maxY);
+      setCalendarModalPosition({ x: nextX, y: nextY });
+    };
+
+    const stopDragging = () => setIsDraggingCalendarModal(false);
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', stopDragging);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', stopDragging);
+    };
+  }, [isDraggingCalendarModal]);
+
+  useEffect(() => {
+    const keepFloatingModalsInView = () => {
       const width = messagesModalRef.current?.offsetWidth || Math.min(window.innerWidth - 16, 900);
       const height = messagesModalRef.current?.offsetHeight || Math.min(window.innerHeight - 16, 680);
       const maxX = Math.max(8, window.innerWidth - width - 8);
@@ -2364,11 +2400,20 @@ function App() {
         x: Math.min(Math.max(8, currentPosition.x), maxX),
         y: Math.min(Math.max(8, currentPosition.y), maxY),
       }));
+
+      const calendarWidth = calendarModalRef.current?.offsetWidth || Math.min(window.innerWidth - 16, 1120);
+      const calendarHeight = calendarModalRef.current?.offsetHeight || Math.min(window.innerHeight - 16, 780);
+      const calendarMaxX = Math.max(8, window.innerWidth - calendarWidth - 8);
+      const calendarMaxY = Math.max(8, window.innerHeight - calendarHeight - 8);
+      setCalendarModalPosition((currentPosition) => ({
+        x: Math.min(Math.max(8, currentPosition.x), calendarMaxX),
+        y: Math.min(Math.max(8, currentPosition.y), calendarMaxY),
+      }));
     };
 
-    window.addEventListener('resize', keepMessagesModalInView);
+    window.addEventListener('resize', keepFloatingModalsInView);
 
-    return () => window.removeEventListener('resize', keepMessagesModalInView);
+    return () => window.removeEventListener('resize', keepFloatingModalsInView);
   }, []);
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const [bugReports, setBugReports] = useState<BugReport[]>([]);
@@ -2383,6 +2428,8 @@ function App() {
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
   const messagesModalRef = useRef<HTMLDivElement | null>(null);
   const messagesModalDragOffsetRef = useRef({ x: 0, y: 0 });
+  const calendarModalRef = useRef<HTMLDivElement | null>(null);
+  const calendarModalDragOffsetRef = useRef({ x: 0, y: 0 });
 
   const showToast = (type: ToastType, message: string, options: { saveToNotifications?: boolean } = {}) => {
     if (/too many|rate limit/iu.test(message)) {
@@ -3022,12 +3069,32 @@ function App() {
     setIsDraggingMessagesModal(true);
   };
 
+  const startDraggingCalendarModal = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) {
+      return;
+    }
+    setActiveFloatingApp('calendar');
+
+    const rect = calendarModalRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return;
+    }
+
+    calendarModalDragOffsetRef.current = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+    setIsDraggingCalendarModal(true);
+  };
+
   const toggleCalendarModal = () => {
     if (isCalendarModalOpen) {
       closeModal('calendar');
       return;
     }
 
+    setCalendarModalPosition(getInitialCalendarModalPosition());
+    setActiveFloatingApp('calendar');
     setIsCalendarModalOpen(true);
   };
 
@@ -3579,15 +3646,24 @@ function App() {
             </div>
           )}
           {isCalendarModalOpen && currentUser && (
-            <div className={getModalBackdropClass(closingModal === 'calendar', 'bg-black/60')}>
-              <div className={getModalWindowClass(closingModal === 'calendar', 'flex h-[96dvh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:h-[94vh] sm:p-4')}>
-                <div className="mb-3 flex items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
+            <div className="pointer-events-none fixed inset-0" style={{ zIndex: activeFloatingApp === 'calendar' ? 70 : 55 }}>
+              <div
+                ref={calendarModalRef}
+                className={getModalWindowClass(closingModal === 'calendar', `pointer-events-auto fixed flex h-[82dvh] max-h-[calc(100dvh-1rem)] min-h-[480px] w-[min(1120px,calc(100vw-1rem))] min-w-[min(420px,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] resize flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:p-4 ${isDraggingCalendarModal ? 'cursor-grabbing' : ''}`)}
+                style={{ left: calendarModalPosition.x, top: calendarModalPosition.y }}
+                onMouseDownCapture={() => setActiveFloatingApp('calendar')}
+              >
+                <div
+                  onPointerDown={startDraggingCalendarModal}
+                  className={`mb-3 flex touch-none cursor-grab select-none items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800 ${isDraggingCalendarModal ? 'cursor-grabbing' : ''}`}
+                >
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Calendar</h2>
-                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Personal calendar entries are separated by account.</p>
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Drag to move. Resize from the corner.</p>
                   </div>
                   <button
                     type="button"
+                    onPointerDown={(event) => event.stopPropagation()}
                     onClick={() => closeModal('calendar')}
                     className="icon-close-button"
                     aria-label="Close calendar"
