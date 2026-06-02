@@ -1929,7 +1929,7 @@ const onboardingSteps: OnboardingStep[] = [
     target: 'navigation',
     eyebrow: 'Navigation',
     title: 'Move through the system',
-    body: 'Use the left navigation for dashboard, calendar, devices, reports, and admin tools based on your permissions.',
+    body: 'Use the left navigation for dashboard, devices, and reports based on your permissions. Calendar and reminders live in the sidebar widgets below.',
   },
   {
     target: 'sidebar-reminders',
@@ -3310,8 +3310,8 @@ function App() {
       ) : !isAuthenticated ? (
         <LoginSplash onLogin={handleLogin} onToast={showToast} isExiting={isLoginTransitioning} />
       ) : (
-        <div className="animate-app-enter flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
-          <aside className={`relative h-screen shrink-0 overflow-visible bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
+        <div className="animate-app-enter flex h-[100dvh] overflow-hidden bg-gray-50 dark:bg-gray-950">
+          <aside className={`relative h-[100dvh] shrink-0 overflow-visible bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed((value) => !value)}
@@ -3321,7 +3321,7 @@ function App() {
               {isSidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
             </button>
 
-            <div className="shield-sidebar flex h-screen flex-col overflow-y-auto overflow-x-hidden">
+            <div className="shield-sidebar flex h-[100dvh] flex-col overflow-y-auto overflow-x-hidden">
             <div className="flex h-20 shrink-0 items-center border-b border-white/10 px-4 dark:border-gray-800">
               {!isSidebarCollapsed && (
                 <div className="flex items-center gap-3">
@@ -3410,7 +3410,7 @@ function App() {
             </div>
           </aside>
 
-          <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="flex h-[100dvh] min-w-0 flex-1 flex-col overflow-hidden">
             <header className="flex min-h-20 shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-3 py-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:px-6">
               <div>
                 <p className="hidden text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 sm:block">Internal System</p>
@@ -3576,7 +3576,7 @@ function App() {
             </header>
 
             <main className="flex-1 overflow-y-auto px-3 pb-36 pt-5 dark:bg-gray-950 sm:px-6 sm:pb-48 sm:pt-8">
-              <div data-onboarding-target="workspace" className="min-h-[calc(100vh-12rem)]">
+              <div data-onboarding-target="workspace" className="min-h-[calc(100dvh-12rem)]">
                 <Suspense fallback={<PageLoader label="Loading page..." />}>
                   <Routes>
                     <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
@@ -3631,7 +3631,7 @@ function App() {
             <div className="pointer-events-none fixed inset-0" style={{ zIndex: activeFloatingApp === 'messages' ? 70 : 55 }}>
               <div
                 ref={messagesModalRef}
-                className={getModalWindowClass(closingModal === 'messages', `pointer-events-auto fixed flex h-[72dvh] max-h-[calc(100dvh-1rem)] min-h-[420px] w-[min(900px,calc(100vw-1rem))] min-w-[min(360px,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] resize flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:p-4 ${isDraggingMessagesModal ? 'cursor-grabbing' : ''}`)}
+                className={getModalWindowClass(closingModal === 'messages', `pointer-events-auto fixed flex h-[72dvh] max-h-[calc(100dvh-1rem)] min-h-[min(420px,calc(100dvh-1rem))] w-[min(900px,calc(100vw-1rem))] min-w-[min(360px,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] resize flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:p-4 ${isDraggingMessagesModal ? 'cursor-grabbing' : ''}`)}
                 style={{ left: messagesModalPosition.x, top: messagesModalPosition.y }}
                 onMouseDownCapture={() => setActiveFloatingApp('messages')}
               >
@@ -3665,7 +3665,7 @@ function App() {
             <div className="pointer-events-none fixed inset-0" style={{ zIndex: activeFloatingApp === 'calendar' ? 70 : 55 }}>
               <div
                 ref={calendarModalRef}
-                className={getModalWindowClass(closingModal === 'calendar', `pointer-events-auto fixed flex h-[82dvh] max-h-[calc(100dvh-1rem)] min-h-[480px] w-[min(1120px,calc(100vw-1rem))] min-w-[min(420px,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] resize flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:p-4 ${isDraggingCalendarModal ? 'cursor-grabbing' : ''}`)}
+                className={getModalWindowClass(closingModal === 'calendar', `pointer-events-auto fixed flex h-[82dvh] max-h-[calc(100dvh-1rem)] min-h-[min(480px,calc(100dvh-1rem))] w-[min(1120px,calc(100vw-1rem))] min-w-[min(420px,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] resize flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:p-4 ${isDraggingCalendarModal ? 'cursor-grabbing' : ''}`)}
                 style={{ left: calendarModalPosition.x, top: calendarModalPosition.y }}
                 onMouseDownCapture={() => setActiveFloatingApp('calendar')}
               >

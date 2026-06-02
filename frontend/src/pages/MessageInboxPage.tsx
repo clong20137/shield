@@ -571,11 +571,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       <div
         className={
           isModalView
-            ? 'grid min-h-0 flex-1 grid-cols-1 gap-2 xl:grid-cols-[minmax(150px,34%)_minmax(0,1fr)]'
+            ? 'grid min-h-0 flex-1 grid-cols-1 gap-2 md:grid-cols-[minmax(150px,34%)_minmax(0,1fr)]'
             : 'grid min-h-[70vh] grid-cols-1 gap-4 xl:h-[calc(100vh-230px)] xl:grid-cols-[minmax(260px,30%)_minmax(0,1fr)]'
         }
       >
-        <section className="relative flex max-h-[34vh] min-h-[14rem] min-w-0 flex-col overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 xl:max-h-none">
+        <section className={`relative flex min-w-0 flex-col overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 ${
+          isModalView ? 'max-h-[34vh] min-h-[12rem] md:max-h-none md:min-h-0' : 'max-h-[34vh] min-h-[14rem] xl:max-h-none'
+        }`}>
           {isModalView && (
             <div className="border-b border-gray-200 p-3 dark:border-gray-800">
               <input

@@ -1047,7 +1047,7 @@ function CalendarPage({
           <button type="button" onClick={() => changeCalendarPeriod(-1)} className="btn-secondary" aria-label="Previous calendar period" title="Previous">
             <ChevronLeft size={16} />
           </button>
-          <div className="min-w-40 text-center text-xl font-bold text-primary-500 dark:text-blue-100 sm:text-2xl">
+          <div className="min-w-32 text-center text-lg font-bold text-primary-500 dark:text-blue-100 sm:min-w-40 sm:text-2xl">
             {activeViewLabel}
           </div>
           <button type="button" onClick={() => changeCalendarPeriod(1)} className="btn-secondary" aria-label="Next calendar period" title="Next">
@@ -1123,16 +1123,16 @@ function CalendarPage({
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         {calendarView === 'month' && (
         <>
-        <div className="grid grid-cols-7 gap-2 text-center text-xs font-bold uppercase text-gray-500 dark:text-gray-400">
+        <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 sm:gap-2 sm:text-xs">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
             <div key={day}>{day}</div>
           ))}
         </div>
 
-        <div className="mt-2 grid grid-cols-7 gap-2">
+        <div className="mt-2 grid grid-cols-7 gap-1 sm:gap-2">
           {calendarCells.map((date, index) => {
             if (!date) {
-              return <div key={`empty-${index}`} className="min-h-16 rounded border border-transparent sm:min-h-24" />;
+              return <div key={`empty-${index}`} className="min-h-14 rounded border border-transparent sm:min-h-24" />;
             }
 
             const dateKey = formatDateKey(date);
@@ -1144,14 +1144,14 @@ function CalendarPage({
                 key={dateKey}
                 type="button"
                 onClick={() => openDay(dateKey)}
-                className={`min-h-16 rounded border bg-gray-50 p-1 text-left transition hover:border-accent hover:bg-accent/5 dark:bg-gray-950 sm:min-h-24 sm:p-2 ${
+                className={`min-h-14 rounded border bg-gray-50 p-1 text-left transition hover:border-accent hover:bg-accent/5 dark:bg-gray-950 sm:min-h-24 sm:p-2 ${
                   isToday
                     ? 'border-accent ring-2 ring-accent/20'
                     : 'border-gray-200 dark:border-gray-800'
                 }`}
               >
                 <div className="mb-1 flex items-center justify-between sm:mb-2">
-                  <span className="font-bold text-gray-800 dark:text-gray-100">{date.getDate()}</span>
+                  <span className="text-xs font-bold text-gray-800 dark:text-gray-100 sm:text-sm">{date.getDate()}</span>
                   {dayEntries.length > 0 && (
                     <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-bold text-accent sm:px-2 sm:text-xs">
                       {dayEntries.length}
@@ -1273,7 +1273,7 @@ function CalendarPage({
       {selectedDate && (
         <div className="modal-backdrop fixed inset-0 z-[70] flex items-end justify-center bg-black/50 sm:items-center">
           <div className="modal-window max-h-[96dvh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:max-h-[92vh] sm:p-5">
-            <div className="mb-5 flex items-start justify-between gap-4">
+            <div className="mb-5 flex flex-wrap items-start justify-between gap-3 sm:gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Trooper Daily</p>
                 <h2 className="mt-1">{getReadableDate(selectedDate)}</h2>
@@ -1288,7 +1288,7 @@ function CalendarPage({
                   {editingSubmissionStatus === 'Submitted' ? 'Submitted report' : 'Saved draft'}
                 </span>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsReminderFormOpen((value) => !value)}
@@ -1297,7 +1297,7 @@ function CalendarPage({
                   title="Create Reminder"
                 >
                   <Bell size={16} />
-                  <span>Create Reminder</span>
+                  <span className="hidden sm:inline">Create Reminder</span>
                 </button>
                 {onOpenCalculator && (
                   <button
