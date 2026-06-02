@@ -713,6 +713,11 @@ input.global-search-input.global-search-input {
   padding-right: 0.75rem !important;
 }
 
+input.pinned-profile-search-input.pinned-profile-search-input {
+  padding-left: 2.75rem !important;
+  padding-right: 0.75rem !important;
+}
+
 select {
   min-height: 2.75rem;
   padding-left: 1rem !important;

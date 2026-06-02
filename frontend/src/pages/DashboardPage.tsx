@@ -895,7 +895,10 @@ function DashboardNews({
                         <span>{post.authorName || 'Administrator'}</span>
                         <span>{new Date(post.createdAt).toLocaleDateString()}</span>
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link to={`/updates/${post.id}`} className="inline-flex h-9 items-center rounded-full border border-accent/30 px-3 text-sm font-bold text-accent transition hover:bg-accent/10">
+                          Read More
+                        </Link>
                         {reactionOptions.map(({ key, label, Icon }) => {
                           const isActive = post.myReaction === key;
                           const count = post.reactions?.[key] || 0;
@@ -1203,7 +1206,7 @@ function PinnedProfilesWidget({ currentUser, onOpenProfile }: { currentUser: Aut
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Pin a profile"
-            className="w-full rounded border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm dark:border-gray-700 dark:bg-gray-950"
+            className="pinned-profile-search-input w-full rounded border border-gray-300 bg-white py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
           />
           {(results.length > 0 || isSearching) && (
             <div className="absolute right-0 top-12 z-30 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900">
