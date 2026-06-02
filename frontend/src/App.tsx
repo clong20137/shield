@@ -3,7 +3,7 @@ import { BarChart3, Bell, Bug, Calculator, CalendarDays, ChevronLeft, ChevronRig
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, clearAuthToken, getAppEventsUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, notificationService, quickLaunchService, RegistrationSettings, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, getAppEventsUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, notificationService, quickLaunchService, RegistrationSettings, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
@@ -759,6 +759,100 @@ function SidebarLink({ to, label, compact, icon: Icon }: SidebarLinkProps) {
       <Icon className={compact ? '' : 'mr-3'} size={19} />
       {!compact && <span>{label}</span>}
     </NavLink>
+  );
+}
+
+function getEntryDateKey(entry: CalendarEntry): string {
+  return entry.date.slice(0, 10);
+}
+
+function getLocalDateKey(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatSidebarCalendarDate(value: string): string {
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  const date = new Date(year, (month || 1) - 1, day || 1);
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+  return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function SidebarCalendarWidget({
+  compact,
+  entries,
+  isLoading,
+  onOpenCalendar,
+}: {
+  compact: boolean;
+  entries: CalendarEntry[];
+  isLoading: boolean;
+  onOpenCalendar: () => void;
+}) {
+  const todayKey = getLocalDateKey();
+  const upcomingEntries = entries
+    .filter((entry) => getEntryDateKey(entry) >= todayKey)
+    .sort((a, b) => getEntryDateKey(a).localeCompare(getEntryDateKey(b)))
+    .slice(0, 3);
+  const todayEntryCount = entries.filter((entry) => getEntryDateKey(entry) === todayKey).length;
+  const currentDay = new Date().toLocaleDateString(undefined, { day: '2-digit' });
+  const currentMonth = new Date().toLocaleDateString(undefined, { month: 'short' });
+
+  if (compact) {
+    return (
+      <button
+        type="button"
+        onClick={onOpenCalendar}
+        className="mx-3 mb-3 flex h-12 items-center justify-center rounded bg-white/10 text-white transition hover:bg-white/15"
+        aria-label="Open calendar"
+        title="Open calendar"
+      >
+        <CalendarDays size={20} />
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onOpenCalendar}
+      className="mx-3 mb-3 rounded-lg border border-white/10 bg-white/10 p-3 text-left text-white transition hover:bg-white/15"
+      aria-label="Open calendar"
+    >
+      <div className="mb-3 flex items-center gap-3">
+        <div className="w-12 shrink-0 overflow-hidden rounded bg-white text-center text-primary-500 shadow">
+          <div className="bg-danger px-1 py-0.5 text-[10px] font-bold uppercase text-white">{currentMonth}</div>
+          <div className="py-1 text-lg font-black leading-none">{currentDay}</div>
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-100">Calendar</p>
+          <p className="truncate text-sm font-bold">
+            {isLoading ? 'Loading entries' : todayEntryCount > 0 ? `${todayEntryCount} today` : 'No entries today'}
+          </p>
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        {upcomingEntries.length > 0 ? (
+          upcomingEntries.map((entry) => (
+            <div key={entry.id} className="min-w-0 rounded bg-black/15 px-2 py-1.5">
+              <p className="truncate text-xs font-bold text-white">{formatSidebarCalendarDate(entry.date)} - {entry.category}</p>
+              <p className="truncate text-[11px] font-semibold text-blue-100">{entry.dutyHours || entry.specialStatus || entry.districtWorked || 'Calendar entry'}</p>
+            </div>
+          ))
+        ) : (
+          <p className="rounded bg-black/15 px-2 py-2 text-xs font-semibold text-blue-100">
+            {isLoading ? 'Checking calendar...' : 'No upcoming entries'}
+          </p>
+        )}
+      </div>
+    </button>
   );
 }
 
@@ -2204,6 +2298,8 @@ function App() {
   }, []);
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const [bugReports, setBugReports] = useState<BugReport[]>([]);
+  const [sidebarCalendarEntries, setSidebarCalendarEntries] = useState<CalendarEntry[]>([]);
+  const [isSidebarCalendarLoading, setIsSidebarCalendarLoading] = useState(false);
   const previousMessageUnreadCount = useRef<number | null>(null);
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
   const rateLimitToastRef = useRef(0);
@@ -2385,6 +2481,38 @@ function App() {
   useEffect(() => {
     void loadUserNotifications();
   }, [loadUserNotifications]);
+
+  const loadSidebarCalendarEntries = useCallback(async (showLoading = false) => {
+    if (!currentUser) {
+      setSidebarCalendarEntries([]);
+      setIsSidebarCalendarLoading(false);
+      return;
+    }
+
+    if (showLoading) {
+      setIsSidebarCalendarLoading(true);
+    }
+
+    try {
+      const response = await calendarService.getAll(currentUser.id);
+      setSidebarCalendarEntries(response.data);
+    } catch (err) {
+      console.error('Failed to load sidebar calendar entries:', err);
+    } finally {
+      setIsSidebarCalendarLoading(false);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    void loadSidebarCalendarEntries(true);
+
+    const handleCalendarUpdate = () => {
+      void loadSidebarCalendarEntries(false);
+    };
+
+    window.addEventListener('shield:calendar-updated', handleCalendarUpdate);
+    return () => window.removeEventListener('shield:calendar-updated', handleCalendarUpdate);
+  }, [loadSidebarCalendarEntries]);
 
   useEffect(() => {
     if (currentUser && !currentUser.hasCompletedOnboarding && !isWelcomeSplashOpen && shouldLaunchGuideAfterWelcome) {
@@ -3041,7 +3169,14 @@ function App() {
               {isAdministrator && <SidebarLink to="/admin" label="Admin" compact={isSidebarCollapsed} icon={Shield} />}
             </nav>
 
-            <div className="shrink-0 border-t border-white/10 p-3" />
+            <div className="shrink-0 border-t border-white/10 pt-3">
+              <SidebarCalendarWidget
+                compact={isSidebarCollapsed}
+                entries={sidebarCalendarEntries}
+                isLoading={isSidebarCalendarLoading}
+                onOpenCalendar={toggleCalendarModal}
+              />
+            </div>
             </div>
           </aside>
 
