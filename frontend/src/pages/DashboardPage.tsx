@@ -646,6 +646,7 @@ function DashboardNews({
   currentUser: AuthAccount | null;
 }) {
   const [posts, setPosts] = useState<DashboardPost[]>([]);
+  const [carouselIndex, setCarouselIndex] = useState(0);
   const [postForm, setPostForm] = useState<DashboardPostForm>(defaultPostForm);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isSavingPost, setIsSavingPost] = useState(false);
@@ -687,6 +688,21 @@ function DashboardNews({
     window.addEventListener('shield:dashboard-updated', handleDashboardUpdate);
     return () => window.removeEventListener('shield:dashboard-updated', handleDashboardUpdate);
   }, [loadPosts]);
+
+  const carouselPosts = posts.slice(0, 3);
+
+  useEffect(() => {
+    if (carouselPosts.length < 2) {
+      setCarouselIndex(0);
+      return undefined;
+    }
+
+    const timer = window.setInterval(() => {
+      setCarouselIndex((currentIndex) => (currentIndex + 1) % carouselPosts.length);
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [carouselPosts.length]);
 
   const createPost = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -802,7 +818,7 @@ function DashboardNews({
   };
 
   return (
-    <section className="mb-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+    <section className="flex h-full min-h-[32rem] flex-col rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2>Updates & News</h2>
@@ -828,71 +844,101 @@ function DashboardNews({
       ) : posts.length === 0 ? (
         <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No updates posted yet.</div>
       ) : (
-        <div className="space-y-3">
-          {posts.map((post) => (
-            <article key={post.id} className="rounded border border-gray-200 p-3 dark:border-gray-800">
-              <div className="flex items-start gap-3">
-                {post.imageUrl && (
-                  <Link to={`/updates/${post.id}`} className="hidden h-20 w-24 shrink-0 overflow-hidden rounded border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-950 sm:block">
-                    <img
-                      src={getAssetUrl(post.imageUrl)}
-                      alt=""
-                      onError={handleAssetImageError}
-                      className="h-full w-full object-cover"
-                    />
-                  </Link>
-                )}
-                <div className="min-w-0 flex-1">
-                  <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold uppercase text-accent">{post.category}</span>
-                  <Link to={`/updates/${post.id}`} className="mt-2 block truncate text-base font-bold text-primary-500 hover:text-primary-700 dark:text-blue-100">
-                    {post.title}
-                  </Link>
-                  <p className="mt-1 line-clamp-2 text-sm text-gray-600 dark:text-gray-300">{getPostBodyText(post.body)}</p>
-                  <p className="mt-2 text-xs text-gray-400">
-                    {post.authorName || 'Administrator'} - {new Date(post.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                {(canEditDashboardPosts || canDeleteDashboardPosts) && (
-                  <div className="flex shrink-0 gap-2">
-                    {canEditDashboardPosts && (
-                      <button type="button" onClick={() => openEditPost(post)} className="btn-secondary" aria-label="Edit post" title="Edit">
-                        <Pencil size={16} />
-                      </button>
-                    )}
-                    {canDeleteDashboardPosts && (
-                      <button type="button" onClick={() => setPostPendingDelete(post)} className="btn-danger" aria-label="Delete post" title="Delete">
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {reactionOptions.map(({ key, label, Icon }) => {
-                  const isActive = post.myReaction === key;
-                  const count = post.reactions?.[key] || 0;
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
+            <div
+              className="flex h-full transition-transform duration-700 ease-in-out"
+              style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
+            >
+              {carouselPosts.map((post) => (
+                <article key={post.id} className="flex min-w-full flex-col">
+                  {post.imageUrl ? (
+                    <Link to={`/updates/${post.id}`} className="block h-44 overflow-hidden bg-gray-100 dark:bg-gray-900 sm:h-52">
+                      <img
+                        src={getAssetUrl(post.imageUrl)}
+                        alt=""
+                        onError={handleAssetImageError}
+                        className="h-full w-full object-cover transition duration-700 hover:scale-[1.03]"
+                      />
+                    </Link>
+                  ) : (
+                    <div className="flex h-44 items-center justify-center bg-primary-500/10 text-primary-500 dark:bg-blue-950/40 dark:text-blue-100 sm:h-52">
+                      <Image size={34} />
+                    </div>
+                  )}
+                  <div className="flex min-h-0 flex-1 flex-col p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold uppercase text-accent">{post.category}</span>
+                        <Link to={`/updates/${post.id}`} className="mt-3 line-clamp-2 text-lg font-bold leading-tight text-primary-500 hover:text-primary-700 dark:text-blue-100">
+                          {post.title}
+                        </Link>
+                      </div>
+                      {(canEditDashboardPosts || canDeleteDashboardPosts) && (
+                        <div className="flex shrink-0 gap-2">
+                          {canEditDashboardPosts && (
+                            <button type="button" onClick={() => openEditPost(post)} className="btn-secondary" aria-label="Edit post" title="Edit">
+                              <Pencil size={16} />
+                            </button>
+                          )}
+                          {canDeleteDashboardPosts && (
+                            <button type="button" onClick={() => setPostPendingDelete(post)} className="btn-danger" aria-label="Delete post" title="Delete">
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-600 dark:text-gray-300">{getPostBodyText(post.body)}</p>
+                    <div className="mt-auto pt-4">
+                      <div className="mb-3 flex items-center justify-between gap-3 text-xs text-gray-400">
+                        <span>{post.authorName || 'Administrator'}</span>
+                        <span>{new Date(post.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {reactionOptions.map(({ key, label, Icon }) => {
+                          const isActive = post.myReaction === key;
+                          const count = post.reactions?.[key] || 0;
 
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => reactToPost(post, key)}
-                      className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-sm font-semibold transition ${
-                        isActive
-                          ? 'border-accent bg-accent/10 text-accent'
-                          : 'border-gray-200 text-gray-600 hover:border-accent hover:text-accent dark:border-gray-800 dark:text-gray-300'
-                      }`}
-                      aria-label={`${label} reaction`}
-                      title={label}
-                    >
-                      <Icon size={16} />
-                      <span>{count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </article>
-          ))}
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => reactToPost(post, key)}
+                              className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-sm font-semibold transition ${
+                                isActive
+                                  ? 'border-accent bg-accent/10 text-accent'
+                                  : 'border-gray-200 text-gray-600 hover:border-accent hover:text-accent dark:border-gray-800 dark:text-gray-300'
+                              }`}
+                              aria-label={`${label} reaction`}
+                              title={label}
+                            >
+                              <Icon size={16} />
+                              <span>{count}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+          {carouselPosts.length > 1 && (
+            <div className="mt-4 flex justify-center gap-2">
+              {carouselPosts.map((post, index) => (
+                <button
+                  key={post.id}
+                  type="button"
+                  onClick={() => setCarouselIndex(index)}
+                  className={`h-2.5 rounded-full transition-all ${index === carouselIndex ? 'w-8 bg-accent' : 'w-2.5 bg-gray-300 dark:bg-gray-700'}`}
+                  aria-label={`Show update ${index + 1}`}
+                  title={`Show update ${index + 1}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
       {(isCreatePostOpen || editingPost) && (
@@ -1172,11 +1218,11 @@ function PinnedProfilesWidget({ currentUser, onOpenProfile }: { currentUser: Aut
           Pin frequently used profiles and they will stay here.
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
+        <div className="flex snap-x gap-3 overflow-x-auto pb-2">
           {profiles.map((profile) => (
-            <article key={profile.id} className="group relative rounded-lg border border-gray-200 bg-gray-50 p-3 text-center transition hover:-translate-y-1 hover:scale-[1.04] hover:border-accent hover:bg-white hover:shadow-lg dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900">
+            <article key={profile.id} className="group relative w-28 shrink-0 snap-start rounded-lg border border-gray-200 bg-gray-50 p-3 text-center transition hover:-translate-y-1 hover:scale-[1.04] hover:border-accent hover:bg-white hover:shadow-lg dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900 sm:w-32">
               <button type="button" onClick={() => onOpenProfile(profile)} className="block w-full" aria-label={`Open ${profile.firstName} ${profile.lastName}`}>
-                <span className="mx-auto block h-16 w-16 overflow-hidden rounded-full border-2 border-white bg-primary-500 shadow group-hover:ring-4 group-hover:ring-accent/20">
+                <span className="mx-auto block h-16 w-16 overflow-hidden rounded-full border-2 border-white bg-primary-500 shadow group-hover:ring-4 group-hover:ring-accent/20 sm:h-[4.5rem] sm:w-[4.5rem]">
                   {profile.profilePictureUrl ? (
                     <img src={getAssetUrl(profile.profilePictureUrl)} alt={`${profile.firstName} ${profile.lastName}`} onError={handleAssetImageError} className="h-full w-full object-cover" />
                   ) : (
@@ -1250,7 +1296,7 @@ function QuickNotesWidget({ currentUser }: { currentUser: AuthAccount | null }) 
         : 'Ready';
 
   return (
-    <section className="rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
+    <section className="flex h-full min-h-[32rem] flex-col rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
       <div className="mb-4 flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">
           <NotebookPen size={19} />
@@ -1265,7 +1311,7 @@ function QuickNotesWidget({ currentUser }: { currentUser: AuthAccount | null }) 
         onChange={(event) => setContent(event.target.value)}
         placeholder="Keep quick reminders, names, or follow-ups here."
         maxLength={10000}
-        className="min-h-[22rem] w-full resize-y rounded border border-gray-300 bg-gray-50 px-4 py-3 text-sm leading-6 outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+        className="min-h-0 flex-1 resize-none rounded border border-gray-300 bg-gray-50 px-4 py-3 text-sm leading-6 outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
       />
     </section>
   );
