@@ -1,5 +1,5 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, CheckCheck, Pin, PinOff, Search, Share2, SmilePlus, Paperclip, Plus, Send, Trash2, X } from 'lucide-react';
+import { Check, CheckCheck, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Send, Trash2, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, userService, User, UserMessage } from '../services/api';
 import { RankBadge } from '../components/RankBadge';
@@ -580,7 +580,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
   };
 
   const addEmojiToReply = (emojiData: EmojiClickData) => {
-    setReplyBody((body) => `${body}${emojiData.emoji}`);
+    updateReplyBody(`${replyBody}${emojiData.emoji}`);
+    setIsEmojiPickerOpen(false);
   };
 
   const togglePinnedThread = (threadId: string) => {
@@ -632,40 +633,6 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
     } catch (err) {
       console.error('Failed to react to message:', err);
       onToast('error', 'Failed to update reaction.');
-    }
-  };
-
-  const shareSelectedProfile = async () => {
-    if (!selectedThread) {
-      return;
-    }
-
-    if (!selectedThreadAcceptsMessages) {
-      onToast('error', `${selectedThread.contactName} is not accepting messages right now.`);
-      return;
-    }
-
-    setIsSending(true);
-    try {
-      await messageService.send({
-        senderAccountId: currentUser.id,
-        recipientUserId: selectedThread.id,
-        subject: selectedThread.subject,
-        body: [
-          'Shared profile',
-          selectedThread.contactName,
-          selectedThread.contactRank ? `Rank: ${selectedThread.contactRank}` : '',
-          selectedThread.contactEmail ? `Email: ${selectedThread.contactEmail}` : '',
-        ].filter(Boolean).join('\n'),
-      });
-      await loadMessages(false);
-      window.dispatchEvent(new CustomEvent('shield:messages-updated'));
-      onToast('success', 'Profile shared.');
-    } catch (err) {
-      console.error('Failed to share profile:', err);
-      onToast('error', 'Failed to share profile.');
-    } finally {
-      setIsSending(false);
     }
   };
 
@@ -786,12 +753,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
       )}
 
       {!isModalView && (
-        <div className="mb-5">
+        <div className="relative mb-5 w-full max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
           <input
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="Search conversations"
-            className="w-full max-w-md rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+            className="global-search-input w-full rounded border border-gray-300 bg-white py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
           />
         </div>
       )}
@@ -808,12 +776,15 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
         }`}>
           {isModalView && (
             <div className="border-b border-gray-200 p-3 dark:border-gray-800">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
               <input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search conversations"
-                className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                className="global-search-input w-full rounded border border-gray-300 bg-white py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
               />
+              </div>
             </div>
           )}
           {isComposeOpen && (
@@ -897,10 +868,30 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                 return (
                   <div
                     key={thread.id}
-                    className={`flex min-w-0 items-center gap-1.5 px-2 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 sm:gap-2 sm:px-3 sm:py-3 ${
+                    className={`flex min-w-0 items-center gap-2 px-2 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 sm:gap-2.5 sm:px-3 sm:py-3 ${
                       selectedThreadId === thread.id ? 'bg-accent/10' : ''
                     }`}
                   >
+                    <button
+                      type="button"
+                      onClick={() => setSelectedThreadId(thread.id)}
+                      className="relative shrink-0"
+                      aria-label={`Open ${thread.contactName}`}
+                    >
+                      {thread.contactProfilePictureUrl ? (
+                        <img
+                          src={getAssetUrl(thread.contactProfilePictureUrl)}
+                          alt={thread.contactName}
+                          onError={handleAssetImageError}
+                          className="h-10 w-10 rounded-full border border-gray-200 object-cover dark:border-gray-700"
+                        />
+                      ) : (
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-accent/10 text-xs font-bold text-accent dark:border-gray-700">
+                          {getInitials(thread.contactName)}
+                        </span>
+                      )}
+                      <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-gray-900 ${presence.online ? 'bg-green-500' : 'bg-gray-400'}`} />
+                    </button>
                     <button
                       type="button"
                       onClick={() => setSelectedThreadId(thread.id)}
@@ -1007,35 +998,14 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                     )}
                   </div>
                   </div>
-                  <div className="flex shrink-0 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => togglePinnedThread(selectedThread.id)}
-                      className="btn-secondary"
-                      aria-label={pinnedThreadIds.includes(selectedThread.id) ? 'Unpin conversation' : 'Pin conversation'}
-                      title={pinnedThreadIds.includes(selectedThread.id) ? 'Unpin Conversation' : 'Pin Conversation'}
-                    >
-                      {pinnedThreadIds.includes(selectedThread.id) ? <PinOff size={16} /> : <Pin size={16} />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={shareSelectedProfile}
-                      className="btn-secondary"
-                      disabled={isSending || !selectedThreadAcceptsMessages}
-                      aria-label="Share profile"
-                      title="Share Profile"
-                    >
-                      <Share2 size={16} />
-                    </button>
-                  </div>
                 </div>
-                <div className="mt-3 flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-950">
-                  <Search size={15} className="shrink-0 text-gray-400" />
+                <div className="relative mt-3">
+                  <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     value={threadSearchTerm}
                     onChange={(event) => setThreadSearchTerm(event.target.value)}
                     placeholder="Search this conversation"
-                    className="min-h-0 flex-1 border-0 bg-transparent p-0 text-sm outline-none focus:ring-0 dark:bg-transparent"
+                    className="global-search-input w-full rounded border border-gray-300 bg-white py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
                   />
                 </div>
                 {selectedTyping && (
@@ -1169,15 +1139,20 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
                     ))}
                   </div>
                 )}
-                <div className="flex min-h-14 items-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 sm:rounded-full sm:py-1.5">
+                <div className="relative flex min-h-14 items-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 sm:rounded-full sm:py-1.5">
                   <button
                     type="button"
-                    onClick={() => setIsEmojiPickerOpen(true)}
+                    onClick={() => setIsEmojiPickerOpen((value) => !value)}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg hover:bg-gray-100 dark:hover:bg-gray-800 sm:h-8 sm:w-8"
                     aria-label="Add emoji"
                   >
                     {emojiButtonLabel}
                   </button>
+                  {isEmojiPickerOpen && (
+                    <div className="absolute bottom-[calc(100%+0.75rem)] left-0 z-40 max-h-[min(28rem,70dvh)] max-w-[calc(100vw-2rem)] overflow-auto rounded-lg border border-gray-200 bg-white p-2 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+                      <EmojiPicker onEmojiClick={addEmojiToReply} />
+                    </div>
+                  )}
                   <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800 sm:h-8 sm:w-8" title="Attach files">
                     <Paperclip size={18} />
                     <input
@@ -1260,13 +1235,6 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false }: Message
         </div>
       )}
 
-      {isEmojiPickerOpen && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onClick={() => setIsEmojiPickerOpen(false)}>
-          <div className="max-h-[80dvh] max-w-[calc(100vw-1rem)] overflow-auto rounded-lg bg-white p-2 shadow-xl sm:max-h-[90vh]" onClick={(event) => event.stopPropagation()}>
-            <EmojiPicker onEmojiClick={addEmojiToReply} />
-          </div>
-        </div>
-      )}
       {selectedMentionUser && (
         <div className="modal-backdrop fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4">
           <div className="modal-window max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-lg">
