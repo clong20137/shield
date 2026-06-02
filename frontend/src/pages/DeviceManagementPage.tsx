@@ -747,7 +747,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       </section>
 
       {canManageDevices && isDeviceFormOpen && (
-        <div className="pointer-events-none fixed inset-0 z-50 bg-black/50 md:bg-black/25">
+        <div className="pointer-events-none fixed inset-0 z-50">
           <div
             ref={deviceModalRef}
             className={`pointer-events-auto modal-window fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-4 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[82dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(520px,calc(100dvh-1rem))] md:w-[min(1152px,calc(100vw-1rem))] md:min-w-[min(520px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg sm:p-6 ${isDeviceModalDragging ? 'md:cursor-grabbing' : ''}`}

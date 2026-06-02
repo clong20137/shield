@@ -1207,7 +1207,6 @@ function PinnedProfilesWidget({ currentUser, onOpenProfile }: { currentUser: Aut
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Pinned Profiles</p>
-          <h2 className="mt-1 text-xl font-bold text-primary-500 dark:text-blue-100">Quick people access</h2>
         </div>
         <div className="relative w-full sm:max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
