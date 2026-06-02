@@ -42,6 +42,19 @@ const deviceIconMap = {
   Cradlepoint: Wifi,
 };
 
+function cleanDeviceFormForType(form: DeviceForm): DeviceForm {
+  if (form.type !== 'Cell Phone') {
+    return form;
+  }
+
+  return {
+    ...form,
+    radioId: '',
+    hostname: '',
+    routerId: '',
+  };
+}
+
 function toDeviceForm(device: DeviceRecord): DeviceForm {
   return {
     type: device.type,
@@ -266,7 +279,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     try {
       if (editingId) {
         const response = await deviceService.update(editingId, {
-          ...form,
+          ...cleanDeviceFormForType(form),
           ...actor,
           eventAction: 'Updated',
           eventNotes: eventNotes || 'Device details updated.',
@@ -277,7 +290,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         setEditingId(null);
       } else {
         const response = await deviceService.create({
-          ...form,
+          ...cleanDeviceFormForType(form),
           ...actor,
           eventNotes: eventNotes || 'Device added to inventory.',
         });
@@ -654,7 +667,14 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             <form onSubmit={saveDevice} className="min-h-0 flex-1 overflow-y-auto pr-1">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Field label="Device Type">
-                  <select value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as DeviceType }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                  <select
+                    value={form.type}
+                    onChange={(event) => {
+                      const nextType = event.target.value as DeviceType;
+                      setForm((current) => cleanDeviceFormForType({ ...current, type: nextType }));
+                    }}
+                    className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                  >
                     {deviceTypes.map((type) => <option key={type}>{type}</option>)}
                   </select>
                 </Field>
@@ -681,9 +701,13 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <TextField label="Phone Number" value={form.phoneNumber} onChange={(value) => setForm((current) => ({ ...current, phoneNumber: value }))} />
                 <TextField label="IMEI" value={form.imei} onChange={(value) => setForm((current) => ({ ...current, imei: value }))} />
                 <TextField label="ICCID" value={form.simNumber} onChange={(value) => setForm((current) => ({ ...current, simNumber: value }))} />
-                <TextField label="Radio ID" value={form.radioId} onChange={(value) => setForm((current) => ({ ...current, radioId: value }))} />
-                <TextField label="Hostname" value={form.hostname} onChange={(value) => setForm((current) => ({ ...current, hostname: value }))} />
-                <TextField label="Router ID" value={form.routerId} onChange={(value) => setForm((current) => ({ ...current, routerId: value }))} />
+                {form.type !== 'Cell Phone' && (
+                  <>
+                    <TextField label="Radio ID" value={form.radioId} onChange={(value) => setForm((current) => ({ ...current, radioId: value }))} />
+                    <TextField label="Hostname" value={form.hostname} onChange={(value) => setForm((current) => ({ ...current, hostname: value }))} />
+                    <TextField label="Router ID" value={form.routerId} onChange={(value) => setForm((current) => ({ ...current, routerId: value }))} />
+                  </>
+                )}
                 <DateField label="Purchase Date" value={form.purchaseDate} onChange={(value) => setForm((current) => ({ ...current, purchaseDate: value }))} />
                 <DateField label="Warranty Expiration" value={form.warrantyExpiration} onChange={(value) => setForm((current) => ({ ...current, warrantyExpiration: value }))} />
                 <DateField label="Replacement Due" value={form.replacementDueDate} onChange={(value) => setForm((current) => ({ ...current, replacementDueDate: value }))} />

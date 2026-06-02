@@ -27,7 +27,7 @@ const MODAL_CLOSE_MS = 220;
 interface MessagePreferences {
   receiveMessages: boolean;
   playMessageSound: boolean;
-  messageSound: 'classic' | 'soft' | 'chime';
+  messageSound: 'classic' | 'soft' | 'chime' | 'msn';
   useMilitaryTime: boolean;
 }
 
@@ -2855,6 +2855,12 @@ function App() {
           { type: 'triangle' as OscillatorType, frequency: 784, start: 0, duration: 0.12, volume: 0.1 },
           { type: 'triangle' as OscillatorType, frequency: 1046.5, start: 0.11, duration: 0.16, volume: 0.09 },
           { type: 'sine' as OscillatorType, frequency: 1318.51, start: 0.24, duration: 0.18, volume: 0.07 },
+        ],
+        msn: [
+          { type: 'sine' as OscillatorType, frequency: 880, start: 0, duration: 0.09, volume: 0.1 },
+          { type: 'sine' as OscillatorType, frequency: 1174.66, start: 0.08, duration: 0.11, volume: 0.095 },
+          { type: 'triangle' as OscillatorType, frequency: 1567.98, start: 0.18, duration: 0.12, volume: 0.08 },
+          { type: 'sine' as OscillatorType, frequency: 1174.66, start: 0.32, duration: 0.1, volume: 0.075 },
         ],
       }[messagePreferences.messageSound || 'classic'];
 

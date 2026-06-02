@@ -10,12 +10,12 @@ interface AccountSettingsPageProps {
   messagePreferences: {
     receiveMessages: boolean;
     playMessageSound: boolean;
-    messageSound: 'classic' | 'soft' | 'chime';
+    messageSound: 'classic' | 'soft' | 'chime' | 'msn';
     useMilitaryTime: boolean;
   };
   onReceiveMessagesChange: (receiveMessages: boolean) => void;
   onMessageSoundChange: (playMessageSound: boolean) => void;
-  onMessageSoundSelect: (messageSound: 'classic' | 'soft' | 'chime') => void;
+  onMessageSoundSelect: (messageSound: 'classic' | 'soft' | 'chime' | 'msn') => void;
   onMilitaryTimeChange: (useMilitaryTime: boolean) => void;
   onOpenEvaluations?: () => void;
   onReplayGuide?: () => void;
@@ -668,12 +668,13 @@ export function AccountSettingsPage({
             <select
               value={messagePreferences.messageSound}
               disabled={!messagePreferences.receiveMessages || !messagePreferences.playMessageSound}
-              onChange={(event) => onMessageSoundSelect(event.target.value as 'classic' | 'soft' | 'chime')}
+              onChange={(event) => onMessageSoundSelect(event.target.value as 'classic' | 'soft' | 'chime' | 'msn')}
               className="mt-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
             >
               <option value="classic">Classic two-tone</option>
               <option value="soft">Soft alert</option>
               <option value="chime">Bright chime</option>
+              <option value="msn">MSN Messenger</option>
             </select>
           </label>
 
