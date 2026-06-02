@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { getSessionAccount } from '../middleware/authSession';
 import { ReminderModel } from '../models/Reminder';
 import { broadcastAccountEvent } from '../services/appEvents';
-import { cleanString } from '../utils/validation';
+import { cleanString, isValidIsoDate } from '../utils/validation';
 
 export class ReminderController {
   static async list(req: Request, res: Response) {
@@ -10,6 +10,12 @@ export class ReminderController {
       const account = await getSessionAccount(req);
       if (!account) {
         return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const dueCount = await ReminderModel.createDueNotifications(account.id);
+      if (dueCount > 0) {
+        broadcastAccountEvent(account.id, { type: 'notification-created' });
+        broadcastAccountEvent(account.id, { type: 'reminder-updated' });
       }
 
       const reminders = await ReminderModel.list(account.id);
@@ -32,7 +38,16 @@ export class ReminderController {
         return res.status(400).json({ error: 'Reminder title is required' });
       }
 
-      const reminder = await ReminderModel.create(account.id, title);
+      const remindOn = cleanString(req.body?.remindOn, 20);
+      if (!remindOn || !isValidIsoDate(remindOn)) {
+        return res.status(400).json({ error: 'Reminder date must use YYYY-MM-DD format' });
+      }
+
+      const reminder = await ReminderModel.create(account.id, title, remindOn);
+      const dueCount = await ReminderModel.createDueNotifications(account.id);
+      if (dueCount > 0) {
+        broadcastAccountEvent(account.id, { type: 'notification-created', entityId: reminder.id });
+      }
       broadcastAccountEvent(account.id, { type: 'reminder-updated', entityId: reminder.id });
       res.status(201).json(reminder);
     } catch (error) {
@@ -53,8 +68,14 @@ export class ReminderController {
         return res.status(400).json({ error: 'Reminder title is required' });
       }
 
+      const remindOn = req.body?.remindOn === undefined ? undefined : cleanString(req.body.remindOn, 20);
+      if (req.body?.remindOn !== undefined && (!remindOn || !isValidIsoDate(remindOn))) {
+        return res.status(400).json({ error: 'Reminder date must use YYYY-MM-DD format' });
+      }
+
       const reminder = await ReminderModel.update(req.params.id, account.id, {
         title,
+        remindOn,
         completed: typeof req.body?.completed === 'boolean' ? req.body.completed : undefined,
       });
 
@@ -62,6 +83,10 @@ export class ReminderController {
         return res.status(404).json({ error: 'Reminder not found' });
       }
 
+      const dueCount = await ReminderModel.createDueNotifications(account.id);
+      if (dueCount > 0) {
+        broadcastAccountEvent(account.id, { type: 'notification-created', entityId: reminder.id });
+      }
       broadcastAccountEvent(account.id, { type: 'reminder-updated', entityId: reminder.id });
       res.json(reminder);
     } catch (error) {

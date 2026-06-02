@@ -860,24 +860,12 @@ function SidebarRemindersWidget({
   compact,
   reminders,
   isLoading,
-  draft,
-  isCreating,
-  onDraftChange,
-  onStartCreate,
-  onCancelCreate,
-  onSubmit,
   onToggle,
   onDelete,
 }: {
   compact: boolean;
   reminders: Reminder[];
   isLoading: boolean;
-  draft: string;
-  isCreating: boolean;
-  onDraftChange: (value: string) => void;
-  onStartCreate: () => void;
-  onCancelCreate: () => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
@@ -886,12 +874,10 @@ function SidebarRemindersWidget({
 
   if (compact) {
     return (
-      <button
-        type="button"
-        onClick={onStartCreate}
+      <div
         className="relative mb-3 flex h-11 w-full items-center justify-center rounded bg-white/10 text-white transition hover:bg-white/15"
-        aria-label="Create reminder"
-        title="Create reminder"
+        aria-label="Reminders"
+        title="Reminders"
       >
         <ClipboardList size={20} />
         {activeReminders.length > 0 && (
@@ -899,60 +885,18 @@ function SidebarRemindersWidget({
             {activeReminders.length > 9 ? '9+' : activeReminders.length}
           </span>
         )}
-      </button>
+      </div>
     );
   }
 
   return (
-    <div
-      className="mb-3 rounded-lg border border-white/10 bg-white/10 p-3 text-white"
-      onClick={() => {
-        if (!isCreating) {
-          onStartCreate();
-        }
-      }}
-    >
+    <div className="mb-3 rounded-lg border border-white/10 bg-white/10 p-3 text-white">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-100">Reminders</p>
           <p className="truncate text-sm font-bold">{isLoading ? 'Loading' : activeReminders.length > 0 ? `${activeReminders.length} active` : 'All clear'}</p>
         </div>
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onStartCreate();
-          }}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-white/10 text-white transition hover:bg-white/20"
-          aria-label="New reminder"
-          title="New Reminder"
-        >
-          <Plus size={16} />
-        </button>
       </div>
-
-      {isCreating && (
-        <form
-          onSubmit={onSubmit}
-          className="mb-3 flex gap-1.5"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <input
-            value={draft}
-            onChange={(event) => onDraftChange(event.target.value)}
-            className="min-w-0 flex-1 rounded border border-white/15 bg-black/20 px-2 py-1.5 text-xs font-semibold text-white outline-none placeholder:text-blue-100 focus:border-white/45"
-            placeholder="New reminder"
-            maxLength={90}
-            autoFocus
-          />
-          <button type="submit" className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-accent text-white hover:bg-accent/90" aria-label="Save reminder" title="Save Reminder">
-            <Save size={14} />
-          </button>
-          <button type="button" onClick={onCancelCreate} className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-white/10 text-white hover:bg-white/20" aria-label="Cancel reminder" title="Cancel">
-            <X size={14} />
-          </button>
-        </form>
-      )}
 
       <div className="space-y-1.5">
         {isLoading ? (
@@ -970,6 +914,7 @@ function SidebarRemindersWidget({
                 aria-label={`Complete ${reminder.title}`}
               />
               <span className="min-w-0 flex-1 truncate text-xs font-bold text-white">{reminder.title}</span>
+              <span className="shrink-0 text-[10px] font-bold text-blue-100">{formatSidebarCalendarDate(reminder.remindOn)}</span>
               <button type="button" onClick={() => onDelete(reminder.id)} className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-blue-100 hover:bg-white/10 hover:text-white" aria-label={`Delete ${reminder.title}`} title="Delete Reminder">
                 <Trash2 size={13} />
               </button>
@@ -2431,8 +2376,6 @@ function App() {
   const [isSidebarCalendarLoading, setIsSidebarCalendarLoading] = useState(false);
   const [sidebarReminders, setSidebarReminders] = useState<Reminder[]>([]);
   const [isSidebarRemindersLoading, setIsSidebarRemindersLoading] = useState(false);
-  const [isReminderComposerOpen, setIsReminderComposerOpen] = useState(false);
-  const [reminderDraft, setReminderDraft] = useState('');
   const previousMessageUnreadCount = useRef<number | null>(null);
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
   const rateLimitToastRef = useRef(0);
@@ -2484,8 +2427,6 @@ function App() {
   }, [currentUser]);
 
   useEffect(() => {
-    setReminderDraft('');
-    setIsReminderComposerOpen(false);
     void loadSidebarReminders(true);
 
     const handleReminderUpdate = () => {
@@ -2493,28 +2434,15 @@ function App() {
     };
 
     window.addEventListener('shield:reminder-updated', handleReminderUpdate);
-    return () => window.removeEventListener('shield:reminder-updated', handleReminderUpdate);
+    const reminderCheckTimer = window.setInterval(() => {
+      void loadSidebarReminders(false);
+    }, 60 * 1000);
+
+    return () => {
+      window.removeEventListener('shield:reminder-updated', handleReminderUpdate);
+      window.clearInterval(reminderCheckTimer);
+    };
   }, [loadSidebarReminders]);
-
-  const createSidebarReminder = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const title = reminderDraft.trim();
-
-    if (!title) {
-      return;
-    }
-
-    try {
-      const response = await reminderService.create(title);
-      setSidebarReminders((currentReminders) => [response.data, ...currentReminders].slice(0, 50));
-      setReminderDraft('');
-      setIsReminderComposerOpen(false);
-      showToast('success', 'Reminder added.', { saveToNotifications: false });
-    } catch (error) {
-      console.error('Failed to create reminder:', error);
-      showToast('error', getErrorMessage(error, 'Failed to add reminder.'), { saveToNotifications: false });
-    }
-  };
 
   const toggleSidebarReminder = async (id: string) => {
     const reminder = sidebarReminders.find((item) => item.id === id);
@@ -2539,13 +2467,6 @@ function App() {
       console.error('Failed to delete reminder:', error);
       showToast('error', getErrorMessage(error, 'Failed to delete reminder.'), { saveToNotifications: false });
     }
-  };
-
-  const openReminderComposer = () => {
-    if (isSidebarCollapsed) {
-      setIsSidebarCollapsed(false);
-    }
-    setIsReminderComposerOpen(true);
   };
 
   useEffect(() => {
@@ -3393,15 +3314,6 @@ function App() {
                 compact={isSidebarCollapsed}
                 reminders={sidebarReminders}
                 isLoading={isSidebarRemindersLoading}
-                draft={reminderDraft}
-                isCreating={isReminderComposerOpen}
-                onDraftChange={setReminderDraft}
-                onStartCreate={openReminderComposer}
-                onCancelCreate={() => {
-                  setReminderDraft('');
-                  setIsReminderComposerOpen(false);
-                }}
-                onSubmit={createSidebarReminder}
                 onToggle={toggleSidebarReminder}
                 onDelete={deleteSidebarReminder}
               />
@@ -3685,7 +3597,7 @@ function App() {
                 </div>
                 <div className="min-h-0 flex-1">
                   <Suspense fallback={<PageLoader label="Loading calendar..." />}>
-                    <CalendarPage currentUser={currentUser} onOpenCalculator={openCalculator} onAccountUpdate={handleAccountUpdate} useMilitaryTime={messagePreferences.useMilitaryTime} />
+                    <CalendarPage currentUser={currentUser} onOpenCalculator={openCalculator} onAccountUpdate={handleAccountUpdate} onToast={showToast} useMilitaryTime={messagePreferences.useMilitaryTime} />
                   </Suspense>
                 </div>
               </div>

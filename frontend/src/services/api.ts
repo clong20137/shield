@@ -549,6 +549,8 @@ export interface Reminder {
   id: string;
   accountId: string;
   title: string;
+  remindOn: string;
+  notifiedAt: string | null;
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -920,10 +922,10 @@ export const reminderService = {
   getAll: () =>
     api.get<Reminder[]>('/reminders'),
 
-  create: (title: string) =>
-    api.post<Reminder>('/reminders', { title }),
+  create: (title: string, remindOn: string) =>
+    api.post<Reminder>('/reminders', { title, remindOn }),
 
-  update: (id: string, updates: { title?: string; completed?: boolean }) =>
+  update: (id: string, updates: { title?: string; remindOn?: string; completed?: boolean }) =>
     api.put<Reminder>(`/reminders/${id}`, updates),
 
   delete: (id: string) =>

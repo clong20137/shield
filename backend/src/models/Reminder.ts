@@ -1,11 +1,14 @@
 import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database';
+import { UserNotificationModel } from './UserNotification';
 
 export interface Reminder {
   id: string;
   accountId: string;
   title: string;
+  remindOn: string;
+  notifiedAt: Date | null;
   completedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -15,6 +18,8 @@ interface ReminderRow extends RowDataPacket {
   id: string;
   accountId: string;
   title: string;
+  remindOn: Date | string | null;
+  notifiedAt: Date | null;
   completedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -25,10 +30,20 @@ function toReminder(row: ReminderRow): Reminder {
     id: row.id,
     accountId: row.accountId,
     title: row.title,
+    remindOn: formatDate(row.remindOn || row.createdAt),
+    notifiedAt: row.notifiedAt || null,
     completedAt: row.completedAt || null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+function formatDate(value: Date | string): string {
+  if (typeof value === 'string') {
+    return value.slice(0, 10);
+  }
+
+  return value.toISOString().slice(0, 10);
 }
 
 export class ReminderModel {
@@ -49,24 +64,24 @@ export class ReminderModel {
     }
   }
 
-  static async create(accountId: string, title: string): Promise<Reminder> {
+  static async create(accountId: string, title: string, remindOn: string): Promise<Reminder> {
     const conn = await pool.getConnection();
     try {
       const id = uuidv4();
       const now = new Date();
       await conn.query<ResultSetHeader>(
-        `INSERT INTO reminders (\`id\`, \`accountId\`, \`title\`, \`completedAt\`, \`createdAt\`, \`updatedAt\`)
-         VALUES (?, ?, ?, NULL, ?, ?)`,
-        [id, accountId, title, now, now]
+        `INSERT INTO reminders (\`id\`, \`accountId\`, \`title\`, \`remindOn\`, \`notifiedAt\`, \`completedAt\`, \`createdAt\`, \`updatedAt\`)
+         VALUES (?, ?, ?, ?, NULL, NULL, ?, ?)`,
+        [id, accountId, title, remindOn, now, now]
       );
 
-      return { id, accountId, title, completedAt: null, createdAt: now, updatedAt: now };
+      return { id, accountId, title, remindOn, notifiedAt: null, completedAt: null, createdAt: now, updatedAt: now };
     } finally {
       conn.release();
     }
   }
 
-  static async update(id: string, accountId: string, updates: { title?: string; completed?: boolean }): Promise<Reminder | null> {
+  static async update(id: string, accountId: string, updates: { title?: string; remindOn?: string; completed?: boolean }): Promise<Reminder | null> {
     const conn = await pool.getConnection();
     try {
       const [existingRows] = await conn.query<ReminderRow[]>(
@@ -79,15 +94,19 @@ export class ReminderModel {
       }
 
       const nextTitle = updates.title ?? existingRows[0].title;
+      const existingRemindOn = formatDate(existingRows[0].remindOn || existingRows[0].createdAt);
+      const nextRemindOn = updates.remindOn ?? existingRemindOn;
+      const shouldResetNotification = updates.remindOn !== undefined && updates.remindOn !== existingRemindOn;
       const nextCompletedAt = typeof updates.completed === 'boolean'
         ? updates.completed ? new Date() : null
         : existingRows[0].completedAt;
+      const nextNotifiedAt = shouldResetNotification ? null : existingRows[0].notifiedAt;
 
       await conn.query<ResultSetHeader>(
         `UPDATE reminders
-         SET \`title\` = ?, \`completedAt\` = ?, \`updatedAt\` = ?
+         SET \`title\` = ?, \`remindOn\` = ?, \`notifiedAt\` = ?, \`completedAt\` = ?, \`updatedAt\` = ?
          WHERE \`id\` = ? AND \`accountId\` = ?`,
-        [nextTitle, nextCompletedAt, new Date(), id, accountId]
+        [nextTitle, nextRemindOn, nextNotifiedAt, nextCompletedAt, new Date(), id, accountId]
       );
 
       const [rows] = await conn.query<ReminderRow[]>(
@@ -110,6 +129,41 @@ export class ReminderModel {
       );
 
       return result.affectedRows > 0;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async createDueNotifications(accountId: string): Promise<number> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<ReminderRow[]>(
+        `SELECT * FROM reminders
+         WHERE \`accountId\` = ?
+           AND \`completedAt\` IS NULL
+           AND \`notifiedAt\` IS NULL
+           AND \`remindOn\` <= CURDATE()
+         ORDER BY \`remindOn\` ASC, \`createdAt\` ASC
+         LIMIT 25`,
+        [accountId]
+      );
+
+      for (const reminder of rows) {
+        await UserNotificationModel.create({
+          userId: accountId,
+          type: 'reminder',
+          title: 'Reminder',
+          message: reminder.title,
+          entityType: 'reminder',
+          entityId: reminder.id,
+        });
+        await conn.query<ResultSetHeader>(
+          'UPDATE reminders SET `notifiedAt` = ?, `updatedAt` = ? WHERE `id` = ? AND `accountId` = ?',
+          [new Date(), new Date(), reminder.id, accountId]
+        );
+      }
+
+      return rows.length;
     } finally {
       conn.release();
     }

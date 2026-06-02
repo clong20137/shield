@@ -545,13 +545,18 @@ export async function initializeDatabase() {
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`accountId\` VARCHAR(36) NOT NULL,
       \`title\` VARCHAR(90) NOT NULL,
+      \`remindOn\` DATE NOT NULL,
+      \`notifiedAt\` TIMESTAMP NULL,
       \`completedAt\` TIMESTAMP NULL,
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX \`idx_reminders_account\` (\`accountId\`),
+      INDEX \`idx_reminders_due\` (\`remindOn\`, \`completedAt\`, \`notifiedAt\`),
       INDEX \`idx_reminders_completed\` (\`completedAt\`)
     )
   `);
+  await ensureColumn('reminders', 'remindOn', '`remindOn` DATE NULL');
+  await ensureColumn('reminders', 'notifiedAt', '`notifiedAt` TIMESTAMP NULL');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS performance_evaluations (

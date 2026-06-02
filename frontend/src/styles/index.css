@@ -667,6 +667,7 @@
   .shield-sidebar {
     scrollbar-width: thin;
     scrollbar-color: rgba(156, 134, 92, 0.9) rgba(255, 255, 255, 0.12);
+    user-select: none;
   }
 
   .shield-sidebar::-webkit-scrollbar {

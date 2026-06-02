@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Calculator, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCopy, Eye, EyeOff, Pencil, Save, Sparkles, Trash2, X } from 'lucide-react';
-import { AuthAccount, CalendarEntry, CalendarShortcut, authService, calendarService } from '../services/api';
+import { Bell, Calculator, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCopy, Eye, EyeOff, Pencil, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { AuthAccount, CalendarEntry, CalendarShortcut, authService, calendarService, reminderService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
@@ -538,11 +538,13 @@ function CalendarPage({
   currentUser,
   onOpenCalculator,
   onAccountUpdate,
+  onToast,
   useMilitaryTime = false,
 }: {
   currentUser: AuthAccount;
   onOpenCalculator?: () => void;
   onAccountUpdate?: (account: AuthAccount) => void;
+  onToast?: (type: 'success' | 'error' | 'info', message: string) => void;
   useMilitaryTime?: boolean;
 }) {
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -569,6 +571,9 @@ function CalendarPage({
   const [isCalendarLoading, setIsCalendarLoading] = useState(true);
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [isDutyHoursManual, setIsDutyHoursManual] = useState(false);
+  const [isReminderFormOpen, setIsReminderFormOpen] = useState(false);
+  const [reminderTitle, setReminderTitle] = useState('');
+  const [isSavingReminder, setIsSavingReminder] = useState(false);
   const lastAutoDutyHoursRef = useRef('');
   const dailyFormRef = useRef<HTMLFormElement | null>(null);
 
@@ -648,6 +653,8 @@ function CalendarPage({
     setIsDutyHoursManual(Boolean(existingEntry));
     lastAutoDutyHoursRef.current = '';
     setEditingEntryId(existingEntry?.id || null);
+    setIsReminderFormOpen(false);
+    setReminderTitle('');
   };
 
   const handleDailyKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
@@ -950,6 +957,31 @@ function CalendarPage({
     });
     setIsDutyHoursManual(true);
     lastAutoDutyHoursRef.current = '';
+  };
+
+  const createCalendarReminder = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedDate || !reminderTitle.trim()) {
+      setCalendarError('Enter a reminder title.');
+      return;
+    }
+
+    setIsSavingReminder(true);
+    setCalendarError(null);
+    try {
+      await reminderService.create(reminderTitle.trim(), selectedDate);
+      window.dispatchEvent(new CustomEvent('shield:reminder-updated'));
+      setReminderTitle('');
+      setIsReminderFormOpen(false);
+      onToast?.('success', 'Reminder created.');
+    } catch (err) {
+      console.error('Failed to create reminder:', err);
+      const message = getApiErrorMessage(err, 'Failed to create reminder.');
+      setCalendarError(message);
+      onToast?.('error', message);
+    } finally {
+      setIsSavingReminder(false);
+    }
   };
 
   const visibleEntries = entries.filter((entry) => {
@@ -1257,6 +1289,16 @@ function CalendarPage({
                 </span>
               </div>
               <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsReminderFormOpen((value) => !value)}
+                  className="btn-secondary"
+                  aria-label="Create reminder"
+                  title="Create Reminder"
+                >
+                  <Bell size={16} />
+                  <span>Create Reminder</span>
+                </button>
                 {onOpenCalculator && (
                   <button
                     type="button"
@@ -1279,6 +1321,33 @@ function CalendarPage({
                 </button>
               </div>
             </div>
+            {isReminderFormOpen && (
+              <form onSubmit={createCalendarReminder} className="mb-5 grid grid-cols-1 gap-2 rounded-lg border border-accent/30 bg-accent/5 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                <input
+                  value={reminderTitle}
+                  onChange={(event) => setReminderTitle(event.target.value)}
+                  placeholder={`Reminder for ${getReadableDate(selectedDate)}`}
+                  maxLength={90}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                  autoFocus
+                />
+                <button type="submit" className="btn-primary" disabled={isSavingReminder} aria-label="Save reminder" title="Save Reminder">
+                  <Save size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReminderTitle('');
+                    setIsReminderFormOpen(false);
+                  }}
+                  className="btn-secondary"
+                  aria-label="Cancel reminder"
+                  title="Cancel"
+                >
+                  <X size={16} />
+                </button>
+              </form>
+            )}
 
             <form ref={dailyFormRef} onSubmit={(event) => saveEntry(event, 'Draft')} onKeyDown={handleDailyKeyDown} className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 md:col-span-2">
