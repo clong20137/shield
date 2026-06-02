@@ -270,7 +270,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
     : 'border-white';
 
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden rounded-none bg-white shadow-xl dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:h-auto sm:max-h-[92dvh] sm:rounded-lg">
+    <div className={`flex flex-col overflow-hidden rounded-none bg-white shadow-xl dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:rounded-lg ${isFloatingProfile ? 'h-full max-h-full' : 'h-[100dvh] sm:h-auto sm:max-h-[92dvh]'}`}>
       <div
         onPointerDown={onHeaderPointerDown}
         className={`shrink-0 select-none bg-primary-500 px-4 py-4 text-white sm:px-5 sm:py-5 ${isFloatingProfile ? 'md:cursor-grab' : ''}`}

@@ -540,12 +540,14 @@ function CalendarPage({
   onAccountUpdate,
   onToast,
   useMilitaryTime = false,
+  isFloatingApp = false,
 }: {
   currentUser: AuthAccount;
   onOpenCalculator?: () => void;
   onAccountUpdate?: (account: AuthAccount) => void;
   onToast?: (type: 'success' | 'error' | 'info', message: string) => void;
   useMilitaryTime?: boolean;
+  isFloatingApp?: boolean;
 }) {
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const today = new Date();
@@ -1041,7 +1043,7 @@ function CalendarPage({
   const editingSubmissionStatus = editingEntry?.submissionStatus || entryForm.submissionStatus || 'Draft';
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="relative flex h-full min-h-0 flex-col">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => changeCalendarPeriod(-1)} className="btn-secondary" aria-label="Previous calendar period" title="Previous">
@@ -1271,8 +1273,8 @@ function CalendarPage({
       </div>
 
       {selectedDate && (
-        <div className="modal-backdrop fixed inset-0 z-[70] flex items-end justify-center bg-black/50 sm:items-center">
-          <div className="modal-window max-h-[96dvh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:max-h-[92vh] sm:p-5">
+        <div className={isFloatingApp ? 'absolute inset-0 z-20 flex min-h-0 bg-white dark:bg-gray-900' : 'modal-backdrop fixed inset-0 z-[70] flex items-end justify-center bg-black/50 sm:items-center'}>
+          <div className={isFloatingApp ? 'h-full min-h-0 w-full overflow-y-auto rounded-lg bg-white p-3 shadow-none dark:bg-gray-900 sm:p-4' : 'modal-window max-h-[96dvh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:max-h-[92vh] sm:p-5'}>
             <div className="mb-5 flex flex-wrap items-start justify-between gap-3 sm:gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Trooper Daily</p>
