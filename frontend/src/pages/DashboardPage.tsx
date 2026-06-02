@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
-import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bold, ChevronLeft, ChevronRight, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Eraser, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, getAssetUrl, handleAssetImageError, pinnedProfileService, PinnedProfile, quickNoteService, userService, User } from '../services/api';
+import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, getAssetUrl, handleAssetImageError, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { UserDetail } from '../components/UserDetail';
 
@@ -1310,30 +1310,208 @@ function PinnedProfilesWidget({ currentUser, onOpenProfile }: { currentUser: Aut
   );
 }
 
+function MyDayWidget({ currentUser }: { currentUser: AuthAccount | null }) {
+  const [entries, setEntries] = useState<CalendarEntry[]>([]);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const todayKey = formatDateKey(new Date());
+
+  const loadMyDay = useCallback(async (showLoading = true) => {
+    if (!currentUser) {
+      setEntries([]);
+      setReminders([]);
+      setIsLoading(false);
+      return;
+    }
+
+    if (showLoading) {
+      setIsLoading(true);
+    }
+    setError(null);
+    try {
+      const [calendarResponse, reminderResponse] = await Promise.all([
+        calendarService.getAll(currentUser.id),
+        reminderService.getAll(),
+      ]);
+      setEntries(calendarResponse.data);
+      setReminders(reminderResponse.data);
+    } catch (err) {
+      console.error('Failed to load My Day:', err);
+      setError('Could not load today.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    void loadMyDay();
+    const refresh = () => void loadMyDay(false);
+
+    window.addEventListener('shield:calendar-updated', refresh);
+    window.addEventListener('shield:reminder-updated', refresh);
+
+    return () => {
+      window.removeEventListener('shield:calendar-updated', refresh);
+      window.removeEventListener('shield:reminder-updated', refresh);
+    };
+  }, [loadMyDay]);
+
+  const todaysEntries = entries
+    .filter((entry) => entry.date === todayKey)
+    .sort((a, b) => a.category.localeCompare(b.category));
+  const activeReminders = reminders
+    .filter((reminder) => !reminder.completedAt && reminder.remindOn <= todayKey)
+    .sort((a, b) => a.remindOn.localeCompare(b.remindOn) || a.title.localeCompare(b.title));
+  const overdueCount = activeReminders.filter((reminder) => reminder.remindOn < todayKey).length;
+  const draftCount = todaysEntries.filter((entry) => entry.submissionStatus === 'Draft').length;
+  const submittedCount = todaysEntries.filter((entry) => entry.submissionStatus === 'Submitted').length;
+
+  const completeReminder = async (reminder: Reminder) => {
+    try {
+      await reminderService.update(reminder.id, { completed: true });
+      setReminders((current) => current.map((item) => (
+        item.id === reminder.id ? { ...item, completedAt: new Date().toISOString() } : item
+      )));
+      window.dispatchEvent(new Event('shield:reminder-updated'));
+    } catch (err) {
+      console.error('Failed to complete reminder:', err);
+      setError('Could not complete reminder.');
+    }
+  };
+
+  return (
+    <section className="flex h-full min-h-[32rem] flex-col rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-primary-500/10 text-primary-500 dark:bg-blue-950 dark:text-blue-100">
+            <CalendarDays size={19} />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold text-primary-500 dark:text-blue-100">My Day</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{getReadableDate(todayKey)}</p>
+          </div>
+        </div>
+        <Link to="/calendar" className="btn-secondary shrink-0" aria-label="Open calendar" title="Open Calendar">
+          <CalendarDays size={16} />
+        </Link>
+      </div>
+
+      <div className="mb-4 grid grid-cols-3 gap-2">
+        <div className="rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+          <p className="text-xs font-bold uppercase text-gray-400">Items</p>
+          <p className="mt-1 text-xl font-bold text-primary-500 dark:text-blue-100">{todaysEntries.length}</p>
+        </div>
+        <div className="rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+          <p className="text-xs font-bold uppercase text-gray-400">Drafts</p>
+          <p className="mt-1 text-xl font-bold text-accent">{draftCount}</p>
+        </div>
+        <div className="rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+          <p className="text-xs font-bold uppercase text-gray-400">Due</p>
+          <p className="mt-1 text-xl font-bold text-primary-500 dark:text-blue-100">{activeReminders.length}</p>
+        </div>
+      </div>
+
+      {error && <div className="error">{error}</div>}
+      {isLoading ? (
+        <div className="loading">Loading your day...</div>
+      ) : (
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Calendar</h3>
+              {submittedCount > 0 && <span className="text-xs font-semibold text-success">{submittedCount} submitted</span>}
+            </div>
+            {todaysEntries.length === 0 ? (
+              <div className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No calendar entries for today.</div>
+            ) : (
+              <div className="space-y-2">
+                {todaysEntries.slice(0, 4).map((entry) => (
+                  <Link key={entry.id} to="/calendar" className="block rounded border border-gray-200 bg-gray-50 p-3 transition hover:border-accent hover:bg-white dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="truncate text-sm font-bold text-gray-900 dark:text-gray-100">{entry.category}</span>
+                      <span className={`rounded-full px-2 py-1 text-xs font-bold ${entry.submissionStatus === 'Submitted' ? 'bg-success/10 text-success' : 'bg-accent/10 text-accent'}`}>
+                        {entry.submissionStatus}
+                      </span>
+                    </div>
+                    <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
+                      {entry.districtWorked || 'No district'} - {entry.dutyHours || '0'} hrs
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Reminders</h3>
+              {overdueCount > 0 && <span className="text-xs font-semibold text-danger">{overdueCount} overdue</span>}
+            </div>
+            {activeReminders.length === 0 ? (
+              <div className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No reminders due.</div>
+            ) : (
+              <div className="space-y-2">
+                {activeReminders.slice(0, 5).map((reminder) => (
+                  <div key={reminder.id} className="flex items-start gap-2 rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                    <button
+                      type="button"
+                      onClick={() => void completeReminder(reminder)}
+                      className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-300 text-gray-400 transition hover:border-success hover:text-success dark:border-gray-700"
+                      aria-label={`Complete ${reminder.title}`}
+                      title="Complete"
+                    >
+                      <CheckCircle2 size={15} />
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-gray-900 dark:text-gray-100">{reminder.title}</p>
+                      <p className={`mt-1 flex items-center gap-1 text-xs ${reminder.remindOn < todayKey ? 'text-danger' : 'text-gray-500 dark:text-gray-400'}`}>
+                        <Bell size={12} /> {reminder.remindOn < todayKey ? `Due ${getReadableDate(reminder.remindOn)}` : 'Due today'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function QuickNotesWidget({ currentUser }: { currentUser: AuthAccount | null }) {
   const [content, setContent] = useState('');
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const hasLoadedNoteRef = useRef(false);
 
   useEffect(() => {
     if (!currentUser) {
       setContent('');
+      hasLoadedNoteRef.current = false;
       return;
     }
 
+    hasLoadedNoteRef.current = false;
+    setStatus('idle');
     quickNoteService.get()
       .then((response) => {
         setContent(response.data.content || '');
         setLastSavedAt(response.data.updatedAt ? new Date(response.data.updatedAt).toLocaleTimeString() : null);
+        setStatus('saved');
       })
       .catch((err) => {
         console.error('Failed to load quick note:', err);
         setStatus('error');
+      })
+      .finally(() => {
+        hasLoadedNoteRef.current = true;
       });
   }, [currentUser]);
 
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUser || !hasLoadedNoteRef.current) {
       return undefined;
     }
 
@@ -1360,16 +1538,50 @@ function QuickNotesWidget({ currentUser }: { currentUser: AuthAccount | null }) 
       : status === 'error'
         ? 'Could not save'
         : 'Ready';
+  const wordCount = content.trim() ? content.trim().split(/\s+/u).length : 0;
+  const lineCount = content ? content.split(/\r\n|\r|\n/u).length : 0;
+  const clearNotes = () => {
+    setContent('');
+  };
 
   return (
     <section className="flex h-full min-h-[32rem] flex-col rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
-      <div className="mb-4 flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">
-          <NotebookPen size={19} />
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">
+            <NotebookPen size={19} />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold text-primary-500 dark:text-blue-100">Quick Notes</h2>
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+              {status === 'saving' ? <Clock3 size={14} /> : status === 'saved' ? <CheckCircle2 size={14} className="text-success" /> : status === 'error' ? <AlertCircle size={14} className="text-danger" /> : <NotebookPen size={14} />}
+              {statusLabel}
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl font-bold text-primary-500 dark:text-blue-100">Quick Notes</h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{statusLabel}</p>
+        <button
+          type="button"
+          onClick={clearNotes}
+          disabled={!content}
+          className="btn-secondary shrink-0 disabled:pointer-events-none disabled:opacity-40"
+          aria-label="Clear quick notes"
+          title="Clear Notes"
+        >
+          <Eraser size={16} />
+        </button>
+      </div>
+      <div className="mb-3 grid grid-cols-3 gap-2 text-center">
+        <div className="rounded border border-gray-200 bg-gray-50 px-2 py-2 dark:border-gray-800 dark:bg-gray-950">
+          <p className="text-xs font-bold uppercase text-gray-400">Words</p>
+          <p className="text-sm font-bold text-gray-800 dark:text-gray-100">{wordCount}</p>
+        </div>
+        <div className="rounded border border-gray-200 bg-gray-50 px-2 py-2 dark:border-gray-800 dark:bg-gray-950">
+          <p className="text-xs font-bold uppercase text-gray-400">Lines</p>
+          <p className="text-sm font-bold text-gray-800 dark:text-gray-100">{lineCount}</p>
+        </div>
+        <div className="rounded border border-gray-200 bg-gray-50 px-2 py-2 dark:border-gray-800 dark:bg-gray-950">
+          <p className="text-xs font-bold uppercase text-gray-400">Left</p>
+          <p className="text-sm font-bold text-gray-800 dark:text-gray-100">{Math.max(0, 10000 - content.length).toLocaleString()}</p>
         </div>
       </div>
       <textarea
@@ -1377,7 +1589,7 @@ function QuickNotesWidget({ currentUser }: { currentUser: AuthAccount | null }) 
         onChange={(event) => setContent(event.target.value)}
         placeholder="Keep quick reminders, names, or follow-ups here."
         maxLength={10000}
-        className="min-h-0 flex-1 resize-none rounded border border-gray-300 bg-gray-50 px-4 py-3 text-sm leading-6 outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+        className="min-h-0 flex-1 resize-none rounded border border-gray-300 bg-[linear-gradient(to_bottom,transparent_31px,rgba(156,134,92,0.13)_32px)] bg-[length:100%_32px] px-4 py-3 text-sm leading-8 outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
       />
     </section>
   );
@@ -1576,7 +1788,8 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
           <h1>Dashboard</h1>
         </div>
         <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} />
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.4fr)]">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(260px,0.85fr)_minmax(280px,0.9fr)_minmax(0,1.35fr)]">
+          <MyDayWidget currentUser={currentUser} />
           <QuickNotesWidget currentUser={currentUser} />
           <DashboardNews currentUser={currentUser} />
         </div>
@@ -1599,7 +1812,8 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
       {error && <div className="error">{error}</div>}
 
       <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} />
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.4fr)]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(260px,0.85fr)_minmax(280px,0.9fr)_minmax(0,1.35fr)]">
+        <MyDayWidget currentUser={currentUser} />
         <QuickNotesWidget currentUser={currentUser} />
         <DashboardNews currentUser={currentUser} />
       </div>
