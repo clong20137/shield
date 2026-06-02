@@ -541,6 +541,18 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS pinned_profiles (
+      \`accountId\` VARCHAR(36) NOT NULL,
+      \`profileUserId\` VARCHAR(36) NOT NULL,
+      \`pinnedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`accountId\`, \`profileUserId\`),
+      INDEX \`idx_pinned_profiles_account\` (\`accountId\`, \`pinnedAt\`),
+      INDEX \`idx_pinned_profiles_user\` (\`profileUserId\`)
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS reminders (
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`accountId\` VARCHAR(36) NOT NULL,

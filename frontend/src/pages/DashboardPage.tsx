@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
-import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bold, ChevronLeft, ChevronRight, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, Outdent, Pencil, PartyPopper, Plus, Quote, Save, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bold, ChevronLeft, ChevronRight, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, Mail, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, getAssetUrl, handleAssetImageError } from '../services/api';
+import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, getAssetUrl, handleAssetImageError, pinnedProfileService, PinnedProfile, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { FormattedText } from '../components/FormattedText';
 
@@ -1028,6 +1028,187 @@ function DashboardNews({
   );
 }
 
+function getInitials(firstName?: string, lastName?: string, email?: string): string {
+  const source = `${firstName || ''} ${lastName || ''}`.trim() || email || 'User';
+  const parts = source.split(/\s+/u).filter(Boolean);
+  return parts.length > 1 ? `${parts[0][0]}${parts[1][0]}`.toUpperCase() : source.slice(0, 2).toUpperCase();
+}
+
+function PinnedProfilesWidget({ currentUser }: { currentUser: AuthAccount | null }) {
+  const [profiles, setProfiles] = useState<PinnedProfile[]>([]);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadProfiles = useCallback(async () => {
+    if (!currentUser) {
+      setProfiles([]);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await pinnedProfileService.getAll();
+      setProfiles(response.data);
+    } catch (err) {
+      console.error('Failed to load pinned profiles:', err);
+      setError('Failed to load pinned profiles.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    void loadProfiles();
+  }, [loadProfiles]);
+
+  useEffect(() => {
+    const trimmedQuery = query.trim();
+    if (trimmedQuery.length < 2) {
+      setResults([]);
+      setIsSearching(false);
+      return undefined;
+    }
+
+    let isMounted = true;
+    setIsSearching(true);
+    const timer = window.setTimeout(() => {
+      userService.search(trimmedQuery)
+        .then((response) => {
+          if (!isMounted) return;
+          const pinnedIds = new Set(profiles.map((profile) => profile.id));
+          setResults((response.data as User[]).filter((user) => !pinnedIds.has(user.id)).slice(0, 6));
+        })
+        .catch((err) => {
+          console.error('Failed to search profiles to pin:', err);
+          if (isMounted) setResults([]);
+        })
+        .finally(() => {
+          if (isMounted) setIsSearching(false);
+        });
+    }, 250);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timer);
+    };
+  }, [profiles, query]);
+
+  const pinProfile = async (user: User) => {
+    try {
+      const response = await pinnedProfileService.pin(user.id);
+      setProfiles((currentProfiles) => [
+        response.data,
+        ...currentProfiles.filter((profile) => profile.id !== response.data.id),
+      ]);
+      setQuery('');
+      setResults([]);
+    } catch (err) {
+      console.error('Failed to pin profile:', err);
+      setError('Failed to pin profile.');
+    }
+  };
+
+  const unpinProfile = async (userId: string) => {
+    try {
+      await pinnedProfileService.unpin(userId);
+      setProfiles((currentProfiles) => currentProfiles.filter((profile) => profile.id !== userId));
+    } catch (err) {
+      console.error('Failed to unpin profile:', err);
+      setError('Failed to remove pinned profile.');
+    }
+  };
+
+  return (
+    <section className="mb-8 rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Pinned Profiles</p>
+          <h2 className="mt-1 text-xl font-bold text-primary-500 dark:text-blue-100">Quick people access</h2>
+        </div>
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Pin a profile"
+            className="w-full rounded border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm dark:border-gray-700 dark:bg-gray-950"
+          />
+          {(results.length > 0 || isSearching) && (
+            <div className="absolute right-0 top-12 z-30 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900">
+              {isSearching ? (
+                <div className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">Searching...</div>
+              ) : results.map((user) => (
+                <button
+                  key={user.id}
+                  type="button"
+                  onClick={() => void pinProfile(user)}
+                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  {user.profilePictureUrl ? (
+                    <img src={getAssetUrl(user.profilePictureUrl)} alt={`${user.firstName} ${user.lastName}`} onError={handleAssetImageError} className="h-9 w-9 rounded-full object-cover" />
+                  ) : (
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-xs font-bold text-accent">
+                      {getInitials(user.firstName, user.lastName, user.email)}
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-bold text-gray-900 dark:text-gray-100">{user.firstName} {user.lastName}</span>
+                    <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{user.rank || user.email || user.peNumber}</span>
+                  </span>
+                  <Pin size={15} className="text-accent" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {error && <div className="error">{error}</div>}
+      {isLoading ? (
+        <div className="loading">Loading pinned profiles...</div>
+      ) : profiles.length === 0 ? (
+        <div className="rounded border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+          Pin frequently used profiles and they will stay here.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {profiles.map((profile) => (
+            <article key={profile.id} className="rounded border border-gray-200 p-3 dark:border-gray-800">
+              <div className="flex items-start gap-3">
+                <Link to={`/search?userId=${encodeURIComponent(profile.id)}`} className="shrink-0">
+                  {profile.profilePictureUrl ? (
+                    <img src={getAssetUrl(profile.profilePictureUrl)} alt={`${profile.firstName} ${profile.lastName}`} onError={handleAssetImageError} className="h-12 w-12 rounded-full object-cover" />
+                  ) : (
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-500 text-sm font-bold text-white">
+                      {getInitials(profile.firstName, profile.lastName, profile.email)}
+                    </span>
+                  )}
+                </Link>
+                <div className="min-w-0 flex-1">
+                  <Link to={`/search?userId=${encodeURIComponent(profile.id)}`} className="block truncate font-bold text-gray-900 hover:text-primary-500 dark:text-gray-100 dark:hover:text-blue-100">
+                    {profile.firstName} {profile.lastName}
+                  </Link>
+                  <p className="mt-1 truncate text-xs font-semibold text-gray-500 dark:text-gray-400">{profile.rank || 'No rank'} - PE {profile.peNumber || 'N/A'}</p>
+                  <p className="mt-1 flex items-center gap-1 truncate text-xs text-gray-500 dark:text-gray-400">
+                    <Mail size={12} /> {profile.email || 'No email'}
+                  </p>
+                </div>
+                <button type="button" onClick={() => void unpinProfile(profile.id)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-gray-200 text-gray-500 hover:border-danger hover:text-danger dark:border-gray-700" aria-label={`Unpin ${profile.firstName} ${profile.lastName}`} title="Unpin">
+                  <PinOff size={15} />
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUser }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1088,6 +1269,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
         <div className="mb-8">
           <h1>Dashboard</h1>
         </div>
+        <PinnedProfilesWidget currentUser={currentUser} />
         <DashboardNews currentUser={currentUser} />
       </div>
     );
@@ -1106,6 +1288,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
 
       {error && <div className="error">{error}</div>}
 
+      <PinnedProfilesWidget currentUser={currentUser} />
       <DashboardNews currentUser={currentUser} />
     </div>
   );

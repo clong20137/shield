@@ -161,6 +161,10 @@ export interface User {
   updatedAt: string;
 }
 
+export type PinnedProfile = User & {
+  pinnedAt: string;
+};
+
 export interface CreateUserPayload extends Omit<User, 'id' | 'createdAt' | 'updatedAt'> {
   password?: string;
 }
@@ -930,6 +934,17 @@ export const reminderService = {
 
   delete: (id: string) =>
     api.delete<{ message: string }>(`/reminders/${id}`),
+};
+
+export const pinnedProfileService = {
+  getAll: () =>
+    api.get<PinnedProfile[]>('/pinned-profiles'),
+
+  pin: (userId: string) =>
+    api.post<PinnedProfile>(`/pinned-profiles/${userId}`),
+
+  unpin: (userId: string) =>
+    api.delete<{ message: string }>(`/pinned-profiles/${userId}`),
 };
 
 export const mileageService = {

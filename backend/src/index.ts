@@ -20,6 +20,7 @@ import quickLaunchRoutes from './routes/quickLaunchRoutes';
 import eventRoutes from './routes/eventRoutes';
 import performanceEvaluationRoutes from './routes/performanceEvaluationRoutes';
 import reminderRoutes from './routes/reminderRoutes';
+import pinnedProfileRoutes from './routes/pinnedProfileRoutes';
 import { startSecurityCleanupJob } from './services/securityCleanup';
 import { rateLimit } from './middleware/rateLimit';
 import { requestTimeout } from './middleware/requestTimeout';
@@ -106,6 +107,7 @@ app.use('/api/quick-launch', quickLaunchRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/performance-evaluations', performanceEvaluationRoutes);
 app.use('/api/reminders', reminderRoutes);
+app.use('/api/pinned-profiles', pinnedProfileRoutes);
 
 const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
 app.use(express.static(frontendDistPath));
