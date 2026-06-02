@@ -3378,6 +3378,9 @@ function App() {
   const isAdministrator = currentUser?.role === 'administrator';
   const openBugCount = bugReports.filter((report) => report.status === 'New' || report.status === 'Pending').length;
   const unreadNotificationCount = userNotifications.filter((notification) => !notification.isRead).length;
+  const recentNotificationCount = notifications.length;
+  const totalNotificationCount = recentNotificationCount + unreadNotificationCount + (isAdministrator ? openBugCount : 0);
+  const hasNotificationCenterItems = totalNotificationCount > 0 || userNotifications.length > 0;
   const shouldShowForcedPasswordModal = Boolean(
     currentUser?.mustChangePassword && !isWelcomeSplashOpen && !isFirstLoginGuideOpen,
   );
@@ -3901,17 +3904,8 @@ function App() {
                 <div className="hidden md:block">
                   <p className="hidden text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 sm:block">Internal System</p>
                   <h2 className="text-xl font-bold text-primary-500 sm:text-2xl">Agency Workspace</h2>
-              </div>
+                </div>
               <div data-onboarding-target="header-actions" className="relative flex items-center gap-2 sm:gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsCommandPaletteOpen(true)}
-                  className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
-                  aria-label="Open command palette"
-                  title="Command palette"
-                >
-                  <Command size={18} />
-                </button>
                 <div ref={notificationsMenuRef} className="relative">
                   <button
                     data-onboarding-control="notifications"
@@ -3921,29 +3915,47 @@ function App() {
                     aria-label="Open notifications"
                   >
                     <Bell size={18} />
-                    {(notifications.length + unreadNotificationCount + (isAdministrator ? openBugCount : 0)) > 0 && (
+                    {totalNotificationCount > 0 && (
                       <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
-                        {notifications.length + unreadNotificationCount + (isAdministrator ? openBugCount : 0) > 9 ? '9+' : notifications.length + unreadNotificationCount + (isAdministrator ? openBugCount : 0)}
+                        {totalNotificationCount > 9 ? '9+' : totalNotificationCount}
                       </span>
                     )}
                   </button>
 
                   {isNotificationsOpen && (
-                    <div className="absolute right-0 top-12 z-40 w-[calc(100vw-6.5rem)] max-w-80 rounded border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 sm:w-80">
-                      <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                        <h3 className="text-base font-bold text-primary-500 dark:text-blue-100">Notifications</h3>
-                        <button
-                          type="button"
-                          onClick={clearAllNotifications}
-                          className="text-xs font-semibold text-gray-500 hover:text-primary-500 dark:text-gray-400"
-                        >
-                          Clear
-                        </button>
+                    <div className="absolute right-0 top-12 z-40 w-[calc(100vw-2rem)] max-w-[26rem] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.2)] dark:border-gray-700 dark:bg-gray-900 sm:w-[26rem]">
+                      <div className="border-b border-gray-200 bg-gray-50 px-4 py-4 dark:border-gray-700 dark:bg-gray-950">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-base font-bold text-primary-500 dark:text-blue-100">Notification Center</p>
+                            <p className="mt-1 truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
+                              {totalNotificationCount > 0 ? `${totalNotificationCount} item${totalNotificationCount === 1 ? '' : 's'} need attention` : 'All caught up'}
+                            </p>
+                          </div>
+                          {hasNotificationCenterItems && (
+                            <button
+                              type="button"
+                              onClick={clearAllNotifications}
+                              className="shrink-0 rounded border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-600 shadow-sm hover:text-primary-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-primary-500 ring-1 ring-gray-200 dark:bg-gray-900 dark:text-blue-100 dark:ring-gray-700">{unreadNotificationCount} unread</span>
+                          {isAdministrator && <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-danger ring-1 ring-red-100 dark:bg-gray-900 dark:ring-red-900">{openBugCount} bugs</span>}
+                          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-gray-600 ring-1 ring-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-700">{recentNotificationCount} recent</span>
+                        </div>
                       </div>
-                      <div className="max-h-96 overflow-y-auto p-2">
-                        {notifications.length === 0 && userNotifications.length === 0 && !(isAdministrator && openBugCount > 0) ? (
-                          <div className="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                            No notifications yet
+                      <div className="max-h-[70dvh] overflow-y-auto p-2">
+                        {!hasNotificationCenterItems ? (
+                          <div className="px-5 py-10 text-center">
+                            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary-500 dark:bg-gray-800 dark:text-blue-100">
+                              <Bell size={20} />
+                            </div>
+                            <p className="text-sm font-bold text-gray-800 dark:text-gray-100">No notifications yet</p>
+                            <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">New alerts and activity will show here.</p>
                           </div>
                         ) : (
                           <>
@@ -3951,10 +3963,15 @@ function App() {
                               <button
                                 type="button"
                                 onClick={openBugTrackerFromNotification}
-                                className="mb-2 block w-full rounded border border-accent/30 bg-accent/10 px-3 py-3 text-left text-sm hover:bg-accent/15"
+                                className="mb-2 flex w-full items-center gap-3 rounded border border-danger/20 bg-red-50 px-3 py-3 text-left text-sm shadow-sm hover:bg-red-100 dark:border-red-900 dark:bg-red-950/40 dark:hover:bg-red-950"
                               >
-                                <p className="font-bold text-primary-500 dark:text-blue-100">{openBugCount} bug report{openBugCount === 1 ? '' : 's'} need review</p>
-                                <p className="mt-1 text-xs uppercase text-accent">Open Bug Tracker</p>
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-white text-danger shadow-sm dark:bg-gray-900">
+                                  <Bug size={18} />
+                                </span>
+                                <span className="min-w-0">
+                                  <span className="block truncate font-bold text-danger">{openBugCount} bug report{openBugCount === 1 ? '' : 's'} need review</span>
+                                  <span className="mt-0.5 block truncate text-xs font-semibold text-red-700 dark:text-red-200">Open Bug Tracker</span>
+                                </span>
                               </button>
                             )}
                             {userNotifications.map((notification) => (
@@ -3962,32 +3979,47 @@ function App() {
                                 key={notification.id}
                                 type="button"
                                 onClick={() => openNotification(notification)}
-                                className={`mb-1 block w-full rounded border px-3 py-3 text-left text-sm transition ${
+                                className={`mb-1 flex w-full items-start gap-3 rounded border px-3 py-3 text-left text-sm transition ${
                                   notification.isRead
                                     ? 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-800'
                                     : 'border-accent/40 bg-accent/10 shadow-sm ring-1 ring-accent/15 hover:bg-accent/15'
                                 }`}
                               >
-                                <div className="flex items-start justify-between gap-2">
-                                  <p className="font-bold text-gray-800 dark:text-gray-100">{notification.title}</p>
-                                  {!notification.isRead && <span className="mt-1 h-2 w-2 rounded-full bg-accent" aria-label="New notification" />}
-                                </div>
-                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{notification.message}</p>
-                                <p className="mt-2 text-xs font-bold uppercase tracking-wide text-accent">
-                                  {notification.isRead ? 'Seen' : 'New'} - {new Date(notification.createdAt).toLocaleString()}
-                                </p>
+                                <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded ${notification.isRead ? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300' : 'bg-primary-500 text-white'}`}>
+                                  <Bell size={16} />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="flex items-start justify-between gap-2">
+                                    <span className="truncate font-bold text-gray-800 dark:text-gray-100">{notification.title}</span>
+                                    {!notification.isRead && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" aria-label="New notification" />}
+                                  </span>
+                                  <span className="mt-1 block line-clamp-2 text-sm text-gray-500 dark:text-gray-400">{notification.message}</span>
+                                  <span className="mt-2 block text-xs font-bold uppercase tracking-wide text-accent">
+                                    {notification.isRead ? 'Seen' : 'New'} - {new Date(notification.createdAt).toLocaleString()}
+                                  </span>
+                                </span>
                               </button>
                             ))}
                             {notifications.map((notification) => {
                               const title = notification.type === 'success' ? 'Done' : notification.type === 'error' ? 'Needs attention' : 'Heads up';
+                              const notificationTone = notification.type === 'success'
+                                ? 'bg-green-50 text-green-700 ring-green-100 dark:bg-green-950/40 dark:text-green-200 dark:ring-green-900'
+                                : notification.type === 'error'
+                                  ? 'bg-red-50 text-danger ring-red-100 dark:bg-red-950/40 dark:ring-red-900'
+                                  : 'bg-blue-50 text-primary-500 ring-blue-100 dark:bg-blue-950/40 dark:text-blue-100 dark:ring-blue-900';
                               return (
-                              <div key={notification.id} className="mb-1 rounded border border-accent/20 bg-accent/5 px-3 py-3 text-sm hover:bg-accent/10">
-                                <div className="flex items-start justify-between gap-2">
-                                  <p className="font-bold text-gray-800 dark:text-gray-100">{title}</p>
-                                  <span className="mt-1 h-2 w-2 rounded-full bg-accent" aria-label="New notification" />
+                              <div key={notification.id} className="mb-1 flex gap-3 rounded border border-gray-200 px-3 py-3 text-sm dark:border-gray-800">
+                                <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded ring-1 ${notificationTone}`}>
+                                  <Bell size={16} />
                                 </div>
-                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{notification.message}</p>
-                                <p className="mt-2 text-xs font-bold uppercase tracking-wide text-accent">Just now</p>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <p className="truncate font-bold text-gray-800 dark:text-gray-100">{title}</p>
+                                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" aria-label="New notification" />
+                                  </div>
+                                  <p className="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">{notification.message}</p>
+                                  <p className="mt-2 text-xs font-bold uppercase tracking-wide text-accent">Just now</p>
+                                </div>
                               </div>
                               );
                             })}
