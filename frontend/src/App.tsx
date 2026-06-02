@@ -810,7 +810,7 @@ function SidebarCalendarWidget({
       <button
         type="button"
         onClick={onOpenCalendar}
-        className="mx-3 mb-3 flex h-12 items-center justify-center rounded bg-white/10 text-white transition hover:bg-white/15"
+        className="mb-3 flex h-11 w-full items-center justify-center rounded bg-white/10 text-white transition hover:bg-white/15"
         aria-label="Open calendar"
         title="Open calendar"
       >
@@ -823,7 +823,7 @@ function SidebarCalendarWidget({
     <button
       type="button"
       onClick={onOpenCalendar}
-      className="mx-3 mb-3 rounded-lg border border-white/10 bg-white/10 p-3 text-left text-white transition hover:bg-white/15"
+      className="mb-3 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-left text-white transition hover:bg-white/15"
       aria-label="Open calendar"
     >
       <div className="mb-3 flex items-center gap-3">
@@ -3169,7 +3169,7 @@ function App() {
               {isAdministrator && <SidebarLink to="/admin" label="Admin" compact={isSidebarCollapsed} icon={Shield} />}
             </nav>
 
-            <div className="shrink-0 border-t border-white/10 pt-3">
+            <div className={`shrink-0 border-t border-white/10 pt-3 ${isSidebarCollapsed ? 'px-3' : 'px-4'}`}>
               <SidebarCalendarWidget
                 compact={isSidebarCollapsed}
                 entries={sidebarCalendarEntries}
