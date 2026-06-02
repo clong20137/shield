@@ -736,6 +736,10 @@ function ShieldLoading() {
   );
 }
 
+function isMobileViewport() {
+  return window.innerWidth < 768;
+}
+
 interface SidebarLinkProps {
   to: string;
   label: string;
@@ -1165,6 +1169,7 @@ function CalculatorModal({ onClose, onFocus, zIndex }: { onClose: () => void; on
   const [display, setDisplay] = useState('0');
   const [position, setPosition] = useState({ x: Math.max(12, window.innerWidth - 400), y: 112 });
   const [isDragging, setIsDragging] = useState(false);
+  const [isMobileLayout, setIsMobileLayout] = useState(() => isMobileViewport());
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const calculatorRef = useRef<HTMLDivElement | null>(null);
   const buttons = ['7', '8', '9', '/', '4', '5', '6', '*', '1', '2', '3', '-', '0', '.', 'C', '+'];
@@ -1201,7 +1206,22 @@ function CalculatorModal({ onClose, onFocus, zIndex }: { onClose: () => void; on
   }, []);
 
   useEffect(() => {
-    if (!isDragging) {
+    const syncLayout = () => {
+      const nextIsMobile = isMobileViewport();
+      setIsMobileLayout(nextIsMobile);
+      if (nextIsMobile) {
+        setIsDragging(false);
+      }
+    };
+
+    syncLayout();
+    window.addEventListener('resize', syncLayout);
+
+    return () => window.removeEventListener('resize', syncLayout);
+  }, []);
+
+  useEffect(() => {
+    if (!isDragging || isMobileLayout) {
       return undefined;
     }
 
@@ -1224,10 +1244,14 @@ function CalculatorModal({ onClose, onFocus, zIndex }: { onClose: () => void; on
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', stopDragging);
     };
-  }, [isDragging]);
+  }, [isDragging, isMobileLayout]);
 
   useEffect(() => {
     const keepInView = () => {
+      if (isMobileViewport()) {
+        return;
+      }
+
       const width = calculatorRef.current?.offsetWidth || 360;
       const height = calculatorRef.current?.offsetHeight || 420;
       const maxX = Math.max(12, window.innerWidth - width - 12);
@@ -1244,7 +1268,7 @@ function CalculatorModal({ onClose, onFocus, zIndex }: { onClose: () => void; on
   }, []);
 
   const startDragging = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) {
+    if (event.button !== 0 || isMobileLayout) {
       return;
     }
     onFocus();
@@ -1304,16 +1328,17 @@ function CalculatorModal({ onClose, onFocus, zIndex }: { onClose: () => void; on
           onFocus();
           calculatorRef.current?.focus();
         }}
-        className="pointer-events-auto fixed w-[calc(100vw-1.5rem)] max-w-sm rounded-lg bg-white p-4 shadow-2xl outline-none ring-1 ring-gray-200 transition-shadow focus:ring-2 focus:ring-accent dark:bg-gray-900 dark:ring-gray-800"
-        style={{ left: position.x, top: position.y }}
+        className="pointer-events-auto fixed inset-0 flex h-[100dvh] w-full flex-col rounded-none bg-white p-3 shadow-2xl outline-none ring-1 ring-gray-200 transition-shadow focus:ring-2 focus:ring-accent dark:bg-gray-900 dark:ring-gray-800 md:inset-auto md:block md:h-auto md:w-[calc(100vw-1.5rem)] md:max-w-sm md:rounded-lg md:p-4"
+        style={isMobileLayout ? undefined : { left: position.x, top: position.y }}
       >
         <div
           onPointerDown={startDragging}
-          className={`mb-4 flex touch-none cursor-grab select-none items-center justify-between border-b border-gray-200 pb-3 dark:border-gray-800 ${isDragging ? 'cursor-grabbing' : ''}`}
+          className={`mb-4 flex select-none items-center justify-between border-b border-gray-200 pb-3 dark:border-gray-800 md:touch-none md:cursor-grab ${isDragging ? 'md:cursor-grabbing' : ''}`}
         >
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Calculator</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Drag to move. Type numbers or operators.</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 md:hidden">Type numbers or operators.</p>
+            <p className="hidden text-xs text-gray-500 dark:text-gray-400 md:block">Drag to move. Type numbers or operators.</p>
           </div>
           <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={onClose} className="icon-close-button" aria-label="Close calculator" title="Close">
             <X size={20} />
@@ -1324,7 +1349,7 @@ function CalculatorModal({ onClose, onFocus, zIndex }: { onClose: () => void; on
           {display}
         </div>
 
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid flex-1 content-end grid-cols-4 gap-2 md:flex-none md:content-normal">
           {buttons.map((button) => (
             <button
               key={button}
@@ -2404,6 +2429,7 @@ function App() {
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [calendarModalPosition, setCalendarModalPosition] = useState(getInitialCalendarModalPosition);
   const [isDraggingCalendarModal, setIsDraggingCalendarModal] = useState(false);
+  const [isMobileFloatingLayout, setIsMobileFloatingLayout] = useState(() => isMobileViewport());
   const [isAdminConsoleOpen, setIsAdminConsoleOpen] = useState(false);
   const [adminConsoleTab, setAdminConsoleTab] = useState<AdminConsoleTab>('general');
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
@@ -2415,8 +2441,13 @@ function App() {
 
   useEffect(() => {
     const collapseSidebarOnMobile = () => {
-      if (window.innerWidth < 768) {
+      const isMobile = isMobileViewport();
+      setIsMobileFloatingLayout(isMobile);
+
+      if (isMobile) {
         setIsSidebarCollapsed(true);
+        setIsDraggingMessagesModal(false);
+        setIsDraggingCalendarModal(false);
       }
     };
 
@@ -2427,7 +2458,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!isDraggingMessagesModal) {
+    if (!isDraggingMessagesModal || isMobileFloatingLayout) {
       return undefined;
     }
 
@@ -2450,10 +2481,10 @@ function App() {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', stopDragging);
     };
-  }, [isDraggingMessagesModal]);
+  }, [isDraggingMessagesModal, isMobileFloatingLayout]);
 
   useEffect(() => {
-    if (!isDraggingCalendarModal) {
+    if (!isDraggingCalendarModal || isMobileFloatingLayout) {
       return undefined;
     }
 
@@ -2476,7 +2507,7 @@ function App() {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', stopDragging);
     };
-  }, [isDraggingCalendarModal]);
+  }, [isDraggingCalendarModal, isMobileFloatingLayout]);
 
   useEffect(() => {
     const keepFloatingModalsInView = () => {
@@ -3140,7 +3171,7 @@ function App() {
   };
 
   const startDraggingMessagesModal = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) {
+    if (event.button !== 0 || isMobileFloatingLayout) {
       return;
     }
     setActiveFloatingApp('messages');
@@ -3158,7 +3189,7 @@ function App() {
   };
 
   const startDraggingCalendarModal = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) {
+    if (event.button !== 0 || isMobileFloatingLayout) {
       return;
     }
     setActiveFloatingApp('calendar');
@@ -3744,17 +3775,18 @@ function App() {
             <div className="pointer-events-none fixed inset-0" style={{ zIndex: activeFloatingApp === 'messages' ? 70 : 55 }}>
               <div
                 ref={messagesModalRef}
-                className={getModalWindowClass(closingModal === 'messages', `pointer-events-auto fixed flex h-[72dvh] max-h-[calc(100dvh-1rem)] min-h-[min(420px,calc(100dvh-1rem))] w-[min(900px,calc(100vw-1rem))] min-w-[min(360px,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] resize flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:p-4 ${isDraggingMessagesModal ? 'cursor-grabbing' : ''}`)}
-                style={{ left: messagesModalPosition.x, top: messagesModalPosition.y }}
+                className={getModalWindowClass(closingModal === 'messages', `pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[72dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(420px,calc(100dvh-1rem))] md:w-[min(900px,calc(100vw-1rem))] md:min-w-[min(360px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4 ${isDraggingMessagesModal ? 'md:cursor-grabbing' : ''}`)}
+                style={isMobileFloatingLayout ? undefined : { left: messagesModalPosition.x, top: messagesModalPosition.y }}
                 onMouseDownCapture={() => setActiveFloatingApp('messages')}
               >
                 <div
                   onPointerDown={startDraggingMessagesModal}
-                  className={`mb-3 flex touch-none cursor-grab select-none items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800 ${isDraggingMessagesModal ? 'cursor-grabbing' : ''}`}
+                  className={`mb-3 flex select-none items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800 md:touch-none md:cursor-grab ${isDraggingMessagesModal ? 'md:cursor-grabbing' : ''}`}
                 >
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Messages</h2>
-                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Drag to move. Resize from the corner.</p>
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 md:hidden">Chats and conversations.</p>
+                    <p className="mt-0.5 hidden text-xs text-gray-500 dark:text-gray-400 md:block">Drag to move. Resize from the corner.</p>
                   </div>
                   <button
                     type="button"
@@ -3778,17 +3810,18 @@ function App() {
             <div className="pointer-events-none fixed inset-0" style={{ zIndex: activeFloatingApp === 'calendar' ? 70 : 55 }}>
               <div
                 ref={calendarModalRef}
-                className={getModalWindowClass(closingModal === 'calendar', `pointer-events-auto fixed flex h-[82dvh] max-h-[calc(100dvh-1rem)] min-h-[min(480px,calc(100dvh-1rem))] w-[min(1120px,calc(100vw-1rem))] min-w-[min(420px,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] resize flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:p-4 ${isDraggingCalendarModal ? 'cursor-grabbing' : ''}`)}
-                style={{ left: calendarModalPosition.x, top: calendarModalPosition.y }}
+                className={getModalWindowClass(closingModal === 'calendar', `pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[82dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(480px,calc(100dvh-1rem))] md:w-[min(1120px,calc(100vw-1rem))] md:min-w-[min(420px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4 ${isDraggingCalendarModal ? 'md:cursor-grabbing' : ''}`)}
+                style={isMobileFloatingLayout ? undefined : { left: calendarModalPosition.x, top: calendarModalPosition.y }}
                 onMouseDownCapture={() => setActiveFloatingApp('calendar')}
               >
                 <div
                   onPointerDown={startDraggingCalendarModal}
-                  className={`mb-3 flex touch-none cursor-grab select-none items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800 ${isDraggingCalendarModal ? 'cursor-grabbing' : ''}`}
+                  className={`mb-3 flex select-none items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800 md:touch-none md:cursor-grab ${isDraggingCalendarModal ? 'md:cursor-grabbing' : ''}`}
                 >
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Calendar</h2>
-                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Drag to move. Resize from the corner.</p>
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 md:hidden">Schedule, daily entries, and reminders.</p>
+                    <p className="mt-0.5 hidden text-xs text-gray-500 dark:text-gray-400 md:block">Drag to move. Resize from the corner.</p>
                   </div>
                   <button
                     type="button"
