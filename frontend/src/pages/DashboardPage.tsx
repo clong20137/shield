@@ -1,9 +1,9 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
-import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bold, ChevronLeft, ChevronRight, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, Mail, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bold, ChevronLeft, ChevronRight, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, getAssetUrl, handleAssetImageError, pinnedProfileService, PinnedProfile, userService, User } from '../services/api';
+import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, getAssetUrl, handleAssetImageError, pinnedProfileService, PinnedProfile, quickNoteService, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
-import { FormattedText } from '../components/FormattedText';
+import { UserDetail } from '../components/UserDetail';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 type DashboardPostForm = Pick<DashboardPost, 'title' | 'body' | 'category' | 'imageUrl' | 'allowComments'>;
@@ -378,7 +378,7 @@ export function DashboardCalendar() {
   const todayKey = formatDateKey(new Date());
 
   return (
-    <section className="mb-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+    <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2>Interactive Calendar</h2>
@@ -828,16 +828,32 @@ function DashboardNews({
       ) : posts.length === 0 ? (
         <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No updates posted yet.</div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="space-y-3">
           {posts.map((post) => (
-            <article key={post.id} className="rounded border border-gray-200 p-4 dark:border-gray-800">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div>
+            <article key={post.id} className="rounded border border-gray-200 p-3 dark:border-gray-800">
+              <div className="flex items-start gap-3">
+                {post.imageUrl && (
+                  <Link to={`/updates/${post.id}`} className="hidden h-20 w-24 shrink-0 overflow-hidden rounded border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-950 sm:block">
+                    <img
+                      src={getAssetUrl(post.imageUrl)}
+                      alt=""
+                      onError={handleAssetImageError}
+                      className="h-full w-full object-cover"
+                    />
+                  </Link>
+                )}
+                <div className="min-w-0 flex-1">
                   <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold uppercase text-accent">{post.category}</span>
-                  <h3 className="mt-3 text-base">{post.title}</h3>
+                  <Link to={`/updates/${post.id}`} className="mt-2 block truncate text-base font-bold text-primary-500 hover:text-primary-700 dark:text-blue-100">
+                    {post.title}
+                  </Link>
+                  <p className="mt-1 line-clamp-2 text-sm text-gray-600 dark:text-gray-300">{getPostBodyText(post.body)}</p>
+                  <p className="mt-2 text-xs text-gray-400">
+                    {post.authorName || 'Administrator'} - {new Date(post.createdAt).toLocaleDateString()}
+                  </p>
                 </div>
                 {(canEditDashboardPosts || canDeleteDashboardPosts) && (
-                  <div className="flex gap-2">
+                  <div className="flex shrink-0 gap-2">
                     {canEditDashboardPosts && (
                       <button type="button" onClick={() => openEditPost(post)} className="btn-secondary" aria-label="Edit post" title="Edit">
                         <Pencil size={16} />
@@ -851,23 +867,7 @@ function DashboardNews({
                   </div>
                 )}
               </div>
-              {post.imageUrl && (
-                <div className="mb-4 overflow-hidden rounded border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-950">
-                  <img
-                    src={getAssetUrl(post.imageUrl)}
-                    alt=""
-                    onError={handleAssetImageError}
-                    className="h-44 w-full object-cover"
-                  />
-                </div>
-              )}
-              <FormattedText text={post.body} className="text-sm leading-6 text-gray-700 dark:text-gray-300" />
-              <div className="mt-4">
-                <Link to={`/updates/${post.id}`} className="inline-flex items-center rounded border border-accent/30 px-3 py-2 text-sm font-bold text-accent hover:bg-accent/10">
-                  Read More
-                </Link>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 {reactionOptions.map(({ key, label, Icon }) => {
                   const isActive = post.myReaction === key;
                   const count = post.reactions?.[key] || 0;
@@ -891,9 +891,6 @@ function DashboardNews({
                   );
                 })}
               </div>
-              <p className="mt-4 text-xs text-gray-400">
-                Posted by {post.authorName || 'Administrator'} on {new Date(post.createdAt).toLocaleString()}
-              </p>
             </article>
           ))}
         </div>
@@ -1034,7 +1031,7 @@ function getInitials(firstName?: string, lastName?: string, email?: string): str
   return parts.length > 1 ? `${parts[0][0]}${parts[1][0]}`.toUpperCase() : source.slice(0, 2).toUpperCase();
 }
 
-function PinnedProfilesWidget({ currentUser }: { currentUser: AuthAccount | null }) {
+function PinnedProfilesWidget({ currentUser, onOpenProfile }: { currentUser: AuthAccount | null; onOpenProfile: (user: User) => void }) {
   const [profiles, setProfiles] = useState<PinnedProfile[]>([]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<User[]>([]);
@@ -1175,32 +1172,24 @@ function PinnedProfilesWidget({ currentUser }: { currentUser: AuthAccount | null
           Pin frequently used profiles and they will stay here.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
           {profiles.map((profile) => (
-            <article key={profile.id} className="rounded border border-gray-200 p-3 dark:border-gray-800">
-              <div className="flex items-start gap-3">
-                <Link to={`/search?userId=${encodeURIComponent(profile.id)}`} className="shrink-0">
+            <article key={profile.id} className="group relative rounded-lg border border-gray-200 bg-gray-50 p-3 text-center transition hover:-translate-y-1 hover:scale-[1.04] hover:border-accent hover:bg-white hover:shadow-lg dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900">
+              <button type="button" onClick={() => onOpenProfile(profile)} className="block w-full" aria-label={`Open ${profile.firstName} ${profile.lastName}`}>
+                <span className="mx-auto block h-16 w-16 overflow-hidden rounded-full border-2 border-white bg-primary-500 shadow group-hover:ring-4 group-hover:ring-accent/20">
                   {profile.profilePictureUrl ? (
-                    <img src={getAssetUrl(profile.profilePictureUrl)} alt={`${profile.firstName} ${profile.lastName}`} onError={handleAssetImageError} className="h-12 w-12 rounded-full object-cover" />
+                    <img src={getAssetUrl(profile.profilePictureUrl)} alt={`${profile.firstName} ${profile.lastName}`} onError={handleAssetImageError} className="h-full w-full object-cover" />
                   ) : (
-                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-500 text-sm font-bold text-white">
+                    <span className="flex h-full w-full items-center justify-center text-sm font-bold text-white">
                       {getInitials(profile.firstName, profile.lastName, profile.email)}
                     </span>
                   )}
-                </Link>
-                <div className="min-w-0 flex-1">
-                  <Link to={`/search?userId=${encodeURIComponent(profile.id)}`} className="block truncate font-bold text-gray-900 hover:text-primary-500 dark:text-gray-100 dark:hover:text-blue-100">
-                    {profile.firstName} {profile.lastName}
-                  </Link>
-                  <p className="mt-1 truncate text-xs font-semibold text-gray-500 dark:text-gray-400">{profile.rank || 'No rank'} - PE {profile.peNumber || 'N/A'}</p>
-                  <p className="mt-1 flex items-center gap-1 truncate text-xs text-gray-500 dark:text-gray-400">
-                    <Mail size={12} /> {profile.email || 'No email'}
-                  </p>
-                </div>
-                <button type="button" onClick={() => void unpinProfile(profile.id)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-gray-200 text-gray-500 hover:border-danger hover:text-danger dark:border-gray-700" aria-label={`Unpin ${profile.firstName} ${profile.lastName}`} title="Unpin">
-                  <PinOff size={15} />
-                </button>
-              </div>
+                </span>
+                <span className="mt-2 block truncate text-sm font-bold text-gray-900 dark:text-gray-100">{profile.firstName} {profile.lastName}</span>
+              </button>
+              <button type="button" onClick={() => void unpinProfile(profile.id)} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 opacity-100 shadow-sm hover:border-danger hover:text-danger dark:border-gray-700 dark:bg-gray-900 sm:opacity-0 sm:group-hover:opacity-100" aria-label={`Unpin ${profile.firstName} ${profile.lastName}`} title="Unpin">
+                <PinOff size={14} />
+              </button>
             </article>
           ))}
         </div>
@@ -1209,10 +1198,84 @@ function PinnedProfilesWidget({ currentUser }: { currentUser: AuthAccount | null
   );
 }
 
+function QuickNotesWidget({ currentUser }: { currentUser: AuthAccount | null }) {
+  const [content, setContent] = useState('');
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+  useEffect(() => {
+    if (!currentUser) {
+      setContent('');
+      return;
+    }
+
+    quickNoteService.get()
+      .then((response) => {
+        setContent(response.data.content || '');
+        setLastSavedAt(response.data.updatedAt ? new Date(response.data.updatedAt).toLocaleTimeString() : null);
+      })
+      .catch((err) => {
+        console.error('Failed to load quick note:', err);
+        setStatus('error');
+      });
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      return undefined;
+    }
+
+    setStatus('saving');
+    const timer = window.setTimeout(() => {
+      quickNoteService.save(content)
+        .then((response) => {
+          setLastSavedAt(new Date(response.data.updatedAt).toLocaleTimeString());
+          setStatus('saved');
+        })
+        .catch((err) => {
+          console.error('Failed to save quick note:', err);
+          setStatus('error');
+        });
+    }, 700);
+
+    return () => window.clearTimeout(timer);
+  }, [content, currentUser]);
+
+  const statusLabel = status === 'saving'
+    ? 'Saving...'
+    : status === 'saved'
+      ? lastSavedAt ? `Saved ${lastSavedAt}` : 'Saved'
+      : status === 'error'
+        ? 'Could not save'
+        : 'Ready';
+
+  return (
+    <section className="rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
+      <div className="mb-4 flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">
+          <NotebookPen size={19} />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-primary-500 dark:text-blue-100">Quick Notes</h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{statusLabel}</p>
+        </div>
+      </div>
+      <textarea
+        value={content}
+        onChange={(event) => setContent(event.target.value)}
+        placeholder="Keep quick reminders, names, or follow-ups here."
+        maxLength={10000}
+        className="min-h-[22rem] w-full resize-y rounded border border-gray-300 bg-gray-50 px-4 py-3 text-sm leading-6 outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+      />
+    </section>
+  );
+}
+
 const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUser }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<User | null>(null);
   const isAdministrator = currentUser?.role === 'administrator';
 
   useEffect(() => {
@@ -1269,8 +1332,18 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
         <div className="mb-8">
           <h1>Dashboard</h1>
         </div>
-        <PinnedProfilesWidget currentUser={currentUser} />
-        <DashboardNews currentUser={currentUser} />
+        <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={setSelectedProfile} />
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.4fr)]">
+          <QuickNotesWidget currentUser={currentUser} />
+          <DashboardNews currentUser={currentUser} />
+        </div>
+        {selectedProfile && (
+          <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/50 sm:items-center sm:p-4">
+            <div className="w-full sm:max-w-4xl">
+              <UserDetail user={selectedProfile} onClose={() => setSelectedProfile(null)} />
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1288,8 +1361,18 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
 
       {error && <div className="error">{error}</div>}
 
-      <PinnedProfilesWidget currentUser={currentUser} />
-      <DashboardNews currentUser={currentUser} />
+      <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={setSelectedProfile} />
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.4fr)]">
+        <QuickNotesWidget currentUser={currentUser} />
+        <DashboardNews currentUser={currentUser} />
+      </div>
+      {selectedProfile && (
+        <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/50 sm:items-center sm:p-4">
+          <div className="w-full sm:max-w-4xl">
+            <UserDetail user={selectedProfile} onClose={() => setSelectedProfile(null)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

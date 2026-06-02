@@ -165,6 +165,12 @@ export type PinnedProfile = User & {
   pinnedAt: string;
 };
 
+export interface QuickNote {
+  accountId: string;
+  content: string;
+  updatedAt: string;
+}
+
 export interface CreateUserPayload extends Omit<User, 'id' | 'createdAt' | 'updatedAt'> {
   password?: string;
 }
@@ -945,6 +951,14 @@ export const pinnedProfileService = {
 
   unpin: (userId: string) =>
     api.delete<{ message: string }>(`/pinned-profiles/${userId}`),
+};
+
+export const quickNoteService = {
+  get: () =>
+    api.get<QuickNote>('/quick-notes'),
+
+  save: (content: string) =>
+    api.put<QuickNote>('/quick-notes', { content }),
 };
 
 export const mileageService = {

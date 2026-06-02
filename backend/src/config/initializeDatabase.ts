@@ -553,6 +553,14 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS quick_notes (
+      \`accountId\` VARCHAR(36) PRIMARY KEY,
+      \`content\` TEXT,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS reminders (
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`accountId\` VARCHAR(36) NOT NULL,
