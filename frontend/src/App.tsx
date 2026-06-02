@@ -925,7 +925,7 @@ function HeaderMessagesButton({
   );
 }
 
-function CalculatorModal({ onClose }: { onClose: () => void }) {
+function CalculatorModal({ onClose, onFocus, zIndex }: { onClose: () => void; onFocus: () => void; zIndex: number }) {
   const [display, setDisplay] = useState('0');
   const [position, setPosition] = useState({ x: Math.max(12, window.innerWidth - 400), y: 112 });
   const [isDragging, setIsDragging] = useState(false);
@@ -1011,6 +1011,7 @@ function CalculatorModal({ onClose }: { onClose: () => void }) {
     if (event.button !== 0) {
       return;
     }
+    onFocus();
 
     const rect = calculatorRef.current?.getBoundingClientRect();
     if (!rect) {
@@ -1058,12 +1059,15 @@ function CalculatorModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[95]">
+    <div className="pointer-events-none fixed inset-0" style={{ zIndex }}>
       <div
         ref={calculatorRef}
         tabIndex={0}
         onKeyDown={handleKeyDown}
-        onMouseDown={() => calculatorRef.current?.focus()}
+        onMouseDown={() => {
+          onFocus();
+          calculatorRef.current?.focus();
+        }}
         className="pointer-events-auto fixed w-[calc(100vw-1.5rem)] max-w-sm rounded-lg bg-white p-4 shadow-2xl outline-none ring-1 ring-gray-200 transition-shadow focus:ring-2 focus:ring-accent dark:bg-gray-900 dark:ring-gray-800"
         style={{ left: position.x, top: position.y }}
       >
@@ -2130,6 +2134,7 @@ function App() {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
+  const [activeFloatingApp, setActiveFloatingApp] = useState<'messages' | 'calculator'>('messages');
   const [messagesModalPosition, setMessagesModalPosition] = useState(getInitialMessagesModalPosition);
   const [isDraggingMessagesModal, setIsDraggingMessagesModal] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
@@ -2725,6 +2730,7 @@ function App() {
     }
 
     setMessagesModalPosition(getInitialMessagesModalPosition());
+    setActiveFloatingApp('messages');
     setIsMessagesModalOpen(true);
   };
 
@@ -2732,6 +2738,7 @@ function App() {
     if (event.button !== 0) {
       return;
     }
+    setActiveFloatingApp('messages');
 
     const rect = messagesModalRef.current?.getBoundingClientRect();
     if (!rect) {
@@ -2752,6 +2759,11 @@ function App() {
     }
 
     setIsCalendarModalOpen(true);
+  };
+
+  const openCalculator = () => {
+    setActiveFloatingApp('calculator');
+    setIsCalculatorOpen(true);
   };
 
   const toggleCreateUserModal = () => {
@@ -3245,17 +3257,18 @@ function App() {
                 accountId={currentUser?.id}
                 onOpenMessages={toggleMessagesModal}
                 onOpenCalendar={toggleCalendarModal}
-                onOpenCalculator={() => setIsCalculatorOpen(true)}
+                onOpenCalculator={openCalculator}
                 onOpenCreateUser={toggleCreateUserModal}
               />
             </main>
           </div>
           {isMessagesModalOpen && currentUser && (
-            <div className="pointer-events-none fixed inset-0 z-50">
+            <div className="pointer-events-none fixed inset-0" style={{ zIndex: activeFloatingApp === 'messages' ? 70 : 55 }}>
               <div
                 ref={messagesModalRef}
                 className={getModalWindowClass(closingModal === 'messages', `pointer-events-auto fixed flex h-[72dvh] max-h-[calc(100dvh-1rem)] min-h-[420px] w-[min(900px,calc(100vw-1rem))] min-w-[min(360px,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] resize flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:p-4 ${isDraggingMessagesModal ? 'cursor-grabbing' : ''}`)}
                 style={{ left: messagesModalPosition.x, top: messagesModalPosition.y }}
+                onMouseDownCapture={() => setActiveFloatingApp('messages')}
               >
                 <div
                   onPointerDown={startDraggingMessagesModal}
@@ -3302,7 +3315,7 @@ function App() {
                 </div>
                 <div className="min-h-0 flex-1">
                   <Suspense fallback={<PageLoader label="Loading calendar..." />}>
-                    <CalendarPage currentUser={currentUser} onOpenCalculator={() => setIsCalculatorOpen(true)} onAccountUpdate={handleAccountUpdate} useMilitaryTime={messagePreferences.useMilitaryTime} />
+                    <CalendarPage currentUser={currentUser} onOpenCalculator={openCalculator} onAccountUpdate={handleAccountUpdate} useMilitaryTime={messagePreferences.useMilitaryTime} />
                   </Suspense>
                 </div>
               </div>
@@ -3397,7 +3410,7 @@ function App() {
             </div>
           )}
           {isCalculatorOpen && (
-            <CalculatorModal onClose={() => setIsCalculatorOpen(false)} />
+            <CalculatorModal onClose={() => setIsCalculatorOpen(false)} onFocus={() => setActiveFloatingApp('calculator')} zIndex={activeFloatingApp === 'calculator' ? 70 : 55} />
           )}
           {isReportBugOpen && (
             <div className={getModalBackdropClass(closingModal === 'reportBug')}>
