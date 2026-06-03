@@ -558,6 +558,30 @@ export interface UserNotification {
   createdAt: string;
 }
 
+export type UrgentAlertSeverity = 'Advisory' | 'Important' | 'Urgent' | 'Critical';
+export type UrgentAlertAudienceType = 'everyone' | 'district' | 'users';
+
+export interface UrgentAlert {
+  id: string;
+  title: string;
+  message: string;
+  severity: UrgentAlertSeverity;
+  audienceType: UrgentAlertAudienceType;
+  audienceLabel: string | null;
+  targetDistrict: string | null;
+  targetUserIds: string[];
+  requireAcknowledgement: boolean;
+  expiresAt: string | null;
+  createdBy: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  acknowledgedAt?: string | null;
+  deliveredAt?: string | null;
+  recipientIds?: string[];
+  recipientCount?: number;
+  acknowledgedCount?: number;
+}
+
 export interface Reminder {
   id: string;
   accountId: string;
@@ -927,6 +951,29 @@ export const notificationService = {
 
   clearAll: () =>
     api.delete<{ message: string; cleared: number }>('/notifications'),
+};
+
+export const urgentAlertService = {
+  getPending: () =>
+    api.get<UrgentAlert[]>('/urgent-alerts'),
+
+  getRecent: () =>
+    api.get<UrgentAlert[]>('/urgent-alerts/recent'),
+
+  create: (alert: {
+    title: string;
+    message: string;
+    severity: UrgentAlertSeverity;
+    audienceType: UrgentAlertAudienceType;
+    targetDistrict?: string;
+    targetUserIds?: string[];
+    requireAcknowledgement: boolean;
+    expiresAt?: string;
+  }) =>
+    api.post<UrgentAlert>('/urgent-alerts', alert),
+
+  acknowledge: (id: string) =>
+    api.put<{ message: string }>(`/urgent-alerts/${id}/acknowledge`),
 };
 
 export const quickLaunchService = {

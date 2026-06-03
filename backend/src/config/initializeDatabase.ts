@@ -242,13 +242,13 @@ export async function initializeDatabase() {
   await pool.query(`
     INSERT IGNORE INTO roles (\`id\`, \`name\`, \`permissions\`)
     VALUES
-      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","users:profile-picture","devices:manage","calendar:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","bugs:manage"]'),
+      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","users:profile-picture","devices:manage","calendar:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","bugs:manage"]'),
       ('role-user', 'user', '["users:view","calendar:manage","messages:send"]')
   `);
 
   await pool.query(`
     UPDATE roles
-    SET \`permissions\` = '["users:view","users:create","users:edit","users:profile-picture","devices:manage","calendar:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","bugs:manage"]'
+    SET \`permissions\` = '["users:view","users:create","users:edit","users:profile-picture","devices:manage","calendar:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","bugs:manage"]'
     WHERE \`name\` = 'administrator'
   `);
 
@@ -460,6 +460,39 @@ export async function initializeDatabase() {
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       INDEX \`idx_user_notifications_user\` (\`userId\`),
       INDEX \`idx_user_notifications_read\` (\`isRead\`)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS urgent_alerts (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`title\` VARCHAR(160) NOT NULL,
+      \`message\` TEXT NOT NULL,
+      \`severity\` VARCHAR(30) NOT NULL DEFAULT 'Urgent',
+      \`audienceType\` VARCHAR(30) NOT NULL DEFAULT 'everyone',
+      \`audienceLabel\` VARCHAR(255),
+      \`targetDistrict\` VARCHAR(100),
+      \`targetUserIds\` JSON,
+      \`requireAcknowledgement\` BOOLEAN DEFAULT 1,
+      \`expiresAt\` DATETIME,
+      \`createdBy\` VARCHAR(36),
+      \`createdByName\` VARCHAR(150),
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX \`idx_urgent_alerts_created\` (\`createdAt\`),
+      INDEX \`idx_urgent_alerts_expires\` (\`expiresAt\`),
+      INDEX \`idx_urgent_alerts_audience\` (\`audienceType\`)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS urgent_alert_acknowledgements (
+      \`alertId\` VARCHAR(36) NOT NULL,
+      \`userId\` VARCHAR(36) NOT NULL,
+      \`acknowledgedAt\` DATETIME,
+      \`deliveredAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`alertId\`, \`userId\`),
+      INDEX \`idx_urgent_alert_ack_user\` (\`userId\`, \`acknowledgedAt\`),
+      INDEX \`idx_urgent_alert_ack_alert\` (\`alertId\`, \`acknowledgedAt\`)
     )
   `);
 

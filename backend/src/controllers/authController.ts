@@ -26,6 +26,7 @@ const allowedPermissions = [
   'audit:view',
   'roles:manage',
   'messages:send',
+  'alerts:send',
   'dashboard:manage',
   'dashboard:create',
   'dashboard:edit',

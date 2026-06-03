@@ -1,10 +1,10 @@
 import { CSSProperties, FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, Bell, Bug, Calculator, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Command, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Command, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { FloatingWindow } from './components/FloatingWindow';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, getAppEventsUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, getAppEventsUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, urgentAlertService, UrgentAlert, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
@@ -2732,6 +2732,67 @@ function ConfettiOverlay() {
   );
 }
 
+function UrgentAlertModal({
+  alert,
+  onAcknowledge,
+  isAcknowledging,
+}: {
+  alert: UrgentAlert;
+  onAcknowledge: () => void;
+  isAcknowledging: boolean;
+}) {
+  const severityClass = alert.severity === 'Critical'
+    ? 'bg-red-600 text-white'
+    : alert.severity === 'Urgent'
+      ? 'bg-red-50 text-danger ring-1 ring-red-200 dark:bg-red-950/50 dark:text-red-100 dark:ring-red-900'
+      : alert.severity === 'Important'
+        ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-100 dark:ring-amber-900'
+        : 'bg-blue-50 text-primary-500 ring-1 ring-blue-200 dark:bg-blue-950/50 dark:text-blue-100 dark:ring-blue-900';
+
+  return (
+    <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/70 px-4 py-8 text-gray-900 dark:text-gray-100">
+      <div className="w-full max-w-2xl overflow-hidden rounded-lg border-2 border-danger bg-white shadow-[0_30px_90px_rgba(127,29,29,0.45)] dark:bg-gray-950">
+        <div className="bg-danger px-5 py-4 text-white">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-white/15 ring-1 ring-white/25">
+              <AlertTriangle size={26} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-red-100">Urgent Alert</p>
+              <h2 className="mt-1 text-2xl font-bold leading-tight text-white">{alert.title}</h2>
+            </div>
+            <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-black uppercase text-danger">
+              {alert.severity}
+            </span>
+          </div>
+        </div>
+
+        <div className="px-5 py-5">
+          <div className="mb-4 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-wide">
+            <span className={`rounded-full px-3 py-1 ${severityClass}`}>{alert.severity}</span>
+            <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600 dark:bg-gray-900 dark:text-gray-300">{alert.audienceLabel || 'Targeted alert'}</span>
+            {alert.expiresAt && <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600 dark:bg-gray-900 dark:text-gray-300">Expires {new Date(alert.expiresAt).toLocaleString()}</span>}
+          </div>
+
+          <p className="whitespace-pre-wrap text-lg font-semibold leading-8 text-gray-800 dark:text-gray-100">
+            {alert.message}
+          </p>
+
+          <div className="mt-5 rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
+            Sent by <span className="font-bold">{alert.createdByName || 'SHIELD'}</span> on {new Date(alert.createdAt).toLocaleString()}.
+          </div>
+        </div>
+
+        <div className="flex justify-end border-t border-gray-200 bg-gray-50 px-5 py-4 dark:border-gray-800 dark:bg-gray-900">
+          <button type="button" onClick={onAcknowledge} disabled={isAcknowledging} className="btn-primary bg-danger hover:bg-red-800">
+            {isAcknowledging ? 'Acknowledging...' : alert.requireAcknowledgement ? 'Acknowledge Alert' : 'Dismiss Alert'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoginTransitioning, setIsLoginTransitioning] = useState(false);
@@ -2753,6 +2814,9 @@ function App() {
   const loginTransitionTimerRef = useRef<number | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
   const [userNotifications, setUserNotifications] = useState<UserNotification[]>([]);
+  const [urgentAlerts, setUrgentAlerts] = useState<UrgentAlert[]>([]);
+  const [acknowledgingUrgentAlertId, setAcknowledgingUrgentAlertId] = useState<string | null>(null);
+  const lastUrgentAlertIdsRef = useRef<Set<string>>(new Set());
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notificationCenterTab, setNotificationCenterTab] = useState<'unread' | 'bugs' | 'recent'>('unread');
   const [isSessionLoading, setIsSessionLoading] = useState(true);
@@ -3036,6 +3100,72 @@ function App() {
     void loadUserNotifications();
   }, [loadUserNotifications]);
 
+  const playUrgentAlertSound = useCallback(() => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) return;
+
+      const audioContext = new AudioContextClass();
+      const gain = audioContext.createGain();
+      gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.16, audioContext.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 1.25);
+      gain.connect(audioContext.destination);
+
+      [740, 988, 740].forEach((frequency, index) => {
+        const oscillator = audioContext.createOscillator();
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime + index * 0.24);
+        oscillator.connect(gain);
+        oscillator.start(audioContext.currentTime + index * 0.24);
+        oscillator.stop(audioContext.currentTime + index * 0.24 + 0.16);
+      });
+
+      window.setTimeout(() => void audioContext.close().catch(() => undefined), 1500);
+    } catch (error) {
+      console.error('Failed to play urgent alert sound:', error);
+    }
+  }, []);
+
+  const loadUrgentAlerts = useCallback(async (playSoundForNew = false) => {
+    if (!currentUser) {
+      setUrgentAlerts([]);
+      lastUrgentAlertIdsRef.current = new Set();
+      return;
+    }
+
+    try {
+      const response = await urgentAlertService.getPending();
+      const nextAlerts = response.data;
+      const nextIds = new Set(nextAlerts.map((alert) => alert.id));
+      const hasNewAlert = nextAlerts.some((alert) => !lastUrgentAlertIdsRef.current.has(alert.id));
+      setUrgentAlerts(nextAlerts);
+      if (playSoundForNew && hasNewAlert && nextAlerts.length > 0) {
+        playUrgentAlertSound();
+      }
+      lastUrgentAlertIdsRef.current = nextIds;
+    } catch (error) {
+      console.error('Failed to load urgent alerts:', error);
+    }
+  }, [currentUser, playUrgentAlertSound]);
+
+  useEffect(() => {
+    void loadUrgentAlerts(true);
+  }, [loadUrgentAlerts]);
+
+  const acknowledgeUrgentAlert = async (alert: UrgentAlert) => {
+    setAcknowledgingUrgentAlertId(alert.id);
+    try {
+      await urgentAlertService.acknowledge(alert.id);
+      setUrgentAlerts((alerts) => alerts.filter((item) => item.id !== alert.id));
+      lastUrgentAlertIdsRef.current.delete(alert.id);
+    } catch (error) {
+      showToast('error', getErrorMessage(error, 'Failed to acknowledge alert.'));
+    } finally {
+      setAcknowledgingUrgentAlertId(null);
+    }
+  };
+
   const loadSidebarCalendarEntries = useCallback(async (showLoading = false) => {
     if (!currentUser) {
       setSidebarCalendarEntries([]);
@@ -3299,6 +3429,15 @@ function App() {
   };
 
   const isAdministrator = currentUser?.role === 'administrator';
+  const hasPermission = (permission: string) => Boolean(isAdministrator || currentUser?.permissions?.includes(permission));
+  const canOpenAdminConsole = Boolean(currentUser && (
+    isAdministrator ||
+    hasPermission('alerts:send') ||
+    hasPermission('roles:manage') ||
+    hasPermission('users:create') ||
+    hasPermission('audit:view') ||
+    hasPermission('bugs:manage')
+  ));
   const openBugCount = bugReports.filter((report) => report.status === 'New' || report.status === 'Pending').length;
   const unreadNotificationCount = userNotifications.filter((notification) => !notification.isRead).length;
   const unreadUserNotifications = userNotifications.filter((notification) => !notification.isRead);
@@ -3343,6 +3482,10 @@ function App() {
       void loadUserNotifications();
       dispatchAppUpdate('notification-updated');
     };
+    const handleUrgentAlertUpdate = () => {
+      void loadUrgentAlerts(true);
+      dispatchAppUpdate('urgent-alert-updated');
+    };
     const handleBugUpdate = () => {
       void loadBugReports();
       dispatchAppUpdate('bug-updated');
@@ -3360,6 +3503,8 @@ function App() {
 
     eventSource.addEventListener('notification-created', handleNotificationUpdate);
     eventSource.addEventListener('notification-updated', handleNotificationUpdate);
+    eventSource.addEventListener('urgent-alert-created', handleUrgentAlertUpdate);
+    eventSource.addEventListener('urgent-alert-updated', handleUrgentAlertUpdate);
     const handleRealtimeAppUpdate = (name: string) => (event: Event) => {
       try {
         dispatchAppUpdate(name, JSON.parse((event as MessageEvent).data || '{}') as Record<string, unknown>);
@@ -3401,7 +3546,7 @@ function App() {
     });
 
     return () => eventSource.close();
-  }, [currentUser, handleForcedLogout, loadBugReports, loadUserNotifications, syncSessionTimeoutFromSettings]);
+  }, [currentUser, handleForcedLogout, loadBugReports, loadUrgentAlerts, loadUserNotifications, syncSessionTimeoutFromSettings]);
 
   const closeModal = (modal: ClosingModal) => {
     setClosingModal(modal);
@@ -3999,10 +4144,10 @@ function App() {
                     >
                       <UserCircle size={16} /> Account Settings
                     </button>
-                    {isAdministrator && (
+                    {canOpenAdminConsole && (
                       <button
                         type="button"
-                        onClick={() => openAdminConsole('general')}
+                        onClick={() => openAdminConsole(hasPermission('alerts:send') && !hasPermission('roles:manage') ? 'alerts' : 'general')}
                         className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
                       >
                         <Shield size={16} /> Admin Console
@@ -4253,7 +4398,7 @@ function App() {
               </div>
             </div>
           )}
-          {isAdminConsoleOpen && currentUser && isAdministrator && (
+          {isAdminConsoleOpen && currentUser && canOpenAdminConsole && (
             <div className={getModalBackdropClass(closingModal === 'adminConsole', 'bg-black/60')}>
               <div className={getModalWindowClass(closingModal === 'adminConsole', 'flex h-[96dvh] w-full max-w-7xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:h-[94vh] sm:p-5')}>
                 <div className="mb-3 flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
@@ -4347,6 +4492,13 @@ function App() {
                 </div>
               </div>
             </div>
+          )}
+          {urgentAlerts[0] && (
+            <UrgentAlertModal
+              alert={urgentAlerts[0]}
+              onAcknowledge={() => void acknowledgeUrgentAlert(urgentAlerts[0])}
+              isAcknowledging={acknowledgingUrgentAlertId === urgentAlerts[0].id}
+            />
           )}
           {isWelcomeSplashOpen && currentUser && (
             <WelcomeSplash

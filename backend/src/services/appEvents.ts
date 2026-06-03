@@ -10,6 +10,8 @@ export type AppEventType =
   | 'permission-updated'
   | 'notification-created'
   | 'notification-updated'
+  | 'urgent-alert-created'
+  | 'urgent-alert-updated'
   | 'performance-evaluation-updated'
   | 'mileage-updated'
   | 'quick-launch-updated'
