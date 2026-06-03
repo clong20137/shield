@@ -969,7 +969,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       )}
 
       {editingUser && (
-        <div className="fixed inset-0 z-[70] flex items-stretch justify-center bg-black/60 sm:items-center sm:p-4">
+        <div className="fixed inset-0 z-[100] flex items-stretch justify-center bg-black/60 sm:items-center sm:p-4">
           <form onSubmit={handleSaveUser} className="flex h-[100dvh] w-full flex-col overflow-hidden rounded-none bg-white shadow-xl dark:bg-gray-900 sm:max-h-[92vh] sm:max-w-5xl sm:rounded-lg">
             <div className="flex shrink-0 items-center justify-between gap-4 bg-primary-500 px-4 py-4 text-white sm:px-5">
               <div className="min-w-0">
