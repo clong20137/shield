@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, Eye, FileSpreadsheet, Search, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Copy, Download, Eye, FileSpreadsheet, Search, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { auditService, AuditLog, AuditLogFilters, AuditLogResponse } from '../services/api';
 
@@ -244,11 +244,11 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
             <form onSubmit={submitSearch} className="flex min-w-0 flex-1 gap-2">
               <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
+                <Search className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
                 <input
                   value={draftSearch}
                   onChange={(event) => setDraftSearch(event.target.value)}
-                  className="h-12 w-full rounded-lg border border-gray-300 bg-white py-2 pl-11 pr-3 text-sm font-semibold shadow-sm outline-none transition placeholder:font-normal focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 dark:border-gray-700 dark:bg-gray-950"
+                  className="h-12 w-full rounded-lg border border-gray-300 bg-white py-2 pl-14 pr-3 text-sm font-semibold shadow-sm outline-none transition placeholder:font-normal focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 dark:border-gray-700 dark:bg-gray-950"
                   placeholder="Search actor, action, entity, details, or IP"
                 />
               </div>
@@ -272,7 +272,6 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
                 title={exporting ? 'Exporting' : 'Export audit logs'}
               >
                 {exporting ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <Download size={16} />}
-                <ChevronDown size={13} className="absolute bottom-1.5 right-1.5" />
               </button>
               {isExportMenuOpen && (
                 <div className="absolute right-0 top-14 z-20 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-950" role="menu">
@@ -463,8 +462,8 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
       </section>
 
       {selectedLog && (
-        <div className="modal-backdrop" onClick={() => setSelectedLog(null)}>
-          <div className="modal max-w-3xl" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4" onClick={() => setSelectedLog(null)}>
+          <div className="modal-window max-h-[90dvh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900" onClick={(event) => event.stopPropagation()}>
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
                 <h2>Audit Details</h2>

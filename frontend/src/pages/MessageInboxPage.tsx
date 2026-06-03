@@ -20,7 +20,7 @@ interface MessageThread {
   contactEmail: string;
   contactRank: string;
   contactProfilePictureUrl: string;
-  contactLastSeenAt: string;
+  contactLastSeenAt: string | null;
   contactReceivesMessages: boolean;
   subject: string;
   latestMessage?: UserMessage;
@@ -54,11 +54,11 @@ function formatMessageTime(value: string): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function getPresenceLabel(value: string): string {
+function getPresenceLabel(value?: string | null): string {
   return getPresenceDisplay(value, isOnlineFromLastSeen(value));
 }
 
-function isOnlineFromLastSeen(value: string, now = Date.now()): boolean {
+function isOnlineFromLastSeen(value?: string | null, now = Date.now()): boolean {
   if (!value) {
     return false;
   }
@@ -71,14 +71,14 @@ function isOnlineFromLastSeen(value: string, now = Date.now()): boolean {
   return now - lastActivityTime <= 5 * 60 * 1000;
 }
 
-function getPresenceDisplay(value: string, isOnline: boolean): string {
+function getPresenceDisplay(value: string | null | undefined, isOnline: boolean): string {
   if (!value) {
-    return 'Last online unavailable';
+    return 'Never';
   }
 
   const lastActivityTime = new Date(value).getTime();
   if (Number.isNaN(lastActivityTime)) {
-    return 'Last online unavailable';
+    return 'Never';
   }
 
   return isOnline ? 'Active' : `Last online ${formatMessageTime(value)}`;
@@ -124,10 +124,10 @@ function getContactProfilePicture(message: UserMessage, currentUserId: string): 
     : message.senderProfilePictureUrl || '';
 }
 
-function getContactLastSeenAt(message: UserMessage, currentUserId: string): string {
+function getContactLastSeenAt(message: UserMessage, currentUserId: string): string | null {
   return message.senderAccountId === currentUserId
-    ? message.recipientLastSeenAt || message.createdAt
-    : message.senderLastSeenAt || message.createdAt;
+    ? message.recipientLastSeenAt || null
+    : message.senderLastSeenAt || null;
 }
 
 function getContactReceivesMessages(message: UserMessage, currentUserId: string): boolean {
@@ -211,7 +211,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const [messagePendingDelete, setMessagePendingDelete] = useState<UserMessage | null>(null);
   const [threadPendingDelete, setThreadPendingDelete] = useState<MessageThread | null>(null);
   const [selectedMentionUser, setSelectedMentionUser] = useState<User | null>(null);
-  const [presenceByAccount, setPresenceByAccount] = useState<Record<string, { online: boolean; lastSeenAt: string }>>({});
+  const [presenceByAccount, setPresenceByAccount] = useState<Record<string, { online: boolean; lastSeenAt: string | null }>>({});
   const typingStopTimerRef = useRef<number | null>(null);
   const lastTypingSentRef = useRef(0);
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
@@ -320,7 +320,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           ...current,
           [payload.actorAccountId as string]: {
             online: payload.actorOnline === true,
-            lastSeenAt: payload.actorLastSeenAt || new Date().toISOString(),
+            lastSeenAt: payload.actorLastSeenAt || null,
           },
         }));
       } catch (err) {
@@ -448,7 +448,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           contactEmail: draftRecipient.email || '',
           contactRank: draftRecipient.rank || '',
           contactProfilePictureUrl: draftRecipient.profilePictureUrl || '',
-          contactLastSeenAt: draftRecipient.lastSeenAt || new Date().toISOString(),
+          contactLastSeenAt: draftRecipient.lastSeenAt || null,
           contactReceivesMessages: draftRecipient.receivesMessages !== false,
           subject: 'Message',
           messages: [],
