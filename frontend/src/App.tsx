@@ -4004,38 +4004,8 @@ function App() {
             </div>
           </aside>
 
-          <div className="flex h-[100dvh] min-w-0 flex-1 flex-col overflow-hidden">
-            <header className="flex shrink-0 flex-col gap-3 border-b border-gray-200 bg-white px-3 py-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:px-6 md:min-h-20">
-              <div className="flex w-full items-center justify-between gap-3">
-                <button
-                  data-onboarding-target="profile-card"
-                  type="button"
-                  onClick={() => setIsProfileModalOpen(true)}
-                  className="flex min-w-0 items-center gap-2 rounded-lg px-1 py-1 text-left md:hidden"
-                  title="Open profile"
-                >
-                  {currentUser?.profilePictureUrl ? (
-                    <img
-                      src={getAssetUrl(currentUser.profilePictureUrl)}
-                      alt={currentUser.displayName}
-                      onError={handleAssetImageError}
-                      className="h-10 w-10 shrink-0 rounded-full border border-gray-200 bg-white object-cover shadow-sm dark:border-gray-700"
-                    />
-                  ) : (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-sm font-bold text-primary-500 shadow-sm dark:border-gray-700">
-                      {currentUser ? getInitials(currentUser.displayName, currentUser.email) : <UserCircle size={24} />}
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-gray-900 dark:text-gray-100">{currentUser?.displayName || 'SHIELD'}</p>
-                    <p className="truncate text-xs font-semibold text-gray-500 dark:text-gray-400">Agency Workspace</p>
-                  </div>
-                </button>
-                <div className="hidden md:block">
-                  <p className="hidden text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 sm:block">Internal System</p>
-                  <h2 className="text-xl font-bold text-primary-500 sm:text-2xl">Agency Workspace</h2>
-                </div>
-              <div data-onboarding-target="header-actions" className="relative flex items-center gap-2 sm:gap-3">
+          <div className="relative flex h-[100dvh] min-w-0 flex-1 flex-col overflow-hidden">
+              <div data-onboarding-target="header-actions" className="pointer-events-auto fixed right-3 top-3 z-40 flex select-none items-center gap-1.5 rounded-2xl border border-gray-200 bg-white/90 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/85 sm:right-5 sm:top-4 sm:gap-2">
                 <div ref={notificationsMenuRef} className="relative">
                   <button
                     data-onboarding-control="notifications"
@@ -4251,13 +4221,8 @@ function App() {
                   </div>
                 )}
               </div>
-              </div>
-              <div className="md:hidden">
-                <GlobalSearch compact={false} />
-              </div>
-            </header>
 
-            <main className="flex-1 overflow-y-auto px-3 pb-28 pt-5 dark:bg-gray-950 sm:px-6 sm:pb-48 sm:pt-8 md:pb-48">
+            <main className="flex-1 overflow-y-auto px-3 pb-28 pt-4 dark:bg-gray-950 sm:px-6 sm:pb-48 sm:pt-5 md:pb-48">
               <div data-onboarding-target="workspace" className="min-h-[calc(100dvh-12rem)]">
                 <Suspense fallback={<PageLoader label="Loading page..." />}>
                   <Routes>
