@@ -1,6 +1,7 @@
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import helmet from 'helmet';
 import path from 'path';
 import multer from 'multer';
 import { initializeDatabase } from './config/initializeDatabase';
@@ -37,12 +38,62 @@ const allowedOrigins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS || '');
 const apiRateLimitWindowMs = Number(process.env.API_RATE_LIMIT_WINDOW_MS || 60 * 1000);
 const apiRateLimitMax = Number(process.env.API_RATE_LIMIT_MAX || 300);
 const apiRequestTimeoutMs = Number(process.env.API_REQUEST_TIMEOUT_MS || 30 * 1000);
+const isProduction = process.env.NODE_ENV === 'production';
+
+function getCspOrigins(): string[] {
+  const configuredApiUrl = process.env.VITE_API_URL || process.env.API_BASE_URL || '';
+  const configuredAppUrl = process.env.APP_BASE_URL || '';
+  const origins = [...allowedOrigins];
+
+  [configuredApiUrl, configuredAppUrl].forEach((value) => {
+    if (!value) {
+      return;
+    }
+
+    try {
+      origins.push(new URL(value).origin);
+    } catch {
+      // Ignore invalid optional configuration and rely on explicit allowed origins.
+    }
+  });
+
+  return [...new Set(origins)];
+}
+
+function getLocalDevelopmentCspSources(): string[] {
+  return isProduction ? [] : ['http://localhost:*', 'http://127.0.0.1:*', 'ws://localhost:*', 'ws://127.0.0.1:*'];
+}
 
 // Middleware
 app.disable('x-powered-by');
 if (process.env.TRUST_PROXY === 'true') {
   app.set('trust proxy', 1);
 }
+
+const cspOrigins = getCspOrigins();
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      scriptSrc: ["'self'"],
+      scriptSrcAttr: ["'none'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:', ...cspOrigins, ...getLocalDevelopmentCspSources()],
+      fontSrc: ["'self'", 'data:'],
+      connectSrc: ["'self'", ...cspOrigins, ...getLocalDevelopmentCspSources()],
+      mediaSrc: ["'self'", 'blob:', ...cspOrigins],
+      formAction: ["'self'"],
+      upgradeInsecureRequests: isProduction ? [] : null,
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: 'same-site' },
+  referrerPolicy: { policy: 'no-referrer' },
+}));
 
 app.use((req: Request, res: Response, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
