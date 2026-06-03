@@ -199,6 +199,35 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     setSelectedUserIds((currentIds) => currentIds.filter((userId) => currentUserIds.has(userId)));
   }, [users]);
 
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) {
+        return;
+      }
+
+      if (editingUser) {
+        event.preventDefault();
+        setEditingUser(null);
+        return;
+      }
+
+      if (bulkActionMode) {
+        event.preventDefault();
+        closeBulkAction();
+        return;
+      }
+
+      if (selectedUser) {
+        event.preventDefault();
+        setSelectedUser(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [bulkActionMode, editingUser, selectedUser]);
+
   const handleSearch = async (query: string) => {
     const requestId = searchRequestRef.current + 1;
     searchRequestRef.current = requestId;

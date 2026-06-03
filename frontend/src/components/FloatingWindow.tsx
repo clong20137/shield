@@ -19,6 +19,7 @@ interface FloatingWindowProps {
   fallbackSize: { width: number; height: number };
   initialPosition: () => FloatingWindowPosition;
   zIndex: number;
+  animationVariant?: 'standard' | 'mac' | 'none';
   dragIgnoreSelector?: string;
   isClosing?: boolean;
   mobileBreakpoint?: number;
@@ -43,8 +44,16 @@ function clampPosition(position: FloatingWindowPosition, width: number, height: 
   };
 }
 
-function getAnimationClass(isClosing = false) {
-  return isClosing ? 'animate-modal-out' : 'animate-modal-in';
+function getAnimationClass(animationVariant: FloatingWindowProps['animationVariant'], isClosing = false) {
+  if (animationVariant === 'none') {
+    return '';
+  }
+
+  if (animationVariant === 'mac') {
+    return isClosing ? 'floating-window-mac-exit' : 'floating-window-mac-enter';
+  }
+
+  return isClosing ? 'floating-window-exit' : 'floating-window-enter';
 }
 
 export function FloatingWindow({
@@ -53,6 +62,7 @@ export function FloatingWindow({
   fallbackSize,
   initialPosition,
   zIndex,
+  animationVariant = 'standard',
   dragIgnoreSelector = defaultDragIgnoreSelector,
   isClosing = false,
   mobileBreakpoint = 768,
@@ -153,7 +163,7 @@ export function FloatingWindow({
       <div
         {...windowAttributes}
         ref={activeWindowRef}
-        className={`${getAnimationClass(isClosing)} ${className} ${isDragging ? 'md:cursor-grabbing' : ''}`}
+        className={`${getAnimationClass(animationVariant, isClosing)} ${className} ${isDragging ? 'md:cursor-grabbing' : ''}`}
         style={style}
         onMouseDownCapture={onFocus}
       >

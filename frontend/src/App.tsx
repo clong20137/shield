@@ -25,6 +25,8 @@ const QUICK_LAUNCH_KEY = 'shield_quick_launch';
 const QUICK_LAUNCH_SLOT_COUNT = 8;
 const MODAL_CLOSE_MS = 220;
 
+type ClosingModal = 'messages' | 'calendar' | 'calculator' | 'profile' | 'adminConsole' | 'reportBug' | 'bugTracker';
+
 interface MessagePreferences {
   receiveMessages: boolean;
   playMessageSound: boolean;
@@ -1182,7 +1184,7 @@ function getInitialCalculatorPosition() {
   return { x: Math.max(12, window.innerWidth - 400), y: 112 };
 }
 
-function CalculatorModal({ onClose, onFocus, zIndex }: { onClose: () => void; onFocus: () => void; zIndex: number }) {
+function CalculatorModal({ isClosing, onClose, onFocus, zIndex }: { isClosing: boolean; onClose: () => void; onFocus: () => void; zIndex: number }) {
   const [display, setDisplay] = useState('0');
   const calculatorRef = useRef<HTMLDivElement | null>(null);
   const buttons = ['7', '8', '9', '/', '4', '5', '6', '*', '1', '2', '3', '-', '0', '.', 'C', '+'];
@@ -1253,9 +1255,11 @@ function CalculatorModal({ onClose, onFocus, zIndex }: { onClose: () => void; on
 
   return (
     <FloatingWindow
+      animationVariant="mac"
       className="pointer-events-auto fixed inset-0 flex h-[100dvh] w-full flex-col rounded-none bg-white p-3 shadow-2xl outline-none ring-1 ring-gray-200 transition-shadow focus:ring-2 focus:ring-accent dark:bg-gray-900 dark:ring-gray-800 md:inset-auto md:block md:h-auto md:w-[calc(100vw-1.5rem)] md:max-w-sm md:rounded-lg md:p-4"
       fallbackSize={{ width: 360, height: 420 }}
       initialPosition={getInitialCalculatorPosition}
+      isClosing={isClosing}
       onFocus={() => {
         onFocus();
         calculatorRef.current?.focus();
@@ -2794,7 +2798,7 @@ function App() {
   const [isFirstLoginGuideOpen, setIsFirstLoginGuideOpen] = useState(false);
   const [isWelcomeSplashOpen, setIsWelcomeSplashOpen] = useState(false);
   const [shouldLaunchGuideAfterWelcome, setShouldLaunchGuideAfterWelcome] = useState(false);
-  const [closingModal, setClosingModal] = useState<'messages' | 'calendar' | 'profile' | 'adminConsole' | 'reportBug' | 'bugTracker' | null>(null);
+  const [closingModal, setClosingModal] = useState<ClosingModal | null>(null);
 
   useEffect(() => {
     const collapseSidebarOnMobile = () => {
@@ -3427,11 +3431,12 @@ function App() {
     return () => eventSource.close();
   }, [currentUser, handleForcedLogout, loadBugReports, loadUserNotifications, syncSessionTimeoutFromSettings]);
 
-  const closeModal = (modal: 'messages' | 'calendar' | 'profile' | 'adminConsole' | 'reportBug' | 'bugTracker') => {
+  const closeModal = (modal: ClosingModal) => {
     setClosingModal(modal);
     window.setTimeout(() => {
       if (modal === 'messages') setIsMessagesModalOpen(false);
       if (modal === 'calendar') setIsCalendarModalOpen(false);
+      if (modal === 'calculator') setIsCalculatorOpen(false);
       if (modal === 'profile') setIsProfileModalOpen(false);
       if (modal === 'adminConsole') setIsAdminConsoleOpen(false);
       if (modal === 'reportBug') setIsReportBugOpen(false);
@@ -3494,7 +3499,7 @@ function App() {
 
   const toggleCalculator = () => {
     if (isCalculatorOpen) {
-      setIsCalculatorOpen(false);
+      closeModal('calculator');
       return;
     }
 
@@ -3503,7 +3508,7 @@ function App() {
 
   const closeActiveFloatingApp = () => {
     if (activeFloatingApp === 'calculator' && isCalculatorOpen) {
-      setIsCalculatorOpen(false);
+      closeModal('calculator');
       return true;
     }
 
@@ -3518,7 +3523,7 @@ function App() {
     }
 
     if (isCalculatorOpen) {
-      setIsCalculatorOpen(false);
+      closeModal('calculator');
       return true;
     }
 
@@ -3666,45 +3671,59 @@ function App() {
         return;
       }
 
+      const consumeEscape = () => {
+        event.preventDefault();
+        event.stopPropagation();
+      };
+
       if (isCommandPaletteOpen) {
+        consumeEscape();
         setIsCommandPaletteOpen(false);
         return;
       }
 
       if (isFirstLoginGuideOpen) {
+        consumeEscape();
         setIsFirstLoginGuideOpen(false);
         return;
       }
 
       if (isNotificationsOpen) {
+        consumeEscape();
         setIsNotificationsOpen(false);
         return;
       }
 
       if (isAccountMenuOpen) {
+        consumeEscape();
         setIsAccountMenuOpen(false);
         return;
       }
 
       if (closeActiveFloatingApp()) {
+        consumeEscape();
         return;
       }
 
       if (isBugTrackerOpen) {
+        consumeEscape();
         closeModal('bugTracker');
         return;
       }
 
       if (isReportBugOpen) {
+        consumeEscape();
         closeModal('reportBug');
         return;
       }
 
       if (isAdminConsoleOpen) {
+        consumeEscape();
         closeModal('adminConsole');
         return;
       }
       if (isProfileModalOpen) {
+        consumeEscape();
         closeModal('profile');
       }
     };
@@ -4300,7 +4319,8 @@ function App() {
           )}
           {isCalculatorOpen && (
             <CalculatorModal
-              onClose={() => setIsCalculatorOpen(false)}
+              isClosing={closingModal === 'calculator'}
+              onClose={() => closeModal('calculator')}
               onFocus={() => {
                 announceFloatingFocus('calculator');
                 setActiveFloatingApp('calculator');
