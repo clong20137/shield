@@ -156,6 +156,8 @@ export class UserModel {
       const conditions: string[] = [];
       const params: Array<string | number> = [];
       const trimmedSearchTerm = searchTerm.trim();
+      const orderParams: Array<string | number> = [];
+      let searchRankSql = '';
 
       if (trimmedSearchTerm) {
         const tokenConditions: string[] = [];
@@ -216,6 +218,42 @@ export class UserModel {
           likeTerm,
           ...tokenParams
         );
+
+        const normalizedSearchTerm = trimmedSearchTerm.toLowerCase();
+        const compactSearchTerm = normalizedSearchTerm.replace(/\s+/gu, '');
+        const firstTokenPrefix = tokens[0] ? `${UserModel.escapeLike(tokens[0])}%` : '';
+        const secondTokenPrefix = tokens[1] ? `${UserModel.escapeLike(tokens[1])}%` : '';
+        const singleTokenPrefix = `${UserModel.escapeLike(tokens[0] || normalizedSearchTerm)}%`;
+
+        searchRankSql = `CASE
+          WHEN LOWER(COALESCE(\`email\`, '')) = ? OR LOWER(COALESCE(\`peNumber\`, '')) = ? OR LOWER(COALESCE(\`badgeNumber\`, '')) = ? OR LOWER(COALESCE(\`peopleSoftId\`, '')) = ? OR LOWER(COALESCE(\`publicSafetyId\`, '')) = ? THEN 0
+          WHEN LOWER(CONCAT_WS(' ', \`firstName\`, \`lastName\`)) = ? OR LOWER(COALESCE(\`displayName\`, '')) = ? THEN 1
+          WHEN LOWER(REPLACE(CONCAT_WS('', \`firstName\`, \`lastName\`), ' ', '')) = ? OR LOWER(REPLACE(COALESCE(\`displayName\`, ''), ' ', '')) = ? THEN 2
+          ${tokens.length >= 2 ? `WHEN (
+            (LOWER(COALESCE(\`firstName\`, '')) LIKE ? AND LOWER(COALESCE(\`lastName\`, '')) LIKE ?)
+            OR (LOWER(COALESCE(\`firstName\`, '')) LIKE ? AND LOWER(COALESCE(\`lastName\`, '')) LIKE ?)
+          ) THEN 3` : ''}
+          WHEN LOWER(COALESCE(\`firstName\`, '')) LIKE ? OR LOWER(COALESCE(\`lastName\`, '')) LIKE ? OR LOWER(COALESCE(\`displayName\`, '')) LIKE ? THEN 4
+          ELSE 9
+        END`;
+
+        orderParams.push(
+          normalizedSearchTerm,
+          normalizedSearchTerm,
+          normalizedSearchTerm,
+          normalizedSearchTerm,
+          normalizedSearchTerm,
+          normalizedSearchTerm,
+          normalizedSearchTerm,
+          compactSearchTerm,
+          compactSearchTerm,
+        );
+
+        if (tokens.length >= 2) {
+          orderParams.push(firstTokenPrefix, secondTokenPrefix, secondTokenPrefix, firstTokenPrefix);
+        }
+
+        orderParams.push(singleTokenPrefix, singleTokenPrefix, singleTokenPrefix);
       }
 
       if (filters?.rank) {
@@ -263,9 +301,11 @@ export class UserModel {
         query += ` WHERE ${conditions.join(' AND ')}`;
       }
 
-      query += ' ORDER BY `lastName`, `firstName` LIMIT 100';
+      query += searchRankSql
+        ? ` ORDER BY ${searchRankSql}, \`lastName\`, \`firstName\` LIMIT 100`
+        : ' ORDER BY `lastName`, `firstName` LIMIT 100';
 
-      const [rows] = await conn.query(query, params);
+      const [rows] = await conn.query(query, [...params, ...orderParams]);
       return rows as User[];
     } finally {
       conn.release();
