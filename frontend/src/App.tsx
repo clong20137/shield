@@ -3,6 +3,7 @@ import { BarChart3, Bell, Bug, Calculator, CalendarDays, ChevronLeft, ChevronRig
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
+import { FloatingWindow } from './components/FloatingWindow';
 import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, getAppEventsUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
@@ -1177,12 +1178,12 @@ function HeaderMessagesButton({
   );
 }
 
+function getInitialCalculatorPosition() {
+  return { x: Math.max(12, window.innerWidth - 400), y: 112 };
+}
+
 function CalculatorModal({ onClose, onFocus, zIndex }: { onClose: () => void; onFocus: () => void; zIndex: number }) {
   const [display, setDisplay] = useState('0');
-  const [position, setPosition] = useState({ x: Math.max(12, window.innerWidth - 400), y: 112 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [isMobileLayout, setIsMobileLayout] = useState(() => isMobileViewport());
-  const dragOffsetRef = useRef({ x: 0, y: 0 });
   const calculatorRef = useRef<HTMLDivElement | null>(null);
   const buttons = ['7', '8', '9', '/', '4', '5', '6', '*', '1', '2', '3', '-', '0', '.', 'C', '+'];
 
@@ -1216,86 +1217,6 @@ function CalculatorModal({ onClose, onFocus, zIndex }: { onClose: () => void; on
   useEffect(() => {
     calculatorRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    const syncLayout = () => {
-      const nextIsMobile = isMobileViewport();
-      setIsMobileLayout(nextIsMobile);
-      if (nextIsMobile) {
-        setIsDragging(false);
-      }
-    };
-
-    syncLayout();
-    window.addEventListener('resize', syncLayout);
-
-    return () => window.removeEventListener('resize', syncLayout);
-  }, []);
-
-  useEffect(() => {
-    if (!isDragging || isMobileLayout) {
-      return undefined;
-    }
-
-    const handlePointerMove = (event: PointerEvent) => {
-      const width = calculatorRef.current?.offsetWidth || 360;
-      const height = calculatorRef.current?.offsetHeight || 420;
-      const maxX = Math.max(12, window.innerWidth - width - 12);
-      const maxY = Math.max(12, window.innerHeight - height - 12);
-      const nextX = Math.min(Math.max(12, event.clientX - dragOffsetRef.current.x), maxX);
-      const nextY = Math.min(Math.max(12, event.clientY - dragOffsetRef.current.y), maxY);
-      setPosition({ x: nextX, y: nextY });
-    };
-
-    const stopDragging = () => setIsDragging(false);
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', stopDragging);
-
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', stopDragging);
-    };
-  }, [isDragging, isMobileLayout]);
-
-  useEffect(() => {
-    const keepInView = () => {
-      if (isMobileViewport()) {
-        return;
-      }
-
-      const width = calculatorRef.current?.offsetWidth || 360;
-      const height = calculatorRef.current?.offsetHeight || 420;
-      const maxX = Math.max(12, window.innerWidth - width - 12);
-      const maxY = Math.max(12, window.innerHeight - height - 12);
-      setPosition((current) => ({
-        x: Math.min(Math.max(12, current.x), maxX),
-        y: Math.min(Math.max(12, current.y), maxY),
-      }));
-    };
-
-    window.addEventListener('resize', keepInView);
-
-    return () => window.removeEventListener('resize', keepInView);
-  }, []);
-
-  const startDragging = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || isMobileLayout) {
-      return;
-    }
-    onFocus();
-
-    const rect = calculatorRef.current?.getBoundingClientRect();
-    if (!rect) {
-      return;
-    }
-
-    dragOffsetRef.current = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    };
-    setIsDragging(true);
-  };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const key = event.key.toLowerCase();
@@ -1331,20 +1252,22 @@ function CalculatorModal({ onClose, onFocus, zIndex }: { onClose: () => void; on
   };
 
   return (
-    <div className="pointer-events-none fixed inset-0" style={{ zIndex }}>
-      <div
-        ref={calculatorRef}
-        tabIndex={0}
-        onKeyDown={handleKeyDown}
-        onMouseDown={() => {
-          onFocus();
-          calculatorRef.current?.focus();
-        }}
-        className="pointer-events-auto fixed inset-0 flex h-[100dvh] w-full flex-col rounded-none bg-white p-3 shadow-2xl outline-none ring-1 ring-gray-200 transition-shadow focus:ring-2 focus:ring-accent dark:bg-gray-900 dark:ring-gray-800 md:inset-auto md:block md:h-auto md:w-[calc(100vw-1.5rem)] md:max-w-sm md:rounded-lg md:p-4"
-        style={isMobileLayout ? undefined : { left: position.x, top: position.y }}
-      >
+    <FloatingWindow
+      className="pointer-events-auto fixed inset-0 flex h-[100dvh] w-full flex-col rounded-none bg-white p-3 shadow-2xl outline-none ring-1 ring-gray-200 transition-shadow focus:ring-2 focus:ring-accent dark:bg-gray-900 dark:ring-gray-800 md:inset-auto md:block md:h-auto md:w-[calc(100vw-1.5rem)] md:max-w-sm md:rounded-lg md:p-4"
+      fallbackSize={{ width: 360, height: 420 }}
+      initialPosition={getInitialCalculatorPosition}
+      onFocus={() => {
+        onFocus();
+        calculatorRef.current?.focus();
+      }}
+      windowAttributes={{ tabIndex: 0, onKeyDown: handleKeyDown }}
+      windowRef={calculatorRef}
+      zIndex={zIndex}
+    >
+      {({ dragHandleProps, isDragging }) => (
+      <>
         <div
-          onPointerDown={startDragging}
+          {...dragHandleProps}
           className={`mb-4 flex select-none items-center justify-between border-b border-gray-200 pb-3 dark:border-gray-800 md:touch-none md:cursor-grab ${isDragging ? 'md:cursor-grabbing' : ''}`}
         >
           <div>
@@ -1385,8 +1308,9 @@ function CalculatorModal({ onClose, onFocus, zIndex }: { onClose: () => void; on
             =
           </button>
         </div>
-      </div>
-    </div>
+      </>
+      )}
+    </FloatingWindow>
   );
 }
 
@@ -2861,13 +2785,8 @@ function App() {
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
   const [activeFloatingApp, setActiveFloatingApp] = useState<'messages' | 'calendar' | 'calculator'>('messages');
-  const [messagesModalPosition, setMessagesModalPosition] = useState(getInitialMessagesModalPosition);
-  const [isDraggingMessagesModal, setIsDraggingMessagesModal] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [messageTargetUser, setMessageTargetUser] = useState<User | null>(null);
-  const [calendarModalPosition, setCalendarModalPosition] = useState(getInitialCalendarModalPosition);
-  const [isDraggingCalendarModal, setIsDraggingCalendarModal] = useState(false);
-  const [isMobileFloatingLayout, setIsMobileFloatingLayout] = useState(() => isMobileViewport());
   const [isAdminConsoleOpen, setIsAdminConsoleOpen] = useState(false);
   const [adminConsoleTab, setAdminConsoleTab] = useState<AdminConsoleTab>('general');
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
@@ -2879,13 +2798,8 @@ function App() {
 
   useEffect(() => {
     const collapseSidebarOnMobile = () => {
-      const isMobile = isMobileViewport();
-      setIsMobileFloatingLayout(isMobile);
-
-      if (isMobile) {
+      if (isMobileViewport()) {
         setIsSidebarCollapsed(true);
-        setIsDraggingMessagesModal(false);
-        setIsDraggingCalendarModal(false);
       }
     };
 
@@ -2893,84 +2807,6 @@ function App() {
     window.addEventListener('resize', collapseSidebarOnMobile);
 
     return () => window.removeEventListener('resize', collapseSidebarOnMobile);
-  }, []);
-
-  useEffect(() => {
-    if (!isDraggingMessagesModal || isMobileFloatingLayout) {
-      return undefined;
-    }
-
-    const handlePointerMove = (event: PointerEvent) => {
-      const width = messagesModalRef.current?.offsetWidth || Math.min(window.innerWidth - 16, 900);
-      const height = messagesModalRef.current?.offsetHeight || Math.min(window.innerHeight - 16, 680);
-      const maxX = Math.max(8, window.innerWidth - width - 8);
-      const maxY = Math.max(8, window.innerHeight - height - 8);
-      const nextX = Math.min(Math.max(8, event.clientX - messagesModalDragOffsetRef.current.x), maxX);
-      const nextY = Math.min(Math.max(8, event.clientY - messagesModalDragOffsetRef.current.y), maxY);
-      setMessagesModalPosition({ x: nextX, y: nextY });
-    };
-
-    const stopDragging = () => setIsDraggingMessagesModal(false);
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', stopDragging);
-
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', stopDragging);
-    };
-  }, [isDraggingMessagesModal, isMobileFloatingLayout]);
-
-  useEffect(() => {
-    if (!isDraggingCalendarModal || isMobileFloatingLayout) {
-      return undefined;
-    }
-
-    const handlePointerMove = (event: PointerEvent) => {
-      const width = calendarModalRef.current?.offsetWidth || Math.min(window.innerWidth - 16, 1120);
-      const height = calendarModalRef.current?.offsetHeight || Math.min(window.innerHeight - 16, 780);
-      const maxX = Math.max(8, window.innerWidth - width - 8);
-      const maxY = Math.max(8, window.innerHeight - height - 8);
-      const nextX = Math.min(Math.max(8, event.clientX - calendarModalDragOffsetRef.current.x), maxX);
-      const nextY = Math.min(Math.max(8, event.clientY - calendarModalDragOffsetRef.current.y), maxY);
-      setCalendarModalPosition({ x: nextX, y: nextY });
-    };
-
-    const stopDragging = () => setIsDraggingCalendarModal(false);
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', stopDragging);
-
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', stopDragging);
-    };
-  }, [isDraggingCalendarModal, isMobileFloatingLayout]);
-
-  useEffect(() => {
-    const keepFloatingModalsInView = () => {
-      const width = messagesModalRef.current?.offsetWidth || Math.min(window.innerWidth - 16, 900);
-      const height = messagesModalRef.current?.offsetHeight || Math.min(window.innerHeight - 16, 680);
-      const maxX = Math.max(8, window.innerWidth - width - 8);
-      const maxY = Math.max(8, window.innerHeight - height - 8);
-      setMessagesModalPosition((currentPosition) => ({
-        x: Math.min(Math.max(8, currentPosition.x), maxX),
-        y: Math.min(Math.max(8, currentPosition.y), maxY),
-      }));
-
-      const calendarWidth = calendarModalRef.current?.offsetWidth || Math.min(window.innerWidth - 16, 1120);
-      const calendarHeight = calendarModalRef.current?.offsetHeight || Math.min(window.innerHeight - 16, 780);
-      const calendarMaxX = Math.max(8, window.innerWidth - calendarWidth - 8);
-      const calendarMaxY = Math.max(8, window.innerHeight - calendarHeight - 8);
-      setCalendarModalPosition((currentPosition) => ({
-        x: Math.min(Math.max(8, currentPosition.x), calendarMaxX),
-        y: Math.min(Math.max(8, currentPosition.y), calendarMaxY),
-      }));
-    };
-
-    window.addEventListener('resize', keepFloatingModalsInView);
-
-    return () => window.removeEventListener('resize', keepFloatingModalsInView);
   }, []);
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const [bugReports, setBugReports] = useState<BugReport[]>([]);
@@ -2983,10 +2819,6 @@ function App() {
   const rateLimitToastRef = useRef(0);
   const notificationRequestRef = useRef(0);
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
-  const messagesModalRef = useRef<HTMLDivElement | null>(null);
-  const messagesModalDragOffsetRef = useRef({ x: 0, y: 0 });
-  const calendarModalRef = useRef<HTMLDivElement | null>(null);
-  const calendarModalDragOffsetRef = useRef({ x: 0, y: 0 });
 
   const showToast = (type: ToastType, message: string, options: { saveToNotifications?: boolean } = {}) => {
     if (/too many|rate limit/iu.test(message)) {
@@ -3609,9 +3441,6 @@ function App() {
   };
 
   const openMessagesModal = () => {
-    if (!isMessagesModalOpen) {
-      setMessagesModalPosition(getInitialMessagesModalPosition());
-    }
     announceFloatingFocus('messages');
     setActiveFloatingApp('messages');
     setIsMessagesModalOpen(true);
@@ -3642,48 +3471,7 @@ function App() {
     openMessagesModal();
   };
 
-  const startDraggingMessagesModal = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || isMobileFloatingLayout) {
-      return;
-    }
-    announceFloatingFocus('messages');
-    setActiveFloatingApp('messages');
-
-    const rect = messagesModalRef.current?.getBoundingClientRect();
-    if (!rect) {
-      return;
-    }
-
-    messagesModalDragOffsetRef.current = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    };
-    setIsDraggingMessagesModal(true);
-  };
-
-  const startDraggingCalendarModal = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || isMobileFloatingLayout) {
-      return;
-    }
-    announceFloatingFocus('calendar');
-    setActiveFloatingApp('calendar');
-
-    const rect = calendarModalRef.current?.getBoundingClientRect();
-    if (!rect) {
-      return;
-    }
-
-    calendarModalDragOffsetRef.current = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    };
-    setIsDraggingCalendarModal(true);
-  };
-
   const openCalendarModal = () => {
-    if (!isCalendarModalOpen) {
-      setCalendarModalPosition(getInitialCalendarModalPosition());
-    }
     announceFloatingFocus('calendar');
     setActiveFloatingApp('calendar');
     setIsCalendarModalOpen(true);
@@ -4308,19 +4096,22 @@ function App() {
             }}
           />
           {isMessagesModalOpen && currentUser && (
-            <div className="pointer-events-none fixed inset-0" style={{ zIndex: activeFloatingApp === 'messages' ? 95 : 55 }}>
-              <div
-                ref={messagesModalRef}
-                className={getModalWindowClass(closingModal === 'messages', `pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[72dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(420px,calc(100dvh-1rem))] md:w-[min(900px,calc(100vw-1rem))] md:min-w-[min(360px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4 ${isDraggingMessagesModal ? 'md:cursor-grabbing' : ''}`)}
-                style={isMobileFloatingLayout ? undefined : { left: messagesModalPosition.x, top: messagesModalPosition.y }}
-                onMouseDownCapture={() => {
-                  announceFloatingFocus('messages');
-                  setActiveFloatingApp('messages');
-                }}
-              >
+            <FloatingWindow
+              className="pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[72dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(420px,calc(100dvh-1rem))] md:w-[min(900px,calc(100vw-1rem))] md:min-w-[min(360px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4"
+              fallbackSize={{ width: Math.min(window.innerWidth - 16, 900), height: Math.min(window.innerHeight - 16, 680) }}
+              initialPosition={getInitialMessagesModalPosition}
+              isClosing={closingModal === 'messages'}
+              onFocus={() => {
+                announceFloatingFocus('messages');
+                setActiveFloatingApp('messages');
+              }}
+              zIndex={activeFloatingApp === 'messages' ? 95 : 55}
+            >
+              {({ dragHandleProps, isDragging }) => (
+              <>
                 <div
-                  onPointerDown={startDraggingMessagesModal}
-                  className={`mb-3 flex select-none items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800 md:touch-none md:cursor-grab ${isDraggingMessagesModal ? 'md:cursor-grabbing' : ''}`}
+                  {...dragHandleProps}
+                  className={`mb-3 flex select-none items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800 md:touch-none md:cursor-grab ${isDragging ? 'md:cursor-grabbing' : ''}`}
                 >
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Messages</h2>
@@ -4342,23 +4133,27 @@ function App() {
                     <MessageInboxPage currentUser={currentUser} onToast={showToast} isModalView targetRecipient={messageTargetUser} />
                   </Suspense>
                 </div>
-              </div>
-            </div>
+              </>
+              )}
+            </FloatingWindow>
           )}
           {isCalendarModalOpen && currentUser && (
-            <div className="pointer-events-none fixed inset-0" style={{ zIndex: activeFloatingApp === 'calendar' ? 95 : 55 }}>
-              <div
-                ref={calendarModalRef}
-                className={getModalWindowClass(closingModal === 'calendar', `pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[82dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(480px,calc(100dvh-1rem))] md:w-[min(1120px,calc(100vw-1rem))] md:min-w-[min(420px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4 ${isDraggingCalendarModal ? 'md:cursor-grabbing' : ''}`)}
-                style={isMobileFloatingLayout ? undefined : { left: calendarModalPosition.x, top: calendarModalPosition.y }}
-                onMouseDownCapture={() => {
-                  announceFloatingFocus('calendar');
-                  setActiveFloatingApp('calendar');
-                }}
-              >
+            <FloatingWindow
+              className="pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[82dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(480px,calc(100dvh-1rem))] md:w-[min(1120px,calc(100vw-1rem))] md:min-w-[min(420px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4"
+              fallbackSize={{ width: Math.min(window.innerWidth - 16, 1120), height: Math.min(window.innerHeight - 16, 780) }}
+              initialPosition={getInitialCalendarModalPosition}
+              isClosing={closingModal === 'calendar'}
+              onFocus={() => {
+                announceFloatingFocus('calendar');
+                setActiveFloatingApp('calendar');
+              }}
+              zIndex={activeFloatingApp === 'calendar' ? 95 : 55}
+            >
+              {({ dragHandleProps, isDragging }) => (
+              <>
                 <div
-                  onPointerDown={startDraggingCalendarModal}
-                  className={`mb-3 flex select-none items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800 md:touch-none md:cursor-grab ${isDraggingCalendarModal ? 'md:cursor-grabbing' : ''}`}
+                  {...dragHandleProps}
+                  className={`mb-3 flex select-none items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800 md:touch-none md:cursor-grab ${isDragging ? 'md:cursor-grabbing' : ''}`}
                 >
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Calendar</h2>
@@ -4380,8 +4175,9 @@ function App() {
                     <CalendarPage currentUser={currentUser} onOpenCalculator={openCalculator} onAccountUpdate={handleAccountUpdate} onToast={showToast} useMilitaryTime={messagePreferences.useMilitaryTime} isFloatingApp />
                   </Suspense>
                 </div>
-              </div>
-            </div>
+              </>
+              )}
+            </FloatingWindow>
           )}
           {isProfileModalOpen && currentUser && (
             <div className={getModalBackdropClass(closingModal === 'profile')}>
