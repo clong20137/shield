@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation,
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { FloatingWindow } from './components/FloatingWindow';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, getAppEventsUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, setAuthToken, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, getAppEventsUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
@@ -187,7 +187,6 @@ function LoginSplash({
   const [isMicrosoftSsoEnabled, setIsMicrosoftSsoEnabled] = useState(false);
   const [inviteToken] = useState(() => new URLSearchParams(window.location.search).get('invite') || '');
   const [resetToken] = useState(() => new URLSearchParams(window.location.search).get('reset') || '');
-  const [ssoToken] = useState(() => new URLSearchParams(window.location.search).get('ssoToken') || '');
   const [ssoError] = useState(() => new URLSearchParams(window.location.search).get('ssoError') || '');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -227,31 +226,8 @@ function LoginSplash({
       setError(ssoError);
       onToast('error', ssoError);
       window.history.replaceState({}, document.title, window.location.pathname);
-      return;
     }
-
-    if (!ssoToken) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
-    setAuthToken(ssoToken);
-    authService.getSession()
-      .then((response) => {
-        if (response.data.account) {
-          onLogin(response.data.account);
-        }
-        window.history.replaceState({}, document.title, window.location.pathname);
-      })
-      .catch((err) => {
-        clearAuthToken();
-        const message = getErrorMessage(err, 'Microsoft sign in failed.');
-        setError(message);
-        onToast('error', message);
-      })
-      .finally(() => setIsSubmitting(false));
-  }, [onLogin, onToast, ssoError, ssoToken]);
+  }, [onToast, ssoError]);
 
   useEffect(() => {
     const cleanCode = twoFactorCode.replace(/[^A-Z0-9]/giu, '');
@@ -364,9 +340,6 @@ function LoginSplash({
       }
 
       if (response.data.account) {
-        if (response.data.token) {
-          setAuthToken(response.data.token);
-        }
         onLogin(response.data.account);
       }
     } catch (err) {
@@ -3182,7 +3155,7 @@ function App() {
     window.addEventListener('shield:messages-updated', loadUnreadCount);
 
     const eventsUrl = getMessageEventsUrl();
-    const eventSource = eventsUrl ? new EventSource(eventsUrl) : null;
+    const eventSource = new EventSource(eventsUrl, { withCredentials: true });
     const handleRealtimeMessageUpdate = () => loadUnreadCount();
     eventSource?.addEventListener('message-created', handleRealtimeMessageUpdate);
     eventSource?.addEventListener('message-read', handleRealtimeMessageUpdate);
@@ -3205,6 +3178,7 @@ function App() {
         if (response.data.account) {
           setCurrentUser(response.data.account);
           setIsAuthenticated(true);
+          clearAuthToken();
           window.localStorage.setItem(SESSION_KEY, JSON.stringify(response.data.account));
           void syncSessionTimeoutFromSettings();
 
@@ -3224,6 +3198,7 @@ function App() {
   }, [syncSessionTimeoutFromSettings]);
 
   const handleLogin = (account: AuthAccount) => {
+    clearAuthToken();
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(account));
     setCurrentUser(account);
     setNotifications([]);
@@ -3359,10 +3334,7 @@ function App() {
     }
 
     const eventsUrl = getAppEventsUrl();
-    const eventSource = eventsUrl ? new EventSource(eventsUrl) : null;
-    if (!eventSource) {
-      return;
-    }
+    const eventSource = new EventSource(eventsUrl, { withCredentials: true });
 
     const dispatchAppUpdate = (name: string, detail?: Record<string, unknown>) => {
       window.dispatchEvent(new CustomEvent(`shield:${name}`, { detail }));

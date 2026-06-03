@@ -1,5 +1,4 @@
 import { NextFunction, Request, Response } from 'express';
-import { getBearerToken } from './authSession';
 
 interface CsrfProtectionOptions {
   allowedOrigins: string[];
@@ -32,8 +31,6 @@ export function csrfProtection({ allowedOrigins }: CsrfProtectionOptions) {
 
     const origin = req.get('origin');
     const site = req.get('sec-fetch-site');
-    const hasCookie = Boolean(req.get('cookie'));
-    const hasBearerToken = Boolean(getBearerToken(req));
 
     if (origin && !isAllowedOrigin(origin, allowedOrigins)) {
       return res.status(403).json({ error: 'Origin not allowed' });
@@ -41,10 +38,6 @@ export function csrfProtection({ allowedOrigins }: CsrfProtectionOptions) {
 
     if ((site === 'cross-site' || site === 'same-site') && origin && !isAllowedOrigin(origin, allowedOrigins)) {
       return res.status(403).json({ error: 'Cross-site request blocked' });
-    }
-
-    if (hasCookie && !hasBearerToken) {
-      return res.status(403).json({ error: 'Bearer token required for credentialed requests' });
     }
 
     return next();

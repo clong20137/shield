@@ -6,12 +6,13 @@ import { AuthPasswordResetModel } from '../models/AuthPasswordReset';
 import { AuthSessionModel } from '../models/AuthSession';
 import { AuditLogModel } from '../models/AuditLog';
 import { SystemSettingModel } from '../models/SystemSetting';
-import { getBearerToken, getSessionAccount } from '../middleware/authSession';
+import { AUTH_SESSION_COOKIE_NAME, getSessionAccount, getSessionToken } from '../middleware/authSession';
 import { broadcastAppEvent } from '../services/appEvents';
 import { sendEmail } from '../services/emailService';
 import { cleanMultiline, cleanString, isOneOf, isStrongPassword, isValidEmail, normalizeEmail } from '../utils/validation';
 
 const DEFAULT_LOGIN_WARNING_MESSAGE = 'This is a Indiana State Police computer application system that is for Official use only. This system is subject to monitoring. Therefore, no expectation of privacy is to be assumed. Individuals found performing unauthorized activities may be subject to disciplinary action including criminal prosecution.';
+const SESSION_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 const allowedPermissions = [
   'users:view',
@@ -177,9 +178,34 @@ function getSafeReturnTo(value: unknown): string {
   return raw.startsWith('/') ? raw : '/';
 }
 
-function appendQueryParam(path: string, key: string, value: string): string {
-  const separator = path.includes('?') ? '&' : '?';
-  return `${path}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+function getSessionCookieSameSite(): 'lax' | 'strict' | 'none' {
+  const value = (process.env.SESSION_COOKIE_SAMESITE || 'lax').trim().toLowerCase();
+  return value === 'strict' || value === 'none' ? value : 'lax';
+}
+
+function shouldUseSecureSessionCookie(req: Request): boolean {
+  return process.env.SESSION_COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production' || req.secure;
+}
+
+function setSessionCookie(req: Request, res: Response, token: string) {
+  const sameSite = getSessionCookieSameSite();
+  res.cookie(AUTH_SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: sameSite === 'none' ? true : shouldUseSecureSessionCookie(req),
+    sameSite,
+    maxAge: SESSION_COOKIE_MAX_AGE_MS,
+    path: '/',
+  });
+}
+
+function clearSessionCookie(req: Request, res: Response) {
+  const sameSite = getSessionCookieSameSite();
+  res.clearCookie(AUTH_SESSION_COOKIE_NAME, {
+    httpOnly: true,
+    secure: sameSite === 'none' ? true : shouldUseSecureSessionCookie(req),
+    sameSite,
+    path: '/',
+  });
 }
 
 async function exchangeMicrosoftCode(code: string, req: Request): Promise<{ id: string; email: string; displayName: string }> {
@@ -314,6 +340,7 @@ export class AuthController {
         await AuthInviteModel.markAccepted(inviteId);
       }
       const token = await AuthSessionModel.createSession(account.id);
+      setSessionCookie(req, res, token);
       broadcastAppEvent({ type: 'user-updated', entityId: account.id });
       broadcastAppEvent({ type: 'dashboard-updated', entityId: account.id });
       await AuditLogModel.create({
@@ -325,7 +352,7 @@ export class AuthController {
         details: JSON.stringify({ email: account.email, role: account.role, inviteAccepted: Boolean(inviteId) }),
         ...requestAuditFields(req),
       });
-      res.status(201).json({ account: await withPermissions(account), token });
+      res.status(201).json({ account: await withPermissions(account) });
     } catch (error) {
       if (isDuplicateEmailError(error)) {
         return res.status(409).json({ error: 'An account already exists for that email' });
@@ -404,6 +431,7 @@ export class AuthController {
       }
 
       const token = await AuthSessionModel.createSession(result.account.id);
+      setSessionCookie(req, res, token);
       await AuditLogModel.create({
         actorId: result.account.id,
         actorName: result.account.displayName || result.account.email,
@@ -413,7 +441,7 @@ export class AuthController {
         details: JSON.stringify({ email: result.account.email, twoFactor: Boolean(result.account.twoFactorEnabled) }),
         ...requestAuditFields(req),
       });
-      res.json({ account: await withPermissions(result.account), token });
+      res.json({ account: await withPermissions(result.account) });
     } catch (error) {
       console.error('Login error:', error);
       res.status(500).json({ error: 'Failed to sign in' });
@@ -496,6 +524,7 @@ export class AuthController {
       }
 
       const token = await AuthSessionModel.createSession(account.id);
+      setSessionCookie(req, res, token);
       await AuditLogModel.create({
         actorId: account.id,
         actorName: account.displayName || account.email,
@@ -506,7 +535,7 @@ export class AuthController {
         ...requestAuditFields(req),
       });
 
-      return res.redirect(`${appBaseUrl}${appendQueryParam(returnTo || '/', 'ssoToken', token)}`);
+      return res.redirect(`${appBaseUrl}${returnTo || '/'}`);
     } catch (error) {
       console.error('Microsoft SSO callback error:', error);
       return redirectWithError('Microsoft sign in failed. Use local login or contact an administrator.');
@@ -652,9 +681,14 @@ export class AuthController {
   static async getSession(req: Request, res: Response) {
     try {
       const account = await getSessionAccount(req);
+      const token = getSessionToken(req);
 
       if (!account) {
         return res.status(401).json({ error: 'Session expired or invalid' });
+      }
+
+      if (token) {
+        setSessionCookie(req, res, token);
       }
 
       res.json({ account: await withPermissions(account) });
@@ -666,12 +700,13 @@ export class AuthController {
 
   static async logout(req: Request, res: Response) {
     try {
-      const token = getBearerToken(req);
+      const token = getSessionToken(req);
       const account = await getSessionAccount(req);
 
       if (token) {
         await AuthSessionModel.revokeToken(token);
       }
+      clearSessionCookie(req, res);
 
       await AuditLogModel.create({
         actorId: account?.id || null,
@@ -692,7 +727,7 @@ export class AuthController {
   static async listSessions(req: Request, res: Response) {
     try {
       const account = await getSessionAccount(req);
-      const token = getBearerToken(req);
+      const token = getSessionToken(req);
 
       if (!account) {
         return res.status(401).json({ error: 'Sign in required' });
@@ -737,7 +772,7 @@ export class AuthController {
   static async revokeOtherSessions(req: Request, res: Response) {
     try {
       const account = await getSessionAccount(req);
-      const token = getBearerToken(req);
+      const token = getSessionToken(req);
       if (!account || !token) {
         return res.status(401).json({ error: 'Sign in required' });
       }

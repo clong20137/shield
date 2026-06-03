@@ -33,22 +33,24 @@ const ASSET_ORIGIN_URL = (() => {
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 8000,
+  withCredentials: true,
 });
 
 const AUTH_TOKEN_KEY = 'shield_auth_token';
 
 api.interceptors.request.use((config) => {
-  const token = window.localStorage.getItem(AUTH_TOKEN_KEY);
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  const legacyToken = window.localStorage.getItem(AUTH_TOKEN_KEY);
+  if (legacyToken) {
+    config.headers.Authorization = `Bearer ${legacyToken}`;
   }
 
   return config;
 });
 
 export function setAuthToken(token: string) {
-  window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+  if (token) {
+    window.localStorage.removeItem(AUTH_TOKEN_KEY);
+  }
 }
 
 export function clearAuthToken() {
@@ -56,17 +58,16 @@ export function clearAuthToken() {
 }
 
 export function getAuthToken(): string | null {
-  return window.localStorage.getItem(AUTH_TOKEN_KEY);
+  window.localStorage.removeItem(AUTH_TOKEN_KEY);
+  return null;
 }
 
-export function getMessageEventsUrl(): string | null {
-  const token = getAuthToken();
-  return token ? `${API_BASE_URL}/messages/events?token=${encodeURIComponent(token)}` : null;
+export function getMessageEventsUrl(): string {
+  return `${API_BASE_URL}/messages/events`;
 }
 
-export function getAppEventsUrl(): string | null {
-  const token = getAuthToken();
-  return token ? `${API_BASE_URL}/events?token=${encodeURIComponent(token)}` : null;
+export function getAppEventsUrl(): string {
+  return `${API_BASE_URL}/events`;
 }
 
 export function getAssetUrl(value?: string | null): string {

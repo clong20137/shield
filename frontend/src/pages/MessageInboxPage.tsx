@@ -260,7 +260,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   useEffect(() => {
     loadMessages(true);
     const eventsUrl = getMessageEventsUrl();
-    const eventSource = eventsUrl ? new EventSource(eventsUrl) : null;
+    const eventSource = new EventSource(eventsUrl, { withCredentials: true });
     const handleRealtimeMessageUpdate = () => loadMessages(false);
     const handleMessageUpdate = (event: MessageEvent<string>) => {
       try {

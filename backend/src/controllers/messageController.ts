@@ -1,18 +1,16 @@
 import { Request, Response } from 'express';
 import { AuthAccountModel } from '../models/AuthAccount';
-import { AuthSessionModel } from '../models/AuthSession';
 import { UserMessageModel } from '../models/UserMessage';
 import { addMessageEventClient, broadcastMessageEvent } from '../services/messageEvents';
 import { notifyMentions } from '../services/mentionService';
 import { cleanMultiline, cleanString } from '../utils/validation';
-import { isWellFormedSessionToken } from '../middleware/authSession';
+import { getSessionAccount } from '../middleware/authSession';
 import { parsePagination } from '../utils/pagination';
 
 export class MessageController {
   static async streamEvents(req: Request, res: Response) {
     try {
-      const token = typeof req.query.token === 'string' && isWellFormedSessionToken(req.query.token) ? req.query.token : '';
-      const account = token ? await AuthSessionModel.getAccountForToken(token) : null;
+      const account = await getSessionAccount(req);
 
       if (!account) {
         return res.status(401).json({ error: 'Session expired or invalid' });
