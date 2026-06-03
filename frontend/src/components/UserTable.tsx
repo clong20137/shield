@@ -10,6 +10,8 @@ interface UserTableProps {
   onEdit?: (user: User) => void;
   onDelete?: (userId: string) => void;
   canEdit?: boolean;
+  selectedUserIds?: string[];
+  onSelectionChange?: (userIds: string[]) => void;
 }
 
 export const UserTable: React.FC<UserTableProps> = ({
@@ -19,8 +21,40 @@ export const UserTable: React.FC<UserTableProps> = ({
   onEdit,
   onDelete,
   canEdit = false,
+  selectedUserIds = [],
+  onSelectionChange,
 }) => {
   const [userPendingDelete, setUserPendingDelete] = useState<User | null>(null);
+  const selectedUserIdSet = new Set(selectedUserIds);
+  const canSelectUsers = Boolean(onSelectionChange);
+  const allVisibleSelected = users.length > 0 && users.every((user) => selectedUserIdSet.has(user.id));
+
+  const toggleVisibleUsers = (checked: boolean) => {
+    if (!onSelectionChange) {
+      return;
+    }
+
+    if (checked) {
+      onSelectionChange(Array.from(new Set([...selectedUserIds, ...users.map((user) => user.id)])));
+      return;
+    }
+
+    const visibleUserIds = new Set(users.map((user) => user.id));
+    onSelectionChange(selectedUserIds.filter((userId) => !visibleUserIds.has(userId)));
+  };
+
+  const toggleUser = (userId: string, checked: boolean) => {
+    if (!onSelectionChange) {
+      return;
+    }
+
+    if (checked) {
+      onSelectionChange(Array.from(new Set([...selectedUserIds, userId])));
+      return;
+    }
+
+    onSelectionChange(selectedUserIds.filter((selectedUserId) => selectedUserId !== userId));
+  };
 
   if (loading) {
     return <div className="loading">Loading users...</div>;
@@ -37,6 +71,17 @@ export const UserTable: React.FC<UserTableProps> = ({
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-primary-500 text-white">
+              {canSelectUsers && (
+                <th className="w-12 px-4 py-3 text-left font-semibold border-b-2 border-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={(event) => toggleVisibleUsers(event.target.checked)}
+                    className="h-4 w-4 rounded border-white/70 text-accent focus:ring-accent"
+                    aria-label={allVisibleSelected ? 'Clear visible selected users' : 'Select visible users'}
+                  />
+                </th>
+              )}
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Last Name</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">First Name</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">PE #</th>
@@ -52,11 +97,25 @@ export const UserTable: React.FC<UserTableProps> = ({
                 key={user.id}
                 onClick={() => onUserSelect?.(user)}
                 className={`border-b border-gray-300 transition cursor-pointer dark:border-gray-800 ${
-                  isImportantRank(user.rank)
+                  selectedUserIdSet.has(user.id)
+                    ? 'bg-accent/10 hover:bg-accent/15 dark:bg-accent/15 dark:hover:bg-accent/20'
+                    : isImportantRank(user.rank)
                     ? 'bg-accent/5 hover:bg-accent/10 dark:bg-accent/10 dark:hover:bg-accent/15'
                     : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                 }`}
               >
+                {canSelectUsers && (
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedUserIdSet.has(user.id)}
+                      onChange={(event) => toggleUser(user.id, event.target.checked)}
+                      onClick={(event) => event.stopPropagation()}
+                      className="h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent dark:border-gray-700"
+                      aria-label={`Select ${user.firstName} ${user.lastName}`}
+                    />
+                  </td>
+                )}
                 <td className="px-4 py-3">
                   <div className="flex min-w-0 items-center gap-3">
                     <img

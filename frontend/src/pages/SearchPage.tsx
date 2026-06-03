@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
-import { Camera, Save, Send, X } from 'lucide-react';
+import { Camera, Download, MessageSquare, Save, Send, Users, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { useSearchParams } from 'react-router-dom';
 import { AuthAccount, AuthRole, authService, getAssetUrl, handleAssetImageError, messageService, userService, User, UserFilters } from '../services/api';
@@ -13,6 +13,15 @@ import { districtOptions } from '../constants/districts';
 interface SearchPageProps {
   currentUser: AuthAccount | null;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
+}
+
+type BulkActionMode = 'message' | 'update' | null;
+
+interface BulkUpdateForm {
+  rank: string;
+  district: string;
+  status: string;
+  isActive: string;
 }
 
 function formatPhoneNumber(value: string): string {
@@ -62,6 +71,13 @@ const userUpdateFields = [
   'receivesMessages',
 ] as const satisfies readonly (keyof User)[];
 
+const defaultBulkUpdateForm: BulkUpdateForm = {
+  rank: '',
+  district: '',
+  status: '',
+  isActive: '',
+};
+
 function getErrorMessage(error: unknown, fallback: string): string {
   if (axios.isAxiosError(error)) {
     const message = error.response?.data?.error;
@@ -71,6 +87,50 @@ function getErrorMessage(error: unknown, fallback: string): string {
   }
 
   return fallback;
+}
+
+function csvCell(value: unknown): string {
+  const stringValue = value === null || value === undefined ? '' : String(value);
+  return `"${stringValue.replace(/"/gu, '""')}"`;
+}
+
+function downloadUsersCsv(users: User[]) {
+  const headers = [
+    'Last Name',
+    'First Name',
+    'Email',
+    'PE Number',
+    'PeopleSoft ID',
+    'Rank',
+    'District',
+    'Status',
+    'Employment Type',
+    'Department Phone',
+    'Personal Phone',
+  ];
+  const rows = users.map((user) => [
+    user.lastName,
+    user.firstName,
+    user.email,
+    user.peNumber,
+    user.peopleSoftId,
+    user.rank,
+    user.district,
+    user.status,
+    user.employmentType,
+    user.departmentPhoneNumber,
+    user.personalPhoneNumber,
+  ]);
+  const csv = [headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `shield-selected-users-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function isMobileViewport() {
@@ -88,6 +148,7 @@ function getInitialProfileWindowPosition() {
 const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [profileWindowPosition, setProfileWindowPosition] = useState(getInitialProfileWindowPosition);
   const [isProfileDragging, setIsProfileDragging] = useState(false);
@@ -100,6 +161,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [messageBody, setMessageBody] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [bulkActionMode, setBulkActionMode] = useState<BulkActionMode>(null);
+  const [bulkMessageSubject, setBulkMessageSubject] = useState('');
+  const [bulkMessageBody, setBulkMessageBody] = useState('');
+  const [bulkUpdateForm, setBulkUpdateForm] = useState<BulkUpdateForm>(defaultBulkUpdateForm);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState<Partial<User>>({});
   const [supervisorOptions, setSupervisorOptions] = useState<User[]>([]);
@@ -117,6 +183,14 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const selectedUserId = useMemo(() => searchParams.get('userId') ?? '', [searchParams]);
   const isAdministrator = currentUser?.role === 'administrator';
   const canEditProfilePictures = isAdministrator || currentUser?.permissions?.includes('users:profile-picture');
+  const selectedUsers = useMemo(
+    () => users.filter((user) => selectedUserIds.includes(user.id)),
+    [selectedUserIds, users],
+  );
+  const eligibleBulkMessageCount = useMemo(
+    () => selectedUsers.filter((user) => user.id !== currentUser?.id && user.receivesMessages !== false).length,
+    [currentUser?.id, selectedUsers],
+  );
 
   useEffect(() => {
     const syncProfileLayout = () => {
@@ -142,6 +216,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     window.addEventListener('shield:floating-focus', handleFloatingFocus);
     return () => window.removeEventListener('shield:floating-focus', handleFloatingFocus);
   }, []);
+
+  useEffect(() => {
+    const currentUserIds = new Set(users.map((user) => user.id));
+    setSelectedUserIds((currentIds) => currentIds.filter((userId) => currentUserIds.has(userId)));
+  }, [users]);
 
   useEffect(() => {
     if (!isProfileDragging || isMobileProfileLayout) {
@@ -473,6 +552,123 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     setMessageBody((body) => `${body}${emojiData.emoji}`);
   };
 
+  const closeBulkAction = () => {
+    setBulkActionMode(null);
+    setBulkMessageSubject('');
+    setBulkMessageBody('');
+    setBulkUpdateForm(defaultBulkUpdateForm);
+    setIsBulkProcessing(false);
+  };
+
+  const exportSelectedUsers = () => {
+    if (selectedUsers.length === 0) {
+      onToast('error', 'Select at least one user first.');
+      return;
+    }
+
+    downloadUsersCsv(selectedUsers);
+    onToast('success', `Exported ${selectedUsers.length} selected user${selectedUsers.length === 1 ? '' : 's'}.`);
+  };
+
+  const handleBulkMessage = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!currentUser) {
+      onToast('error', 'You must be signed in to send messages.');
+      return;
+    }
+
+    if (!bulkMessageSubject.trim() || !bulkMessageBody.trim()) {
+      onToast('error', 'Enter a subject and message.');
+      return;
+    }
+
+    const recipients = selectedUsers.filter((user) => user.id !== currentUser.id && user.receivesMessages !== false);
+
+    if (recipients.length === 0) {
+      onToast('error', 'No selected users can receive messages.');
+      return;
+    }
+
+    setIsBulkProcessing(true);
+
+    try {
+      await Promise.all(
+        recipients.map((recipient) =>
+          messageService.send({
+            senderAccountId: currentUser.id,
+            recipientUserId: recipient.id,
+            subject: bulkMessageSubject,
+            body: bulkMessageBody,
+          }),
+        ),
+      );
+      onToast('success', `Message sent to ${recipients.length} user${recipients.length === 1 ? '' : 's'}.`);
+      closeBulkAction();
+    } catch (err) {
+      console.error(err);
+      onToast('error', 'Failed to send bulk message.');
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const handleBulkUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!isAdministrator) {
+      onToast('error', 'Administrator permission required.');
+      return;
+    }
+
+    const updates: Partial<User> = {};
+
+    if (bulkUpdateForm.rank) {
+      updates.rank = bulkUpdateForm.rank;
+    }
+
+    if (bulkUpdateForm.district) {
+      updates.district = bulkUpdateForm.district;
+    }
+
+    if (bulkUpdateForm.status) {
+      updates.status = bulkUpdateForm.status;
+    }
+
+    if (bulkUpdateForm.isActive) {
+      updates.isActive = bulkUpdateForm.isActive === 'true';
+    }
+
+    if (Object.keys(updates).length === 0) {
+      onToast('error', 'Choose at least one field to update.');
+      return;
+    }
+
+    setIsBulkProcessing(true);
+
+    try {
+      await Promise.all(selectedUsers.map((user) => userService.update(user.id, updates)));
+      const refreshedUsers = await Promise.all(selectedUsers.map((user) => userService.getById(user.id)));
+      const updatedUsers = refreshedUsers.map((response) => response.data as User);
+      const updatedUserMap = new Map(updatedUsers.map((user) => [user.id, user]));
+      setUsers((currentUsers) =>
+        currentUsers.map((user) => updatedUserMap.get(user.id) || user),
+      );
+
+      if (selectedUser && updatedUserMap.has(selectedUser.id)) {
+        setSelectedUser(updatedUserMap.get(selectedUser.id) || selectedUser);
+      }
+
+      onToast('success', `Updated ${updatedUsers.length} user${updatedUsers.length === 1 ? '' : 's'}.`);
+      closeBulkAction();
+    } catch (err) {
+      console.error(err);
+      onToast('error', getErrorMessage(err, 'Failed to update selected users.'));
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
   const openMessageThread = (user: User) => {
     window.dispatchEvent(new CustomEvent('shield:open-message-thread', { detail: user }));
   };
@@ -587,6 +783,39 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
         placeholder="Search by email, name, PE #, district, badge, radio, phone, or ID..."
       />
 
+      {selectedUsers.length > 0 && (
+        <div className="mb-4 flex flex-col gap-3 rounded-lg border border-primary-100 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="font-semibold text-primary-500 dark:text-blue-100">
+              {selectedUsers.length} selected
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Bulk actions apply to the currently selected search results.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={exportSelectedUsers} className="btn-secondary" aria-label="Export selected users" title="Export selected users">
+              <Download size={16} />
+              <span>CSV</span>
+            </button>
+            <button type="button" onClick={() => setBulkActionMode('message')} className="btn-primary" aria-label="Message selected users" title="Message selected users">
+              <MessageSquare size={16} />
+              <span>Message</span>
+            </button>
+            {isAdministrator && (
+              <button type="button" onClick={() => setBulkActionMode('update')} className="btn-primary" aria-label="Bulk update selected users" title="Bulk update selected users">
+                <Users size={16} />
+                <span>Update</span>
+              </button>
+            )}
+            <button type="button" onClick={() => setSelectedUserIds([])} className="btn-secondary" aria-label="Clear selected users" title="Clear selected users">
+              <X size={16} />
+              <span>Clear</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       <UserTable
         users={users}
         loading={loading}
@@ -594,7 +823,128 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
         onEdit={openEditUser}
         onDelete={handleDelete}
         canEdit={isAdministrator}
+        selectedUserIds={selectedUserIds}
+        onSelectionChange={setSelectedUserIds}
       />
+
+      {bulkActionMode === 'message' && (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/45 p-4">
+          <form onSubmit={handleBulkMessage} className="w-full max-w-2xl rounded-lg bg-white shadow-2xl ring-1 ring-black/10 dark:bg-gray-900 dark:ring-white/10">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Message Selected Users</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Sending to {eligibleBulkMessageCount} eligible user{eligibleBulkMessageCount === 1 ? '' : 's'}.
+                </p>
+              </div>
+              <button type="button" onClick={closeBulkAction} className="icon-close-button" aria-label="Close bulk message" title="Close">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-4 p-5">
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Subject</span>
+                <input
+                  value={bulkMessageSubject}
+                  onChange={(event) => setBulkMessageSubject(event.target.value)}
+                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Message</span>
+                <textarea
+                  value={bulkMessageBody}
+                  onChange={(event) => setBulkMessageBody(event.target.value)}
+                  className="min-h-44 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                />
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-4 dark:border-gray-800">
+              <button type="button" onClick={closeBulkAction} className="btn-secondary" disabled={isBulkProcessing}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={isBulkProcessing}>
+                <Send size={16} />
+                <span>{isBulkProcessing ? 'Sending' : 'Send'}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {bulkActionMode === 'update' && (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/45 p-4">
+          <form onSubmit={handleBulkUpdate} className="w-full max-w-3xl rounded-lg bg-white shadow-2xl ring-1 ring-black/10 dark:bg-gray-900 dark:ring-white/10">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Bulk Update Users</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Leave fields blank to keep existing values.
+                </p>
+              </div>
+              <button type="button" onClick={closeBulkAction} className="icon-close-button" aria-label="Close bulk update" title="Close">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Rank</span>
+                <select
+                  value={bulkUpdateForm.rank}
+                  onChange={(event) => setBulkUpdateForm((form) => ({ ...form, rank: event.target.value }))}
+                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                >
+                  <option value="">No change</option>
+                  {rankOptions.filter(Boolean).map((rank) => <option key={rank} value={rank}>{rank}</option>)}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">District</span>
+                <select
+                  value={bulkUpdateForm.district}
+                  onChange={(event) => setBulkUpdateForm((form) => ({ ...form, district: event.target.value }))}
+                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                >
+                  <option value="">No change</option>
+                  {districtOptions.map((district) => <option key={district} value={district}>{district}</option>)}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Status</span>
+                <select
+                  value={bulkUpdateForm.status}
+                  onChange={(event) => setBulkUpdateForm((form) => ({ ...form, status: event.target.value }))}
+                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                >
+                  <option value="">No change</option>
+                  {['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Administrative Duty', 'Inactive'].map((status) => <option key={status} value={status}>{status}</option>)}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Login Access</span>
+                <select
+                  value={bulkUpdateForm.isActive}
+                  onChange={(event) => setBulkUpdateForm((form) => ({ ...form, isActive: event.target.value }))}
+                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                >
+                  <option value="">No change</option>
+                  <option value="true">Active</option>
+                  <option value="false">Inactive</option>
+                </select>
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-4 dark:border-gray-800">
+              <button type="button" onClick={closeBulkAction} className="btn-secondary" disabled={isBulkProcessing}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={isBulkProcessing}>
+                <Save size={16} />
+                <span>{isBulkProcessing ? 'Updating' : 'Apply Update'}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {selectedUser && (
         <div className="pointer-events-none fixed inset-0" style={{ zIndex: profileZIndex }}>
