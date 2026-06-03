@@ -4,17 +4,23 @@ import { requireAnyPermission, requirePermission, requireSelfOrPermission } from
 import { rateLimit } from '../middleware/rateLimit';
 
 const router = Router();
-const authLimiter = rateLimit({ keyPrefix: 'auth', windowMs: 15 * 60 * 1000, max: 30, message: 'Too many auth attempts. Try again later.' });
+const registrationLimiter = rateLimit({ keyPrefix: 'auth-register', windowMs: 15 * 60 * 1000, max: 8, message: 'Too many registration attempts. Try again later.' });
+const loginLimiter = rateLimit({ keyPrefix: 'auth-login', windowMs: 15 * 60 * 1000, max: 12, message: 'Too many login attempts. Try again later.' });
+const ssoLimiter = rateLimit({ keyPrefix: 'auth-sso', windowMs: 15 * 60 * 1000, max: 20, message: 'Too many SSO attempts. Try again later.' });
 const inviteLimiter = rateLimit({ keyPrefix: 'invite', windowMs: 15 * 60 * 1000, max: 20, message: 'Too many invite attempts. Try again later.' });
-const passwordResetLimiter = rateLimit({ keyPrefix: 'password-reset', windowMs: 15 * 60 * 1000, max: 10, message: 'Too many password reset attempts. Try again later.' });
+const passwordResetRequestLimiter = rateLimit({ keyPrefix: 'password-reset-request', windowMs: 15 * 60 * 1000, max: 5, message: 'Too many password reset requests. Try again later.' });
+const passwordResetConfirmLimiter = rateLimit({ keyPrefix: 'password-reset-confirm', windowMs: 15 * 60 * 1000, max: 10, message: 'Too many password reset attempts. Try again later.' });
+const passwordChangeLimiter = rateLimit({ keyPrefix: 'password-change', windowMs: 15 * 60 * 1000, max: 8, message: 'Too many password change attempts. Try again later.' });
+const mfaLimiter = rateLimit({ keyPrefix: 'mfa', windowMs: 15 * 60 * 1000, max: 12, message: 'Too many MFA attempts. Try again later.' });
+const roleManagementLimiter = rateLimit({ keyPrefix: 'role-management', windowMs: 15 * 60 * 1000, max: 60, message: 'Too many role management requests. Try again later.' });
 
-router.post('/register', authLimiter, AuthController.register);
-router.post('/login', authLimiter, AuthController.login);
+router.post('/register', registrationLimiter, AuthController.register);
+router.post('/login', loginLimiter, AuthController.login);
 router.get('/microsoft/status', AuthController.getMicrosoftSsoStatus);
-router.get('/microsoft/start', authLimiter, AuthController.startMicrosoftSso);
-router.get('/microsoft/callback', authLimiter, AuthController.completeMicrosoftSso);
-router.post('/password-reset/request', passwordResetLimiter, AuthController.requestPasswordReset);
-router.post('/password-reset/confirm', passwordResetLimiter, AuthController.resetPassword);
+router.get('/microsoft/start', ssoLimiter, AuthController.startMicrosoftSso);
+router.get('/microsoft/callback', ssoLimiter, AuthController.completeMicrosoftSso);
+router.post('/password-reset/request', passwordResetRequestLimiter, AuthController.requestPasswordReset);
+router.post('/password-reset/confirm', passwordResetConfirmLimiter, AuthController.resetPassword);
 router.get('/session', AuthController.getSession);
 router.post('/logout', AuthController.logout);
 router.get('/registration-settings', AuthController.getRegistrationSettings);
@@ -24,17 +30,17 @@ router.post('/invites', inviteLimiter, requirePermission('roles:manage'), AuthCo
 router.get('/sessions', AuthController.listSessions);
 router.delete('/sessions/:sessionId', AuthController.revokeSession);
 router.post('/sessions/revoke-others', AuthController.revokeOtherSessions);
-router.post('/change-password', requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.changePassword);
-router.post('/2fa/setup', requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.setupTwoFactor);
-router.post('/2fa/enable', requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.enableTwoFactor);
-router.post('/2fa/disable', requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.disableTwoFactor);
+router.post('/change-password', passwordChangeLimiter, requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.changePassword);
+router.post('/2fa/setup', mfaLimiter, requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.setupTwoFactor);
+router.post('/2fa/enable', mfaLimiter, requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.enableTwoFactor);
+router.post('/2fa/disable', mfaLimiter, requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.disableTwoFactor);
 router.get('/accounts', requireAnyPermission(['roles:manage', 'devices:manage', 'reports:cpar']), AuthController.listAccounts);
-router.put('/accounts/:accountId/role', requirePermission('roles:manage'), AuthController.updateRole);
+router.put('/accounts/:accountId/role', roleManagementLimiter, requirePermission('roles:manage'), AuthController.updateRole);
 router.put('/accounts/:accountId/message-preferences', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), AuthController.updateMessagePreferences);
 router.put('/accounts/:accountId/trooper-daily-preferences', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), AuthController.updateTrooperDailyPreferences);
 router.put('/accounts/:accountId/onboarding-complete', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), AuthController.completeOnboarding);
 router.get('/roles', requirePermission('roles:manage'), AuthController.listRoles);
-router.post('/roles', requirePermission('roles:manage'), AuthController.createRole);
-router.put('/roles/:roleId', requirePermission('roles:manage'), AuthController.updateRoleDefinition);
+router.post('/roles', roleManagementLimiter, requirePermission('roles:manage'), AuthController.createRole);
+router.put('/roles/:roleId', roleManagementLimiter, requirePermission('roles:manage'), AuthController.updateRoleDefinition);
 
 export default router;
