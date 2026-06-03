@@ -166,11 +166,11 @@ export class UserModel {
           const tokenPrefix = `${UserModel.escapeLike(token)}%`;
           const fullNameTokenPrefix = `% ${UserModel.escapeLike(token)}%`;
           tokenConditions.push(`(
-            LOWER(COALESCE(\`firstName\`, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(\`lastName\`, '')) LIKE ? ESCAPE '\\'
-            OR LOWER(COALESCE(\`displayName\`, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(\`displayName\`, '')) LIKE ? ESCAPE '\\'
-            OR LOWER(CONCAT_WS(' ', \`firstName\`, \`lastName\`)) LIKE ? ESCAPE '\\' OR LOWER(CONCAT_WS(' ', \`firstName\`, \`lastName\`)) LIKE ? ESCAPE '\\'
-            OR LOWER(COALESCE(\`email\`, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(\`peNumber\`, '')) LIKE ? ESCAPE '\\'
-            OR LOWER(COALESCE(\`badgeNumber\`, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(\`peopleSoftId\`, '')) LIKE ? ESCAPE '\\'
+            LOWER(COALESCE(\`firstName\`, '')) LIKE ? OR LOWER(COALESCE(\`lastName\`, '')) LIKE ?
+            OR LOWER(COALESCE(\`displayName\`, '')) LIKE ? OR LOWER(COALESCE(\`displayName\`, '')) LIKE ?
+            OR LOWER(CONCAT_WS(' ', \`firstName\`, \`lastName\`)) LIKE ? OR LOWER(CONCAT_WS(' ', \`firstName\`, \`lastName\`)) LIKE ?
+            OR LOWER(COALESCE(\`email\`, '')) LIKE ? OR LOWER(COALESCE(\`peNumber\`, '')) LIKE ?
+            OR LOWER(COALESCE(\`badgeNumber\`, '')) LIKE ? OR LOWER(COALESCE(\`peopleSoftId\`, '')) LIKE ?
           )`);
           tokenParams.push(
             tokenPrefix,
