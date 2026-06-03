@@ -1,27 +1,11 @@
 import { NextFunction, Request, Response } from 'express';
+import { isAllowedOrigin } from '../utils/originPolicy';
 
 interface CsrfProtectionOptions {
   allowedOrigins: string[];
 }
 
 const unsafeMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-
-function isLocalDevelopmentOrigin(origin: string): boolean {
-  try {
-    const url = new URL(origin);
-    return ['localhost', '127.0.0.1'].includes(url.hostname);
-  } catch {
-    return false;
-  }
-}
-
-function isAllowedOrigin(origin: string, allowedOrigins: string[]): boolean {
-  if (allowedOrigins.includes(origin)) {
-    return true;
-  }
-
-  return allowedOrigins.length === 0 && process.env.NODE_ENV !== 'production' && isLocalDevelopmentOrigin(origin);
-}
 
 export function csrfProtection({ allowedOrigins }: CsrfProtectionOptions) {
   return (req: Request, res: Response, next: NextFunction) => {

@@ -27,15 +27,13 @@ import { rateLimit } from './middleware/rateLimit';
 import { requestTimeout } from './middleware/requestTimeout';
 import { csrfProtection } from './middleware/csrfProtection';
 import { ErrorLogModel } from './models/ErrorLog';
+import { isAllowedOrigin, parseAllowedOrigins } from './utils/originPolicy';
 
 dotenv.config();
 
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const allowedOrigins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS || '');
 const apiRateLimitWindowMs = Number(process.env.API_RATE_LIMIT_WINDOW_MS || 60 * 1000);
 const apiRateLimitMax = Number(process.env.API_RATE_LIMIT_MAX || 300);
 const apiRequestTimeoutMs = Number(process.env.API_REQUEST_TIMEOUT_MS || 30 * 1000);
@@ -60,7 +58,7 @@ app.use((req: Request, res: Response, next) => {
 });
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin) || (allowedOrigins.length === 0 && process.env.NODE_ENV !== 'production')) {
+    if (!origin || isAllowedOrigin(origin, allowedOrigins)) {
       return callback(null, true);
     }
 
