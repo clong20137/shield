@@ -3458,7 +3458,7 @@ function App() {
         return;
       }
 
-      setMessageTargetUser(user);
+      setMessageTargetUser({ ...user });
       openMessagesModal();
     };
 

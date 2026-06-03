@@ -717,14 +717,21 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
   const deleteThread = async (thread: MessageThread) => {
     try {
+      const deletedMessageIds = new Set(thread.messages.map((message) => message.id));
       await Promise.all(thread.messages.map((message) => messageService.delete(message.id, currentUser.id)));
-      setInboxMessages((messages) => messages.filter((message) => !thread.messages.some((item) => item.id === message.id)));
-      setSentMessages((messages) => messages.filter((message) => !thread.messages.some((item) => item.id === message.id)));
+      setInboxMessages((messages) => messages.filter((message) => !deletedMessageIds.has(message.id)));
+      setSentMessages((messages) => messages.filter((message) => !deletedMessageIds.has(message.id)));
+      setDraftRecipient((recipient) => (recipient?.id === thread.id ? null : recipient));
+      setPinnedThreadIds((ids) => ids.filter((id) => id !== thread.id));
+      setReplyBody('');
+      setReplyAttachments([]);
+      setThreadSearchTerm('');
       if (selectedThreadId === thread.id) {
         const nextThread = threads.find((item) => item.id !== thread.id);
         setSelectedThreadId(nextThread?.id ?? null);
       }
       setThreadPendingDelete(null);
+      await loadMessages(false);
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
       onToast('success', 'Conversation deleted.');
     } catch (err) {
