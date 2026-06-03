@@ -3492,6 +3492,49 @@ function App() {
     setIsCalculatorOpen(true);
   };
 
+  const toggleCalculator = () => {
+    if (isCalculatorOpen) {
+      setIsCalculatorOpen(false);
+      return;
+    }
+
+    openCalculator();
+  };
+
+  const closeActiveFloatingApp = () => {
+    if (activeFloatingApp === 'calculator' && isCalculatorOpen) {
+      setIsCalculatorOpen(false);
+      return true;
+    }
+
+    if (activeFloatingApp === 'calendar' && isCalendarModalOpen) {
+      closeModal('calendar');
+      return true;
+    }
+
+    if (activeFloatingApp === 'messages' && isMessagesModalOpen) {
+      closeModal('messages');
+      return true;
+    }
+
+    if (isCalculatorOpen) {
+      setIsCalculatorOpen(false);
+      return true;
+    }
+
+    if (isCalendarModalOpen) {
+      closeModal('calendar');
+      return true;
+    }
+
+    if (isMessagesModalOpen) {
+      closeModal('messages');
+      return true;
+    }
+
+    return false;
+  };
+
   const toggleCreateUserModal = () => {
     if (isAdminConsoleOpen && adminConsoleTab === 'create-user') {
       closeModal('adminConsole');
@@ -3643,8 +3686,7 @@ function App() {
         return;
       }
 
-      if (isCalculatorOpen) {
-        setIsCalculatorOpen(false);
+      if (closeActiveFloatingApp()) {
         return;
       }
 
@@ -3662,26 +3704,15 @@ function App() {
         closeModal('adminConsole');
         return;
       }
-
-      if (isCalendarModalOpen) {
-        closeModal('calendar');
-        return;
-      }
-
       if (isProfileModalOpen) {
         closeModal('profile');
-        return;
-      }
-
-      if (isMessagesModalOpen) {
-        closeModal('messages');
       }
     };
 
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isAccountMenuOpen, isAdminConsoleOpen, isBugTrackerOpen, isCalculatorOpen, isCalendarModalOpen, isCommandPaletteOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isProfileModalOpen, isReportBugOpen]);
+  }, [activeFloatingApp, isAccountMenuOpen, isAdminConsoleOpen, isBugTrackerOpen, isCalculatorOpen, isCalendarModalOpen, isCommandPaletteOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isProfileModalOpen, isReportBugOpen]);
 
   return (
     <Router>
@@ -4057,7 +4088,7 @@ function App() {
                 accountId={currentUser?.id}
                 onOpenMessages={toggleMessagesModal}
                 onOpenCalendar={toggleCalendarModal}
-                onOpenCalculator={openCalculator}
+                onOpenCalculator={toggleCalculator}
                 onOpenCreateUser={toggleCreateUserModal}
               />
             </main>
