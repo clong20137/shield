@@ -531,11 +531,11 @@ export class AuthAccountModel {
     }
   }
 
-  static async listAccounts(): Promise<AuthAccount[]> {
+  static async listAccounts(includeHidden = false): Promise<AuthAccount[]> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<AuthAccountRow[]>(
-        'SELECT * FROM users WHERE `passwordHash` IS NOT NULL ORDER BY `role`, `displayName`, `email`'
+        `SELECT * FROM users WHERE \`passwordHash\` IS NOT NULL ${includeHidden ? '' : 'AND COALESCE(`isHidden`, 0) = 0'} ORDER BY \`role\`, \`displayName\`, \`email\``
       );
 
       return rows.map(toPublicAccount);

@@ -18,6 +18,7 @@ const allowedPermissions = [
   'users:view',
   'users:create',
   'users:edit',
+  'users:view-hidden',
   'users:profile-picture',
   'devices:manage',
   'calendar:manage',
@@ -67,6 +68,19 @@ async function canListAccounts(account?: { id: string; role: string } | null): P
 
   const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
   return permissions.includes('roles:manage') || permissions.includes('devices:manage');
+}
+
+async function canViewHiddenUsers(account?: { id: string; role: string } | null): Promise<boolean> {
+  if (!account) {
+    return false;
+  }
+
+  if (account.role === 'administrator') {
+    return true;
+  }
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
+  return permissions.includes('users:view-hidden');
 }
 
 async function withPermissions<T extends { id: string; role: string }>(account: T): Promise<T & { permissions: string[] }> {
@@ -888,7 +902,7 @@ export class AuthController {
         return res.status(403).json({ error: 'Account list permission required' });
       }
 
-      const accounts = await AuthAccountModel.listAccounts();
+      const accounts = await AuthAccountModel.listAccounts(await canViewHiddenUsers(requester));
       res.json(accounts);
     } catch (error) {
       console.error('List accounts error:', error);
@@ -1032,7 +1046,7 @@ export class AuthController {
         return res.status(400).json({ error: 'Choose an existing role' });
       }
 
-      const accounts = await AuthAccountModel.listAccounts();
+      const accounts = await AuthAccountModel.listAccounts(await canViewHiddenUsers(requester));
       const administratorCount = accounts.filter((account) => account.role === 'administrator').length;
       const targetAccount = accounts.find((account) => account.id === accountId);
 

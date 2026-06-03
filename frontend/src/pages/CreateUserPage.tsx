@@ -48,6 +48,7 @@ const emptyUserForm: UserForm = {
   district: districtOptions[0],
   rank: '',
   isActive: true,
+  isHidden: false,
   employmentType: employmentTypes[0],
   typeDetails: '',
   status: statusOptions[0],

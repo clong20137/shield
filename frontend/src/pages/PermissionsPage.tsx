@@ -19,6 +19,7 @@ const permissionGroups = [
       { key: 'users:view', label: 'View users' },
       { key: 'users:create', label: 'Create users' },
       { key: 'users:edit', label: 'Edit users' },
+      { key: 'users:view-hidden', label: 'View hidden users' },
       { key: 'users:profile-picture', label: 'Edit profile photos' },
     ],
   },

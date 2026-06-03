@@ -1,7 +1,17 @@
 import { Request, Response } from 'express';
 import { getSessionAccount } from '../middleware/authSession';
+import { AuthAccountModel } from '../models/AuthAccount';
 import { PinnedProfileModel } from '../models/PinnedProfile';
 import { UserModel } from '../models/User';
+
+async function canViewHiddenUsers(account: { id: string; role: string }): Promise<boolean> {
+  if (account.role === 'administrator') {
+    return true;
+  }
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
+  return permissions.includes('users:view-hidden');
+}
 
 export class PinnedProfileController {
   static async list(req: Request, res: Response) {
@@ -11,7 +21,7 @@ export class PinnedProfileController {
         return res.status(401).json({ error: 'Sign in required' });
       }
 
-      const profiles = await PinnedProfileModel.list(account.id);
+      const profiles = await PinnedProfileModel.list(account.id, await canViewHiddenUsers(account));
       res.json(profiles);
     } catch (error) {
       console.error('List pinned profiles error:', error);
@@ -28,7 +38,7 @@ export class PinnedProfileController {
 
       const profileUserId = String(req.params.userId || '').trim();
       const user = profileUserId ? await UserModel.getUserById(profileUserId) : null;
-      if (!user) {
+      if (!user || (user.isHidden && !(await canViewHiddenUsers(account)))) {
         return res.status(404).json({ error: 'User not found' });
       }
 

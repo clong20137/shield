@@ -55,6 +55,7 @@ const userUpdateFields = [
   'district',
   'rank',
   'isActive',
+  'isHidden',
   'employmentType',
   'typeDetails',
   'status',
@@ -175,6 +176,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const selectedUserId = useMemo(() => searchParams.get('userId') ?? '', [searchParams]);
   const isAdministrator = currentUser?.role === 'administrator';
   const canEditProfilePictures = isAdministrator || currentUser?.permissions?.includes('users:profile-picture');
+  const canViewHiddenUsers = isAdministrator || currentUser?.permissions?.includes('users:view-hidden');
   const selectedUsers = useMemo(
     () => users.filter((user) => selectedUserIds.includes(user.id)),
     [selectedUserIds, users],
@@ -1015,6 +1017,19 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                     onChange={(event) => updateEditField('isActive', event.target.checked)}
                   />
                 </label>
+                {canViewHiddenUsers && (
+                  <label className="flex items-center justify-between gap-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/60 dark:bg-amber-950/30">
+                    <span>
+                      <span className="block text-sm font-semibold text-gray-800 dark:text-gray-100">Hidden profile</span>
+                      <span className="mt-1 block text-xs text-gray-600 dark:text-gray-300">Hide from search, profile lookup, mentions, and pinned profiles unless the viewer has hidden-user permission.</span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={editForm.isHidden === true}
+                      onChange={(event) => updateEditField('isHidden', event.target.checked)}
+                    />
+                  </label>
+                )}
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Role</span>
                   <select value={String(editForm.role || 'user')} onChange={(event) => updateEditField('role', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">

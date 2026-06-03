@@ -88,6 +88,7 @@ function safeUserDetails(user: User) {
     peNumber: user.peNumber,
     badgeNumber: user.badgeNumber,
     isActive: user.isActive,
+    isHidden: user.isHidden,
   };
 }
 
@@ -155,6 +156,7 @@ function mapImportRow(row: ImportRow) {
     district: getImportValue(row, ['assignmentlocation'], 100) || getImportValue(row, ['physicallocation'], 100),
     rank: getImportValue(row, ['rank'], 100) || getImportValue(row, ['title'], 100),
     isActive: isImportUserActive(status),
+    isHidden: false,
     employmentType: getImportValue(row, ['employementtype', 'employmenttype'], 100) || 'Other',
     typeDetails: getImportValue(row, ['employementtypedetails', 'employmenttypedetails'], 100),
     status,
@@ -243,6 +245,7 @@ function validateUserPayload(body: Record<string, unknown>, isCreate: boolean): 
   setCleanString('district', 100);
   setCleanString('rank', 100);
   if (isCreate || has('isActive')) cleaned.isActive = body.isActive !== false;
+  if (isCreate || has('isHidden')) cleaned.isHidden = body.isHidden === true;
   if (isCreate || has('employmentType')) cleaned.employmentType = employmentType || 'Other';
   setCleanString('typeDetails', 100);
   if (isCreate || has('status')) cleaned.status = status || 'Active';
@@ -271,6 +274,19 @@ async function canEditProtectedUserFields(req: Request): Promise<boolean> {
 
   const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
   return permissions.includes('users:edit');
+}
+
+async function canViewHiddenUsers(req: Request): Promise<boolean> {
+  const account = await getSessionAccount(req);
+  if (!account) return false;
+  if (account.role === 'administrator') return true;
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
+  return permissions.includes('users:view-hidden');
+}
+
+function isHiddenFromRequester(user: User, requesterId: string | undefined, canViewHidden: boolean): boolean {
+  return Boolean(user.isHidden) && user.id !== requesterId && !canViewHidden;
 }
 
 function includesProtectedSelfUpdate(body: Record<string, unknown>): boolean {
@@ -346,7 +362,7 @@ export class UserController {
       if (typeof radioNumber === 'string' && radioNumber) filters.radioNumber = radioNumber;
       if (typeof peNumber === 'string' && peNumber) filters.peNumber = peNumber;
 
-      const users = await UserModel.searchUsers(q ?? '', filters);
+      const users = await UserModel.searchUsers(q ?? '', filters, { includeHidden: await canViewHiddenUsers(req) });
       res.json(users);
     } catch (error) {
       console.error('Search error:', error);
@@ -358,7 +374,7 @@ export class UserController {
     try {
       const { page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 50, maxPageSize: 250 });
 
-      const users = await UserModel.getAllUsers(pageSize, offset);
+      const users = await UserModel.getAllUsers(pageSize, offset, await canViewHiddenUsers(req));
       res.json({
         data: users,
         page,
@@ -375,8 +391,9 @@ export class UserController {
     try {
       const { id } = req.params;
       const user = await UserModel.getUserById(id);
+      const sessionAccount = await getSessionAccount(req);
 
-      if (!user) {
+      if (!user || isHiddenFromRequester(user, sessionAccount?.id, await canViewHiddenUsers(req))) {
         return res.status(404).json({ error: 'User not found' });
       }
 
@@ -560,6 +577,12 @@ export class UserController {
         return res.status(403).json({ error: 'User management permission required to edit personnel fields' });
       }
 
+      const canViewHidden = await canViewHiddenUsers(req);
+
+      if (Object.prototype.hasOwnProperty.call(req.body, 'isHidden') && !canViewHidden) {
+        return res.status(403).json({ error: 'Hidden user permission required' });
+      }
+
       const validation = validateUserPayload(req.body, false);
       if (validation.error || !validation.value) {
         return res.status(400).json({ error: validation.error || 'Invalid user data' });
@@ -570,6 +593,9 @@ export class UserController {
       }
 
       const before = await UserModel.getUserById(id);
+      if (!before || isHiddenFromRequester(before, sessionAccount?.id, canViewHidden)) {
+        return res.status(404).json({ error: 'User not found' });
+      }
       const success = await UserModel.updateUser(id, validation.value);
 
       if (!success) {
@@ -641,9 +667,18 @@ export class UserController {
   static async uploadProfilePicture(req: Request, res: Response) {
     try {
       const file = req.file;
+      const targetUser = await UserModel.getUserById(req.params.id);
+      const sessionAccount = await getSessionAccount(req);
 
       if (!file) {
         return res.status(400).json({ error: 'Profile picture is required' });
+      }
+
+      if (!targetUser || isHiddenFromRequester(targetUser, sessionAccount?.id, await canViewHiddenUsers(req))) {
+        if (file.path) {
+          fs.rmSync(file.path, { force: true });
+        }
+        return res.status(404).json({ error: 'User not found' });
       }
 
       if (!isSafeUploadedImage(file.path)) {
@@ -683,6 +718,13 @@ export class UserController {
 
   static async removeProfilePicture(req: Request, res: Response) {
     try {
+      const targetUser = await UserModel.getUserById(req.params.id);
+      const sessionAccount = await getSessionAccount(req);
+
+      if (!targetUser || isHiddenFromRequester(targetUser, sessionAccount?.id, await canViewHiddenUsers(req))) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
       const success = await UserModel.updateUser(req.params.id, { profilePictureUrl: '' });
 
       if (!success) {

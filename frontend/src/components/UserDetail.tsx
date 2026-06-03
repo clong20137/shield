@@ -295,6 +295,11 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           <div>
             <div className="flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
               <h2 className="m-0 text-xl font-bold text-white sm:text-2xl">{user.firstName} {user.lastName}</h2>
+              {user.isHidden && (
+                <span className="rounded-full border border-amber-200/40 bg-amber-300/15 px-2 py-1 text-xs font-bold uppercase tracking-wide text-amber-100">
+                  Hidden
+                </span>
+              )}
               <div className="flex gap-2">
                 <a
                   className={`flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white hover:bg-white/20 ${emailHref ? '' : 'pointer-events-none opacity-50'}`}
@@ -407,6 +412,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           <DetailRow label="Assigned To" value={user.assignedTo} />
           <DetailRow label="Supervisor" value={user.supervisor} />
           <DetailRow label="Active" value={user.isActive} />
+          {user.isHidden && <DetailRow label="Hidden" value={user.isHidden} />}
           <DetailRow label="Type Details" value={user.typeDetails} />
         </DetailSection>}
 

@@ -9,14 +9,14 @@ export type PinnedProfile = User & {
 interface PinnedProfileRow extends RowDataPacket, PinnedProfile {}
 
 export class PinnedProfileModel {
-  static async list(accountId: string): Promise<PinnedProfile[]> {
+  static async list(accountId: string, includeHidden = false): Promise<PinnedProfile[]> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<PinnedProfileRow[]>(
         `SELECT u.*, p.\`pinnedAt\`
          FROM pinned_profiles p
          JOIN users u ON u.\`id\` = p.\`profileUserId\`
-         WHERE p.\`accountId\` = ?
+         WHERE p.\`accountId\` = ? ${includeHidden ? '' : 'AND COALESCE(u.`isHidden`, 0) = 0'}
          ORDER BY p.\`pinnedAt\` DESC`,
         [accountId]
       );

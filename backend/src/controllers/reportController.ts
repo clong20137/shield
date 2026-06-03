@@ -77,6 +77,15 @@ function parseDetails(value: string | Record<string, string> | null): Record<str
   }
 }
 
+async function canViewHiddenUsers(req: Request): Promise<boolean> {
+  const account = await getSessionAccount(req);
+  if (!account) return false;
+  if (account.role === 'administrator') return true;
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
+  return permissions.includes('users:view-hidden');
+}
+
 export class ReportController {
   static async getTrooperDailies(req: Request, res: Response) {
     let conn;
@@ -314,10 +323,12 @@ export class ReportController {
     let conn;
     try {
       conn = await pool.getConnection();
+      const hiddenFilter = (await canViewHiddenUsers(req)) ? '' : 'WHERE COALESCE(`isHidden`, 0) = 0';
       const [rows] = await conn.query(`
         SELECT \`rank\`, COUNT(*) as count,
         SUM(CASE WHEN \`isActive\` = 1 THEN 1 ELSE 0 END) as activeCount
         FROM users
+        ${hiddenFilter}
         GROUP BY \`rank\`
         ORDER BY count DESC
       `);
@@ -334,10 +345,12 @@ export class ReportController {
     let conn;
     try {
       conn = await pool.getConnection();
+      const hiddenFilter = (await canViewHiddenUsers(req)) ? '' : 'WHERE COALESCE(`isHidden`, 0) = 0';
       const [rows] = await conn.query(`
         SELECT \`district\`, COUNT(*) as count,
         SUM(CASE WHEN \`isActive\` = 1 THEN 1 ELSE 0 END) as activeCount
         FROM users
+        ${hiddenFilter}
         GROUP BY \`district\`
         ORDER BY count DESC
       `);
@@ -354,10 +367,12 @@ export class ReportController {
     let conn;
     try {
       conn = await pool.getConnection();
+      const hiddenFilter = (await canViewHiddenUsers(req)) ? '' : 'WHERE COALESCE(`isHidden`, 0) = 0';
       const [rows] = await conn.query(`
         SELECT \`employmentType\`, COUNT(*) as count,
         SUM(CASE WHEN \`isActive\` = 1 THEN 1 ELSE 0 END) as activeCount
         FROM users
+        ${hiddenFilter}
         GROUP BY \`employmentType\`
         ORDER BY count DESC
       `);
@@ -374,6 +389,8 @@ export class ReportController {
     let conn;
     try {
       conn = await pool.getConnection();
+      const hiddenFilter = (await canViewHiddenUsers(req)) ? '' : 'WHERE COALESCE(`isHidden`, 0) = 0';
+      const accountHiddenFilter = (await canViewHiddenUsers(req)) ? 'WHERE `passwordHash` IS NOT NULL' : 'WHERE `passwordHash` IS NOT NULL AND COALESCE(`isHidden`, 0) = 0';
       const [stats] = await conn.query<StatisticsRow[]>(`
         SELECT 
           COUNT(*) as totalUsers,
@@ -382,6 +399,7 @@ export class ReportController {
           COUNT(DISTINCT \`district\`) as totalDistricts,
           COUNT(DISTINCT \`rank\`) as totalRanks
         FROM users
+        ${hiddenFilter}
       `);
       const [accountStats] = await conn.query<AccountStatisticsRow[]>(`
         SELECT
@@ -389,7 +407,7 @@ export class ReportController {
           SUM(CASE WHEN \`role\` = 'administrator' THEN 1 ELSE 0 END) as administratorAccounts,
           SUM(CASE WHEN \`role\` = 'user' THEN 1 ELSE 0 END) as standardAccounts
         FROM users
-        WHERE \`passwordHash\` IS NOT NULL
+        ${accountHiddenFilter}
       `);
 
       res.json({
@@ -415,6 +433,10 @@ export class ReportController {
 
       let query = 'SELECT * FROM users WHERE 1=1';
       const params: Array<string | number> = [];
+
+      if (!(await canViewHiddenUsers(req))) {
+        query += ' AND COALESCE(`isHidden`, 0) = 0';
+      }
 
       if (typeof district === 'string' && district) {
         query += ' AND `district` = ?';

@@ -20,6 +20,7 @@ export interface User {
   district: string;
   rank: string;
   isActive: boolean;
+  isHidden: boolean;
   employmentType: string;
   typeDetails: string;
   status: string;
@@ -62,6 +63,7 @@ export class UserModel {
     'district',
     'rank',
     'isActive',
+    'isHidden',
     'employmentType',
     'typeDetails',
     'status',
@@ -95,6 +97,7 @@ export class UserModel {
     district: '`district`',
     rank: '`rank`',
     isActive: '`isActive`',
+    isHidden: '`isHidden`',
     employmentType: '`employmentType`',
     typeDetails: '`typeDetails`',
     status: '`status`',
@@ -139,7 +142,7 @@ export class UserModel {
       return typeof value === 'string' ? UserModel.blankToNull(value) : null;
     }
 
-    if (key === 'isActive' || key === 'receivesMessages') {
+    if (key === 'isActive' || key === 'isHidden' || key === 'receivesMessages') {
       return value === false ? false : true;
     }
 
@@ -148,7 +151,8 @@ export class UserModel {
 
   static async searchUsers(
     searchTerm: string,
-    filters?: Partial<User>
+    filters?: Partial<User>,
+    options: { includeHidden?: boolean } = {}
   ): Promise<User[]> {
     const conn = await pool.getConnection();
     try {
@@ -158,6 +162,10 @@ export class UserModel {
       const trimmedSearchTerm = searchTerm.trim();
       const orderParams: Array<string | number> = [];
       let searchRankSql = '';
+
+      if (!options.includeHidden) {
+        conditions.push('COALESCE(`isHidden`, 0) = 0');
+      }
 
       if (trimmedSearchTerm) {
         const tokenConditions: string[] = [];
@@ -323,11 +331,11 @@ export class UserModel {
     }
   }
 
-  static async getAllUsers(limit: number = 100, offset: number = 0): Promise<User[]> {
+  static async getAllUsers(limit: number = 100, offset: number = 0, includeHidden = false): Promise<User[]> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query(
-        'SELECT * FROM users ORDER BY `lastName`, `firstName` LIMIT ? OFFSET ?',
+        `SELECT * FROM users ${includeHidden ? '' : 'WHERE COALESCE(`isHidden`, 0) = 0'} ORDER BY \`lastName\`, \`firstName\` LIMIT ? OFFSET ?`,
         [limit, offset]
       );
       return rows as User[];
@@ -395,7 +403,7 @@ export class UserModel {
       )`);
       const params = normalizedTokens.flatMap((token) => [token, token, token, token, token, token]);
       const [rows] = await conn.query(
-        `SELECT * FROM users WHERE (${conditions.join(' OR ')}) AND \`isActive\` = 1 ORDER BY \`lastName\`, \`firstName\` LIMIT ?`,
+        `SELECT * FROM users WHERE (${conditions.join(' OR ')}) AND \`isActive\` = 1 AND COALESCE(\`isHidden\`, 0) = 0 ORDER BY \`lastName\`, \`firstName\` LIMIT ?`,
         [...params, limit]
       );
 
@@ -415,11 +423,11 @@ export class UserModel {
         `INSERT INTO users (
           \`id\`, \`firstName\`, \`lastName\`, \`email\`, \`profilePictureUrl\`, \`displayName\`, \`passwordHash\`, \`role\`, \`mustChangePassword\`, \`peNumber\`, \`peopleSoftId\`, \`carNumber\`, \`badgeNumber\`,
           \`radioNumber\`, \`personalPhoneNumber\`, \`departmentPhoneNumber\`, \`assignedTo\`, \`district\`, \`rank\`,
-          \`isActive\`, \`employmentType\`, \`typeDetails\`, \`status\`, \`supervisor\`, \`specialtyCertifications\`,
+          \`isActive\`, \`isHidden\`, \`employmentType\`, \`typeDetails\`, \`status\`, \`supervisor\`, \`specialtyCertifications\`,
           \`publicSafetyId\`, \`race\`, \`sex\`, \`maritalStatus\`, \`residentialAddress\`, \`mailingAddress\`,
           \`emergencyContactName\`, \`emergencyContactRelationship\`, \`emergencyContactPhone\`,
           \`receivesMessages\`, \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           user.firstName,
@@ -441,6 +449,7 @@ export class UserModel {
           user.district,
           user.rank,
           user.isActive ? 1 : 0,
+          user.isHidden ? 1 : 0,
           user.employmentType,
           user.typeDetails,
           user.status,

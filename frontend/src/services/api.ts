@@ -141,6 +141,7 @@ export interface User {
   district: string;
   rank: string;
   isActive: boolean;
+  isHidden: boolean;
   employmentType: string;
   typeDetails: string;
   status: string;
