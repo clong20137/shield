@@ -117,6 +117,23 @@ export class UserModel {
     return trimmedValue ? trimmedValue : null;
   }
 
+  private static escapeLike(value: string): string {
+    return value.replace(/[\\%_]/gu, '\\$&');
+  }
+
+  private static getSearchTokens(searchTerm: string): string[] {
+    return Array.from(
+      new Set(
+        searchTerm
+          .toLowerCase()
+          .split(/[\s,]+/u)
+          .map((token) => token.trim())
+          .filter((token) => token.length > 0)
+          .slice(0, 5),
+      ),
+    );
+  }
+
   private static normalizeUpdateValue(key: string, value: unknown): string | boolean | Date | null {
     if (['email', 'peNumber', 'badgeNumber', 'publicSafetyId'].includes(key)) {
       return typeof value === 'string' ? UserModel.blankToNull(value) : null;
@@ -141,6 +158,34 @@ export class UserModel {
       const trimmedSearchTerm = searchTerm.trim();
 
       if (trimmedSearchTerm) {
+        const tokenConditions: string[] = [];
+        const tokenParams: string[] = [];
+        const tokens = UserModel.getSearchTokens(trimmedSearchTerm);
+
+        tokens.forEach((token) => {
+          const tokenPrefix = `${UserModel.escapeLike(token)}%`;
+          const fullNameTokenPrefix = `% ${UserModel.escapeLike(token)}%`;
+          tokenConditions.push(`(
+            LOWER(COALESCE(\`firstName\`, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(\`lastName\`, '')) LIKE ? ESCAPE '\\'
+            OR LOWER(COALESCE(\`displayName\`, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(\`displayName\`, '')) LIKE ? ESCAPE '\\'
+            OR LOWER(CONCAT_WS(' ', \`firstName\`, \`lastName\`)) LIKE ? ESCAPE '\\' OR LOWER(CONCAT_WS(' ', \`firstName\`, \`lastName\`)) LIKE ? ESCAPE '\\'
+            OR LOWER(COALESCE(\`email\`, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(\`peNumber\`, '')) LIKE ? ESCAPE '\\'
+            OR LOWER(COALESCE(\`badgeNumber\`, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(\`peopleSoftId\`, '')) LIKE ? ESCAPE '\\'
+          )`);
+          tokenParams.push(
+            tokenPrefix,
+            tokenPrefix,
+            tokenPrefix,
+            fullNameTokenPrefix,
+            tokenPrefix,
+            fullNameTokenPrefix,
+            tokenPrefix,
+            tokenPrefix,
+            tokenPrefix,
+            tokenPrefix,
+          );
+        });
+
         conditions.push(
           `(
             LOWER(COALESCE(\`firstName\`, '')) LIKE ? OR LOWER(COALESCE(\`lastName\`, '')) LIKE ? OR LOWER(CONCAT_WS(' ', \`firstName\`, \`lastName\`)) LIKE ?
@@ -148,10 +193,11 @@ export class UserModel {
             OR LOWER(COALESCE(\`badgeNumber\`, '')) LIKE ? OR LOWER(COALESCE(\`radioNumber\`, '')) LIKE ? OR LOWER(COALESCE(\`publicSafetyId\`, '')) LIKE ?
             OR LOWER(COALESCE(\`district\`, '')) LIKE ? OR LOWER(COALESCE(\`employmentType\`, '')) LIKE ? OR LOWER(COALESCE(\`status\`, '')) LIKE ?
             OR LOWER(COALESCE(\`supervisor\`, '')) LIKE ? OR LOWER(COALESCE(\`personalPhoneNumber\`, '')) LIKE ? OR LOWER(COALESCE(\`departmentPhoneNumber\`, '')) LIKE ?
+            ${tokenConditions.length > 0 ? `OR (${tokenConditions.join(' AND ')})` : ''}
           )`
         );
 
-        const likeTerm = `%${trimmedSearchTerm.toLowerCase()}%`;
+        const likeTerm = `%${UserModel.escapeLike(trimmedSearchTerm.toLowerCase())}%`;
         params.push(
           likeTerm,
           likeTerm,
@@ -167,7 +213,8 @@ export class UserModel {
           likeTerm,
           likeTerm,
           likeTerm,
-          likeTerm
+          likeTerm,
+          ...tokenParams
         );
       }
 
