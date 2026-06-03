@@ -585,7 +585,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
 
   return (
     <div>
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-3 lg:pr-56">
         <div>
           <h1>Device Management</h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">

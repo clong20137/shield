@@ -331,7 +331,6 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
               {isOnline && <span className="h-1.5 w-1.5 rounded-full bg-green-300/80" />}
               {lastOnlineLabel}
             </p>
-            {isFloatingProfile && <p className="mt-1 hidden text-xs text-blue-100 md:block">Drag to move. Resize from the corner.</p>}
           </div>
         </div>
           <div className="flex w-full items-start gap-3 lg:ml-auto lg:w-auto">
