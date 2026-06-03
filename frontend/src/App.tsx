@@ -744,6 +744,14 @@ function announceFloatingFocus(app: string) {
   window.dispatchEvent(new CustomEvent('shield:floating-focus', { detail: { app } }));
 }
 
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
+}
+
 interface SidebarLinkProps {
   to: string;
   label: string;
@@ -1847,6 +1855,10 @@ function GlobalCommandPalette({
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
+      if (isEditableKeyboardTarget(event.target)) {
+        return;
+      }
+
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         onOpenChange(true);
@@ -2120,6 +2132,104 @@ function GlobalCommandPalette({
       </div>
     </div>
   );
+}
+
+function GlobalKeyboardShortcuts({
+  isAdministrator,
+  onOpenMessages,
+  onOpenCalendar,
+  onOpenCalculator,
+  onOpenCommandPalette,
+  onOpenAdminConsole,
+}: {
+  isAdministrator: boolean;
+  onOpenMessages: () => void;
+  onOpenCalendar: () => void;
+  onOpenCalculator: () => void;
+  onOpenCommandPalette: () => void;
+  onOpenAdminConsole: (tab?: AdminConsoleTab) => void;
+}) {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const focusUserSearch = () => {
+      navigate('/search');
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('shield:focus-user-search'));
+      }, 80);
+    };
+
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (isEditableKeyboardTarget(event.target)) {
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        onOpenCommandPalette();
+        return;
+      }
+
+      if (event.altKey || event.ctrlKey || event.metaKey) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+
+      if (key === '/') {
+        event.preventDefault();
+        focusUserSearch();
+        return;
+      }
+
+      if (key === 'm') {
+        event.preventDefault();
+        onOpenMessages();
+        return;
+      }
+
+      if (key === 'c') {
+        event.preventDefault();
+        onOpenCalendar();
+        return;
+      }
+
+      if (key === 'd') {
+        event.preventDefault();
+        navigate('/');
+        return;
+      }
+
+      if (key === 'r') {
+        event.preventDefault();
+        navigate('/reports');
+        return;
+      }
+
+      if (key === 'a' && isAdministrator) {
+        event.preventDefault();
+        onOpenAdminConsole('general');
+        return;
+      }
+
+      if (key === 'u' && isAdministrator) {
+        event.preventDefault();
+        onOpenAdminConsole('create-user');
+        return;
+      }
+
+      if (key === '=') {
+        event.preventDefault();
+        onOpenCalculator();
+      }
+    };
+
+    document.addEventListener('keydown', handleShortcut);
+
+    return () => document.removeEventListener('keydown', handleShortcut);
+  }, [isAdministrator, navigate, onOpenAdminConsole, onOpenCalendar, onOpenCalculator, onOpenCommandPalette, onOpenMessages]);
+
+  return null;
 }
 
 function NotFoundPage() {
@@ -4206,6 +4316,14 @@ function App() {
             isCalendarOpen={isCalendarModalOpen}
             onOpenMessages={toggleMessagesModal}
             onOpenCalendar={toggleCalendarModal}
+          />
+          <GlobalKeyboardShortcuts
+            isAdministrator={isAdministrator}
+            onOpenMessages={openMessagesModal}
+            onOpenCalendar={openCalendarModal}
+            onOpenCalculator={openCalculator}
+            onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+            onOpenAdminConsole={openAdminConsole}
           />
           <GlobalCommandPalette
             isOpen={isCommandPaletteOpen}

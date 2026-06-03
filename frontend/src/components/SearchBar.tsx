@@ -20,6 +20,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const employmentTypes = ['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inactive', 'Other', 'CPS'];
   const [query, setQuery] = React.useState(initialQuery);
   const onSearchRef = React.useRef(onSearch);
+  const inputRef = React.useRef<HTMLInputElement | null>(null);
   const [showFilters, setShowFilters] = React.useState(false);
   const [filters, setFilters] = React.useState({
     rank: '',
@@ -48,6 +49,17 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   }, [onSearch]);
 
   React.useEffect(() => {
+    const focusSearch = () => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    };
+
+    window.addEventListener('shield:focus-user-search', focusSearch);
+
+    return () => window.removeEventListener('shield:focus-user-search', focusSearch);
+  }, []);
+
+  React.useEffect(() => {
     const timer = window.setTimeout(() => {
       onSearchRef.current(query);
     }, 250);
@@ -65,6 +77,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     <div className="bg-white rounded-lg shadow p-5 mb-8 dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
       <form onSubmit={handleSearch} className="flex gap-2 mb-4">
         <input
+          ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
