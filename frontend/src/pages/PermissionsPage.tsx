@@ -29,6 +29,7 @@ const permissionGroups = [
     permissions: [
       { key: 'devices:manage', label: 'Manage devices' },
       { key: 'calendar:manage', label: 'Manage calendar' },
+      { key: 'calendar:view-profiles', label: 'View profile calendars' },
       { key: 'messages:send', label: 'Send messages' },
       { key: 'alerts:send', label: 'Send urgent alerts' },
     ],

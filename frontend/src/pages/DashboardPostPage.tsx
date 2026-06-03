@@ -397,6 +397,7 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
               onClose={() => setSelectedCommentUser(null)}
               canEdit={isAdministrator}
               onToast={onToast}
+              currentUser={currentUser}
               onEdit={(user) => {
                 setSelectedCommentUser(null);
                 navigate(`/search?userId=${encodeURIComponent(user.id)}&q=${encodeURIComponent(`${user.firstName} ${user.lastName}`.trim() || user.email || user.id)}`);

@@ -801,6 +801,9 @@ export const calendarService = {
   getAll: (accountId: string) =>
     api.get<CalendarEntry[]>('/calendar', { params: { accountId } }),
 
+  getProfileEntries: (accountId: string) =>
+    api.get<CalendarEntry[]>(`/calendar/profile/${accountId}`),
+
   create: (entry: CalendarEntryPayload & { accountId: string; actorId?: string; actorName?: string }) =>
     api.post<CalendarEntry>('/calendar', entry),
 

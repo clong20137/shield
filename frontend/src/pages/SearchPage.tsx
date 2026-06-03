@@ -900,6 +900,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
               onMessage={openMessageThread}
               onToast={onToast}
               canEdit={isAdministrator}
+              currentUser={currentUser}
               onHeaderPointerDown={dragHandleProps.onPointerDown}
               isFloatingProfile
             />

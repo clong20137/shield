@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, Copy, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
-import { DeviceRecord, deviceService, getAssetUrl, handleAssetImageError, MileageSummary, mileageService, User } from '../services/api';
+import { CalendarDays, Check, Copy, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
+import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetUrl, handleAssetImageError, MileageSummary, mileageService, User } from '../services/api';
 import { RankBadge } from './RankBadge';
 
 interface UserDetailProps {
@@ -10,6 +10,7 @@ interface UserDetailProps {
   onMessage?: (user: User) => void;
   onToast?: (type: 'success' | 'error', message: string) => void;
   canEdit?: boolean;
+  currentUser?: AuthAccount | null;
   onHeaderPointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void;
   isFloatingProfile?: boolean;
 }
@@ -112,12 +113,53 @@ function getLastOnlineLabel(lastSeenAt?: string | null): string {
   return `Last online ${new Date(lastSeenAt).toLocaleString()}`;
 }
 
-export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, onMessage, onToast, canEdit = false, onHeaderPointerDown, isFloatingProfile = false }) => {
+type ProfileTab = 'personal' | 'identification' | 'employment' | 'contact' | 'devices' | 'calendar' | 'additional';
+
+function getSupervisorLookupValues(account?: AuthAccount | null) {
+  if (!account) {
+    return [];
+  }
+
+  return Array.from(new Set([
+    account.displayName,
+    `${account.firstName || ''} ${account.lastName || ''}`.trim(),
+    account.email,
+  ]
+    .map((value) => value?.trim().toLowerCase())
+    .filter((value): value is string => Boolean(value))));
+}
+
+function isProfileSupervisor(user: User, account?: AuthAccount | null): boolean {
+  const supervisor = user.supervisor?.trim().toLowerCase();
+  return Boolean(supervisor && getSupervisorLookupValues(account).includes(supervisor));
+}
+
+function formatCalendarDate(value: string): string {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function getCalendarSummary(entries: CalendarEntry[]) {
+  const submitted = entries.filter((entry) => entry.submissionStatus === 'Submitted').length;
+  const dutyHours = entries.reduce((total, entry) => total + (Number(entry.dutyHours) || 0), 0);
+  const trooperDailyCount = entries.filter((entry) => entry.category === 'Trooper Daily').length;
+
+  return { submitted, dutyHours, trooperDailyCount };
+}
+
+export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, onMessage, onToast, canEdit = false, currentUser = null, onHeaderPointerDown, isFloatingProfile = false }) => {
   const callNumber = user.departmentPhoneNumber || user.personalPhoneNumber;
   const callHref = callNumber ? `tel:${callNumber.replace(/[^\d+]/gu, '')}` : undefined;
   const emailHref = user.email ? `mailto:${user.email}` : undefined;
-  const [activeTab, setActiveTab] = useState<'personal' | 'identification' | 'employment' | 'contact' | 'devices' | 'additional'>('personal');
+  const [activeTab, setActiveTab] = useState<ProfileTab>('personal');
   const [mileageSummary, setMileageSummary] = useState<MileageSummary | null>(null);
+  const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>([]);
+  const [isCalendarLoading, setIsCalendarLoading] = useState(false);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
   const [assignedDevices, setAssignedDevices] = useState<DeviceRecord[]>([]);
   const [isDevicesLoading, setIsDevicesLoading] = useState(false);
   const [editingDevice, setEditingDevice] = useState<DeviceRecord | null>(null);
@@ -125,14 +167,22 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const [deviceError, setDeviceError] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [presenceTick, setPresenceTick] = useState(0);
-  const tabs = [
+  const canViewProfileCalendar = Boolean(
+    currentUser?.id === user.id ||
+    currentUser?.role === 'administrator' ||
+    currentUser?.permissions?.includes('calendar:view-profiles') ||
+    isProfileSupervisor(user, currentUser),
+  );
+  const tabs: Array<[ProfileTab, string]> = [
     ['personal', 'Personal'],
     ['identification', 'Identification'],
     ['employment', 'Employment'],
     ['contact', 'Contact'],
     ['devices', 'Devices'],
+    ...(canViewProfileCalendar ? [['calendar', 'Calendar'] as [ProfileTab, string]] : []),
     ['additional', 'Additional'],
-  ] as const;
+  ];
+  const calendarSummary = useMemo(() => getCalendarSummary(calendarEntries), [calendarEntries]);
 
   useEffect(() => {
     let isMounted = true;
@@ -166,6 +216,39 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
     const timer = window.setInterval(() => setPresenceTick((current) => current + 1), 60000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'calendar' || !canViewProfileCalendar) {
+      return;
+    }
+
+    let isMounted = true;
+    setIsCalendarLoading(true);
+    setCalendarError(null);
+
+    calendarService.getProfileEntries(user.id)
+      .then((response) => {
+        if (isMounted) {
+          setCalendarEntries(response.data);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load profile calendar:', error);
+        if (isMounted) {
+          setCalendarEntries([]);
+          setCalendarError('Failed to load calendar activity.');
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsCalendarLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab, canViewProfileCalendar, user.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -465,6 +548,63 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
                   </div>
                 </article>
               ))}
+            </div>
+          )}
+        </DetailSection>}
+
+        {activeTab === 'calendar' && canViewProfileCalendar && <DetailSection title="Calendar Activity">
+          {calendarError && <div className="error">{calendarError}</div>}
+          {isCalendarLoading ? (
+            <div className="loading">Loading calendar activity...</div>
+          ) : calendarEntries.length === 0 ? (
+            <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No calendar activity found.</div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="rounded border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+                  <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Entries</span>
+                  <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{calendarEntries.length}</p>
+                </div>
+                <div className="rounded border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+                  <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Duty Hours</span>
+                  <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{calendarSummary.dutyHours.toLocaleString()}</p>
+                </div>
+                <div className="rounded border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+                  <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Submitted</span>
+                  <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{calendarSummary.submitted}</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {calendarEntries.slice(0, 30).map((entry) => (
+                  <article key={entry.id} className="rounded border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-primary-500/10 text-primary-500 dark:text-blue-100">
+                          <CalendarDays size={18} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-gray-900 dark:text-gray-100">{formatCalendarDate(entry.date)}</p>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{entry.category} - {entry.districtWorked || 'No district'}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold text-accent">{entry.dutyHours || '0'} hrs</span>
+                        <span className="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-600 dark:bg-gray-800 dark:text-gray-300">{entry.submissionStatus}</span>
+                        {entry.category === 'Trooper Daily' && (
+                          <span className="rounded bg-primary-500/10 px-2 py-1 text-xs font-bold text-primary-500 dark:text-blue-100">{entry.reviewStatus}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                      <DetailRow label="Special Status" value={entry.specialStatus} />
+                      <DetailRow label="Updated" value={new Date(entry.updatedAt).toLocaleString()} />
+                    </div>
+                  </article>
+                ))}
+              </div>
+              {calendarEntries.length > 30 && (
+                <p className="text-sm text-gray-500 dark:text-gray-400">Showing latest 30 of {calendarEntries.length} entries.</p>
+              )}
             </div>
           )}
         </DetailSection>}

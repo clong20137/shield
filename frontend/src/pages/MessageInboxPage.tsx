@@ -1280,6 +1280,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
               onClose={() => setSelectedMentionUser(null)}
               onToast={onToast}
               canEdit={currentUser.role === 'administrator'}
+              currentUser={currentUser}
             />
           </div>
         </div>

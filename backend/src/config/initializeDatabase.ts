@@ -245,13 +245,13 @@ export async function initializeDatabase() {
   await pool.query(`
     INSERT IGNORE INTO roles (\`id\`, \`name\`, \`permissions\`)
     VALUES
-      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","devices:manage","calendar:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","bugs:manage"]'),
+      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","devices:manage","calendar:manage","calendar:view-profiles","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","bugs:manage"]'),
       ('role-user', 'user', '["users:view","calendar:manage","messages:send"]')
   `);
 
   await pool.query(`
     UPDATE roles
-    SET \`permissions\` = '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","devices:manage","calendar:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","bugs:manage"]'
+    SET \`permissions\` = '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","devices:manage","calendar:manage","calendar:view-profiles","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","bugs:manage"]'
     WHERE \`name\` = 'administrator'
   `);
 

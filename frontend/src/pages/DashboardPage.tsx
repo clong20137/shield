@@ -1774,6 +1774,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
           onClose={() => setSelectedProfile(null)}
           onMessage={(user) => window.dispatchEvent(new CustomEvent('shield:open-message-thread', { detail: user }))}
           canEdit={isAdministrator}
+          currentUser={currentUser}
           onHeaderPointerDown={startDraggingProfile}
           isFloatingProfile
         />

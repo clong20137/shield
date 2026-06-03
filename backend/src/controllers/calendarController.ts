@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { CalendarEntryModel } from '../models/CalendarEntry';
 import { CalendarShortcutModel } from '../models/CalendarShortcut';
 import { AuditLogModel } from '../models/AuditLog';
+import { AuthAccountModel } from '../models/AuthAccount';
+import { UserModel } from '../models/User';
 import { getSessionAccount } from '../middleware/authSession';
 import { broadcastAppEvent } from '../services/appEvents';
 import { cleanRecord, cleanString, isOneOf, isValidHexColor, isValidIsoDate } from '../utils/validation';
@@ -45,6 +47,39 @@ function getAuditActor(account: { id: string; displayName: string; email: string
     actorId: account?.id || null,
     actorName: account?.displayName || account?.email || null,
   };
+}
+
+function getSupervisorLookupValues(account: { displayName?: string; firstName?: string; lastName?: string; email?: string }) {
+  return Array.from(new Set([
+    account.displayName,
+    `${account.firstName || ''} ${account.lastName || ''}`.trim(),
+    account.email,
+  ]
+    .map((value) => value?.trim().toLowerCase())
+    .filter((value): value is string => Boolean(value))));
+}
+
+async function canViewHiddenUsers(account: { id: string; role: string }) {
+  if (account.role === 'administrator') {
+    return true;
+  }
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
+  return permissions.includes('users:view-hidden');
+}
+
+async function canViewProfileCalendar(account: { id: string; role: string; displayName?: string; firstName?: string; lastName?: string; email?: string }, targetUser: { id: string; supervisor?: string }) {
+  if (account.id === targetUser.id || account.role === 'administrator') {
+    return true;
+  }
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
+  if (permissions.includes('calendar:view-profiles')) {
+    return true;
+  }
+
+  const supervisor = targetUser.supervisor?.trim().toLowerCase();
+  return Boolean(supervisor && getSupervisorLookupValues(account).includes(supervisor));
 }
 
 async function getCalendarAccount(req: Request, requestedAccountId?: string) {
@@ -152,6 +187,31 @@ function validateCalendarShortcutPayload(body: Record<string, unknown>) {
 }
 
 export class CalendarController {
+  static async listProfileEntries(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in to view profile calendar' });
+      }
+
+      const targetUser = await UserModel.getUserById(req.params.accountId);
+      if (!targetUser || (targetUser.isHidden && targetUser.id !== account.id && !(await canViewHiddenUsers(account)))) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      if (!(await canViewProfileCalendar(account, targetUser))) {
+        return res.status(403).json({ error: 'Profile calendar permission required' });
+      }
+
+      const pagination = parsePagination(req.query, { defaultPageSize: 90, maxPageSize: 365 });
+      const entries = await CalendarEntryModel.listEntries(targetUser.id, pagination.pageSize, pagination.offset);
+      res.json(entries);
+    } catch (error) {
+      console.error('Profile calendar list error:', error);
+      res.status(500).json({ error: 'Failed to load profile calendar' });
+    }
+  }
+
   static async listShortcuts(req: Request, res: Response) {
     try {
       const account = await getCalendarAccount(req);

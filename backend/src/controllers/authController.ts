@@ -22,6 +22,7 @@ const allowedPermissions = [
   'users:profile-picture',
   'devices:manage',
   'calendar:manage',
+  'calendar:view-profiles',
   'reports:trooper-dailies',
   'reports:cpar',
   'audit:view',
