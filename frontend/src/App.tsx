@@ -26,6 +26,7 @@ const QUICK_LAUNCH_SLOT_COUNT = 8;
 const MODAL_CLOSE_MS = 220;
 
 type ClosingModal = 'messages' | 'calendar' | 'calculator' | 'profile' | 'adminConsole' | 'reportBug' | 'bugTracker';
+type FloatingAppId = 'messages' | 'calendar' | 'calculator' | 'profile' | 'adminConsole';
 
 interface MessagePreferences {
   receiveMessages: boolean;
@@ -719,6 +720,21 @@ function isMobileViewport() {
 
 function announceFloatingFocus(app: string) {
   window.dispatchEvent(new CustomEvent('shield:floating-focus', { detail: { app } }));
+}
+
+function getCenteredFloatingPosition(width: number, topRatio = 0.08) {
+  return {
+    x: Math.max(8, Math.round((window.innerWidth - width) / 2)),
+    y: Math.max(8, Math.round(window.innerHeight * topRatio)),
+  };
+}
+
+function getInitialProfileSettingsPosition() {
+  return getCenteredFloatingPosition(Math.min(window.innerWidth - 16, 900), 0.07);
+}
+
+function getInitialAdminConsolePosition() {
+  return getCenteredFloatingPosition(Math.min(window.innerWidth - 16, 1240), 0.035);
 }
 
 function isEditableKeyboardTarget(target: EventTarget | null): boolean {
@@ -2879,7 +2895,7 @@ function App() {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
-  const [activeFloatingApp, setActiveFloatingApp] = useState<'messages' | 'calendar' | 'calculator'>('messages');
+  const [activeFloatingApp, setActiveFloatingApp] = useState<FloatingAppId>('messages');
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [messageTargetUser, setMessageTargetUser] = useState<User | null>(null);
   const [isAdminConsoleOpen, setIsAdminConsoleOpen] = useState(false);
@@ -3693,6 +3709,12 @@ function App() {
     openCalculator();
   };
 
+  const openProfileSettings = () => {
+    announceFloatingFocus('profile');
+    setActiveFloatingApp('profile');
+    setIsProfileModalOpen(true);
+  };
+
   const closeActiveFloatingApp = () => {
     if (activeFloatingApp === 'calculator' && isCalculatorOpen) {
       closeModal('calculator');
@@ -3709,6 +3731,16 @@ function App() {
       return true;
     }
 
+    if (activeFloatingApp === 'profile' && isProfileModalOpen) {
+      closeModal('profile');
+      return true;
+    }
+
+    if (activeFloatingApp === 'adminConsole' && isAdminConsoleOpen) {
+      closeModal('adminConsole');
+      return true;
+    }
+
     if (isCalculatorOpen) {
       closeModal('calculator');
       return true;
@@ -3721,6 +3753,16 @@ function App() {
 
     if (isMessagesModalOpen) {
       closeModal('messages');
+      return true;
+    }
+
+    if (isProfileModalOpen) {
+      closeModal('profile');
+      return true;
+    }
+
+    if (isAdminConsoleOpen) {
+      closeModal('adminConsole');
       return true;
     }
 
@@ -3746,6 +3788,8 @@ function App() {
       return;
     }
 
+    announceFloatingFocus('adminConsole');
+    setActiveFloatingApp('adminConsole');
     setAdminConsoleTab(tab);
     setIsAccountMenuOpen(false);
     setIsAdminConsoleOpen(true);
@@ -3976,7 +4020,7 @@ function App() {
               <button
                 data-onboarding-target="profile-card"
                 type="button"
-                onClick={() => setIsProfileModalOpen(true)}
+                onClick={openProfileSettings}
                 className={`w-full overflow-hidden rounded bg-white/10 text-left transition hover:bg-white/15 ${isSidebarCollapsed ? 'p-1.5' : 'p-3'}`}
                 title="Open profile"
               >
@@ -4215,7 +4259,7 @@ function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        setIsProfileModalOpen(true);
+                        openProfileSettings();
                         setIsAccountMenuOpen(false);
                       }}
                       className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
@@ -4337,7 +4381,7 @@ function App() {
             onOpenCalendar={openCalendarModal}
             onOpenCalculator={openCalculator}
             onOpenProfile={() => {
-              setIsProfileModalOpen(true);
+              openProfileSettings();
               setIsAccountMenuOpen(false);
             }}
             onOpenAdminConsole={openAdminConsole}
@@ -4431,9 +4475,23 @@ function App() {
             </FloatingWindow>
           )}
           {isProfileModalOpen && currentUser && (
-            <div className={getModalBackdropClass(closingModal === 'profile')}>
-              <div className={getModalWindowClass(closingModal === 'profile', 'flex h-[100dvh] w-full flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 sm:h-auto sm:max-h-[88vh] sm:max-w-4xl sm:rounded-lg sm:p-4')}>
-                <div className="mb-3 flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
+            <FloatingWindow
+              className="pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[min(88dvh,760px)] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(460px,calc(100dvh-1rem))] md:w-[min(900px,calc(100vw-1rem))] md:min-w-[min(380px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4"
+              fallbackSize={{ width: Math.min(window.innerWidth - 16, 900), height: Math.min(window.innerHeight - 16, 760) }}
+              initialPosition={getInitialProfileSettingsPosition}
+              isClosing={closingModal === 'profile'}
+              onFocus={() => {
+                announceFloatingFocus('profile');
+                setActiveFloatingApp('profile');
+              }}
+              zIndex={activeFloatingApp === 'profile' ? 95 : 55}
+            >
+              {({ dragHandleProps, isDragging }) => (
+              <>
+                <div
+                  {...dragHandleProps}
+                  className={`mb-3 flex shrink-0 select-none items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800 md:cursor-grab ${isDragging ? 'md:cursor-grabbing' : ''}`}
+                >
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 sm:text-2xl">Account Settings</h2>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage your profile security and sign-in options.</p>
@@ -4479,13 +4537,28 @@ function App() {
                     />
                   </Suspense>
                 </div>
-              </div>
-            </div>
+              </>
+              )}
+            </FloatingWindow>
           )}
           {isAdminConsoleOpen && currentUser && canOpenAdminConsole && (
-            <div className={getModalBackdropClass(closingModal === 'adminConsole', 'bg-black/60')}>
-              <div className={getModalWindowClass(closingModal === 'adminConsole', 'flex h-[96dvh] w-full max-w-7xl flex-col overflow-hidden rounded-lg bg-white p-3 shadow-2xl dark:bg-gray-900 sm:h-[94vh] sm:p-5')}>
-                <div className="mb-3 flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800">
+            <FloatingWindow
+              className="pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[min(94dvh,860px)] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(520px,calc(100dvh-1rem))] md:w-[min(1240px,calc(100vw-1rem))] md:min-w-[min(460px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-5"
+              fallbackSize={{ width: Math.min(window.innerWidth - 16, 1240), height: Math.min(window.innerHeight - 16, 860) }}
+              initialPosition={getInitialAdminConsolePosition}
+              isClosing={closingModal === 'adminConsole'}
+              onFocus={() => {
+                announceFloatingFocus('adminConsole');
+                setActiveFloatingApp('adminConsole');
+              }}
+              zIndex={activeFloatingApp === 'adminConsole' ? 95 : 55}
+            >
+              {({ dragHandleProps, isDragging }) => (
+              <>
+                <div
+                  {...dragHandleProps}
+                  className={`mb-3 flex shrink-0 select-none items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800 md:cursor-grab ${isDragging ? 'md:cursor-grabbing' : ''}`}
+                >
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 sm:text-2xl">Admin Console</h2>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage settings, permissions, users, bug reports, and audit history from one place.</p>
@@ -4515,8 +4588,9 @@ function App() {
                     />
                   </Suspense>
                 </div>
-              </div>
-            </div>
+              </>
+              )}
+            </FloatingWindow>
           )}
           {isCalculatorOpen && (
             <CalculatorModal

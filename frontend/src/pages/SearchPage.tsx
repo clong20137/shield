@@ -152,6 +152,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [profileZIndex, setProfileZIndex] = useState(85);
+  const [editProfileZIndex, setEditProfileZIndex] = useState(86);
   const [error, setError] = useState<string | null>(null);
   const [currentQuery, setCurrentQuery] = useState('');
   const [currentFilters, setCurrentFilters] = useState<UserFilters>({});
@@ -199,6 +200,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     const handleFloatingFocus = (event: Event) => {
       const detail = (event as CustomEvent<{ app?: string }>).detail;
       setProfileZIndex(detail?.app === 'profile' ? 85 : 58);
+      setEditProfileZIndex(detail?.app === 'editProfile' ? 86 : 59);
     };
 
     window.addEventListener('shield:floating-focus', handleFloatingFocus);
@@ -311,6 +313,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       return;
     }
 
+    setEditProfileZIndex(86);
+    window.dispatchEvent(new CustomEvent('shield:floating-focus', { detail: { app: 'editProfile' } }));
     setEditingUser(user);
     setEditForm(user);
     if (supervisorOptions.length === 0 || addressSuggestions.length === 0 || roleOptions.length === 0) {
@@ -337,6 +341,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const focusProfileWindow = () => {
     setProfileZIndex(85);
     window.dispatchEvent(new CustomEvent('shield:floating-focus', { detail: { app: 'profile' } }));
+  };
+
+  const focusEditProfileWindow = () => {
+    setEditProfileZIndex(86);
+    window.dispatchEvent(new CustomEvent('shield:floating-focus', { detail: { app: 'editProfile' } }));
   };
 
   const updateProfilePicture = () => {
@@ -933,9 +942,19 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       )}
 
       {editingUser && (
-        <div className="fixed inset-0 z-[100] flex items-stretch justify-center bg-black/60 sm:items-center sm:p-4">
-          <form onSubmit={handleSaveUser} className="flex h-[100dvh] w-full flex-col overflow-hidden rounded-none bg-white shadow-xl dark:bg-gray-900 sm:max-h-[92vh] sm:max-w-5xl sm:rounded-lg">
-            <div className="flex shrink-0 items-center justify-between gap-4 bg-primary-500 px-4 py-4 text-white sm:px-5">
+        <FloatingWindow
+          className="pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[min(92dvh,820px)] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(520px,calc(100dvh-1rem))] md:w-[min(1040px,calc(100vw-1rem))] md:min-w-[min(440px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg"
+          fallbackSize={{ width: Math.min(window.innerWidth - 16, 1040), height: Math.min(window.innerHeight - 16, 820) }}
+          initialPosition={getInitialProfileWindowPosition}
+          zIndex={editProfileZIndex}
+          onFocus={focusEditProfileWindow}
+        >
+          {({ dragHandleProps, isDragging }) => (
+          <form onSubmit={handleSaveUser} className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-none bg-white dark:bg-gray-900 md:rounded-lg">
+            <div
+              {...dragHandleProps}
+              className={`flex shrink-0 select-none items-center justify-between gap-4 bg-primary-500 px-4 py-4 text-white sm:px-5 md:cursor-grab ${isDragging ? 'md:cursor-grabbing' : ''}`}
+            >
               <div className="min-w-0">
                 <h2 className="truncate text-xl font-bold text-white sm:text-2xl">Edit User</h2>
                 <p className="mt-1 text-sm text-blue-100">{editingUser.firstName} {editingUser.lastName}</p>
@@ -1147,13 +1166,12 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
             <div className="flex shrink-0 flex-wrap justify-end gap-3 border-t border-gray-200 px-4 py-4 dark:border-gray-800 sm:px-5">
               <button type="submit" className="btn-primary" disabled={isSavingUser} aria-label="Save user" title={isSavingUser ? 'Saving' : 'Save User'}>
                 <Save size={16} />
-              </button>
-              <button type="button" onClick={() => setEditingUser(null)} className="btn-secondary" aria-label="Cancel edit user" title="Cancel">
-                <X size={16} />
+                <span>Save</span>
               </button>
             </div>
           </form>
-        </div>
+          )}
+        </FloatingWindow>
       )}
 
       {messageRecipient && (
