@@ -38,6 +38,7 @@ const allowedPermissions = [
   'dashboard:edit',
   'dashboard:delete',
   'bugs:manage',
+  'admin:access',
   'admin:general',
   'admin:permissions',
   'admin:achievements',

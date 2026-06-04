@@ -69,6 +69,7 @@ const permissionGroups = [
     title: 'Admin Console Sections',
     description: 'Control which admin tools appear inside the Admin Console.',
     permissions: [
+      { key: 'admin:access', label: 'Open Admin Console' },
       { key: 'admin:general', label: 'Open General settings' },
       { key: 'admin:permissions', label: 'Open Permissions' },
       { key: 'admin:achievements', label: 'Open Achievements' },

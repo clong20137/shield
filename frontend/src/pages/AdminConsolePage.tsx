@@ -41,6 +41,10 @@ function hasPermission(account: AuthAccount, permission: string): boolean {
 }
 
 function getVisibleTabs(account: AuthAccount): Array<{ id: AdminConsoleTab; label: string; icon: typeof Settings }> {
+  if (!hasPermission(account, 'admin:access')) {
+    return [];
+  }
+
   return tabs.filter((tab) => {
     if (tab.id === 'general') return hasPermission(account, 'admin:general') && hasPermission(account, 'roles:manage');
     if (tab.id === 'permissions') return hasPermission(account, 'admin:permissions') && hasPermission(account, 'roles:manage');
@@ -78,6 +82,10 @@ export function AdminConsolePage({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 md:flex-row">
+      {visibleTabs.length === 0 ? (
+        <div className="empty-state">You do not have access to any Admin Console tools.</div>
+      ) : (
+      <>
       <aside className="shrink-0 border-b border-gray-200 pb-3 dark:border-gray-800 md:w-56 md:border-r md:border-b-0 md:pr-3 md:pb-0">
         <div className="mb-3 flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-950">
           <ActiveIcon size={17} className="text-primary-500" />
@@ -165,6 +173,8 @@ export function AdminConsolePage({
           )}
         </Suspense>
       </div>
+      </>
+      )}
     </div>
   );
 }

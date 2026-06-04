@@ -3432,24 +3432,7 @@ function App() {
   const hasPermission = (permission: string) => Boolean(isAdministrator || currentUser?.permissions?.includes(permission));
   const canOpenAdminConsole = Boolean(currentUser && (
     isAdministrator ||
-    hasPermission('admin:general') ||
-    hasPermission('admin:permissions') ||
-    hasPermission('admin:achievements') ||
-    hasPermission('admin:create-user') ||
-    hasPermission('admin:media') ||
-    hasPermission('admin:alerts') ||
-    hasPermission('admin:bugs') ||
-    hasPermission('admin:audit') ||
-    hasPermission('admin:errors') ||
-    hasPermission('alerts:send') ||
-    hasPermission('roles:manage') ||
-    hasPermission('users:create') ||
-    hasPermission('media:view') ||
-    hasPermission('media:upload') ||
-    hasPermission('media:edit') ||
-    hasPermission('media:delete') ||
-    hasPermission('audit:view') ||
-    hasPermission('bugs:manage')
+    hasPermission('admin:access')
   ));
   const openBugCount = bugReports.filter((report) => report.status === 'New' || report.status === 'Pending').length;
   const unreadNotificationCount = userNotifications.filter((notification) => !notification.isRead).length;
