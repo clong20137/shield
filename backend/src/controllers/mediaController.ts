@@ -25,6 +25,10 @@ export class MediaController {
   static async list(req: Request, res: Response) {
     try {
       const uploadsRoot = path.resolve(process.cwd(), 'uploads');
+      const selectedFolder = typeof req.query.folder === 'string' ? req.query.folder : '';
+      const searchTerm = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : '';
+      const page = Math.max(Number(req.query.page) || 1, 1);
+      const limit = Math.min(Math.max(Number(req.query.limit) || 60, 12), 120);
       const items: Array<{
         id: string;
         folder: string;
@@ -35,10 +39,22 @@ export class MediaController {
         size: number;
         updatedAt: Date;
       }> = [];
+      const folders: Array<{
+        key: string;
+        label: string;
+        count: number;
+        size: number;
+        updatedAt: Date | null;
+      }> = [];
 
       for (const folder of mediaFolders) {
         const folderPath = path.join(uploadsRoot, folder.key);
+        let folderCount = 0;
+        let folderSize = 0;
+        let folderUpdatedAt: Date | null = null;
+
         if (!fs.existsSync(folderPath)) {
+          folders.push({ key: folder.key, label: folder.label, count: 0, size: 0, updatedAt: null });
           continue;
         }
 
@@ -46,6 +62,20 @@ export class MediaController {
           const filePath = path.join(folderPath, fileName);
           const stat = fs.statSync(filePath);
           if (!stat.isFile() || !allowedImageExtensions.has(path.extname(fileName).toLowerCase())) {
+            continue;
+          }
+
+          folderCount += 1;
+          folderSize += stat.size;
+          if (!folderUpdatedAt || stat.mtime.getTime() > folderUpdatedAt.getTime()) {
+            folderUpdatedAt = stat.mtime;
+          }
+
+          if (selectedFolder && selectedFolder !== folder.key) {
+            continue;
+          }
+
+          if (searchTerm && !`${fileName} ${folder.label}`.toLowerCase().includes(searchTerm)) {
             continue;
           }
 
@@ -61,10 +91,31 @@ export class MediaController {
             updatedAt: stat.mtime,
           });
         }
+
+        folders.push({
+          key: folder.key,
+          label: folder.label,
+          count: folderCount,
+          size: folderSize,
+          updatedAt: folderUpdatedAt,
+        });
       }
 
       items.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-      res.json(items);
+      const totalItems = folders.reduce((total, folder) => total + folder.count, 0);
+      const totalSize = folders.reduce((total, folder) => total + folder.size, 0);
+      const total = items.length;
+      const pagedItems = items.slice((page - 1) * limit, page * limit);
+
+      res.json({
+        items: pagedItems,
+        folders,
+        page,
+        limit,
+        total,
+        totalItems,
+        totalSize,
+      });
     } catch (error) {
       console.error('List media error:', error);
       res.status(500).json({ error: 'Failed to load media library' });

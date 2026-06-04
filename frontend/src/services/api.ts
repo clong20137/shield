@@ -278,6 +278,24 @@ export interface MediaLibraryItem {
   updatedAt: string;
 }
 
+export interface MediaLibraryFolder {
+  key: string;
+  label: string;
+  count: number;
+  size: number;
+  updatedAt: string | null;
+}
+
+export interface MediaLibraryResponse {
+  items: MediaLibraryItem[];
+  folders: MediaLibraryFolder[];
+  page: number;
+  limit: number;
+  total: number;
+  totalItems: number;
+  totalSize: number;
+}
+
 export interface SystemStatistics {
   totalUsers: number;
   activeUsers: number;
@@ -1031,8 +1049,8 @@ export const dashboardSummaryService = {
 };
 
 export const mediaService = {
-  getAll: () =>
-    api.get<MediaLibraryItem[]>('/media'),
+  getAll: (params?: { folder?: string; q?: string; page?: number; limit?: number }) =>
+    api.get<MediaLibraryResponse>('/media', { params }),
 };
 
 export const bugReportService = {
