@@ -51,7 +51,7 @@ export const profilePictureImportUpload = multer({
   },
   fileFilter: (_req, file, cb) => {
     const extension = path.extname(file.originalname).toLowerCase();
-    if (!allowedMimeTypes.has(file.mimetype) || !allowedExtensions.has(extension)) {
+    if (!allowedExtensions.has(extension)) {
       cb(new Error('Only image uploads are allowed'));
       return;
     }
