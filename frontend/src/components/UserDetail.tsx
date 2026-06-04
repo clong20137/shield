@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Check, Copy, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetUrl, handleAssetImageError, MileageSummary, mileageService, User } from '../services/api';
 import { RankBadge } from './RankBadge';
 
@@ -143,6 +143,40 @@ function formatCalendarDate(value: string): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function formatCalendarMonth(value: Date): string {
+  return value.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
+function formatDateKey(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function getCalendarDays(month: Date) {
+  const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
+  const gridStart = new Date(monthStart);
+  gridStart.setDate(monthStart.getDate() - monthStart.getDay());
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + index);
+    return date;
+  });
+}
+
+function getEntryTone(entry: CalendarEntry): string {
+  if (entry.category === 'Trooper Daily') {
+    return entry.reviewStatus === 'Returned'
+      ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100'
+      : 'border-primary-100 bg-primary-50 text-primary-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100';
+  }
+
+  return 'border-amber-100 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100';
+}
+
 function getCalendarSummary(entries: CalendarEntry[]) {
   const submitted = entries.filter((entry) => entry.submissionStatus === 'Submitted').length;
   const dutyHours = entries.reduce((total, entry) => total + (Number(entry.dutyHours) || 0), 0);
@@ -160,6 +194,8 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>([]);
   const [isCalendarLoading, setIsCalendarLoading] = useState(false);
   const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [profileCalendarMonth, setProfileCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => formatDateKey(new Date()));
   const [assignedDevices, setAssignedDevices] = useState<DeviceRecord[]>([]);
   const [isDevicesLoading, setIsDevicesLoading] = useState(false);
   const [editingDevice, setEditingDevice] = useState<DeviceRecord | null>(null);
@@ -183,6 +219,16 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
     ['additional', 'Additional'],
   ];
   const calendarSummary = useMemo(() => getCalendarSummary(calendarEntries), [calendarEntries]);
+  const calendarDays = useMemo(() => getCalendarDays(profileCalendarMonth), [profileCalendarMonth]);
+  const entriesByDate = useMemo(() => calendarEntries.reduce<Record<string, CalendarEntry[]>>((groups, entry) => {
+    groups[entry.date] = [...(groups[entry.date] || []), entry];
+    return groups;
+  }, {}), [calendarEntries]);
+  const selectedDayEntries = entriesByDate[selectedCalendarDate] || [];
+  const selectedDayLabel = formatCalendarDate(selectedCalendarDate);
+  const changeProfileCalendarMonth = (offset: number) => {
+    setProfileCalendarMonth((currentMonth) => new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1));
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -552,12 +598,10 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           )}
         </DetailSection>}
 
-        {activeTab === 'calendar' && canViewProfileCalendar && <DetailSection title="Calendar Activity">
+        {activeTab === 'calendar' && canViewProfileCalendar && <DetailSection title="Calendar">
           {calendarError && <div className="error">{calendarError}</div>}
           {isCalendarLoading ? (
             <div className="loading">Loading calendar activity...</div>
-          ) : calendarEntries.length === 0 ? (
-            <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No calendar activity found.</div>
           ) : (
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -574,37 +618,93 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
                   <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{calendarSummary.submitted}</p>
                 </div>
               </div>
-              <div className="space-y-3">
-                {calendarEntries.slice(0, 30).map((entry) => (
-                  <article key={entry.id} className="rounded border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-primary-500/10 text-primary-500 dark:text-blue-100">
-                          <CalendarDays size={18} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-gray-900 dark:text-gray-100">{formatCalendarDate(entry.date)}</p>
-                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{entry.category} - {entry.districtWorked || 'No district'}</p>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold text-accent">{entry.dutyHours || '0'} hrs</span>
-                        <span className="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-600 dark:bg-gray-800 dark:text-gray-300">{entry.submissionStatus}</span>
-                        {entry.category === 'Trooper Daily' && (
-                          <span className="rounded bg-primary-500/10 px-2 py-1 text-xs font-bold text-primary-500 dark:text-blue-100">{entry.reviewStatus}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-                      <DetailRow label="Special Status" value={entry.specialStatus} />
-                      <DetailRow label="Updated" value={new Date(entry.updatedAt).toLocaleString()} />
-                    </div>
-                  </article>
-                ))}
+              <div className="rounded border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{formatCalendarMonth(profileCalendarMonth)}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{calendarEntries.length === 0 ? 'No activity loaded' : `${calendarSummary.trooperDailyCount} Trooper Daily entr${calendarSummary.trooperDailyCount === 1 ? 'y' : 'ies'}`}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => changeProfileCalendarMonth(-1)} className="btn-secondary" aria-label="Previous month" title="Previous Month">
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button type="button" onClick={() => setProfileCalendarMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1))} className="btn-secondary text-xs" title="Current Month">
+                      Today
+                    </button>
+                    <button type="button" onClick={() => changeProfileCalendarMonth(1)} className="btn-secondary" aria-label="Next month" title="Next Month">
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 sm:text-xs">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => <div key={day}>{day}</div>)}
+                </div>
+                <div className="mt-2 grid grid-cols-7 gap-1 sm:gap-2">
+                  {calendarDays.map((day) => {
+                    const dateKey = formatDateKey(day);
+                    const dayEntries = entriesByDate[dateKey] || [];
+                    const isCurrentMonth = day.getMonth() === profileCalendarMonth.getMonth();
+                    const isSelected = selectedCalendarDate === dateKey;
+                    const isToday = dateKey === formatDateKey(new Date());
+
+                    return (
+                      <button
+                        key={dateKey}
+                        type="button"
+                        onClick={() => setSelectedCalendarDate(dateKey)}
+                        className={`min-h-[76px] rounded border p-1 text-left transition sm:min-h-[100px] sm:p-2 ${isSelected ? 'border-primary-500 ring-2 ring-primary-500/20' : 'border-gray-200 dark:border-gray-800'} ${isCurrentMonth ? 'bg-white dark:bg-gray-950' : 'bg-gray-50 text-gray-400 dark:bg-gray-900/50 dark:text-gray-500'} hover:border-primary-400 hover:shadow-sm`}
+                      >
+                        <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${isToday ? 'bg-primary-500 text-white' : 'text-gray-700 dark:text-gray-200'}`}>
+                          {day.getDate()}
+                        </span>
+                        <span className="mt-1 flex flex-col gap-1">
+                          {dayEntries.slice(0, 2).map((entry) => (
+                            <span key={entry.id} className={`truncate rounded border px-1.5 py-0.5 text-[10px] font-bold sm:text-xs ${getEntryTone(entry)}`}>
+                              {entry.category === 'Trooper Daily' ? `${entry.dutyHours || '0'} hrs` : entry.category}
+                            </span>
+                          ))}
+                          {dayEntries.length > 2 && (
+                            <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400">+{dayEntries.length - 2} more</span>
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              {calendarEntries.length > 30 && (
-                <p className="text-sm text-gray-500 dark:text-gray-400">Showing latest 30 of {calendarEntries.length} entries.</p>
-              )}
+              <div className="rounded border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+                <div className="mb-3 flex items-center gap-2">
+                  <CalendarDays size={18} className="text-primary-500 dark:text-blue-100" />
+                  <h4 className="text-base font-bold text-gray-900 dark:text-gray-100">{selectedDayLabel}</h4>
+                </div>
+                {selectedDayEntries.length === 0 ? (
+                  <div className="empty-state rounded border border-dashed border-gray-300 py-6 text-sm dark:border-gray-700">No activity on this date.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {selectedDayEntries.map((entry) => (
+                      <article key={entry.id} className="rounded border border-gray-200 p-3 dark:border-gray-800">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-bold text-gray-900 dark:text-gray-100">{entry.category}</p>
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{entry.districtWorked || 'No district'} - {entry.specialStatus || 'None'}</p>
+                          </div>
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold text-accent">{entry.dutyHours || '0'} hrs</span>
+                            <span className="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-600 dark:bg-gray-800 dark:text-gray-300">{entry.submissionStatus}</span>
+                            {entry.category === 'Trooper Daily' && (
+                              <span className="rounded bg-primary-500/10 px-2 py-1 text-xs font-bold text-primary-500 dark:text-blue-100">{entry.reviewStatus}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                          <DetailRow label="Updated" value={new Date(entry.updatedAt).toLocaleString()} />
+                          <DetailRow label="Review Notes" value={entry.reviewNotes} />
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </DetailSection>}
