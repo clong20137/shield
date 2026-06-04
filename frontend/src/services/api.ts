@@ -267,6 +267,17 @@ export interface UserPhotoImportResponse {
   skippedFiles: Array<{ fileName: string; peNumber: string; reason: string }>;
 }
 
+export interface MediaLibraryItem {
+  id: string;
+  folder: string;
+  label: string;
+  fileName: string;
+  url: string;
+  thumbnailUrl: string;
+  size: number;
+  updatedAt: string;
+}
+
 export interface SystemStatistics {
   totalUsers: number;
   activeUsers: number;
@@ -824,10 +835,17 @@ export const userService = {
     return api.post<UserImportResponse>('/users/import', formData, { timeout: 30000 });
   },
 
-  importProfilePictures: (files: File[]) => {
+  importProfilePictures: (files: File[], onProgress?: (progress: number) => void) => {
     const formData = new FormData();
     files.forEach((file) => formData.append('photos', file));
-    return api.post<UserPhotoImportResponse>('/users/profile-pictures/import', formData, { timeout: 120000 });
+    return api.post<UserPhotoImportResponse>('/users/profile-pictures/import', formData, {
+      timeout: 300000,
+      onUploadProgress: (event) => {
+        if (event.total && onProgress) {
+          onProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      },
+    });
   },
   
   update: (id: string, updates: Partial<User>) =>
@@ -1010,6 +1028,11 @@ export const dashboardPostService = {
 export const dashboardSummaryService = {
   get: () =>
     api.get<DashboardSummary>('/dashboard/summary'),
+};
+
+export const mediaService = {
+  getAll: () =>
+    api.get<MediaLibraryItem[]>('/media'),
 };
 
 export const bugReportService = {

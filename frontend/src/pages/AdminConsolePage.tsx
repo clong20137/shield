@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { AlertTriangle, Award, Bug, ClipboardList, LockKeyhole, Radio, Settings, UserPlus } from 'lucide-react';
+import { AlertTriangle, Award, Bug, ClipboardList, Images, LockKeyhole, Radio, Settings, UserPlus } from 'lucide-react';
 import { AuthAccount, BugReport, BugReportStatus, User } from '../services/api';
 
 const AchievementsPage = lazy(() => import('./AchievementsPage'));
@@ -7,10 +7,11 @@ const AuditLogPage = lazy(() => import('./AuditLogPage'));
 const BugTrackerPage = lazy(() => import('./BugTrackerPage'));
 const CreateUserPage = lazy(() => import('./CreateUserPage'));
 const ErrorLogPage = lazy(() => import('./ErrorLogPage'));
+const MediaLibraryPage = lazy(() => import('./MediaLibraryPage'));
 const PermissionsPage = lazy(() => import('./PermissionsPage'));
 const UrgentAlertsPage = lazy(() => import('./UrgentAlertsPage'));
 
-export type AdminConsoleTab = 'general' | 'permissions' | 'achievements' | 'create-user' | 'alerts' | 'audit' | 'errors' | 'bugs';
+export type AdminConsoleTab = 'general' | 'permissions' | 'achievements' | 'create-user' | 'media' | 'alerts' | 'audit' | 'errors' | 'bugs';
 
 interface AdminConsolePageProps {
   account: AuthAccount;
@@ -28,6 +29,7 @@ const tabs: Array<{ id: AdminConsoleTab; label: string; icon: typeof Settings }>
   { id: 'permissions', label: 'Permissions', icon: LockKeyhole },
   { id: 'achievements', label: 'Achievements', icon: Award },
   { id: 'create-user', label: 'Create User', icon: UserPlus },
+  { id: 'media', label: 'Media', icon: Images },
   { id: 'alerts', label: 'Urgent Alerts', icon: Radio },
   { id: 'bugs', label: 'Bug Tracker', icon: Bug },
   { id: 'audit', label: 'Audit Log', icon: ClipboardList },
@@ -44,6 +46,7 @@ function getVisibleTabs(account: AuthAccount): Array<{ id: AdminConsoleTab; labe
     if (tab.id === 'permissions') return hasPermission(account, 'roles:manage');
     if (tab.id === 'achievements') return hasPermission(account, 'roles:manage');
     if (tab.id === 'create-user') return hasPermission(account, 'users:create');
+    if (tab.id === 'media') return hasPermission(account, 'users:profile-picture') || hasPermission(account, 'dashboard:manage');
     if (tab.id === 'alerts') return hasPermission(account, 'alerts:send');
     if (tab.id === 'bugs') return hasPermission(account, 'bugs:manage');
     if (tab.id === 'audit') return hasPermission(account, 'audit:view');
@@ -131,6 +134,8 @@ export function AdminConsolePage({
               getErrorMessage={getErrorMessage}
             />
           )}
+
+          {currentTab === 'media' && <MediaLibraryPage />}
 
           {currentTab === 'audit' && <AuditLogPage isModalView />}
 

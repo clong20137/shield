@@ -75,6 +75,7 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
   const [isSaving, setIsSaving] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isImportingPhotos, setIsImportingPhotos] = useState(false);
+  const [photoUploadProgress, setPhotoUploadProgress] = useState(0);
   const [importSummary, setImportSummary] = useState<{ createdCount: number; skippedRows: Array<{ rowNumber: number; reason: string }> } | null>(null);
   const [photoImportSummary, setPhotoImportSummary] = useState<{ uploadedCount: number; skippedFiles: Array<{ fileName: string; peNumber: string; reason: string }> } | null>(null);
   const spreadsheetInputRef = useRef<HTMLInputElement | null>(null);
@@ -193,9 +194,11 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
     }
 
     setIsImportingPhotos(true);
+    setPhotoUploadProgress(0);
     setPhotoImportSummary(null);
     try {
-      const response = await userService.importProfilePictures(files);
+      const response = await userService.importProfilePictures(files, setPhotoUploadProgress);
+      setPhotoUploadProgress(100);
       setPhotoImportSummary({
         uploadedCount: response.data.uploadedCount,
         skippedFiles: response.data.skippedFiles,
@@ -271,6 +274,18 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
                 {photoImportSummary.skippedFiles.length > 20 && <p>{photoImportSummary.skippedFiles.length - 20} more skipped files.</p>}
               </div>
             )}
+          </div>
+        )}
+        {isImportingPhotos && (
+          <div className="mt-4 rounded border border-blue-100 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/40">
+            <div className="mb-2 flex items-center justify-between text-sm font-semibold text-primary-500 dark:text-blue-100">
+              <span>Uploading profile photos</span>
+              <span>{photoUploadProgress}%</span>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-white dark:bg-gray-900">
+              <div className="h-full rounded-full bg-primary-500 transition-all" style={{ width: `${photoUploadProgress}%` }} />
+            </div>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Large batches may keep processing after the upload reaches 100% while thumbnails are generated.</p>
           </div>
         )}
       </div>

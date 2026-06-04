@@ -26,6 +26,7 @@ import reminderRoutes from './routes/reminderRoutes';
 import pinnedProfileRoutes from './routes/pinnedProfileRoutes';
 import quickNoteRoutes from './routes/quickNoteRoutes';
 import urgentAlertRoutes from './routes/urgentAlertRoutes';
+import mediaRoutes from './routes/mediaRoutes';
 import { startSecurityCleanupJob } from './services/securityCleanup';
 import { rateLimit } from './middleware/rateLimit';
 import { requestTimeout } from './middleware/requestTimeout';
@@ -188,7 +189,7 @@ app.use('/api', rateLimit({
 app.use('/api', requestTimeout({
   timeoutMs: Number.isFinite(apiRequestTimeoutMs) && apiRequestTimeoutMs > 0 ? apiRequestTimeoutMs : 30 * 1000,
   message: 'The request took too long. Try again shortly.',
-  skipPaths: ['/api/events', '/api/messages/events', '/api/users/import'],
+  skipPaths: ['/api/events', '/api/messages/events', '/api/users/import', '/api/users/profile-pictures/import'],
 }));
 
 app.use('/api/auth', authRoutes);
@@ -211,6 +212,7 @@ app.use('/api/reminders', reminderRoutes);
 app.use('/api/pinned-profiles', pinnedProfileRoutes);
 app.use('/api/quick-notes', quickNoteRoutes);
 app.use('/api/urgent-alerts', urgentAlertRoutes);
+app.use('/api/media', mediaRoutes);
 
 const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
 app.use(express.static(frontendDistPath));
