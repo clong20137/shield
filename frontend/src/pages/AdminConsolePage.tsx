@@ -42,15 +42,15 @@ function hasPermission(account: AuthAccount, permission: string): boolean {
 
 function getVisibleTabs(account: AuthAccount): Array<{ id: AdminConsoleTab; label: string; icon: typeof Settings }> {
   return tabs.filter((tab) => {
-    if (tab.id === 'general') return hasPermission(account, 'roles:manage');
-    if (tab.id === 'permissions') return hasPermission(account, 'roles:manage');
-    if (tab.id === 'achievements') return hasPermission(account, 'roles:manage');
-    if (tab.id === 'create-user') return hasPermission(account, 'users:create');
-    if (tab.id === 'media') return hasPermission(account, 'users:profile-picture') || hasPermission(account, 'dashboard:manage');
-    if (tab.id === 'alerts') return hasPermission(account, 'alerts:send');
-    if (tab.id === 'bugs') return hasPermission(account, 'bugs:manage');
-    if (tab.id === 'audit') return hasPermission(account, 'audit:view');
-    if (tab.id === 'errors') return hasPermission(account, 'audit:view');
+    if (tab.id === 'general') return hasPermission(account, 'admin:general') && hasPermission(account, 'roles:manage');
+    if (tab.id === 'permissions') return hasPermission(account, 'admin:permissions') && hasPermission(account, 'roles:manage');
+    if (tab.id === 'achievements') return hasPermission(account, 'admin:achievements') && hasPermission(account, 'roles:manage');
+    if (tab.id === 'create-user') return hasPermission(account, 'admin:create-user') && hasPermission(account, 'users:create');
+    if (tab.id === 'media') return hasPermission(account, 'admin:media') && (hasPermission(account, 'media:view') || hasPermission(account, 'media:upload') || hasPermission(account, 'media:edit') || hasPermission(account, 'media:delete'));
+    if (tab.id === 'alerts') return hasPermission(account, 'admin:alerts') && hasPermission(account, 'alerts:send');
+    if (tab.id === 'bugs') return hasPermission(account, 'admin:bugs') && hasPermission(account, 'bugs:manage');
+    if (tab.id === 'audit') return hasPermission(account, 'admin:audit') && hasPermission(account, 'audit:view');
+    if (tab.id === 'errors') return hasPermission(account, 'admin:errors') && hasPermission(account, 'audit:view');
     return account.role === 'administrator';
   });
 }
@@ -148,7 +148,7 @@ export function AdminConsolePage({
             />
           )}
 
-          {currentTab === 'media' && <MediaLibraryPage />}
+          {currentTab === 'media' && <MediaLibraryPage account={account} onToast={onToast} getErrorMessage={getErrorMessage} />}
 
           {currentTab === 'audit' && <AuditLogPage isModalView />}
 

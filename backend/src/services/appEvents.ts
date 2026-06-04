@@ -14,6 +14,7 @@ export type AppEventType =
   | 'urgent-alert-updated'
   | 'performance-evaluation-updated'
   | 'mileage-updated'
+  | 'media-updated'
   | 'quick-launch-updated'
   | 'reminder-updated'
   | 'session-revoked'

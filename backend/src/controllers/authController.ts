@@ -20,6 +20,10 @@ const allowedPermissions = [
   'users:edit',
   'users:view-hidden',
   'users:profile-picture',
+  'media:view',
+  'media:upload',
+  'media:edit',
+  'media:delete',
   'devices:manage',
   'calendar:manage',
   'calendar:view-profiles',
@@ -34,6 +38,15 @@ const allowedPermissions = [
   'dashboard:edit',
   'dashboard:delete',
   'bugs:manage',
+  'admin:general',
+  'admin:permissions',
+  'admin:achievements',
+  'admin:create-user',
+  'admin:media',
+  'admin:alerts',
+  'admin:bugs',
+  'admin:audit',
+  'admin:errors',
 ] as const;
 
 function isDuplicateEmailError(error: unknown): boolean {

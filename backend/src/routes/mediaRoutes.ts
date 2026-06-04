@@ -1,9 +1,23 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { MediaController } from '../controllers/mediaController';
-import { requireAnyPermission } from '../middleware/permissions';
+import { requireAnyPermission, requirePermission } from '../middleware/permissions';
 
 const router = Router();
+const mediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 20 * 1024 * 1024,
+    files: 300,
+  },
+});
 
-router.get('/', requireAnyPermission(['users:profile-picture', 'dashboard:manage']), MediaController.list);
+router.get('/', requireAnyPermission(['media:view', 'media:upload', 'media:edit', 'media:delete', 'users:profile-picture', 'dashboard:manage']), MediaController.list);
+router.post('/folders', requirePermission('media:edit'), MediaController.createFolder);
+router.put('/folders/:folder', requirePermission('media:edit'), MediaController.renameFolder);
+router.delete('/folders/:folder', requirePermission('media:delete'), MediaController.deleteFolder);
+router.post('/images', requirePermission('media:upload'), mediaUpload.array('images', 300), MediaController.uploadImages);
+router.put('/images/:folder/:fileName', requirePermission('media:edit'), MediaController.renameImage);
+router.delete('/images/:folder/:fileName', requirePermission('media:delete'), MediaController.deleteImage);
 
 export default router;

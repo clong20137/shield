@@ -284,6 +284,7 @@ export interface MediaLibraryFolder {
   count: number;
   size: number;
   updatedAt: string | null;
+  protected: boolean;
 }
 
 export interface MediaLibraryResponse {
@@ -1051,6 +1052,29 @@ export const dashboardSummaryService = {
 export const mediaService = {
   getAll: (params?: { folder?: string; q?: string; page?: number; limit?: number }) =>
     api.get<MediaLibraryResponse>('/media', { params }),
+  createFolder: (name: string) =>
+    api.post<MediaLibraryFolder>('/media/folders', { name }),
+  renameFolder: (folder: string, name: string) =>
+    api.put<Pick<MediaLibraryFolder, 'key' | 'label'>>(`/media/folders/${encodeURIComponent(folder)}`, { name }),
+  deleteFolder: (folder: string) =>
+    api.delete(`/media/folders/${encodeURIComponent(folder)}`),
+  uploadImages: (folder: string, files: File[], onProgress?: (progress: number) => void) => {
+    const formData = new FormData();
+    formData.append('folder', folder);
+    files.forEach((file) => formData.append('images', file));
+    return api.post<{ uploadedCount: number; skippedCount: number; uploaded: string[]; skipped: Array<{ fileName: string; reason: string }> }>('/media/images', formData, {
+      timeout: 300000,
+      onUploadProgress: (event) => {
+        if (event.total && onProgress) {
+          onProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      },
+    });
+  },
+  renameImage: (folder: string, fileName: string, name: string) =>
+    api.put<{ fileName: string }>(`/media/images/${encodeURIComponent(folder)}/${encodeURIComponent(fileName)}`, { name }),
+  deleteImage: (folder: string, fileName: string) =>
+    api.delete(`/media/images/${encodeURIComponent(folder)}/${encodeURIComponent(fileName)}`),
 };
 
 export const bugReportService = {

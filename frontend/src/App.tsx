@@ -3432,9 +3432,22 @@ function App() {
   const hasPermission = (permission: string) => Boolean(isAdministrator || currentUser?.permissions?.includes(permission));
   const canOpenAdminConsole = Boolean(currentUser && (
     isAdministrator ||
+    hasPermission('admin:general') ||
+    hasPermission('admin:permissions') ||
+    hasPermission('admin:achievements') ||
+    hasPermission('admin:create-user') ||
+    hasPermission('admin:media') ||
+    hasPermission('admin:alerts') ||
+    hasPermission('admin:bugs') ||
+    hasPermission('admin:audit') ||
+    hasPermission('admin:errors') ||
     hasPermission('alerts:send') ||
     hasPermission('roles:manage') ||
     hasPermission('users:create') ||
+    hasPermission('media:view') ||
+    hasPermission('media:upload') ||
+    hasPermission('media:edit') ||
+    hasPermission('media:delete') ||
     hasPermission('audit:view') ||
     hasPermission('bugs:manage')
   ));
@@ -3519,6 +3532,7 @@ function App() {
     eventSource.addEventListener('dashboard-updated', handleRealtimeAppUpdate('dashboard-updated'));
     eventSource.addEventListener('device-updated', handleRealtimeAppUpdate('device-updated'));
     eventSource.addEventListener('error-updated', handleRealtimeAppUpdate('error-updated'));
+    eventSource.addEventListener('media-updated', handleRealtimeAppUpdate('media-updated'));
     eventSource.addEventListener('mileage-updated', handleRealtimeAppUpdate('mileage-updated'));
     eventSource.addEventListener('performance-evaluation-updated', handleRealtimeAppUpdate('performance-evaluation-updated'));
     eventSource.addEventListener('permission-updated', (event) => {

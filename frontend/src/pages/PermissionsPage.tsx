@@ -24,6 +24,16 @@ const permissionGroups = [
     ],
   },
   {
+    title: 'Media Library',
+    description: 'Photo library browsing, uploads, folder management, and deletion.',
+    permissions: [
+      { key: 'media:view', label: 'View media library' },
+      { key: 'media:upload', label: 'Upload media' },
+      { key: 'media:edit', label: 'Create/rename folders and images' },
+      { key: 'media:delete', label: 'Delete images and folders' },
+    ],
+  },
+  {
     title: 'Operations',
     description: 'Daily work tools and inventory operations.',
     permissions: [
@@ -53,6 +63,21 @@ const permissionGroups = [
       { key: 'dashboard:edit', label: 'Edit news and updates' },
       { key: 'dashboard:delete', label: 'Delete news and updates' },
       { key: 'bugs:manage', label: 'Manage bug tracker' },
+    ],
+  },
+  {
+    title: 'Admin Console Sections',
+    description: 'Control which admin tools appear inside the Admin Console.',
+    permissions: [
+      { key: 'admin:general', label: 'Open General settings' },
+      { key: 'admin:permissions', label: 'Open Permissions' },
+      { key: 'admin:achievements', label: 'Open Achievements' },
+      { key: 'admin:create-user', label: 'Open Create User' },
+      { key: 'admin:media', label: 'Open Media' },
+      { key: 'admin:alerts', label: 'Open Urgent Alerts' },
+      { key: 'admin:bugs', label: 'Open Bug Tracker' },
+      { key: 'admin:audit', label: 'Open Audit Log' },
+      { key: 'admin:errors', label: 'Open Error Log' },
     ],
   },
 ];

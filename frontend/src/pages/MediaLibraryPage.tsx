@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink, Folder, HardDrive, Image, RefreshCw, Search, X } from 'lucide-react';
-import { getAssetThumbnailUrl, getAssetUrl, handleAssetThumbnailError, MediaLibraryFolder, MediaLibraryItem, mediaService } from '../services/api';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ChevronLeft, ChevronRight, ExternalLink, Folder, HardDrive, Image, Pencil, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { AuthAccount, getAssetThumbnailUrl, getAssetUrl, handleAssetThumbnailError, MediaLibraryFolder, MediaLibraryItem, mediaService } from '../services/api';
 
 const pageSize = 60;
 
@@ -21,19 +21,41 @@ function formatDate(value: string | null): string {
   });
 }
 
-export default function MediaLibraryPage() {
+interface MediaLibraryPageProps {
+  account: AuthAccount;
+  onToast: (type: 'success' | 'error' | 'info', message: string) => void;
+  getErrorMessage: (error: unknown, fallback: string) => string;
+}
+
+function hasPermission(account: AuthAccount, permission: string): boolean {
+  return account.role === 'administrator' || Boolean(account.permissions?.includes(permission));
+}
+
+export default function MediaLibraryPage({ account, onToast, getErrorMessage }: MediaLibraryPageProps) {
   const [items, setItems] = useState<MediaLibraryItem[]>([]);
   const [folders, setFolders] = useState<MediaLibraryFolder[]>([]);
   const [activeFolder, setActiveFolder] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState<MediaLibraryItem | null>(null);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [editingFolderKey, setEditingFolderKey] = useState('');
+  const [editingFolderName, setEditingFolderName] = useState('');
+  const [renamingImageId, setRenamingImageId] = useState('');
+  const [renamingImageName, setRenamingImageName] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
   const [totalSize, setTotalSize] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const canViewMedia = hasPermission(account, 'media:view') || hasPermission(account, 'media:upload') || hasPermission(account, 'media:edit') || hasPermission(account, 'media:delete');
+  const canUploadMedia = hasPermission(account, 'media:upload');
+  const canEditMedia = hasPermission(account, 'media:edit');
+  const canDeleteMedia = hasPermission(account, 'media:delete');
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -71,6 +93,12 @@ export default function MediaLibraryPage() {
     void loadMedia();
   }, [activeFolder, debouncedSearchTerm, page]);
 
+  useEffect(() => {
+    const handleMediaUpdate = () => void loadMedia();
+    window.addEventListener('shield:media-updated', handleMediaUpdate);
+    return () => window.removeEventListener('shield:media-updated', handleMediaUpdate);
+  }, [activeFolder, debouncedSearchTerm, page]);
+
   const activeFolderDetails = useMemo(
     () => folders.find((folder) => folder.key === activeFolder) || null,
     [activeFolder, folders],
@@ -92,6 +120,104 @@ export default function MediaLibraryPage() {
     setSearchTerm('');
     setDebouncedSearchTerm('');
   };
+
+  const createFolder = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!newFolderName.trim()) return;
+
+    try {
+      await mediaService.createFolder(newFolderName);
+      setNewFolderName('');
+      onToast('success', 'Folder created.');
+      await loadMedia();
+    } catch (err) {
+      onToast('error', getErrorMessage(err, 'Failed to create folder.'));
+    }
+  };
+
+  const renameFolder = async (folder: MediaLibraryFolder) => {
+    if (!editingFolderName.trim()) return;
+
+    try {
+      const response = await mediaService.renameFolder(folder.key, editingFolderName);
+      setEditingFolderKey('');
+      setEditingFolderName('');
+      if (activeFolder === folder.key) {
+        setActiveFolder(response.data.key);
+      }
+      onToast('success', 'Folder renamed.');
+      await loadMedia();
+    } catch (err) {
+      onToast('error', getErrorMessage(err, 'Failed to rename folder.'));
+    }
+  };
+
+  const deleteFolder = async (folder: MediaLibraryFolder) => {
+    if (folder.protected || !window.confirm(`Delete ${folder.label} and all images inside it?`)) {
+      return;
+    }
+
+    try {
+      await mediaService.deleteFolder(folder.key);
+      if (activeFolder === folder.key) {
+        closeFolder();
+      }
+      onToast('success', 'Folder deleted.');
+      await loadMedia();
+    } catch (err) {
+      onToast('error', getErrorMessage(err, 'Failed to delete folder.'));
+    }
+  };
+
+  const uploadImages = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (!activeFolder || files.length === 0) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+    try {
+      const response = await mediaService.uploadImages(activeFolder, files, setUploadProgress);
+      setUploadProgress(100);
+      onToast('success', `${response.data.uploadedCount} image${response.data.uploadedCount === 1 ? '' : 's'} uploaded\n${response.data.skippedCount} skipped`);
+      await loadMedia();
+    } catch (err) {
+      onToast('error', getErrorMessage(err, 'Failed to upload images.'));
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const renameImage = async (item: MediaLibraryItem) => {
+    if (!renamingImageName.trim()) return;
+
+    try {
+      await mediaService.renameImage(item.folder, item.fileName, renamingImageName);
+      setRenamingImageId('');
+      setRenamingImageName('');
+      onToast('success', 'Image renamed.');
+      await loadMedia();
+    } catch (err) {
+      onToast('error', getErrorMessage(err, 'Failed to rename image.'));
+    }
+  };
+
+  const deleteImage = async (item: MediaLibraryItem) => {
+    if (!window.confirm(`Delete ${item.fileName}?`)) return;
+
+    try {
+      await mediaService.deleteImage(item.folder, item.fileName);
+      setSelectedItem((selected) => selected?.id === item.id ? null : selected);
+      onToast('success', 'Image deleted.');
+      await loadMedia();
+    } catch (err) {
+      onToast('error', getErrorMessage(err, 'Failed to delete image.'));
+    }
+  };
+
+  if (!canViewMedia) {
+    return <div className="empty-state">You do not have permission to view the media library.</div>;
+  }
 
   return (
     <div className="space-y-4">
@@ -150,44 +276,90 @@ export default function MediaLibraryPage() {
                 className="w-full rounded border border-gray-300 bg-white py-2 pr-3 pl-9 text-sm dark:border-gray-700 dark:bg-gray-950"
               />
             </label>
+            {activeFolderDetails && canUploadMedia && (
+              <>
+                <button type="button" onClick={() => uploadInputRef.current?.click()} className="btn-primary" disabled={isUploading} aria-label="Upload images" title="Upload Images">
+                  <Upload size={16} />
+                </button>
+                <input ref={uploadInputRef} type="file" multiple accept=".jpg,.jpeg,.jfif,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={uploadImages} />
+              </>
+            )}
             {activeFolderDetails && (
               <button type="button" onClick={closeFolder} className="btn-secondary">
                 <ChevronLeft size={16} />
                 Folders
               </button>
             )}
-            <button type="button" onClick={() => void loadMedia()} className="btn-secondary" aria-label="Refresh media library" title="Refresh">
-              <RefreshCw size={16} />
-            </button>
           </div>
         </div>
       </div>
 
       {error && <div className="error">{error}</div>}
+      {isUploading && (
+        <div className="rounded border border-blue-100 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/40">
+          <div className="mb-2 flex items-center justify-between text-sm font-semibold text-primary-500 dark:text-blue-100">
+            <span>Uploading images</span>
+            <span>{uploadProgress}%</span>
+          </div>
+          <div className="h-3 overflow-hidden rounded-full bg-white dark:bg-gray-900">
+            <div className="h-full rounded-full bg-primary-500 transition-all" style={{ width: `${uploadProgress}%` }} />
+          </div>
+        </div>
+      )}
 
       {!activeFolder && (
+        <>
+        {canEditMedia && (
+          <form onSubmit={createFolder} className="flex flex-col gap-2 rounded border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 sm:flex-row">
+            <input value={newFolderName} onChange={(event) => setNewFolderName(event.target.value)} placeholder="New folder name" className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
+            <button type="submit" className="btn-primary" aria-label="Create folder" title="Create Folder">
+              <Plus size={16} />
+            </button>
+          </form>
+        )}
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {folders.map((folder) => (
-            <button
+            <article
               key={folder.key}
-              type="button"
-              onDoubleClick={() => openFolder(folder.key)}
-              onClick={() => openFolder(folder.key)}
-              className="rounded border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:hover:border-primary-700"
+              className="rounded border border-gray-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:hover:border-primary-700"
             >
-              <div className="flex items-start gap-3">
-                <div className="rounded bg-primary-50 p-3 text-primary-500 dark:bg-primary-900/30 dark:text-primary-200">
+              <div className="flex items-start gap-3" onDoubleClick={() => openFolder(folder.key)}>
+                <button type="button" onClick={() => openFolder(folder.key)} className="rounded bg-primary-50 p-3 text-primary-500 dark:bg-primary-900/30 dark:text-primary-200" aria-label={`Open ${folder.label}`}>
                   <Folder size={24} />
-                </div>
+                </button>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-bold text-gray-900 dark:text-white">{folder.label}</p>
+                  {editingFolderKey === folder.key ? (
+                    <div className="flex gap-2">
+                      <input value={editingFolderName} onChange={(event) => setEditingFolderName(event.target.value)} className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-950" autoFocus />
+                      <button type="button" onClick={() => void renameFolder(folder)} className="btn-secondary" aria-label="Save folder name" title="Save">
+                        <Check size={15} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => openFolder(folder.key)} className="block max-w-full text-left">
+                      <p className="truncate text-base font-bold text-gray-900 dark:text-white">{folder.label}</p>
+                    </button>
+                  )}
                   <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{folder.count} image{folder.count === 1 ? '' : 's'} / {formatBytes(folder.size)}</p>
                   <p className="mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400">Last updated {formatDate(folder.updatedAt)}</p>
                 </div>
+                <div className="flex items-center gap-1">
+                  {canEditMedia && !folder.protected && (
+                    <button type="button" onClick={() => { setEditingFolderKey(folder.key); setEditingFolderName(folder.label); }} className="btn-secondary" aria-label="Rename folder" title="Rename">
+                      <Pencil size={15} />
+                    </button>
+                  )}
+                  {canDeleteMedia && !folder.protected && (
+                    <button type="button" onClick={() => void deleteFolder(folder)} className="btn-secondary text-danger" aria-label="Delete folder" title="Delete">
+                      <Trash2 size={15} />
+                    </button>
+                  )}
+                </div>
               </div>
-            </button>
+            </article>
           ))}
         </div>
+        </>
       )}
 
       {activeFolder && (
@@ -232,12 +404,36 @@ export default function MediaLibraryPage() {
                     <div className="p-3">
                       <div className="mb-2 flex items-center gap-2">
                         <Image size={15} className="shrink-0 text-primary-500" />
-                        <p className="truncate text-sm font-bold text-gray-900 dark:text-white" title={item.fileName}>{item.fileName}</p>
+                        {renamingImageId === item.id ? (
+                          <input value={renamingImageName} onChange={(event) => setRenamingImageName(event.target.value)} onClick={(event) => event.stopPropagation()} className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950" autoFocus />
+                        ) : (
+                          <p className="truncate text-sm font-bold text-gray-900 dark:text-white" title={item.fileName}>{item.fileName}</p>
+                        )}
                       </div>
                       <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{formatBytes(item.size)}</p>
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{formatDate(item.updatedAt)}</p>
                     </div>
                   </button>
+                  {(canEditMedia || canDeleteMedia) && (
+                    <div className="flex gap-1 border-t border-gray-100 p-2 dark:border-gray-800">
+                      {canEditMedia && (
+                        renamingImageId === item.id ? (
+                          <button type="button" onClick={() => void renameImage(item)} className="btn-secondary flex-1" aria-label="Save image name" title="Save">
+                            <Check size={15} />
+                          </button>
+                        ) : (
+                          <button type="button" onClick={() => { setRenamingImageId(item.id); setRenamingImageName(item.fileName.replace(/\.[^.]+$/u, '')); }} className="btn-secondary flex-1" aria-label="Rename image" title="Rename">
+                            <Pencil size={15} />
+                          </button>
+                        )
+                      )}
+                      {canDeleteMedia && (
+                        <button type="button" onClick={() => void deleteImage(item)} className="btn-secondary flex-1 text-danger" aria-label="Delete image" title="Delete">
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
@@ -254,6 +450,11 @@ export default function MediaLibraryPage() {
                 <p className="text-sm text-gray-500 dark:text-gray-400">{formatBytes(selectedItem.size)} / {formatDate(selectedItem.updatedAt)}</p>
               </div>
               <div className="flex items-center gap-2">
+                {canDeleteMedia && (
+                  <button type="button" onClick={() => void deleteImage(selectedItem)} className="btn-secondary text-danger" aria-label="Delete media" title="Delete">
+                    <Trash2 size={16} />
+                  </button>
+                )}
                 <a href={getAssetUrl(selectedItem.url)} target="_blank" rel="noreferrer" className="btn-secondary" aria-label="Open media in new tab" title="Open">
                   <ExternalLink size={16} />
                 </a>
