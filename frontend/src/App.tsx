@@ -43,6 +43,7 @@ interface QuickLaunchApp {
   label: string;
   path?: string;
   adminOnly?: boolean;
+  requiredPermission?: string;
   icon: LucideIcon;
 }
 
@@ -57,13 +58,13 @@ const quickLaunchApps: QuickLaunchApp[] = [
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: LayoutDashboard },
   { id: 'messages', label: 'Messages', icon: Mail },
   { id: 'calendar', label: 'Calendar', icon: CalendarDays },
-  { id: 'devices', label: 'Devices', path: '/devices', adminOnly: true, icon: Laptop },
+  { id: 'devices', label: 'Devices', path: '/devices', requiredPermission: 'devices:manage', icon: Laptop },
   { id: 'calculator', label: 'Calculator', icon: Calculator },
   { id: 'search', label: 'Search Users', path: '/search', icon: Search },
   { id: 'reports', label: 'Reports', path: '/reports', icon: BarChart3 },
-  { id: 'create-user', label: 'Create User', path: '/users/create', adminOnly: true, icon: UserPlus },
-  { id: 'audit', label: 'Audit Log', path: '/audit', adminOnly: true, icon: ClipboardList },
-  { id: 'permissions', label: 'Permissions', path: '/permissions', adminOnly: true, icon: LockKeyhole },
+  { id: 'create-user', label: 'Create User', path: '/users/create', requiredPermission: 'admin:create-user', icon: UserPlus },
+  { id: 'audit', label: 'Audit Log', path: '/audit', requiredPermission: 'admin:audit', icon: ClipboardList },
+  { id: 'permissions', label: 'Permissions', path: '/permissions', requiredPermission: 'admin:permissions', icon: LockKeyhole },
 ];
 
 function loadMessagePreferences(): MessagePreferences {
@@ -1293,6 +1294,7 @@ function CalculatorModal({ isClosing, onClose, onFocus, zIndex }: { isClosing: b
 
 function QuickLaunchTray({
   isAdministrator,
+  permissions,
   isSidebarCollapsed,
   badgeCounts,
   activeModalApps,
@@ -1304,6 +1306,7 @@ function QuickLaunchTray({
   onOpenCreateUser,
 }: {
   isAdministrator: boolean;
+  permissions: string[];
   isSidebarCollapsed: boolean;
   badgeCounts: Partial<Record<QuickLaunchAppId, number>>;
   activeModalApps: QuickLaunchAppId[];
@@ -1322,7 +1325,27 @@ function QuickLaunchTray({
   const didDragSlotRef = useRef(false);
   const [externalLabel, setExternalLabel] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
-  const availableApps = quickLaunchApps.filter((app) => !app.adminOnly || isAdministrator);
+  const permissionSet = useMemo(() => new Set(permissions), [permissions]);
+  const canUseQuickLaunchApp = (app: QuickLaunchApp) => {
+    if (app.requiredPermission && !isAdministrator && !permissionSet.has(app.requiredPermission)) {
+      return false;
+    }
+
+    if (app.id === 'create-user' && !isAdministrator && (!permissionSet.has('admin:access') || !permissionSet.has('users:create'))) {
+      return false;
+    }
+
+    if (app.id === 'audit' && !isAdministrator && (!permissionSet.has('admin:access') || !permissionSet.has('audit:view'))) {
+      return false;
+    }
+
+    if (app.id === 'permissions' && !isAdministrator && (!permissionSet.has('admin:access') || !permissionSet.has('roles:manage'))) {
+      return false;
+    }
+
+    return !app.adminOnly || isAdministrator;
+  };
+  const availableApps = quickLaunchApps.filter(canUseQuickLaunchApp);
   const usedAppIds = new Set(
     slots
       .map((slot, index) => (index === editingSlot ? null : slot))
@@ -1481,6 +1504,7 @@ function QuickLaunchTray({
         {slots.map((slot, index) => {
           const app = typeof slot === 'string' ? availableApps.find((item) => item.id === slot) || null : null;
           const isExternal = isExternalQuickLaunchSlot(slot);
+          const visibleSlot = app || isExternal ? slot : null;
           const Icon = app?.icon || (isExternal ? ExternalLink : null);
           const label = app?.label || (isExternal ? slot.label : 'Add');
           const badgeCount = app ? badgeCounts[app.id] || 0 : 0;
@@ -1490,9 +1514,9 @@ function QuickLaunchTray({
             <div
               key={`quick-launch-${index}`}
               className="relative"
-              draggable={Boolean(slot)}
+              draggable={Boolean(visibleSlot)}
               onDragStart={(event) => {
-                if (!slot) {
+                if (!visibleSlot) {
                   event.preventDefault();
                   return;
                 }
@@ -1524,19 +1548,19 @@ function QuickLaunchTray({
             >
               <button
                 type="button"
-                draggable={Boolean(slot)}
+                draggable={Boolean(visibleSlot)}
                 onClick={() => {
                   if (didDragSlotRef.current) {
                     return;
                   }
-                  if (slot) {
-                    openSlot(slot);
+                  if (visibleSlot) {
+                    openSlot(visibleSlot);
                     return;
                   }
                   setEditingSlot(index);
                 }}
                 onDragStart={(event) => {
-                  if (!slot) {
+                  if (!visibleSlot) {
                     event.preventDefault();
                     return;
                   }
@@ -1722,6 +1746,9 @@ interface CommandPaletteItem {
 function GlobalCommandPalette({
   isOpen,
   isAdministrator,
+  canOpenAdminConsole,
+  defaultAdminConsoleTab,
+  permissions,
   onOpenChange,
   onOpenMessages,
   onOpenCalendar,
@@ -1732,6 +1759,9 @@ function GlobalCommandPalette({
 }: {
   isOpen: boolean;
   isAdministrator: boolean;
+  canOpenAdminConsole: boolean;
+  defaultAdminConsoleTab: AdminConsoleTab;
+  permissions: string[];
   onOpenChange: (isOpen: boolean) => void;
   onOpenMessages: () => void;
   onOpenCalendar: () => void;
@@ -1741,6 +1771,8 @@ function GlobalCommandPalette({
   onReportBug: () => void;
 }) {
   const navigate = useNavigate();
+  const permissionSet = useMemo(() => new Set(permissions), [permissions]);
+  const canUsePermission = (permission: string) => isAdministrator || permissionSet.has(permission);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -1857,7 +1889,7 @@ function GlobalCommandPalette({
       },
     ];
 
-    if (isAdministrator) {
+    if (canOpenAdminConsole) {
       items.push(
         {
           id: 'admin',
@@ -1865,16 +1897,24 @@ function GlobalCommandPalette({
           detail: 'Open Shield administration.',
           keywords: ['settings', 'manage', 'administrator'],
           icon: Shield,
-          action: () => onOpenAdminConsole('general'),
+          action: () => onOpenAdminConsole(defaultAdminConsoleTab),
         },
-        {
+      );
+    }
+
+    if (canOpenAdminConsole && canUsePermission('admin:create-user') && canUsePermission('users:create')) {
+      items.push({
           id: 'create-user',
           label: 'Create User',
           detail: 'Add a new account.',
           keywords: ['account', 'new', 'person'],
           icon: UserPlus,
           action: () => onOpenAdminConsole('create-user'),
-        },
+        });
+    }
+
+    if (canUsePermission('devices:manage')) {
+      items.push(
         {
           id: 'devices',
           label: 'Devices',
@@ -1883,6 +1923,11 @@ function GlobalCommandPalette({
           icon: Laptop,
           action: () => navigate('/devices'),
         },
+      );
+    }
+
+    if (canOpenAdminConsole && canUsePermission('admin:audit') && canUsePermission('audit:view')) {
+      items.push(
         {
           id: 'audit-log',
           label: 'Audit Log',
@@ -1891,6 +1936,11 @@ function GlobalCommandPalette({
           icon: ClipboardList,
           action: () => onOpenAdminConsole('audit'),
         },
+      );
+    }
+
+    if (canOpenAdminConsole && canUsePermission('admin:permissions') && canUsePermission('roles:manage')) {
+      items.push(
         {
           id: 'permissions',
           label: 'Permissions',
@@ -1903,7 +1953,7 @@ function GlobalCommandPalette({
     }
 
     return items;
-  }, [isAdministrator, navigate, onOpenAdminConsole, onOpenCalendar, onOpenCalculator, onOpenMessages, onOpenProfile, onReportBug]);
+  }, [canOpenAdminConsole, canUsePermission, defaultAdminConsoleTab, navigate, onOpenAdminConsole, onOpenCalendar, onOpenCalculator, onOpenMessages, onOpenProfile, onReportBug]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -2036,14 +2086,18 @@ function GlobalCommandPalette({
 }
 
 function GlobalKeyboardShortcuts({
-  isAdministrator,
+  canOpenAdminConsole,
+  canCreateUsers,
+  defaultAdminConsoleTab,
   onOpenMessages,
   onOpenCalendar,
   onOpenCalculator,
   onOpenCommandPalette,
   onOpenAdminConsole,
 }: {
-  isAdministrator: boolean;
+  canOpenAdminConsole: boolean;
+  canCreateUsers: boolean;
+  defaultAdminConsoleTab: AdminConsoleTab;
   onOpenMessages: () => void;
   onOpenCalendar: () => void;
   onOpenCalculator: () => void;
@@ -2107,13 +2161,13 @@ function GlobalKeyboardShortcuts({
         return;
       }
 
-      if (key === 'a' && isAdministrator) {
+      if (key === 'a' && canOpenAdminConsole) {
         event.preventDefault();
-        onOpenAdminConsole('general');
+        onOpenAdminConsole(defaultAdminConsoleTab);
         return;
       }
 
-      if (key === 'u' && isAdministrator) {
+      if (key === 'u' && canCreateUsers) {
         event.preventDefault();
         onOpenAdminConsole('create-user');
         return;
@@ -2128,7 +2182,7 @@ function GlobalKeyboardShortcuts({
     document.addEventListener('keydown', handleShortcut);
 
     return () => document.removeEventListener('keydown', handleShortcut);
-  }, [isAdministrator, navigate, onOpenAdminConsole, onOpenCalendar, onOpenCalculator, onOpenCommandPalette, onOpenMessages]);
+  }, [canCreateUsers, canOpenAdminConsole, defaultAdminConsoleTab, navigate, onOpenAdminConsole, onOpenCalendar, onOpenCalculator, onOpenCommandPalette, onOpenMessages]);
 
   return null;
 }
@@ -3434,6 +3488,18 @@ function App() {
     isAdministrator ||
     hasPermission('admin:access')
   ));
+  const getDefaultAdminConsoleTab = (): AdminConsoleTab => {
+    if (hasPermission('admin:general') && hasPermission('roles:manage')) return 'general';
+    if (hasPermission('admin:permissions') && hasPermission('roles:manage')) return 'permissions';
+    if (hasPermission('admin:achievements') && hasPermission('roles:manage')) return 'achievements';
+    if (hasPermission('admin:create-user') && hasPermission('users:create')) return 'create-user';
+    if (hasPermission('admin:media') && (hasPermission('media:view') || hasPermission('media:upload') || hasPermission('media:edit') || hasPermission('media:delete'))) return 'media';
+    if (hasPermission('admin:alerts') && hasPermission('alerts:send')) return 'alerts';
+    if (hasPermission('admin:bugs') && hasPermission('bugs:manage')) return 'bugs';
+    if (hasPermission('admin:audit') && hasPermission('audit:view')) return 'audit';
+    if (hasPermission('admin:errors') && hasPermission('audit:view')) return 'errors';
+    return 'general';
+  };
   const openBugCount = bugReports.filter((report) => report.status === 'New' || report.status === 'Pending').length;
   const unreadNotificationCount = userNotifications.filter((notification) => !notification.isRead).length;
   const unreadUserNotifications = userNotifications.filter((notification) => !notification.isRead);
@@ -3443,6 +3509,12 @@ function App() {
   const shouldShowForcedPasswordModal = Boolean(
     currentUser?.mustChangePassword && !isWelcomeSplashOpen && !isFirstLoginGuideOpen,
   );
+
+  useEffect(() => {
+    if (!canOpenAdminConsole && isAdminConsoleOpen) {
+      setIsAdminConsoleOpen(false);
+    }
+  }, [canOpenAdminConsole, isAdminConsoleOpen]);
 
   const loadBugReports = useCallback(async () => {
     if (!isAdministrator) return;
@@ -3520,6 +3592,7 @@ function App() {
     eventSource.addEventListener('performance-evaluation-updated', handleRealtimeAppUpdate('performance-evaluation-updated'));
     eventSource.addEventListener('permission-updated', (event) => {
       void syncSessionTimeoutFromSettings();
+      void syncCurrentAccount();
       handleRealtimeAppUpdate('permission-updated')(event);
     });
     eventSource.addEventListener('quick-launch-updated', handleRealtimeAppUpdate('quick-launch-updated'));
@@ -3655,6 +3728,10 @@ function App() {
   };
 
   const toggleCreateUserModal = () => {
+    if (!canOpenAdminConsole || !hasPermission('admin:create-user') || !hasPermission('users:create')) {
+      return;
+    }
+
     if (isAdminConsoleOpen && adminConsoleTab === 'create-user') {
       closeModal('adminConsole');
       return;
@@ -3665,6 +3742,10 @@ function App() {
   };
 
   const openAdminConsole = (tab: AdminConsoleTab = 'general') => {
+    if (!canOpenAdminConsole) {
+      return;
+    }
+
     setAdminConsoleTab(tab);
     setIsAccountMenuOpen(false);
     setIsAdminConsoleOpen(true);
@@ -4144,7 +4225,7 @@ function App() {
                     {canOpenAdminConsole && (
                       <button
                         type="button"
-                        onClick={() => openAdminConsole(hasPermission('alerts:send') && !hasPermission('roles:manage') ? 'alerts' : 'general')}
+                        onClick={() => openAdminConsole(getDefaultAdminConsoleTab())}
                         className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
                       >
                         <Shield size={16} /> Admin Console
@@ -4190,17 +4271,17 @@ function App() {
                       />
                     )}
                     <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
-                    {currentUser && isAdministrator && (
-                      <Route path="/admin" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('general')} />} />
+                    {currentUser && canOpenAdminConsole && (
+                      <Route path="/admin" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole(getDefaultAdminConsoleTab())} />} />
                     )}
-                    {currentUser && isAdministrator && (
+                    {currentUser && canOpenAdminConsole && hasPermission('admin:create-user') && hasPermission('users:create') && (
                       <Route path="/users/create" element={<CreateUserRouteRedirect onOpenCreateUser={() => openAdminConsole('create-user')} />} />
                     )}
                     <Route path="/reports" element={<ReportsPage currentUser={currentUser} onToast={showToast} getErrorMessage={getErrorMessage} />} />
-                    {currentUser && isAdministrator && (
+                    {currentUser && canOpenAdminConsole && hasPermission('admin:audit') && hasPermission('audit:view') && (
                       <Route path="/audit" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('audit')} />} />
                     )}
-                    {currentUser && isAdministrator && (
+                    {currentUser && canOpenAdminConsole && hasPermission('admin:permissions') && hasPermission('roles:manage') && (
                       <Route path="/permissions" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('permissions')} />} />
                     )}
                     <Route path="*" element={<NotFoundPage />} />
@@ -4209,6 +4290,7 @@ function App() {
               </div>
               <QuickLaunchTray
                 isAdministrator={isAdministrator}
+                permissions={currentUser?.permissions || []}
                 isSidebarCollapsed={isSidebarCollapsed}
                 badgeCounts={{ messages: messageUnreadCount }}
                 activeModalApps={[
@@ -4235,7 +4317,9 @@ function App() {
             onOpenCalendar={toggleCalendarModal}
           />
           <GlobalKeyboardShortcuts
-            isAdministrator={isAdministrator}
+            canOpenAdminConsole={canOpenAdminConsole}
+            canCreateUsers={canOpenAdminConsole && hasPermission('admin:create-user') && hasPermission('users:create')}
+            defaultAdminConsoleTab={getDefaultAdminConsoleTab()}
             onOpenMessages={openMessagesModal}
             onOpenCalendar={openCalendarModal}
             onOpenCalculator={openCalculator}
@@ -4245,6 +4329,9 @@ function App() {
           <GlobalCommandPalette
             isOpen={isCommandPaletteOpen}
             isAdministrator={isAdministrator}
+            canOpenAdminConsole={canOpenAdminConsole}
+            defaultAdminConsoleTab={getDefaultAdminConsoleTab()}
+            permissions={currentUser?.permissions || []}
             onOpenChange={setIsCommandPaletteOpen}
             onOpenMessages={openMessagesModal}
             onOpenCalendar={openCalendarModal}
