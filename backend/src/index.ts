@@ -2,6 +2,7 @@ import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
+import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
 import { initializeDatabase } from './config/initializeDatabase';
@@ -30,6 +31,7 @@ import { rateLimit } from './middleware/rateLimit';
 import { requestTimeout } from './middleware/requestTimeout';
 import { csrfProtection } from './middleware/csrfProtection';
 import { ErrorLogModel } from './models/ErrorLog';
+import { createImageThumbnail } from './services/imageThumbnails';
 import { isAllowedOrigin, parseAllowedOrigins } from './utils/originPolicy';
 
 dotenv.config();
@@ -64,6 +66,47 @@ function getCspOrigins(): string[] {
 
 function getLocalDevelopmentCspSources(): string[] {
   return isProduction ? [] : ['http://localhost:*', 'http://127.0.0.1:*', 'ws://localhost:*', 'ws://127.0.0.1:*'];
+}
+
+function isPathInside(parentPath: string, childPath: string): boolean {
+  const relativePath = path.relative(parentPath, childPath);
+  return Boolean(relativePath) && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+}
+
+async function generateMissingUploadThumbnail(req: Request, _res: Response, next: express.NextFunction) {
+  if (!['GET', 'HEAD'].includes(req.method)) {
+    return next();
+  }
+
+  const normalizedRequestPath = decodeURIComponent(req.path).replace(/\\/gu, '/');
+  const thumbnailMatch = normalizedRequestPath.match(/^\/(.+)\/thumbs\/([^/]+)-(\d+)\.webp$/u);
+  if (!thumbnailMatch) {
+    return next();
+  }
+
+  const [, containingDirectory, originalBaseName, widthValue] = thumbnailMatch;
+  const width = Number(widthValue);
+  if (!Number.isFinite(width) || width < 32 || width > 1200) {
+    return next();
+  }
+
+  const uploadsRoot = path.resolve(process.cwd(), 'uploads');
+  const originalDirectory = path.resolve(uploadsRoot, containingDirectory);
+  if (!isPathInside(uploadsRoot, originalDirectory)) {
+    return next();
+  }
+
+  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  const originalPath = allowedExtensions
+    .map((extension) => path.join(originalDirectory, `${originalBaseName}${extension}`))
+    .find((candidatePath) => isPathInside(uploadsRoot, candidatePath) && fs.existsSync(candidatePath));
+
+  if (!originalPath) {
+    return next();
+  }
+
+  await createImageThumbnail(originalPath, width);
+  return next();
 }
 
 // Middleware
@@ -130,6 +173,8 @@ const uploadsStaticMiddleware = express.static(path.join(process.cwd(), 'uploads
     res.setHeader('X-Content-Type-Options', 'nosniff');
   },
 });
+app.use('/uploads', generateMissingUploadThumbnail);
+app.use('/api/uploads', generateMissingUploadThumbnail);
 app.use('/uploads', uploadsStaticMiddleware);
 app.use('/api/uploads', uploadsStaticMiddleware);
 
@@ -184,6 +229,15 @@ app.get('*', (req: Request, res: Response) => {
 });
 
 app.use((error: Error, req: Request, res: Response, next: express.NextFunction) => {
+  const statusCode = (error as Error & { status?: number; statusCode?: number }).statusCode || (error as Error & { status?: number }).status;
+  if (statusCode === 404 || (error as NodeJS.ErrnoException).code === 'ENOENT') {
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    return res.status(404).send('File not found');
+  }
+
   if (error instanceof multer.MulterError) {
     return res.status(400).json({ error: error.message });
   }
