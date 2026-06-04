@@ -1,5 +1,5 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
-import { Camera, RotateCcw, Upload, UserPlus } from 'lucide-react';
+import { Camera, FolderUp, RotateCcw, Upload, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CreateUserPayload, User, userService } from '../services/api';
 import { rankOptions } from '../constants/ranks';
@@ -79,6 +79,7 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
   const [photoImportSummary, setPhotoImportSummary] = useState<{ uploadedCount: number; skippedFiles: Array<{ fileName: string; peNumber: string; reason: string }> } | null>(null);
   const spreadsheetInputRef = useRef<HTMLInputElement | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const photoFolderInputRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -230,9 +231,21 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
             <button type="button" onClick={() => photoInputRef.current?.click()} className="btn-secondary" disabled={isImportingPhotos} aria-label="Import profile photos" title={isImportingPhotos ? 'Importing photos' : 'Import profile photos by PE number'}>
               <Camera size={16} />
             </button>
+            <button type="button" onClick={() => photoFolderInputRef.current?.click()} className="btn-secondary" disabled={isImportingPhotos} aria-label="Import profile photo folder" title={isImportingPhotos ? 'Importing photos' : 'Import a folder of PE-numbered photos'}>
+              <FolderUp size={16} />
+            </button>
           </div>
           <input ref={spreadsheetInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
           <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple className="hidden" onChange={handlePhotoImport} />
+          <input
+            ref={photoFolderInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            multiple
+            className="hidden"
+            onChange={handlePhotoImport}
+            {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
+          />
         </div>
         {importSummary && (
           <div className="mt-4 rounded border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-gray-950">
