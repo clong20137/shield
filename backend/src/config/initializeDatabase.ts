@@ -160,6 +160,11 @@ export async function initializeDatabase() {
   await ensureIndex('users', 'idx_users_hidden', '`isHidden`, `lastName`, `firstName`');
   await ensureIndex('users', 'idx_users_rank', '`rank`');
   await ensureIndex('users', 'idx_users_name', '`lastName`, `firstName`');
+  await ensureIndex('users', 'idx_users_active_district', '`isActive`, `district`');
+  await ensureIndex('users', 'idx_users_hidden_filters_name', '`isHidden`, `district`, `rank`, `isActive`, `lastName`, `firstName`');
+  await ensureIndex('users', 'idx_users_people_soft', '`peopleSoftId`');
+  await ensureIndex('users', 'idx_users_radio', '`radioNumber`');
+  await ensureIndex('users', 'idx_users_public_safety', '`publicSafetyId`');
 
   if (await tableExists('auth_accounts')) {
     await ensureColumn('auth_accounts', 'twoFactorSecret', '`twoFactorSecret` VARCHAR(64)');
@@ -277,6 +282,10 @@ export async function initializeDatabase() {
   await ensureColumn('audit_logs', 'userAgent', '`userAgent` VARCHAR(255)');
   await ensureIndex('audit_logs', 'idx_audit_action', '`action`');
   await ensureIndex('audit_logs', 'idx_audit_actor_created', '`actorId`, `createdAt`');
+  await ensureIndex('audit_logs', 'idx_audit_created_id', '`createdAt`, `id`');
+  await ensureIndex('audit_logs', 'idx_audit_action_created', '`action`, `createdAt`');
+  await ensureIndex('audit_logs', 'idx_audit_entity_created', '`entityType`, `createdAt`');
+  await ensureIndex('audit_logs', 'idx_audit_ip_created', '`ipAddress`, `createdAt`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS error_logs (
@@ -295,6 +304,9 @@ export async function initializeDatabase() {
       INDEX \`idx_error_logs_route\` (\`route\`)
     )
   `);
+  await ensureIndex('error_logs', 'idx_error_logs_level_created', '`level`, `createdAt`');
+  await ensureIndex('error_logs', 'idx_error_logs_route_created', '`route`, `createdAt`');
+  await ensureIndex('error_logs', 'idx_error_logs_user_created', '`userId`, `createdAt`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS dashboard_posts (
@@ -315,6 +327,7 @@ export async function initializeDatabase() {
 
   await ensureColumn('dashboard_posts', 'allowComments', '`allowComments` BOOLEAN DEFAULT 1');
   await ensureColumn('dashboard_posts', 'imageUrl', '`imageUrl` VARCHAR(500)');
+  await ensureIndex('dashboard_posts', 'idx_dashboard_posts_created_id', '`createdAt`, `id`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS dashboard_post_reactions (
@@ -358,6 +371,7 @@ export async function initializeDatabase() {
   await ensureColumn('dashboard_post_comments', 'isPinned', '`isPinned` BOOLEAN DEFAULT 0');
   await ensureColumn('dashboard_post_comments', 'pinnedBy', '`pinnedBy` VARCHAR(36)');
   await ensureColumn('dashboard_post_comments', 'pinnedAt', '`pinnedAt` DATETIME');
+  await ensureIndex('dashboard_post_comments', 'idx_dashboard_comments_post_pinned_created', '`postId`, `isPinned`, `pinnedAt`, `createdAt`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_messages (
@@ -381,6 +395,10 @@ export async function initializeDatabase() {
   await ensureColumn('user_messages', 'recipientDeleted', '`recipientDeleted` BOOLEAN DEFAULT 0');
   await ensureColumn('user_messages', 'senderReaction', '`senderReaction` VARCHAR(30)');
   await ensureColumn('user_messages', 'recipientReaction', '`recipientReaction` VARCHAR(30)');
+  await ensureIndex('user_messages', 'idx_messages_recipient_visible_created', '`recipientUserId`, `recipientDeleted`, `isArchived`, `createdAt`');
+  await ensureIndex('user_messages', 'idx_messages_sender_visible_created', '`senderAccountId`, `senderDeleted`, `createdAt`');
+  await ensureIndex('user_messages', 'idx_messages_recipient_read_created', '`recipientUserId`, `isRead`, `createdAt`');
+  await ensureIndex('user_messages', 'idx_messages_thread_created', '`senderAccountId`, `recipientUserId`, `createdAt`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS calendar_entries (
@@ -412,8 +430,11 @@ export async function initializeDatabase() {
   await ensureIndex('calendar_entries', 'idx_calendar_category_date', '`category`, `entryDate`');
   await ensureIndex('calendar_entries', 'idx_calendar_district_date', '`districtWorked`, `entryDate`');
   await ensureIndex('calendar_entries', 'idx_calendar_owner_date', '`ownerAccountId`, `entryDate`');
+  await ensureIndex('calendar_entries', 'idx_calendar_owner_date_updated', '`ownerAccountId`, `entryDate`, `updatedAt`');
+  await ensureIndex('calendar_entries', 'idx_calendar_owner_category_submission', '`ownerAccountId`, `category`, `submissionStatus`');
   await ensureIndex('calendar_entries', 'idx_calendar_review_status', '`reviewStatus`, `entryDate`');
   await ensureIndex('calendar_entries', 'idx_calendar_submission_status', '`submissionStatus`, `entryDate`');
+  await ensureIndex('calendar_entries', 'idx_calendar_trooper_report', '`category`, `submissionStatus`, `districtWorked`, `entryDate`, `updatedAt`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS calendar_shortcuts (
@@ -465,6 +486,8 @@ export async function initializeDatabase() {
       INDEX \`idx_user_notifications_read\` (\`isRead\`)
     )
   `);
+  await ensureIndex('user_notifications', 'idx_user_notifications_user_created', '`userId`, `createdAt`');
+  await ensureIndex('user_notifications', 'idx_user_notifications_user_read_created', '`userId`, `isRead`, `createdAt`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS urgent_alerts (
@@ -486,6 +509,7 @@ export async function initializeDatabase() {
       INDEX \`idx_urgent_alerts_audience\` (\`audienceType\`)
     )
   `);
+  await ensureIndex('urgent_alerts', 'idx_urgent_alerts_expires_created', '`expiresAt`, `createdAt`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS urgent_alert_acknowledgements (
@@ -498,6 +522,7 @@ export async function initializeDatabase() {
       INDEX \`idx_urgent_alert_ack_alert\` (\`alertId\`, \`acknowledgedAt\`)
     )
   `);
+  await ensureIndex('urgent_alert_acknowledgements', 'idx_urgent_alert_ack_pending_user', '`userId`, `acknowledgedAt`, `alertId`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS system_settings (
@@ -589,6 +614,7 @@ export async function initializeDatabase() {
       INDEX \`idx_pinned_profiles_user\` (\`profileUserId\`)
     )
   `);
+  await ensureIndex('pinned_profiles', 'idx_pinned_profiles_account_recent', '`accountId`, `pinnedAt`, `profileUserId`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS quick_notes (
@@ -619,6 +645,8 @@ export async function initializeDatabase() {
   await ensureColumn('reminders', 'priority', "`priority` VARCHAR(20) NOT NULL DEFAULT 'Normal'");
   await ensureColumn('reminders', 'notes', '`notes` TEXT');
   await ensureColumn('reminders', 'notifiedAt', '`notifiedAt` TIMESTAMP NULL');
+  await ensureIndex('reminders', 'idx_reminders_account_open_created', '`accountId`, `completedAt`, `createdAt`');
+  await ensureIndex('reminders', 'idx_reminders_due_notify', '`accountId`, `completedAt`, `notifiedAt`, `remindOn`, `createdAt`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS performance_evaluations (
@@ -650,6 +678,9 @@ export async function initializeDatabase() {
       INDEX \`idx_performance_status\` (\`status\`)
     )
   `);
+  await ensureIndex('performance_evaluations', 'idx_performance_created', '`createdAt`');
+  await ensureIndex('performance_evaluations', 'idx_performance_employee_created', '`employeeAccountId`, `createdAt`');
+  await ensureIndex('performance_evaluations', 'idx_performance_supervisor_created', '`supervisorAccountId`, `createdAt`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS devices (
@@ -693,6 +724,8 @@ export async function initializeDatabase() {
   await ensureColumn('devices', 'lastServiceDate', '`lastServiceDate` DATE');
   await ensureColumn('devices', 'purchaseDate', '`purchaseDate` DATE');
   await ensureColumn('devices', 'condition', "`condition` VARCHAR(50) NOT NULL DEFAULT 'Good'");
+  await ensureIndex('devices', 'idx_devices_updated_asset', '`updatedAt`, `assetTag`');
+  await ensureIndex('devices', 'idx_devices_assigned_updated', '`assignedTo`, `updatedAt`, `assetTag`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS device_events (
@@ -709,4 +742,5 @@ export async function initializeDatabase() {
       INDEX \`idx_device_events_created\` (\`createdAt\`)
     )
   `);
+  await ensureIndex('device_events', 'idx_device_events_device_created', '`deviceId`, `createdAt`');
 }

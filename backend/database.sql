@@ -50,6 +50,10 @@ CREATE TABLE IF NOT EXISTS users (
   INDEX `idx_employmentType` (`employmentType`),
   INDEX `idx_user_email` (`email`),
   INDEX `idx_user_role` (`role`),
+  INDEX `idx_users_active_district` (`isActive`, `district`),
+  INDEX `idx_users_name` (`lastName`, `firstName`),
+  INDEX `idx_users_people_soft` (`peopleSoftId`),
+  INDEX `idx_users_radio` (`radioNumber`),
   FULLTEXT INDEX `ft_search` (`firstName`, `lastName`, `email`, `peNumber`, `peopleSoftId`, `badgeNumber`, `publicSafetyId`, `district`)
 );
 
@@ -62,7 +66,9 @@ CREATE TABLE IF NOT EXISTS user_messages (
   `isRead` BOOLEAN DEFAULT 0,
   `createdAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX `idx_messages_sender` (`senderAccountId`),
-  INDEX `idx_messages_recipient` (`recipientUserId`)
+  INDEX `idx_messages_recipient` (`recipientUserId`),
+  INDEX `idx_messages_sender_created` (`senderAccountId`, `createdAt`),
+  INDEX `idx_messages_recipient_read_created` (`recipientUserId`, `isRead`, `createdAt`)
 );
 
 CREATE TABLE IF NOT EXISTS devices (
@@ -90,7 +96,9 @@ CREATE TABLE IF NOT EXISTS devices (
   `createdAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updatedAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_devices_type` (`type`),
-  INDEX `idx_devices_status` (`status`)
+  INDEX `idx_devices_status` (`status`),
+  INDEX `idx_devices_updated_asset` (`updatedAt`, `assetTag`),
+  INDEX `idx_devices_assigned_updated` (`assignedTo`, `updatedAt`, `assetTag`)
 );
 
 CREATE TABLE IF NOT EXISTS device_events (
@@ -104,7 +112,8 @@ CREATE TABLE IF NOT EXISTS device_events (
   `notes` TEXT,
   `createdAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX `idx_device_events_device` (`deviceId`),
-  INDEX `idx_device_events_created` (`createdAt`)
+  INDEX `idx_device_events_created` (`createdAt`),
+  INDEX `idx_device_events_device_created` (`deviceId`, `createdAt`)
 );
 
 -- Sample Data (Optional)
