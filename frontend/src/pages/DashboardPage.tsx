@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Eraser, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, getAssetUrl, handleAssetImageError, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
+import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, dashboardSummaryService, DashboardSummary, getAssetUrl, handleAssetImageError, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { UserDetail } from '../components/UserDetail';
 
@@ -656,8 +656,10 @@ export function DashboardCalendar() {
 
 function DashboardNews({
   currentUser,
+  initialPosts,
 }: {
   currentUser: AuthAccount | null;
+  initialPosts?: DashboardPost[];
 }) {
   const [posts, setPosts] = useState<DashboardPost[]>([]);
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -673,6 +675,15 @@ function DashboardNews({
   const canCreateDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:create'));
   const canEditDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:edit'));
   const canDeleteDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:delete'));
+
+  useEffect(() => {
+    if (!initialPosts) {
+      return;
+    }
+
+    setPosts(initialPosts);
+    setIsLoadingPosts(false);
+  }, [initialPosts]);
 
   const loadPosts = useCallback(async (showLoading = true) => {
     if (currentUser?.mustChangePassword) {
@@ -696,12 +707,14 @@ function DashboardNews({
   }, [currentUser?.mustChangePassword]);
 
   useEffect(() => {
-    loadPosts();
+    if (!initialPosts) {
+      loadPosts();
+    }
     const handleDashboardUpdate = () => loadPosts(false);
 
     window.addEventListener('shield:dashboard-updated', handleDashboardUpdate);
     return () => window.removeEventListener('shield:dashboard-updated', handleDashboardUpdate);
-  }, [loadPosts]);
+  }, [initialPosts, loadPosts]);
 
   const carouselPosts = posts.slice(0, 3);
 
@@ -1115,7 +1128,15 @@ function getInitialProfileWindowPosition() {
   };
 }
 
-function PinnedProfilesWidget({ currentUser, onOpenProfile }: { currentUser: AuthAccount | null; onOpenProfile: (user: User) => void }) {
+function PinnedProfilesWidget({
+  currentUser,
+  onOpenProfile,
+  initialProfiles,
+}: {
+  currentUser: AuthAccount | null;
+  onOpenProfile: (user: User) => void;
+  initialProfiles?: PinnedProfile[];
+}) {
   const [profiles, setProfiles] = useState<PinnedProfile[]>([]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<User[]>([]);
@@ -1123,6 +1144,15 @@ function PinnedProfilesWidget({ currentUser, onOpenProfile }: { currentUser: Aut
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pinnedRailRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!initialProfiles) {
+      return;
+    }
+
+    setProfiles(initialProfiles);
+    setIsLoading(false);
+  }, [initialProfiles]);
 
   const loadProfiles = useCallback(async () => {
     if (!currentUser) {
@@ -1144,8 +1174,10 @@ function PinnedProfilesWidget({ currentUser, onOpenProfile }: { currentUser: Aut
   }, [currentUser]);
 
   useEffect(() => {
-    void loadProfiles();
-  }, [loadProfiles]);
+    if (!initialProfiles) {
+      void loadProfiles();
+    }
+  }, [initialProfiles, loadProfiles]);
 
   useEffect(() => {
     const trimmedQuery = query.trim();
@@ -1323,12 +1355,30 @@ function PinnedProfilesWidget({ currentUser, onOpenProfile }: { currentUser: Aut
   );
 }
 
-function MyDayWidget({ currentUser }: { currentUser: AuthAccount | null }) {
+function MyDayWidget({
+  currentUser,
+  initialEntries,
+  initialReminders,
+}: {
+  currentUser: AuthAccount | null;
+  initialEntries?: CalendarEntry[];
+  initialReminders?: Reminder[];
+}) {
   const [entries, setEntries] = useState<CalendarEntry[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const todayKey = formatDateKey(new Date());
+
+  useEffect(() => {
+    if (!initialEntries || !initialReminders) {
+      return;
+    }
+
+    setEntries(initialEntries);
+    setReminders(initialReminders);
+    setIsLoading(false);
+  }, [initialEntries, initialReminders]);
 
   const loadMyDay = useCallback(async (showLoading = true) => {
     if (!currentUser) {
@@ -1358,7 +1408,9 @@ function MyDayWidget({ currentUser }: { currentUser: AuthAccount | null }) {
   }, [currentUser]);
 
   useEffect(() => {
-    void loadMyDay();
+    if (!initialEntries || !initialReminders) {
+      void loadMyDay();
+    }
     const refresh = () => void loadMyDay(false);
 
     window.addEventListener('shield:calendar-updated', refresh);
@@ -1368,7 +1420,7 @@ function MyDayWidget({ currentUser }: { currentUser: AuthAccount | null }) {
       window.removeEventListener('shield:calendar-updated', refresh);
       window.removeEventListener('shield:reminder-updated', refresh);
     };
-  }, [loadMyDay]);
+  }, [initialEntries, initialReminders, loadMyDay]);
 
   const todaysEntries = entries
     .filter((entry) => entry.date === todayKey)
@@ -1555,7 +1607,13 @@ function MyDayWidget({ currentUser }: { currentUser: AuthAccount | null }) {
   );
 }
 
-function QuickNotesWidget({ currentUser }: { currentUser: AuthAccount | null }) {
+function QuickNotesWidget({
+  currentUser,
+  initialNote,
+}: {
+  currentUser: AuthAccount | null;
+  initialNote?: DashboardSummary['quickNote'];
+}) {
   const [content, setContent] = useState('');
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -1565,6 +1623,17 @@ function QuickNotesWidget({ currentUser }: { currentUser: AuthAccount | null }) 
     if (!currentUser) {
       setContent('');
       hasLoadedNoteRef.current = false;
+      return;
+    }
+
+    if (initialNote) {
+      hasLoadedNoteRef.current = false;
+      setContent(initialNote.content || '');
+      setLastSavedAt(initialNote.updatedAt ? new Date(initialNote.updatedAt).toLocaleTimeString() : null);
+      setStatus('saved');
+      window.setTimeout(() => {
+        hasLoadedNoteRef.current = true;
+      }, 0);
       return;
     }
 
@@ -1583,7 +1652,7 @@ function QuickNotesWidget({ currentUser }: { currentUser: AuthAccount | null }) 
       .finally(() => {
         hasLoadedNoteRef.current = true;
       });
-  }, [currentUser]);
+  }, [currentUser, initialNote]);
 
   useEffect(() => {
     if (!currentUser || !hasLoadedNoteRef.current) {
@@ -1674,6 +1743,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null);
   const [selectedProfile, setSelectedProfile] = useState<User | null>(null);
   const [profileWindowPosition, setProfileWindowPosition] = useState(getInitialProfileWindowPosition);
   const [isProfileDragging, setIsProfileDragging] = useState(false);
@@ -1790,7 +1860,8 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
   };
 
   useEffect(() => {
-    if (!isAdministrator) {
+    if (!currentUser) {
+      setDashboardSummary(null);
       setLoading(false);
       return;
     }
@@ -1816,7 +1887,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
       window.removeEventListener('shield:permission-updated', handleDashboardUpdate);
       window.removeEventListener('shield:user-updated', handleDashboardUpdate);
     };
-  }, [isAdministrator]);
+  }, [currentUser?.id]);
 
   const loadDashboard = async (showLoading = true) => {
     if (showLoading) {
@@ -1824,6 +1895,8 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
     }
     setError(null);
     try {
+      const response = await dashboardSummaryService.get();
+      setDashboardSummary(response.data);
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
       setError('Failed to load dashboard data. Check that the backend is running and MySQL is available.');
@@ -1864,11 +1937,11 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
         <div className="mb-8">
           <h1>Dashboard</h1>
         </div>
-        <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} />
+        <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} initialProfiles={dashboardSummary?.pinnedProfiles} />
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(260px,0.85fr)_minmax(280px,0.9fr)_minmax(0,1.35fr)]">
-          <MyDayWidget currentUser={currentUser} />
-          <QuickNotesWidget currentUser={currentUser} />
-          <DashboardNews currentUser={currentUser} />
+          <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} />
+          <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
+          <DashboardNews currentUser={currentUser} initialPosts={dashboardSummary?.posts} />
         </div>
         {profileWindow}
       </div>
@@ -1888,11 +1961,11 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
 
       {error && <div className="error">{error}</div>}
 
-      <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} />
+      <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} initialProfiles={dashboardSummary?.pinnedProfiles} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(260px,0.85fr)_minmax(280px,0.9fr)_minmax(0,1.35fr)]">
-        <MyDayWidget currentUser={currentUser} />
-        <QuickNotesWidget currentUser={currentUser} />
-        <DashboardNews currentUser={currentUser} />
+        <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} />
+        <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
+        <DashboardNews currentUser={currentUser} initialPosts={dashboardSummary?.posts} />
       </div>
       {profileWindow}
     </div>

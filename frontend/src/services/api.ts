@@ -173,6 +173,15 @@ export interface QuickNote {
   updatedAt: string;
 }
 
+export interface DashboardSummary {
+  calendarEntries: CalendarEntry[];
+  reminders: Reminder[];
+  pinnedProfiles: PinnedProfile[];
+  posts: DashboardPost[];
+  quickNote: QuickNote;
+  dueReminderNotificationsCreated: number;
+}
+
 export interface CreateUserPayload extends Omit<User, 'id' | 'createdAt' | 'updatedAt'> {
   password?: string;
 }
@@ -939,6 +948,11 @@ export const dashboardPostService = {
 
   deleteComment: (id: string, commentId: string) =>
     api.delete(`/dashboard-posts/${id}/comments/${commentId}`),
+};
+
+export const dashboardSummaryService = {
+  get: () =>
+    api.get<DashboardSummary>('/dashboard/summary'),
 };
 
 export const bugReportService = {
