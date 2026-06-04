@@ -6,6 +6,7 @@ import { FloatingWindow } from '../components/FloatingWindow';
 type DeviceType = DeviceRecord['type'];
 type DeviceStatus = DeviceRecord['status'];
 type DeviceForm = Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'>;
+type DeviceConditionalField = 'phoneNumber' | 'imei' | 'simNumber' | 'radioId' | 'hostname' | 'routerId';
 type SortKey = keyof Pick<DeviceRecord, 'type' | 'assetTag' | 'makeModel' | 'assignedTo' | 'status' | 'location' | 'maintenanceDueDate' | 'replacementDueDate' | 'updatedAt'>;
 
 const deviceTypes: DeviceType[] = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio', 'Cradlepoint'];
@@ -44,16 +45,41 @@ const deviceIconMap = {
 };
 
 function cleanDeviceFormForType(form: DeviceForm): DeviceForm {
-  if (form.type !== 'Cell Phone') {
-    return form;
+  const cleanedForm = { ...form };
+
+  if (form.type === 'Computer') {
+    cleanedForm.phoneNumber = '';
+    cleanedForm.imei = '';
+    cleanedForm.simNumber = '';
+    cleanedForm.radioId = '';
   }
 
-  return {
-    ...form,
-    radioId: '',
-    hostname: '',
-    routerId: '',
+  if (form.type === 'Radio') {
+    cleanedForm.phoneNumber = '';
+    cleanedForm.imei = '';
+    cleanedForm.hostname = '';
+    cleanedForm.routerId = '';
+  }
+
+  if (form.type === 'Cell Phone') {
+    cleanedForm.radioId = '';
+    cleanedForm.hostname = '';
+    cleanedForm.routerId = '';
+  }
+
+  return cleanedForm;
+}
+
+function shouldShowDeviceField(type: DeviceType, field: DeviceConditionalField): boolean {
+  const hiddenFieldsByType: Record<DeviceType, DeviceConditionalField[]> = {
+    'Cell Phone': ['radioId', 'hostname', 'routerId'],
+    'MiFi Device': ['radioId'],
+    Computer: ['phoneNumber', 'imei', 'simNumber', 'radioId'],
+    Radio: ['phoneNumber', 'imei', 'hostname', 'routerId'],
+    Cradlepoint: ['phoneNumber', 'imei', 'simNumber', 'radioId'],
   };
+
+  return !hiddenFieldsByType[type].includes(field);
 }
 
 function toDeviceForm(device: DeviceRecord): DeviceForm {
@@ -455,7 +481,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               (nextForm as Record<string, string>)[normalizedHeader] = values[index] || '';
             }
           });
-          return deviceService.create({ ...nextForm, ...actor, eventNotes: 'Imported from CSV.' });
+          return deviceService.create({ ...cleanDeviceFormForType(nextForm), ...actor, eventNotes: 'Imported from CSV.' });
         }),
       );
       setDevices((currentDevices) => [...importedDevices.map((response) => response.data), ...currentDevices]);
@@ -474,7 +500,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     const responses = await Promise.all(
       selected.map((device) =>
         deviceService.update(device.id, {
-          ...toDeviceForm(device),
+          ...cleanDeviceFormForType(toDeviceForm(device)),
           status,
           ...actor,
           eventAction: `Bulk ${status}`,
@@ -718,16 +744,12 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                   </select>
                 </Field>
                 <TextField label="Location" value={form.location} onChange={(value) => setForm((current) => ({ ...current, location: value }))} />
-                <TextField label="Phone Number" value={form.phoneNumber} onChange={(value) => setForm((current) => ({ ...current, phoneNumber: value }))} />
-                <TextField label="IMEI" value={form.imei} onChange={(value) => setForm((current) => ({ ...current, imei: value }))} />
-                <TextField label="ICCID" value={form.simNumber} onChange={(value) => setForm((current) => ({ ...current, simNumber: value }))} />
-                {form.type !== 'Cell Phone' && (
-                  <>
-                    <TextField label="Radio ID" value={form.radioId} onChange={(value) => setForm((current) => ({ ...current, radioId: value }))} />
-                    <TextField label="Hostname" value={form.hostname} onChange={(value) => setForm((current) => ({ ...current, hostname: value }))} />
-                    <TextField label="Router ID" value={form.routerId} onChange={(value) => setForm((current) => ({ ...current, routerId: value }))} />
-                  </>
-                )}
+                {shouldShowDeviceField(form.type, 'phoneNumber') && <TextField label="Phone Number" value={form.phoneNumber} onChange={(value) => setForm((current) => ({ ...current, phoneNumber: value }))} />}
+                {shouldShowDeviceField(form.type, 'imei') && <TextField label="IMEI" value={form.imei} onChange={(value) => setForm((current) => ({ ...current, imei: value }))} />}
+                {shouldShowDeviceField(form.type, 'simNumber') && <TextField label="ICCID" value={form.simNumber} onChange={(value) => setForm((current) => ({ ...current, simNumber: value }))} />}
+                {shouldShowDeviceField(form.type, 'radioId') && <TextField label="Radio ID" value={form.radioId} onChange={(value) => setForm((current) => ({ ...current, radioId: value }))} />}
+                {shouldShowDeviceField(form.type, 'hostname') && <TextField label="Hostname" value={form.hostname} onChange={(value) => setForm((current) => ({ ...current, hostname: value }))} />}
+                {shouldShowDeviceField(form.type, 'routerId') && <TextField label="Router ID" value={form.routerId} onChange={(value) => setForm((current) => ({ ...current, routerId: value }))} />}
                 <DateField label="Purchase Date" value={form.purchaseDate} onChange={(value) => setForm((current) => ({ ...current, purchaseDate: value }))} />
                 <DateField label="Warranty Expiration" value={form.warrantyExpiration} onChange={(value) => setForm((current) => ({ ...current, warrantyExpiration: value }))} />
                 <DateField label="Replacement Due" value={form.replacementDueDate} onChange={(value) => setForm((current) => ({ ...current, replacementDueDate: value }))} />

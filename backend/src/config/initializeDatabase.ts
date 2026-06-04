@@ -603,6 +603,8 @@ export async function initializeDatabase() {
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`accountId\` VARCHAR(36) NOT NULL,
       \`title\` VARCHAR(90) NOT NULL,
+      \`priority\` VARCHAR(20) NOT NULL DEFAULT 'Normal',
+      \`notes\` TEXT,
       \`remindOn\` DATE NOT NULL,
       \`notifiedAt\` TIMESTAMP NULL,
       \`completedAt\` TIMESTAMP NULL,
@@ -614,6 +616,8 @@ export async function initializeDatabase() {
     )
   `);
   await ensureColumn('reminders', 'remindOn', '`remindOn` DATE NULL');
+  await ensureColumn('reminders', 'priority', "`priority` VARCHAR(20) NOT NULL DEFAULT 'Normal'");
+  await ensureColumn('reminders', 'notes', '`notes` TEXT');
   await ensureColumn('reminders', 'notifiedAt', '`notifiedAt` TIMESTAMP NULL');
 
   await pool.query(`

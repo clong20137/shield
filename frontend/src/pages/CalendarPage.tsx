@@ -575,6 +575,8 @@ function CalendarPage({
   const [isDutyHoursManual, setIsDutyHoursManual] = useState(false);
   const [isReminderFormOpen, setIsReminderFormOpen] = useState(false);
   const [reminderTitle, setReminderTitle] = useState('');
+  const [reminderPriority, setReminderPriority] = useState<'Low' | 'Normal' | 'High' | 'Critical'>('Normal');
+  const [reminderNotes, setReminderNotes] = useState('');
   const [isSavingReminder, setIsSavingReminder] = useState(false);
   const lastAutoDutyHoursRef = useRef('');
   const dailyFormRef = useRef<HTMLFormElement | null>(null);
@@ -657,6 +659,8 @@ function CalendarPage({
     setEditingEntryId(existingEntry?.id || null);
     setIsReminderFormOpen(false);
     setReminderTitle('');
+    setReminderPriority('Normal');
+    setReminderNotes('');
   };
 
   const handleDailyKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
@@ -971,9 +975,11 @@ function CalendarPage({
     setIsSavingReminder(true);
     setCalendarError(null);
     try {
-      await reminderService.create(reminderTitle.trim(), selectedDate);
+      await reminderService.create(reminderTitle.trim(), selectedDate, reminderPriority, reminderNotes.trim());
       window.dispatchEvent(new CustomEvent('shield:reminder-updated'));
       setReminderTitle('');
+      setReminderPriority('Normal');
+      setReminderNotes('');
       setIsReminderFormOpen(false);
       onToast?.('success', 'Reminder created.');
     } catch (err) {
@@ -1324,7 +1330,7 @@ function CalendarPage({
               </div>
             </div>
             {isReminderFormOpen && (
-              <form onSubmit={createCalendarReminder} className="mb-5 grid grid-cols-1 gap-2 rounded-lg border border-accent/30 bg-accent/5 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+              <form onSubmit={createCalendarReminder} className="mb-5 grid grid-cols-1 gap-2 rounded-lg border border-accent/30 bg-accent/5 p-3 sm:grid-cols-[minmax(0,1fr)_10rem_auto_auto]">
                 <input
                   value={reminderTitle}
                   onChange={(event) => setReminderTitle(event.target.value)}
@@ -1333,6 +1339,14 @@ function CalendarPage({
                   className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
                   autoFocus
                 />
+                <select
+                  value={reminderPriority}
+                  onChange={(event) => setReminderPriority(event.target.value as typeof reminderPriority)}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                  aria-label="Reminder priority"
+                >
+                  {['Low', 'Normal', 'High', 'Critical'].map((priority) => <option key={priority}>{priority}</option>)}
+                </select>
                 <button type="submit" className="btn-primary" disabled={isSavingReminder} aria-label="Save reminder" title="Save Reminder">
                   <Save size={16} />
                 </button>
@@ -1340,6 +1354,8 @@ function CalendarPage({
                   type="button"
                   onClick={() => {
                     setReminderTitle('');
+                    setReminderPriority('Normal');
+                    setReminderNotes('');
                     setIsReminderFormOpen(false);
                   }}
                   className="btn-secondary"
@@ -1348,6 +1364,13 @@ function CalendarPage({
                 >
                   <X size={16} />
                 </button>
+                <textarea
+                  value={reminderNotes}
+                  onChange={(event) => setReminderNotes(event.target.value)}
+                  placeholder="Notes"
+                  maxLength={1000}
+                  className="min-h-20 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 sm:col-span-4"
+                />
               </form>
             )}
 

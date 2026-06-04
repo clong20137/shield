@@ -7,6 +7,8 @@ export interface Reminder {
   id: string;
   accountId: string;
   title: string;
+  priority: 'Low' | 'Normal' | 'High' | 'Critical';
+  notes: string;
   remindOn: string;
   notifiedAt: Date | null;
   completedAt: Date | null;
@@ -18,6 +20,8 @@ interface ReminderRow extends RowDataPacket {
   id: string;
   accountId: string;
   title: string;
+  priority: 'Low' | 'Normal' | 'High' | 'Critical' | null;
+  notes: string | null;
   remindOn: Date | string | null;
   notifiedAt: Date | null;
   completedAt: Date | null;
@@ -30,6 +34,8 @@ function toReminder(row: ReminderRow): Reminder {
     id: row.id,
     accountId: row.accountId,
     title: row.title,
+    priority: row.priority || 'Normal',
+    notes: row.notes || '',
     remindOn: formatDate(row.remindOn || row.createdAt),
     notifiedAt: row.notifiedAt || null,
     completedAt: row.completedAt || null,
@@ -64,24 +70,24 @@ export class ReminderModel {
     }
   }
 
-  static async create(accountId: string, title: string, remindOn: string): Promise<Reminder> {
+  static async create(accountId: string, title: string, remindOn: string, priority: Reminder['priority'] = 'Normal', notes = ''): Promise<Reminder> {
     const conn = await pool.getConnection();
     try {
       const id = uuidv4();
       const now = new Date();
       await conn.query<ResultSetHeader>(
-        `INSERT INTO reminders (\`id\`, \`accountId\`, \`title\`, \`remindOn\`, \`notifiedAt\`, \`completedAt\`, \`createdAt\`, \`updatedAt\`)
-         VALUES (?, ?, ?, ?, NULL, NULL, ?, ?)`,
-        [id, accountId, title, remindOn, now, now]
+        `INSERT INTO reminders (\`id\`, \`accountId\`, \`title\`, \`priority\`, \`notes\`, \`remindOn\`, \`notifiedAt\`, \`completedAt\`, \`createdAt\`, \`updatedAt\`)
+         VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)`,
+        [id, accountId, title, priority, notes, remindOn, now, now]
       );
 
-      return { id, accountId, title, remindOn, notifiedAt: null, completedAt: null, createdAt: now, updatedAt: now };
+      return { id, accountId, title, priority, notes, remindOn, notifiedAt: null, completedAt: null, createdAt: now, updatedAt: now };
     } finally {
       conn.release();
     }
   }
 
-  static async update(id: string, accountId: string, updates: { title?: string; remindOn?: string; completed?: boolean }): Promise<Reminder | null> {
+  static async update(id: string, accountId: string, updates: { title?: string; priority?: Reminder['priority']; notes?: string; remindOn?: string; completed?: boolean }): Promise<Reminder | null> {
     const conn = await pool.getConnection();
     try {
       const [existingRows] = await conn.query<ReminderRow[]>(
@@ -94,6 +100,8 @@ export class ReminderModel {
       }
 
       const nextTitle = updates.title ?? existingRows[0].title;
+      const nextPriority = updates.priority ?? existingRows[0].priority ?? 'Normal';
+      const nextNotes = updates.notes ?? existingRows[0].notes ?? '';
       const existingRemindOn = formatDate(existingRows[0].remindOn || existingRows[0].createdAt);
       const nextRemindOn = updates.remindOn ?? existingRemindOn;
       const shouldResetNotification = updates.remindOn !== undefined && updates.remindOn !== existingRemindOn;
@@ -104,9 +112,9 @@ export class ReminderModel {
 
       await conn.query<ResultSetHeader>(
         `UPDATE reminders
-         SET \`title\` = ?, \`remindOn\` = ?, \`notifiedAt\` = ?, \`completedAt\` = ?, \`updatedAt\` = ?
+         SET \`title\` = ?, \`priority\` = ?, \`notes\` = ?, \`remindOn\` = ?, \`notifiedAt\` = ?, \`completedAt\` = ?, \`updatedAt\` = ?
          WHERE \`id\` = ? AND \`accountId\` = ?`,
-        [nextTitle, nextRemindOn, nextNotifiedAt, nextCompletedAt, new Date(), id, accountId]
+        [nextTitle, nextPriority, nextNotes, nextRemindOn, nextNotifiedAt, nextCompletedAt, new Date(), id, accountId]
       );
 
       const [rows] = await conn.query<ReminderRow[]>(
@@ -153,7 +161,7 @@ export class ReminderModel {
           userId: accountId,
           type: 'reminder',
           title: 'Reminder',
-          message: reminder.title,
+          message: reminder.notes ? `${reminder.title}: ${reminder.notes}` : reminder.title,
           entityType: 'reminder',
           entityId: reminder.id,
         });

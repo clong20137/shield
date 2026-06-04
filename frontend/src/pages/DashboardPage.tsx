@@ -70,6 +70,20 @@ const getReadableDate = (dateKey: string) => {
   });
 };
 
+const addDaysToDateKey = (dateKey: string, days: number) => {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + days);
+  return formatDateKey(date);
+};
+
+const getReminderPriorityClass = (priority: Reminder['priority'] = 'Normal') => {
+  if (priority === 'Critical') return 'bg-danger/10 text-danger';
+  if (priority === 'High') return 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-100';
+  if (priority === 'Low') return 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300';
+  return 'bg-primary-500/10 text-primary-500 dark:text-blue-100';
+};
+
 const postHtmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span|h1|h2|h3|blockquote)\b[^>]*>/iu;
 
 function escapeHtml(value: string): string {
@@ -1359,9 +1373,13 @@ function MyDayWidget({ currentUser }: { currentUser: AuthAccount | null }) {
   const todaysEntries = entries
     .filter((entry) => entry.date === todayKey)
     .sort((a, b) => a.category.localeCompare(b.category));
-  const activeReminders = reminders
-    .filter((reminder) => !reminder.completedAt && reminder.remindOn <= todayKey)
+  const openReminders = reminders
+    .filter((reminder) => !reminder.completedAt)
     .sort((a, b) => a.remindOn.localeCompare(b.remindOn) || a.title.localeCompare(b.title));
+  const activeReminders = openReminders
+    .filter((reminder) => reminder.remindOn <= todayKey)
+    .sort((a, b) => a.remindOn.localeCompare(b.remindOn) || a.title.localeCompare(b.title));
+  const upcomingReminders = openReminders.filter((reminder) => reminder.remindOn > todayKey).slice(0, 3);
   const overdueCount = activeReminders.filter((reminder) => reminder.remindOn < todayKey).length;
   const draftCount = todaysEntries.filter((entry) => entry.submissionStatus === 'Draft').length;
   const submittedCount = todaysEntries.filter((entry) => entry.submissionStatus === 'Submitted').length;
@@ -1376,6 +1394,31 @@ function MyDayWidget({ currentUser }: { currentUser: AuthAccount | null }) {
     } catch (err) {
       console.error('Failed to complete reminder:', err);
       setError('Could not complete reminder.');
+    }
+  };
+
+  const snoozeReminder = async (reminder: Reminder) => {
+    try {
+      const response = await reminderService.update(reminder.id, {
+        remindOn: addDaysToDateKey(todayKey, 1),
+        completed: false,
+      });
+      setReminders((current) => current.map((item) => (item.id === reminder.id ? response.data : item)));
+      window.dispatchEvent(new Event('shield:reminder-updated'));
+    } catch (err) {
+      console.error('Failed to snooze reminder:', err);
+      setError('Could not snooze reminder.');
+    }
+  };
+
+  const deleteReminder = async (reminder: Reminder) => {
+    try {
+      await reminderService.delete(reminder.id);
+      setReminders((current) => current.filter((item) => item.id !== reminder.id));
+      window.dispatchEvent(new Event('shield:reminder-updated'));
+    } catch (err) {
+      console.error('Failed to delete reminder:', err);
+      setError('Could not delete reminder.');
     }
   };
 
@@ -1407,7 +1450,7 @@ function MyDayWidget({ currentUser }: { currentUser: AuthAccount | null }) {
         </div>
         <div className="rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
           <p className="text-xs font-bold uppercase text-gray-400">Due</p>
-          <p className="mt-1 text-xl font-bold text-primary-500 dark:text-blue-100">{activeReminders.length}</p>
+          <p className="mt-1 text-xl font-bold text-primary-500 dark:text-blue-100">{openReminders.length}</p>
         </div>
       </div>
 
@@ -1447,29 +1490,62 @@ function MyDayWidget({ currentUser }: { currentUser: AuthAccount | null }) {
               <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Reminders</h3>
               {overdueCount > 0 && <span className="text-xs font-semibold text-danger">{overdueCount} overdue</span>}
             </div>
-            {activeReminders.length === 0 ? (
-              <div className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No reminders due.</div>
+            {openReminders.length === 0 ? (
+              <div className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No open reminders.</div>
             ) : (
               <div className="space-y-2">
                 {activeReminders.slice(0, 5).map((reminder) => (
-                  <div key={reminder.id} className="flex items-start gap-2 rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
-                    <button
-                      type="button"
-                      onClick={() => void completeReminder(reminder)}
-                      className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-300 text-gray-400 transition hover:border-success hover:text-success dark:border-gray-700"
-                      aria-label={`Complete ${reminder.title}`}
-                      title="Complete"
-                    >
-                      <CheckCircle2 size={15} />
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-gray-900 dark:text-gray-100">{reminder.title}</p>
-                      <p className={`mt-1 flex items-center gap-1 text-xs ${reminder.remindOn < todayKey ? 'text-danger' : 'text-gray-500 dark:text-gray-400'}`}>
-                        <Bell size={12} /> {reminder.remindOn < todayKey ? `Due ${getReadableDate(reminder.remindOn)}` : 'Due today'}
-                      </p>
+                  <div key={reminder.id} className="rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                    <div className="flex items-start gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void completeReminder(reminder)}
+                        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-300 text-gray-400 transition hover:border-success hover:text-success dark:border-gray-700"
+                        aria-label={`Complete ${reminder.title}`}
+                        title="Complete"
+                      >
+                        <CheckCircle2 size={15} />
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <p className="min-w-0 flex-1 truncate text-sm font-bold text-gray-900 dark:text-gray-100">{reminder.title}</p>
+                          <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${getReminderPriorityClass(reminder.priority)}`}>{reminder.priority}</span>
+                        </div>
+                        <p className={`mt-1 flex items-center gap-1 text-xs ${reminder.remindOn < todayKey ? 'text-danger' : 'text-gray-500 dark:text-gray-400'}`}>
+                          <Bell size={12} /> {reminder.remindOn < todayKey ? `Due ${getReadableDate(reminder.remindOn)}` : 'Due today'}
+                        </p>
+                        {reminder.notes && <p className="mt-2 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">{reminder.notes}</p>}
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2 pl-9">
+                      <button type="button" onClick={() => void snoozeReminder(reminder)} className="btn-secondary px-2 py-1 text-xs" aria-label={`Snooze ${reminder.title}`} title="Snooze until tomorrow">
+                        <Clock3 size={13} />
+                      </button>
+                      <button type="button" onClick={() => void deleteReminder(reminder)} className="btn-secondary px-2 py-1 text-xs text-danger hover:border-danger hover:text-danger" aria-label={`Delete ${reminder.title}`} title="Delete Reminder">
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                   </div>
                 ))}
+                {activeReminders.length === 0 && (
+                  <div className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No reminders due today.</div>
+                )}
+                {upcomingReminders.length > 0 && (
+                  <div className="space-y-2 border-t border-gray-200 pt-2 dark:border-gray-800">
+                    <p className="text-xs font-bold uppercase text-gray-400">Upcoming</p>
+                    {upcomingReminders.map((reminder) => (
+                      <div key={reminder.id} className="rounded border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-sm font-bold text-gray-900 dark:text-gray-100">{reminder.title}</p>
+                          <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${getReminderPriorityClass(reminder.priority)}`}>{reminder.priority}</span>
+                        </div>
+                        <p className="mt-1 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                          <Bell size={12} /> Due {getReadableDate(reminder.remindOn)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

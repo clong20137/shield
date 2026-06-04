@@ -2,7 +2,9 @@ import { Request, Response } from 'express';
 import { getSessionAccount } from '../middleware/authSession';
 import { ReminderModel } from '../models/Reminder';
 import { broadcastAccountEvent } from '../services/appEvents';
-import { cleanString, isValidIsoDate } from '../utils/validation';
+import { cleanMultiline, cleanString, isOneOf, isValidIsoDate } from '../utils/validation';
+
+const reminderPriorities = ['Low', 'Normal', 'High', 'Critical'] as const;
 
 export class ReminderController {
   static async list(req: Request, res: Response) {
@@ -43,7 +45,13 @@ export class ReminderController {
         return res.status(400).json({ error: 'Reminder date must use YYYY-MM-DD format' });
       }
 
-      const reminder = await ReminderModel.create(account.id, title, remindOn);
+      const priority = cleanString(req.body?.priority, 20) || 'Normal';
+      if (!isOneOf(priority, reminderPriorities)) {
+        return res.status(400).json({ error: 'Choose a valid reminder priority' });
+      }
+
+      const notes = cleanMultiline(req.body?.notes, 1000);
+      const reminder = await ReminderModel.create(account.id, title, remindOn, priority, notes);
       const dueCount = await ReminderModel.createDueNotifications(account.id);
       if (dueCount > 0) {
         broadcastAccountEvent(account.id, { type: 'notification-created', entityId: reminder.id });
@@ -73,8 +81,15 @@ export class ReminderController {
         return res.status(400).json({ error: 'Reminder date must use YYYY-MM-DD format' });
       }
 
+      const priority = req.body?.priority === undefined ? undefined : cleanString(req.body.priority, 20);
+      if (priority !== undefined && !isOneOf(priority, reminderPriorities)) {
+        return res.status(400).json({ error: 'Choose a valid reminder priority' });
+      }
+
       const reminder = await ReminderModel.update(req.params.id, account.id, {
         title,
+        priority,
+        notes: req.body?.notes === undefined ? undefined : cleanMultiline(req.body.notes, 1000),
         remindOn,
         completed: typeof req.body?.completed === 'boolean' ? req.body.completed : undefined,
       });
