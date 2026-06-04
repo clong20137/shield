@@ -1,5 +1,5 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
-import { RotateCcw, Upload, UserPlus } from 'lucide-react';
+import { Camera, RotateCcw, Upload, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CreateUserPayload, User, userService } from '../services/api';
 import { rankOptions } from '../constants/ranks';
@@ -74,8 +74,11 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
   const [addressLookupQuery, setAddressLookupQuery] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isImportingPhotos, setIsImportingPhotos] = useState(false);
   const [importSummary, setImportSummary] = useState<{ createdCount: number; skippedRows: Array<{ rowNumber: number; reason: string }> } | null>(null);
+  const [photoImportSummary, setPhotoImportSummary] = useState<{ uploadedCount: number; skippedFiles: Array<{ fileName: string; peNumber: string; reason: string }> } | null>(null);
   const spreadsheetInputRef = useRef<HTMLInputElement | null>(null);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -180,6 +183,31 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
     }
   };
 
+  const handlePhotoImport = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+
+    if (files.length === 0) {
+      return;
+    }
+
+    setIsImportingPhotos(true);
+    setPhotoImportSummary(null);
+    try {
+      const response = await userService.importProfilePictures(files);
+      setPhotoImportSummary({
+        uploadedCount: response.data.uploadedCount,
+        skippedFiles: response.data.skippedFiles,
+      });
+      onToast('success', `${response.data.uploadedCount} profile photo${response.data.uploadedCount === 1 ? '' : 's'} imported\n${response.data.skippedCount} skipped`);
+    } catch (err) {
+      console.error(err);
+      onToast('error', 'Failed to import profile photos.');
+    } finally {
+      setIsImportingPhotos(false);
+    }
+  };
+
   return (
     <div>
       {!isModalView && (
@@ -192,13 +220,19 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
       <div className={isModalView ? 'mb-5 rounded border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900' : 'mb-5 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800'}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-bold text-gray-900 dark:text-white">Import Roster</h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Creates new accounts with the default password and required password change.</p>
+            <h2 className="text-base font-bold text-gray-900 dark:text-white">Import Roster & Photos</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Import accounts from Excel, or upload profile photos named by PE number. Existing photos are skipped.</p>
           </div>
-          <button type="button" onClick={() => spreadsheetInputRef.current?.click()} className="btn-secondary" disabled={isImporting} aria-label="Import Excel roster" title={isImporting ? 'Importing' : 'Import Excel roster'}>
-            <Upload size={16} />
-          </button>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => spreadsheetInputRef.current?.click()} className="btn-secondary" disabled={isImporting} aria-label="Import Excel roster" title={isImporting ? 'Importing' : 'Import Excel roster'}>
+              <Upload size={16} />
+            </button>
+            <button type="button" onClick={() => photoInputRef.current?.click()} className="btn-secondary" disabled={isImportingPhotos} aria-label="Import profile photos" title={isImportingPhotos ? 'Importing photos' : 'Import profile photos by PE number'}>
+              <Camera size={16} />
+            </button>
+          </div>
           <input ref={spreadsheetInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
+          <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple className="hidden" onChange={handlePhotoImport} />
         </div>
         {importSummary && (
           <div className="mt-4 rounded border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-gray-950">
@@ -209,6 +243,19 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
                   <p key={`${row.rowNumber}-${row.reason}`}>Row {row.rowNumber}: {row.reason}</p>
                 ))}
                 {importSummary.skippedRows.length > 20 && <p>{importSummary.skippedRows.length - 20} more skipped rows.</p>}
+              </div>
+            )}
+          </div>
+        )}
+        {photoImportSummary && (
+          <div className="mt-4 rounded border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-gray-950">
+            <p className="font-semibold text-gray-900 dark:text-white">{photoImportSummary.uploadedCount} profile photo{photoImportSummary.uploadedCount === 1 ? '' : 's'} uploaded.</p>
+            {photoImportSummary.skippedFiles.length > 0 && (
+              <div className="mt-2 max-h-40 overflow-auto text-gray-600 dark:text-gray-300">
+                {photoImportSummary.skippedFiles.slice(0, 20).map((file) => (
+                  <p key={`${file.fileName}-${file.reason}`}>{file.fileName}: {file.reason}</p>
+                ))}
+                {photoImportSummary.skippedFiles.length > 20 && <p>{photoImportSummary.skippedFiles.length - 20} more skipped files.</p>}
               </div>
             )}
           </div>

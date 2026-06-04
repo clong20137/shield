@@ -259,6 +259,14 @@ export interface UserImportResponse {
   skippedRows: Array<{ rowNumber: number; reason: string }>;
 }
 
+export interface UserPhotoImportResponse {
+  totalFiles: number;
+  uploadedCount: number;
+  skippedCount: number;
+  uploaded: Array<Pick<User, 'id' | 'firstName' | 'lastName' | 'peNumber'> & { profilePictureUrl: string; fileName: string }>;
+  skippedFiles: Array<{ fileName: string; peNumber: string; reason: string }>;
+}
+
 export interface SystemStatistics {
   totalUsers: number;
   activeUsers: number;
@@ -814,6 +822,12 @@ export const userService = {
     const formData = new FormData();
     formData.append('spreadsheet', file);
     return api.post<UserImportResponse>('/users/import', formData, { timeout: 30000 });
+  },
+
+  importProfilePictures: (files: File[]) => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('photos', file));
+    return api.post<UserPhotoImportResponse>('/users/profile-pictures/import', formData, { timeout: 120000 });
   },
   
   update: (id: string, updates: Partial<User>) =>

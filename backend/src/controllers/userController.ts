@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import fs from 'fs';
+import path from 'path';
 import * as XLSX from 'xlsx';
 import { User, UserModel } from '../models/User';
 import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents';
@@ -127,6 +128,16 @@ function buildSupervisorName(row: ImportRow): string {
 function isImportUserActive(status: string): boolean {
   const normalizedStatus = status.trim().toLowerCase();
   return !['inactive', 'terminated', 'separated', 'retired'].includes(normalizedStatus);
+}
+
+function getPeCandidatesFromFileName(fileName: string): string[] {
+  const baseName = path.parse(fileName).name.trim();
+  const compactName = baseName.replace(/[^a-z0-9]/giu, '');
+  const withoutPePrefix = compactName.replace(/^pe/iu, '');
+
+  return Array.from(
+    new Set([baseName, compactName, withoutPePrefix].map((value) => value.trim()).filter(Boolean)),
+  );
 }
 
 function formatImportedName(value: string): string {
@@ -583,6 +594,114 @@ export class UserController {
       }
 
       res.status(500).json({ error: 'Failed to import users' });
+    }
+  }
+
+  static async importProfilePictures(req: Request, res: Response) {
+    try {
+      const files = req.files as Express.Multer.File[] | undefined;
+
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: 'At least one profile photo is required' });
+      }
+
+      const actor = await getSessionAccount(req);
+      const canViewHidden = await canViewHiddenUsers(req);
+      const uploaded: Array<Pick<User, 'id' | 'firstName' | 'lastName' | 'peNumber'> & { profilePictureUrl: string; fileName: string }> = [];
+      const skippedFiles: Array<{ fileName: string; peNumber: string; reason: string }> = [];
+
+      for (const file of files) {
+        const candidates = getPeCandidatesFromFileName(file.originalname);
+        const displayPeNumber = candidates[0] || '';
+
+        const skipFile = (reason: string) => {
+          skippedFiles.push({ fileName: file.originalname, peNumber: displayPeNumber, reason });
+          if (file.path) {
+            fs.rmSync(file.path, { force: true });
+          }
+        };
+
+        if (candidates.length === 0) {
+          skipFile('File name does not include a PE number');
+          continue;
+        }
+
+        if (!isSafeUploadedImage(file.path)) {
+          skipFile('File is not a valid image');
+          continue;
+        }
+
+        let targetUser: User | null = null;
+        for (const candidate of candidates) {
+          targetUser = await UserModel.getUserByPeNumber(candidate);
+          if (targetUser) {
+            break;
+          }
+        }
+
+        if (!targetUser) {
+          skipFile('No user found with that PE number');
+          continue;
+        }
+
+        if (isHiddenFromRequester(targetUser, actor?.id, canViewHidden)) {
+          skipFile('No user found with that PE number');
+          continue;
+        }
+
+        if (targetUser.profilePictureUrl?.trim()) {
+          skipFile('Profile picture already exists');
+          continue;
+        }
+
+        await createImageThumbnails(file.path, [96, 256]);
+        const profilePictureUrl = `/uploads/profile-pictures/${file.filename}`;
+        const success = await UserModel.updateUser(targetUser.id, { profilePictureUrl });
+
+        if (!success) {
+          skipFile('Failed to update user profile picture');
+          continue;
+        }
+
+        uploaded.push({
+          id: targetUser.id,
+          firstName: targetUser.firstName,
+          lastName: targetUser.lastName,
+          peNumber: targetUser.peNumber,
+          profilePictureUrl,
+          fileName: file.originalname,
+        });
+      }
+
+      if (uploaded.length > 0) {
+        broadcastAppEvent({ type: 'user-updated' });
+        broadcastAppEvent({ type: 'dashboard-updated' });
+      }
+
+      await AuditLogModel.create({
+        actorId: actor?.id || null,
+        actorName: actor?.displayName || actor?.email || null,
+        action: 'users.profile_pictures_imported',
+        entityType: 'user',
+        entityId: null,
+        details: JSON.stringify({
+          totalFiles: files.length,
+          uploadedCount: uploaded.length,
+          skippedCount: skippedFiles.length,
+        }),
+        ...requestAuditFields(req),
+      });
+
+      res.status(201).json({
+        totalFiles: files.length,
+        uploadedCount: uploaded.length,
+        skippedCount: skippedFiles.length,
+        uploaded,
+        skippedFiles,
+      });
+    } catch (error) {
+      console.error('Import profile pictures error:', error);
+      res.status(500).json({ error: 'Failed to import profile pictures' });
     }
   }
 

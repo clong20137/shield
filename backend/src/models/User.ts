@@ -331,6 +331,25 @@ export class UserModel {
     }
   }
 
+  static async getUserByPeNumber(peNumber: string): Promise<User | null> {
+    const normalizedPeNumber = peNumber.trim().toLowerCase();
+    if (!normalizedPeNumber) {
+      return null;
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query(
+        'SELECT * FROM users WHERE LOWER(COALESCE(`peNumber`, \'\')) = ? LIMIT 1',
+        [normalizedPeNumber]
+      );
+      const users = rows as User[];
+      return users.length > 0 ? users[0] : null;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async getAllUsers(limit: number = 100, offset: number = 0, includeHidden = false): Promise<User[]> {
     const conn = await pool.getConnection();
     try {
