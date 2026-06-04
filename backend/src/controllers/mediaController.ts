@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { Request, Response } from 'express';
 
-const allowedImageExtensions = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+const allowedImageExtensions = new Set(['.jpg', '.jpeg', '.jfif', '.png', '.gif', '.webp']);
 const mediaFolders = [
   { key: 'profile-pictures', label: 'Profile Pictures' },
   { key: 'dashboard-posts', label: 'Dashboard Posts' },

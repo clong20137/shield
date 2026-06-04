@@ -97,7 +97,7 @@ async function generateMissingUploadThumbnail(req: Request, _res: Response, next
     return next();
   }
 
-  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  const allowedExtensions = ['.jpg', '.jpeg', '.jfif', '.png', '.gif', '.webp'];
   const originalPath = allowedExtensions
     .map((extension) => path.join(originalDirectory, `${originalBaseName}${extension}`))
     .find((candidatePath) => isPathInside(uploadsRoot, candidatePath) && fs.existsSync(candidatePath));

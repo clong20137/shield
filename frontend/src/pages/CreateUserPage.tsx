@@ -16,6 +16,7 @@ const employmentTypes = ['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inact
 const statusOptions = ['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Administrative Duty', 'Inactive'];
 const sexOptions = ['', 'Male', 'Female'];
 const maritalStatusOptions = ['', 'Single', 'Married', 'Divorced', 'Widowed'];
+const allowedPhotoExtensions = new Set(['jpg', 'jpeg', 'jfif', 'png', 'gif', 'webp']);
 
 type UserForm = CreateUserPayload;
 
@@ -26,6 +27,11 @@ function getImportErrorMessage(error: unknown, fallback: string): string {
   }
 
   return error instanceof Error ? error.message : fallback;
+}
+
+function isAllowedProfilePhoto(file: File): boolean {
+  const extension = file.name.split('.').pop()?.toLowerCase() || '';
+  return allowedPhotoExtensions.has(extension);
 }
 
 function formatPhoneNumber(value: string): string {
@@ -196,10 +202,18 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
   };
 
   const handlePhotoImport = async (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
+    const selectedFiles = Array.from(event.target.files || []);
     event.target.value = '';
 
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    const files = selectedFiles.filter(isAllowedProfilePhoto);
+    const ignoredCount = selectedFiles.length - files.length;
+
     if (files.length === 0) {
+      onToast('error', 'No supported image files were selected. Use JPG, JPEG, JFIF, PNG, GIF, or WEBP.');
       return;
     }
 
@@ -213,7 +227,8 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
         uploadedCount: response.data.uploadedCount,
         skippedFiles: response.data.skippedFiles,
       });
-      onToast('success', `${response.data.uploadedCount} profile photo${response.data.uploadedCount === 1 ? '' : 's'} imported\n${response.data.skippedCount} skipped`);
+      const ignoredText = ignoredCount > 0 ? `\n${ignoredCount} unsupported file${ignoredCount === 1 ? '' : 's'} ignored` : '';
+      onToast('success', `${response.data.uploadedCount} profile photo${response.data.uploadedCount === 1 ? '' : 's'} imported\n${response.data.skippedCount} skipped${ignoredText}`);
     } catch (err) {
       console.error(err);
       const message = getImportErrorMessage(err, 'Failed to import profile photos.');
@@ -254,11 +269,11 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
             </button>
           </div>
           <input ref={spreadsheetInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
-          <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple className="hidden" onChange={handlePhotoImport} />
+          <input ref={photoInputRef} type="file" accept=".jpg,.jpeg,.jfif,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp" multiple className="hidden" onChange={handlePhotoImport} />
           <input
             ref={photoFolderInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp"
+            accept=".jpg,.jpeg,.jfif,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp"
             multiple
             className="hidden"
             onChange={handlePhotoImport}

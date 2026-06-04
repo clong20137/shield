@@ -4,10 +4,11 @@ import multer from 'multer';
 
 const uploadDirectory = path.join(process.cwd(), 'uploads', 'profile-pictures');
 const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
-const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+const allowedExtensions = new Set(['.jpg', '.jpeg', '.jfif', '.png', '.gif', '.webp']);
 const imageSignatures: Record<string, number[][]> = {
   '.jpg': [[0xff, 0xd8, 0xff]],
   '.jpeg': [[0xff, 0xd8, 0xff]],
+  '.jfif': [[0xff, 0xd8, 0xff]],
   '.png': [[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]],
   '.gif': [[0x47, 0x49, 0x46, 0x38]],
   '.webp': [[0x52, 0x49, 0x46, 0x46]],
@@ -52,7 +53,7 @@ export const profilePictureImportUpload = multer({
   fileFilter: (_req, file, cb) => {
     const extension = path.extname(file.originalname).toLowerCase();
     if (!allowedExtensions.has(extension)) {
-      cb(new Error('Only image uploads are allowed'));
+      cb(null, false);
       return;
     }
 

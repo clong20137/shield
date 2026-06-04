@@ -73,30 +73,43 @@ export function AdminConsolePage({
     setActiveTab(initialTab);
   }, [initialTab]);
 
-  return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 flex-wrap gap-2 border-b border-gray-200 pb-3 dark:border-gray-800">
-        {visibleTabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 rounded px-3 py-2 text-sm font-bold transition ${
-                currentTab === tab.id
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
-              }`}
-            >
-              <Icon size={16} />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+  const activeTabConfig = visibleTabs.find((tab) => tab.id === currentTab);
+  const ActiveIcon = activeTabConfig?.icon || Settings;
 
-      <div className="min-h-0 flex-1 overflow-y-auto pt-4 pr-1">
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-4 md:flex-row">
+      <aside className="shrink-0 border-b border-gray-200 pb-3 dark:border-gray-800 md:w-56 md:border-r md:border-b-0 md:pr-3 md:pb-0">
+        <div className="mb-3 flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-950">
+          <ActiveIcon size={17} className="text-primary-500" />
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Admin Console</p>
+            <p className="truncate text-sm font-bold text-gray-900 dark:text-white">{activeTabConfig?.label || 'Admin'}</p>
+          </div>
+        </div>
+
+        <nav className="flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0" aria-label="Admin console navigation">
+          {visibleTabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex shrink-0 items-center gap-2 rounded px-3 py-2 text-left text-sm font-bold transition md:w-full ${
+                  currentTab === tab.id
+                    ? 'bg-primary-500 text-white shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800'
+                }`}
+              >
+                <Icon size={16} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
+
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         <Suspense fallback={<div className="loading">Loading admin tools...</div>}>
           {currentTab === 'general' && (
             <PermissionsPage
