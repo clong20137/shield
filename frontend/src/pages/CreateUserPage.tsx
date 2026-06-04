@@ -1,4 +1,5 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
+import axios from 'axios';
 import { Camera, FolderUp, RotateCcw, Upload, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CreateUserPayload, User, userService } from '../services/api';
@@ -17,6 +18,15 @@ const sexOptions = ['', 'Male', 'Female'];
 const maritalStatusOptions = ['', 'Single', 'Married', 'Divorced', 'Widowed'];
 
 type UserForm = CreateUserPayload;
+
+function getImportErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const responseError = error.response?.data as { error?: string; message?: string } | undefined;
+    return responseError?.error || responseError?.message || error.message || fallback;
+  }
+
+  return error instanceof Error ? error.message : fallback;
+}
 
 function formatPhoneNumber(value: string): string {
   const digits = value.replace(/\D/gu, '').slice(0, 10);
@@ -179,7 +189,7 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
       onToast('success', `${response.data.createdCount} account${response.data.createdCount === 1 ? '' : 's'} imported\nDefault password: ${response.data.defaultPassword}`);
     } catch (err) {
       console.error(err);
-      onToast('error', 'Failed to import spreadsheet.');
+      onToast('error', getImportErrorMessage(err, 'Failed to import spreadsheet.'));
     } finally {
       setIsImporting(false);
     }
@@ -206,7 +216,12 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
       onToast('success', `${response.data.uploadedCount} profile photo${response.data.uploadedCount === 1 ? '' : 's'} imported\n${response.data.skippedCount} skipped`);
     } catch (err) {
       console.error(err);
-      onToast('error', 'Failed to import profile photos.');
+      const message = getImportErrorMessage(err, 'Failed to import profile photos.');
+      setPhotoImportSummary({
+        uploadedCount: 0,
+        skippedFiles: [{ fileName: 'Import failed', peNumber: '', reason: message }],
+      });
+      onToast('error', message);
     } finally {
       setIsImportingPhotos(false);
     }

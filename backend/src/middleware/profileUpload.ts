@@ -43,6 +43,23 @@ export const profilePictureUpload = multer({
   },
 });
 
+export const profilePictureImportUpload = multer({
+  storage,
+  limits: {
+    fileSize: 20 * 1024 * 1024,
+    files: 3000,
+  },
+  fileFilter: (_req, file, cb) => {
+    const extension = path.extname(file.originalname).toLowerCase();
+    if (!allowedMimeTypes.has(file.mimetype) || !allowedExtensions.has(extension)) {
+      cb(new Error('Only image uploads are allowed'));
+      return;
+    }
+
+    cb(null, true);
+  },
+});
+
 export function isSafeUploadedImage(filePath: string): boolean {
   const extension = path.extname(filePath).toLowerCase();
   const signatures = imageSignatures[extension];

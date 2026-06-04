@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { UserController } from '../controllers/userController';
-import { profilePictureUpload } from '../middleware/profileUpload';
+import { profilePictureImportUpload, profilePictureUpload } from '../middleware/profileUpload';
 import { requirePermission, requireSelfOrPermission } from '../middleware/permissions';
 import { rateLimit } from '../middleware/rateLimit';
 
@@ -32,7 +32,7 @@ router.get('/all', requirePermission('users:view'), UserController.getAllUsers);
 router.get('/address-suggestions', addressLookupLimiter, requirePermission('users:view'), UserController.suggestAddresses);
 router.post('/', userCreateLimiter, requirePermission('users:create'), UserController.createUser);
 router.post('/import', userImportLimiter, requirePermission('users:create'), spreadsheetUpload.single('spreadsheet'), UserController.importUsers);
-router.post('/profile-pictures/import', profilePictureImportLimiter, requirePermission('users:profile-picture'), profilePictureUpload.array('photos', 500), UserController.importProfilePictures);
+router.post('/profile-pictures/import', profilePictureImportLimiter, requirePermission('users:profile-picture'), profilePictureImportUpload.array('photos', 3000), UserController.importProfilePictures);
 router.post('/:id/profile-picture', profilePictureLimiter, requireSelfOrPermission((req) => req.params.id, 'users:profile-picture'), profilePictureUpload.single('profilePicture'), UserController.uploadProfilePicture);
 router.delete('/:id/profile-picture', profilePictureLimiter, requireSelfOrPermission((req) => req.params.id, 'users:profile-picture'), UserController.removeProfilePicture);
 router.get('/:id', requirePermission('users:view'), UserController.getUserById);
