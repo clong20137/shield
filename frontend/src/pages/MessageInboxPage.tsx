@@ -1,11 +1,13 @@
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, KeyboardEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, CheckCheck, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Send, Trash2, X } from 'lucide-react';
-import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
-import { AuthAccount, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, userService, User, UserMessage } from '../services/api';
+import type { EmojiClickData } from 'emoji-picker-react';
+import { AuthAccount, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, userService, User, UserMessage } from '../services/api';
 import { RankBadge } from '../components/RankBadge';
 import { MentionText } from '../components/MentionText';
 import { MentionTextarea } from '../components/MentionTextarea';
 import { UserDetail } from '../components/UserDetail';
+
+const EmojiPicker = lazy(() => import('emoji-picker-react'));
 
 interface MessageInboxPageProps {
   currentUser: AuthAccount;
@@ -862,9 +864,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                       >
                         {user.profilePictureUrl ? (
                           <img
-                            src={getAssetUrl(user.profilePictureUrl)}
+                            src={getAssetThumbnailUrl(user.profilePictureUrl, 96)}
                             alt={`${user.firstName} ${user.lastName}`}
-                            onError={handleAssetImageError}
+                            onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)}
                             className="h-8 w-8 rounded-full object-cover sm:h-9 sm:w-9"
                           />
                         ) : (
@@ -908,9 +910,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                     >
                       {thread.contactProfilePictureUrl ? (
                         <img
-                          src={getAssetUrl(thread.contactProfilePictureUrl)}
+                          src={getAssetThumbnailUrl(thread.contactProfilePictureUrl, 96)}
                           alt={thread.contactName}
-                          onError={handleAssetImageError}
+                          onError={(event) => handleAssetThumbnailError(event, thread.contactProfilePictureUrl)}
                           className="h-10 w-10 rounded-full border border-gray-200 object-cover dark:border-gray-700"
                         />
                       ) : (
@@ -997,9 +999,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   <div className="relative shrink-0">
                     {selectedThread.contactProfilePictureUrl ? (
                       <img
-                        src={getAssetUrl(selectedThread.contactProfilePictureUrl)}
+                        src={getAssetThumbnailUrl(selectedThread.contactProfilePictureUrl, 96)}
                         alt={selectedThread.contactName}
-                        onError={handleAssetImageError}
+                        onError={(event) => handleAssetThumbnailError(event, selectedThread.contactProfilePictureUrl)}
                         className="h-12 w-12 rounded-full border border-gray-200 object-cover shadow-sm dark:border-gray-700"
                       />
                     ) : (
@@ -1180,14 +1182,16 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   </button>
                   {isEmojiPickerOpen && (
                     <div className="absolute bottom-[calc(100%+0.75rem)] left-0 z-40 overflow-hidden rounded-lg border border-gray-200 bg-white p-2 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
-                      <EmojiPicker
-                        onEmojiClick={addEmojiToReply}
-                        width={280}
-                        height={320}
-                        previewConfig={{ showPreview: false }}
-                        searchDisabled={false}
-                        skinTonesDisabled
-                      />
+                      <Suspense fallback={<div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">Loading...</div>}>
+                        <EmojiPicker
+                          onEmojiClick={addEmojiToReply}
+                          width={280}
+                          height={320}
+                          previewConfig={{ showPreview: false }}
+                          searchDisabled={false}
+                          skinTonesDisabled
+                        />
+                      </Suspense>
                     </div>
                   )}
                   <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800 sm:h-8 sm:w-8" title="Attach files">

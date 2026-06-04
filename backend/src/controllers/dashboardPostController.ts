@@ -6,6 +6,7 @@ import { AuthAccountModel } from '../models/AuthAccount';
 import { DashboardPostModel } from '../models/DashboardPost';
 import { UserNotificationModel } from '../models/UserNotification';
 import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents';
+import { createImageThumbnails } from '../services/imageThumbnails';
 import { notifyMentions } from '../services/mentionService';
 import { cleanMultiline, cleanString, isOneOf } from '../utils/validation';
 import { parsePagination } from '../utils/pagination';
@@ -154,6 +155,8 @@ export class DashboardPostController {
         fs.rmSync(file.path, { force: true });
         return res.status(400).json({ error: 'Only valid image uploads are allowed' });
       }
+
+      await createImageThumbnails(file.path, [480, 960]);
 
       res.status(201).json({ imageUrl: `/uploads/dashboard-posts/${file.filename}` });
     } catch (error) {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pencil, Trash2, X } from 'lucide-react';
-import { getAssetUrl, handleAssetImageError, User } from '../services/api';
+import { getAssetThumbnailUrl, handleAssetThumbnailError, User } from '../services/api';
 import { RankBadge, isImportantRank } from './RankBadge';
 
 interface UserTableProps {
@@ -142,9 +142,9 @@ export const UserTable: React.FC<UserTableProps> = ({
                 <td className="px-4 py-3">
                   <div className="flex min-w-0 items-center gap-3">
                     <img
-                      src={getAssetUrl(user.profilePictureUrl)}
+                      src={getAssetThumbnailUrl(user.profilePictureUrl, 96)}
                       alt={`${user.firstName} ${user.lastName}`}
-                      onError={handleAssetImageError}
+                      onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)}
                       className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-700"
                     />
                     <span className="truncate font-semibold">{user.lastName}</span>

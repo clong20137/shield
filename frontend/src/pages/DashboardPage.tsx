@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Eraser, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, dashboardSummaryService, DashboardSummary, getAssetUrl, handleAssetImageError, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
+import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, dashboardSummaryService, DashboardSummary, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { UserDetail } from '../components/UserDetail';
 
@@ -882,9 +882,9 @@ function DashboardNews({
                   {post.imageUrl ? (
                     <Link to={`/updates/${post.id}`} className="block h-44 overflow-hidden bg-gray-100 dark:bg-gray-900 sm:h-52">
                       <img
-                        src={getAssetUrl(post.imageUrl)}
+                        src={getAssetThumbnailUrl(post.imageUrl, 480)}
                         alt=""
-                        onError={handleAssetImageError}
+                        onError={(event) => handleAssetThumbnailError(event, post.imageUrl)}
                         className="h-full w-full object-cover transition duration-700 hover:scale-[1.03]"
                       />
                     </Link>
@@ -1274,7 +1274,7 @@ function PinnedProfilesWidget({
                   className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
                 >
                   {user.profilePictureUrl ? (
-                    <img src={getAssetUrl(user.profilePictureUrl)} alt={`${user.firstName} ${user.lastName}`} onError={handleAssetImageError} className="h-9 w-9 rounded-full object-cover" />
+                    <img src={getAssetThumbnailUrl(user.profilePictureUrl, 96)} alt={`${user.firstName} ${user.lastName}`} onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)} className="h-9 w-9 rounded-full object-cover" />
                   ) : (
                     <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-xs font-bold text-accent">
                       {getInitials(user.firstName, user.lastName, user.email)}
@@ -1333,7 +1333,7 @@ function PinnedProfilesWidget({
                     )}
                     <span className="relative block h-full w-full overflow-hidden rounded-full border-2 border-white bg-primary-500 shadow group-hover:ring-4 group-hover:ring-accent/20">
                       {profile.profilePictureUrl ? (
-                        <img src={getAssetUrl(profile.profilePictureUrl)} alt={`${profile.firstName} ${profile.lastName}`} onError={handleAssetImageError} className="h-full w-full object-cover" />
+                        <img src={getAssetThumbnailUrl(profile.profilePictureUrl, 96)} alt={`${profile.firstName} ${profile.lastName}`} onError={(event) => handleAssetThumbnailError(event, profile.profilePictureUrl)} className="h-full w-full object-cover" />
                       ) : (
                         <span className="flex h-full w-full items-center justify-center text-sm font-bold text-white">
                           {getInitials(profile.firstName, profile.lastName, profile.email)}

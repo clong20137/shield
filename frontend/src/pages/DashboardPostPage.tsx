@@ -1,12 +1,15 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
+import { lazy, Suspense } from 'react';
+import type { EmojiClickData } from 'emoji-picker-react';
 import { Flag, MessageSquare, Pin, PinOff, Send, Smile, Trash2, X } from 'lucide-react';
 import { UserDetail } from '../components/UserDetail';
 import { FormattedText } from '../components/FormattedText';
 import { MentionTextarea } from '../components/MentionTextarea';
 import { MentionText } from '../components/MentionText';
 import { AuthAccount, DashboardPost, DashboardPostComment, User, dashboardPostService, getAssetUrl, handleAssetImageError, userService } from '../services/api';
+
+const EmojiPicker = lazy(() => import('emoji-picker-react'));
 
 interface DashboardPostPageProps {
   currentUser: AuthAccount | null;
@@ -299,7 +302,9 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
                 </button>
                 {isEmojiPickerOpen && (
                   <div className="absolute bottom-12 right-0 z-50 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
-                    <EmojiPicker onEmojiClick={addEmoji} />
+                    <Suspense fallback={<div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">Loading...</div>}>
+                      <EmojiPicker onEmojiClick={addEmoji} />
+                    </Suspense>
                   </div>
                 )}
                 <button type="submit" className="btn-primary" disabled={!currentUser || isSavingComment || !commentBody.trim()} aria-label="Post comment" title={isSavingComment ? 'Posting' : 'Post Comment'}>

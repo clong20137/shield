@@ -107,6 +107,37 @@ export function getAssetUrl(value?: string | null): string {
   }
 }
 
+export function getAssetThumbnailUrl(value?: string | null, width = 96): string {
+  if (!value) {
+    return '';
+  }
+
+  const rawValue = value.trim().replace(/\\/gu, '/');
+  const uploadMatch = rawValue.match(/(?:^|\/)(?:api\/)?uploads\/(.+)$/u);
+  if (!uploadMatch?.[1]) {
+    return getAssetUrl(value);
+  }
+
+  const assetPath = uploadMatch[1];
+  if (assetPath.includes('/thumbs/')) {
+    return getAssetUrl(value);
+  }
+
+  const pathParts = assetPath.split('/').filter(Boolean);
+  const fileName = pathParts.pop();
+  if (!fileName) {
+    return getAssetUrl(value);
+  }
+
+  const dotIndex = fileName.lastIndexOf('.');
+  const baseName = dotIndex > 0 ? fileName.slice(0, dotIndex) : fileName;
+  const thumbnailPath = [...pathParts, 'thumbs', `${baseName}-${width}.webp`]
+    .map((part) => encodeURIComponent(decodeURIComponent(part)))
+    .join('/');
+
+  return `${ASSET_ORIGIN_URL}/uploads/${thumbnailPath}`;
+}
+
 export function handleAssetImageError(event: { currentTarget: HTMLImageElement }) {
   const image = event.currentTarget;
   const currentSource = image.currentSrc || image.src;
@@ -122,6 +153,18 @@ export function handleAssetImageError(event: { currentTarget: HTMLImageElement }
   }
 
   image.style.display = 'none';
+}
+
+export function handleAssetThumbnailError(event: { currentTarget: HTMLImageElement }, fallbackValue?: string | null) {
+  const image = event.currentTarget;
+  const fallbackUrl = getAssetUrl(fallbackValue);
+
+  if (fallbackUrl && image.src !== fallbackUrl) {
+    image.src = fallbackUrl;
+    return;
+  }
+
+  handleAssetImageError(event);
 }
 
 export interface User {

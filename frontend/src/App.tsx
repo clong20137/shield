@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation,
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { FloatingWindow } from './components/FloatingWindow';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, getAppEventsUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, urgentAlertService, UrgentAlert, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, getAppEventsUrl, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, urgentAlertService, UrgentAlert, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
@@ -1096,9 +1096,9 @@ function GlobalSearch({ compact }: { compact: boolean }) {
                   className="flex w-full min-w-0 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
                 >
                   <img
-                    src={getAssetUrl(user.profilePictureUrl)}
+                    src={getAssetThumbnailUrl(user.profilePictureUrl, 96)}
                     alt={`${user.firstName} ${user.lastName}`}
-                    onError={handleAssetImageError}
+                    onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)}
                     className="mr-3 h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-700"
                   />
                   <div className="min-w-0 flex-1">
@@ -3905,9 +3905,9 @@ function App() {
                 <div className={isSidebarCollapsed ? 'flex justify-center' : 'flex items-center gap-3'}>
                   {currentUser?.profilePictureUrl ? (
                     <img
-                      src={getAssetUrl(currentUser.profilePictureUrl)}
+                      src={getAssetThumbnailUrl(currentUser.profilePictureUrl, 96)}
                       alt={currentUser.displayName}
-                      onError={handleAssetImageError}
+                      onError={(event) => handleAssetThumbnailError(event, currentUser.profilePictureUrl)}
                       className={`${isSidebarCollapsed ? 'h-10 w-10' : 'h-14 w-14'} shrink-0 rounded-full border border-white bg-white object-cover shadow`}
                     />
                   ) : (

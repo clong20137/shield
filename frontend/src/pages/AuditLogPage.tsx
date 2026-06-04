@@ -1,6 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, Copy, Download, Eye, FileSpreadsheet, Search, X } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { auditService, AuditLog, AuditLogFilters, AuditLogResponse } from '../services/api';
 
 const DEFAULT_RESPONSE: AuditLogResponse = {
@@ -98,7 +97,8 @@ function downloadCsv(logs: AuditLog[]) {
   URL.revokeObjectURL(url);
 }
 
-function downloadXlsx(logs: AuditLog[]) {
+async function downloadXlsx(logs: AuditLog[]) {
+  const XLSX = await import('xlsx');
   const worksheet = XLSX.utils.aoa_to_sheet(getExportRows(logs));
   worksheet['!cols'] = [
     { wch: 22 },
@@ -183,7 +183,7 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
       }
 
       if (format === 'xlsx') {
-        downloadXlsx(allLogs);
+        await downloadXlsx(allLogs);
       } else {
         downloadCsv(allLogs);
       }

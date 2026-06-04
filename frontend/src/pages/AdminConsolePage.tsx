@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { AlertTriangle, Award, Bug, ClipboardList, LockKeyhole, Radio, Settings, UserPlus } from 'lucide-react';
 import { AuthAccount, BugReport, BugReportStatus, User } from '../services/api';
-import AuditLogPage from './AuditLogPage';
-import BugTrackerPage from './BugTrackerPage';
-import CreateUserPage from './CreateUserPage';
-import ErrorLogPage from './ErrorLogPage';
-import PermissionsPage from './PermissionsPage';
-import AchievementsPage from './AchievementsPage';
-import UrgentAlertsPage from './UrgentAlertsPage';
+
+const AchievementsPage = lazy(() => import('./AchievementsPage'));
+const AuditLogPage = lazy(() => import('./AuditLogPage'));
+const BugTrackerPage = lazy(() => import('./BugTrackerPage'));
+const CreateUserPage = lazy(() => import('./CreateUserPage'));
+const ErrorLogPage = lazy(() => import('./ErrorLogPage'));
+const PermissionsPage = lazy(() => import('./PermissionsPage'));
+const UrgentAlertsPage = lazy(() => import('./UrgentAlertsPage'));
 
 export type AdminConsoleTab = 'general' | 'permissions' | 'achievements' | 'create-user' | 'alerts' | 'audit' | 'errors' | 'bugs';
 
@@ -93,56 +94,58 @@ export function AdminConsolePage({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto pt-4 pr-1">
-        {currentTab === 'general' && (
-          <PermissionsPage
-            account={account}
-            onAccountUpdate={onAccountUpdate}
-            onToast={onToast}
-            getErrorMessage={getErrorMessage}
-            section="settings"
-            isModalView
-          />
-        )}
+        <Suspense fallback={<div className="loading">Loading admin tools...</div>}>
+          {currentTab === 'general' && (
+            <PermissionsPage
+              account={account}
+              onAccountUpdate={onAccountUpdate}
+              onToast={onToast}
+              getErrorMessage={getErrorMessage}
+              section="settings"
+              isModalView
+            />
+          )}
 
-        {currentTab === 'permissions' && (
-          <PermissionsPage
-            account={account}
-            onAccountUpdate={onAccountUpdate}
-            onToast={onToast}
-            getErrorMessage={getErrorMessage}
-            section="permissions"
-            isModalView
-          />
-        )}
+          {currentTab === 'permissions' && (
+            <PermissionsPage
+              account={account}
+              onAccountUpdate={onAccountUpdate}
+              onToast={onToast}
+              getErrorMessage={getErrorMessage}
+              section="permissions"
+              isModalView
+            />
+          )}
 
-        {currentTab === 'create-user' && (
-          <CreateUserPage
-            onToast={onToast}
-            isModalView
-            onCreated={onUserCreated}
-          />
-        )}
+          {currentTab === 'create-user' && (
+            <CreateUserPage
+              onToast={onToast}
+              isModalView
+              onCreated={onUserCreated}
+            />
+          )}
 
-        {currentTab === 'achievements' && (
-          <AchievementsPage
-            onToast={onToast}
-            getErrorMessage={getErrorMessage}
-          />
-        )}
+          {currentTab === 'achievements' && (
+            <AchievementsPage
+              onToast={onToast}
+              getErrorMessage={getErrorMessage}
+            />
+          )}
 
-        {currentTab === 'audit' && <AuditLogPage isModalView />}
+          {currentTab === 'audit' && <AuditLogPage isModalView />}
 
-        {currentTab === 'errors' && <ErrorLogPage />}
+          {currentTab === 'errors' && <ErrorLogPage />}
 
-        {currentTab === 'alerts' && <UrgentAlertsPage onToast={onToast} />}
+          {currentTab === 'alerts' && <UrgentAlertsPage onToast={onToast} />}
 
-        {currentTab === 'bugs' && (
-          onBugStatusChange ? (
-            <BugTrackerPage reports={bugReports} onStatusChange={onBugStatusChange} />
-          ) : (
-            <div className="empty-state">Bug tracker is unavailable.</div>
-          )
-        )}
+          {currentTab === 'bugs' && (
+            onBugStatusChange ? (
+              <BugTrackerPage reports={bugReports} onStatusChange={onBugStatusChange} />
+            ) : (
+              <div className="empty-state">Bug tracker is unavailable.</div>
+            )
+          )}
+        </Suspense>
       </div>
     </div>
   );

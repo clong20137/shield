@@ -10,6 +10,7 @@ import { AuditLogModel } from '../models/AuditLog';
 import { cleanMultiline, cleanString, isOneOf, isStrongPassword, isValidEmail, isValidPhone, normalizeEmail, normalizePhone } from '../utils/validation';
 import { isSafeUploadedImage } from '../middleware/profileUpload';
 import { parsePagination } from '../utils/pagination';
+import { createImageThumbnails } from '../services/imageThumbnails';
 
 const employmentTypes = ['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inactive', 'Other', 'CPS'] as const;
 const userStatuses = ['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Administrative Duty', 'Inactive'] as const;
@@ -702,6 +703,8 @@ export class UserController {
         fs.rmSync(file.path, { force: true });
         return res.status(400).json({ error: 'Only valid image uploads are allowed' });
       }
+
+      await createImageThumbnails(file.path, [96, 256]);
 
       const profilePictureUrl = `/uploads/profile-pictures/${file.filename}`;
       const success = await UserModel.updateUser(req.params.id, { profilePictureUrl });

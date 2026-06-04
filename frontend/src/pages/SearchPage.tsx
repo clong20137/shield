@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
+import { lazy, Suspense } from 'react';
 import { Camera, Download, MessageSquare, Save, Send, Users, X } from 'lucide-react';
-import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
+import type { EmojiClickData } from 'emoji-picker-react';
 import { useSearchParams } from 'react-router-dom';
 import { AuthAccount, AuthRole, authService, getAssetUrl, handleAssetImageError, messageService, userService, User, UserFilters } from '../services/api';
 import { SearchBar } from '../components/SearchBar';
@@ -10,6 +11,8 @@ import { UserDetail } from '../components/UserDetail';
 import { FloatingWindow } from '../components/FloatingWindow';
 import { rankOptions } from '../constants/ranks';
 import { districtOptions } from '../constants/districts';
+
+const EmojiPicker = lazy(() => import('emoji-picker-react'));
 
 interface SearchPageProps {
   currentUser: AuthAccount | null;
@@ -1189,7 +1192,9 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
               </button>
               {isEmojiPickerOpen && (
                 <div className="absolute z-20 mt-2">
-                  <EmojiPicker onEmojiClick={addEmoji} />
+                  <Suspense fallback={<div className="rounded border border-gray-200 bg-white px-3 py-2 text-sm text-gray-500 shadow dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">Loading...</div>}>
+                    <EmojiPicker onEmojiClick={addEmoji} />
+                  </Suspense>
                 </div>
               )}
             </div>
