@@ -151,8 +151,10 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [profileZIndex, setProfileZIndex] = useState(85);
   const [error, setError] = useState<string | null>(null);
   const [currentQuery, setCurrentQuery] = useState('');
+  const [currentFilters, setCurrentFilters] = useState<UserFilters>({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  const [hasMoreUsers, setHasMoreUsers] = useState(false);
   const [messageRecipient, setMessageRecipient] = useState<User | null>(null);
   const [messageSubject, setMessageSubject] = useState('');
   const [messageBody, setMessageBody] = useState('');
@@ -187,16 +189,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     () => selectedUsers.filter((user) => user.id !== currentUser?.id && user.receivesMessages !== false).length,
     [currentUser?.id, selectedUsers],
   );
-  const totalPages = Math.max(1, Math.ceil(users.length / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const pageStartIndex = (safePage - 1) * pageSize;
-  const paginatedUsers = users.slice(pageStartIndex, pageStartIndex + pageSize);
-  const pageStart = users.length === 0 ? 0 : pageStartIndex + 1;
-  const pageEnd = Math.min(users.length, pageStartIndex + pageSize);
-
-  useEffect(() => {
-    setPage(1);
-  }, [currentQuery, pageSize, users.length]);
+  const pageStart = users.length === 0 ? 0 : ((page - 1) * pageSize) + 1;
+  const pageEnd = users.length === 0 ? 0 : pageStart + users.length - 1;
 
   useEffect(() => {
     const handleFloatingFocus = (event: Event) => {
@@ -242,22 +236,20 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     return () => document.removeEventListener('keydown', handleEscape);
   }, [bulkActionMode, editingUser, selectedUser]);
 
-  const handleSearch = async (query: string) => {
+  const loadUsersPage = async (query: string, filters: UserFilters = currentFilters, nextPage = 1, nextPageSize = pageSize) => {
     const requestId = searchRequestRef.current + 1;
     searchRequestRef.current = requestId;
     setCurrentQuery(query);
+    setCurrentFilters(filters);
+    setPage(nextPage);
+    setPageSize(nextPageSize);
     setLoading(true);
     setError(null);
     try {
-      if (!query.trim()) {
-        const response = await userService.getAll(1, 100);
-        if (requestId !== searchRequestRef.current) return;
-        setUsers(response.data.data);
-      } else {
-        const response = await userService.search(query);
-        if (requestId !== searchRequestRef.current) return;
-        setUsers(response.data);
-      }
+      const response = await userService.searchPaged(query, filters, nextPage, nextPageSize);
+      if (requestId !== searchRequestRef.current) return;
+      setUsers(response.data.data);
+      setHasMoreUsers(Boolean(response.data.hasMore));
     } catch (err) {
       setError('Failed to search users. Please try again.');
       console.error(err);
@@ -268,18 +260,12 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     }
   };
 
+  const handleSearch = async (query: string) => {
+    await loadUsersPage(query, currentFilters, 1, pageSize);
+  };
+
   const handleFilterChange = async (filters: UserFilters) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await userService.search(currentQuery, filters);
-      setUsers(response.data);
-    } catch (err) {
-      setError('Failed to apply filters. Please try again.');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    await loadUsersPage(currentQuery, filters, 1, pageSize);
   };
 
   const handleDelete = async (userId: string) => {
@@ -768,21 +754,21 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
 
       {users.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-gray-950">
-          <span className="text-gray-500 dark:text-gray-400">Showing {pageStart}-{pageEnd} of {users.length}</span>
+          <span className="text-gray-500 dark:text-gray-400">Showing {pageStart}-{pageEnd}{hasMoreUsers ? '+' : ''}</span>
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={pageSize}
-              onChange={(event) => setPageSize(Number(event.target.value))}
+              onChange={(event) => void loadUsersPage(currentQuery, currentFilters, 1, Number(event.target.value))}
               className="rounded border border-gray-300 bg-white px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
               aria-label="Users per page"
             >
               {[25, 50, 100, 250].map((size) => <option key={size} value={size}>{size}</option>)}
             </select>
-            <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={safePage <= 1} className="btn-secondary px-2 py-1 text-xs" aria-label="Previous user page" title="Previous">
+            <button type="button" onClick={() => void loadUsersPage(currentQuery, currentFilters, Math.max(1, page - 1), pageSize)} disabled={page <= 1 || loading} className="btn-secondary px-2 py-1 text-xs" aria-label="Previous user page" title="Previous">
               Previous
             </button>
-            <span className="font-semibold text-gray-700 dark:text-gray-200">Page {safePage} of {totalPages}</span>
-            <button type="button" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={safePage >= totalPages} className="btn-secondary px-2 py-1 text-xs" aria-label="Next user page" title="Next">
+            <span className="font-semibold text-gray-700 dark:text-gray-200">Page {page}</span>
+            <button type="button" onClick={() => void loadUsersPage(currentQuery, currentFilters, page + 1, pageSize)} disabled={!hasMoreUsers || loading} className="btn-secondary px-2 py-1 text-xs" aria-label="Next user page" title="Next">
               Next
             </button>
           </div>
@@ -790,7 +776,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       )}
 
       <UserTable
-        users={paginatedUsers}
+        users={users}
         loading={loading}
         onUserSelect={openSelectedUser}
         onEdit={openEditUser}

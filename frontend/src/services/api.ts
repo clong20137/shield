@@ -195,6 +195,7 @@ export interface UserListResponse {
   page: number;
   limit: number;
   count: number;
+  hasMore?: boolean;
 }
 
 export interface UserImportResponse {
@@ -741,6 +742,9 @@ export const authService = {
 export const userService = {
   search: (searchTerm: string, filters?: UserFilters) =>
     api.get('/users/search', { params: { q: searchTerm, ...filters } }),
+
+  searchPaged: (searchTerm: string, filters?: UserFilters, page: number = 1, pageSize: number = 50) =>
+    api.get<UserListResponse>('/users/search', { params: { q: searchTerm, ...filters, page, pageSize } }),
   
   getAll: (page: number = 1, limit: number = 50) =>
     api.get<UserListResponse>('/users/all', { params: { page, limit } }),

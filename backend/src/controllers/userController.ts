@@ -362,7 +362,24 @@ export class UserController {
       if (typeof radioNumber === 'string' && radioNumber) filters.radioNumber = radioNumber;
       if (typeof peNumber === 'string' && peNumber) filters.peNumber = peNumber;
 
-      const users = await UserModel.searchUsers(q ?? '', filters, { includeHidden: await canViewHiddenUsers(req) });
+      const isPagedRequest = req.query.page !== undefined || req.query.pageSize !== undefined || req.query.limit !== undefined;
+      const includeHidden = await canViewHiddenUsers(req);
+
+      if (isPagedRequest) {
+        const { page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 50, maxPageSize: 250 });
+        const rows = await UserModel.searchUsers(q ?? '', filters, { includeHidden, limit: pageSize + 1, offset });
+        const hasMore = rows.length > pageSize;
+        const users = hasMore ? rows.slice(0, pageSize) : rows;
+        return res.json({
+          data: users,
+          page,
+          limit: pageSize,
+          count: users.length,
+          hasMore,
+        });
+      }
+
+      const users = await UserModel.searchUsers(q ?? '', filters, { includeHidden });
       res.json(users);
     } catch (error) {
       console.error('Search error:', error);

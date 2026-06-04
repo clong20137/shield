@@ -152,7 +152,7 @@ export class UserModel {
   static async searchUsers(
     searchTerm: string,
     filters?: Partial<User>,
-    options: { includeHidden?: boolean } = {}
+    options: { includeHidden?: boolean; limit?: number; offset?: number } = {}
   ): Promise<User[]> {
     const conn = await pool.getConnection();
     try {
@@ -310,10 +310,10 @@ export class UserModel {
       }
 
       query += searchRankSql
-        ? ` ORDER BY ${searchRankSql}, \`lastName\`, \`firstName\` LIMIT 100`
-        : ' ORDER BY `lastName`, `firstName` LIMIT 100';
+        ? ` ORDER BY ${searchRankSql}, \`lastName\`, \`firstName\` LIMIT ? OFFSET ?`
+        : ' ORDER BY `lastName`, `firstName` LIMIT ? OFFSET ?';
 
-      const [rows] = await conn.query(query, [...params, ...orderParams]);
+      const [rows] = await conn.query(query, [...params, ...orderParams, options.limit ?? 100, options.offset ?? 0]);
       return rows as User[];
     } finally {
       conn.release();
