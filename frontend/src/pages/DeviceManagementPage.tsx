@@ -167,6 +167,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [statusFilter, setStatusFilter] = useState<DeviceStatus | 'All'>('All');
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [detailDevice, setDetailDevice] = useState<DeviceRecord | null>(null);
   const [devicePendingDelete, setDevicePendingDelete] = useState<DeviceRecord | null>(null);
@@ -286,6 +288,17 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       })
       .sort((a, b) => String(a[sortKey] || '').localeCompare(String(b[sortKey] || '')));
   }, [devices, filter, query, sortKey, statusFilter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filter, pageSize, query, sortKey, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredDevices.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageStartIndex = (safePage - 1) * pageSize;
+  const paginatedDevices = filteredDevices.slice(pageStartIndex, pageStartIndex + pageSize);
+  const pageStart = filteredDevices.length === 0 ? 0 : pageStartIndex + 1;
+  const pageEnd = Math.min(filteredDevices.length, pageStartIndex + pageSize);
 
   const statusCounts = useMemo(
     () =>
@@ -599,8 +612,28 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No devices match this view.</div>
         ) : (
           <>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-gray-950">
+            <span className="text-gray-500 dark:text-gray-400">Showing {pageStart}-{pageEnd} of {filteredDevices.length}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={pageSize}
+                onChange={(event) => setPageSize(Number(event.target.value))}
+                className="rounded border border-gray-300 bg-white px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+                aria-label="Devices per page"
+              >
+                {[25, 50, 100, 250].map((size) => <option key={size} value={size}>{size}</option>)}
+              </select>
+              <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={safePage <= 1} className="btn-secondary px-2 py-1 text-xs" aria-label="Previous device page" title="Previous">
+                Previous
+              </button>
+              <span className="font-semibold text-gray-700 dark:text-gray-200">Page {safePage} of {totalPages}</span>
+              <button type="button" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={safePage >= totalPages} className="btn-secondary px-2 py-1 text-xs" aria-label="Next device page" title="Next">
+                Next
+              </button>
+            </div>
+          </div>
           <div className="space-y-3 lg:hidden">
-            {filteredDevices.map((device) => {
+            {paginatedDevices.map((device) => {
               const DeviceIcon = deviceIconMap[device.type];
               return (
                 <article key={device.id} className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
@@ -633,7 +666,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             <table className="w-full min-w-[1180px] border-collapse text-left">
               <thead>
                 <tr className="border-b border-gray-200 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                  <th className="px-3 py-3"><input type="checkbox" checked={selectedDevices.length === filteredDevices.length} onChange={(event) => setSelectedDevices(event.target.checked ? filteredDevices.map((device) => device.id) : [])} /></th>
+                  <th className="px-3 py-3"><input type="checkbox" checked={paginatedDevices.length > 0 && paginatedDevices.every((device) => selectedDevices.includes(device.id))} onChange={(event) => setSelectedDevices(event.target.checked ? Array.from(new Set([...selectedDevices, ...paginatedDevices.map((device) => device.id)])) : selectedDevices.filter((id) => !paginatedDevices.some((device) => device.id === id)))} /></th>
                   <th className="px-3 py-3">Type</th>
                   <th className="px-3 py-3">Asset Tag</th>
                   <th className="px-3 py-3">Make / Model</th>
@@ -647,7 +680,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 </tr>
               </thead>
               <tbody>
-                {filteredDevices.map((device) => {
+                {paginatedDevices.map((device) => {
                   const DeviceIcon = deviceIconMap[device.type];
                   return (
                     <tr key={device.id} className="border-b border-gray-100 dark:border-gray-800">

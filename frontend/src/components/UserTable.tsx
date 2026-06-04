@@ -25,9 +25,19 @@ export const UserTable: React.FC<UserTableProps> = ({
   onSelectionChange,
 }) => {
   const [userPendingDelete, setUserPendingDelete] = useState<User | null>(null);
+  const [scrollTop, setScrollTop] = useState(0);
   const selectedUserIdSet = new Set(selectedUserIds);
   const canSelectUsers = Boolean(onSelectionChange);
   const allVisibleSelected = users.length > 0 && users.every((user) => selectedUserIdSet.has(user.id));
+  const rowHeight = 73;
+  const virtualize = users.length > 80;
+  const viewportHeight = virtualize ? Math.min(620, Math.max(360, users.length * rowHeight)) : undefined;
+  const overscan = 8;
+  const startIndex = virtualize ? Math.max(0, Math.floor(scrollTop / rowHeight) - overscan) : 0;
+  const visibleCount = virtualize && viewportHeight ? Math.ceil(viewportHeight / rowHeight) + overscan * 2 : users.length;
+  const visibleUsers = virtualize ? users.slice(startIndex, startIndex + visibleCount) : users;
+  const topSpacerHeight = virtualize ? startIndex * rowHeight : 0;
+  const bottomSpacerHeight = virtualize ? Math.max(0, (users.length - startIndex - visibleUsers.length) * rowHeight) : 0;
 
   const toggleVisibleUsers = (checked: boolean) => {
     if (!onSelectionChange) {
@@ -67,9 +77,17 @@ export const UserTable: React.FC<UserTableProps> = ({
   return (
     <>
     <div className="bg-white rounded-lg shadow overflow-hidden dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-      <div className="overflow-x-auto">
+      <div
+        className="overflow-auto"
+        style={viewportHeight ? { maxHeight: viewportHeight } : undefined}
+        onScroll={(event) => {
+          if (virtualize) {
+            setScrollTop(event.currentTarget.scrollTop);
+          }
+        }}
+      >
         <table className="w-full border-collapse">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr className="bg-primary-500 text-white">
               {canSelectUsers && (
                 <th className="w-12 px-4 py-3 text-left font-semibold border-b-2 border-gray-300">
@@ -92,7 +110,12 @@ export const UserTable: React.FC<UserTableProps> = ({
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
+            {topSpacerHeight > 0 && (
+              <tr aria-hidden="true">
+                <td colSpan={(canSelectUsers ? 7 : 6) + (canEdit ? 1 : 0)} style={{ height: topSpacerHeight, padding: 0, border: 0 }} />
+              </tr>
+            )}
+            {visibleUsers.map((user) => (
               <tr
                 key={user.id}
                 onClick={() => onUserSelect?.(user)}
@@ -170,6 +193,11 @@ export const UserTable: React.FC<UserTableProps> = ({
                 )}
               </tr>
             ))}
+            {bottomSpacerHeight > 0 && (
+              <tr aria-hidden="true">
+                <td colSpan={(canSelectUsers ? 7 : 6) + (canEdit ? 1 : 0)} style={{ height: bottomSpacerHeight, padding: 0, border: 0 }} />
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

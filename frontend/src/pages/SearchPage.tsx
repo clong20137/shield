@@ -151,6 +151,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [profileZIndex, setProfileZIndex] = useState(85);
   const [error, setError] = useState<string | null>(null);
   const [currentQuery, setCurrentQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [messageRecipient, setMessageRecipient] = useState<User | null>(null);
   const [messageSubject, setMessageSubject] = useState('');
   const [messageBody, setMessageBody] = useState('');
@@ -185,6 +187,16 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     () => selectedUsers.filter((user) => user.id !== currentUser?.id && user.receivesMessages !== false).length,
     [currentUser?.id, selectedUsers],
   );
+  const totalPages = Math.max(1, Math.ceil(users.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageStartIndex = (safePage - 1) * pageSize;
+  const paginatedUsers = users.slice(pageStartIndex, pageStartIndex + pageSize);
+  const pageStart = users.length === 0 ? 0 : pageStartIndex + 1;
+  const pageEnd = Math.min(users.length, pageStartIndex + pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [currentQuery, pageSize, users.length]);
 
   useEffect(() => {
     const handleFloatingFocus = (event: Event) => {
@@ -754,8 +766,31 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
         </div>
       )}
 
+      {users.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-gray-950">
+          <span className="text-gray-500 dark:text-gray-400">Showing {pageStart}-{pageEnd} of {users.length}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={pageSize}
+              onChange={(event) => setPageSize(Number(event.target.value))}
+              className="rounded border border-gray-300 bg-white px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+              aria-label="Users per page"
+            >
+              {[25, 50, 100, 250].map((size) => <option key={size} value={size}>{size}</option>)}
+            </select>
+            <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={safePage <= 1} className="btn-secondary px-2 py-1 text-xs" aria-label="Previous user page" title="Previous">
+              Previous
+            </button>
+            <span className="font-semibold text-gray-700 dark:text-gray-200">Page {safePage} of {totalPages}</span>
+            <button type="button" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={safePage >= totalPages} className="btn-secondary px-2 py-1 text-xs" aria-label="Next user page" title="Next">
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
       <UserTable
-        users={users}
+        users={paginatedUsers}
         loading={loading}
         onUserSelect={openSelectedUser}
         onEdit={openEditUser}
