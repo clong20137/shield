@@ -1054,7 +1054,7 @@ function SidebarRemindersWidget({
               />
               <span className="min-w-0 flex-1 truncate text-xs font-bold text-white">{reminder.title}</span>
               <span className="shrink-0 text-[10px] font-bold text-blue-100">{formatSidebarCalendarDate(reminder.remindOn)}</span>
-              <button type="button" onClick={() => onDelete(reminder.id)} className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-blue-100 hover:bg-white/10 hover:text-white" aria-label={`Delete ${reminder.title}`} title="Delete Reminder">
+              <button type="button" onClick={() => onDelete(reminder.id)} className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-danger text-white shadow-sm hover:bg-red-800" aria-label={`Delete ${reminder.title}`} title="Delete Reminder">
                 <Trash2 size={13} />
               </button>
             </div>
@@ -1734,7 +1734,7 @@ function QuickLaunchTray({
                   <button
                     type="button"
                     onClick={() => assignSlot(null)}
-                    className="mt-3 flex w-full items-center gap-3 rounded border border-danger bg-white px-4 py-3 text-left text-sm font-bold text-danger hover:bg-red-50 dark:bg-gray-950 dark:hover:bg-red-950"
+                    className="btn-danger mt-3 flex w-full items-center justify-start gap-3 px-4 py-3 text-left text-sm"
                   >
                     <Trash2 size={18} />
                     Remove external site from this box
@@ -1767,7 +1767,7 @@ function QuickLaunchTray({
               <button
                 type="button"
                 onClick={() => assignSlot(null)}
-                className="flex items-center gap-3 rounded border border-danger px-4 py-3 text-left text-sm font-bold text-danger hover:bg-red-50 dark:hover:bg-red-950 sm:col-span-2"
+                className="btn-danger flex items-center justify-start gap-3 px-4 py-3 text-left text-sm sm:col-span-2"
               >
                 <Trash2 size={18} />
                 Clear this box
@@ -3038,13 +3038,42 @@ function App() {
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
   const rateLimitToastRef = useRef(0);
   const notificationRequestRef = useRef(0);
+  const apiConnectionWasLostRef = useRef(false);
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
 
   useEffect(() => {
-    const markConnectionLost = () => setIsApiConnectionLost(true);
+    const dispatchReconnectRefresh = () => {
+      [
+        'audit-updated',
+        'bug-updated',
+        'calendar-updated',
+        'dashboard-updated',
+        'device-updated',
+        'error-updated',
+        'media-updated',
+        'messages-updated',
+        'mileage-updated',
+        'notification-updated',
+        'performance-evaluation-updated',
+        'permission-updated',
+        'quick-launch-updated',
+        'reminder-updated',
+        'urgent-alert-updated',
+        'api-reconnected',
+        'user-updated',
+      ].forEach((eventName) => window.dispatchEvent(new CustomEvent(`shield:${eventName}`, { detail: { source: 'api-reconnect' } })));
+    };
+    const markConnectionLost = () => {
+      apiConnectionWasLostRef.current = true;
+      setIsApiConnectionLost(true);
+    };
     const markConnectionRestored = () => {
       setLastApiConnectedAt(Date.now());
       setIsApiConnectionLost(false);
+      if (apiConnectionWasLostRef.current) {
+        apiConnectionWasLostRef.current = false;
+        dispatchReconnectRefresh();
+      }
     };
     const handleBrowserOffline = () => markConnectionLost();
     const handleBrowserOnline = async () => {
@@ -3080,8 +3109,6 @@ function App() {
       const isHealthy = await checkApiHealth(controller.signal);
       if (!isCancelled && isHealthy) {
         window.dispatchEvent(new CustomEvent('shield:api-connection-restored'));
-        window.dispatchEvent(new CustomEvent('shield:dashboard-updated'));
-        window.dispatchEvent(new CustomEvent('shield:notification-updated'));
       }
     };
 

@@ -350,7 +350,7 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
                     </button>
                   )}
                   {canDeleteMedia && !folder.protected && (
-                    <button type="button" onClick={() => void deleteFolder(folder)} className="btn-secondary text-danger" aria-label="Delete folder" title="Delete">
+                    <button type="button" onClick={() => void deleteFolder(folder)} className="btn-danger" aria-label="Delete folder" title="Delete">
                       <Trash2 size={15} />
                     </button>
                   )}
@@ -428,7 +428,7 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
                         )
                       )}
                       {canDeleteMedia && (
-                        <button type="button" onClick={() => void deleteImage(item)} className="btn-secondary flex-1 text-danger" aria-label="Delete image" title="Delete">
+                        <button type="button" onClick={() => void deleteImage(item)} className="btn-danger flex-1" aria-label="Delete image" title="Delete">
                           <Trash2 size={15} />
                         </button>
                       )}
@@ -451,7 +451,7 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
               </div>
               <div className="flex items-center gap-2">
                 {canDeleteMedia && (
-                  <button type="button" onClick={() => void deleteImage(selectedItem)} className="btn-secondary text-danger" aria-label="Delete media" title="Delete">
+                  <button type="button" onClick={() => void deleteImage(selectedItem)} className="btn-danger" aria-label="Delete media" title="Delete">
                     <Trash2 size={16} />
                   </button>
                 )}

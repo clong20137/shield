@@ -296,7 +296,7 @@ export default function UrgentAlertsPage({ onToast }: UrgentAlertsPageProps) {
                         type="button"
                         onClick={() => void handleRemoveAlert(alert)}
                         disabled={removingAlertId === alert.id}
-                        className="btn-secondary h-8 w-8 p-0 text-danger hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:hover:border-red-900 dark:hover:bg-red-950"
+                        className="btn-danger h-8 w-8 p-0"
                         aria-label={`Remove ${alert.title}`}
                         title="Remove alert"
                       >

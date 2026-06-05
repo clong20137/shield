@@ -6,10 +6,16 @@ import { districtOptions } from '../constants/districts';
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 type TimePeriod = 'AM' | 'PM';
 type CalendarView = 'day' | 'week' | 'month';
+type StoredTrooperDailyDraft = {
+  form: CalendarEntryForm;
+  editingEntryId: string | null;
+  savedAt: number;
+};
 
 const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty'];
 const narrativeCharacterLimit = 1000;
 const dailyInputCharacterLimit = 5;
+const trooperDailyDraftStoragePrefix = 'shield_trooper_daily_draft';
 
 const entryColors = [
   { label: 'Accent', value: '#9C865C' },
@@ -220,6 +226,53 @@ const createEntryFormFromEntry = (entry: CalendarEntry): CalendarEntryForm => ({
   submissionStatus: entry.submissionStatus || 'Submitted',
   details: entry.details || {},
 });
+
+function getTrooperDailyDraftKey(accountId: string, date: string): string {
+  return `${trooperDailyDraftStoragePrefix}:${accountId}:${date}`;
+}
+
+function readTrooperDailyDraft(accountId: string, date: string): StoredTrooperDailyDraft | null {
+  try {
+    const rawDraft = window.localStorage.getItem(getTrooperDailyDraftKey(accountId, date));
+    if (!rawDraft) {
+      return null;
+    }
+
+    const draft = JSON.parse(rawDraft) as StoredTrooperDailyDraft;
+    if (!draft?.form || draft.form.date !== date || typeof draft.savedAt !== 'number') {
+      return null;
+    }
+
+    return draft;
+  } catch {
+    return null;
+  }
+}
+
+function writeTrooperDailyDraft(accountId: string, form: CalendarEntryForm, editingEntryId: string | null) {
+  try {
+    const savedAt = Date.now();
+    window.localStorage.setItem(
+      getTrooperDailyDraftKey(accountId, form.date),
+      JSON.stringify({
+        form: { ...form, submissionStatus: 'Draft' },
+        editingEntryId,
+        savedAt,
+      } satisfies StoredTrooperDailyDraft),
+    );
+    return savedAt;
+  } catch {
+    return null;
+  }
+}
+
+function removeTrooperDailyDraft(accountId: string, date: string) {
+  try {
+    window.localStorage.removeItem(getTrooperDailyDraftKey(accountId, date));
+  } catch {
+    // Ignore local storage cleanup failures.
+  }
+}
 
 const formatDateKey = (date: Date) => {
   const year = date.getFullYear();
@@ -578,8 +631,10 @@ function CalendarPage({
   const [reminderPriority, setReminderPriority] = useState<'Low' | 'Normal' | 'High' | 'Critical'>('Normal');
   const [reminderNotes, setReminderNotes] = useState('');
   const [isSavingReminder, setIsSavingReminder] = useState(false);
+  const [dailyDraftSavedAt, setDailyDraftSavedAt] = useState<number | null>(null);
   const lastAutoDutyHoursRef = useRef('');
   const dailyFormRef = useRef<HTMLFormElement | null>(null);
+  const skipNextDailyDraftWriteRef = useRef(false);
 
   const actor = {
     actorId: currentUser.id,
@@ -651,17 +706,41 @@ function CalendarPage({
   const openDay = (dateKey: string) => {
     const [year, month, day] = dateKey.split('-').map(Number);
     const existingEntry = entries.find((entry) => entry.date === dateKey);
+    const localDraft = readTrooperDailyDraft(currentUser.id, dateKey);
+    const existingUpdatedAt = existingEntry?.updatedAt ? new Date(existingEntry.updatedAt).getTime() : 0;
+    const shouldRestoreLocalDraft = Boolean(localDraft && localDraft.savedAt > existingUpdatedAt);
     setCalendarFocusDate(new Date(year, month - 1, day));
     setSelectedDate(dateKey);
-    setEntryForm(existingEntry ? createEntryFormFromEntry(existingEntry) : createDefaultEntryForm(dateKey, currentUser));
+    setEntryForm(shouldRestoreLocalDraft && localDraft ? localDraft.form : existingEntry ? createEntryFormFromEntry(existingEntry) : createDefaultEntryForm(dateKey, currentUser));
     setIsDutyHoursManual(Boolean(existingEntry));
     lastAutoDutyHoursRef.current = '';
-    setEditingEntryId(existingEntry?.id || null);
+    setEditingEntryId(shouldRestoreLocalDraft && localDraft ? localDraft.editingEntryId || existingEntry?.id || null : existingEntry?.id || null);
+    setDailyDraftSavedAt(shouldRestoreLocalDraft && localDraft ? localDraft.savedAt : null);
     setIsReminderFormOpen(false);
     setReminderTitle('');
     setReminderPriority('Normal');
     setReminderNotes('');
   };
+
+  useEffect(() => {
+    if (!selectedDate || entryForm.date !== selectedDate) {
+      return undefined;
+    }
+
+    if (skipNextDailyDraftWriteRef.current) {
+      skipNextDailyDraftWriteRef.current = false;
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      const savedAt = writeTrooperDailyDraft(currentUser.id, entryForm, editingEntryId);
+      if (savedAt) {
+        setDailyDraftSavedAt(savedAt);
+      }
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [currentUser.id, editingEntryId, entryForm, selectedDate]);
 
   const handleDailyKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
     if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.metaKey) {
@@ -744,16 +823,21 @@ function CalendarPage({
         setEntries((currentEntries) =>
           currentEntries.map((entry) => (entry.id === targetEntryId ? response.data : entry)),
         );
+        removeTrooperDailyDraft(currentUser.id, response.data.date);
+        skipNextDailyDraftWriteRef.current = true;
         setSelectedDate(response.data.date);
         setEditingEntryId(response.data.id);
         setEntryForm(createEntryFormFromEntry(response.data));
       } else {
         const response = await calendarService.create(payload);
         setEntries((currentEntries) => [response.data, ...currentEntries]);
+        removeTrooperDailyDraft(currentUser.id, response.data.date);
+        skipNextDailyDraftWriteRef.current = true;
         setSelectedDate(response.data.date);
         setEditingEntryId(response.data.id);
         setEntryForm(createEntryFormFromEntry(response.data));
       }
+      setDailyDraftSavedAt(null);
       setIsDutyHoursManual(true);
       lastAutoDutyHoursRef.current = '';
     } catch (err) {
@@ -767,12 +851,15 @@ function CalendarPage({
     try {
       await calendarService.delete(entry.id, { ...actor, accountId: currentUser.id });
       setEntries((currentEntries) => currentEntries.filter((currentEntry) => currentEntry.id !== entry.id));
+      removeTrooperDailyDraft(currentUser.id, entry.date);
       if (editingEntryId === entry.id) {
         setEditingEntryId(null);
+        skipNextDailyDraftWriteRef.current = true;
         setEntryForm(createDefaultEntryForm(selectedDate || entry.date, currentUser));
         setIsDutyHoursManual(false);
         lastAutoDutyHoursRef.current = '';
       }
+      setDailyDraftSavedAt(null);
       setEntryPendingDelete(null);
     } catch (err) {
       console.error('Failed to delete calendar entry:', err);
@@ -1408,7 +1495,7 @@ function CalendarPage({
                           <button type="button" onClick={() => startEditingShortcut(shortcut)} className="border-l border-gray-200 px-2 text-primary-500 hover:bg-gray-50 dark:border-gray-800 dark:text-blue-100 dark:hover:bg-gray-900" aria-label={`Edit ${shortcut.name}`} title="Edit Shortcut">
                             <Pencil size={14} />
                           </button>
-                          <button type="button" onClick={() => deleteShortcut(shortcut)} className="border-l border-gray-200 px-2 text-danger hover:bg-red-50 dark:border-gray-800 dark:hover:bg-red-950" aria-label={`Delete ${shortcut.name}`} title="Delete Shortcut">
+                          <button type="button" onClick={() => deleteShortcut(shortcut)} className="btn-danger h-8 w-8 rounded-none p-0" aria-label={`Delete ${shortcut.name}`} title="Delete Shortcut">
                             <Trash2 size={14} />
                           </button>
                         </span>
@@ -1682,6 +1769,12 @@ function CalendarPage({
               <div className="flex flex-wrap items-center justify-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950 md:col-span-2">
                 <span className="mr-auto text-sm font-semibold text-gray-500 dark:text-gray-400">
                   Save keeps this as a draft. Submit sends the final report.
+                  {dailyDraftSavedAt && (
+                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-1 text-xs font-bold text-green-700 ring-1 ring-green-100 dark:bg-green-950/40 dark:text-green-200 dark:ring-green-900">
+                      <CheckCircle2 size={13} />
+                      Autosaved {new Date(dailyDraftSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                    </span>
+                  )}
                 </span>
                 {editingEntry && (
                   <button type="button" onClick={() => setEntryPendingDelete(editingEntry)} className="btn-danger" aria-label="Delete daily report" title="Delete Report">

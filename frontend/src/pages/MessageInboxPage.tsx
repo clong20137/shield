@@ -340,8 +340,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     eventSource?.addEventListener('error', (event) => {
       console.error('Message realtime connection error:', event);
     });
+    window.addEventListener('shield:api-reconnected', handleRealtimeMessageUpdate);
 
-    return () => eventSource?.close();
+    return () => {
+      eventSource?.close();
+      window.removeEventListener('shield:api-reconnected', handleRealtimeMessageUpdate);
+    };
   }, [currentUser.id]);
 
   useEffect(() => {
@@ -962,7 +966,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                       type="button"
                       onClick={() => setThreadPendingDelete(thread)}
                       disabled={!thread.latestMessage}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-danger dark:hover:bg-red-950 sm:h-9 sm:w-9"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-danger text-white shadow-sm hover:bg-red-800 sm:h-9 sm:w-9"
                       aria-label="Delete conversation"
                       title="Delete conversation"
                     >
@@ -1120,7 +1124,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                             <button
                               type="button"
                               onClick={() => setMessagePendingDelete(message)}
-                              className="flex h-7 w-7 items-center justify-center rounded-full opacity-100 transition hover:bg-red-50 hover:text-danger dark:hover:bg-red-950 sm:opacity-0 sm:group-hover:opacity-100"
+                              className="flex h-7 w-7 items-center justify-center rounded-full bg-danger text-white opacity-100 shadow-sm transition hover:bg-red-800 sm:opacity-0 sm:group-hover:opacity-100"
                               aria-label="Delete message"
                               title="Delete"
                             >

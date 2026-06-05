@@ -179,7 +179,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                       <Pencil size={14} />
                     </button>
                     <button
-                      className="btn btn-danger text-xs"
+                      className="btn-danger text-xs"
                       aria-label={`Delete ${user.firstName} ${user.lastName}`}
                       title="Delete"
                       onClick={(e) => {

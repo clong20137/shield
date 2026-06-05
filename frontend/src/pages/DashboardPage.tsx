@@ -1573,7 +1573,7 @@ function MyDayWidget({
                       <button type="button" onClick={() => void snoozeReminder(reminder)} className="btn-secondary px-2 py-1 text-xs" aria-label={`Snooze ${reminder.title}`} title="Snooze until tomorrow">
                         <Clock3 size={13} />
                       </button>
-                      <button type="button" onClick={() => void deleteReminder(reminder)} className="btn-secondary px-2 py-1 text-xs text-danger hover:border-danger hover:text-danger" aria-label={`Delete ${reminder.title}`} title="Delete Reminder">
+                      <button type="button" onClick={() => void deleteReminder(reminder)} className="btn-danger px-2 py-1 text-xs" aria-label={`Delete ${reminder.title}`} title="Delete Reminder">
                         <Trash2 size={13} />
                       </button>
                     </div>
