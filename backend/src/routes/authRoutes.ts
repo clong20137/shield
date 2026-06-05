@@ -13,7 +13,10 @@ const passwordResetConfirmLimiter = rateLimit({ keyPrefix: 'password-reset-confi
 const passwordChangeLimiter = rateLimit({ keyPrefix: 'password-change', windowMs: 15 * 60 * 1000, max: 8, message: 'Too many password change attempts. Try again later.' });
 const mfaLimiter = rateLimit({ keyPrefix: 'mfa', windowMs: 15 * 60 * 1000, max: 12, message: 'Too many MFA attempts. Try again later.' });
 const roleManagementLimiter = rateLimit({ keyPrefix: 'role-management', windowMs: 15 * 60 * 1000, max: 60, message: 'Too many role management requests. Try again later.' });
+const setupLimiter = rateLimit({ keyPrefix: 'setup', windowMs: 15 * 60 * 1000, max: 12, message: 'Too many setup attempts. Try again later.' });
 
+router.get('/setup/status', AuthController.getSetupStatus);
+router.post('/setup/complete', setupLimiter, AuthController.completeSetup);
 router.post('/register', registrationLimiter, AuthController.register);
 router.post('/login', loginLimiter, AuthController.login);
 router.get('/microsoft/status', AuthController.getMicrosoftSsoStatus);

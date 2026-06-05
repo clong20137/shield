@@ -418,6 +418,44 @@ export interface AuthResponse {
   recoveryCodes?: string[];
 }
 
+export interface SetupStatus {
+  setupRequired: boolean;
+  setupCompleted: boolean;
+  accountCount: number;
+  database: {
+    connected: boolean;
+    initialized: boolean;
+    name?: string;
+  };
+  appName?: string;
+  siteName?: string;
+  apiUrl?: string;
+  appBaseUrl?: string;
+  registrationMode?: RegistrationMode;
+  features?: string[];
+  error?: string;
+}
+
+export interface CompleteSetupPayload {
+  appName: string;
+  siteName: string;
+  appBaseUrl: string;
+  apiUrl: string;
+  registrationMode: RegistrationMode;
+  maintenanceMode: boolean;
+  loginWarningEnabled: boolean;
+  loginWarningMessage: string;
+  sessionTimeoutMinutes: number;
+  features: string[];
+  admin: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    confirmPassword: string;
+  };
+}
+
 export interface TwoFactorSetupResponse {
   secret: string;
   otpauthUrl: string;
@@ -777,6 +815,12 @@ export type CreatePerformanceEvaluationPayload = Pick<
 >;
 
 export const authService = {
+  getSetupStatus: () =>
+    api.get<SetupStatus>('/auth/setup/status'),
+
+  completeSetup: (payload: CompleteSetupPayload) =>
+    api.post<AuthResponse>('/auth/setup/complete', payload),
+
   register: (email: string, password: string, firstName: string, lastName: string, inviteToken?: string) =>
     api.post<AuthResponse>('/auth/register', { email, password, firstName, lastName, displayName: `${firstName} ${lastName}`.trim(), inviteToken }),
 

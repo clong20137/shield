@@ -108,9 +108,29 @@ async function withPermissions<T extends { id: string; role: string }>(account: 
 
 const registrationModes = ['public', 'invite-only', 'disabled'] as const;
 type RegistrationMode = typeof registrationModes[number];
+const setupFeatureKeys = [
+  'dashboardWidgets',
+  'messaging',
+  'mediaLibrary',
+  'calendarReminders',
+  'deviceManagement',
+  'reportsAudit',
+  'urgentAlerts',
+  'performanceEvaluations',
+] as const;
 
 function normalizeRegistrationMode(value: string): RegistrationMode {
   return registrationModes.includes(value as RegistrationMode) ? value as RegistrationMode : 'public';
+}
+
+function cleanFeatureSelection(value: unknown): string[] {
+  const selected = Array.isArray(value) ? value : [];
+  const allowed = new Set<string>(setupFeatureKeys);
+  return selected.filter((item): item is string => typeof item === 'string' && allowed.has(item));
+}
+
+function normalizeUrl(value: unknown, maxLength = 300): string {
+  return cleanString(value, maxLength).replace(/\/+$/u, '');
 }
 
 async function getRegistrationMode(): Promise<RegistrationMode> {
@@ -309,6 +329,179 @@ function publicInvite(invite: Awaited<ReturnType<typeof AuthInviteModel.create>>
 }
 
 export class AuthController {
+  static async getSetupStatus(req: Request, res: Response) {
+    try {
+      const accountCount = await AuthAccountModel.countAccounts();
+      const setupCompleted = await SystemSettingModel.getString('setupCompleted', accountCount > 0 ? 'true' : 'false') === 'true';
+      res.json({
+        setupRequired: accountCount === 0 && !setupCompleted,
+        setupCompleted,
+        accountCount,
+        database: {
+          connected: true,
+          initialized: true,
+          name: process.env.DB_NAME || 'shield',
+        },
+        appName: await SystemSettingModel.getString('appName', 'SHIELD'),
+        siteName: await SystemSettingModel.getString('siteName', 'SHIELD Workspace'),
+        apiUrl: await SystemSettingModel.getString('appApiUrl', `${req.protocol}://${req.get('host')}/api`),
+        appBaseUrl: await getAppBaseUrl(req),
+        registrationMode: await getRegistrationMode(),
+        features: cleanFeatureSelection(JSON.parse(await SystemSettingModel.getString('enabledFeatures', '[]'))),
+      });
+    } catch (error) {
+      console.error('Get setup status error:', error);
+      res.status(500).json({
+        setupRequired: false,
+        setupCompleted: false,
+        database: {
+          connected: false,
+          initialized: false,
+        },
+        error: 'Failed to inspect setup status',
+      });
+    }
+  }
+
+  static async completeSetup(req: Request, res: Response) {
+    try {
+      const existingAccountCount = await AuthAccountModel.countAccounts();
+      if (existingAccountCount > 0) {
+        return res.status(409).json({ error: 'Setup is already complete' });
+      }
+
+      const {
+        appName,
+        siteName,
+        appBaseUrl,
+        apiUrl,
+        registrationMode,
+        maintenanceMode,
+        loginWarningEnabled,
+        loginWarningMessage,
+        sessionTimeoutMinutes,
+        features,
+        admin,
+      } = req.body as {
+        appName?: unknown;
+        siteName?: unknown;
+        appBaseUrl?: unknown;
+        apiUrl?: unknown;
+        registrationMode?: unknown;
+        maintenanceMode?: boolean;
+        loginWarningEnabled?: boolean;
+        loginWarningMessage?: unknown;
+        sessionTimeoutMinutes?: number;
+        features?: unknown;
+        admin?: {
+          firstName?: unknown;
+          lastName?: unknown;
+          email?: unknown;
+          password?: string;
+          confirmPassword?: string;
+        };
+      };
+
+      const cleanAppName = cleanString(appName, 80) || 'SHIELD';
+      const cleanSiteName = cleanString(siteName, 120) || `${cleanAppName} Workspace`;
+      const cleanAppBaseUrl = normalizeUrl(appBaseUrl);
+      const cleanApiUrl = normalizeUrl(apiUrl);
+      const normalizedRegistrationMode = normalizeRegistrationMode(cleanString(registrationMode, 40));
+      const normalizedWarningMessage = cleanMultiline(loginWarningMessage, 2000) || DEFAULT_LOGIN_WARNING_MESSAGE;
+      const normalizedSessionTimeoutMinutes = Math.max(0, Math.min(1440, Number(sessionTimeoutMinutes) || 0));
+      const cleanFeatures = cleanFeatureSelection(features);
+      const cleanEmail = normalizeEmail(cleanString(admin?.email, 255));
+      const cleanFirstName = cleanString(admin?.firstName, 100);
+      const cleanLastName = cleanString(admin?.lastName, 100);
+      const password = typeof admin?.password === 'string' ? admin.password : '';
+      const confirmPassword = typeof admin?.confirmPassword === 'string' ? admin.confirmPassword : '';
+
+      if (cleanAppBaseUrl && !/^https?:\/\//iu.test(cleanAppBaseUrl)) {
+        return res.status(400).json({ error: 'Application URL must start with http:// or https://' });
+      }
+
+      if (cleanApiUrl && !/^https?:\/\//iu.test(cleanApiUrl)) {
+        return res.status(400).json({ error: 'API URL must start with http:// or https://' });
+      }
+
+      if (!isValidEmail(cleanEmail)) {
+        return res.status(400).json({ error: 'Enter a valid admin email address' });
+      }
+
+      if (!cleanFirstName || !cleanLastName) {
+        return res.status(400).json({ error: 'Admin first and last name are required' });
+      }
+
+      if (password !== confirmPassword) {
+        return res.status(400).json({ error: 'Admin passwords do not match' });
+      }
+
+      if (!isStrongPassword(password)) {
+        return res.status(400).json({ error: 'Admin password must be at least 8 characters and include uppercase, lowercase, and a number' });
+      }
+
+      await SystemSettingModel.setString('appName', cleanAppName);
+      await SystemSettingModel.setString('siteName', cleanSiteName);
+      if (cleanAppBaseUrl) {
+        await SystemSettingModel.setString('appBaseUrl', cleanAppBaseUrl);
+      }
+      if (cleanApiUrl) {
+        await SystemSettingModel.setString('appApiUrl', cleanApiUrl);
+      }
+      await SystemSettingModel.setString('registrationMode', normalizedRegistrationMode);
+      await SystemSettingModel.setString('maintenanceMode', maintenanceMode === true ? 'true' : 'false');
+      await SystemSettingModel.setString('loginWarningEnabled', loginWarningEnabled === false ? 'false' : 'true');
+      await SystemSettingModel.setString('loginWarningMessage', normalizedWarningMessage);
+      await SystemSettingModel.setString('sessionTimeoutMinutes', String(normalizedSessionTimeoutMinutes));
+      await SystemSettingModel.setString('enabledFeatures', JSON.stringify(cleanFeatures));
+
+      const account = await AuthAccountModel.createAccount(cleanEmail, password, cleanFirstName, cleanLastName);
+      await SystemSettingModel.setString('setupCompleted', 'true');
+      await SystemSettingModel.setString('setupCompletedAt', new Date().toISOString());
+
+      const token = await AuthSessionModel.createSession(account.id);
+      setSessionCookie(req, res, token);
+      broadcastAppEvent({ type: 'permission-updated' });
+      broadcastAppEvent({ type: 'user-updated', entityId: account.id });
+      await AuditLogModel.create({
+        actorId: account.id,
+        actorName: account.displayName || account.email,
+        action: 'setup.completed',
+        entityType: 'system',
+        entityId: 'setup',
+        details: JSON.stringify({
+          appName: cleanAppName,
+          siteName: cleanSiteName,
+          registrationMode: normalizedRegistrationMode,
+          features: cleanFeatures,
+        }),
+        ...requestAuditFields(req),
+      });
+
+      res.status(201).json({
+        account: await withPermissions(account),
+        settings: {
+          appName: cleanAppName,
+          siteName: cleanSiteName,
+          appBaseUrl: cleanAppBaseUrl,
+          apiUrl: cleanApiUrl,
+          registrationMode: normalizedRegistrationMode,
+          maintenanceMode: maintenanceMode === true,
+          loginWarningEnabled: loginWarningEnabled !== false,
+          sessionTimeoutMinutes: normalizedSessionTimeoutMinutes,
+          features: cleanFeatures,
+        },
+      });
+    } catch (error) {
+      if (isDuplicateEmailError(error)) {
+        return res.status(409).json({ error: 'An account already exists for that email' });
+      }
+
+      console.error('Complete setup error:', error);
+      res.status(500).json({ error: 'Failed to complete setup' });
+    }
+  }
+
   static async register(req: Request, res: Response) {
     try {
       const { email, password, firstName, lastName, displayName, inviteToken } = req.body as {

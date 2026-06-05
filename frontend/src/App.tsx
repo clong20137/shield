@@ -1,10 +1,10 @@
 import { CSSProperties, FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Command, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Command, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { FloatingWindow } from './components/FloatingWindow';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, urgentAlertService, UrgentAlert, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, CompleteSetupPayload, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, SetupStatus, urgentAlertService, UrgentAlert, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
@@ -182,10 +182,14 @@ function isNetworkConnectionError(error: unknown): boolean {
 function LoginSplash({
   onLogin,
   onToast,
+  appName = 'SHIELD',
+  siteName = 'Agency Access Portal',
   isExiting = false,
 }: {
   onLogin: (account: AuthAccount) => void;
   onToast: (type: ToastType, message: string) => void;
+  appName?: string;
+  siteName?: string;
   isExiting?: boolean;
 }) {
   const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset'>('login');
@@ -373,10 +377,10 @@ function LoginSplash({
         <section className="flex items-center bg-primary-500 px-8 py-12 text-white lg:px-16">
           <div className="max-w-3xl">
             <p className="mb-4 text-sm font-semibold uppercase tracking-[0.24em] text-blue-100">
-              Agency Access Portal
+              {siteName}
             </p>
             <h1 className="mb-5 text-5xl font-bold leading-tight text-white">
-              SHIELD
+              {appName}
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-blue-50">
               Search personnel records, review operational reporting, and monitor agency activity from one secured workspace.
@@ -2970,6 +2974,382 @@ function UrgentAlertModal({
   );
 }
 
+const setupFeatureOptions = [
+  { id: 'dashboardWidgets', label: 'Dashboard widgets', description: 'Pinned profiles, sticky notes, My Day, reminders, and updates.' },
+  { id: 'messaging', label: 'Messaging', description: 'Internal conversations, unread counts, reactions, and realtime updates.' },
+  { id: 'mediaLibrary', label: 'Media library', description: 'Shared image storage for profiles and dashboard posts.' },
+  { id: 'calendarReminders', label: 'Calendar and reminders', description: 'Daily entries, reminders, and review workflows.' },
+  { id: 'deviceManagement', label: 'Device management', description: 'Track assigned equipment, status, and history.' },
+  { id: 'reportsAudit', label: 'Reports and audit', description: 'Reporting views, audit log, and operational exports.' },
+  { id: 'urgentAlerts', label: 'Urgent alerts', description: 'Priority alerts with acknowledgement tracking.' },
+  { id: 'performanceEvaluations', label: 'Performance evaluations', description: 'CPAR/evaluation creation, delivery, and signatures.' },
+];
+
+const setupSteps = ['Database', 'Features', 'Access', 'Settings', 'Admin'];
+
+function getDefaultSetupPayload(status: SetupStatus | null): CompleteSetupPayload {
+  const inferredApiUrl = getApiHealthUrl().replace(/\/health$/u, '/api');
+  return {
+    appName: status?.appName || 'SHIELD',
+    siteName: status?.siteName || 'SHIELD Workspace',
+    appBaseUrl: status?.appBaseUrl || window.location.origin,
+    apiUrl: status?.apiUrl || inferredApiUrl,
+    registrationMode: status?.registrationMode || 'invite-only',
+    maintenanceMode: false,
+    loginWarningEnabled: true,
+    loginWarningMessage: 'This system is for authorized use only and may be monitored.',
+    sessionTimeoutMinutes: 0,
+    features: status?.features?.length ? status.features : setupFeatureOptions.map((feature) => feature.id),
+    admin: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
+  };
+}
+
+function SetupWizard({
+  status,
+  onComplete,
+  onToast,
+}: {
+  status: SetupStatus | null;
+  onComplete: (account: AuthAccount, settings: Pick<CompleteSetupPayload, 'appName' | 'siteName' | 'appBaseUrl' | 'apiUrl' | 'registrationMode' | 'features'>) => void;
+  onToast: (type: ToastType, message: string) => void;
+}) {
+  const [step, setStep] = useState(0);
+  const [form, setForm] = useState<CompleteSetupPayload>(() => getDefaultSetupPayload(status));
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(status?.error || null);
+
+  useEffect(() => {
+    setForm(getDefaultSetupPayload(status));
+    setError(status?.error || null);
+  }, [status]);
+
+  const updateForm = <Key extends keyof CompleteSetupPayload>(key: Key, value: CompleteSetupPayload[Key]) => {
+    setForm((currentForm) => ({ ...currentForm, [key]: value }));
+  };
+
+  const updateAdmin = (key: keyof CompleteSetupPayload['admin'], value: string) => {
+    setForm((currentForm) => ({
+      ...currentForm,
+      admin: { ...currentForm.admin, [key]: value },
+    }));
+  };
+
+  const toggleFeature = (featureId: string) => {
+    setForm((currentForm) => ({
+      ...currentForm,
+      features: currentForm.features.includes(featureId)
+        ? currentForm.features.filter((item) => item !== featureId)
+        : [...currentForm.features, featureId],
+    }));
+  };
+
+  const validateCurrentStep = (): string | null => {
+    if (step === 0 && !status?.database.connected) {
+      return 'The API cannot confirm the database connection yet.';
+    }
+
+    if (step === 1 && form.features.length === 0) {
+      return 'Select at least one feature area.';
+    }
+
+    if (step === 3) {
+      if (!form.appName.trim() || !form.siteName.trim()) {
+        return 'Application name and site name are required.';
+      }
+      if (!/^https?:\/\//iu.test(form.appBaseUrl.trim())) {
+        return 'Application URL must start with http:// or https://.';
+      }
+      if (!/^https?:\/\//iu.test(form.apiUrl.trim())) {
+        return 'API URL must start with http:// or https://.';
+      }
+    }
+
+    if (step === 4) {
+      if (!form.admin.firstName.trim() || !form.admin.lastName.trim() || !form.admin.email.trim()) {
+        return 'First admin name and email are required.';
+      }
+      if (form.admin.password !== form.admin.confirmPassword) {
+        return 'Admin passwords do not match.';
+      }
+      if (form.admin.password.length < 8 || !/[A-Z]/u.test(form.admin.password) || !/[a-z]/u.test(form.admin.password) || !/\d/u.test(form.admin.password)) {
+        return 'Admin password must be at least 8 characters and include uppercase, lowercase, and a number.';
+      }
+    }
+
+    return null;
+  };
+
+  const goNext = () => {
+    const validationError = validateCurrentStep();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setError(null);
+    setStep((currentStep) => Math.min(currentStep + 1, setupSteps.length - 1));
+  };
+
+  const goBack = () => {
+    setError(null);
+    setStep((currentStep) => Math.max(currentStep - 1, 0));
+  };
+
+  const submitSetup = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const validationError = validateCurrentStep();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const response = await authService.completeSetup(form);
+      if (!response.data.account) {
+        setError('Setup completed, but no admin session was returned.');
+        return;
+      }
+      onToast('success', 'Installation complete.');
+      onComplete(response.data.account, {
+        appName: form.appName,
+        siteName: form.siteName,
+        appBaseUrl: form.appBaseUrl,
+        apiUrl: form.apiUrl,
+        registrationMode: form.registrationMode,
+        features: form.features,
+      });
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to complete installation.'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="min-h-[100dvh] bg-gray-950 px-4 py-6 text-gray-100 sm:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-[calc(100dvh-3rem)] max-w-6xl flex-col justify-center">
+        <div className="mb-5 flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded bg-accent text-white shadow-lg">
+            <Shield size={26} />
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-accent">First Run Installation</p>
+            <h1 className="text-3xl font-bold text-white">Configure SHIELD</h1>
+          </div>
+        </div>
+
+        <div className="grid overflow-hidden rounded-lg border border-white/10 bg-white shadow-2xl dark:bg-gray-900 lg:grid-cols-[17rem_minmax(0,1fr)]">
+          <aside className="bg-primary-500 p-5 text-white dark:bg-gray-950">
+            <div className="space-y-2">
+              {setupSteps.map((label, index) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setStep(index)}
+                  className={`flex w-full items-center gap-3 rounded px-3 py-3 text-left text-sm font-bold transition ${
+                    index === step ? 'bg-white text-primary-500 shadow' : index < step ? 'bg-white/15 text-white' : 'text-blue-100 hover:bg-white/10'
+                  }`}
+                >
+                  <span className={`flex h-7 w-7 items-center justify-center rounded-full ${index < step ? 'bg-success text-white' : index === step ? 'bg-primary-500 text-white' : 'bg-white/15 text-white'}`}>
+                    {index < step ? <CheckCircle2 size={16} /> : index + 1}
+                  </span>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </aside>
+
+          <form onSubmit={submitSetup} className="min-h-[36rem] p-5 text-gray-900 dark:text-gray-100 sm:p-7">
+            {error && <div className="error">{error}</div>}
+
+            {step === 0 && (
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-primary-500 dark:text-blue-100">Database Connection</h2>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">SHIELD uses the configured backend database connection and initializes required tables on startup.</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
+                    <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Connection</p>
+                    <p className={`mt-2 flex items-center gap-2 text-lg font-bold ${status?.database.connected ? 'text-success' : 'text-danger'}`}>
+                      {status?.database.connected ? <CheckCircle2 size={20} /> : <AlertTriangle size={20} />}
+                      {status?.database.connected ? 'Connected' : 'Not connected'}
+                    </p>
+                  </div>
+                  <div className="rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
+                    <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Database</p>
+                    <p className="mt-2 text-lg font-bold text-gray-900 dark:text-white">{status?.database.name || 'Configured database'}</p>
+                  </div>
+                </div>
+                <div className="rounded border border-gray-200 p-4 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-300">
+                  Tables, default roles, default permissions, sessions, audit logs, dashboard data, messages, and media metadata are checked by the backend initializer.
+                </div>
+              </div>
+            )}
+
+            {step === 1 && (
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-primary-500 dark:text-blue-100">Feature Checklist</h2>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Select the areas this installation should track during setup.</p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {setupFeatureOptions.map((feature) => (
+                    <label key={feature.id} className="flex cursor-pointer items-start gap-3 rounded border border-gray-200 bg-gray-50 p-4 transition hover:border-accent dark:border-gray-800 dark:bg-gray-950">
+                      <input
+                        type="checkbox"
+                        checked={form.features.includes(feature.id)}
+                        onChange={() => toggleFeature(feature.id)}
+                        className="mt-1"
+                      />
+                      <span>
+                        <span className="block font-bold text-gray-900 dark:text-white">{feature.label}</span>
+                        <span className="mt-1 block text-sm text-gray-500 dark:text-gray-400">{feature.description}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-primary-500 dark:text-blue-100">Permissions And Roles</h2>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">The installer will create the first administrator account and keep the default role definitions ready.</p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
+                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded bg-primary-500/10 text-primary-500 dark:bg-blue-950 dark:text-blue-100">
+                      <LockKeyhole size={20} />
+                    </div>
+                    <h3 className="font-bold text-gray-900 dark:text-white">Administrator</h3>
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Full access to users, roles, dashboard posts, media, devices, reports, alerts, audit, and system settings.</p>
+                  </div>
+                  <div className="rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
+                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded bg-accent/10 text-accent">
+                      <UserCircle size={20} />
+                    </div>
+                    <h3 className="font-bold text-gray-900 dark:text-white">Standard User</h3>
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Baseline access for user search, calendar tools, and messaging. Admins can tune permissions after setup.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {step === 3 && (
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-primary-500 dark:text-blue-100">Application Settings</h2>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Set URLs, security defaults, registration behavior, and site naming.</p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Application Name</span>
+                    <input value={form.appName} onChange={(event) => updateForm('appName', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Site Name</span>
+                    <input value={form.siteName} onChange={(event) => updateForm('siteName', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Application URL</span>
+                    <input value={form.appBaseUrl} onChange={(event) => updateForm('appBaseUrl', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">API URL</span>
+                    <input value={form.apiUrl} onChange={(event) => updateForm('apiUrl', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Registration</span>
+                    <select value={form.registrationMode} onChange={(event) => updateForm('registrationMode', event.target.value as RegistrationSettings['mode'])} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
+                      <option value="invite-only">Invite only</option>
+                      <option value="disabled">Disabled</option>
+                      <option value="public">Public</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Session Timeout Minutes</span>
+                    <input type="number" min={0} max={1440} value={form.sessionTimeoutMinutes} onChange={(event) => updateForm('sessionTimeoutMinutes', Math.max(0, Number(event.target.value) || 0))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-3 dark:border-gray-800">
+                    <span className="font-semibold">Maintenance mode</span>
+                    <input type="checkbox" checked={form.maintenanceMode} onChange={(event) => updateForm('maintenanceMode', event.target.checked)} />
+                  </label>
+                  <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-3 dark:border-gray-800">
+                    <span className="font-semibold">Login warning</span>
+                    <input type="checkbox" checked={form.loginWarningEnabled} onChange={(event) => updateForm('loginWarningEnabled', event.target.checked)} />
+                  </label>
+                </div>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Login Warning Message</span>
+                  <textarea value={form.loginWarningMessage} onChange={(event) => updateForm('loginWarningMessage', event.target.value)} disabled={!form.loginWarningEnabled} rows={4} className="w-full resize-none rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 disabled:opacity-50" />
+                </label>
+              </div>
+            )}
+
+            {step === 4 && (
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-primary-500 dark:text-blue-100">First Admin Account</h2>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">This account will be created as the first administrator and signed in when installation finishes.</p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">First Name</span>
+                    <input value={form.admin.firstName} onChange={(event) => updateAdmin('firstName', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Last Name</span>
+                    <input value={form.admin.lastName} onChange={(event) => updateAdmin('lastName', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                  <label className="md:col-span-2">
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Email</span>
+                    <input type="email" value={form.admin.email} onChange={(event) => updateAdmin('email', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Password</span>
+                    <input type="password" value={form.admin.password} onChange={(event) => updateAdmin('password', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Confirm Password</span>
+                    <input type="password" value={form.admin.confirmPassword} onChange={(event) => updateAdmin('confirmPassword', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-8 flex justify-between gap-3 border-t border-gray-200 pt-5 dark:border-gray-800">
+              <button type="button" onClick={goBack} disabled={step === 0 || isSubmitting} className="btn-secondary disabled:pointer-events-none disabled:opacity-40">
+                <ChevronLeft size={16} />
+              </button>
+              {step < setupSteps.length - 1 ? (
+                <button type="button" onClick={goNext} className="btn-primary">
+                  <ChevronRight size={16} />
+                </button>
+              ) : (
+                <button type="submit" disabled={isSubmitting} className="btn-primary">
+                  {isSubmitting ? 'Installing...' : <Save size={16} />}
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoginTransitioning, setIsLoginTransitioning] = useState(false);
@@ -2997,6 +3377,10 @@ function App() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notificationCenterTab, setNotificationCenterTab] = useState<'unread' | 'bugs' | 'recent'>('unread');
   const [isSessionLoading, setIsSessionLoading] = useState(true);
+  const [isSetupLoading, setIsSetupLoading] = useState(true);
+  const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
+  const appName = setupStatus?.appName || 'SHIELD';
+  const siteName = setupStatus?.siteName || 'Agency User Search';
   const [isApiConnectionLost, setIsApiConnectionLost] = useState(false);
   const [lastApiConnectedAt, setLastApiConnectedAt] = useState<number | null>(Date.now());
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -3040,6 +3424,41 @@ function App() {
   const notificationRequestRef = useRef(0);
   const apiConnectionWasLostRef = useRef(false);
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
+
+  useEffect(() => {
+    let isMounted = true;
+    authService.getSetupStatus()
+      .then((response) => {
+        if (isMounted) {
+          setSetupStatus(response.data);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load setup status:', error);
+        if (isMounted) {
+          setSetupStatus({
+            setupRequired: false,
+            setupCompleted: false,
+            accountCount: 0,
+            database: { connected: false, initialized: false },
+            error: 'Failed to load setup status.',
+          });
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsSetupLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    document.title = `${appName} - ${siteName}`;
+  }, [appName, siteName]);
 
   useEffect(() => {
     const dispatchReconnectRefresh = () => {
@@ -4198,14 +4617,34 @@ function App() {
     <Router>
       <ToastHost toasts={toasts} />
       {showConfetti && <ConfettiOverlay />}
-      {isSessionLoading ? (
+      {isSetupLoading || isSessionLoading ? (
         <ShieldLoading
           title={isApiConnectionLost ? 'Connection Lost' : 'Loading SHIELD'}
           detail={isApiConnectionLost ? 'Reconnecting...' : undefined}
           lastConnectedAt={isApiConnectionLost ? lastApiConnectedAt : undefined}
         />
+      ) : setupStatus?.setupRequired ? (
+        <SetupWizard
+          status={setupStatus}
+          onToast={showToast}
+          onComplete={(account, settings) => {
+            setSetupStatus((currentStatus) => currentStatus ? {
+              ...currentStatus,
+              setupRequired: false,
+              setupCompleted: true,
+              accountCount: Math.max(1, currentStatus.accountCount),
+              appName: settings.appName,
+              siteName: settings.siteName,
+              appBaseUrl: settings.appBaseUrl,
+              apiUrl: settings.apiUrl,
+              registrationMode: settings.registrationMode,
+              features: settings.features,
+            } : currentStatus);
+            handleLogin(account);
+          }}
+        />
       ) : !isAuthenticated ? (
-        <LoginSplash onLogin={handleLogin} onToast={showToast} isExiting={isLoginTransitioning} />
+        <LoginSplash onLogin={handleLogin} onToast={showToast} appName={appName} siteName={siteName} isExiting={isLoginTransitioning} />
       ) : (
         <div className="animate-app-enter flex h-[100dvh] overflow-hidden bg-gray-50 dark:bg-gray-950">
           <aside className={`relative hidden h-[100dvh] shrink-0 overflow-visible bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 md:block ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
@@ -4226,8 +4665,8 @@ function App() {
                     <Shield size={22} />
                   </div>
                   <div>
-                    <h1 className="text-2xl font-bold tracking-wider text-white">SHIELD</h1>
-                    <p className="text-xs text-blue-100">Agency User Search</p>
+                    <h1 className="text-2xl font-bold tracking-wider text-white">{appName}</h1>
+                    <p className="text-xs text-blue-100">{siteName}</p>
                   </div>
                 </div>
               )}
