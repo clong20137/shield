@@ -220,13 +220,13 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
     return (
       <div className="mx-auto max-w-4xl space-y-6">
         <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-          <div className="h-4 w-32 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
-          <div className="mt-6 h-8 w-2/3 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
-          <div className="mt-4 h-4 w-1/2 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
+          <div className="skeleton-shimmer h-4 w-32" />
+          <div className="skeleton-shimmer mt-6 h-8 w-2/3" />
+          <div className="skeleton-shimmer mt-4 h-4 w-1/2" />
           <div className="mt-8 space-y-3">
-            <div className="h-4 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
-            <div className="h-4 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
-            <div className="h-4 w-4/5 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
+            <div className="skeleton-shimmer h-4" />
+            <div className="skeleton-shimmer h-4" />
+            <div className="skeleton-shimmer h-4 w-4/5" />
           </div>
         </div>
       </div>

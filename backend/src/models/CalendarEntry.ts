@@ -115,6 +115,37 @@ export class CalendarEntryModel {
     }
   }
 
+  static async getEntryById(id: string, ownerAccountId: string): Promise<CalendarEntry | null> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<CalendarEntryRow[]>(
+        'SELECT * FROM calendar_entries WHERE `id` = ? AND `ownerAccountId` = ? LIMIT 1',
+        [id, ownerAccountId]
+      );
+
+      return rows[0] ? toCalendarEntry(rows[0]) : null;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async getDraftEntryForDate(ownerAccountId: string, date: string): Promise<CalendarEntry | null> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<CalendarEntryRow[]>(
+        `SELECT * FROM calendar_entries
+         WHERE \`ownerAccountId\` = ? AND \`category\` = 'Trooper Daily' AND \`entryDate\` = ? AND COALESCE(\`submissionStatus\`, 'Submitted') = 'Draft'
+         ORDER BY \`updatedAt\` DESC
+         LIMIT 1`,
+        [ownerAccountId, date]
+      );
+
+      return rows[0] ? toCalendarEntry(rows[0]) : null;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async createEntry(entry: CalendarEntryInput): Promise<CalendarEntry> {
     const conn = await pool.getConnection();
     try {

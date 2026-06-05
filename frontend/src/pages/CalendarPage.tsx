@@ -6,6 +6,7 @@ import { districtOptions } from '../constants/districts';
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 type TimePeriod = 'AM' | 'PM';
 type CalendarView = 'day' | 'week' | 'month';
+type BackendDraftStatus = 'idle' | 'saving' | 'saved' | 'error';
 type StoredTrooperDailyDraft = {
   form: CalendarEntryForm;
   editingEntryId: string | null;
@@ -632,9 +633,12 @@ function CalendarPage({
   const [reminderNotes, setReminderNotes] = useState('');
   const [isSavingReminder, setIsSavingReminder] = useState(false);
   const [dailyDraftSavedAt, setDailyDraftSavedAt] = useState<number | null>(null);
+  const [backendDraftStatus, setBackendDraftStatus] = useState<BackendDraftStatus>('idle');
+  const [backendDraftSavedAt, setBackendDraftSavedAt] = useState<number | null>(null);
   const lastAutoDutyHoursRef = useRef('');
   const dailyFormRef = useRef<HTMLFormElement | null>(null);
   const skipNextDailyDraftWriteRef = useRef(false);
+  const backendAutosaveRequestRef = useRef(0);
 
   const actor = {
     actorId: currentUser.id,
@@ -709,6 +713,7 @@ function CalendarPage({
     const localDraft = readTrooperDailyDraft(currentUser.id, dateKey);
     const existingUpdatedAt = existingEntry?.updatedAt ? new Date(existingEntry.updatedAt).getTime() : 0;
     const shouldRestoreLocalDraft = Boolean(localDraft && localDraft.savedAt > existingUpdatedAt);
+    backendAutosaveRequestRef.current += 1;
     setCalendarFocusDate(new Date(year, month - 1, day));
     setSelectedDate(dateKey);
     setEntryForm(shouldRestoreLocalDraft && localDraft ? localDraft.form : existingEntry ? createEntryFormFromEntry(existingEntry) : createDefaultEntryForm(dateKey, currentUser));
@@ -716,6 +721,8 @@ function CalendarPage({
     lastAutoDutyHoursRef.current = '';
     setEditingEntryId(shouldRestoreLocalDraft && localDraft ? localDraft.editingEntryId || existingEntry?.id || null : existingEntry?.id || null);
     setDailyDraftSavedAt(shouldRestoreLocalDraft && localDraft ? localDraft.savedAt : null);
+    setBackendDraftStatus(existingEntry?.submissionStatus === 'Draft' && !shouldRestoreLocalDraft ? 'saved' : 'idle');
+    setBackendDraftSavedAt(existingEntry?.submissionStatus === 'Draft' && existingEntry.updatedAt && !shouldRestoreLocalDraft ? new Date(existingEntry.updatedAt).getTime() : null);
     setIsReminderFormOpen(false);
     setReminderTitle('');
     setReminderPriority('Normal');
@@ -738,6 +745,65 @@ function CalendarPage({
         setDailyDraftSavedAt(savedAt);
       }
     }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [currentUser.id, editingEntryId, entryForm, selectedDate]);
+
+  useEffect(() => {
+    if (!selectedDate || entryForm.date !== selectedDate) {
+      return undefined;
+    }
+
+    if (entryForm.submissionStatus === 'Submitted') {
+      return undefined;
+    }
+
+    const hours = Number(entryForm.dutyHours || 0);
+    if (!entryForm.date || !Number.isFinite(hours) || hours < 0 || hours > 24) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      const requestId = backendAutosaveRequestRef.current + 1;
+      backendAutosaveRequestRef.current = requestId;
+      setBackendDraftStatus('saving');
+
+      const payload = {
+        ...entryForm,
+        category: 'Trooper Daily' as const,
+        submissionStatus: 'Draft' as const,
+        dutyHours: hours.toFixed(2).replace(/\.?0+$/u, ''),
+        accountId: currentUser.id,
+        entryId: editingEntryId,
+      };
+
+      void calendarService.autosaveDraft(payload)
+        .then((response) => {
+          if (backendAutosaveRequestRef.current !== requestId) {
+            return;
+          }
+
+          setEntries((currentEntries) => {
+            const hasEntry = currentEntries.some((entry) => entry.id === response.data.id);
+            if (hasEntry) {
+              return currentEntries.map((entry) => (entry.id === response.data.id ? response.data : entry));
+            }
+
+            return [response.data, ...currentEntries];
+          });
+          setEditingEntryId(response.data.id);
+          setBackendDraftStatus('saved');
+          setBackendDraftSavedAt(Date.now());
+        })
+        .catch((err) => {
+          if (backendAutosaveRequestRef.current !== requestId) {
+            return;
+          }
+
+          console.error('Failed to autosave calendar draft:', err);
+          setBackendDraftStatus('error');
+        });
+    }, 1800);
 
     return () => window.clearTimeout(timer);
   }, [currentUser.id, editingEntryId, entryForm, selectedDate]);
@@ -838,6 +904,8 @@ function CalendarPage({
         setEntryForm(createEntryFormFromEntry(response.data));
       }
       setDailyDraftSavedAt(null);
+      setBackendDraftStatus('saved');
+      setBackendDraftSavedAt(Date.now());
       setIsDutyHoursManual(true);
       lastAutoDutyHoursRef.current = '';
     } catch (err) {
@@ -860,6 +928,8 @@ function CalendarPage({
         lastAutoDutyHoursRef.current = '';
       }
       setDailyDraftSavedAt(null);
+      setBackendDraftStatus('idle');
+      setBackendDraftSavedAt(null);
       setEntryPendingDelete(null);
     } catch (err) {
       console.error('Failed to delete calendar entry:', err);
@@ -1769,10 +1839,28 @@ function CalendarPage({
               <div className="flex flex-wrap items-center justify-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950 md:col-span-2">
                 <span className="mr-auto text-sm font-semibold text-gray-500 dark:text-gray-400">
                   Save keeps this as a draft. Submit sends the final report.
-                  {dailyDraftSavedAt && (
+                  {backendDraftStatus === 'saving' && (
+                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 ring-1 ring-blue-100 dark:bg-blue-950/40 dark:text-blue-200 dark:ring-blue-900">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-blue-500" />
+                      Saving to server
+                    </span>
+                  )}
+                  {backendDraftStatus === 'saved' && backendDraftSavedAt && (
                     <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-1 text-xs font-bold text-green-700 ring-1 ring-green-100 dark:bg-green-950/40 dark:text-green-200 dark:ring-green-900">
                       <CheckCircle2 size={13} />
-                      Autosaved {new Date(dailyDraftSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                      Saved to server {new Date(backendDraftSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                    </span>
+                  )}
+                  {backendDraftStatus === 'error' && dailyDraftSavedAt && (
+                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900">
+                      <CheckCircle2 size={13} />
+                      Local draft saved {new Date(dailyDraftSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                    </span>
+                  )}
+                  {backendDraftStatus === 'idle' && dailyDraftSavedAt && (
+                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900">
+                      <CheckCircle2 size={13} />
+                      Local draft saved {new Date(dailyDraftSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                     </span>
                   )}
                 </span>

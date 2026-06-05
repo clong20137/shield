@@ -404,6 +404,68 @@ export class CalendarController {
     }
   }
 
+  static async autosaveDraft(req: Request, res: Response) {
+    try {
+      const requestedAccountId = cleanString(req.body?.accountId, 36) || undefined;
+      const requestedEntryId = cleanString(req.body?.entryId, 36) || undefined;
+      const account = await getCalendarAccount(req, requestedAccountId);
+      const accountId = account?.id;
+
+      if (!accountId) {
+        return res.status(401).json({ error: 'Sign in to autosave your calendar' });
+      }
+
+      const validation = validateCalendarEntryPayload({
+        ...req.body,
+        category: 'Trooper Daily',
+        submissionStatus: 'Draft',
+      });
+      if (validation.error || !validation.value) {
+        return res.status(400).json({ error: validation.error || 'Invalid calendar draft' });
+      }
+
+      let targetEntryId = requestedEntryId || null;
+      if (targetEntryId) {
+        const existingEntry = await CalendarEntryModel.getEntryById(targetEntryId, accountId);
+        if (!existingEntry) {
+          return res.status(404).json({ error: 'Calendar draft not found' });
+        }
+
+        if (existingEntry.submissionStatus !== 'Draft') {
+          return res.status(409).json({ error: 'Submitted reports cannot be autosaved as drafts' });
+        }
+      } else {
+        const existingDraft = await CalendarEntryModel.getDraftEntryForDate(accountId, validation.value.date);
+        targetEntryId = existingDraft?.id || null;
+      }
+
+      const draftPayload = {
+        ownerAccountId: accountId,
+        ...validation.value,
+        category: 'Trooper Daily',
+        submissionStatus: 'Draft' as const,
+      };
+
+      const entry = targetEntryId
+        ? await CalendarEntryModel.updateEntry(targetEntryId, draftPayload)
+        : await CalendarEntryModel.createEntry(draftPayload);
+
+      if (!entry) {
+        return res.status(404).json({ error: 'Calendar draft not found' });
+      }
+
+      broadcastAppEvent({ type: 'calendar-updated', entityId: entry.id });
+      res.json(entry);
+    } catch (error) {
+      if (typeof error === 'object' && error !== null && (error as { statusCode?: number }).statusCode === 403) {
+        return res.status(403).json({ error: 'Calendar account mismatch' });
+      }
+
+      console.error('Calendar autosave error:', error);
+      res.status(500).json({ error: 'Failed to autosave calendar draft' });
+    }
+  }
+
   static async deleteEntry(req: Request, res: Response) {
     try {
       const requestedAccountId = typeof req.body?.accountId === 'string' ? req.body.accountId : undefined;

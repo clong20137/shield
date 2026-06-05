@@ -947,6 +947,9 @@ export const calendarService = {
   update: (id: string, entry: CalendarEntryPayload & { accountId: string; actorId?: string; actorName?: string }) =>
     api.put<CalendarEntry>(`/calendar/${id}`, entry),
 
+  autosaveDraft: (entry: CalendarEntryPayload & { accountId: string; entryId?: string | null }) =>
+    api.post<CalendarEntry>('/calendar/autosave', entry),
+
   delete: (id: string, actor?: { accountId?: string; actorId?: string; actorName?: string }) =>
     api.delete(`/calendar/${id}`, { data: actor }),
 

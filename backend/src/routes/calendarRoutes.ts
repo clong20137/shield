@@ -11,6 +11,7 @@ router.get('/shortcuts', requirePermission('calendar:manage'), CalendarControlle
 router.post('/shortcuts', requirePermission('calendar:manage'), CalendarController.createShortcut);
 router.put('/shortcuts/:id', requirePermission('calendar:manage'), CalendarController.updateShortcut);
 router.delete('/shortcuts/:id', requirePermission('calendar:manage'), CalendarController.deleteShortcut);
+router.post('/autosave', requirePermission('calendar:manage'), CalendarController.autosaveDraft);
 router.post('/', requirePermission('calendar:manage'), CalendarController.createEntry);
 router.put('/:id', requirePermission('calendar:manage'), CalendarController.updateEntry);
 router.delete('/:id', requirePermission('calendar:manage'), CalendarController.deleteEntry);
