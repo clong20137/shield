@@ -449,7 +449,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
                 <button className="flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => onMessage?.(user)} aria-label="Send message" title="Send Message" type="button">
                   <Send size={16} />
                 </button>
-                {canEdit && (
+                {canEdit && onEdit && (
                   <button className="flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => onEdit?.(user)} aria-label="Edit user" title="Edit User" type="button">
                     <Pencil size={16} />
                   </button>

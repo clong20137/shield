@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Eraser, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, dashboardSummaryService, DashboardSummary, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { UserDetail } from '../components/UserDetail';
@@ -1740,6 +1740,7 @@ function QuickNotesWidget({
 }
 
 const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUser }) => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
@@ -1921,6 +1922,10 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
         <UserDetail
           user={selectedProfile}
           onClose={() => setSelectedProfile(null)}
+          onEdit={(user) => {
+            setSelectedProfile(null);
+            navigate(`/search?userId=${encodeURIComponent(user.id)}&edit=1&q=${encodeURIComponent(`${user.firstName} ${user.lastName}`.trim() || user.email || user.id)}`);
+          }}
           onMessage={(user) => window.dispatchEvent(new CustomEvent('shield:open-message-thread', { detail: user }))}
           canEdit={isAdministrator}
           currentUser={currentUser}

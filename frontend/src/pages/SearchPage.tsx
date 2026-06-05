@@ -182,6 +182,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [searchParams] = useSearchParams();
   const globalQuery = useMemo(() => searchParams.get('q') ?? '', [searchParams]);
   const selectedUserId = useMemo(() => searchParams.get('userId') ?? '', [searchParams]);
+  const shouldEditSelectedUser = useMemo(() => searchParams.get('edit') === '1', [searchParams]);
   const isAdministrator = currentUser?.role === 'administrator';
   const canEditProfilePictures = isAdministrator || currentUser?.permissions?.includes('users:profile-picture');
   const canViewHiddenUsers = isAdministrator || currentUser?.permissions?.includes('users:view-hidden');
@@ -702,8 +703,14 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     userService.getById(selectedUserId)
       .then((response) => {
         if (isMounted) {
-          setSelectedUser(response.data);
-          focusProfileWindow();
+          const loadedUser = response.data as User;
+          if (shouldEditSelectedUser) {
+            setSelectedUser(null);
+            openEditUser(loadedUser);
+          } else {
+            setSelectedUser(loadedUser);
+            focusProfileWindow();
+          }
         }
       })
       .catch((err) => {
@@ -716,7 +723,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     return () => {
       isMounted = false;
     };
-  }, [selectedUserId]);
+  }, [selectedUserId, shouldEditSelectedUser]);
 
   return (
     <div>
