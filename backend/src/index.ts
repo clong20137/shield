@@ -270,15 +270,17 @@ app.use((error: Error, req: Request, res: Response, next: express.NextFunction) 
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Start server
+// Start server. If database initialization fails, keep the API online so first-run
+// setup can write a backend .env file and guide the operator through restart.
 initializeDatabase()
   .then(() => {
     startSecurityCleanupJob();
+  })
+  .catch((error) => {
+    console.error('Failed to initialize database. Starting setup-capable API anyway:', error);
+  })
+  .finally(() => {
     app.listen(PORT, () => {
       console.log(`Shield backend running on port ${PORT}`);
     });
-  })
-  .catch((error) => {
-    console.error('Failed to initialize database:', error);
-    process.exit(1);
   });

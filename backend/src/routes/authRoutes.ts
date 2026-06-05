@@ -16,6 +16,8 @@ const roleManagementLimiter = rateLimit({ keyPrefix: 'role-management', windowMs
 const setupLimiter = rateLimit({ keyPrefix: 'setup', windowMs: 15 * 60 * 1000, max: 12, message: 'Too many setup attempts. Try again later.' });
 
 router.get('/setup/status', AuthController.getSetupStatus);
+router.get('/setup/environment', AuthController.getSetupEnvironment);
+router.post('/setup/environment', setupLimiter, AuthController.saveSetupEnvironment);
 router.post('/setup/complete', setupLimiter, AuthController.completeSetup);
 router.post('/register', registrationLimiter, AuthController.register);
 router.post('/login', loginLimiter, AuthController.login);

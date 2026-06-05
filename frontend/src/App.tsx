@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation,
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { FloatingWindow } from './components/FloatingWindow';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, CompleteSetupPayload, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, SetupStatus, urgentAlertService, UrgentAlert, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, CompleteSetupPayload, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, SetupEnvironmentValues, SetupStatus, urgentAlertService, UrgentAlert, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
@@ -2987,6 +2987,25 @@ const setupFeatureOptions = [
 
 const setupSteps = ['Database', 'Features', 'Access', 'Settings', 'Admin'];
 
+function getDefaultSetupEnvironment(status: SetupStatus | null): SetupEnvironmentValues {
+  const apiUrl = getApiHealthUrl().replace(/\/health$/u, '/api');
+  return {
+    NODE_ENV: 'development',
+    PORT: '5000',
+    DB_HOST: 'localhost',
+    DB_PORT: '3306',
+    DB_USER: 'root',
+    DB_PASSWORD: '',
+    DB_NAME: status?.database.name || 'shield',
+    ALLOWED_ORIGINS: window.location.origin,
+    APP_BASE_URL: status?.appBaseUrl || window.location.origin,
+    API_BASE_URL: status?.apiUrl || apiUrl,
+    SESSION_COOKIE_SECURE: window.location.protocol === 'https:' ? 'true' : 'false',
+    SESSION_COOKIE_SAMESITE: 'lax',
+    TRUST_PROXY: 'false',
+  };
+}
+
 function getDefaultSetupPayload(status: SetupStatus | null): CompleteSetupPayload {
   const inferredApiUrl = getApiHealthUrl().replace(/\/health$/u, '/api');
   return {
@@ -3021,13 +3040,51 @@ function SetupWizard({
 }) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<CompleteSetupPayload>(() => getDefaultSetupPayload(status));
+  const [environmentForm, setEnvironmentForm] = useState<SetupEnvironmentValues>(() => getDefaultSetupEnvironment(status));
+  const [canWriteEnvironment, setCanWriteEnvironment] = useState(false);
+  const [isEnvironmentLoading, setIsEnvironmentLoading] = useState(true);
+  const [isSavingEnvironment, setIsSavingEnvironment] = useState(false);
+  const [environmentSavedMessage, setEnvironmentSavedMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(status?.error || null);
 
   useEffect(() => {
     setForm(getDefaultSetupPayload(status));
+    setEnvironmentForm((currentEnvironment) => ({ ...getDefaultSetupEnvironment(status), ...currentEnvironment }));
     setError(status?.error || null);
   }, [status]);
+
+  useEffect(() => {
+    let isMounted = true;
+    authService.getSetupEnvironment()
+      .then((response) => {
+        if (!isMounted) {
+          return;
+        }
+        setCanWriteEnvironment(response.data.canWrite);
+        setEnvironmentForm(response.data.values);
+        setForm((currentForm) => ({
+          ...currentForm,
+          appBaseUrl: response.data.values.APP_BASE_URL || currentForm.appBaseUrl,
+          apiUrl: response.data.values.API_BASE_URL || currentForm.apiUrl,
+        }));
+      })
+      .catch((err) => {
+        console.error('Failed to load setup environment:', err);
+        if (isMounted) {
+          setCanWriteEnvironment(false);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsEnvironmentLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const updateForm = <Key extends keyof CompleteSetupPayload>(key: Key, value: CompleteSetupPayload[Key]) => {
     setForm((currentForm) => ({ ...currentForm, [key]: value }));
@@ -3038,6 +3095,36 @@ function SetupWizard({
       ...currentForm,
       admin: { ...currentForm.admin, [key]: value },
     }));
+  };
+
+  const updateEnvironment = (key: keyof SetupEnvironmentValues, value: string) => {
+    setEnvironmentForm((currentEnvironment) => ({ ...currentEnvironment, [key]: value }));
+    if (key === 'APP_BASE_URL') {
+      updateForm('appBaseUrl', value);
+    }
+    if (key === 'API_BASE_URL') {
+      updateForm('apiUrl', value);
+    }
+  };
+
+  const saveEnvironment = async () => {
+    setIsSavingEnvironment(true);
+    setError(null);
+    setEnvironmentSavedMessage(null);
+    try {
+      const response = await authService.saveSetupEnvironment(environmentForm);
+      setCanWriteEnvironment(response.data.canWrite);
+      setEnvironmentSavedMessage(response.data.message || 'Environment saved. Restart the backend to apply changes.');
+      setForm((currentForm) => ({
+        ...currentForm,
+        appBaseUrl: environmentForm.APP_BASE_URL || currentForm.appBaseUrl,
+        apiUrl: environmentForm.API_BASE_URL || currentForm.apiUrl,
+      }));
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to save environment settings.'));
+    } finally {
+      setIsSavingEnvironment(false);
+    }
   };
 
   const toggleFeature = (featureId: string) => {
@@ -3051,7 +3138,7 @@ function SetupWizard({
 
   const validateCurrentStep = (): string | null => {
     if (step === 0 && !status?.database.connected) {
-      return 'The API cannot confirm the database connection yet.';
+      return 'Save the environment settings, restart the backend, and return to this installer once the database connects.';
     }
 
     if (step === 1 && form.features.length === 0) {
@@ -3173,8 +3260,8 @@ function SetupWizard({
             {step === 0 && (
               <div className="space-y-4">
                 <div>
-                  <h2 className="text-2xl font-bold text-primary-500 dark:text-blue-100">Database Connection</h2>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">SHIELD uses the configured backend database connection and initializes required tables on startup.</p>
+                  <h2 className="text-2xl font-bold text-primary-500 dark:text-blue-100">Environment And Database</h2>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Fill out the backend `.env` values used by SHIELD. Database changes require a backend restart.</p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
@@ -3189,8 +3276,85 @@ function SetupWizard({
                     <p className="mt-2 text-lg font-bold text-gray-900 dark:text-white">{status?.database.name || 'Configured database'}</p>
                   </div>
                 </div>
-                <div className="rounded border border-gray-200 p-4 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-300">
-                  Tables, default roles, default permissions, sessions, audit logs, dashboard data, messages, and media metadata are checked by the backend initializer.
+                {environmentSavedMessage && (
+                  <div className="rounded border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                    {environmentSavedMessage}
+                  </div>
+                )}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Environment</span>
+                    <select
+                      value={environmentForm.NODE_ENV}
+                      onChange={(event) => updateEnvironment('NODE_ENV', event.target.value)}
+                      disabled={!canWriteEnvironment || isEnvironmentLoading}
+                      className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 disabled:opacity-60"
+                    >
+                      <option value="development">Development</option>
+                      <option value="production">Production</option>
+                      <option value="test">Test</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Backend Port</span>
+                    <input value={environmentForm.PORT} onChange={(event) => updateEnvironment('PORT', event.target.value)} disabled={!canWriteEnvironment || isEnvironmentLoading} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 disabled:opacity-60" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">DB Host</span>
+                    <input value={environmentForm.DB_HOST} onChange={(event) => updateEnvironment('DB_HOST', event.target.value)} disabled={!canWriteEnvironment || isEnvironmentLoading} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 disabled:opacity-60" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">DB Port</span>
+                    <input value={environmentForm.DB_PORT} onChange={(event) => updateEnvironment('DB_PORT', event.target.value)} disabled={!canWriteEnvironment || isEnvironmentLoading} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 disabled:opacity-60" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">DB User</span>
+                    <input value={environmentForm.DB_USER} onChange={(event) => updateEnvironment('DB_USER', event.target.value)} disabled={!canWriteEnvironment || isEnvironmentLoading} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 disabled:opacity-60" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">DB Password</span>
+                    <input type="password" value={environmentForm.DB_PASSWORD} onChange={(event) => updateEnvironment('DB_PASSWORD', event.target.value)} disabled={!canWriteEnvironment || isEnvironmentLoading} placeholder={canWriteEnvironment ? '' : 'Hidden after save'} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 disabled:opacity-60" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">DB Name</span>
+                    <input value={environmentForm.DB_NAME} onChange={(event) => updateEnvironment('DB_NAME', event.target.value)} disabled={!canWriteEnvironment || isEnvironmentLoading} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 disabled:opacity-60" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Allowed Origins</span>
+                    <input value={environmentForm.ALLOWED_ORIGINS} onChange={(event) => updateEnvironment('ALLOWED_ORIGINS', event.target.value)} disabled={!canWriteEnvironment || isEnvironmentLoading} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 disabled:opacity-60" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Application URL</span>
+                    <input value={environmentForm.APP_BASE_URL} onChange={(event) => updateEnvironment('APP_BASE_URL', event.target.value)} disabled={!canWriteEnvironment || isEnvironmentLoading} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 disabled:opacity-60" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">API URL</span>
+                    <input value={environmentForm.API_BASE_URL} onChange={(event) => updateEnvironment('API_BASE_URL', event.target.value)} disabled={!canWriteEnvironment || isEnvironmentLoading} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 disabled:opacity-60" />
+                  </label>
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <label className="flex items-center justify-between gap-3 rounded border border-gray-200 p-3 dark:border-gray-800">
+                    <span className="text-sm font-semibold">Secure cookies</span>
+                    <input type="checkbox" checked={environmentForm.SESSION_COOKIE_SECURE === 'true'} onChange={(event) => updateEnvironment('SESSION_COOKIE_SECURE', event.target.checked ? 'true' : 'false')} disabled={!canWriteEnvironment || isEnvironmentLoading} />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Cookie SameSite</span>
+                    <select value={environmentForm.SESSION_COOKIE_SAMESITE} onChange={(event) => updateEnvironment('SESSION_COOKIE_SAMESITE', event.target.value)} disabled={!canWriteEnvironment || isEnvironmentLoading} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 disabled:opacity-60">
+                      <option value="lax">lax</option>
+                      <option value="strict">strict</option>
+                      <option value="none">none</option>
+                    </select>
+                  </label>
+                  <label className="flex items-center justify-between gap-3 rounded border border-gray-200 p-3 dark:border-gray-800">
+                    <span className="text-sm font-semibold">Trust proxy</span>
+                    <input type="checkbox" checked={environmentForm.TRUST_PROXY === 'true'} onChange={(event) => updateEnvironment('TRUST_PROXY', event.target.checked ? 'true' : 'false')} disabled={!canWriteEnvironment || isEnvironmentLoading} />
+                  </label>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-gray-200 p-4 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-300">
+                  <span>Tables and default roles are initialized after the backend restarts with a valid database connection.</span>
+                  <button type="button" onClick={() => void saveEnvironment()} disabled={!canWriteEnvironment || isSavingEnvironment || isEnvironmentLoading} className="btn-primary disabled:pointer-events-none disabled:opacity-50">
+                    {isSavingEnvironment ? 'Saving...' : 'Save .env'}
+                  </button>
                 </div>
               </div>
             )}

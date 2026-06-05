@@ -456,6 +456,30 @@ export interface CompleteSetupPayload {
   };
 }
 
+export interface SetupEnvironmentValues {
+  NODE_ENV: string;
+  PORT: string;
+  DB_HOST: string;
+  DB_PORT: string;
+  DB_USER: string;
+  DB_PASSWORD: string;
+  DB_NAME: string;
+  ALLOWED_ORIGINS: string;
+  APP_BASE_URL: string;
+  API_BASE_URL: string;
+  SESSION_COOKIE_SECURE: string;
+  SESSION_COOKIE_SAMESITE: string;
+  TRUST_PROXY: string;
+}
+
+export interface SetupEnvironmentResponse {
+  canWrite: boolean;
+  envFileExists: boolean;
+  requiresRestart: boolean;
+  values: SetupEnvironmentValues;
+  message?: string;
+}
+
 export interface TwoFactorSetupResponse {
   secret: string;
   otpauthUrl: string;
@@ -817,6 +841,12 @@ export type CreatePerformanceEvaluationPayload = Pick<
 export const authService = {
   getSetupStatus: () =>
     api.get<SetupStatus>('/auth/setup/status'),
+
+  getSetupEnvironment: () =>
+    api.get<SetupEnvironmentResponse>('/auth/setup/environment'),
+
+  saveSetupEnvironment: (values: SetupEnvironmentValues) =>
+    api.post<SetupEnvironmentResponse>('/auth/setup/environment', values),
 
   completeSetup: (payload: CompleteSetupPayload) =>
     api.post<AuthResponse>('/auth/setup/complete', payload),

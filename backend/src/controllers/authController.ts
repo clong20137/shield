@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { AuthInviteModel } from '../models/AuthInvite';
 import { AuthPasswordResetModel } from '../models/AuthPasswordReset';
@@ -118,6 +120,22 @@ const setupFeatureKeys = [
   'urgentAlerts',
   'performanceEvaluations',
 ] as const;
+const setupEnvironmentKeys = [
+  'NODE_ENV',
+  'PORT',
+  'DB_HOST',
+  'DB_PORT',
+  'DB_USER',
+  'DB_PASSWORD',
+  'DB_NAME',
+  'ALLOWED_ORIGINS',
+  'APP_BASE_URL',
+  'API_BASE_URL',
+  'SESSION_COOKIE_SECURE',
+  'SESSION_COOKIE_SAMESITE',
+  'TRUST_PROXY',
+  'SETUP_ENV_LOCKED',
+] as const;
 
 function normalizeRegistrationMode(value: string): RegistrationMode {
   return registrationModes.includes(value as RegistrationMode) ? value as RegistrationMode : 'public';
@@ -131,6 +149,82 @@ function cleanFeatureSelection(value: unknown): string[] {
 
 function normalizeUrl(value: unknown, maxLength = 300): string {
   return cleanString(value, maxLength).replace(/\/+$/u, '');
+}
+
+function getBackendEnvPath(): string {
+  return path.resolve(__dirname, '../../.env');
+}
+
+function parseEnvFile(value: string): Record<string, string> {
+  return value
+    .split(/\r?\n/u)
+    .reduce<Record<string, string>>((settings, line) => {
+      const trimmedLine = line.trim();
+      if (!trimmedLine || trimmedLine.startsWith('#')) {
+        return settings;
+      }
+
+      const equalsIndex = trimmedLine.indexOf('=');
+      if (equalsIndex <= 0) {
+        return settings;
+      }
+
+      const key = trimmedLine.slice(0, equalsIndex).trim();
+      let rawValue = trimmedLine.slice(equalsIndex + 1).trim();
+      if ((rawValue.startsWith('"') && rawValue.endsWith('"')) || (rawValue.startsWith("'") && rawValue.endsWith("'"))) {
+        rawValue = rawValue.slice(1, -1);
+      }
+      settings[key] = rawValue.replace(/\\n/gu, '\n');
+      return settings;
+    }, {});
+}
+
+function formatEnvValue(value: string): string {
+  if (!value) {
+    return '';
+  }
+
+  if (/[\s#"']/u.test(value)) {
+    return `"${value.replace(/\\/gu, '\\\\').replace(/"/gu, '\\"').replace(/\n/gu, '\\n')}"`;
+  }
+
+  return value;
+}
+
+function serializeEnvFile(settings: Record<string, string>): string {
+  const orderedKeys = [
+    ...setupEnvironmentKeys,
+    ...Object.keys(settings).filter((key) => !(setupEnvironmentKeys as readonly string[]).includes(key)).sort(),
+  ];
+
+  return `${orderedKeys
+    .filter((key, index, keys) => keys.indexOf(key) === index)
+    .map((key) => `${key}=${formatEnvValue(settings[key] || '')}`)
+    .join('\n')}\n`;
+}
+
+async function canWriteSetupEnvironment(): Promise<boolean> {
+  const envPath = getBackendEnvPath();
+  if (!fs.existsSync(envPath)) {
+    return true;
+  }
+
+  const fileSettings = parseEnvFile(await fs.promises.readFile(envPath, 'utf8'));
+  if (fileSettings.SETUP_ENV_LOCKED !== 'true') {
+    return true;
+  }
+
+  try {
+    return await AuthAccountModel.countAccounts() === 0;
+  } catch {
+    return false;
+  }
+}
+
+async function updateBackendEnv(values: Record<string, string>): Promise<void> {
+  const envPath = getBackendEnvPath();
+  const currentSettings = fs.existsSync(envPath) ? parseEnvFile(await fs.promises.readFile(envPath, 'utf8')) : {};
+  await fs.promises.writeFile(envPath, serializeEnvFile({ ...currentSettings, ...values }), { encoding: 'utf8' });
 }
 
 async function getRegistrationMode(): Promise<RegistrationMode> {
@@ -329,6 +423,96 @@ function publicInvite(invite: Awaited<ReturnType<typeof AuthInviteModel.create>>
 }
 
 export class AuthController {
+  static async getSetupEnvironment(_req: Request, res: Response) {
+    try {
+      const envPath = getBackendEnvPath();
+      const fileSettings = fs.existsSync(envPath) ? parseEnvFile(await fs.promises.readFile(envPath, 'utf8')) : {};
+      res.json({
+        canWrite: await canWriteSetupEnvironment(),
+        envFileExists: fs.existsSync(envPath),
+        requiresRestart: false,
+        values: {
+          NODE_ENV: fileSettings.NODE_ENV || process.env.NODE_ENV || 'development',
+          PORT: fileSettings.PORT || process.env.PORT || '5000',
+          DB_HOST: fileSettings.DB_HOST || process.env.DB_HOST || 'localhost',
+          DB_PORT: fileSettings.DB_PORT || process.env.DB_PORT || '3306',
+          DB_USER: fileSettings.DB_USER || process.env.DB_USER || 'root',
+          DB_PASSWORD: '',
+          DB_NAME: fileSettings.DB_NAME || process.env.DB_NAME || 'shield',
+          ALLOWED_ORIGINS: fileSettings.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGINS || '',
+          APP_BASE_URL: fileSettings.APP_BASE_URL || process.env.APP_BASE_URL || '',
+          API_BASE_URL: fileSettings.API_BASE_URL || process.env.API_BASE_URL || '',
+          SESSION_COOKIE_SECURE: fileSettings.SESSION_COOKIE_SECURE || process.env.SESSION_COOKIE_SECURE || 'false',
+          SESSION_COOKIE_SAMESITE: fileSettings.SESSION_COOKIE_SAMESITE || process.env.SESSION_COOKIE_SAMESITE || 'lax',
+          TRUST_PROXY: fileSettings.TRUST_PROXY || process.env.TRUST_PROXY || 'false',
+          SETUP_ENV_LOCKED: fileSettings.SETUP_ENV_LOCKED || process.env.SETUP_ENV_LOCKED || 'false',
+        },
+      });
+    } catch (error) {
+      console.error('Get setup environment error:', error);
+      res.status(500).json({ error: 'Failed to load environment settings' });
+    }
+  }
+
+  static async saveSetupEnvironment(req: Request, res: Response) {
+    try {
+      if (!await canWriteSetupEnvironment()) {
+        return res.status(403).json({ error: 'Environment setup is locked after installation begins' });
+      }
+
+      const input = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as Record<string, unknown>;
+      const cleanPort = String(Math.max(1, Math.min(65535, Number(input.PORT) || 5000)));
+      const cleanDbPort = String(Math.max(1, Math.min(65535, Number(input.DB_PORT) || 3306)));
+      const cleanAllowedOrigins = cleanMultiline(input.ALLOWED_ORIGINS, 1000).replace(/\s+/gu, '');
+      const cleanAppBaseUrl = normalizeUrl(input.APP_BASE_URL);
+      const cleanApiBaseUrl = normalizeUrl(input.API_BASE_URL);
+
+      if (cleanAppBaseUrl && !/^https?:\/\//iu.test(cleanAppBaseUrl)) {
+        return res.status(400).json({ error: 'Application URL must start with http:// or https://' });
+      }
+
+      if (cleanApiBaseUrl && !/^https?:\/\//iu.test(cleanApiBaseUrl)) {
+        return res.status(400).json({ error: 'API URL must start with http:// or https://' });
+      }
+
+      const envPath = getBackendEnvPath();
+      const currentSettings = fs.existsSync(envPath) ? parseEnvFile(await fs.promises.readFile(envPath, 'utf8')) : {};
+      const cleanNodeEnv = cleanString(input.NODE_ENV, 40);
+      const cleanSameSite = cleanString(input.SESSION_COOKIE_SAMESITE, 20).toLowerCase();
+      const nextSettings = {
+        ...currentSettings,
+        NODE_ENV: isOneOf(cleanNodeEnv, ['development', 'production', 'test']) ? cleanNodeEnv : 'development',
+        PORT: cleanPort,
+        DB_HOST: cleanString(input.DB_HOST, 255) || 'localhost',
+        DB_PORT: cleanDbPort,
+        DB_USER: cleanString(input.DB_USER, 255) || 'root',
+        DB_PASSWORD: typeof input.DB_PASSWORD === 'string' ? input.DB_PASSWORD.slice(0, 500) : '',
+        DB_NAME: cleanString(input.DB_NAME, 120) || 'shield',
+        ALLOWED_ORIGINS: cleanAllowedOrigins,
+        APP_BASE_URL: cleanAppBaseUrl,
+        API_BASE_URL: cleanApiBaseUrl,
+        SESSION_COOKIE_SECURE: input.SESSION_COOKIE_SECURE === true || input.SESSION_COOKIE_SECURE === 'true' ? 'true' : 'false',
+        SESSION_COOKIE_SAMESITE: isOneOf(cleanSameSite, ['lax', 'strict', 'none']) ? cleanSameSite : 'lax',
+        TRUST_PROXY: input.TRUST_PROXY === true || input.TRUST_PROXY === 'true' ? 'true' : 'false',
+        SETUP_ENV_LOCKED: 'false',
+      };
+
+      await fs.promises.writeFile(envPath, serializeEnvFile(nextSettings), { encoding: 'utf8' });
+      res.json({
+        saved: true,
+        canWrite: true,
+        envFileExists: true,
+        requiresRestart: true,
+        envFile: '.env',
+        values: { ...nextSettings, DB_PASSWORD: '' },
+        message: 'Environment saved. Restart the backend so SHIELD can reconnect with these values.',
+      });
+    } catch (error) {
+      console.error('Save setup environment error:', error);
+      res.status(500).json({ error: 'Failed to save environment settings' });
+    }
+  }
+
   static async getSetupStatus(req: Request, res: Response) {
     try {
       const accountCount = await AuthAccountModel.countAccounts();
@@ -458,6 +642,7 @@ export class AuthController {
       const account = await AuthAccountModel.createAccount(cleanEmail, password, cleanFirstName, cleanLastName);
       await SystemSettingModel.setString('setupCompleted', 'true');
       await SystemSettingModel.setString('setupCompletedAt', new Date().toISOString());
+      await updateBackendEnv({ SETUP_ENV_LOCKED: 'true' });
 
       const token = await AuthSessionModel.createSession(account.id);
       setSessionCookie(req, res, token);
