@@ -425,6 +425,12 @@ function publicInvite(invite: Awaited<ReturnType<typeof AuthInviteModel.create>>
 export class AuthController {
   static async getSetupEnvironment(_req: Request, res: Response) {
     try {
+      const accountCount = await AuthAccountModel.countAccounts().catch(() => 0);
+      const setupCompleted = await SystemSettingModel.getString('setupCompleted', accountCount > 0 ? 'true' : 'false').catch(() => accountCount > 0 ? 'true' : 'false') === 'true';
+      if (accountCount > 0 || setupCompleted) {
+        return res.status(410).json({ error: 'Installer environment settings are no longer available after installation' });
+      }
+
       const envPath = getBackendEnvPath();
       const fileSettings = fs.existsSync(envPath) ? parseEnvFile(await fs.promises.readFile(envPath, 'utf8')) : {};
       res.json({
@@ -456,6 +462,12 @@ export class AuthController {
 
   static async saveSetupEnvironment(req: Request, res: Response) {
     try {
+      const accountCount = await AuthAccountModel.countAccounts().catch(() => 0);
+      const setupCompleted = await SystemSettingModel.getString('setupCompleted', accountCount > 0 ? 'true' : 'false').catch(() => accountCount > 0 ? 'true' : 'false') === 'true';
+      if (accountCount > 0 || setupCompleted) {
+        return res.status(410).json({ error: 'Installer environment settings are no longer available after installation' });
+      }
+
       if (!await canWriteSetupEnvironment()) {
         return res.status(403).json({ error: 'Environment setup is locked after installation begins' });
       }
@@ -519,6 +531,7 @@ export class AuthController {
       const setupCompleted = await SystemSettingModel.getString('setupCompleted', accountCount > 0 ? 'true' : 'false') === 'true';
       res.json({
         setupRequired: accountCount === 0 && !setupCompleted,
+        installed: accountCount > 0 || setupCompleted,
         setupCompleted,
         accountCount,
         database: {

@@ -3625,6 +3625,21 @@ function App() {
   }, [appName, siteName]);
 
   useEffect(() => {
+    if (isSetupLoading || !setupStatus) {
+      return;
+    }
+
+    if (setupStatus.setupRequired && window.location.pathname !== '/install') {
+      window.history.replaceState({}, document.title, '/install');
+      return;
+    }
+
+    if (!setupStatus.setupRequired && window.location.pathname === '/install') {
+      window.history.replaceState({}, document.title, '/');
+    }
+  }, [isSetupLoading, setupStatus]);
+
+  useEffect(() => {
     const dispatchReconnectRefresh = () => {
       [
         'audit-updated',
@@ -4804,6 +4819,7 @@ function App() {
               registrationMode: settings.registrationMode,
               features: settings.features,
             } : currentStatus);
+            window.history.replaceState({}, document.title, '/');
             handleLogin(account);
           }}
         />

@@ -420,6 +420,7 @@ export interface AuthResponse {
 
 export interface SetupStatus {
   setupRequired: boolean;
+  installed?: boolean;
   setupCompleted: boolean;
   accountCount: number;
   database: {
