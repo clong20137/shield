@@ -2410,7 +2410,31 @@ const onboardingSteps: OnboardingStep[] = [
     target: 'workspace',
     eyebrow: 'Start Here',
     title: 'Your daily workspace',
-    body: 'The dashboard is the first stop for live user totals, updates, news, and the main work happening across SHIELD.',
+    body: 'The dashboard is the first stop for pinned people, your day, quick notes, updates, news, and the main work happening across SHIELD.',
+  },
+  {
+    target: 'pinned-profiles',
+    eyebrow: 'Pinned Profiles',
+    title: 'Keep key people close',
+    body: 'Pin frequently used profiles to the top of the dashboard. Use the arrows to move through more pinned users, and open a profile without leaving the dashboard.',
+  },
+  {
+    target: 'my-day',
+    eyebrow: 'My Day',
+    title: 'See today at a glance',
+    body: 'My Day combines today\'s calendar items, drafts, submitted entries, and due reminders so your daily workload is visible without opening another app.',
+  },
+  {
+    target: 'quick-notes',
+    eyebrow: 'Quick Notes',
+    title: 'Capture working notes',
+    body: 'Quick Notes is your private scratchpad. It saves automatically, tracks word and character counts, and stays available from the dashboard.',
+  },
+  {
+    target: 'dashboard-news',
+    eyebrow: 'Updates & News',
+    title: 'Read the latest posts',
+    body: 'Updates and news rotate through the latest posts. Use Read More to open the full post, reactions, comments, and attachments.',
   },
   {
     target: 'global-search',
@@ -2477,6 +2501,13 @@ const onboardingSteps: OnboardingStep[] = [
     body: 'Use the dock on larger screens or the bottom navigation on mobile to jump between core tools. Badges show items like unread messages.',
     placement: 'right',
   },
+  {
+    target: 'quick-launch',
+    eyebrow: 'Hot Keys',
+    title: 'Move faster from the keyboard',
+    body: 'Use Ctrl+K to open the command palette, / to jump to user search, M for messages, C for calendar, D for dashboard, R for reports, A for Admin Console when permitted, U for Create User when permitted, = for calculator, and Esc to close the front window.',
+    placement: 'right',
+  },
 ];
 
 const findOnboardingElement = (target: string) => {
@@ -2511,6 +2542,7 @@ function FirstLoginGuide({
 
   useEffect(() => {
     let frame = 0;
+    const timeouts: number[] = [];
 
     const measureTarget = () => {
       const target = findOnboardingElement(step.target);
@@ -2524,8 +2556,20 @@ function FirstLoginGuide({
 
     const scrollToTarget = () => {
       const target = findOnboardingElement(step.target);
-      target?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
-      window.setTimeout(measureTarget, 220);
+      if (!target) {
+        measureTarget();
+        return;
+      }
+
+      const rect = target.getBoundingClientRect();
+      const isFullyVisible = rect.top >= 24 && rect.left >= 8 && rect.bottom <= window.innerHeight - 24 && rect.right <= window.innerWidth - 8;
+      if (!isFullyVisible) {
+        target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+      }
+
+      [80, 220, 420, 700].forEach((delay) => {
+        timeouts.push(window.setTimeout(measureTarget, delay));
+      });
     };
 
     frame = window.requestAnimationFrame(scrollToTarget);
@@ -2534,6 +2578,7 @@ function FirstLoginGuide({
 
     return () => {
       window.cancelAnimationFrame(frame);
+      timeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
       window.removeEventListener('resize', measureTarget);
       window.removeEventListener('scroll', measureTarget, true);
     };

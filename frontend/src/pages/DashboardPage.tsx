@@ -845,7 +845,7 @@ function DashboardNews({
   };
 
   return (
-    <section className="flex h-full min-h-[32rem] flex-col rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+    <section data-onboarding-target="dashboard-news" className="flex h-full min-h-[32rem] flex-col rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2>Updates & News</h2>
@@ -1249,7 +1249,7 @@ function PinnedProfilesWidget({
   };
 
   return (
-    <section className="mb-8 rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
+    <section data-onboarding-target="pinned-profiles" className="mb-8 rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Pinned Profiles</p>
@@ -1475,7 +1475,7 @@ function MyDayWidget({
   };
 
   return (
-    <section className="flex h-full min-h-[32rem] flex-col rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
+    <section data-onboarding-target="my-day" className="flex h-full min-h-[32rem] flex-col rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-primary-500/10 text-primary-500 dark:bg-blue-950 dark:text-blue-100">
@@ -1689,7 +1689,7 @@ function QuickNotesWidget({
   };
 
   return (
-    <section className="flex h-full min-h-[32rem] flex-col rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
+    <section data-onboarding-target="quick-notes" className="flex h-full min-h-[32rem] flex-col rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">
