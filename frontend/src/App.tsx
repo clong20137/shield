@@ -4185,6 +4185,15 @@ function App() {
     return () => document.removeEventListener('keydown', handleEscape);
   }, [activeFloatingApp, isAccountMenuOpen, isAdminConsoleOpen, isBugTrackerOpen, isCalculatorOpen, isCalendarModalOpen, isCommandPaletteOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isProfileModalOpen, isReportBugOpen]);
 
+  useEffect(() => {
+    const blockContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+    };
+
+    document.addEventListener('contextmenu', blockContextMenu);
+    return () => document.removeEventListener('contextmenu', blockContextMenu);
+  }, []);
+
   return (
     <Router>
       <ToastHost toasts={toasts} />

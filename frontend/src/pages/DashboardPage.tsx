@@ -1749,6 +1749,7 @@ function QuickNotesWidget({
     content: string;
     x: number;
     y: number;
+    z: number;
     color: 'yellow' | 'blue' | 'green' | 'pink';
   };
 
@@ -1775,6 +1776,7 @@ function QuickNotesWidget({
               content: typeof item.content === 'string' ? item.content : '',
               x: Number.isFinite(item.x) ? Number(item.x) : 18 + index * 28,
               y: Number.isFinite(item.y) ? Number(item.y) : 18 + index * 28,
+              z: Number.isFinite(item.z) ? Number(item.z) : index + 1,
               color,
             };
           })
@@ -1789,6 +1791,7 @@ function QuickNotesWidget({
       content: value,
       x: 18,
       y: 18,
+      z: 1,
       color: 'yellow',
     }];
   };
@@ -1803,6 +1806,7 @@ function QuickNotesWidget({
     });
 
   const [notes, setNotes] = useState<StickyNote[]>([]);
+  const [topNoteZ, setTopNoteZ] = useState(1);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
@@ -1813,13 +1817,16 @@ function QuickNotesWidget({
   useEffect(() => {
     if (!currentUser) {
       setNotes([]);
+      setTopNoteZ(1);
       hasLoadedNoteRef.current = false;
       return;
     }
 
     if (initialNote) {
       hasLoadedNoteRef.current = false;
-      setNotes(parseStickyNotes(initialNote.content || ''));
+      const parsedNotes = parseStickyNotes(initialNote.content || '');
+      setNotes(parsedNotes);
+      setTopNoteZ(Math.max(1, ...parsedNotes.map((note) => note.z)));
       setLastSavedAt(initialNote.updatedAt ? new Date(initialNote.updatedAt).toLocaleTimeString() : null);
       setStatus('saved');
       window.setTimeout(() => {
@@ -1832,7 +1839,9 @@ function QuickNotesWidget({
     setStatus('idle');
     quickNoteService.get()
       .then((response) => {
-        setNotes(parseStickyNotes(response.data.content || ''));
+        const parsedNotes = parseStickyNotes(response.data.content || '');
+        setNotes(parsedNotes);
+        setTopNoteZ(Math.max(1, ...parsedNotes.map((note) => note.z)));
         setLastSavedAt(response.data.updatedAt ? new Date(response.data.updatedAt).toLocaleTimeString() : null);
         setStatus('saved');
       })
@@ -1919,9 +1928,21 @@ function QuickNotesWidget({
           content: '',
           x: 18 + (index % 3) * 32,
           y: 18 + (index % 3) * 28,
+          z: topNoteZ + 1,
           color: stickyColors[index % stickyColors.length],
         },
       ];
+    });
+    setTopNoteZ((currentZ) => currentZ + 1);
+  };
+
+  const bringNoteToFront = (id: string) => {
+    setTopNoteZ((currentZ) => {
+      const nextZ = currentZ + 1;
+      setNotes((currentNotes) => currentNotes.map((note) => (
+        note.id === id ? { ...note, z: nextZ } : note
+      )));
+      return nextZ;
     });
   };
 
@@ -1936,6 +1957,8 @@ function QuickNotesWidget({
   };
 
   const startDraggingNote = (event: React.PointerEvent<HTMLDivElement>, note: StickyNote) => {
+    bringNoteToFront(note.id);
+
     if (event.button !== 0 || (event.target as HTMLElement).closest('textarea,button')) {
       return;
     }
@@ -1995,7 +2018,7 @@ function QuickNotesWidget({
                     ? 'bg-rose-100 text-rose-950 dark:bg-rose-950 dark:text-rose-50'
                     : 'bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-50'
             }`}
-            style={{ left: note.x, top: note.y }}
+            style={{ left: note.x, top: note.y, zIndex: note.z }}
           >
             <div className="mb-2 flex items-center justify-between gap-2">
               <span className="h-2 w-10 rounded-full bg-black/10 dark:bg-white/15" />
@@ -2227,13 +2250,11 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
           <h1>Dashboard</h1>
         </div>
         <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} initialProfiles={dashboardSummary?.pinnedProfiles} />
-        <div className="mb-6">
-          <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
-        </div>
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)]">
+        <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)]">
           <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} />
           <DashboardNews currentUser={currentUser} initialPosts={dashboardSummary?.posts} />
         </div>
+        <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
         {profileWindow}
       </div>
     );
@@ -2253,13 +2274,11 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
       {error && <div className="error">{error}</div>}
 
       <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} initialProfiles={dashboardSummary?.pinnedProfiles} />
-      <div className="mb-6">
-        <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
-      </div>
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)]">
+      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)]">
         <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} />
         <DashboardNews currentUser={currentUser} initialPosts={dashboardSummary?.posts} />
       </div>
+      <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
       {profileWindow}
     </div>
   );
