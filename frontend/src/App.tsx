@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation,
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { FloatingWindow } from './components/FloatingWindow';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, getAppEventsUrl, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, urgentAlertService, UrgentAlert, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, urgentAlertService, UrgentAlert, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
@@ -167,6 +167,16 @@ function getErrorMessage(error: unknown, fallback: string): string {
   }
 
   return fallback;
+}
+
+function isNetworkConnectionError(error: unknown): boolean {
+  return Boolean(
+    typeof error === 'object' &&
+    error !== null &&
+    'isAxiosError' in error &&
+    (error as { isAxiosError?: boolean; response?: unknown }).isAxiosError &&
+    !(error as { response?: unknown }).response,
+  );
 }
 
 function LoginSplash({
@@ -701,14 +711,66 @@ function getInitials(name?: string, email?: string): string {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
-function ShieldLoading() {
+function formatConnectionTime(value: number | null): string {
+  return value ? new Date(value).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Unknown';
+}
+
+async function checkApiHealth(signal?: AbortSignal): Promise<boolean> {
+  try {
+    const response = await fetch(getApiHealthUrl(), {
+      cache: 'no-store',
+      credentials: 'include',
+      signal,
+    });
+
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+function ShieldLoading({
+  title = 'Loading SHIELD',
+  detail,
+  lastConnectedAt,
+}: {
+  title?: string;
+  detail?: string;
+  lastConnectedAt?: number | null;
+}) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
       <div className="text-center">
         <div className="shield-loader mx-auto mb-4">
           <Shield size={76} />
         </div>
-        <p className="text-sm font-bold uppercase tracking-[0.24em] text-accent">Loading SHIELD</p>
+        <p className="text-sm font-bold uppercase tracking-[0.24em] text-accent">{title}</p>
+        {detail && <p className="mt-3 text-sm font-semibold text-gray-500 dark:text-gray-400">{detail}</p>}
+        {lastConnectedAt && (
+          <p className="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-gray-400">
+            Last connected {formatConnectionTime(lastConnectedAt)}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ConnectionLostOverlay({ lastConnectedAt }: { lastConnectedAt: number | null }) {
+  return (
+    <div className="fixed inset-0 z-[260] flex items-center justify-center bg-gray-950/72 px-4 backdrop-blur-[2px]">
+      <div className="w-full max-w-sm rounded-lg border border-white/10 bg-white p-6 text-center shadow-[0_28px_80px_rgba(15,23,42,0.45)] dark:bg-gray-950">
+        <div className="shield-loader mx-auto mb-4">
+          <Shield size={70} />
+        </div>
+        <p className="text-sm font-bold uppercase tracking-[0.22em] text-danger">Connection Lost</p>
+        <h2 className="mt-2 text-2xl font-bold text-primary-500 dark:text-blue-100">Reconnecting...</h2>
+        <p className="mt-3 text-sm leading-6 text-gray-500 dark:text-gray-400">
+          SHIELD cannot reach the API right now. Your session is being kept open while we try again.
+        </p>
+        <p className="mt-4 rounded bg-gray-50 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+          Last connected {formatConnectionTime(lastConnectedAt)}
+        </p>
       </div>
     </div>
   );
@@ -2935,6 +2997,8 @@ function App() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notificationCenterTab, setNotificationCenterTab] = useState<'unread' | 'bugs' | 'recent'>('unread');
   const [isSessionLoading, setIsSessionLoading] = useState(true);
+  const [isApiConnectionLost, setIsApiConnectionLost] = useState(false);
+  const [lastApiConnectedAt, setLastApiConnectedAt] = useState<number | null>(Date.now());
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
@@ -2975,6 +3039,63 @@ function App() {
   const rateLimitToastRef = useRef(0);
   const notificationRequestRef = useRef(0);
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
+
+  useEffect(() => {
+    const markConnectionLost = () => setIsApiConnectionLost(true);
+    const markConnectionRestored = () => {
+      setLastApiConnectedAt(Date.now());
+      setIsApiConnectionLost(false);
+    };
+    const handleBrowserOffline = () => markConnectionLost();
+    const handleBrowserOnline = async () => {
+      if (await checkApiHealth()) {
+        markConnectionRestored();
+      }
+    };
+    const handleOnline = () => {
+      void handleBrowserOnline();
+    };
+
+    window.addEventListener('shield:api-connection-lost', markConnectionLost);
+    window.addEventListener('shield:api-connection-restored', markConnectionRestored);
+    window.addEventListener('offline', handleBrowserOffline);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      window.removeEventListener('shield:api-connection-lost', markConnectionLost);
+      window.removeEventListener('shield:api-connection-restored', markConnectionRestored);
+      window.removeEventListener('offline', handleBrowserOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isApiConnectionLost) {
+      return undefined;
+    }
+
+    let isCancelled = false;
+    const controller = new AbortController();
+    const checkConnection = async () => {
+      const isHealthy = await checkApiHealth(controller.signal);
+      if (!isCancelled && isHealthy) {
+        window.dispatchEvent(new CustomEvent('shield:api-connection-restored'));
+        window.dispatchEvent(new CustomEvent('shield:dashboard-updated'));
+        window.dispatchEvent(new CustomEvent('shield:notification-updated'));
+      }
+    };
+
+    void checkConnection();
+    const intervalId = window.setInterval(() => {
+      void checkConnection();
+    }, 3500);
+
+    return () => {
+      isCancelled = true;
+      controller.abort();
+      window.clearInterval(intervalId);
+    };
+  }, [isApiConnectionLost]);
 
   const showToast = (type: ToastType, message: string, options: { saveToNotifications?: boolean } = {}) => {
     if (/too many|rate limit/iu.test(message)) {
@@ -3435,7 +3556,21 @@ function App() {
           }
         }
       })
-      .catch(() => {
+      .catch((error) => {
+        if (isNetworkConnectionError(error)) {
+          try {
+            const cachedSession = window.localStorage.getItem(SESSION_KEY);
+            if (cachedSession) {
+              const cachedAccount = JSON.parse(cachedSession) as AuthAccount;
+              setCurrentUser(cachedAccount);
+              setIsAuthenticated(true);
+            }
+          } catch {
+            window.localStorage.removeItem(SESSION_KEY);
+          }
+          return;
+        }
+
         clearAuthToken();
         window.localStorage.removeItem(SESSION_KEY);
       })
@@ -3672,8 +3807,14 @@ function App() {
       }
       dispatchAppUpdate('user-updated', payload);
     });
-    eventSource.addEventListener('error', (event) => {
+    eventSource.addEventListener('open', () => {
+      window.dispatchEvent(new CustomEvent('shield:api-connection-restored'));
+    });
+    eventSource.addEventListener('error', async (event) => {
       console.error('Application realtime connection error:', event);
+      if (!(await checkApiHealth())) {
+        window.dispatchEvent(new CustomEvent('shield:api-connection-lost'));
+      }
     });
 
     return () => eventSource.close();
@@ -4022,7 +4163,11 @@ function App() {
       <ToastHost toasts={toasts} />
       {showConfetti && <ConfettiOverlay />}
       {isSessionLoading ? (
-        <ShieldLoading />
+        <ShieldLoading
+          title={isApiConnectionLost ? 'Connection Lost' : 'Loading SHIELD'}
+          detail={isApiConnectionLost ? 'Reconnecting...' : undefined}
+          lastConnectedAt={isApiConnectionLost ? lastApiConnectedAt : undefined}
+        />
       ) : !isAuthenticated ? (
         <LoginSplash onLogin={handleLogin} onToast={showToast} isExiting={isLoginTransitioning} />
       ) : (
@@ -4720,6 +4865,7 @@ function App() {
           {shouldShowForcedPasswordModal && currentUser && (
             <ForcePasswordChange account={currentUser} onChanged={handleAccountUpdate} onLogout={handleLogout} onToast={showToast} />
           )}
+          {isApiConnectionLost && <ConnectionLostOverlay lastConnectedAt={lastApiConnectedAt} />}
         </div>
       )}
     </Router>

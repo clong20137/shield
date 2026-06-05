@@ -37,6 +37,16 @@ const api = axios.create({
 });
 
 const AUTH_TOKEN_KEY = 'shield_auth_token';
+const API_CONNECTION_LOST_EVENT = 'shield:api-connection-lost';
+const API_CONNECTION_RESTORED_EVENT = 'shield:api-connection-restored';
+
+function dispatchApiConnectionEvent(type: typeof API_CONNECTION_LOST_EVENT | typeof API_CONNECTION_RESTORED_EVENT) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(type));
+}
 
 api.interceptors.request.use((config) => {
   const legacyToken = window.localStorage.getItem(AUTH_TOKEN_KEY);
@@ -46,6 +56,20 @@ api.interceptors.request.use((config) => {
 
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => {
+    dispatchApiConnectionEvent(API_CONNECTION_RESTORED_EVENT);
+    return response;
+  },
+  (error) => {
+    if (axios.isAxiosError(error) && !error.response) {
+      dispatchApiConnectionEvent(API_CONNECTION_LOST_EVENT);
+    }
+
+    return Promise.reject(error);
+  },
+);
 
 export function setAuthToken(token: string) {
   if (token) {
@@ -68,6 +92,10 @@ export function getMessageEventsUrl(): string {
 
 export function getAppEventsUrl(): string {
   return `${API_BASE_URL}/events`;
+}
+
+export function getApiHealthUrl(): string {
+  return `${API_ORIGIN_URL}/health`;
 }
 
 export function getAssetUrl(value?: string | null): string {
