@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
-import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Eraser, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, dashboardSummaryService, DashboardSummary, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
+import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, dashboardSummaryService, DashboardSummary, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { UserDetail } from '../components/UserDetail';
 
@@ -26,6 +26,9 @@ const defaultPostForm: DashboardPostForm = {
   imageUrl: '',
   allowComments: true,
 };
+
+const MEDIA_PICKER_PAGE_SIZE = 18;
+const DASHBOARD_POST_MEDIA_FOLDER = 'dashboard-posts';
 
 const reactionOptions: Array<{
   key: DashboardReaction;
@@ -666,7 +669,11 @@ function DashboardNews({
   const [postForm, setPostForm] = useState<DashboardPostForm>(defaultPostForm);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isSavingPost, setIsSavingPost] = useState(false);
-  const [isUploadingPostImage, setIsUploadingPostImage] = useState(false);
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
+  const [mediaItems, setMediaItems] = useState<MediaLibraryItem[]>([]);
+  const [mediaSearchTerm, setMediaSearchTerm] = useState('');
+  const [isLoadingMedia, setIsLoadingMedia] = useState(false);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<DashboardPost | null>(null);
   const [postPendingDelete, setPostPendingDelete] = useState<DashboardPost | null>(null);
@@ -675,6 +682,7 @@ function DashboardNews({
   const canCreateDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:create'));
   const canEditDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:edit'));
   const canDeleteDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:delete'));
+  const canUploadMedia = canCreateDashboardPosts || canEditDashboardPosts || Boolean(currentUser?.permissions?.includes('media:upload'));
 
   useEffect(() => {
     if (!initialPosts) {
@@ -789,20 +797,63 @@ function DashboardNews({
   const closePostForm = () => {
     setIsCreatePostOpen(false);
     setEditingPost(null);
+    setIsMediaPickerOpen(false);
     setPostForm(defaultPostForm);
   };
 
-  const uploadPostImage = async (file: File) => {
-    setIsUploadingPostImage(true);
+  const loadMediaItems = useCallback(async () => {
+    setIsLoadingMedia(true);
     setPostError(null);
     try {
-      const response = await dashboardPostService.uploadImage(file);
-      setPostForm((form) => ({ ...form, imageUrl: response.data.imageUrl }));
+      const response = await mediaService.getAll({
+        folder: DASHBOARD_POST_MEDIA_FOLDER,
+        q: mediaSearchTerm.trim() || undefined,
+        page: 1,
+        limit: MEDIA_PICKER_PAGE_SIZE,
+      });
+      setMediaItems(response.data.items);
     } catch (err) {
-      console.error('Failed to upload dashboard post image:', err);
-      setPostError('Failed to upload image.');
+      console.error('Failed to load media library images:', err);
+      setPostError('Failed to load media library.');
     } finally {
-      setIsUploadingPostImage(false);
+      setIsLoadingMedia(false);
+    }
+  }, [mediaSearchTerm]);
+
+  useEffect(() => {
+    if (!isMediaPickerOpen) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      void loadMediaItems();
+    }, 200);
+
+    return () => window.clearTimeout(timer);
+  }, [isMediaPickerOpen, loadMediaItems]);
+
+  const uploadMediaImage = async (file: File) => {
+    if (!canUploadMedia) {
+      setPostError('You do not have permission to upload media.');
+      return;
+    }
+
+    setIsUploadingMedia(true);
+    setPostError(null);
+    try {
+      const response = await mediaService.uploadImages(DASHBOARD_POST_MEDIA_FOLDER, [file]);
+      const uploadedFileName = response.data.uploaded[0];
+      if (!uploadedFileName) {
+        setPostError(response.data.skipped[0]?.reason || 'No image was uploaded.');
+        return;
+      }
+      setPostForm((form) => ({ ...form, imageUrl: `/uploads/${DASHBOARD_POST_MEDIA_FOLDER}/${uploadedFileName}` }));
+      await loadMediaItems();
+    } catch (err) {
+      console.error('Failed to upload media image:', err);
+      setPostError('Failed to upload image to media library.');
+    } finally {
+      setIsUploadingMedia(false);
     }
   };
 
@@ -1019,26 +1070,13 @@ function DashboardNews({
               <div className="rounded border border-gray-200 p-3 dark:border-gray-800">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Thumbnail image</span>
-                    <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Shown with this update on the dashboard.</span>
+                    <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Media library image</span>
+                    <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose an existing image or upload into Dashboard Posts.</span>
                   </div>
                   <div className="flex gap-2">
-                    <label className="btn-secondary cursor-pointer" aria-label="Upload dashboard post image" title={isUploadingPostImage ? 'Uploading' : 'Upload Image'}>
-                      <Upload size={16} />
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/gif,image/webp"
-                        className="hidden"
-                        disabled={isUploadingPostImage}
-                        onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                          const file = event.target.files?.[0];
-                          event.target.value = '';
-                          if (file) {
-                            void uploadPostImage(file);
-                          }
-                        }}
-                      />
-                    </label>
+                    <button type="button" onClick={() => setIsMediaPickerOpen((isOpen) => !isOpen)} className="btn-secondary" aria-label="Choose media library image" title="Choose Image">
+                      <Image size={16} />
+                    </button>
                     {postForm.imageUrl && (
                       <button type="button" onClick={() => setPostForm((form) => ({ ...form, imageUrl: '' }))} className="btn-danger" aria-label="Remove dashboard post image" title="Remove Image">
                         <X size={16} />
@@ -1046,6 +1084,75 @@ function DashboardNews({
                     )}
                   </div>
                 </div>
+                {isMediaPickerOpen && (
+                  <div className="mt-3 rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <div className="relative min-w-[14rem] flex-1">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <input
+                          value={mediaSearchTerm}
+                          onChange={(event) => setMediaSearchTerm(event.target.value)}
+                          placeholder="Search media"
+                          className="w-full rounded border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-gray-700 dark:bg-gray-900"
+                        />
+                      </div>
+                      {canUploadMedia && (
+                        <label className="btn-secondary cursor-pointer" aria-label="Upload media library image" title={isUploadingMedia ? 'Uploading' : 'Upload Image'}>
+                          <Upload size={16} />
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/gif,image/webp"
+                            className="hidden"
+                            disabled={isUploadingMedia}
+                            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                              const file = event.target.files?.[0];
+                              event.target.value = '';
+                              if (file) {
+                                void uploadMediaImage(file);
+                              }
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                    {isLoadingMedia ? (
+                      <div className="loading py-6">Loading media...</div>
+                    ) : mediaItems.length === 0 ? (
+                      <div className="rounded border border-dashed border-gray-300 px-3 py-5 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                        No dashboard post images found.
+                      </div>
+                    ) : (
+                      <div className="grid max-h-80 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-6">
+                        {mediaItems.map((item) => {
+                          const isSelected = postForm.imageUrl === item.url;
+
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => setPostForm((form) => ({ ...form, imageUrl: item.url }))}
+                              className={`group relative aspect-[4/3] overflow-hidden rounded border bg-white text-left transition hover:border-accent dark:bg-gray-900 ${
+                                isSelected ? 'border-accent ring-2 ring-accent/30' : 'border-gray-200 dark:border-gray-800'
+                              }`}
+                              aria-label={`Use ${item.label}`}
+                              title={item.label}
+                            >
+                              <img src={getAssetThumbnailUrl(item.url, 256)} alt="" onError={(event) => handleAssetThumbnailError(event, item.url)} className="h-full w-full object-cover transition group-hover:scale-[1.03]" />
+                              <span className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-xs font-semibold text-white">
+                                <span className="block truncate">{item.label}</span>
+                              </span>
+                              {isSelected && (
+                                <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-accent text-white shadow">
+                                  <CheckCircle2 size={15} />
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {postForm.imageUrl ? (
                   <div className="mt-3 overflow-hidden rounded border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-950">
                     <img src={getAssetUrl(postForm.imageUrl)} alt="" onError={handleAssetImageError} className="h-48 w-full object-cover" />
@@ -1140,10 +1247,12 @@ function PinnedProfilesWidget({
   const [profiles, setProfiles] = useState<PinnedProfile[]>([]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<User[]>([]);
+  const [isAddPopoverOpen, setIsAddPopoverOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pinnedRailRef = useRef<HTMLDivElement | null>(null);
+  const pinSearchInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!initialProfiles) {
@@ -1220,6 +1329,7 @@ function PinnedProfilesWidget({
       ]);
       setQuery('');
       setResults([]);
+      setIsAddPopoverOpen(false);
     } catch (err) {
       console.error('Failed to pin profile:', err);
       setError('Failed to pin profile.');
@@ -1254,51 +1364,11 @@ function PinnedProfilesWidget({
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Pinned Profiles</p>
         </div>
-        <div className="relative w-full sm:max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Pin a profile"
-            className="pinned-profile-search-input w-full rounded border border-gray-300 bg-white py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-          />
-          {(results.length > 0 || isSearching) && (
-            <div className="absolute right-0 top-12 z-30 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900">
-              {isSearching ? (
-                <div className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">Searching...</div>
-              ) : results.map((user) => (
-                <button
-                  key={user.id}
-                  type="button"
-                  onClick={() => void pinProfile(user)}
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  {user.profilePictureUrl ? (
-                    <img src={getAssetThumbnailUrl(user.profilePictureUrl, 96)} alt={`${user.firstName} ${user.lastName}`} onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)} className="h-9 w-9 rounded-full object-cover" />
-                  ) : (
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-xs font-bold text-accent">
-                      {getInitials(user.firstName, user.lastName, user.email)}
-                    </span>
-                  )}
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-bold text-gray-900 dark:text-gray-100">{user.firstName} {user.lastName}</span>
-                    <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{user.rank || user.email || user.peNumber}</span>
-                  </span>
-                  <Pin size={15} className="text-accent" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
       {error && <div className="error">{error}</div>}
       {isLoading ? (
         <div className="loading">Loading pinned profiles...</div>
-      ) : profiles.length === 0 ? (
-        <div className="rounded border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
-          Pin frequently used profiles and they will stay here.
-        </div>
       ) : (
         <div className="relative">
           {profiles.length > 4 && (
@@ -1324,6 +1394,23 @@ function PinnedProfilesWidget({
             </>
           )}
           <div ref={pinnedRailRef} className="shield-scrollbar-hidden flex snap-x gap-3 overflow-x-auto scroll-smooth px-1 py-1 sm:px-12">
+            <div className="relative w-28 shrink-0 snap-start sm:w-32">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddPopoverOpen((isOpen) => !isOpen);
+                  window.setTimeout(() => pinSearchInputRef.current?.focus(), 0);
+                }}
+                className="flex h-full min-h-[8.75rem] w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-accent/60 bg-accent/5 p-3 text-center text-accent transition hover:-translate-y-1 hover:bg-accent/10 hover:shadow-lg dark:bg-accent/10"
+                aria-label="Add pinned profile"
+                title="Add Profile"
+              >
+                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-accent/25 dark:bg-gray-900">
+                  <Plus size={24} />
+                </span>
+                <span className="text-sm font-bold">Add Profile</span>
+              </button>
+            </div>
             {profiles.map((profile) => (
               <article key={profile.id} className="group relative w-28 shrink-0 snap-start rounded-lg border border-gray-200 bg-gray-50 p-3 text-center transition hover:-translate-y-1 hover:scale-[1.04] hover:border-accent hover:bg-white hover:shadow-lg dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900 sm:w-32">
                 <button type="button" onClick={() => onOpenProfile(profile)} className="block w-full" aria-label={`Open ${profile.firstName} ${profile.lastName}`}>
@@ -1349,6 +1436,49 @@ function PinnedProfilesWidget({
               </article>
             ))}
           </div>
+          {isAddPopoverOpen && (
+            <div className="absolute left-1 top-2 z-30 w-[min(22rem,calc(100vw-3rem))] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900 sm:left-12">
+              <div className="border-b border-gray-200 p-3 dark:border-gray-800">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
+                  <input
+                    ref={pinSearchInputRef}
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search profiles"
+                    className="pinned-profile-search-input w-full rounded border border-gray-300 bg-white py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                  />
+                </div>
+              </div>
+              {isSearching ? (
+                <div className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">Searching...</div>
+              ) : query.trim().length < 2 ? (
+                <div className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">Type a name, PE number, or email.</div>
+              ) : results.length === 0 ? (
+                <div className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">No available profiles found.</div>
+              ) : results.map((user) => (
+                <button
+                  key={user.id}
+                  type="button"
+                  onClick={() => void pinProfile(user)}
+                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  {user.profilePictureUrl ? (
+                    <img src={getAssetThumbnailUrl(user.profilePictureUrl, 96)} alt={`${user.firstName} ${user.lastName}`} onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)} className="h-9 w-9 rounded-full object-cover" />
+                  ) : (
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-xs font-bold text-accent">
+                      {getInitials(user.firstName, user.lastName, user.email)}
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-bold text-gray-900 dark:text-gray-100">{user.firstName} {user.lastName}</span>
+                    <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{user.rank || user.email || user.peNumber}</span>
+                  </span>
+                  <Pin size={15} className="text-accent" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </section>
@@ -1614,21 +1744,82 @@ function QuickNotesWidget({
   currentUser: AuthAccount | null;
   initialNote?: DashboardSummary['quickNote'];
 }) {
-  const [content, setContent] = useState('');
+  type StickyNote = {
+    id: string;
+    content: string;
+    x: number;
+    y: number;
+    color: 'yellow' | 'blue' | 'green' | 'pink';
+  };
+
+  const stickyColors: Array<StickyNote['color']> = ['yellow', 'blue', 'green', 'pink'];
+
+  const parseStickyNotes = (value: string): StickyNote[] => {
+    if (!value.trim()) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(value) as { version?: number; notes?: unknown };
+      if (parsed.version === 1 && Array.isArray(parsed.notes)) {
+        return parsed.notes
+          .map((note, index): StickyNote | null => {
+            if (typeof note !== 'object' || note === null) {
+              return null;
+            }
+
+            const item = note as Partial<StickyNote>;
+            const color = stickyColors.includes(item.color as StickyNote['color']) ? item.color as StickyNote['color'] : stickyColors[index % stickyColors.length];
+            return {
+              id: typeof item.id === 'string' ? item.id : `note-${index}`,
+              content: typeof item.content === 'string' ? item.content : '',
+              x: Number.isFinite(item.x) ? Number(item.x) : 18 + index * 28,
+              y: Number.isFinite(item.y) ? Number(item.y) : 18 + index * 28,
+              color,
+            };
+          })
+          .filter((note): note is StickyNote => Boolean(note));
+      }
+    } catch {
+      // Plain text notes from the previous dashboard become one sticky note.
+    }
+
+    return [{
+      id: `note-${Date.now()}`,
+      content: value,
+      x: 18,
+      y: 18,
+      color: 'yellow',
+    }];
+  };
+
+  const serializeStickyNotes = (notes: StickyNote[]): string =>
+    JSON.stringify({
+      version: 1,
+      notes: notes.map((note) => ({
+        ...note,
+        content: note.content.slice(0, 1800),
+      })),
+    });
+
+  const [notes, setNotes] = useState<StickyNote[]>([]);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
   const hasLoadedNoteRef = useRef(false);
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     if (!currentUser) {
-      setContent('');
+      setNotes([]);
       hasLoadedNoteRef.current = false;
       return;
     }
 
     if (initialNote) {
       hasLoadedNoteRef.current = false;
-      setContent(initialNote.content || '');
+      setNotes(parseStickyNotes(initialNote.content || ''));
       setLastSavedAt(initialNote.updatedAt ? new Date(initialNote.updatedAt).toLocaleTimeString() : null);
       setStatus('saved');
       window.setTimeout(() => {
@@ -1641,7 +1832,7 @@ function QuickNotesWidget({
     setStatus('idle');
     quickNoteService.get()
       .then((response) => {
-        setContent(response.data.content || '');
+        setNotes(parseStickyNotes(response.data.content || ''));
         setLastSavedAt(response.data.updatedAt ? new Date(response.data.updatedAt).toLocaleTimeString() : null);
         setStatus('saved');
       })
@@ -1661,7 +1852,7 @@ function QuickNotesWidget({
 
     setStatus('saving');
     const timer = window.setTimeout(() => {
-      quickNoteService.save(content)
+      quickNoteService.save(serializeStickyNotes(notes))
         .then((response) => {
           setLastSavedAt(new Date(response.data.updatedAt).toLocaleTimeString());
           setStatus('saved');
@@ -1673,7 +1864,42 @@ function QuickNotesWidget({
     }, 700);
 
     return () => window.clearTimeout(timer);
-  }, [content, currentUser]);
+  }, [currentUser, notes]);
+
+  useEffect(() => {
+    if (!draggingNoteId) {
+      return undefined;
+    }
+
+    const moveNote = (event: PointerEvent) => {
+      const board = boardRef.current;
+      if (!board) {
+        return;
+      }
+
+      const rect = board.getBoundingClientRect();
+      const noteWidth = 224;
+      const noteHeight = 184;
+      const maxX = Math.max(0, rect.width - noteWidth - 8);
+      const maxY = Math.max(0, rect.height - noteHeight - 8);
+      const nextX = Math.min(Math.max(8, event.clientX - rect.left - dragOffsetRef.current.x), maxX);
+      const nextY = Math.min(Math.max(8, event.clientY - rect.top - dragOffsetRef.current.y), maxY);
+
+      setNotes((currentNotes) => currentNotes.map((note) => (
+        note.id === draggingNoteId ? { ...note, x: Math.round(nextX), y: Math.round(nextY) } : note
+      )));
+    };
+
+    const stopDragging = () => setDraggingNoteId(null);
+
+    window.addEventListener('pointermove', moveNote);
+    window.addEventListener('pointerup', stopDragging);
+
+    return () => {
+      window.removeEventListener('pointermove', moveNote);
+      window.removeEventListener('pointerup', stopDragging);
+    };
+  }, [draggingNoteId]);
 
   const statusLabel = status === 'saving'
     ? 'Saving...'
@@ -1682,10 +1908,44 @@ function QuickNotesWidget({
       : status === 'error'
         ? 'Could not save'
         : 'Ready';
-  const wordCount = content.trim() ? content.trim().split(/\s+/u).length : 0;
-  const lineCount = content ? content.split(/\r\n|\r|\n/u).length : 0;
-  const clearNotes = () => {
-    setContent('');
+
+  const addNote = () => {
+    setNotes((currentNotes) => {
+      const index = currentNotes.length;
+      return [
+        ...currentNotes,
+        {
+          id: `note-${Date.now()}`,
+          content: '',
+          x: 18 + (index % 3) * 32,
+          y: 18 + (index % 3) * 28,
+          color: stickyColors[index % stickyColors.length],
+        },
+      ];
+    });
+  };
+
+  const updateNoteContent = (id: string, content: string) => {
+    setNotes((currentNotes) => currentNotes.map((note) => (
+      note.id === id ? { ...note, content } : note
+    )));
+  };
+
+  const deleteNote = (id: string) => {
+    setNotes((currentNotes) => currentNotes.filter((note) => note.id !== id));
+  };
+
+  const startDraggingNote = (event: React.PointerEvent<HTMLDivElement>, note: StickyNote) => {
+    if (event.button !== 0 || (event.target as HTMLElement).closest('textarea,button')) {
+      return;
+    }
+
+    const card = event.currentTarget.getBoundingClientRect();
+    dragOffsetRef.current = {
+      x: event.clientX - card.left,
+      y: event.clientY - card.top,
+    };
+    setDraggingNoteId(note.id);
   };
 
   return (
@@ -1705,36 +1965,60 @@ function QuickNotesWidget({
         </div>
         <button
           type="button"
-          onClick={clearNotes}
-          disabled={!content}
-          className="btn-secondary shrink-0 disabled:pointer-events-none disabled:opacity-40"
-          aria-label="Clear quick notes"
-          title="Clear Notes"
+          onClick={addNote}
+          className="btn-primary shrink-0"
+          aria-label="Add sticky note"
+          title="Add Note"
         >
-          <Eraser size={16} />
+          <Plus size={16} />
         </button>
       </div>
-      <div className="mb-3 grid grid-cols-3 gap-2 text-center">
-        <div className="rounded border border-gray-200 bg-gray-50 px-2 py-2 dark:border-gray-800 dark:bg-gray-950">
-          <p className="text-xs font-bold uppercase text-gray-400">Words</p>
-          <p className="text-sm font-bold text-gray-800 dark:text-gray-100">{wordCount}</p>
-        </div>
-        <div className="rounded border border-gray-200 bg-gray-50 px-2 py-2 dark:border-gray-800 dark:bg-gray-950">
-          <p className="text-xs font-bold uppercase text-gray-400">Lines</p>
-          <p className="text-sm font-bold text-gray-800 dark:text-gray-100">{lineCount}</p>
-        </div>
-        <div className="rounded border border-gray-200 bg-gray-50 px-2 py-2 dark:border-gray-800 dark:bg-gray-950">
-          <p className="text-xs font-bold uppercase text-gray-400">Left</p>
-          <p className="text-sm font-bold text-gray-800 dark:text-gray-100">{Math.max(0, 10000 - content.length).toLocaleString()}</p>
-        </div>
+      <div ref={boardRef} className="relative min-h-0 flex-1 overflow-hidden rounded border border-gray-200 bg-[radial-gradient(circle_at_1px_1px,rgba(148,163,184,0.28)_1px,transparent_0)] bg-[length:18px_18px] dark:border-gray-800 dark:bg-gray-950">
+        {notes.length === 0 ? (
+          <button
+            type="button"
+            onClick={addNote}
+            className="absolute inset-4 flex items-center justify-center rounded border border-dashed border-gray-300 text-sm font-semibold text-gray-500 transition hover:border-accent hover:text-accent dark:border-gray-700 dark:text-gray-400"
+          >
+            <Plus size={17} />
+          </button>
+        ) : notes.map((note) => (
+          <div
+            key={note.id}
+            onPointerDown={(event) => startDraggingNote(event, note)}
+            className={`absolute flex h-44 w-56 cursor-grab flex-col rounded-sm p-3 shadow-lg ring-1 ring-black/5 transition ${draggingNoteId === note.id ? 'cursor-grabbing shadow-2xl' : ''} ${
+              note.color === 'blue'
+                ? 'bg-sky-100 text-sky-950 dark:bg-sky-950 dark:text-sky-50'
+                : note.color === 'green'
+                  ? 'bg-emerald-100 text-emerald-950 dark:bg-emerald-950 dark:text-emerald-50'
+                  : note.color === 'pink'
+                    ? 'bg-rose-100 text-rose-950 dark:bg-rose-950 dark:text-rose-50'
+                    : 'bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-50'
+            }`}
+            style={{ left: note.x, top: note.y }}
+          >
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="h-2 w-10 rounded-full bg-black/10 dark:bg-white/15" />
+              <button
+                type="button"
+                onClick={() => deleteNote(note.id)}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-black/10 text-current transition hover:bg-black/20 dark:bg-white/10 dark:hover:bg-white/20"
+                aria-label="Delete sticky note"
+                title="Delete Note"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <textarea
+              value={note.content}
+              onChange={(event) => updateNoteContent(note.id, event.target.value)}
+              placeholder="New note"
+              maxLength={1800}
+              className="min-h-0 flex-1 resize-none bg-transparent text-sm leading-5 outline-none placeholder:text-current/45"
+            />
+          </div>
+        ))}
       </div>
-      <textarea
-        value={content}
-        onChange={(event) => setContent(event.target.value)}
-        placeholder="Keep quick reminders, names, or follow-ups here."
-        maxLength={10000}
-        className="min-h-0 flex-1 resize-none rounded border border-gray-300 bg-[linear-gradient(to_bottom,transparent_31px,rgba(156,134,92,0.13)_32px)] bg-[length:100%_32px] px-4 py-3 text-sm leading-8 outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
-      />
     </section>
   );
 }
@@ -1943,9 +2227,11 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
           <h1>Dashboard</h1>
         </div>
         <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} initialProfiles={dashboardSummary?.pinnedProfiles} />
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(260px,0.85fr)_minmax(280px,0.9fr)_minmax(0,1.35fr)]">
-          <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} />
+        <div className="mb-6">
           <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
+        </div>
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)]">
+          <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} />
           <DashboardNews currentUser={currentUser} initialPosts={dashboardSummary?.posts} />
         </div>
         {profileWindow}
@@ -1967,9 +2253,11 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
       {error && <div className="error">{error}</div>}
 
       <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} initialProfiles={dashboardSummary?.pinnedProfiles} />
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(260px,0.85fr)_minmax(280px,0.9fr)_minmax(0,1.35fr)]">
-        <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} />
+      <div className="mb-6">
         <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
+      </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)]">
+        <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} />
         <DashboardNews currentUser={currentUser} initialPosts={dashboardSummary?.posts} />
       </div>
       {profileWindow}

@@ -2490,7 +2490,7 @@ const onboardingSteps: OnboardingStep[] = [
     target: 'quick-notes',
     eyebrow: 'Quick Notes',
     title: 'Capture working notes',
-    body: 'Quick Notes is your private scratchpad. It saves automatically, tracks word and character counts, and stays available from the dashboard.',
+    body: 'Quick Notes is your private sticky-note board. Add notes, move them around, and SHIELD saves the layout automatically.',
   },
   {
     target: 'dashboard-news',

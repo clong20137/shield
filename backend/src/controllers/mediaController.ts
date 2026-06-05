@@ -3,6 +3,7 @@ import path from 'path';
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { AuditLogModel } from '../models/AuditLog';
+import { AuthAccountModel } from '../models/AuthAccount';
 import { getSessionAccount } from '../middleware/authSession';
 import { isSafeUploadedImage } from '../middleware/profileUpload';
 import { broadcastAppEvent } from '../services/appEvents';
@@ -14,6 +15,7 @@ const mediaFolders = [
   { key: 'dashboard-posts', label: 'Dashboard Posts' },
 ] as const;
 const protectedFolders = new Set<string>(mediaFolders.map((folder) => folder.key));
+const dashboardMediaFolder = 'dashboard-posts';
 
 function getUploadsRoot(): string {
   return path.resolve(process.cwd(), 'uploads');
@@ -85,6 +87,16 @@ function requestAuditFields(req: Request) {
   };
 }
 
+async function canUseFullMediaLibrary(accountId: string): Promise<boolean> {
+  const permissions = await AuthAccountModel.getPermissionsForAccount(accountId);
+  return ['media:view', 'media:upload', 'media:edit', 'media:delete', 'users:profile-picture'].some((permission) => permissions.includes(permission));
+}
+
+async function canUseDashboardMedia(accountId: string): Promise<boolean> {
+  const permissions = await AuthAccountModel.getPermissionsForAccount(accountId);
+  return ['dashboard:create', 'dashboard:edit', 'dashboard:manage'].some((permission) => permissions.includes(permission));
+}
+
 function getUploadUrl(relativePath: string): string {
   return `/uploads/${relativePath.replace(/\\/gu, '/')}`;
 }
@@ -101,11 +113,23 @@ function getThumbnailUrl(relativePath: string, width: number): string {
 export class MediaController {
   static async list(req: Request, res: Response) {
     try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
       const uploadsRoot = getUploadsRoot();
       const selectedFolder = typeof req.query.folder === 'string' ? req.query.folder : '';
       const searchTerm = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : '';
       const page = Math.max(Number(req.query.page) || 1, 1);
       const limit = Math.min(Math.max(Number(req.query.limit) || 60, 12), 120);
+      const hasFullMediaAccess = account.role === 'administrator' || await canUseFullMediaLibrary(account.id);
+      const hasDashboardMediaAccess = account.role === 'administrator' || await canUseDashboardMedia(account.id);
+
+      if (!hasFullMediaAccess && (!hasDashboardMediaAccess || selectedFolder !== dashboardMediaFolder)) {
+        return res.status(403).json({ error: 'Permission denied' });
+      }
+
       const items: Array<{
         id: string;
         folder: string;
@@ -307,7 +331,18 @@ export class MediaController {
 
   static async uploadImages(req: Request, res: Response) {
     try {
+      const actor = await getSessionAccount(req);
+      if (!actor) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
       const folderKey = typeof req.body?.folder === 'string' ? req.body.folder : '';
+      const hasFullMediaAccess = actor.role === 'administrator' || await canUseFullMediaLibrary(actor.id);
+      const hasDashboardMediaAccess = actor.role === 'administrator' || await canUseDashboardMedia(actor.id);
+      if (!hasFullMediaAccess && (!hasDashboardMediaAccess || folderKey !== dashboardMediaFolder)) {
+        return res.status(403).json({ error: 'Permission denied' });
+      }
+
       const folderPath = getSafeFolderPath(folderKey);
       const files = req.files as Express.Multer.File[] | undefined;
       if (!folderPath || !fs.existsSync(folderPath)) {
@@ -340,7 +375,6 @@ export class MediaController {
         uploaded.push(safeName);
       }
 
-      const actor = await getSessionAccount(req);
       await AuditLogModel.create({
         actorId: actor?.id || null,
         actorName: actor?.displayName || actor?.email || null,
