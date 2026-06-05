@@ -1040,7 +1040,7 @@ function DashboardNews({
                       />
                     </label>
                     {postForm.imageUrl && (
-                      <button type="button" onClick={() => setPostForm((form) => ({ ...form, imageUrl: '' }))} className="btn-secondary" aria-label="Remove dashboard post image" title="Remove Image">
+                      <button type="button" onClick={() => setPostForm((form) => ({ ...form, imageUrl: '' }))} className="btn-danger" aria-label="Remove dashboard post image" title="Remove Image">
                         <X size={16} />
                       </button>
                     )}
@@ -1343,7 +1343,7 @@ function PinnedProfilesWidget({
                   </span>
                   <span className="mt-2 block truncate text-sm font-bold text-gray-900 dark:text-gray-100">{profile.firstName} {profile.lastName}</span>
                 </button>
-                <button type="button" onClick={() => void unpinProfile(profile.id)} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 opacity-100 shadow-sm hover:border-danger hover:text-danger dark:border-gray-700 dark:bg-gray-900 sm:opacity-0 sm:group-hover:opacity-100" aria-label={`Unpin ${profile.firstName} ${profile.lastName}`} title="Unpin">
+                <button type="button" onClick={() => void unpinProfile(profile.id)} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-danger text-white opacity-100 shadow-sm hover:bg-red-800 sm:opacity-0 sm:group-hover:opacity-100" aria-label={`Unpin ${profile.firstName} ${profile.lastName}`} title="Unpin">
                   <PinOff size={14} />
                 </button>
               </article>

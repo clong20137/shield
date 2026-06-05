@@ -556,7 +556,7 @@ export function AccountSettingsPage({
                   <button
                     type="button"
                     onClick={() => revokeSession(session.id)}
-                    className="flex h-9 w-9 items-center justify-center rounded border border-red-200 text-danger hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950"
+                    className="btn-danger h-9 w-9 p-0"
                     aria-label="Revoke session"
                     title="Revoke session"
                     disabled={isRevokingSessions}
