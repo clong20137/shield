@@ -11,5 +11,6 @@ router.get('/', requireAuthenticated(), UrgentAlertController.listPending);
 router.get('/recent', requirePermission('alerts:send'), UrgentAlertController.listRecent);
 router.post('/', sendAlertLimiter, requirePermission('alerts:send'), UrgentAlertController.create);
 router.put('/:id/acknowledge', requireAuthenticated(), UrgentAlertController.acknowledge);
+router.delete('/:id', requirePermission('alerts:send'), UrgentAlertController.remove);
 
 export default router;

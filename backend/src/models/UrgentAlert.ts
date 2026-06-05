@@ -249,4 +249,38 @@ export class UrgentAlertModel {
       conn.release();
     }
   }
+
+  static async remove(alertId: string): Promise<UrgentAlert | null> {
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [rows] = await conn.query<UrgentAlertRow[]>(
+        'SELECT * FROM urgent_alerts WHERE `id` = ? LIMIT 1',
+        [alertId],
+      );
+
+      if (rows.length === 0) {
+        await conn.commit();
+        return null;
+      }
+
+      await conn.query<ResultSetHeader>(
+        'DELETE FROM urgent_alert_acknowledgements WHERE `alertId` = ?',
+        [alertId],
+      );
+      await conn.query<ResultSetHeader>(
+        'DELETE FROM urgent_alerts WHERE `id` = ?',
+        [alertId],
+      );
+
+      await conn.commit();
+      return toAlert(rows[0]);
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
+  }
 }

@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
-import { Camera, FolderUp, RotateCcw, Upload, UserPlus } from 'lucide-react';
+import { Camera, FolderUp, Upload, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CreateUserPayload, User, userService } from '../services/api';
 import { rankOptions } from '../constants/ranks';
@@ -435,12 +435,10 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
           {addressSuggestions.map((address) => <option key={address} value={address} />)}
         </datalist>
 
-        <div className="mt-5 flex flex-wrap gap-3 border-t border-gray-200 pt-5 dark:border-gray-800">
+        <div className="mt-5 flex justify-end border-t border-gray-200 pt-5 dark:border-gray-800">
           <button type="submit" className="btn-primary" disabled={isSaving} aria-label="Create user" title={isSaving ? 'Creating' : 'Create User'}>
             <UserPlus size={16} />
-          </button>
-          <button type="button" onClick={() => setForm(emptyUserForm)} className="btn-secondary" aria-label="Reset create user form" title="Reset">
-            <RotateCcw size={16} />
+            <span>{isSaving ? 'Creating...' : 'Create User'}</span>
           </button>
         </div>
       </form>

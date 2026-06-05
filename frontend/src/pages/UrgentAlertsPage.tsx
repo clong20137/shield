@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Radio, Search, Send } from 'lucide-react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, Radio, Search, Send, Trash2 } from 'lucide-react';
 import { districtOptions } from '../constants/districts';
 import { urgentAlertService, UrgentAlert, UrgentAlertAudienceType, UrgentAlertSeverity, userService, User } from '../services/api';
 
@@ -47,11 +47,14 @@ export default function UrgentAlertsPage({ onToast }: UrgentAlertsPageProps) {
   const [recentAlerts, setRecentAlerts] = useState<UrgentAlert[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [isLoadingRecent, setIsLoadingRecent] = useState(false);
+  const [removingAlertId, setRemovingAlertId] = useState<string | null>(null);
 
   const selectedPersonIds = useMemo(() => new Set(selectedPeople.map((person) => person.id)), [selectedPeople]);
 
-  const loadRecent = async () => {
-    setIsLoadingRecent(true);
+  const loadRecent = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setIsLoadingRecent(true);
+    }
     try {
       const response = await urgentAlertService.getRecent();
       setRecentAlerts(response.data);
@@ -60,11 +63,15 @@ export default function UrgentAlertsPage({ onToast }: UrgentAlertsPageProps) {
     } finally {
       setIsLoadingRecent(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void loadRecent();
-  }, []);
+    const handleUrgentAlertUpdate = () => void loadRecent(false);
+    window.addEventListener('shield:urgent-alert-updated', handleUrgentAlertUpdate);
+
+    return () => window.removeEventListener('shield:urgent-alert-updated', handleUrgentAlertUpdate);
+  }, [loadRecent]);
 
   useEffect(() => {
     if (audienceType !== 'users' || personQuery.trim().length < 2) {
@@ -135,6 +142,24 @@ export default function UrgentAlertsPage({ onToast }: UrgentAlertsPageProps) {
       onToast('error', getErrorMessage(error, 'Failed to send urgent alert.'));
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleRemoveAlert = async (alert: UrgentAlert) => {
+    const confirmed = window.confirm(`Remove "${alert.title}"? Recipients will no longer see this urgent alert.`);
+    if (!confirmed) {
+      return;
+    }
+
+    setRemovingAlertId(alert.id);
+    try {
+      await urgentAlertService.remove(alert.id);
+      setRecentAlerts((alerts) => alerts.filter((item) => item.id !== alert.id));
+      onToast('success', 'Urgent alert removed.');
+    } catch (error) {
+      onToast('error', getErrorMessage(error, 'Failed to remove urgent alert.'));
+    } finally {
+      setRemovingAlertId(null);
     }
   };
 
@@ -258,14 +283,26 @@ export default function UrgentAlertsPage({ onToast }: UrgentAlertsPageProps) {
               const acknowledgedCount = alert.acknowledgedCount || 0;
               return (
                 <div key={alert.id} className="rounded border border-gray-200 px-3 py-3 dark:border-gray-800">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-bold text-gray-900 dark:text-gray-100">{alert.title}</p>
                       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{alert.audienceLabel || alert.audienceType} - {formatDateTime(alert.createdAt)}</p>
                     </div>
-                    <span className={`rounded-full px-3 py-1 text-xs font-bold ${getSeverityClass(alert.severity)}`}>
-                      {alert.severity}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className={`rounded-full px-3 py-1 text-xs font-bold ${getSeverityClass(alert.severity)}`}>
+                        {alert.severity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void handleRemoveAlert(alert)}
+                        disabled={removingAlertId === alert.id}
+                        className="btn-secondary h-8 w-8 p-0 text-danger hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:hover:border-red-900 dark:hover:bg-red-950"
+                        aria-label={`Remove ${alert.title}`}
+                        title="Remove alert"
+                      >
+                        {removingAlertId === alert.id ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current/30 border-t-current" /> : <Trash2 size={15} />}
+                      </button>
+                    </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-gray-500 dark:text-gray-400">
                     <AlertTriangle size={14} />

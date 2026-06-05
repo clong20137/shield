@@ -84,9 +84,12 @@ export function BugTrackerPage({ reports, onStatusChange }: BugTrackerPageProps)
               <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Admin notes</span>
               <textarea value={adminNotes} onChange={(event) => setAdminNotes(event.target.value)} className="min-h-32 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
             </label>
-            <button type="button" onClick={() => onStatusChange(selectedReport, status, adminNotes)} className="btn-primary" aria-label="Save bug status" title="Save Bug Status">
-              <Save size={16} />
-            </button>
+            <div className="flex justify-end">
+              <button type="button" onClick={() => onStatusChange(selectedReport, status, adminNotes)} className="btn-primary" aria-label="Save bug status" title="Save Bug Status">
+                <Save size={16} />
+                <span>Save</span>
+              </button>
+            </div>
           </div>
         )}
       </section>

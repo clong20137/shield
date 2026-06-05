@@ -1120,6 +1120,9 @@ export const urgentAlertService = {
 
   acknowledge: (id: string) =>
     api.put<{ message: string }>(`/urgent-alerts/${id}/acknowledge`),
+
+  remove: (id: string) =>
+    api.delete<{ message: string }>(`/urgent-alerts/${id}`),
 };
 
 export const quickLaunchService = {

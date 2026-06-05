@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Copy, Download, Eye, FileSpreadsheet, Search, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet, Search, X } from 'lucide-react';
 import { auditService, AuditLog, AuditLogFilters, AuditLogResponse } from '../services/api';
 
 const DEFAULT_RESPONSE: AuditLogResponse = {
@@ -388,7 +388,11 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
               </thead>
               <tbody>
                 {response.data.map((log) => (
-                  <tr key={log.id} className="border-b border-gray-100 align-top transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-950">
+                  <tr
+                    key={log.id}
+                    onClick={() => setSelectedLog(log)}
+                    className="cursor-pointer border-b border-gray-100 align-top transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-950"
+                  >
                     <td className="whitespace-nowrap px-3 py-4 text-gray-700 dark:text-gray-200">{new Date(log.createdAt).toLocaleString()}</td>
                     <td className="px-3 py-4">
                       <div className="font-bold text-gray-900 dark:text-gray-100">{log.actorName || 'System'}</div>
@@ -409,21 +413,15 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
                       <div className="flex justify-end gap-2">
                         <button
                           type="button"
-                          onClick={() => void copyAuditLog(log)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void copyAuditLog(log);
+                          }}
                           className="btn-secondary h-9 w-9 p-0"
                           title="Copy audit log"
                           aria-label="Copy audit log"
                         >
                           {copiedLogId === log.id ? <Check size={16} /> : <Copy size={16} />}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedLog(log)}
-                          className="btn-secondary h-9 w-9 p-0"
-                          title="View details"
-                          aria-label="View audit log details"
-                        >
-                          <Eye size={16} />
                         </button>
                       </div>
                     </td>
@@ -462,7 +460,7 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
       </section>
 
       {selectedLog && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4" onClick={() => setSelectedLog(null)}>
+        <div className="modal-backdrop fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4" onClick={() => setSelectedLog(null)}>
           <div className="modal-window max-h-[90dvh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900" onClick={(event) => event.stopPropagation()}>
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>

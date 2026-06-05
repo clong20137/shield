@@ -164,4 +164,40 @@ export class UrgentAlertController {
       res.status(500).json({ error: 'Failed to acknowledge urgent alert' });
     }
   }
+
+  static async remove(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const removedAlert = await UrgentAlertModel.remove(req.params.id);
+      if (!removedAlert) {
+        return res.status(404).json({ error: 'Alert not found' });
+      }
+
+      broadcastAppEvent({ type: 'urgent-alert-updated', entityId: req.params.id });
+
+      await AuditLogModel.create({
+        actorId: account.id,
+        actorName: account.displayName || account.email,
+        action: 'alerts.removed',
+        entityType: 'urgent_alert',
+        entityId: req.params.id,
+        details: JSON.stringify({
+          title: removedAlert.title,
+          severity: removedAlert.severity,
+          audienceType: removedAlert.audienceType,
+          audienceLabel: removedAlert.audienceLabel,
+        }),
+        ...requestAuditFields(req),
+      });
+
+      res.json({ message: 'Urgent alert removed' });
+    } catch (error) {
+      console.error('Remove urgent alert error:', error);
+      res.status(500).json({ error: 'Failed to remove urgent alert' });
+    }
+  }
 }
