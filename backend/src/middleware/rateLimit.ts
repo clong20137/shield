@@ -1,4 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
+import { createHash } from 'crypto';
+import { getSessionToken } from './authSession';
 
 interface RateLimitRecord {
   count: number;
@@ -10,21 +12,30 @@ interface RateLimitOptions {
   max: number;
   message: string;
   keyPrefix: string;
+  keyBy?: 'sessionOrClient' | 'client';
 }
 
 const buckets = new Map<string, RateLimitRecord>();
 
-function getClientKey(req: Request, keyPrefix: string): string {
+function getClientKey(req: Request, keyPrefix: string, keyBy: RateLimitOptions['keyBy'] = 'sessionOrClient'): string {
+  if (keyBy === 'sessionOrClient') {
+    const sessionToken = getSessionToken(req);
+    if (sessionToken) {
+      const tokenHash = createHash('sha256').update(sessionToken).digest('hex').slice(0, 24);
+      return `${keyPrefix}:session:${tokenHash}`;
+    }
+  }
+
   const forwardedFor = req.headers['x-forwarded-for'];
   const forwardedIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor?.split(',')[0];
   const trustedProxyEnabled = process.env.TRUST_PROXY === 'true';
-  return `${keyPrefix}:${trustedProxyEnabled ? forwardedIp || req.ip || req.socket.remoteAddress || 'unknown' : req.ip || req.socket.remoteAddress || 'unknown'}`;
+  return `${keyPrefix}:client:${trustedProxyEnabled ? forwardedIp || req.ip || req.socket.remoteAddress || 'unknown' : req.ip || req.socket.remoteAddress || 'unknown'}`;
 }
 
 export function rateLimit(options: RateLimitOptions) {
   return (req: Request, res: Response, next: NextFunction) => {
     const now = Date.now();
-    const key = getClientKey(req, options.keyPrefix);
+    const key = getClientKey(req, options.keyPrefix, options.keyBy);
     const existing = buckets.get(key);
 
     if (!existing || existing.resetAt <= now) {

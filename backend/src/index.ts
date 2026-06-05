@@ -41,7 +41,7 @@ const app: Express = express();
 const PORT = process.env.PORT || 5000;
 const allowedOrigins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS || '');
 const apiRateLimitWindowMs = Number(process.env.API_RATE_LIMIT_WINDOW_MS || 60 * 1000);
-const apiRateLimitMax = Number(process.env.API_RATE_LIMIT_MAX || 300);
+const apiRateLimitMax = Number(process.env.API_RATE_LIMIT_MAX || 1200);
 const apiRequestTimeoutMs = Number(process.env.API_REQUEST_TIMEOUT_MS || 30 * 1000);
 const isProduction = process.env.NODE_ENV === 'production';
 
