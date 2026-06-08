@@ -360,6 +360,7 @@ export interface AuthAccount {
   microsoftUserId?: string | null;
   lastSsoLoginAt?: string | null;
   receivesMessages: boolean;
+  calendarHidden: boolean;
   hasCompletedOnboarding: boolean;
   trooperDailyHiddenSections: string[];
   twoFactorEnabled: boolean;
@@ -944,6 +945,9 @@ export const authService = {
 
   updateMessagePreferences: (accountId: string, receiveMessages: boolean) =>
     api.put<AuthResponse>(`/auth/accounts/${accountId}/message-preferences`, { receiveMessages }),
+
+  updateCalendarPreferences: (accountId: string, calendarHidden: boolean) =>
+    api.put<AuthResponse>(`/auth/accounts/${accountId}/calendar-preferences`, { calendarHidden }),
 
   updateTrooperDailyPreferences: (accountId: string, hiddenSections: string[]) =>
     api.put<AuthResponse>(`/auth/accounts/${accountId}/trooper-daily-preferences`, { hiddenSections }),

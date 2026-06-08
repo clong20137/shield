@@ -862,6 +862,7 @@ interface MobileNavigationProps {
   unreadMessages: number;
   isMessagesOpen: boolean;
   isCalendarOpen: boolean;
+  showCalendar: boolean;
   onOpenMessages: () => void;
   onOpenCalendar: () => void;
 }
@@ -871,6 +872,7 @@ function MobileNavigation({
   unreadMessages,
   isMessagesOpen,
   isCalendarOpen,
+  showCalendar,
   onOpenMessages,
   onOpenCalendar,
 }: MobileNavigationProps) {
@@ -916,10 +918,12 @@ function MobileNavigation({
             </span>
           )}
         </button>
-        <button type="button" onClick={onOpenCalendar} className={actionClassName(isCalendarOpen)} aria-label="Open calendar">
-          <CalendarDays size={19} />
-          <span>Calendar</span>
-        </button>
+        {showCalendar && (
+          <button type="button" onClick={onOpenCalendar} className={actionClassName(isCalendarOpen)} aria-label="Open calendar">
+            <CalendarDays size={19} />
+            <span>Calendar</span>
+          </button>
+        )}
       </div>
     </nav>
   );
@@ -1402,6 +1406,7 @@ function QuickLaunchTray({
   activeModalApps,
   storageKey,
   accountId,
+  showCalendar,
   onOpenMessages,
   onOpenCalendar,
   onOpenCalculator,
@@ -1414,6 +1419,7 @@ function QuickLaunchTray({
   activeModalApps: QuickLaunchAppId[];
   storageKey: string;
   accountId?: string;
+  showCalendar: boolean;
   onOpenMessages: () => void;
   onOpenCalendar: () => void;
   onOpenCalculator: () => void;
@@ -1423,12 +1429,17 @@ function QuickLaunchTray({
   const location = useLocation();
   const [slots, setSlots] = useState<QuickLaunchSlot[]>(getEmptyQuickLaunchSlots);
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ index: number; x: number; y: number } | null>(null);
   const [draggingSlot, setDraggingSlot] = useState<number | null>(null);
   const didDragSlotRef = useRef(false);
   const [externalLabel, setExternalLabel] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
   const permissionSet = useMemo(() => new Set(permissions), [permissions]);
   const canUseQuickLaunchApp = (app: QuickLaunchApp) => {
+    if (app.id === 'calendar' && !showCalendar) {
+      return false;
+    }
+
     if (app.requiredPermission && !isAdministrator && !permissionSet.has(app.requiredPermission)) {
       return false;
     }
@@ -1528,12 +1539,30 @@ function QuickLaunchTray({
         setExternalLabel('');
         setExternalUrl('');
       }
+      if (event.key === 'Escape') {
+        setContextMenu(null);
+      }
     };
 
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
   }, [editingSlot]);
+
+  useEffect(() => {
+    if (!contextMenu) {
+      return undefined;
+    }
+
+    const closeContextMenu = () => setContextMenu(null);
+    window.addEventListener('click', closeContextMenu);
+    window.addEventListener('scroll', closeContextMenu, true);
+
+    return () => {
+      window.removeEventListener('click', closeContextMenu);
+      window.removeEventListener('scroll', closeContextMenu, true);
+    };
+  }, [contextMenu]);
 
   const openSlot = (slot: NonNullable<QuickLaunchSlot>) => {
     if (isExternalQuickLaunchSlot(slot)) {
@@ -1577,6 +1606,18 @@ function QuickLaunchTray({
     setEditingSlot(null);
     setExternalLabel('');
     setExternalUrl('');
+  };
+
+  const removeSlot = (index: number) => {
+    const nextSlots = slots.map((currentSlot, slotIndex) => (slotIndex === index ? null : currentSlot));
+    void saveQuickLaunchSlots(nextSlots);
+    setContextMenu(null);
+  };
+
+  const removeAllSlots = () => {
+    void saveQuickLaunchSlots(getEmptyQuickLaunchSlots());
+    setContextMenu(null);
+    setEditingSlot(null);
   };
 
   const assignExternalSlot = (event: FormEvent<HTMLFormElement>) => {
@@ -1647,6 +1688,10 @@ function QuickLaunchTray({
                   didDragSlotRef.current = false;
                 }, 0);
               }}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setContextMenu({ index, x: event.clientX, y: event.clientY });
+              }}
             >
               <button
                 type="button"
@@ -1709,6 +1754,32 @@ function QuickLaunchTray({
         })}
         </div>
       </div>
+
+      {contextMenu && (
+        <div
+          className="pointer-events-auto fixed z-[70] min-w-40 overflow-hidden rounded border border-gray-200 bg-white p-1 text-sm shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+          style={{
+            left: Math.min(contextMenu.x, window.innerWidth - 180),
+            top: Math.min(contextMenu.y, window.innerHeight - 96),
+          }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => removeSlot(contextMenu.index)}
+            className="flex w-full items-center gap-2 rounded px-3 py-2 text-left font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            <Trash2 size={15} /> Remove
+          </button>
+          <button
+            type="button"
+            onClick={removeAllSlots}
+            className="flex w-full items-center gap-2 rounded px-3 py-2 text-left font-semibold text-danger hover:bg-red-50 dark:hover:bg-red-950"
+          >
+            <X size={15} /> Remove All
+          </button>
+        </div>
+      )}
 
       {editingSlot !== null && (
         <div className="modal-backdrop pointer-events-auto fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center">
@@ -1849,6 +1920,7 @@ function GlobalCommandPalette({
   isOpen,
   isAdministrator,
   canOpenAdminConsole,
+  showCalendar,
   defaultAdminConsoleTab,
   permissions,
   onOpenChange,
@@ -1862,6 +1934,7 @@ function GlobalCommandPalette({
   isOpen: boolean;
   isAdministrator: boolean;
   canOpenAdminConsole: boolean;
+  showCalendar: boolean;
   defaultAdminConsoleTab: AdminConsoleTab;
   permissions: string[];
   onOpenChange: (isOpen: boolean) => void;
@@ -1933,14 +2006,14 @@ function GlobalCommandPalette({
         icon: Mail,
         action: onOpenMessages,
       },
-      {
+      ...(showCalendar ? [{
         id: 'calendar',
         label: 'Calendar',
         detail: 'Open calendar, entries, and reminders.',
         keywords: ['schedule', 'reminder', 'daily'],
         icon: CalendarDays,
         action: onOpenCalendar,
-      },
+      }] : []),
       {
         id: 'calculator',
         label: 'Calculator',
@@ -2055,7 +2128,7 @@ function GlobalCommandPalette({
     }
 
     return items;
-  }, [canOpenAdminConsole, canUsePermission, defaultAdminConsoleTab, navigate, onOpenAdminConsole, onOpenCalendar, onOpenCalculator, onOpenMessages, onOpenProfile, onReportBug]);
+  }, [canOpenAdminConsole, canUsePermission, defaultAdminConsoleTab, navigate, onOpenAdminConsole, onOpenCalendar, onOpenCalculator, onOpenMessages, onOpenProfile, onReportBug, showCalendar]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -2190,6 +2263,7 @@ function GlobalCommandPalette({
 function GlobalKeyboardShortcuts({
   canOpenAdminConsole,
   canCreateUsers,
+  showCalendar,
   defaultAdminConsoleTab,
   onOpenMessages,
   onOpenCalendar,
@@ -2199,6 +2273,7 @@ function GlobalKeyboardShortcuts({
 }: {
   canOpenAdminConsole: boolean;
   canCreateUsers: boolean;
+  showCalendar: boolean;
   defaultAdminConsoleTab: AdminConsoleTab;
   onOpenMessages: () => void;
   onOpenCalendar: () => void;
@@ -2245,7 +2320,7 @@ function GlobalKeyboardShortcuts({
         return;
       }
 
-      if (key === 'c') {
+      if (key === 'c' && showCalendar) {
         event.preventDefault();
         onOpenCalendar();
         return;
@@ -2284,7 +2359,7 @@ function GlobalKeyboardShortcuts({
     document.addEventListener('keydown', handleShortcut);
 
     return () => document.removeEventListener('keydown', handleShortcut);
-  }, [canCreateUsers, canOpenAdminConsole, defaultAdminConsoleTab, navigate, onOpenAdminConsole, onOpenCalendar, onOpenCalculator, onOpenCommandPalette, onOpenMessages]);
+  }, [canCreateUsers, canOpenAdminConsole, defaultAdminConsoleTab, navigate, onOpenAdminConsole, onOpenCalendar, onOpenCalculator, onOpenCommandPalette, onOpenMessages, showCalendar]);
 
   return null;
 }
@@ -4110,7 +4185,7 @@ function App() {
   };
 
   const loadSidebarCalendarEntries = useCallback(async (showLoading = false) => {
-    if (!currentUser) {
+    if (!currentUser || currentUser.calendarHidden) {
       setSidebarCalendarEntries([]);
       setIsSidebarCalendarLoading(false);
       return;
@@ -4389,6 +4464,7 @@ function App() {
 
   const isAdministrator = currentUser?.role === 'administrator';
   const hasPermission = (permission: string) => Boolean(isAdministrator || currentUser?.permissions?.includes(permission));
+  const showCalendar = Boolean(currentUser && !currentUser.calendarHidden);
   const canOpenAdminConsole = Boolean(currentUser && (
     isAdministrator ||
     hasPermission('admin:access')
@@ -4578,6 +4654,10 @@ function App() {
   };
 
   const openCalendarModal = () => {
+    if (!showCalendar) {
+      return;
+    }
+
     announceFloatingFocus('calendar');
     setActiveFloatingApp('calendar');
     setIsCalendarModalOpen(true);
@@ -4715,6 +4795,30 @@ function App() {
       console.error(err);
       setMessagePreferences(previousPreferences);
       showToast('error', 'Failed to update message preferences.');
+    }
+  };
+
+  const handleCalendarHiddenChange = async (calendarHidden: boolean) => {
+    if (!currentUser) {
+      return;
+    }
+
+    const previousUser = currentUser;
+    handleAccountUpdate({ ...currentUser, calendarHidden });
+    if (calendarHidden && isCalendarModalOpen) {
+      closeModal('calendar');
+    }
+
+    try {
+      const response = await authService.updateCalendarPreferences(currentUser.id, calendarHidden);
+      if (response.data.account) {
+        handleAccountUpdate(response.data.account);
+      }
+      showToast('success', calendarHidden ? 'Calendar hidden.' : 'Calendar shown.');
+    } catch (err) {
+      console.error(err);
+      handleAccountUpdate(previousUser);
+      showToast('error', 'Failed to update calendar preference.');
     }
   };
 
@@ -5003,14 +5107,16 @@ function App() {
                   onDelete={deleteSidebarReminder}
                 />
               </div>
-              <div data-onboarding-target="sidebar-calendar">
-                <SidebarCalendarWidget
-                  compact={isSidebarCollapsed}
-                  entries={sidebarCalendarEntries}
-                  isLoading={isSidebarCalendarLoading}
-                  onOpenCalendar={toggleCalendarModal}
-                />
-              </div>
+              {showCalendar && (
+                <div data-onboarding-target="sidebar-calendar">
+                  <SidebarCalendarWidget
+                    compact={isSidebarCollapsed}
+                    entries={sidebarCalendarEntries}
+                    isLoading={isSidebarCalendarLoading}
+                    onOpenCalendar={toggleCalendarModal}
+                  />
+                </div>
+              )}
             </div>
             </div>
           </aside>
@@ -5246,7 +5352,7 @@ function App() {
                     <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
                     {currentUser && <Route path="/updates/:postId" element={<DashboardPostPage currentUser={currentUser} onToast={showToast} />} />}
                     {currentUser && <Route path="/messages" element={<MessagesRouteRedirect onOpenMessages={openMessagesModal} />} />}
-                    {currentUser && <Route path="/calendar" element={<CalendarRouteRedirect onOpenCalendar={openCalendarModal} />} />}
+                    {currentUser && showCalendar && <Route path="/calendar" element={<CalendarRouteRedirect onOpenCalendar={openCalendarModal} />} />}
                     <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
                     {currentUser && (
                       <Route
@@ -5285,6 +5391,7 @@ function App() {
                 ]}
                 storageKey={getQuickLaunchStorageKey(currentUser?.id || 'anonymous')}
                 accountId={currentUser?.id}
+                showCalendar={showCalendar}
                 onOpenMessages={toggleMessagesModal}
                 onOpenCalendar={toggleCalendarModal}
                 onOpenCalculator={toggleCalculator}
@@ -5297,12 +5404,14 @@ function App() {
             unreadMessages={messageUnreadCount}
             isMessagesOpen={isMessagesModalOpen}
             isCalendarOpen={isCalendarModalOpen}
+            showCalendar={showCalendar}
             onOpenMessages={toggleMessagesModal}
             onOpenCalendar={toggleCalendarModal}
           />
           <GlobalKeyboardShortcuts
             canOpenAdminConsole={canOpenAdminConsole}
             canCreateUsers={canOpenAdminConsole && hasPermission('admin:create-user') && hasPermission('users:create')}
+            showCalendar={showCalendar}
             defaultAdminConsoleTab={getDefaultAdminConsoleTab()}
             onOpenMessages={openMessagesModal}
             onOpenCalendar={openCalendarModal}
@@ -5314,6 +5423,7 @@ function App() {
             isOpen={isCommandPaletteOpen}
             isAdministrator={isAdministrator}
             canOpenAdminConsole={canOpenAdminConsole}
+            showCalendar={showCalendar}
             defaultAdminConsoleTab={getDefaultAdminConsoleTab()}
             permissions={currentUser?.permissions || []}
             onOpenChange={setIsCommandPaletteOpen}
@@ -5372,7 +5482,7 @@ function App() {
               )}
             </FloatingWindow>
           )}
-          {isCalendarModalOpen && currentUser && (
+          {isCalendarModalOpen && currentUser && showCalendar && (
             <FloatingWindow
               className="pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[82dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(480px,calc(100dvh-1rem))] md:w-[min(1120px,calc(100vw-1rem))] md:min-w-[min(420px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4"
               fallbackSize={{ width: Math.min(window.innerWidth - 16, 1120), height: Math.min(window.innerHeight - 16, 780) }}
@@ -5469,6 +5579,7 @@ function App() {
                           useMilitaryTime,
                         }))
                       }
+                      onCalendarHiddenChange={handleCalendarHiddenChange}
                       onReplayGuide={replayGuide}
                       onOpenEvaluations={() => closeModal('profile')}
                       onAccountUpdate={handleAccountUpdate}

@@ -17,6 +17,7 @@ interface AccountSettingsPageProps {
   onMessageSoundChange: (playMessageSound: boolean) => void;
   onMessageSoundSelect: (messageSound: 'classic' | 'soft' | 'chime' | 'msn') => void;
   onMilitaryTimeChange: (useMilitaryTime: boolean) => void;
+  onCalendarHiddenChange: (calendarHidden: boolean) => void;
   onOpenEvaluations?: () => void;
   onReplayGuide?: () => void;
   onAccountUpdate: (account: AuthAccount) => void;
@@ -48,6 +49,7 @@ export function AccountSettingsPage({
   onMessageSoundChange,
   onMessageSoundSelect,
   onMilitaryTimeChange,
+  onCalendarHiddenChange,
   onOpenEvaluations,
   onReplayGuide,
   onAccountUpdate,
@@ -74,6 +76,7 @@ export function AccountSettingsPage({
   const [evaluationCount, setEvaluationCount] = useState<number | null>(null);
   const [isEvaluationsLoading, setIsEvaluationsLoading] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
+  const canChangeCalendarPreference = account.role === 'administrator' || Boolean(account.permissions?.includes('calendar:manage'));
 
   useEffect(() => {
     let isMounted = true;
@@ -764,6 +767,20 @@ export function AccountSettingsPage({
               onChange={(event) => onMilitaryTimeChange(event.target.checked)}
             />
           </label>
+
+          {canChangeCalendarPreference && (
+            <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
+              <span>
+                <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Hide calendar</span>
+                <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Remove calendar shortcuts and widgets from your workspace.</span>
+              </span>
+              <input
+                type="checkbox"
+                checked={Boolean(account.calendarHidden)}
+                onChange={(event) => onCalendarHiddenChange(event.target.checked)}
+              />
+            </label>
+          )}
 
           {onReplayGuide && (
             <div className="flex flex-wrap items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">

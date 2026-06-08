@@ -1632,6 +1632,41 @@ export class AuthController {
     }
   }
 
+  static async updateCalendarPreferences(req: Request, res: Response) {
+    try {
+      const { calendarHidden } = req.body as { calendarHidden?: boolean };
+      const { accountId } = req.params;
+      const sessionAccount = await getSessionAccount(req);
+
+      if (!sessionAccount || sessionAccount.id !== accountId) {
+        return res.status(403).json({ error: 'You can only update your own calendar preferences' });
+      }
+
+      if (sessionAccount.role !== 'administrator') {
+        const permissions = await AuthAccountModel.getPermissionsForAccount(sessionAccount.id);
+        if (!permissions.includes('calendar:manage')) {
+          return res.status(403).json({ error: 'Calendar permission required' });
+        }
+      }
+
+      if (typeof calendarHidden !== 'boolean') {
+        return res.status(400).json({ error: 'Calendar preference is required' });
+      }
+
+      const account = await AuthAccountModel.updateCalendarPreferences(accountId, calendarHidden);
+
+      if (!account) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+
+      broadcastAppEvent({ type: 'user-updated', entityId: accountId });
+      res.json({ account: await withPermissions(account) });
+    } catch (error) {
+      console.error('Update calendar preferences error:', error);
+      res.status(500).json({ error: 'Failed to update calendar preferences' });
+    }
+  }
+
   static async updateTrooperDailyPreferences(req: Request, res: Response) {
     try {
       const { hiddenSections } = req.body as { hiddenSections?: unknown };

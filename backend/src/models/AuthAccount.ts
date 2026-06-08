@@ -19,6 +19,7 @@ export interface AuthAccount {
   microsoftUserId: string | null;
   lastSsoLoginAt: Date | null;
   receivesMessages: boolean;
+  calendarHidden: boolean;
   hasCompletedOnboarding: boolean;
   trooperDailyHiddenSections: string[];
   twoFactorEnabled: boolean;
@@ -49,6 +50,7 @@ interface AuthAccountRow extends RowDataPacket {
   microsoftUserId: string | null;
   lastSsoLoginAt: Date | null;
   receivesMessages: boolean | number;
+  calendarHidden: boolean | number;
   hasCompletedOnboarding: boolean | number;
   trooperDailyHiddenSections: string | null;
   passwordHash: string | null;
@@ -224,6 +226,7 @@ function toPublicAccount(account: AuthAccountRow): AuthAccount {
     microsoftUserId: account.microsoftUserId || null,
     lastSsoLoginAt: account.lastSsoLoginAt || null,
     receivesMessages: account.receivesMessages !== false && account.receivesMessages !== 0,
+    calendarHidden: Boolean(account.calendarHidden),
     hasCompletedOnboarding: Boolean(account.hasCompletedOnboarding),
     trooperDailyHiddenSections,
     twoFactorEnabled: Boolean(account.twoFactorEnabled),
@@ -305,6 +308,7 @@ export class AuthAccountModel {
           microsoftUserId: existingUser.microsoftUserId || null,
           lastSsoLoginAt: existingUser.lastSsoLoginAt || null,
           receivesMessages: existingUser.receivesMessages !== false && existingUser.receivesMessages !== 0,
+          calendarHidden: Boolean(existingUser.calendarHidden),
           hasCompletedOnboarding: Boolean(existingUser.hasCompletedOnboarding),
           trooperDailyHiddenSections: [],
           twoFactorEnabled: Boolean(existingUser.twoFactorEnabled),
@@ -336,6 +340,7 @@ export class AuthAccountModel {
         microsoftUserId: null,
         lastSsoLoginAt: null,
         receivesMessages: true,
+        calendarHidden: false,
         hasCompletedOnboarding: false,
         trooperDailyHiddenSections: [],
         twoFactorEnabled: false,
@@ -792,6 +797,26 @@ export class AuthAccountModel {
       await conn.query<ResultSetHeader>(
         'UPDATE users SET `receivesMessages` = ?, `updatedAt` = ? WHERE `id` = ? AND `passwordHash` IS NOT NULL',
         [receiveMessages ? 1 : 0, new Date(), accountId]
+      );
+
+      const [rows] = await conn.query<AuthAccountRow[]>(
+        'SELECT * FROM users WHERE `id` = ? AND `passwordHash` IS NOT NULL LIMIT 1',
+        [accountId]
+      );
+      const account = rows[0];
+
+      return account ? toPublicAccount(account) : null;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async updateCalendarPreferences(accountId: string, calendarHidden: boolean): Promise<AuthAccount | null> {
+    const conn = await pool.getConnection();
+    try {
+      await conn.query<ResultSetHeader>(
+        'UPDATE users SET `calendarHidden` = ?, `updatedAt` = ? WHERE `id` = ? AND `passwordHash` IS NOT NULL',
+        [calendarHidden ? 1 : 0, new Date(), accountId]
       );
 
       const [rows] = await conn.query<AuthAccountRow[]>(

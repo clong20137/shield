@@ -479,7 +479,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
               <div className="h-2 overflow-hidden rounded-full bg-white/20">
                 <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${mileagePercent}%` }} />
               </div>
-              {milestone > 0 && (
+              {Boolean(milestone > 0) && (
                 <p className="mt-1 text-xs font-semibold text-blue-100">
                   {mileagePercent}% of {nextAchievement?.title || `${milestone.toLocaleString()} mi milestone`}
                 </p>
