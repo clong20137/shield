@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import mysql from 'mysql2/promise';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { AuthInviteModel } from '../models/AuthInvite';
 import { AuthPasswordResetModel } from '../models/AuthPasswordReset';
@@ -227,6 +228,26 @@ async function updateBackendEnv(values: Record<string, string>): Promise<void> {
   await fs.promises.writeFile(envPath, serializeEnvFile({ ...currentSettings, ...values }), { encoding: 'utf8' });
 }
 
+function getSetupDatabaseSettings(input: Record<string, unknown>) {
+  return {
+    host: cleanString(input.DB_HOST, 255) || 'localhost',
+    port: Math.max(1, Math.min(65535, Number(input.DB_PORT) || 3306)),
+    user: cleanString(input.DB_USER, 255) || 'root',
+    password: typeof input.DB_PASSWORD === 'string' ? input.DB_PASSWORD.slice(0, 500) : '',
+    database: cleanString(input.DB_NAME, 120) || 'shield',
+  };
+}
+
+function quoteDatabaseName(databaseName: string): string {
+  return `\`${databaseName.replace(/`/gu, '``')}\``;
+}
+
+async function isInstallerClosed(): Promise<boolean> {
+  const accountCount = await AuthAccountModel.countAccounts().catch(() => 0);
+  const setupCompleted = await SystemSettingModel.getString('setupCompleted', accountCount > 0 ? 'true' : 'false').catch(() => accountCount > 0 ? 'true' : 'false') === 'true';
+  return accountCount > 0 || setupCompleted;
+}
+
 async function getRegistrationMode(): Promise<RegistrationMode> {
   return normalizeRegistrationMode(await SystemSettingModel.getString('registrationMode', 'public'));
 }
@@ -425,9 +446,7 @@ function publicInvite(invite: Awaited<ReturnType<typeof AuthInviteModel.create>>
 export class AuthController {
   static async getSetupEnvironment(_req: Request, res: Response) {
     try {
-      const accountCount = await AuthAccountModel.countAccounts().catch(() => 0);
-      const setupCompleted = await SystemSettingModel.getString('setupCompleted', accountCount > 0 ? 'true' : 'false').catch(() => accountCount > 0 ? 'true' : 'false') === 'true';
-      if (accountCount > 0 || setupCompleted) {
+      if (await isInstallerClosed()) {
         return res.status(410).json({ error: 'Installer environment settings are no longer available after installation' });
       }
 
@@ -462,9 +481,7 @@ export class AuthController {
 
   static async saveSetupEnvironment(req: Request, res: Response) {
     try {
-      const accountCount = await AuthAccountModel.countAccounts().catch(() => 0);
-      const setupCompleted = await SystemSettingModel.getString('setupCompleted', accountCount > 0 ? 'true' : 'false').catch(() => accountCount > 0 ? 'true' : 'false') === 'true';
-      if (accountCount > 0 || setupCompleted) {
+      if (await isInstallerClosed()) {
         return res.status(410).json({ error: 'Installer environment settings are no longer available after installation' });
       }
 
@@ -525,6 +542,60 @@ export class AuthController {
     }
   }
 
+  static async testSetupDatabase(req: Request, res: Response) {
+    let connection: mysql.Connection | null = null;
+    try {
+      if (await isInstallerClosed()) {
+        return res.status(410).json({ error: 'Installer database testing is no longer available after installation' });
+      }
+
+      const input = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as Record<string, unknown>;
+      const settings = getSetupDatabaseSettings(input);
+      if (!/^[A-Za-z0-9_$-]+$/u.test(settings.database)) {
+        return res.status(400).json({ error: 'Database name can only include letters, numbers, underscore, dollar sign, or hyphen' });
+      }
+
+      connection = await mysql.createConnection({
+        host: settings.host,
+        port: settings.port,
+        user: settings.user,
+        password: settings.password,
+        connectTimeout: 7000,
+        multipleStatements: false,
+      });
+
+      const [existingRows] = await connection.query(
+        'SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ? LIMIT 1',
+        [settings.database]
+      );
+      const existed = (existingRows as unknown[]).length > 0;
+      if (!existed) {
+        await connection.query(`CREATE DATABASE ${quoteDatabaseName(settings.database)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+      }
+
+      await connection.query(`USE ${quoteDatabaseName(settings.database)}`);
+      await connection.query('SELECT 1');
+
+      res.json({
+        connected: true,
+        database: settings.database,
+        created: !existed,
+        message: existed
+          ? `Connected to ${settings.database}.`
+          : `Created and connected to ${settings.database}.`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown database connection error';
+      res.status(400).json({
+        connected: false,
+        error: message,
+        message: 'Database connection failed. Check the host, port, username, password, and database permissions.',
+      });
+    } finally {
+      await connection?.end().catch(() => {});
+    }
+  }
+
   static async getSetupStatus(req: Request, res: Response) {
     try {
       const accountCount = await AuthAccountModel.countAccounts();
@@ -548,12 +619,18 @@ export class AuthController {
       });
     } catch (error) {
       console.error('Get setup status error:', error);
-      res.status(500).json({
-        setupRequired: false,
-        setupCompleted: false,
+      const envPath = getBackendEnvPath();
+      const fileSettings = fs.existsSync(envPath) ? parseEnvFile(await fs.promises.readFile(envPath, 'utf8').catch(() => '')) : {};
+      const setupLocked = fileSettings.SETUP_ENV_LOCKED === 'true' || process.env.SETUP_ENV_LOCKED === 'true';
+      res.status(200).json({
+        setupRequired: !setupLocked,
+        installed: setupLocked,
+        setupCompleted: setupLocked,
+        accountCount: 0,
         database: {
           connected: false,
           initialized: false,
+          name: fileSettings.DB_NAME || process.env.DB_NAME || 'shield',
         },
         error: 'Failed to inspect setup status',
       });

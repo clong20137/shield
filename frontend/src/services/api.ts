@@ -481,6 +481,14 @@ export interface SetupEnvironmentResponse {
   message?: string;
 }
 
+export interface SetupDatabaseTestResponse {
+  connected: boolean;
+  database?: string;
+  created?: boolean;
+  message?: string;
+  error?: string;
+}
+
 export interface TwoFactorSetupResponse {
   secret: string;
   otpauthUrl: string;
@@ -848,6 +856,9 @@ export const authService = {
 
   saveSetupEnvironment: (values: SetupEnvironmentValues) =>
     api.post<SetupEnvironmentResponse>('/auth/setup/environment', values),
+
+  testSetupDatabase: (values: SetupEnvironmentValues) =>
+    api.post<SetupDatabaseTestResponse>('/auth/setup/database-test', values),
 
   completeSetup: (payload: CompleteSetupPayload) =>
     api.post<AuthResponse>('/auth/setup/complete', payload),

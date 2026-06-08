@@ -18,6 +18,7 @@ const setupLimiter = rateLimit({ keyPrefix: 'setup', windowMs: 15 * 60 * 1000, m
 router.get('/setup/status', AuthController.getSetupStatus);
 router.get('/setup/environment', AuthController.getSetupEnvironment);
 router.post('/setup/environment', setupLimiter, AuthController.saveSetupEnvironment);
+router.post('/setup/database-test', setupLimiter, AuthController.testSetupDatabase);
 router.post('/setup/complete', setupLimiter, AuthController.completeSetup);
 router.post('/register', registrationLimiter, AuthController.register);
 router.post('/login', loginLimiter, AuthController.login);

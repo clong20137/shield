@@ -82,6 +82,18 @@ SHIELD/
 - MySQL 5.7+
 - npm or yarn
 
+### First-Run Installer
+
+SHIELD includes a browser-based first-run installer. On a fresh installation, the app redirects to `/install` until the first administrator account is created.
+
+The installer can:
+- Write the backend `.env` file.
+- Test the MySQL connection.
+- Create the configured database if it does not already exist and the database user has permission.
+- Configure application/site names, URLs, security settings, registration mode, enabled feature areas, roles, and the first administrator account.
+
+After installation completes, the installer is locked and environment editing is no longer available through the browser.
+
 ### Backend Setup
 
 1. Navigate to the backend folder:
@@ -94,12 +106,7 @@ cd backend
 npm install
 ```
 
-3. Create `.env` file from `.env.example`:
-```bash
-cp .env.example .env
-```
-
-4. Update `.env` with your MySQL credentials:
+3. Start with either an empty backend `.env` or create one manually if you prefer:
 ```env
 DB_HOST=localhost
 DB_USER=root
@@ -120,23 +127,20 @@ SMTP_SECURE=false
 `ALLOWED_ORIGINS` is a comma-separated list of trusted frontend origins. Leave it blank only for local testing.
 Password reset emails use the SMTP settings above. If SMTP is not configured, reset links are printed to the backend console for local development.
 
-5. Create the database and tables:
-```bash
-mysql -u root -p < database.sql
-```
-
-6. Build TypeScript:
+4. Build TypeScript:
 ```bash
 npm run build
 ```
 
-7. Start the server:
+5. Start the server:
 ```bash
 npm run dev  # For development
 npm start    # For production
 ```
 
 The backend will run on `http://localhost:5000`.
+
+If the database is not connected yet, the backend still starts enough API for the installer to write `.env`. After saving database settings in the installer, restart the backend and refresh `/install`.
 
 ### Frontend Setup
 
@@ -156,6 +160,8 @@ npm run dev
 ```
 
 The frontend will run on `http://localhost:3000`.
+
+Open the frontend URL. A fresh installation redirects to `/install`.
 
 To override the API URL in Vite, set `VITE_API_URL`, for example:
 

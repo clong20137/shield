@@ -3029,6 +3029,26 @@ function getDefaultSetupPayload(status: SetupStatus | null): CompleteSetupPayloa
   };
 }
 
+function InstalledSetupClosedScreen({ appName, siteName }: { appName: string; siteName: string }) {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-gray-950 px-4 py-6 text-gray-100">
+      <div className="w-full max-w-xl rounded-lg border border-white/10 bg-white p-6 text-center text-gray-900 shadow-2xl dark:bg-gray-900 dark:text-gray-100">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded bg-success text-white">
+          <CheckCircle2 size={30} />
+        </div>
+        <p className="mt-5 text-xs font-bold uppercase tracking-[0.22em] text-accent">Installer Closed</p>
+        <h1 className="mt-2 text-3xl font-bold text-primary-500 dark:text-blue-100">{appName} is installed</h1>
+        <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+          The first-run installer is locked after setup is complete. Environment changes should now be handled by an administrator on the server.
+        </p>
+        <button type="button" onClick={() => window.location.replace('/')} className="btn-primary mt-6">
+          Go to {siteName}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SetupWizard({
   status,
   onComplete,
@@ -3044,6 +3064,8 @@ function SetupWizard({
   const [canWriteEnvironment, setCanWriteEnvironment] = useState(false);
   const [isEnvironmentLoading, setIsEnvironmentLoading] = useState(true);
   const [isSavingEnvironment, setIsSavingEnvironment] = useState(false);
+  const [isTestingDatabase, setIsTestingDatabase] = useState(false);
+  const [databaseTestResult, setDatabaseTestResult] = useState<{ connected: boolean; message: string } | null>(null);
   const [environmentSavedMessage, setEnvironmentSavedMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(status?.error || null);
@@ -3099,11 +3121,34 @@ function SetupWizard({
 
   const updateEnvironment = (key: keyof SetupEnvironmentValues, value: string) => {
     setEnvironmentForm((currentEnvironment) => ({ ...currentEnvironment, [key]: value }));
+    if (key.startsWith('DB_')) {
+      setDatabaseTestResult(null);
+    }
     if (key === 'APP_BASE_URL') {
       updateForm('appBaseUrl', value);
     }
     if (key === 'API_BASE_URL') {
       updateForm('apiUrl', value);
+    }
+  };
+
+  const testDatabase = async () => {
+    setIsTestingDatabase(true);
+    setError(null);
+    setDatabaseTestResult(null);
+    try {
+      const response = await authService.testSetupDatabase(environmentForm);
+      setDatabaseTestResult({
+        connected: response.data.connected,
+        message: response.data.message || 'Database connection verified.',
+      });
+    } catch (err) {
+      setDatabaseTestResult({
+        connected: false,
+        message: getErrorMessage(err, 'Database connection failed.'),
+      });
+    } finally {
+      setIsTestingDatabase(false);
     }
   };
 
@@ -3277,8 +3322,20 @@ function SetupWizard({
                   </div>
                 </div>
                 {environmentSavedMessage && (
-                  <div className="rounded border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-                    {environmentSavedMessage}
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                    <span>{environmentSavedMessage}</span>
+                    <button type="button" onClick={() => window.location.reload()} className="btn-secondary bg-white text-amber-900 hover:bg-amber-100 dark:bg-gray-950 dark:text-amber-100 dark:hover:bg-gray-900">
+                      Refresh After Restart
+                    </button>
+                  </div>
+                )}
+                {databaseTestResult && (
+                  <div className={`rounded border p-4 text-sm font-semibold ${
+                    databaseTestResult.connected
+                      ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-100'
+                      : 'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100'
+                  }`}>
+                    {databaseTestResult.message}
                   </div>
                 )}
                 <div className="grid gap-4 md:grid-cols-2">
@@ -3351,10 +3408,15 @@ function SetupWizard({
                   </label>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-gray-200 p-4 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-300">
-                  <span>Tables and default roles are initialized after the backend restarts with a valid database connection.</span>
-                  <button type="button" onClick={() => void saveEnvironment()} disabled={!canWriteEnvironment || isSavingEnvironment || isEnvironmentLoading} className="btn-primary disabled:pointer-events-none disabled:opacity-50">
-                    {isSavingEnvironment ? 'Saving...' : 'Save .env'}
-                  </button>
+                  <span>Test the database settings, save `.env`, restart the backend, then refresh this installer.</span>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => void testDatabase()} disabled={!canWriteEnvironment || isTestingDatabase || isEnvironmentLoading} className="btn-secondary disabled:pointer-events-none disabled:opacity-50">
+                      {isTestingDatabase ? 'Testing...' : 'Test Database'}
+                    </button>
+                    <button type="button" onClick={() => void saveEnvironment()} disabled={!canWriteEnvironment || isSavingEnvironment || isEnvironmentLoading} className="btn-primary disabled:pointer-events-none disabled:opacity-50">
+                      {isSavingEnvironment ? 'Saving...' : 'Save .env'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -3634,7 +3696,7 @@ function App() {
       return;
     }
 
-    if (!setupStatus.setupRequired && window.location.pathname === '/install') {
+    if (!setupStatus.setupRequired && !setupStatus.installed && window.location.pathname === '/install') {
       window.history.replaceState({}, document.title, '/');
     }
   }, [isSetupLoading, setupStatus]);
@@ -4823,6 +4885,8 @@ function App() {
             handleLogin(account);
           }}
         />
+      ) : setupStatus?.installed && window.location.pathname === '/install' ? (
+        <InstalledSetupClosedScreen appName={appName} siteName={siteName} />
       ) : !isAuthenticated ? (
         <LoginSplash onLogin={handleLogin} onToast={showToast} appName={appName} siteName={siteName} isExiting={isLoginTransitioning} />
       ) : (

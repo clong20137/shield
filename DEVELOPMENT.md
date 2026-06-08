@@ -20,6 +20,10 @@ npm run dev
 
 ## MySQL Setup
 
+For normal local setup, start the backend and frontend, then open the app. If no administrator account exists, SHIELD redirects to `/install`. The installer can write `backend/.env`, test the database connection, create the database when your MySQL user has permission, and guide you through the first admin account.
+
+After saving `.env` in the installer, restart the backend and refresh `/install`.
+
 ### Using Command Line
 ```bash
 # Connect to MySQL

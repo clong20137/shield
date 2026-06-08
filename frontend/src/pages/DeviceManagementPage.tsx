@@ -1,5 +1,5 @@
 import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Ban, CheckCircle2, Download, Eye, FileText, Laptop, Pencil, Plus, Printer, QrCode, Radio, Router, Save, Smartphone, Trash2, Upload, Wifi, Wrench, X } from 'lucide-react';
+import { AlertTriangle, ArchiveX, Ban, CheckCircle2, Download, Eye, FileText, Laptop, MapPinOff, PackageCheck, Pencil, Plus, Printer, QrCode, Radio, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, deviceService, DeviceEvent, DeviceRecord } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
 
@@ -43,6 +43,43 @@ const deviceIconMap = {
   Radio,
   Cradlepoint: Wifi,
 };
+
+const deviceStatusMeta: Record<DeviceStatus, { icon: typeof CheckCircle2; tone: string; cardTone: string }> = {
+  Available: {
+    icon: PackageCheck,
+    tone: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-200',
+    cardTone: 'bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-200',
+  },
+  Assigned: {
+    icon: UserCheck,
+    tone: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-200',
+    cardTone: 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-200',
+  },
+  Maintenance: {
+    icon: Wrench,
+    tone: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-200',
+    cardTone: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-200',
+  },
+  Damaged: {
+    icon: AlertTriangle,
+    tone: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200',
+    cardTone: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-200',
+  },
+  Lost: {
+    icon: MapPinOff,
+    tone: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200',
+    cardTone: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-200',
+  },
+  Retired: {
+    icon: ArchiveX,
+    tone: 'bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
+    cardTone: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
+  },
+};
+
+function isComplete(value: string | undefined | null): boolean {
+  return Boolean(String(value || '').trim());
+}
 
 function cleanDeviceFormForType(form: DeviceForm): DeviceForm {
   const cleanedForm = { ...form };
@@ -562,17 +599,25 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       {loading && <div className="loading">Loading device inventory...</div>}
 
       <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-        {statusCounts.map((item) => (
-          <button
-            key={item.status}
-            type="button"
-            onClick={() => setStatusFilter(item.status)}
-            className={`rounded-lg bg-white p-4 text-left shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 ${statusFilter === item.status ? 'ring-2 ring-accent' : ''}`}
-          >
-            <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">{item.status}</p>
-            <p className="mt-2 text-3xl font-bold text-primary-500 dark:text-blue-100">{item.count}</p>
-          </button>
-        ))}
+        {statusCounts.map((item) => {
+          const StatusIcon = deviceStatusMeta[item.status].icon;
+          return (
+            <button
+              key={item.status}
+              type="button"
+              onClick={() => setStatusFilter(item.status)}
+              className={`rounded-lg bg-white p-4 text-left shadow transition hover:-translate-y-0.5 hover:shadow-md dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 ${statusFilter === item.status ? 'ring-2 ring-accent' : ''}`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className={`flex h-10 w-10 items-center justify-center rounded ${deviceStatusMeta[item.status].cardTone}`}>
+                  <StatusIcon size={20} />
+                </span>
+                <p className="text-3xl font-bold text-primary-500 dark:text-blue-100">{item.count}</p>
+              </div>
+              <p className="mt-3 text-sm font-semibold text-gray-500 dark:text-gray-400">{item.status}</p>
+            </button>
+          );
+        })}
       </div>
 
       <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
@@ -603,7 +648,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           <div className="mb-4 flex flex-wrap items-center gap-3 rounded bg-gray-50 p-3 dark:bg-gray-950">
             <span className="text-sm font-bold">{selectedDevices.length} selected</span>
             <button type="button" onClick={() => bulkStatusUpdate('Maintenance')} className="btn-secondary" aria-label="Move selected to maintenance" title="Maintenance"><Wrench size={16} /></button>
-            <button type="button" onClick={() => bulkStatusUpdate('Retired')} className="btn-secondary" aria-label="Retire selected devices" title="Retire"><Ban size={16} /></button>
+            <button type="button" onClick={() => bulkStatusUpdate('Retired')} className="btn-secondary" aria-label="Retire selected devices" title="Retire"><ArchiveX size={16} /></button>
             <button type="button" onClick={() => setSelectedDevices([])} className="btn-secondary" aria-label="Clear selected devices" title="Clear"><X size={16} /></button>
           </div>
         )}
@@ -746,35 +791,43 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             <form onSubmit={saveDevice} className="min-h-0 flex-1 overflow-y-auto pr-1">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Field label="Device Type">
-                  <select
-                    value={form.type}
-                    onChange={(event) => {
-                      const nextType = event.target.value as DeviceType;
-                      setForm((current) => cleanDeviceFormForType({ ...current, type: nextType }));
-                    }}
-                    className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-                  >
-                    {deviceTypes.map((type) => <option key={type}>{type}</option>)}
-                  </select>
+                  <InputWithCheck complete={isComplete(form.type)}>
+                    <select
+                      value={form.type}
+                      onChange={(event) => {
+                        const nextType = event.target.value as DeviceType;
+                        setForm((current) => cleanDeviceFormForType({ ...current, type: nextType }));
+                      }}
+                      className={completedInputClass}
+                    >
+                      {deviceTypes.map((type) => <option key={type}>{type}</option>)}
+                    </select>
+                  </InputWithCheck>
                 </Field>
                 <TextField label="Asset Tag" value={form.assetTag} required onChange={(value) => setForm((current) => ({ ...current, assetTag: value }))} />
                 <TextField label="Make / Model" value={form.makeModel} required onChange={(value) => setForm((current) => ({ ...current, makeModel: value }))} />
                 <TextField label="Serial Number" value={form.serialNumber} onChange={(value) => setForm((current) => ({ ...current, serialNumber: value }))} />
                 <Field label="Assigned To">
-                  <select value={form.assignedTo} onChange={(event) => setForm((current) => ({ ...current, assignedTo: event.target.value, status: event.target.value ? 'Assigned' : 'Available' }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
-                    <option value="">Unassigned</option>
-                    {registeredUsers.map((user) => <option key={user.id} value={user.email}>{user.displayName} ({user.email})</option>)}
-                  </select>
+                  <InputWithCheck complete={isComplete(form.assignedTo)}>
+                    <select value={form.assignedTo} onChange={(event) => setForm((current) => ({ ...current, assignedTo: event.target.value, status: event.target.value ? 'Assigned' : 'Available' }))} className={completedInputClass}>
+                      <option value="">Unassigned</option>
+                      {registeredUsers.map((user) => <option key={user.id} value={user.email}>{user.displayName} ({user.email})</option>)}
+                    </select>
+                  </InputWithCheck>
                 </Field>
                 <Field label="Status">
-                  <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as DeviceStatus }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
-                    {deviceStatuses.map((status) => <option key={status}>{status}</option>)}
-                  </select>
+                  <InputWithCheck complete={isComplete(form.status)}>
+                    <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as DeviceStatus }))} className={completedInputClass}>
+                      {deviceStatuses.map((status) => <option key={status}>{status}</option>)}
+                    </select>
+                  </InputWithCheck>
                 </Field>
                 <Field label="Condition">
-                  <select value={form.condition} onChange={(event) => setForm((current) => ({ ...current, condition: event.target.value }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
-                    {deviceConditions.map((condition) => <option key={condition}>{condition}</option>)}
-                  </select>
+                  <InputWithCheck complete={isComplete(form.condition)}>
+                    <select value={form.condition} onChange={(event) => setForm((current) => ({ ...current, condition: event.target.value }))} className={completedInputClass}>
+                      {deviceConditions.map((condition) => <option key={condition}>{condition}</option>)}
+                    </select>
+                  </InputWithCheck>
                 </Field>
                 <TextField label="Location" value={form.location} onChange={(value) => setForm((current) => ({ ...current, location: value }))} />
                 {shouldShowDeviceField(form.type, 'phoneNumber') && <TextField label="Phone Number" value={form.phoneNumber} onChange={(value) => setForm((current) => ({ ...current, phoneNumber: value }))} />}
@@ -790,11 +843,15 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <DateField label="Last Service" value={form.lastServiceDate} onChange={(value) => setForm((current) => ({ ...current, lastServiceDate: value }))} />
                 <label className="block lg:col-span-2">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Event Note</span>
-                  <input value={eventNotes} onChange={(event) => setEventNotes(event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  <InputWithCheck complete={isComplete(eventNotes)}>
+                    <input value={eventNotes} onChange={(event) => setEventNotes(event.target.value)} className={completedInputClass} />
+                  </InputWithCheck>
                 </label>
                 <label className="block lg:col-span-4">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Device Notes</span>
-                  <textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} className="min-h-24 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  <InputWithCheck complete={isComplete(form.notes)} alignTop>
+                    <textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} className={`${completedInputClass} min-h-24 resize-y py-2`} />
+                  </InputWithCheck>
                 </label>
               </div>
 
@@ -923,10 +980,27 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+const completedInputClass = 'w-full rounded border border-gray-300 bg-white px-3 py-2 pr-10 dark:border-gray-700 dark:bg-gray-950';
+
+function InputWithCheck({ children, complete, alignTop = false }: { children: ReactNode; complete: boolean; alignTop?: boolean }) {
+  return (
+    <div className="relative">
+      {children}
+      {complete && (
+        <span className={`pointer-events-none absolute right-3 ${alignTop ? 'top-3' : 'top-1/2 -translate-y-1/2'} flex h-5 w-5 items-center justify-center rounded-full bg-success text-white`}>
+          <CheckCircle2 size={13} />
+        </span>
+      )}
+    </div>
+  );
+}
+
 function TextField({ label, value, onChange, required = false }: { label: string; value: string; onChange: (value: string) => void; required?: boolean }) {
   return (
     <Field label={label}>
-      <input value={value} required={required} onChange={(event) => onChange(event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+      <InputWithCheck complete={isComplete(value)}>
+        <input value={value} required={required} onChange={(event) => onChange(event.target.value)} className={completedInputClass} />
+      </InputWithCheck>
     </Field>
   );
 }
@@ -934,7 +1008,9 @@ function TextField({ label, value, onChange, required = false }: { label: string
 function DateField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
     <Field label={label}>
-      <input type="date" value={value || ''} onChange={(event) => onChange(event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+      <InputWithCheck complete={isComplete(value)}>
+        <input type="date" value={value || ''} onChange={(event) => onChange(event.target.value)} className={completedInputClass} />
+      </InputWithCheck>
     </Field>
   );
 }
@@ -949,8 +1025,13 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 function StatusBadge({ status }: { status: DeviceStatus }) {
-  const tone = status === 'Lost' || status === 'Damaged' ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200' : 'bg-accent/10 text-accent';
-  return <span className={`rounded-full px-3 py-1 text-xs font-bold ${tone}`}>{status}</span>;
+  const StatusIcon = deviceStatusMeta[status].icon;
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${deviceStatusMeta[status].tone}`}>
+      <StatusIcon size={13} />
+      {status}
+    </span>
+  );
 }
 
 export default DeviceManagementPage;

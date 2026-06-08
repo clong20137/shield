@@ -3,6 +3,7 @@
 ## Pre-Deployment Checklist
 
 - [ ] All environment variables are set correctly
+- [ ] First-run installer has been completed and is locked
 - [ ] Database backups are in place
 - [ ] Frontend is built and tested
 - [ ] Backend is built and tested
@@ -12,6 +13,10 @@
 ## Environment Setup
 
 ### Production Environment Variables (.env)
+
+For a new deployment, SHIELD can create or update the backend `.env` from the `/install` page before the first administrator account exists. After saving `.env` in the installer, restart the backend so the new database and security values are loaded.
+
+After the first administrator account is created, the installer is locked by `SETUP_ENV_LOCKED=true` and browser-based environment editing is no longer available.
 
 ```
 # Database
@@ -35,6 +40,7 @@ SMTP_USER=your_smtp_user
 SMTP_PASSWORD=your_smtp_password
 SMTP_FROM=shield@yourdomain.com
 SMTP_SECURE=false
+SETUP_ENV_LOCKED=true
 ```
 
 ## Backend Deployment
@@ -115,12 +121,14 @@ server {
 
 ### MySQL Setup on Production
 
-1. Create database:
+Option A: use the first-run installer. Enter the database host, port, username, password, and database name on `/install`, then use **Test Database**. If the database does not exist, SHIELD will create it when the database user has permission.
+
+Option B: create the database manually:
 ```bash
 mysql -u admin -p < backend/database.sql
 ```
 
-2. Create application user:
+Create an application user:
 ```sql
 CREATE USER 'shield_user'@'localhost' IDENTIFIED BY 'strong_password';
 GRANT ALL PRIVILEGES ON shield.* TO 'shield_user'@'localhost';
