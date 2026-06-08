@@ -16,6 +16,7 @@ import { cleanMultiline, cleanString, isOneOf, isStrongPassword, isValidEmail, n
 
 const DEFAULT_LOGIN_WARNING_MESSAGE = 'This is a Indiana State Police computer application system that is for Official use only. This system is subject to monitoring. Therefore, no expectation of privacy is to be assumed. Individuals found performing unauthorized activities may be subject to disciplinary action including criminal prosecution.';
 const SESSION_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const ADMIN_TEMPORARY_PASSWORD = 'ISP08isp!';
 
 const allowedPermissions = [
   'users:view',
@@ -1173,6 +1174,45 @@ export class AuthController {
     } catch (error) {
       console.error('Change password error:', error);
       res.status(500).json({ error: 'Failed to update password' });
+    }
+  }
+
+  static async adminResetPassword(req: Request, res: Response) {
+    try {
+      const requester = await getSessionAccount(req);
+      if (!requester) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const cleanAccountId = cleanString(req.params.accountId, 36);
+      if (!cleanAccountId) {
+        return res.status(400).json({ error: 'Account is required' });
+      }
+
+      const account = await AuthAccountModel.resetPasswordByAdmin(cleanAccountId, ADMIN_TEMPORARY_PASSWORD);
+      if (!account) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+
+      await AuthSessionModel.revokeAllSessions(cleanAccountId);
+      await AuditLogModel.create({
+        actorId: requester.id,
+        actorName: requester.displayName || requester.email,
+        action: 'auth.password_admin_reset',
+        entityType: 'user',
+        entityId: cleanAccountId,
+        details: JSON.stringify({ temporaryPasswordAssigned: true, mustChangePassword: true }),
+        ...requestAuditFields(req),
+      });
+
+      res.json({
+        account: await withPermissions(account),
+        temporaryPassword: ADMIN_TEMPORARY_PASSWORD,
+        message: 'Password reset successfully',
+      });
+    } catch (error) {
+      console.error('Admin password reset error:', error);
+      res.status(500).json({ error: 'Failed to reset password' });
     }
   }
 

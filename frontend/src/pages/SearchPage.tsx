@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { lazy, Suspense } from 'react';
-import { Camera, Download, MessageSquare, Save, Send, Users, X } from 'lucide-react';
+import { Camera, Download, KeyRound, MessageSquare, Save, Send, Users, X } from 'lucide-react';
 import type { EmojiClickData } from 'emoji-picker-react';
 import { useSearchParams } from 'react-router-dom';
 import { AuthAccount, AuthRole, authService, getAssetUrl, handleAssetImageError, messageService, userService, User, UserFilters } from '../services/api';
@@ -175,6 +175,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [roleOptions, setRoleOptions] = useState<AuthRole[]>([]);
   const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
   const [isSavingUser, setIsSavingUser] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
   const searchRequestRef = useRef(0);
@@ -460,6 +461,34 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       onToast('error', getErrorMessage(err, 'Failed to update user.'));
     } finally {
       setIsSavingUser(false);
+    }
+  };
+
+  const handleAdminPasswordReset = async () => {
+    if (!editingUser || !isAdministrator) {
+      onToast('error', 'Administrator permission required.');
+      return;
+    }
+
+    if (editingUser.id === currentUser?.id) {
+      onToast('error', 'Use Account Settings to change your own password.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Reset ${editingUser.firstName} ${editingUser.lastName}'s password to ISP08isp! and require a password change on next sign-in?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setIsResettingPassword(true);
+    try {
+      const response = await authService.adminResetPassword(editingUser.id);
+      onToast('success', `Password reset\nTemporary password: ${response.data.temporaryPassword}`);
+    } catch (err) {
+      console.error(err);
+      onToast('error', getErrorMessage(err, 'Failed to reset password.'));
+    } finally {
+      setIsResettingPassword(false);
     }
   };
 
@@ -1170,7 +1199,18 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
               </datalist>
             </div>
 
-            <div className="flex shrink-0 flex-wrap justify-end gap-3 border-t border-gray-200 px-4 py-4 dark:border-gray-800 sm:px-5">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-4 py-4 dark:border-gray-800 sm:px-5">
+              <button
+                type="button"
+                onClick={handleAdminPasswordReset}
+                className="btn-secondary"
+                disabled={isResettingPassword || editingUser.id === currentUser?.id}
+                aria-label="Reset user password"
+                title={editingUser.id === currentUser?.id ? 'Use Account Settings for your password' : isResettingPassword ? 'Resetting Password' : 'Reset Password'}
+              >
+                <KeyRound size={16} />
+                <span>{isResettingPassword ? 'Resetting...' : 'Reset Password'}</span>
+              </button>
               <button type="submit" className="btn-primary" disabled={isSavingUser} aria-label="Save user" title={isSavingUser ? 'Saving' : 'Save User'}>
                 <Save size={16} />
                 <span>Save</span>

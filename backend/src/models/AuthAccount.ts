@@ -440,6 +440,24 @@ export class AuthAccountModel {
     }
   }
 
+  static async resetPasswordByAdmin(accountId: string, temporaryPassword: string): Promise<AuthAccount | null> {
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>(
+        'UPDATE users SET `passwordHash` = ?, `mustChangePassword` = 1, `updatedAt` = ? WHERE `id` = ? AND `passwordHash` IS NOT NULL',
+        [hashPassword(temporaryPassword), new Date(), accountId]
+      );
+
+      if (result.affectedRows === 0) {
+        return null;
+      }
+
+      return AuthAccountModel.getAccountById(accountId);
+    } finally {
+      conn.release();
+    }
+  }
+
   static async createTwoFactorSetup(accountId: string): Promise<{ secret: string; otpauthUrl: string } | null> {
     const conn = await pool.getConnection();
     try {

@@ -37,6 +37,7 @@ router.get('/sessions', AuthController.listSessions);
 router.delete('/sessions/:sessionId', AuthController.revokeSession);
 router.post('/sessions/revoke-others', AuthController.revokeOtherSessions);
 router.post('/change-password', passwordChangeLimiter, requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.changePassword);
+router.post('/accounts/:accountId/reset-password', passwordChangeLimiter, requirePermission('roles:manage'), AuthController.adminResetPassword);
 router.post('/2fa/setup', mfaLimiter, requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.setupTwoFactor);
 router.post('/2fa/enable', mfaLimiter, requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.enableTwoFactor);
 router.post('/2fa/disable', mfaLimiter, requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.disableTwoFactor);

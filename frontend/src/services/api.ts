@@ -903,6 +903,9 @@ export const authService = {
   changePassword: (accountId: string, currentPassword: string, newPassword: string) =>
     api.post('/auth/change-password', { accountId, currentPassword, newPassword }),
 
+  adminResetPassword: (accountId: string) =>
+    api.post<{ account: AuthAccount; temporaryPassword: string; message: string }>(`/auth/accounts/${accountId}/reset-password`),
+
   setupTwoFactor: (accountId: string) =>
     api.post<TwoFactorSetupResponse>('/auth/2fa/setup', { accountId }),
 
