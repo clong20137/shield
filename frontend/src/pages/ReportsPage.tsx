@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle2, ChevronLeft, ChevronRight, Download, RotateCcw, Search, X } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, Download, FileText, RotateCcw, Search, Table, X } from 'lucide-react';
 import { AuthAccount, reportService, TrooperDailyReportEntry } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import PerformanceEvaluationsPage from './PerformanceEvaluationsPage';
@@ -169,7 +169,7 @@ const ReportsPage: React.FC<{
   const [dailyScope, setDailyScope] = useState<'all' | 'own' | 'supervised'>('own');
   const [dailyLoading, setDailyLoading] = useState(true);
   const [dailyExportFormat, setDailyExportFormat] = useState<DailyExportFormat>('csv');
-  const [selectedDailyExportFormat, setSelectedDailyExportFormat] = useState<DailyExportFormat>('pdf');
+  const [isSelectedDailyExportMenuOpen, setIsSelectedDailyExportMenuOpen] = useState(false);
   const [rowDailyExportFormats, setRowDailyExportFormats] = useState<Record<string, DailyExportFormat>>({});
   const [dailyExporting, setDailyExporting] = useState(false);
   const [dailyError, setDailyError] = useState<string | null>(null);
@@ -326,6 +326,7 @@ const ReportsPage: React.FC<{
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        setIsSelectedDailyExportMenuOpen(false);
         setSelectedDaily(null);
       }
     };
@@ -336,6 +337,7 @@ const ReportsPage: React.FC<{
   }, []);
 
   const openDailyReport = (entry: TrooperDailyReportEntry) => {
+    setIsSelectedDailyExportMenuOpen(false);
     setSelectedDaily(entry);
     setReviewNotes(entry.reviewNotes || '');
   };
@@ -345,7 +347,7 @@ const ReportsPage: React.FC<{
     return `trooper-daily-${entry.date}-${user}`;
   };
 
-  const exportSingleDaily = (entry: TrooperDailyReportEntry, format = selectedDailyExportFormat) => {
+  const exportSingleDaily = (entry: TrooperDailyReportEntry, format: DailyExportFormat = 'pdf') => {
     const label = getDailyExportLabel(entry);
     if (format === 'csv') {
       downloadTrooperDailiesCsv([entry], label);
@@ -612,28 +614,54 @@ const ReportsPage: React.FC<{
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <select
-                  value={selectedDailyExportFormat}
-                  onChange={(event) => setSelectedDailyExportFormat(event.target.value as DailyExportFormat)}
-                  className="rounded border border-white/25 bg-white px-3 py-2 text-sm font-semibold text-primary-500 shadow-sm"
-                  aria-label="Selected report export format"
-                >
-                  <option value="pdf">PDF</option>
-                  <option value="csv">CSV</option>
-                  <option value="xls">XLS</option>
-                </select>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setIsSelectedDailyExportMenuOpen((value) => !value);
+                    }}
+                    className="flex h-10 w-10 items-center justify-center rounded border border-white/20 bg-white/10 text-white hover:bg-white/20"
+                    aria-expanded={isSelectedDailyExportMenuOpen}
+                    aria-haspopup="menu"
+                    aria-label="Export selected Trooper Daily report"
+                    title="Export"
+                  >
+                    <Download size={18} />
+                  </button>
+                  {isSelectedDailyExportMenuOpen && (
+                    <div className="absolute right-0 top-12 z-20 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 text-gray-800 shadow-xl dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" role="menu">
+                      {([
+                        { format: 'pdf' as const, label: 'PDF', icon: FileText },
+                        { format: 'csv' as const, label: 'CSV', icon: Download },
+                        { format: 'xls' as const, label: 'XLS', icon: Table },
+                      ]).map((item) => {
+                        const ExportIcon = item.icon;
+                        return (
+                          <button
+                            key={item.format}
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              exportSingleDaily(selectedDaily, item.format);
+                              setIsSelectedDailyExportMenuOpen(false);
+                            }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+                            role="menuitem"
+                          >
+                            <ExportIcon size={15} /> {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
-                  onClick={() => exportSingleDaily(selectedDaily)}
-                  className="flex h-10 w-10 items-center justify-center rounded border border-white/20 bg-white/10 text-white hover:bg-white/20"
-                  aria-label="Download selected Trooper Daily report"
-                  title="Download"
-                >
-                  <Download size={18} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedDaily(null)}
+                  onClick={() => {
+                    setIsSelectedDailyExportMenuOpen(false);
+                    setSelectedDaily(null);
+                  }}
                   className="icon-close-button border-white/20 bg-white/10 text-white hover:bg-white/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
                   aria-label="Close Trooper Daily report"
                   title="Close"

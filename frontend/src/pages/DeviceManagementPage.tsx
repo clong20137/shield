@@ -798,7 +798,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                         const nextType = event.target.value as DeviceType;
                         setForm((current) => cleanDeviceFormForType({ ...current, type: nextType }));
                       }}
-                      className={completedInputClass}
+                      className={getCompletedInputClass(isComplete(form.type))}
                     >
                       {deviceTypes.map((type) => <option key={type}>{type}</option>)}
                     </select>
@@ -809,7 +809,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <TextField label="Serial Number" value={form.serialNumber} onChange={(value) => setForm((current) => ({ ...current, serialNumber: value }))} />
                 <Field label="Assigned To">
                   <InputWithCheck complete={isComplete(form.assignedTo)}>
-                    <select value={form.assignedTo} onChange={(event) => setForm((current) => ({ ...current, assignedTo: event.target.value, status: event.target.value ? 'Assigned' : 'Available' }))} className={completedInputClass}>
+                    <select value={form.assignedTo} onChange={(event) => setForm((current) => ({ ...current, assignedTo: event.target.value, status: event.target.value ? 'Assigned' : 'Available' }))} className={getCompletedInputClass(isComplete(form.assignedTo))}>
                       <option value="">Unassigned</option>
                       {registeredUsers.map((user) => <option key={user.id} value={user.email}>{user.displayName} ({user.email})</option>)}
                     </select>
@@ -817,14 +817,14 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 </Field>
                 <Field label="Status">
                   <InputWithCheck complete={isComplete(form.status)}>
-                    <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as DeviceStatus }))} className={completedInputClass}>
+                    <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as DeviceStatus }))} className={getCompletedInputClass(isComplete(form.status))}>
                       {deviceStatuses.map((status) => <option key={status}>{status}</option>)}
                     </select>
                   </InputWithCheck>
                 </Field>
                 <Field label="Condition">
                   <InputWithCheck complete={isComplete(form.condition)}>
-                    <select value={form.condition} onChange={(event) => setForm((current) => ({ ...current, condition: event.target.value }))} className={completedInputClass}>
+                    <select value={form.condition} onChange={(event) => setForm((current) => ({ ...current, condition: event.target.value }))} className={getCompletedInputClass(isComplete(form.condition))}>
                       {deviceConditions.map((condition) => <option key={condition}>{condition}</option>)}
                     </select>
                   </InputWithCheck>
@@ -844,13 +844,13 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <label className="block lg:col-span-2">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Event Note</span>
                   <InputWithCheck complete={isComplete(eventNotes)}>
-                    <input value={eventNotes} onChange={(event) => setEventNotes(event.target.value)} className={completedInputClass} />
+                    <input value={eventNotes} onChange={(event) => setEventNotes(event.target.value)} className={getCompletedInputClass(isComplete(eventNotes))} />
                   </InputWithCheck>
                 </label>
                 <label className="block lg:col-span-4">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Device Notes</span>
                   <InputWithCheck complete={isComplete(form.notes)} alignTop>
-                    <textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} className={`${completedInputClass} min-h-24 resize-y py-2`} />
+                    <textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} className={`${getCompletedInputClass(isComplete(form.notes))} min-h-24 resize-y py-2`} />
                   </InputWithCheck>
                 </label>
               </div>
@@ -980,15 +980,21 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-const completedInputClass = 'w-full rounded border border-gray-300 bg-white px-3 py-2 pr-10 dark:border-gray-700 dark:bg-gray-950';
+function getCompletedInputClass(complete: boolean): string {
+  return `w-full rounded border bg-white px-3 py-2 pr-8 transition dark:bg-gray-950 ${
+    complete
+      ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
+      : 'border-gray-300 dark:border-gray-700'
+  }`;
+}
 
 function InputWithCheck({ children, complete, alignTop = false }: { children: ReactNode; complete: boolean; alignTop?: boolean }) {
   return (
     <div className="relative">
       {children}
       {complete && (
-        <span className={`pointer-events-none absolute right-3 ${alignTop ? 'top-3' : 'top-1/2 -translate-y-1/2'} flex h-5 w-5 items-center justify-center rounded-full bg-success text-white`}>
-          <CheckCircle2 size={13} />
+        <span className={`pointer-events-none absolute right-3 ${alignTop ? 'top-3' : 'top-1/2 -translate-y-1/2'} flex items-center text-green-600 dark:text-green-300`}>
+          <CheckCircle2 className="trooper-daily-check" size={16} />
         </span>
       )}
     </div>
@@ -996,20 +1002,22 @@ function InputWithCheck({ children, complete, alignTop = false }: { children: Re
 }
 
 function TextField({ label, value, onChange, required = false }: { label: string; value: string; onChange: (value: string) => void; required?: boolean }) {
+  const complete = isComplete(value);
   return (
     <Field label={label}>
-      <InputWithCheck complete={isComplete(value)}>
-        <input value={value} required={required} onChange={(event) => onChange(event.target.value)} className={completedInputClass} />
+      <InputWithCheck complete={complete}>
+        <input value={value} required={required} onChange={(event) => onChange(event.target.value)} className={getCompletedInputClass(complete)} />
       </InputWithCheck>
     </Field>
   );
 }
 
 function DateField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const complete = isComplete(value);
   return (
     <Field label={label}>
-      <InputWithCheck complete={isComplete(value)}>
-        <input type="date" value={value || ''} onChange={(event) => onChange(event.target.value)} className={completedInputClass} />
+      <InputWithCheck complete={complete}>
+        <input type="date" value={value || ''} onChange={(event) => onChange(event.target.value)} className={getCompletedInputClass(complete)} />
       </InputWithCheck>
     </Field>
   );
