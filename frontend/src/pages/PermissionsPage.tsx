@@ -629,8 +629,8 @@ function PermissionsPage({
         </div>
       )}
       {editingRole && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <form onSubmit={saveRoleEdit} className="modal-window w-full max-w-3xl rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 sm:p-6">
+          <form onSubmit={saveRoleEdit} className="modal-window my-4 max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900 sm:my-6 sm:max-h-[calc(100vh-3rem)] sm:p-6">
             <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Edit Role</h2>

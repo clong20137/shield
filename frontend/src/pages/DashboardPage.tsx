@@ -1265,7 +1265,9 @@ function PinnedProfilesWidget({
 
   const loadProfiles = useCallback(async () => {
     if (!currentUser) {
-      setProfiles([]);
+      setProfiles(initialProfiles ?? []);
+      setError(null);
+      setIsLoading(false);
       return;
     }
 
@@ -1276,11 +1278,12 @@ function PinnedProfilesWidget({
       setProfiles(response.data);
     } catch (err) {
       console.error('Failed to load pinned profiles:', err);
-      setError('Failed to load pinned profiles.');
+      setProfiles((currentProfiles) => (currentProfiles.length > 0 ? currentProfiles : initialProfiles ?? []));
+      setError(null);
     } finally {
       setIsLoading(false);
     }
-  }, [currentUser]);
+  }, [currentUser, initialProfiles]);
 
   useEffect(() => {
     if (!initialProfiles) {
