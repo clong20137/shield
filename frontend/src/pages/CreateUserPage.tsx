@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
-import { Camera, FolderUp, Upload, UserPlus } from 'lucide-react';
+import { Camera, FolderUp, Search, Upload, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CreateUserPayload, User, userService } from '../services/api';
 import { rankOptions } from '../constants/ranks';
@@ -93,6 +93,9 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
   const [form, setForm] = useState<UserForm>(emptyUserForm);
   const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
   const [addressLookupQuery, setAddressLookupQuery] = useState('');
+  const [supervisorResults, setSupervisorResults] = useState<User[]>([]);
+  const [isSupervisorSearchOpen, setIsSupervisorSearchOpen] = useState(false);
+  const [isSearchingSupervisors, setIsSearchingSupervisors] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isImportingPhotos, setIsImportingPhotos] = useState(false);
@@ -150,6 +153,50 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
       window.clearTimeout(timer);
     };
   }, [addressLookupQuery]);
+
+  useEffect(() => {
+    const query = form.supervisor.trim();
+    if (!isSupervisorSearchOpen || query.length < 2) {
+      setSupervisorResults([]);
+      setIsSearchingSupervisors(false);
+      return undefined;
+    }
+
+    let isMounted = true;
+    setIsSearchingSupervisors(true);
+    const timer = window.setTimeout(() => {
+      userService.search(query)
+        .then((response) => {
+          if (!isMounted) {
+            return;
+          }
+
+          setSupervisorResults((response.data as User[]).slice(0, 6));
+        })
+        .catch(() => {
+          if (isMounted) {
+            setSupervisorResults([]);
+          }
+        })
+        .finally(() => {
+          if (isMounted) {
+            setIsSearchingSupervisors(false);
+          }
+        });
+    }, 250);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timer);
+    };
+  }, [form.supervisor, isSupervisorSearchOpen]);
+
+  const selectSupervisor = (user: User) => {
+    const supervisorName = `${user.firstName} ${user.lastName}`.trim() || user.email;
+    updateField('supervisor', supervisorName);
+    setSupervisorResults([]);
+    setIsSupervisorSearchOpen(false);
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -397,7 +444,41 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Supervisor</span>
-            <input value={form.supervisor} onChange={(event) => updateField('supervisor', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <input
+                value={form.supervisor}
+                onFocus={() => setIsSupervisorSearchOpen(true)}
+                onChange={(event) => {
+                  updateField('supervisor', event.target.value);
+                  setIsSupervisorSearchOpen(true);
+                }}
+                className="w-full rounded border border-gray-300 bg-white py-2 pl-9 pr-3 dark:border-gray-700 dark:bg-gray-950"
+                placeholder="Search supervisor"
+                autoComplete="off"
+              />
+              {isSupervisorSearchOpen && (form.supervisor.trim().length >= 2 || supervisorResults.length > 0) && (
+                <div className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded border border-gray-200 bg-white p-1 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                  {isSearchingSupervisors && <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">Searching...</div>}
+                  {!isSearchingSupervisors && supervisorResults.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No users found.</div>
+                  )}
+                  {supervisorResults.map((user) => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      onClick={() => selectSupervisor(user)}
+                      className="flex w-full items-center justify-between gap-3 rounded px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold text-gray-800 dark:text-gray-100">{`${user.firstName} ${user.lastName}`.trim() || user.email}</span>
+                        <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{[user.rank, user.district, user.email].filter(Boolean).join(' - ')}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </label>
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Sex</span>

@@ -4434,11 +4434,14 @@ function App() {
   useEffect(() => {
     if (!isAdministrator) {
       setBugReports([]);
+      if (notificationCenterTab === 'bugs') {
+        setNotificationCenterTab('unread');
+      }
       return;
     }
 
     void loadBugReports();
-  }, [isAdministrator, loadBugReports]);
+  }, [isAdministrator, loadBugReports, notificationCenterTab]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -5051,10 +5054,10 @@ function App() {
                             </button>
                           )}
                         </div>
-                        <div className="mt-3 grid grid-cols-3 gap-1 rounded border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900">
+                        <div className={`mt-3 grid gap-1 rounded border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900 ${isAdministrator ? 'grid-cols-3' : 'grid-cols-2'}`}>
                           {[
                             { id: 'unread' as const, label: 'Unread', count: unreadNotificationCount },
-                            { id: 'bugs' as const, label: 'Bugs', count: isAdministrator ? openBugCount : 0 },
+                            ...(isAdministrator ? [{ id: 'bugs' as const, label: 'Bugs', count: openBugCount }] : []),
                             { id: 'recent' as const, label: 'Recent', count: recentNotificationCount },
                           ].map((tab) => (
                             <button

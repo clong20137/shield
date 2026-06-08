@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Award, Flag, Gauge, Medal, Plus, Save, ShieldCheck, Star, Trash2, Trophy, X } from 'lucide-react';
+import { Award, BookOpenCheck, BriefcaseBusiness, Flag, Gauge, GraduationCap, Medal, Plus, Save, ShieldCheck, Star, Trash2, Trophy, X } from 'lucide-react';
 import { MileageAchievement, mileageService } from '../services/api';
 
 interface AchievementsPageProps {
@@ -8,16 +8,27 @@ interface AchievementsPageProps {
 }
 
 const achievementIcons = [
+  { value: 'award', label: 'Award', icon: Award },
   { value: 'gauge', label: 'Gauge', icon: Gauge },
   { value: 'trophy', label: 'Trophy', icon: Trophy },
   { value: 'star', label: 'Star', icon: Star },
   { value: 'medal', label: 'Medal', icon: Medal },
   { value: 'flag', label: 'Flag', icon: Flag },
   { value: 'shield', label: 'Shield', icon: ShieldCheck },
-  { value: 'award', label: 'Award', icon: Award },
+  { value: 'training', label: 'Training', icon: GraduationCap },
+  { value: 'service', label: 'Service', icon: BriefcaseBusiness },
+  { value: 'certification', label: 'Certification', icon: BookOpenCheck },
 ] as const;
 
-const emptyForm = { title: '', mileage: 1000, icon: 'gauge' };
+const achievementTypes = [
+  { value: 'mileage', label: 'Mileage', unit: 'miles' },
+  { value: 'training', label: 'Training', unit: 'hours' },
+  { value: 'service', label: 'Service', unit: 'years' },
+  { value: 'certification', label: 'Certification', unit: 'certifications' },
+  { value: 'custom', label: 'Custom', unit: 'points' },
+] as const;
+
+const emptyForm = { title: '', achievementType: 'mileage', targetValue: 1000, targetLabel: 'miles', description: '', icon: 'gauge' };
 
 export function getAchievementIcon(icon: string) {
   return achievementIcons.find((item) => item.value === icon)?.icon || Gauge;
@@ -62,6 +73,28 @@ function AchievementsPage({ onToast, getErrorMessage }: AchievementsPageProps) {
     setEditing(null);
   };
 
+  const updateAchievementType = (achievementType: string) => {
+    const selectedType = achievementTypes.find((type) => type.value === achievementType);
+    setForm((current) => ({
+      ...current,
+      achievementType,
+      targetLabel: selectedType?.unit || current.targetLabel,
+      icon: achievementType === 'mileage' ? 'gauge' : current.icon === 'gauge' ? 'award' : current.icon,
+    }));
+  };
+
+  const startEditing = (achievement: MileageAchievement) => {
+    setEditing(achievement);
+    setForm({
+      title: achievement.title,
+      achievementType: achievement.achievementType || 'mileage',
+      targetValue: achievement.targetValue || achievement.mileage,
+      targetLabel: achievement.targetLabel || (achievement.achievementType === 'mileage' ? 'miles' : ''),
+      description: achievement.description || '',
+      icon: achievement.icon,
+    });
+  };
+
   const submitAchievement = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -70,15 +103,23 @@ function AchievementsPage({ onToast, getErrorMessage }: AchievementsPageProps) {
       return;
     }
 
-    if (!Number.isFinite(form.mileage) || form.mileage <= 0) {
-      onToast('error', 'Mileage must be greater than zero.');
+    if (!Number.isFinite(form.targetValue) || form.targetValue <= 0) {
+      onToast('error', 'Achievement target must be greater than zero.');
       return;
     }
 
     setIsSaving(true);
     setError(null);
     try {
-      const payload = { title: form.title.trim(), mileage: form.mileage, icon: form.icon };
+      const payload = {
+        title: form.title.trim(),
+        achievementType: form.achievementType,
+        targetValue: form.targetValue,
+        targetLabel: form.targetLabel.trim(),
+        description: form.description.trim(),
+        mileage: form.achievementType === 'mileage' ? form.targetValue : form.targetValue,
+        icon: form.icon,
+      };
       const response = editing
         ? await mileageService.updateAchievement(editing.id, payload)
         : await mileageService.createAchievement(payload);
@@ -87,7 +128,7 @@ function AchievementsPage({ onToast, getErrorMessage }: AchievementsPageProps) {
         const next = editing
           ? items.map((item) => (item.id === editing.id ? response.data : item))
           : [...items, response.data];
-        return next.sort((a, b) => a.mileage - b.mileage || a.title.localeCompare(b.title));
+        return next.sort((a, b) => a.achievementType.localeCompare(b.achievementType) || a.targetValue - b.targetValue || a.title.localeCompare(b.title));
       });
       resetForm();
       onToast('success', editing ? 'Achievement updated.' : 'Achievement created.');
@@ -124,13 +165,13 @@ function AchievementsPage({ onToast, getErrorMessage }: AchievementsPageProps) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Achievements</h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Create mileage milestones shown on user profiles.</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Create mileage, training, service, certification, or custom achievements shown on user profiles.</p>
         </div>
       </div>
 
       {error && <div className="error">{error}</div>}
 
-      <form onSubmit={submitAchievement} className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900 md:grid-cols-[minmax(0,1.4fr)_160px_190px_auto_auto]">
+      <form onSubmit={submitAchievement} className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900 md:grid-cols-2 xl:grid-cols-[minmax(0,1.3fr)_170px_130px_140px_180px_auto_auto]">
         <label>
           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Achievement Name</span>
           <input
@@ -141,14 +182,35 @@ function AchievementsPage({ onToast, getErrorMessage }: AchievementsPageProps) {
           />
         </label>
         <label>
-          <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Miles</span>
+          <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Type</span>
+          <select
+            value={form.achievementType}
+            onChange={(event) => updateAchievementType(event.target.value)}
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+          >
+            {achievementTypes.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Target</span>
           <input
             type="number"
             min={1}
             step={1}
-            value={form.mileage}
-            onChange={(event) => setForm((current) => ({ ...current, mileage: Math.max(1, Number(event.target.value) || 1) }))}
+            value={form.targetValue}
+            onChange={(event) => setForm((current) => ({ ...current, targetValue: Math.max(1, Number(event.target.value) || 1) }))}
             className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+          />
+        </label>
+        <label>
+          <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Unit</span>
+          <input
+            value={form.targetLabel}
+            onChange={(event) => setForm((current) => ({ ...current, targetLabel: event.target.value }))}
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+            placeholder="hours"
           />
         </label>
         <label>
@@ -162,6 +224,15 @@ function AchievementsPage({ onToast, getErrorMessage }: AchievementsPageProps) {
               <option key={item.value} value={item.value}>{item.label}</option>
             ))}
           </select>
+        </label>
+        <label className="md:col-span-2 xl:col-span-5">
+          <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Description</span>
+          <input
+            value={form.description}
+            onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+            placeholder="Optional context for how this achievement is earned"
+          />
         </label>
         <button type="submit" className="btn-primary self-end" disabled={isSaving} aria-label={editing ? 'Save achievement' : 'Create achievement'} title={editing ? 'Save Achievement' : 'Create Achievement'}>
           {editing ? <Save size={16} /> : <Plus size={16} />}
@@ -191,11 +262,14 @@ function AchievementsPage({ onToast, getErrorMessage }: AchievementsPageProps) {
                       </div>
                       <div className="min-w-0">
                         <p className="truncate font-bold text-gray-900 dark:text-gray-100">{achievement.title}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{achievement.mileage.toLocaleString()} miles</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {(achievement.achievementType || 'mileage').replace(/^\w/u, (letter) => letter.toUpperCase())} - {(achievement.targetValue || achievement.mileage).toLocaleString()} {achievement.targetLabel || (achievement.achievementType === 'mileage' ? 'miles' : '')}
+                        </p>
+                        {achievement.description && <p className="mt-1 line-clamp-2 text-xs text-gray-400">{achievement.description}</p>}
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => { setEditing(achievement); setForm({ title: achievement.title, mileage: achievement.mileage, icon: achievement.icon }); }} className="btn-secondary" aria-label={`Edit ${achievement.title}`} title="Edit">
+                      <button type="button" onClick={() => startEditing(achievement)} className="btn-secondary" aria-label={`Edit ${achievement.title}`} title="Edit">
                         <Save size={16} />
                       </button>
                       <button type="button" onClick={() => deleteAchievement(achievement)} className="btn-danger" disabled={isSaving} aria-label={`Delete ${achievement.title}`} title="Delete">

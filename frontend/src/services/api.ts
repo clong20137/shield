@@ -797,10 +797,16 @@ export interface MileageAchievement {
   id: string;
   title: string;
   mileage: number;
+  achievementType: string;
+  targetValue: number;
+  targetLabel: string;
+  description: string;
   icon: string;
   createdAt: string;
   updatedAt: string;
 }
+
+export type AchievementPayload = Pick<MileageAchievement, 'title' | 'mileage' | 'achievementType' | 'targetValue' | 'targetLabel' | 'description' | 'icon'>;
 
 export type QuickLaunchExternalSlot = {
   type: 'external';
@@ -1293,10 +1299,10 @@ export const mileageService = {
   getAchievements: () =>
     api.get<MileageAchievement[]>('/mileage/achievements'),
 
-  createAchievement: (achievement: Pick<MileageAchievement, 'title' | 'mileage' | 'icon'>) =>
+  createAchievement: (achievement: AchievementPayload) =>
     api.post<MileageAchievement>('/mileage/achievements', achievement),
 
-  updateAchievement: (id: string, achievement: Pick<MileageAchievement, 'title' | 'mileage' | 'icon'>) =>
+  updateAchievement: (id: string, achievement: AchievementPayload) =>
     api.put<MileageAchievement>(`/mileage/achievements/${id}`, achievement),
 
   deleteAchievement: (id: string) =>

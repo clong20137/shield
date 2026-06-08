@@ -8,6 +8,21 @@ import { broadcastAppEvent } from '../services/appEvents';
 import { cleanString } from '../utils/validation';
 
 const MILEAGE_SETTING = 'mileageMilestone';
+const achievementTypes = new Set(['mileage', 'training', 'service', 'certification', 'custom']);
+
+function cleanAchievementPayload(body: Record<string, unknown>) {
+  const title = cleanString(body?.title, 120);
+  const icon = cleanString(body?.icon, 50) || 'award';
+  const requestedType = cleanString(body?.achievementType, 50) || 'mileage';
+  const achievementType = achievementTypes.has(requestedType) ? requestedType : 'custom';
+  const rawTarget = body?.targetValue ?? body?.mileage;
+  const targetValue = Number(rawTarget);
+  const mileage = achievementType === 'mileage' ? targetValue : Number(body?.mileage) || targetValue;
+  const targetLabel = cleanString(body?.targetLabel, 80) || (achievementType === 'mileage' ? 'miles' : '');
+  const description = cleanString(body?.description, 500);
+
+  return { title, icon, achievementType, targetValue, mileage, targetLabel, description };
+}
 
 export class MileageController {
   static async getSummaryForAccount(req: Request, res: Response) {
@@ -80,19 +95,17 @@ export class MileageController {
 
   static async createAchievement(req: Request, res: Response) {
     try {
-      const title = cleanString(req.body?.title, 120);
-      const icon = cleanString(req.body?.icon, 50) || 'gauge';
-      const mileage = Number(req.body?.mileage);
+      const payload = cleanAchievementPayload(req.body);
 
-      if (!title) {
+      if (!payload.title) {
         return res.status(400).json({ error: 'Achievement title is required' });
       }
 
-      if (!Number.isFinite(mileage) || mileage <= 0) {
-        return res.status(400).json({ error: 'Achievement mileage must be greater than zero' });
+      if (!Number.isFinite(payload.targetValue) || payload.targetValue <= 0) {
+        return res.status(400).json({ error: 'Achievement target must be greater than zero' });
       }
 
-      const achievement = await MileageAchievementModel.create({ title, mileage, icon });
+      const achievement = await MileageAchievementModel.create(payload);
       broadcastAppEvent({ type: 'mileage-updated' });
       res.status(201).json(achievement);
     } catch (error) {
@@ -103,19 +116,17 @@ export class MileageController {
 
   static async updateAchievement(req: Request, res: Response) {
     try {
-      const title = cleanString(req.body?.title, 120);
-      const icon = cleanString(req.body?.icon, 50) || 'gauge';
-      const mileage = Number(req.body?.mileage);
+      const payload = cleanAchievementPayload(req.body);
 
-      if (!title) {
+      if (!payload.title) {
         return res.status(400).json({ error: 'Achievement title is required' });
       }
 
-      if (!Number.isFinite(mileage) || mileage <= 0) {
-        return res.status(400).json({ error: 'Achievement mileage must be greater than zero' });
+      if (!Number.isFinite(payload.targetValue) || payload.targetValue <= 0) {
+        return res.status(400).json({ error: 'Achievement target must be greater than zero' });
       }
 
-      const achievement = await MileageAchievementModel.update(req.params.id, { title, mileage, icon });
+      const achievement = await MileageAchievementModel.update(req.params.id, payload);
       if (!achievement) {
         return res.status(404).json({ error: 'Achievement not found' });
       }

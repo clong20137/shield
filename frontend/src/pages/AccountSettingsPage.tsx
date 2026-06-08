@@ -71,6 +71,8 @@ export function AccountSettingsPage({
   const [isAssignedDevicesLoading, setIsAssignedDevicesLoading] = useState(false);
   const [isRevokingSessions, setIsRevokingSessions] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'devices' | 'reports' | 'preferences'>('general');
+  const [evaluationCount, setEvaluationCount] = useState<number | null>(null);
+  const [isEvaluationsLoading, setIsEvaluationsLoading] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -279,11 +281,52 @@ export function AccountSettingsPage({
         (evaluation) => evaluation.employeeAccountId === account.id || evaluation.supervisorAccountId === account.id,
       );
 
+      if (evaluations.length === 0) {
+        setEvaluationCount(0);
+        onToast('info', 'No performance evaluations are available to download.');
+        return;
+      }
+
+      setEvaluationCount(evaluations.length);
       downloadPerformanceEvaluationPdf(evaluations);
     } catch (error) {
       onToast('error', getErrorMessage(error, 'Failed to download performance reports.'));
     }
   };
+
+  useEffect(() => {
+    if (activeTab !== 'reports') {
+      return;
+    }
+
+    let isMounted = true;
+    setIsEvaluationsLoading(true);
+    performanceEvaluationService.getAll()
+      .then((response) => {
+        if (!isMounted) {
+          return;
+        }
+
+        const availableEvaluations = response.data.filter(
+          (evaluation) => evaluation.employeeAccountId === account.id || evaluation.supervisorAccountId === account.id,
+        );
+        setEvaluationCount(availableEvaluations.length);
+      })
+      .catch(() => {
+        if (isMounted) {
+          setEvaluationCount(null);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsEvaluationsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [account.id, activeTab]);
 
   return (
     <div className="space-y-3 pb-1">
@@ -597,10 +640,18 @@ export function AccountSettingsPage({
                 <Link to="/evaluations" onClick={onOpenEvaluations} className="btn-secondary" aria-label="Open performance evaluations" title="Open Evaluations">
                   <ExternalLink size={16} />
                 </Link>
-                <button type="button" onClick={downloadPerformanceEvaluations} className="btn-primary" aria-label="Download performance evaluations PDF" title="Download PDF">
+                <button
+                  type="button"
+                  onClick={downloadPerformanceEvaluations}
+                  className="btn-primary"
+                  disabled={isEvaluationsLoading || evaluationCount === 0}
+                  aria-label="Download performance evaluations PDF"
+                  title={isEvaluationsLoading ? 'Checking evaluations' : evaluationCount === 0 ? 'No evaluations available' : 'Download PDF'}
+                >
                   <Download size={16} />
                 </button>
               </div>
+              {evaluationCount === 0 && <p className="mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400">No evaluations are available for this account.</p>}
             </div>
           </div>
         </section>

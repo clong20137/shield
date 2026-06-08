@@ -11,7 +11,9 @@ export class NotificationController {
         return res.status(401).json({ error: 'Sign in required' });
       }
 
-      const notifications = await UserNotificationModel.listForUser(account.id);
+      const notifications = (await UserNotificationModel.listForUser(account.id)).filter((notification) => (
+        account.role === 'administrator' || (notification.type !== 'bug' && notification.entityType !== 'bug_report')
+      ));
       res.json(notifications);
     } catch (error) {
       console.error('List notifications error:', error);

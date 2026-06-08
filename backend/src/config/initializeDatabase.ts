@@ -542,6 +542,10 @@ export async function initializeDatabase() {
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`title\` VARCHAR(120) NOT NULL,
       \`mileage\` DECIMAL(10,2) NOT NULL,
+      \`achievementType\` VARCHAR(50) NOT NULL DEFAULT 'mileage',
+      \`targetValue\` DECIMAL(10,2) NULL,
+      \`targetLabel\` VARCHAR(80),
+      \`description\` TEXT,
       \`icon\` VARCHAR(50) NOT NULL DEFAULT 'gauge',
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -553,6 +557,11 @@ export async function initializeDatabase() {
     INSERT IGNORE INTO mileage_achievements (\`id\`, \`title\`, \`mileage\`, \`icon\`)
     VALUES ('achievement-mileage-1000', '1,000 Mile Mark', 1000, 'gauge')
   `);
+  await ensureColumn('mileage_achievements', 'achievementType', "`achievementType` VARCHAR(50) NOT NULL DEFAULT 'mileage'");
+  await ensureColumn('mileage_achievements', 'targetValue', '`targetValue` DECIMAL(10,2) NULL');
+  await ensureColumn('mileage_achievements', 'targetLabel', '`targetLabel` VARCHAR(80)');
+  await ensureColumn('mileage_achievements', 'description', '`description` TEXT');
+  await pool.query("UPDATE mileage_achievements SET `achievementType` = 'mileage', `targetValue` = `mileage`, `targetLabel` = 'miles' WHERE `achievementType` IS NULL OR `achievementType` = ''");
 
   await pool.query(`
     INSERT IGNORE INTO system_settings (\`settingKey\`, \`settingValue\`)
