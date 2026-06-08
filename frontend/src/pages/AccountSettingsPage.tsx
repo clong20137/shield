@@ -35,6 +35,12 @@ function getAccountInitials(account: AuthAccount): string {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
+const PASSWORD_REQUIREMENTS_MESSAGE = 'New password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.';
+
+function isSecurePassword(password: string): boolean {
+  return password.length >= 12 && /[A-Z]/u.test(password) && /[a-z]/u.test(password) && /\d/u.test(password) && /[^A-Za-z0-9]/u.test(password);
+}
+
 export function AccountSettingsPage({
   account,
   messagePreferences,
@@ -172,6 +178,11 @@ export function AccountSettingsPage({
 
     if (newPassword !== confirmNewPassword) {
       onToast('error', 'New passwords do not match.');
+      return;
+    }
+
+    if (!isSecurePassword(newPassword)) {
+      onToast('error', PASSWORD_REQUIREMENTS_MESSAGE);
       return;
     }
 

@@ -8,7 +8,7 @@ import { getSessionAccount } from '../middleware/authSession';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { AuthSessionModel } from '../models/AuthSession';
 import { AuditLogModel } from '../models/AuditLog';
-import { cleanMultiline, cleanString, isOneOf, isStrongPassword, isValidEmail, isValidPhone, normalizeEmail, normalizePhone } from '../utils/validation';
+import { cleanMultiline, cleanString, isOneOf, isStrongPassword, isValidEmail, isValidPhone, normalizeEmail, normalizePhone, strongPasswordMessage } from '../utils/validation';
 import { isSafeUploadedImage } from '../middleware/profileUpload';
 import { parsePagination } from '../utils/pagination';
 import { createImageThumbnails } from '../services/imageThumbnails';
@@ -17,7 +17,7 @@ const employmentTypes = ['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inact
 const userStatuses = ['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Administrative Duty', 'Inactive'] as const;
 const sexOptions = ['Male', 'Female'] as const;
 const maritalStatuses = ['Single', 'Married', 'Divorced', 'Widowed'] as const;
-const DEFAULT_IMPORT_PASSWORD = 'ISP08isp!';
+const DEFAULT_IMPORT_PASSWORD = 'SHIELD2026!Temp';
 const selfEditableFields = new Set([
   'profilePictureUrl',
   'personalPhoneNumber',
@@ -443,7 +443,7 @@ export class UserController {
       }
 
       if (password && !isStrongPassword(password)) {
-        return res.status(400).json({ error: 'Password must be at least 8 characters and include uppercase, lowercase, and a number' });
+        return res.status(400).json({ error: strongPasswordMessage });
       }
 
       if (role && role !== 'user' && !(await canManageRoles(req))) {

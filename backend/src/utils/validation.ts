@@ -74,6 +74,14 @@ export function cleanRecord(value: unknown, maxKeys = 120, maxValueLength = 500)
     }, {});
 }
 
+export const strongPasswordMessage = 'Password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol';
+
 export function isStrongPassword(password: string): boolean {
-  return password.length >= 8 && /[A-Z]/u.test(password) && /[a-z]/u.test(password) && /\d/u.test(password);
+  return (
+    password.length >= 12 &&
+    /[A-Z]/u.test(password) &&
+    /[a-z]/u.test(password) &&
+    /\d/u.test(password) &&
+    /[^A-Za-z0-9]/u.test(password)
+  );
 }

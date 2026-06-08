@@ -12,7 +12,7 @@ import { SystemSettingModel } from '../models/SystemSetting';
 import { AUTH_SESSION_COOKIE_NAME, getSessionAccount, getSessionToken } from '../middleware/authSession';
 import { broadcastAppEvent } from '../services/appEvents';
 import { sendEmail } from '../services/emailService';
-import { cleanMultiline, cleanString, isOneOf, isStrongPassword, isValidEmail, normalizeEmail } from '../utils/validation';
+import { cleanMultiline, cleanString, isOneOf, isStrongPassword, isValidEmail, normalizeEmail, strongPasswordMessage } from '../utils/validation';
 
 const DEFAULT_LOGIN_WARNING_MESSAGE = 'This is a Indiana State Police computer application system that is for Official use only. This system is subject to monitoring. Therefore, no expectation of privacy is to be assumed. Individuals found performing unauthorized activities may be subject to disciplinary action including criminal prosecution.';
 const SESSION_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -711,7 +711,7 @@ export class AuthController {
       }
 
       if (!isStrongPassword(password)) {
-        return res.status(400).json({ error: 'Admin password must be at least 8 characters and include uppercase, lowercase, and a number' });
+        return res.status(400).json({ error: `Admin ${strongPasswordMessage.charAt(0).toLowerCase()}${strongPasswordMessage.slice(1)}` });
       }
 
       await SystemSettingModel.setString('appName', cleanAppName);
@@ -809,7 +809,7 @@ export class AuthController {
       }
 
       if (!isStrongPassword(password)) {
-        return res.status(400).json({ error: 'Password must be at least 8 characters and include uppercase, lowercase, and a number' });
+        return res.status(400).json({ error: strongPasswordMessage });
       }
 
       const accountCount = await AuthAccountModel.countAccounts();
@@ -1100,7 +1100,7 @@ export class AuthController {
       }
 
       if (!isStrongPassword(password)) {
-        return res.status(400).json({ error: 'Password must be at least 8 characters and include uppercase, lowercase, and a number' });
+        return res.status(400).json({ error: strongPasswordMessage });
       }
 
       const reset = await AuthPasswordResetModel.getValidReset(cleanToken);
@@ -1147,7 +1147,7 @@ export class AuthController {
       }
 
       if (!isStrongPassword(newPassword)) {
-        return res.status(400).json({ error: 'New password must be at least 8 characters and include uppercase, lowercase, and a number' });
+        return res.status(400).json({ error: `New ${strongPasswordMessage.charAt(0).toLowerCase()}${strongPasswordMessage.slice(1)}` });
       }
 
       if (currentPassword === newPassword) {

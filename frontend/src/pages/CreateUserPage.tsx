@@ -17,6 +17,7 @@ const statusOptions = ['Active', 'TDY', 'Military Leave', 'Disability', 'Limited
 const sexOptions = ['', 'Male', 'Female'];
 const maritalStatusOptions = ['', 'Single', 'Married', 'Divorced', 'Widowed'];
 const allowedPhotoExtensions = new Set(['jpg', 'jpeg', 'jfif', 'png', 'gif', 'webp']);
+const PASSWORD_REQUIREMENTS_MESSAGE = 'Password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.';
 
 type UserForm = CreateUserPayload;
 
@@ -32,6 +33,10 @@ function getImportErrorMessage(error: unknown, fallback: string): string {
 function isAllowedProfilePhoto(file: File): boolean {
   const extension = file.name.split('.').pop()?.toLowerCase() || '';
   return allowedPhotoExtensions.has(extension);
+}
+
+function isSecurePassword(password: string): boolean {
+  return password.length >= 12 && /[A-Z]/u.test(password) && /[a-z]/u.test(password) && /\d/u.test(password) && /[^A-Za-z0-9]/u.test(password);
 }
 
 function formatPhoneNumber(value: string): string {
@@ -154,8 +159,8 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
       return;
     }
 
-    if (form.password && form.password.length < 8) {
-      onToast('error', 'Password must be at least 8 characters.');
+    if (form.password && !isSecurePassword(form.password)) {
+      onToast('error', PASSWORD_REQUIREMENTS_MESSAGE);
       return;
     }
 

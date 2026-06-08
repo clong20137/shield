@@ -24,6 +24,11 @@ const SESSION_TIMEOUT_KEY = 'shield_session_timeout_minutes';
 const QUICK_LAUNCH_KEY = 'shield_quick_launch';
 const QUICK_LAUNCH_SLOT_COUNT = 8;
 const MODAL_CLOSE_MS = 220;
+const PASSWORD_REQUIREMENTS_MESSAGE = 'Password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.';
+
+function isSecurePassword(password: string): boolean {
+  return password.length >= 12 && /[A-Z]/u.test(password) && /[a-z]/u.test(password) && /\d/u.test(password) && /[^A-Za-z0-9]/u.test(password);
+}
 
 type ClosingModal = 'messages' | 'calendar' | 'calculator' | 'profile' | 'adminConsole' | 'reportBug' | 'bugTracker';
 type FloatingAppId = 'messages' | 'calendar' | 'calculator' | 'profile' | 'adminConsole';
@@ -296,6 +301,11 @@ function LoginSplash({
         return;
       }
 
+      if (!isSecurePassword(password)) {
+        setError(PASSWORD_REQUIREMENTS_MESSAGE);
+        return;
+      }
+
       setIsSubmitting(true);
       setError(null);
 
@@ -328,6 +338,11 @@ function LoginSplash({
 
     if (mode === 'register' && password !== confirmPassword) {
       setError('Passwords do not match.');
+      return;
+    }
+
+    if (mode === 'register' && !isSecurePassword(password)) {
+      setError(PASSWORD_REQUIREMENTS_MESSAGE);
       return;
     }
 
@@ -614,6 +629,11 @@ function ForcePasswordChange({
 
     if (newPassword !== confirmPassword) {
       setError('New passwords do not match.');
+      return;
+    }
+
+    if (!isSecurePassword(newPassword)) {
+      setError(PASSWORD_REQUIREMENTS_MESSAGE.replace('Password', 'New password'));
       return;
     }
 
@@ -1134,7 +1154,7 @@ function GlobalSearch({ compact }: { compact: boolean }) {
         type="button"
         onClick={() => navigate('/search')}
         className="mx-auto flex h-11 w-11 items-center justify-center rounded bg-white/10 text-white hover:bg-white/20"
-        title="Global search"
+        title="Search"
       >
         <Search size={20} />
       </button>
@@ -1153,7 +1173,7 @@ function GlobalSearch({ compact }: { compact: boolean }) {
               setIsResultsOpen(true);
             }
           }}
-          placeholder="Global search"
+          placeholder="Search"
           className="global-search-input h-11 w-full rounded border border-white/10 bg-white/10 py-2 text-sm text-white outline-none placeholder:text-blue-100 focus:border-white/40 focus:bg-white/15"
         />
       </div>
@@ -3209,8 +3229,8 @@ function SetupWizard({
       if (form.admin.password !== form.admin.confirmPassword) {
         return 'Admin passwords do not match.';
       }
-      if (form.admin.password.length < 8 || !/[A-Z]/u.test(form.admin.password) || !/[a-z]/u.test(form.admin.password) || !/\d/u.test(form.admin.password)) {
-        return 'Admin password must be at least 8 characters and include uppercase, lowercase, and a number.';
+      if (!isSecurePassword(form.admin.password)) {
+        return PASSWORD_REQUIREMENTS_MESSAGE.replace('Password', 'Admin password');
       }
     }
 
@@ -4962,7 +4982,7 @@ function App() {
               </button>
             </div>
 
-            <nav data-onboarding-target="navigation" className="flex flex-1 flex-col gap-1.5 px-3 py-2">
+            <nav data-onboarding-target="navigation" className="flex shrink-0 flex-col gap-1.5 px-3 py-2">
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
               {isAdministrator && <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />}
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
