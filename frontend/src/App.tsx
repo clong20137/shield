@@ -4377,6 +4377,8 @@ function App() {
     setIsWelcomeSplashOpen(false);
     setShouldLaunchGuideAfterWelcome(false);
     closeModal('profile');
+    window.history.pushState({}, document.title, '/');
+    window.dispatchEvent(new PopStateEvent('popstate'));
     window.setTimeout(() => setIsFirstLoginGuideOpen(true), MODAL_CLOSE_MS + 40);
   };
 
