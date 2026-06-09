@@ -1,5 +1,6 @@
 import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArchiveX, Ban, CheckCircle2, Download, Eye, FileText, Laptop, MapPinOff, PackageCheck, Pencil, Plus, Printer, QrCode, Radio, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
+import QRCode from 'qrcode';
 import { authService, AuthAccount, deviceService, DeviceEvent, DeviceRecord } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
 
@@ -8,6 +9,7 @@ type DeviceStatus = DeviceRecord['status'];
 type DeviceForm = Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'>;
 type DeviceConditionalField = 'phoneNumber' | 'imei' | 'simNumber' | 'radioId' | 'hostname' | 'routerId';
 type SortKey = keyof Pick<DeviceRecord, 'type' | 'assetTag' | 'makeModel' | 'assignedTo' | 'status' | 'location' | 'maintenanceDueDate' | 'replacementDueDate' | 'updatedAt'>;
+type ScanMode = 'lookup' | 'check-in' | 'check-out';
 
 const deviceTypes: DeviceType[] = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio', 'Cradlepoint'];
 const deviceStatuses: DeviceStatus[] = ['Available', 'Assigned', 'Maintenance', 'Damaged', 'Lost', 'Retired'];
@@ -186,6 +188,34 @@ function isDueSoon(value: string): boolean {
   return target <= Date.now() + thirtyDays;
 }
 
+function getDeviceQrPayload(device: DeviceRecord): string {
+  return device.assetTag;
+}
+
+function normalizeScanValue(value: string): string {
+  return value
+    .trim()
+    .replace(/^shield-device:/iu, '')
+    .replace(/^asset:/iu, '')
+    .toLowerCase();
+}
+
+function deviceMatchesScan(device: DeviceRecord, scanValue: string): boolean {
+  const normalizedScan = normalizeScanValue(scanValue);
+  if (!normalizedScan) return false;
+
+  return [
+    device.assetTag,
+    device.serialNumber,
+    device.imei,
+    device.simNumber,
+    device.radioId,
+    device.hostname,
+    device.routerId,
+    device.phoneNumber,
+  ].some((value) => normalizeScanValue(value || '') === normalizedScan);
+}
+
 function getInitialDeviceModalPosition() {
   const width = Math.min(window.innerWidth - 16, 1152);
   return {
@@ -211,6 +241,11 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [devicePendingDelete, setDevicePendingDelete] = useState<DeviceRecord | null>(null);
   const [deviceHistory, setDeviceHistory] = useState<DeviceEvent[]>([]);
   const [eventNotes, setEventNotes] = useState('');
+  const [scanValue, setScanValue] = useState('');
+  const [scanMode, setScanMode] = useState<ScanMode>('lookup');
+  const [scanAssignee, setScanAssignee] = useState('');
+  const [scanFeedback, setScanFeedback] = useState<string | null>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -253,6 +288,30 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     window.addEventListener('shield:device-updated', handleDeviceDetailUpdate);
     return () => window.removeEventListener('shield:device-updated', handleDeviceDetailUpdate);
   }, [detailDevice?.id]);
+
+  useEffect(() => {
+    if (!detailDevice) {
+      setQrCodeUrl('');
+      return;
+    }
+
+    let isCurrent = true;
+    QRCode.toDataURL(getDeviceQrPayload(detailDevice), { width: 176, margin: 1 })
+      .then((url) => {
+        if (isCurrent) {
+          setQrCodeUrl(url);
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setQrCodeUrl('');
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [detailDevice?.id, detailDevice?.assetTag]);
 
   const loadRegisteredUsers = async () => {
     if (!currentUser) {
@@ -412,26 +471,76 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setEventNotes('');
   };
 
-  const updateDeviceStatus = async (device: DeviceRecord, status: DeviceStatus, action: string) => {
+  const updateDeviceStatus = async (
+    device: DeviceRecord,
+    status: DeviceStatus,
+    action: string,
+    options: { assignedTo?: string; notes?: string; showDetails?: boolean } = {},
+  ) => {
     if (!canManageDevices) return;
 
     try {
       const response = await deviceService.update(device.id, {
         ...toDeviceForm(device),
         status,
-        assignedTo: status === 'Available' ? '' : device.assignedTo,
+        assignedTo: status === 'Available' ? '' : options.assignedTo ?? device.assignedTo,
         lastServiceDate: action === 'Maintenance' ? new Date().toISOString().slice(0, 10) : device.lastServiceDate || '',
         ...actor,
         eventAction: action,
-        eventNotes: eventNotes || action,
+        eventNotes: options.notes || eventNotes || action,
       });
       setDevices((currentDevices) => currentDevices.map((item) => (item.id === device.id ? response.data : item)));
-      setDetailDevice(response.data);
-      await loadDeviceHistory(response.data);
+      if (options.showDetails !== false) {
+        setDetailDevice(response.data);
+        await loadDeviceHistory(response.data);
+      }
     } catch (err) {
       console.error('Failed to update device status:', err);
       setError('Failed to update device status.');
     }
+  };
+
+  const findScannedDevice = (value: string) => devices.find((device) => deviceMatchesScan(device, value));
+
+  const handleScannerSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const scannedDevice = findScannedDevice(scanValue);
+    if (!scannedDevice) {
+      setScanFeedback('No device matched that scan. Try asset tag, serial, IMEI, ICCID, radio ID, hostname, router ID, or phone number.');
+      return;
+    }
+
+    setScanFeedback(null);
+
+    if (scanMode === 'lookup') {
+      await loadDeviceHistory(scannedDevice);
+      setScanFeedback(`Opened ${scannedDevice.assetTag}.`);
+      setScanValue('');
+      return;
+    }
+
+    if (!canManageDevices) {
+      setScanFeedback('You do not have permission to check devices in or out.');
+      return;
+    }
+
+    if (scanMode === 'check-out' && !scanAssignee.trim()) {
+      setScanFeedback('Choose who the device is being checked out to.');
+      return;
+    }
+
+    const nextStatus = scanMode === 'check-in' ? 'Available' : 'Assigned';
+    const action = scanMode === 'check-in' ? 'Scanned In' : 'Scanned Out';
+    const assignee = scanMode === 'check-in' ? '' : scanAssignee;
+
+    await updateDeviceStatus(scannedDevice, nextStatus, action, {
+      assignedTo: assignee,
+      notes: scanMode === 'check-in' ? `Scanned in from ${scanValue}.` : `Scanned out to ${assignee}.`,
+      showDetails: true,
+    });
+    setScanFeedback(`${scannedDevice.assetTag} ${scanMode === 'check-in' ? 'checked in' : `checked out to ${assignee}`}.`);
+    setScanValue('');
   };
 
   const addHistoryNote = async () => {
@@ -581,14 +690,17 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           {canManageDevices && (
             <button type="button" onClick={openAddDeviceModal} className="btn-primary" title="Add Device" aria-label="Add Device">
               <Plus size={16} />
+              <span>Add Device</span>
             </button>
           )}
           <button type="button" onClick={exportCsv} className="btn-secondary" title="Export CSV" aria-label="Export CSV">
             <Download size={16} />
+            <span>Export</span>
           </button>
           {canManageDevices && (
             <label className="btn-secondary cursor-pointer" title="Import CSV" aria-label="Import CSV">
               <Upload size={16} />
+              <span>Import</span>
               <input type="file" accept=".csv" className="hidden" onChange={importCsv} />
             </label>
           )}
@@ -597,6 +709,62 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
 
       {error && <div className="error">{error}</div>}
       {loading && <div className="loading">Loading device inventory...</div>}
+
+      <section className="mb-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2>Scanner & Labels</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Scan a QR label or type an identifier to open an item, check it in, or check it out.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 rounded bg-accent/10 px-3 py-2 text-sm font-bold text-accent">
+            <QrCode size={16} />
+            <span>{devices.filter((device) => device.assetTag).length} labels ready</span>
+          </div>
+        </div>
+
+        <form onSubmit={handleScannerSubmit} className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.5fr)_180px_minmax(0,1fr)_auto]">
+          <input
+            value={scanValue}
+            onChange={(event) => setScanValue(event.target.value)}
+            placeholder="Scan or enter asset tag, serial, IMEI, ICCID, radio ID, hostname, router ID, or phone"
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+            autoComplete="off"
+          />
+          <select
+            value={scanMode}
+            onChange={(event) => setScanMode(event.target.value as ScanMode)}
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+          >
+            <option value="lookup">Lookup</option>
+            <option value="check-in">Check In</option>
+            <option value="check-out">Check Out</option>
+          </select>
+          <select
+            value={scanAssignee}
+            onChange={(event) => setScanAssignee(event.target.value)}
+            disabled={scanMode !== 'check-out'}
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950"
+            aria-label="Check out assignee"
+          >
+            <option value="">Select assignee</option>
+            {registeredUsers.map((user) => (
+              <option key={user.id} value={user.email}>{user.displayName || user.email}</option>
+            ))}
+          </select>
+          <button type="submit" className="btn-primary justify-center" aria-label="Apply scan" title="Apply Scan">
+            <QrCode size={16} />
+            <span>Apply</span>
+          </button>
+        </form>
+
+        {scanFeedback && (
+          <div className="mt-3 rounded border border-accent/30 bg-accent/10 px-3 py-2 text-sm font-semibold text-accent">
+            {scanFeedback}
+          </div>
+        )}
+      </section>
 
       <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
         {statusCounts.map((item) => {
@@ -699,9 +867,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                     <Detail label="Replacement" value={formatDate(device.replacementDueDate)} />
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => loadDeviceHistory(device)} className="btn-secondary" aria-label="View device" title="View"><Eye size={15} /></button>
-                    {canManageDevices && <button type="button" onClick={() => editDevice(device)} className="btn-secondary" aria-label="Edit device" title="Edit"><Pencil size={15} /></button>}
-                    {canManageDevices && <button type="button" onClick={() => setDevicePendingDelete(device)} className="btn-danger" aria-label="Delete device" title="Delete"><Trash2 size={15} /></button>}
+                    <button type="button" onClick={() => loadDeviceHistory(device)} className="btn-secondary" aria-label="View device" title="View"><Eye size={15} /><span>View</span></button>
+                    {canManageDevices && <button type="button" onClick={() => editDevice(device)} className="btn-secondary" aria-label="Edit device" title="Edit"><Pencil size={15} /><span>Edit</span></button>}
+                    {canManageDevices && <button type="button" onClick={() => setDevicePendingDelete(device)} className="btn-danger" aria-label="Delete device" title="Delete"><Trash2 size={15} /><span>Remove</span></button>}
                   </div>
                 </article>
               );
@@ -740,7 +908,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                       <td className={`px-3 py-4 ${isDueSoon(device.replacementDueDate) ? 'font-bold text-danger' : ''}`}>{formatDate(device.replacementDueDate)}</td>
                       <td className="px-3 py-4">{device.location || 'N/A'}</td>
                       <td className="px-3 py-4">
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <button type="button" onClick={() => loadDeviceHistory(device)} className="btn-secondary" aria-label="View device" title="View"><Eye size={15} /></button>
                           {canManageDevices && <button type="button" onClick={() => editDevice(device)} className="btn-secondary" aria-label="Edit device" title="Edit"><Pencil size={15} /></button>}
                           {canManageDevices && <button type="button" onClick={() => setDevicePendingDelete(device)} className="btn-danger" aria-label="Delete device" title="Delete"><Trash2 size={15} /></button>}
@@ -900,21 +1068,46 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 </div>
                 <div className="mt-4 rounded border border-gray-200 p-4 dark:border-gray-800">
                   <p className="mb-2 text-sm font-bold text-gray-700 dark:text-gray-300">Barcode / QR Label</p>
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-24 w-24 items-center justify-center rounded border border-dashed border-gray-300 text-primary-500 dark:border-gray-700"><QrCode size={52} /></div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex h-28 w-28 items-center justify-center rounded border border-gray-200 bg-white p-2 text-primary-500 dark:border-gray-700">
+                      {qrCodeUrl ? (
+                        <img src={qrCodeUrl} alt={`${detailDevice.assetTag} QR label`} className="h-full w-full" />
+                      ) : (
+                        <QrCode size={52} />
+                      )}
+                    </div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">
                       <p className="font-bold text-gray-800 dark:text-gray-100">{detailDevice.assetTag}</p>
-                      <p>Use this asset tag for printable labels or scanner lookup.</p>
-                      <button type="button" onClick={() => window.print()} className="btn-secondary mt-3" aria-label="Print label" title="Print Label"><Printer size={16} /></button>
+                      <p>QR payload: {getDeviceQrPayload(detailDevice)}</p>
+                      <p>Print this label and scan it from the Scanner & Labels panel.</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button type="button" onClick={() => window.print()} className="btn-secondary" aria-label="Print label" title="Print Label">
+                          <Printer size={16} />
+                          <span>Print</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setScanValue(getDeviceQrPayload(detailDevice));
+                            setDetailDevice(null);
+                          }}
+                          className="btn-secondary"
+                          aria-label="Send asset tag to scanner"
+                          title="Send To Scanner"
+                        >
+                          <QrCode size={16} />
+                          <span>Scan Field</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
                 {canManageDevices && (
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Available', 'Checked In')} className="btn-secondary" aria-label="Check in device" title="Check In"><CheckCircle2 size={16} /></button>
-                    <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Maintenance', 'Maintenance')} className="btn-secondary" aria-label="Move device to maintenance" title="Maintenance"><Wrench size={16} /></button>
-                    <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Damaged', 'Marked Damaged')} className="btn-secondary" aria-label="Mark device damaged" title="Damaged"><AlertTriangle size={16} /></button>
-                    <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Lost', 'Marked Lost')} className="btn-danger" aria-label="Mark device lost" title="Lost"><Ban size={16} /></button>
+                    <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Available', 'Checked In')} className="btn-secondary" aria-label="Check in device" title="Check In"><CheckCircle2 size={16} /><span>Check In</span></button>
+                    <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Maintenance', 'Maintenance')} className="btn-secondary" aria-label="Move device to maintenance" title="Maintenance"><Wrench size={16} /><span>Maintenance</span></button>
+                    <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Damaged', 'Marked Damaged')} className="btn-secondary" aria-label="Mark device damaged" title="Damaged"><AlertTriangle size={16} /><span>Damaged</span></button>
+                    <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Lost', 'Marked Lost')} className="btn-danger" aria-label="Mark device lost" title="Lost"><Ban size={16} /><span>Lost</span></button>
                   </div>
                 )}
               </div>

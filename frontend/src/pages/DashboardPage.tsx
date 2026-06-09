@@ -2040,7 +2040,7 @@ function QuickNotesWidget({
               onChange={(event) => updateNoteContent(note.id, event.target.value)}
               placeholder="New note"
               maxLength={1800}
-              className="min-h-0 flex-1 resize-none bg-transparent text-sm leading-5 outline-none placeholder:text-current/45"
+              className="sticky-note-editor min-h-0 flex-1 resize-none border-0 bg-transparent text-sm leading-5 outline-none placeholder:text-current/45"
             />
           </div>
         ))}

@@ -377,6 +377,12 @@
     box-shadow: inset 0 0 0 2px #9C865C;
   }
 
+  .sticky-note-editor:focus,
+  .sticky-note-editor:focus-visible {
+    border-color: transparent;
+    box-shadow: none;
+  }
+
   input,
   select,
   textarea,
