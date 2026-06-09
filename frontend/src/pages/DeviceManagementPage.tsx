@@ -849,7 +849,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             {paginatedDevices.map((device) => {
               const DeviceIcon = deviceIconMap[device.type];
               return (
-                <article key={device.id} className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                <article key={device.id} className="rounded-lg border border-gray-200 p-3 transition-colors hover:border-accent/40 hover:bg-accent/10 dark:border-gray-800 dark:hover:bg-gray-800/70">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 font-bold text-gray-900 dark:text-gray-100">
@@ -876,42 +876,40 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             })}
           </div>
           <div className="hidden overflow-x-auto lg:block">
-            <table className="w-full min-w-[1180px] border-collapse text-left">
+            <table className="w-full min-w-[820px] border-collapse text-left">
               <thead>
-                <tr className="border-b border-gray-200 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                  <th className="px-3 py-3"><input type="checkbox" checked={paginatedDevices.length > 0 && paginatedDevices.every((device) => selectedDevices.includes(device.id))} onChange={(event) => setSelectedDevices(event.target.checked ? Array.from(new Set([...selectedDevices, ...paginatedDevices.map((device) => device.id)])) : selectedDevices.filter((id) => !paginatedDevices.some((device) => device.id === id)))} /></th>
-                  <th className="px-3 py-3">Type</th>
-                  <th className="px-3 py-3">Asset Tag</th>
-                  <th className="px-3 py-3">Make / Model</th>
-                  <th className="px-3 py-3">Assigned To</th>
-                  <th className="px-3 py-3">Status</th>
-                  <th className="px-3 py-3">Condition</th>
-                  <th className="px-3 py-3">Maintenance</th>
-                  <th className="px-3 py-3">Replacement</th>
-                  <th className="px-3 py-3">Location</th>
-                  <th className="px-3 py-3">Actions</th>
+                <tr className="border-b border-gray-200 text-xs font-bold uppercase tracking-wide text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                  <th className="w-10 px-2 py-2"><input type="checkbox" checked={paginatedDevices.length > 0 && paginatedDevices.every((device) => selectedDevices.includes(device.id))} onChange={(event) => setSelectedDevices(event.target.checked ? Array.from(new Set([...selectedDevices, ...paginatedDevices.map((device) => device.id)])) : selectedDevices.filter((id) => !paginatedDevices.some((device) => device.id === id)))} /></th>
+                  <th className="px-2 py-2">Device</th>
+                  <th className="px-2 py-2">Assigned</th>
+                  <th className="px-2 py-2">Status</th>
+                  <th className="px-2 py-2">Maintenance</th>
+                  <th className="px-2 py-2 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedDevices.map((device) => {
                   const DeviceIcon = deviceIconMap[device.type];
                   return (
-                    <tr key={device.id} className="border-b border-gray-100 dark:border-gray-800">
-                      <td className="px-3 py-4"><input type="checkbox" checked={selectedDevices.includes(device.id)} onChange={(event) => setSelectedDevices((ids) => event.target.checked ? [...ids, device.id] : ids.filter((id) => id !== device.id))} /></td>
-                      <td className="px-3 py-4"><div className="flex items-center gap-2 font-semibold text-gray-800 dark:text-gray-100"><DeviceIcon size={18} className="text-accent" />{device.type}</div></td>
-                      <td className="px-3 py-4 font-semibold">{device.assetTag}</td>
-                      <td className="px-3 py-4">{device.makeModel}</td>
-                      <td className="px-3 py-4">{device.assignedTo || 'Unassigned'}</td>
-                      <td className="px-3 py-4"><StatusBadge status={device.status} /></td>
-                      <td className="px-3 py-4">{device.condition || 'Good'}</td>
-                      <td className={`px-3 py-4 ${isDueSoon(device.maintenanceDueDate) ? 'font-bold text-danger' : ''}`}>{formatDate(device.maintenanceDueDate)}</td>
-                      <td className={`px-3 py-4 ${isDueSoon(device.replacementDueDate) ? 'font-bold text-danger' : ''}`}>{formatDate(device.replacementDueDate)}</td>
-                      <td className="px-3 py-4">{device.location || 'N/A'}</td>
-                      <td className="px-3 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          <button type="button" onClick={() => loadDeviceHistory(device)} className="btn-secondary" aria-label="View device" title="View"><Eye size={15} /></button>
-                          {canManageDevices && <button type="button" onClick={() => editDevice(device)} className="btn-secondary" aria-label="Edit device" title="Edit"><Pencil size={15} /></button>}
-                          {canManageDevices && <button type="button" onClick={() => setDevicePendingDelete(device)} className="btn-danger" aria-label="Delete device" title="Delete"><Trash2 size={15} /></button>}
+                    <tr key={device.id} className="border-b border-gray-100 text-sm transition-colors hover:bg-accent/10 dark:border-gray-800 dark:hover:bg-gray-800/70">
+                      <td className="px-2 py-2"><input type="checkbox" checked={selectedDevices.includes(device.id)} onChange={(event) => setSelectedDevices((ids) => event.target.checked ? [...ids, device.id] : ids.filter((id) => id !== device.id))} /></td>
+                      <td className="px-2 py-2">
+                        <button type="button" onClick={() => loadDeviceHistory(device)} className="flex min-w-0 items-center gap-2 text-left" aria-label={`View ${device.assetTag}`}>
+                          <DeviceIcon size={17} className="shrink-0 text-accent" />
+                          <span className="min-w-0">
+                            <span className="block truncate font-bold text-gray-900 dark:text-gray-100">{device.assetTag}</span>
+                            <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{device.type} - {device.makeModel}</span>
+                          </span>
+                        </button>
+                      </td>
+                      <td className="max-w-[220px] truncate px-2 py-2">{device.assignedTo || 'Unassigned'}</td>
+                      <td className="px-2 py-2"><StatusBadge status={device.status} /></td>
+                      <td className={`px-2 py-2 ${isDueSoon(device.maintenanceDueDate) ? 'font-bold text-danger' : ''}`}>{formatDate(device.maintenanceDueDate)}</td>
+                      <td className="px-2 py-2">
+                        <div className="flex justify-end gap-1.5">
+                          <button type="button" onClick={() => loadDeviceHistory(device)} className="btn-secondary h-8 w-8 p-0" aria-label="View device" title="View"><Eye size={14} /></button>
+                          {canManageDevices && <button type="button" onClick={() => editDevice(device)} className="btn-secondary h-8 w-8 p-0" aria-label="Edit device" title="Edit"><Pencil size={14} /></button>}
+                          {canManageDevices && <button type="button" onClick={() => setDevicePendingDelete(device)} className="btn-danger h-8 w-8 p-0" aria-label="Delete device" title="Delete"><Trash2 size={14} /></button>}
                         </div>
                       </td>
                     </tr>
