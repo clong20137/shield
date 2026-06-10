@@ -6,6 +6,7 @@ export type AppEventType =
   | 'calendar-updated'
   | 'dashboard-updated'
   | 'device-updated'
+  | 'dispatch-updated'
   | 'error-updated'
   | 'permission-updated'
   | 'notification-created'

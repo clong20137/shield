@@ -251,14 +251,74 @@ export async function initializeDatabase() {
   await pool.query(`
     INSERT IGNORE INTO roles (\`id\`, \`name\`, \`permissions\`)
     VALUES
-      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","media:view","media:upload","media:edit","media:delete","devices:manage","calendar:manage","calendar:view-profiles","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","bugs:manage","admin:access","admin:general","admin:permissions","admin:achievements","admin:create-user","admin:media","admin:alerts","admin:bugs","admin:audit","admin:errors"]'),
+      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","media:view","media:upload","media:edit","media:delete","devices:manage","dispatch:manage","calendar:manage","calendar:view-profiles","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","bugs:manage","admin:access","admin:general","admin:permissions","admin:achievements","admin:create-user","admin:media","admin:alerts","admin:bugs","admin:audit","admin:errors"]'),
       ('role-user', 'user', '["users:view","calendar:manage","messages:send"]')
   `);
 
   await pool.query(`
     UPDATE roles
-    SET \`permissions\` = '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","media:view","media:upload","media:edit","media:delete","devices:manage","calendar:manage","calendar:view-profiles","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","bugs:manage","admin:access","admin:general","admin:permissions","admin:achievements","admin:create-user","admin:media","admin:alerts","admin:bugs","admin:audit","admin:errors"]'
+    SET \`permissions\` = '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","media:view","media:upload","media:edit","media:delete","devices:manage","dispatch:manage","calendar:manage","calendar:view-profiles","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","bugs:manage","admin:access","admin:general","admin:permissions","admin:achievements","admin:create-user","admin:media","admin:alerts","admin:bugs","admin:audit","admin:errors"]'
     WHERE \`name\` = 'administrator'
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dispatch_calls (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`callNumber\` VARCHAR(50) NOT NULL UNIQUE,
+      \`title\` VARCHAR(180) NOT NULL,
+      \`address\` VARCHAR(255),
+      \`latitude\` DECIMAL(10, 7),
+      \`longitude\` DECIMAL(10, 7),
+      \`priority\` VARCHAR(30) NOT NULL DEFAULT 'Normal',
+      \`status\` VARCHAR(30) NOT NULL DEFAULT 'Active',
+      \`trafficStatus\` VARCHAR(30) NOT NULL DEFAULT 'Checking',
+      \`etaMinutes\` INT DEFAULT 0,
+      \`distanceMiles\` DECIMAL(8, 2) DEFAULT 0,
+      \`createdBy\` VARCHAR(36),
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX \`idx_dispatch_calls_status\` (\`status\`, \`updatedAt\`)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dispatch_unit_assignments (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`callId\` VARCHAR(36) NOT NULL,
+      \`accountId\` VARCHAR(36) NOT NULL,
+      \`unitLabel\` VARCHAR(80) NOT NULL,
+      \`status\` VARCHAR(30) NOT NULL DEFAULT 'Assigned',
+      \`lastLatitude\` DECIMAL(10, 7),
+      \`lastLongitude\` DECIMAL(10, 7),
+      \`lastSpeedMph\` DECIMAL(6, 2) DEFAULT 0,
+      \`lastDistanceMiles\` DECIMAL(8, 2) DEFAULT 0,
+      \`lastGpsAt\` TIMESTAMP NULL,
+      \`assignedAt\` TIMESTAMP NULL,
+      \`enRouteAt\` TIMESTAMP NULL,
+      \`onSceneAt\` TIMESTAMP NULL,
+      \`clearedAt\` TIMESTAMP NULL,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY \`uniq_dispatch_assignment_call_account\` (\`callId\`, \`accountId\`),
+      INDEX \`idx_dispatch_assignment_account_status\` (\`accountId\`, \`status\`),
+      INDEX \`idx_dispatch_assignment_call_status\` (\`callId\`, \`status\`, \`lastDistanceMiles\`)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dispatch_location_pings (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`assignmentId\` VARCHAR(36) NOT NULL,
+      \`callId\` VARCHAR(36) NOT NULL,
+      \`accountId\` VARCHAR(36) NOT NULL,
+      \`latitude\` DECIMAL(10, 7) NOT NULL,
+      \`longitude\` DECIMAL(10, 7) NOT NULL,
+      \`speedMph\` DECIMAL(6, 2) DEFAULT 0,
+      \`distanceMiles\` DECIMAL(8, 2) DEFAULT 0,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX \`idx_dispatch_location_assignment\` (\`assignmentId\`, \`createdAt\`),
+      INDEX \`idx_dispatch_location_call\` (\`callId\`, \`createdAt\`)
+    )
   `);
 
   await pool.query(`

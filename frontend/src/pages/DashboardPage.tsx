@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Gauge, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, MapPin, Navigation, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, Users, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, dashboardSummaryService, DashboardSummary, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
+import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, dashboardSummaryService, DashboardSummary, dispatchService, DispatchSummary, DispatchUnitStatus, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { UserDetail } from '../components/UserDetail';
 
@@ -1235,88 +1235,171 @@ function getInitialProfileWindowPosition() {
   };
 }
 
-type OfficerCallStatus = 'Available' | 'Assigned' | 'En Route' | 'On Scene';
-
-const statusToneMap: Record<OfficerCallStatus, string> = {
+const statusToneMap: Record<DispatchUnitStatus, string> = {
   Available: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
   Assigned: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-100',
   'En Route': 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-100',
   'On Scene': 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-100',
+  Clear: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
 };
 
 function OperationsStatusWidget({ currentUser }: { currentUser: AuthAccount | null }) {
-  const [status, setStatus] = useState<OfficerCallStatus>('Available');
-  const [speedMph, setSpeedMph] = useState(0);
-  const [distanceMiles, setDistanceMiles] = useState(2.4);
+  const [summary, setSummary] = useState<DispatchSummary | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const canViewDispatchSide = Boolean(
     currentUser?.role === 'administrator'
       || currentUser?.role === 'supervisor'
       || currentUser?.permissions?.includes('dispatch:manage'),
   );
 
-  useEffect(() => {
-    if (status === 'Assigned' && speedMph > 3) {
-      setStatus('En Route');
+  const loadDispatch = useCallback(async (showLoading = true) => {
+    if (!currentUser) {
+      setSummary(null);
+      setIsLoading(false);
+      return;
     }
 
-    if ((status === 'Assigned' || status === 'En Route') && distanceMiles <= 0.15) {
-      setStatus('On Scene');
-      setSpeedMph(0);
+    if (showLoading) {
+      setIsLoading(true);
     }
-  }, [distanceMiles, speedMph, status]);
+    setError(null);
+    try {
+      const response = await dispatchService.getActive();
+      setSummary(response.data);
+    } catch (err) {
+      console.error('Failed to load dispatch summary:', err);
+      setError('Dispatch data is unavailable.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentUser]);
 
   useEffect(() => {
-    if (status !== 'En Route' || speedMph <= 0) {
+    void loadDispatch();
+    const refresh = () => void loadDispatch(false);
+
+    window.addEventListener('shield:dispatch-updated', refresh);
+    window.addEventListener('shield:api-reconnected', refresh);
+    return () => {
+      window.removeEventListener('shield:dispatch-updated', refresh);
+      window.removeEventListener('shield:api-reconnected', refresh);
+    };
+  }, [loadDispatch]);
+
+  useEffect(() => {
+    const assignment = summary?.assignment;
+    if (!assignment || !navigator.geolocation || !['Assigned', 'En Route'].includes(assignment.status)) {
       return undefined;
     }
 
-    const timer = window.setInterval(() => {
-      setDistanceMiles((currentDistance) => Math.max(0, Number((currentDistance - speedMph / 3600).toFixed(2))));
-    }, 1000);
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        void dispatchService.recordLocation(assignment.id, {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          speedMph: position.coords.speed === null ? 0 : Math.max(0, Math.round(position.coords.speed * 2.23694)),
+        }).then((response) => {
+          setSummary((current) => current ? { ...current, assignment: response.data } : current);
+        }).catch((err) => console.error('Failed to sync GPS location:', err));
+      },
+      (geoError) => {
+        console.warn('GPS location unavailable:', geoError.message);
+      },
+      { enableHighAccuracy: true, maximumAge: 8000, timeout: 10000 },
+    );
 
-    return () => window.clearInterval(timer);
-  }, [speedMph, status]);
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [summary?.assignment?.id, summary?.assignment?.status]);
 
-  const assignCall = () => {
-    setStatus('Assigned');
-    setSpeedMph(0);
-    setDistanceMiles(2.4);
+  const refreshWithAssignment = (assignment: DispatchSummary['assignment']) => {
+    setSummary((current) => current ? { ...current, assignment } : current);
+    void loadDispatch(false);
   };
 
-  const startMoving = () => {
-    if (status === 'Available') {
-      setStatus('Assigned');
+  const assignCall = async () => {
+    if (!summary?.call) return;
+    try {
+      const response = await dispatchService.assignSelf(summary.call.id, currentUser?.displayName || currentUser?.email);
+      refreshWithAssignment(response.data);
+    } catch (err) {
+      console.error('Failed to assign call:', err);
+      setError('Could not assign the call.');
     }
-    setSpeedMph(38);
   };
 
-  const clearCall = () => {
-    setStatus('Available');
-    setSpeedMph(0);
-    setDistanceMiles(2.4);
+  const updateStatus = async (status: DispatchUnitStatus) => {
+    if (!summary?.assignment) return;
+    try {
+      const response = await dispatchService.updateStatus(summary.assignment.id, status);
+      refreshWithAssignment(response.data);
+    } catch (err) {
+      console.error('Failed to update dispatch status:', err);
+      setError('Could not update unit status.');
+    }
   };
 
-  const etaMinutes = speedMph > 3 ? Math.max(1, Math.ceil((distanceMiles / speedMph) * 60)) : 6;
-  const trafficStatus = distanceMiles < 0.8 ? 'Light' : speedMph >= 30 ? 'Moderate' : 'Checking';
-  const nearestUnits = [
-    { unit: '12-41', status: 'Available', distance: '0.7 mi' },
-    { unit: '12-18', status: 'En Route', distance: '1.2 mi' },
-    { unit: '12-52', status: 'Clear', distance: '1.8 mi' },
-  ];
+  const startMoving = async () => {
+    let assignment = summary?.assignment;
+    if (!assignment && summary?.call) {
+      const response = await dispatchService.assignSelf(summary.call.id, currentUser?.displayName || currentUser?.email);
+      assignment = response.data;
+    }
+
+    if (!assignment) return;
+    try {
+      const response = await dispatchService.recordLocation(assignment.id, {
+        latitude: 39.786,
+        longitude: -86.184,
+        speedMph: 38,
+      });
+      refreshWithAssignment(response.data);
+    } catch (err) {
+      console.error('Failed to record movement:', err);
+      setError('Could not record movement.');
+    }
+  };
+
+  const markArrived = async () => {
+    const assignment = summary?.assignment;
+    const call = summary?.call;
+    if (!assignment || !call?.latitude || !call.longitude) return;
+    try {
+      const response = await dispatchService.recordLocation(assignment.id, {
+        latitude: call.latitude,
+        longitude: call.longitude,
+        speedMph: 0,
+      });
+      refreshWithAssignment(response.data);
+    } catch (err) {
+      console.error('Failed to mark on scene:', err);
+      setError('Could not record arrival.');
+    }
+  };
+
+  const call = summary?.call;
+  const assignment = summary?.assignment;
+  const status: DispatchUnitStatus = assignment?.status || 'Available';
+  const speedMph = Math.round(Number(assignment?.lastSpeedMph || 0));
+  const distanceMiles = Number(assignment?.lastDistanceMiles || call?.distanceMiles || 0);
+  const etaMinutes = Number(call?.etaMinutes || (speedMph > 3 ? Math.max(1, Math.ceil((distanceMiles / speedMph) * 60)) : 0));
+  const trafficStatus = call?.trafficStatus || 'Checking';
 
   return (
     <section className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
+      {error && <div className="error mb-3">{error}</div>}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
         <div>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Active Call</p>
-              <h2 className="mt-1 text-lg">I-70 WB / marker 91</h2>
+              <h2 className="mt-1 text-lg">{isLoading ? 'Loading call...' : call?.title || 'No active call'}</h2>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={assignCall} className="btn-secondary px-3 py-2 text-xs" aria-label="Assign call">Assign</button>
-              <button type="button" onClick={startMoving} className="btn-primary px-3 py-2 text-xs" aria-label="Start moving">Moving</button>
-              <button type="button" onClick={clearCall} className="btn-secondary px-3 py-2 text-xs" aria-label="Clear call">Clear</button>
+              <button type="button" onClick={assignCall} disabled={!call || Boolean(assignment)} className="btn-secondary px-3 py-2 text-xs" aria-label="Assign call">Assign</button>
+              <button type="button" onClick={startMoving} disabled={!call || status === 'On Scene'} className="btn-primary px-3 py-2 text-xs" aria-label="Start moving">Moving</button>
+              <button type="button" onClick={markArrived} disabled={!assignment || status === 'On Scene'} className="btn-secondary px-3 py-2 text-xs" aria-label="Mark on scene">Arrive</button>
+              <button type="button" onClick={() => void updateStatus('Clear')} disabled={!assignment} className="btn-secondary px-3 py-2 text-xs" aria-label="Clear call">Clear</button>
             </div>
           </div>
 
@@ -1331,13 +1414,15 @@ function OperationsStatusWidget({ currentUser }: { currentUser: AuthAccount | nu
             </div>
             <div className="rounded border border-gray-200 p-3 dark:border-gray-800">
               <p className="flex items-center gap-1 text-xs font-bold uppercase text-gray-400"><MapPin size={13} /> GPS</p>
-              <p className="mt-1 truncate text-sm font-bold text-gray-900 dark:text-gray-100">39.7684, -86.1581</p>
+              <p className="mt-1 truncate text-sm font-bold text-gray-900 dark:text-gray-100">
+                {assignment?.lastLatitude && assignment.lastLongitude ? `${Number(assignment.lastLatitude).toFixed(4)}, ${Number(assignment.lastLongitude).toFixed(4)}` : 'Waiting for GPS'}
+              </p>
             </div>
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-600 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300">
             <Navigation size={14} className="text-accent" />
-            <span>{etaMinutes} min</span>
+            <span>{etaMinutes || '--'} min</span>
             <span className="text-gray-300 dark:text-gray-700">|</span>
             <span>{distanceMiles.toFixed(1)} mi</span>
             <span className="text-gray-300 dark:text-gray-700">|</span>
@@ -1349,10 +1434,12 @@ function OperationsStatusWidget({ currentUser }: { currentUser: AuthAccount | nu
           <aside className="rounded border border-gray-200 p-3 dark:border-gray-800">
             <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-accent"><Users size={14} /> Nearest Units</p>
             <div className="space-y-2">
-              {nearestUnits.map((unit) => (
-                <div key={unit.unit} className="flex items-center justify-between gap-3 rounded bg-gray-50 px-3 py-2 text-sm dark:bg-gray-950">
-                  <span className="font-bold text-gray-900 dark:text-gray-100">{unit.unit}</span>
-                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{unit.status} - {unit.distance}</span>
+              {(summary?.nearestUnits || []).length === 0 ? (
+                <div className="rounded bg-gray-50 px-3 py-2 text-sm text-gray-500 dark:bg-gray-950 dark:text-gray-400">No units assigned.</div>
+              ) : summary?.nearestUnits.map((unit) => (
+                <div key={unit.id} className="flex items-center justify-between gap-3 rounded bg-gray-50 px-3 py-2 text-sm dark:bg-gray-950">
+                  <span className="font-bold text-gray-900 dark:text-gray-100">{unit.unitLabel}</span>
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{unit.status} - {Number(unit.lastDistanceMiles || 0).toFixed(1)} mi</span>
                 </div>
               ))}
             </div>

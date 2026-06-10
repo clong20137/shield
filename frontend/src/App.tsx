@@ -3804,6 +3804,7 @@ function App() {
         'calendar-updated',
         'dashboard-updated',
         'device-updated',
+        'dispatch-updated',
         'error-updated',
         'media-updated',
         'messages-updated',
@@ -4570,6 +4571,7 @@ function App() {
     eventSource.addEventListener('calendar-updated', handleRealtimeAppUpdate('calendar-updated'));
     eventSource.addEventListener('dashboard-updated', handleRealtimeAppUpdate('dashboard-updated'));
     eventSource.addEventListener('device-updated', handleRealtimeAppUpdate('device-updated'));
+    eventSource.addEventListener('dispatch-updated', handleRealtimeAppUpdate('dispatch-updated'));
     eventSource.addEventListener('error-updated', handleRealtimeAppUpdate('error-updated'));
     eventSource.addEventListener('media-updated', handleRealtimeAppUpdate('media-updated'));
     eventSource.addEventListener('mileage-updated', handleRealtimeAppUpdate('mileage-updated'));

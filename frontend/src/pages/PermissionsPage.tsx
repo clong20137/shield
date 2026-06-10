@@ -38,6 +38,7 @@ const permissionGroups = [
     description: 'Daily work tools and inventory operations.',
     permissions: [
       { key: 'devices:manage', label: 'Manage devices' },
+      { key: 'dispatch:manage', label: 'Manage dispatch' },
       { key: 'calendar:manage', label: 'Manage calendar' },
       { key: 'calendar:view-profiles', label: 'View profile calendars' },
       { key: 'messages:send', label: 'Send messages' },
