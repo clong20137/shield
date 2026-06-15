@@ -1,6 +1,37 @@
 import axios from 'axios';
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/+$/u, '');
+function getRuntimeApiBaseUrl(value?: string): string {
+  const defaultUrl = import.meta.env.DEV ? 'http://localhost:5000/api' : '/api';
+  const rawValue = (value || defaultUrl).trim();
+  const withApiPath = rawValue.replace(/\/+$/u, '');
+
+  if (!withApiPath) {
+    return defaultUrl;
+  }
+
+  if (withApiPath.startsWith('//')) {
+    return `${window.location.protocol}${withApiPath}`;
+  }
+
+  if (/^:\d+(?:\/|$)/u.test(withApiPath)) {
+    const origin = typeof window === 'undefined' ? 'http://localhost' : `${window.location.protocol}//${window.location.hostname}`;
+    return `${origin}${withApiPath}`;
+  }
+
+  if (/^\d+(?:\/|$)/u.test(withApiPath)) {
+    const origin = typeof window === 'undefined' ? 'http://localhost' : `${window.location.protocol}//${window.location.hostname}`;
+    return `${origin}:${withApiPath}`;
+  }
+
+  if (/^[\w.-]+(?::\d+)?\/api(?:\/|$)/iu.test(withApiPath)) {
+    const protocol = typeof window === 'undefined' ? 'http:' : window.location.protocol;
+    return `${protocol}//${withApiPath}`;
+  }
+
+  return withApiPath;
+}
+
+const API_BASE_URL = getRuntimeApiBaseUrl(import.meta.env.VITE_API_URL);
 const API_ORIGIN_URL = (() => {
   try {
     const parsedUrl = new URL(API_BASE_URL);
