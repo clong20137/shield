@@ -1497,7 +1497,9 @@ function QuickLaunchTray({
   const [draggingSlot, setDraggingSlot] = useState<number | null>(null);
   const [launchingSlot, setLaunchingSlot] = useState<number | null>(null);
   const [failedLaunchSlot, setFailedLaunchSlot] = useState<number | null>(null);
+  const [activeIndicator, setActiveIndicator] = useState<{ left: number; top: number } | null>(null);
   const didDragSlotRef = useRef(false);
+  const trayRef = useRef<HTMLDivElement | null>(null);
   const slotRefs = useRef<Array<HTMLDivElement | null>>([]);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const [pickerPosition, setPickerPosition] = useState<{ left: number; top: number; arrowLeft: number } | null>(null);
@@ -1789,9 +1791,52 @@ function QuickLaunchTray({
     void saveQuickLaunchSlots(nextSlots);
   };
 
+  const activeQuickLaunchIndex = launchingSlot ?? slots.findIndex((slot) => {
+    if (typeof slot !== 'string') {
+      return false;
+    }
+
+    const app = availableApps.find((item) => item.id === slot);
+    return app ? isAppActive(app) : false;
+  });
+
+  useLayoutEffect(() => {
+    if (activeQuickLaunchIndex < 0) {
+      setActiveIndicator(null);
+      return undefined;
+    }
+
+    const updateActiveIndicator = () => {
+      const tray = trayRef.current;
+      const slot = slotRefs.current[activeQuickLaunchIndex];
+
+      if (!tray || !slot) {
+        setActiveIndicator(null);
+        return;
+      }
+
+      const trayRect = tray.getBoundingClientRect();
+      const slotRect = slot.getBoundingClientRect();
+
+      setActiveIndicator({
+        left: slotRect.left - trayRect.left + slotRect.width / 2,
+        top: slotRect.bottom - trayRect.top + 6,
+      });
+    };
+
+    updateActiveIndicator();
+    window.addEventListener('resize', updateActiveIndicator);
+    window.addEventListener('scroll', updateActiveIndicator, true);
+
+    return () => {
+      window.removeEventListener('resize', updateActiveIndicator);
+      window.removeEventListener('scroll', updateActiveIndicator, true);
+    };
+  }, [activeQuickLaunchIndex, isSidebarCollapsed, slots]);
+
   return (
     <section className={`pointer-events-none fixed bottom-3 left-3 right-3 z-30 hidden select-none transition-all duration-200 sm:bottom-5 sm:right-6 md:block ${isSidebarCollapsed ? 'sm:left-24' : 'sm:left-[19.5rem]'}`}>
-      <div data-onboarding-target="quick-launch" className="quick-launch-gold-frame pointer-events-auto mx-auto w-fit max-w-full rounded-2xl border border-transparent bg-white/85 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:bg-gray-950/80 sm:p-3">
+      <div ref={trayRef} data-onboarding-target="quick-launch" className="quick-launch-gold-frame pointer-events-auto relative mx-auto w-fit max-w-full rounded-2xl border border-transparent bg-white/85 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:bg-gray-950/80 sm:p-3">
         <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 sm:gap-2">
         {slots.map((slot, index) => {
           const app = typeof slot === 'string' ? availableApps.find((item) => item.id === slot) || null : null;
@@ -1896,10 +1941,6 @@ function QuickLaunchTray({
                 <span className="quick-launch-slot-label">{hasFailedLaunch ? 'Blocked' : isLaunching ? 'Opening' : label}</span>
               </button>
 
-              {isActive && (
-                <span className="absolute -bottom-2 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-accent shadow" />
-              )}
-
               {badgeCount > 0 && (
                 <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white shadow">
                   {badgeCount > 9 ? '9+' : badgeCount}
@@ -1921,6 +1962,13 @@ function QuickLaunchTray({
           );
         })}
         </div>
+        <span
+          className={`quick-launch-active-indicator ${activeIndicator ? 'quick-launch-active-indicator-visible' : ''}`}
+          style={{
+            left: activeIndicator?.left ?? 0,
+            top: activeIndicator?.top ?? 0,
+          }}
+        />
       </div>
 
       {contextMenu && (

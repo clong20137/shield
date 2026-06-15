@@ -887,6 +887,27 @@
     transform: translateX(45%) rotate(16deg);
   }
 
+  .quick-launch-active-indicator {
+    pointer-events: none;
+    position: absolute;
+    z-index: 2;
+    height: 0.375rem;
+    width: 0.375rem;
+    border-radius: 9999px;
+    background: rgb(156, 134, 92);
+    box-shadow: 0 0 0 3px rgba(156, 134, 92, 0.14), 0 8px 18px rgba(15, 23, 42, 0.2);
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.72);
+    transition-property: left, top, opacity, transform, box-shadow;
+    transition-duration: var(--shield-motion-duration);
+    transition-timing-function: var(--shield-motion-ease);
+  }
+
+  .quick-launch-active-indicator-visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
   .quick-launch-slot-icon,
   .quick-launch-picker-icon {
     display: flex;
@@ -999,6 +1020,23 @@
   .dark .quick-launch-slot-editing {
     background: linear-gradient(180deg, rgba(156, 134, 92, 0.18), rgba(15, 23, 42, 0.94));
     color: rgb(235, 211, 157);
+  }
+
+  .dark .quick-launch-slot-shine {
+    background: linear-gradient(90deg, transparent, rgba(235, 211, 157, 0.18), transparent);
+  }
+
+  .dark .quick-launch-slot:hover .quick-launch-slot-shine {
+    opacity: 0.24;
+  }
+
+  .dark .quick-launch-slot-launching .quick-launch-slot-shine {
+    opacity: 0.38;
+  }
+
+  .dark .quick-launch-active-indicator {
+    background: rgb(235, 211, 157);
+    box-shadow: 0 0 0 3px rgba(235, 211, 157, 0.12), 0 8px 18px rgba(0, 0, 0, 0.36);
   }
 
   .dark .quick-launch-edit-button {
