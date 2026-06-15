@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --shield-motion-duration: 500ms;
+  --shield-motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 @property --shield-border-angle {
   syntax: "<angle>";
   inherits: false;
@@ -458,14 +463,16 @@
   select,
   textarea,
   button,
-  a {
+  a,
+  [role='button'],
+  [tabindex] {
     @apply touch-manipulation;
   }
 
   button {
     transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter;
-    transition-duration: 180ms;
-    transition-timing-function: ease-in-out;
+    transition-duration: var(--shield-motion-duration);
+    transition-timing-function: var(--shield-motion-ease);
   }
 
   button:not(:disabled):hover {
@@ -487,7 +494,9 @@
 
 @layer components {
   .btn {
-    @apply inline-flex min-h-10 items-center justify-center gap-2 px-4 py-2 border-none rounded transition-all duration-200 ease-in-out cursor-pointer font-semibold text-sm disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 px-4 py-2 border-none rounded transition-all cursor-pointer font-semibold text-sm disabled:cursor-not-allowed disabled:opacity-60;
+    transition-duration: var(--shield-motion-duration);
+    transition-timing-function: var(--shield-motion-ease);
   }
 
   .btn-primary {
@@ -508,6 +517,8 @@
 
   .icon-close-button {
     @apply flex h-11 w-11 shrink-0 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-blue-100 dark:hover:bg-gray-800;
+    transition-duration: var(--shield-motion-duration);
+    transition-timing-function: var(--shield-motion-ease);
   }
 
   .container {
@@ -553,6 +564,39 @@
     backdrop-filter: none;
     filter: none;
     isolation: isolate;
+  }
+
+  .polished-motion,
+  .btn,
+  .icon-close-button,
+  .quick-launch-gold-frame button,
+  .quick-launch-picker-enter button,
+  .quick-launch-picker-enter input,
+  .toast-notification,
+  .floating-window-enter,
+  .floating-window-exit,
+  .floating-window-mac-enter,
+  .floating-window-mac-exit,
+  .modal-window,
+  .modal-window-exit,
+  table tbody tr,
+  tbody tr,
+  tr[class*='hover:'],
+  article[class*='hover:'],
+  div[class*='hover:'],
+  section[class*='hover:'],
+  a[class*='hover:'],
+  button[class*='hover:'] {
+    transition-duration: var(--shield-motion-duration) !important;
+    transition-timing-function: var(--shield-motion-ease) !important;
+  }
+
+  table tbody tr,
+  tbody tr,
+  article[class*='hover:'],
+  div[class*='hover:'],
+  section[class*='hover:'] {
+    transition-property: color, background-color, border-color, opacity, box-shadow, transform, filter !important;
   }
 
   .toast-notification::after {
@@ -736,13 +780,13 @@
   }
 
   .quick-launch-picker-enter {
-    animation: quick-launch-picker-enter 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: quick-launch-picker-enter var(--shield-motion-duration) var(--shield-motion-ease) both;
     will-change: opacity, transform, filter;
   }
 
   .modal-backdrop {
     @apply p-2 sm:p-4;
-    animation: modal-backdrop-enter 180ms ease-out both;
+    animation: modal-backdrop-enter var(--shield-motion-duration) var(--shield-motion-ease) both;
   }
 
   .modal-window {
@@ -750,7 +794,7 @@
     max-height: calc(100dvh - 0.75rem);
     transform-origin: bottom center;
     box-shadow: 0 28px 90px rgba(15, 23, 42, 0.38), 0 0 0 1px rgba(255, 255, 255, 0.28) !important;
-    animation: modal-window-enter 260ms cubic-bezier(0.2, 0.85, 0.2, 1) both;
+    animation: modal-window-enter var(--shield-motion-duration) var(--shield-motion-ease) both;
     will-change: transform, opacity, filter;
   }
 
@@ -759,36 +803,36 @@
   }
 
   .modal-backdrop-exit {
-    animation: modal-backdrop-exit 180ms ease-in both;
+    animation: modal-backdrop-exit var(--shield-motion-duration) ease-in both;
   }
 
   .modal-window-exit {
     transform-origin: bottom center;
-    animation: modal-window-exit 200ms cubic-bezier(0.4, 0, 0.7, 0.2) both;
+    animation: modal-window-exit var(--shield-motion-duration) cubic-bezier(0.4, 0, 0.7, 0.2) both;
     will-change: transform, opacity, filter;
   }
 
   .floating-window-enter {
     transform-origin: bottom center;
-    animation: modal-window-enter 260ms cubic-bezier(0.2, 0.85, 0.2, 1) both;
+    animation: modal-window-enter var(--shield-motion-duration) var(--shield-motion-ease) both;
     will-change: transform, opacity, filter;
   }
 
   .floating-window-exit {
     transform-origin: bottom center;
-    animation: modal-window-exit 200ms cubic-bezier(0.4, 0, 0.7, 0.2) both;
+    animation: modal-window-exit var(--shield-motion-duration) cubic-bezier(0.4, 0, 0.7, 0.2) both;
     will-change: transform, opacity, filter;
   }
 
   .floating-window-mac-enter {
     transform-origin: bottom center;
-    animation: floating-window-mac-enter 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: floating-window-mac-enter var(--shield-motion-duration) var(--shield-motion-ease) both;
     will-change: transform, opacity, filter;
   }
 
   .floating-window-mac-exit {
     transform-origin: bottom center;
-    animation: floating-window-mac-exit 210ms cubic-bezier(0.45, 0, 0.85, 0.25) both;
+    animation: floating-window-mac-exit var(--shield-motion-duration) cubic-bezier(0.45, 0, 0.85, 0.25) both;
     will-change: transform, opacity, filter;
   }
 
@@ -877,7 +921,8 @@
   }
 
   .shield-sidebar::-webkit-scrollbar {
-    width: 10px;
+    width: 7px;
+    height: 7px;
   }
 
   .shield-sidebar::-webkit-scrollbar-track {
@@ -902,6 +947,17 @@
 
   .shield-online-pulse {
     animation: shield-online-pulse 2.8s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 1ms !important;
+    }
   }
 }
 
