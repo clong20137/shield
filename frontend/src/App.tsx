@@ -177,7 +177,7 @@ function getExternalAppWindowName(label: string): string {
   return `shield_app_${normalizedLabel || 'external'}`;
 }
 
-function openExternalAppPopup(slot: QuickLaunchExternalSlot) {
+function openExternalAppPopup(slot: QuickLaunchExternalSlot): boolean {
   const url = normalizeExternalAppUrl(slot.url);
   const width = Math.min(1280, Math.max(960, Math.round(window.screen.availWidth * 0.82)));
   const height = Math.min(900, Math.max(700, Math.round(window.screen.availHeight * 0.82)));
@@ -197,10 +197,10 @@ function openExternalAppPopup(slot: QuickLaunchExternalSlot) {
   if (popup) {
     popup.opener = null;
     popup.focus();
-    return;
+    return true;
   }
 
-  window.open(url, '_blank', 'noopener,noreferrer');
+  return Boolean(window.open(url, '_blank', 'noopener,noreferrer'));
 }
 
 const WELCOME_SPLASH_KEY_PREFIX = 'shield_welcome_splash_seen';
@@ -1495,6 +1495,8 @@ function QuickLaunchTray({
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
   const [contextMenu, setContextMenu] = useState<{ index: number; x: number; y: number } | null>(null);
   const [draggingSlot, setDraggingSlot] = useState<number | null>(null);
+  const [launchingSlot, setLaunchingSlot] = useState<number | null>(null);
+  const [failedLaunchSlot, setFailedLaunchSlot] = useState<number | null>(null);
   const didDragSlotRef = useRef(false);
   const slotRefs = useRef<Array<HTMLDivElement | null>>([]);
   const pickerRef = useRef<HTMLDivElement | null>(null);
@@ -1700,9 +1702,21 @@ function QuickLaunchTray({
     };
   }, [contextMenu]);
 
-  const openSlot = (slot: NonNullable<QuickLaunchSlot>) => {
+  const openSlot = (index: number, slot: NonNullable<QuickLaunchSlot>) => {
+    setLaunchingSlot(index);
+    setFailedLaunchSlot(null);
+    window.setTimeout(() => setLaunchingSlot((currentSlot) => (currentSlot === index ? null : currentSlot)), 650);
+
     if (isExternalQuickLaunchSlot(slot)) {
-      openExternalAppPopup(slot);
+      try {
+        if (!openExternalAppPopup(slot)) {
+          setFailedLaunchSlot(index);
+          window.setTimeout(() => setFailedLaunchSlot((currentSlot) => (currentSlot === index ? null : currentSlot)), 2200);
+        }
+      } catch {
+        setFailedLaunchSlot(index);
+        window.setTimeout(() => setFailedLaunchSlot((currentSlot) => (currentSlot === index ? null : currentSlot)), 2200);
+      }
       return;
     }
 
@@ -1787,6 +1801,21 @@ function QuickLaunchTray({
           const label = app?.label || (isExternal ? slot.label : 'Add');
           const badgeCount = app ? badgeCounts[app.id] || 0 : 0;
           const isActive = app ? isAppActive(app) : false;
+          const isEditing = editingSlot === index;
+          const isLaunching = launchingSlot === index;
+          const hasFailedLaunch = failedLaunchSlot === index;
+          const slotStateClass = visibleSlot
+            ? [
+                'quick-launch-slot-configured',
+                draggingSlot === index ? 'quick-launch-slot-dragging' : '',
+                isActive ? 'quick-launch-slot-active' : '',
+                isEditing ? 'quick-launch-slot-editing' : '',
+                isLaunching ? 'quick-launch-slot-launching' : '',
+                hasFailedLaunch ? 'quick-launch-slot-failed' : '',
+              ].filter(Boolean).join(' ')
+            : isEditing
+              ? 'quick-launch-slot-empty quick-launch-slot-editing'
+              : 'quick-launch-slot-empty';
 
           return (
             <div
@@ -1839,7 +1868,7 @@ function QuickLaunchTray({
                     return;
                   }
                   if (visibleSlot) {
-                    openSlot(visibleSlot);
+                    openSlot(index, visibleSlot);
                     return;
                   }
                   setEditingSlot(index);
@@ -1855,15 +1884,16 @@ function QuickLaunchTray({
                   event.dataTransfer.effectAllowed = 'move';
                   event.dataTransfer.setData('text/plain', String(index));
                 }}
-                className={`flex h-12 w-12 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-[10px] font-bold transition sm:h-16 sm:w-16 ${
-                  slot
-                    ? `${draggingSlot === index ? 'scale-95 opacity-50' : ''} ${isActive ? 'translate-y-[-3px] border-accent bg-accent/10 text-accent shadow-md' : 'border-gray-200 bg-white text-primary-500 shadow-sm'} cursor-grab active:cursor-grabbing hover:-translate-y-1 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100`
-                    : 'border-gray-300 bg-white/60 text-gray-400 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900/60'
-                }`}
+                className={`quick-launch-slot group ${slotStateClass}`}
                 title={label || 'Add App'}
+                aria-label={visibleSlot ? `Open ${label}` : 'Add quick launch app'}
+                aria-pressed={isActive}
               >
-                {Icon ? <Icon size={20} /> : <Plus size={22} />}
-                <span className="hidden max-w-14 truncate sm:block">{label}</span>
+                <span className="quick-launch-slot-shine" />
+                <span className="quick-launch-slot-icon" aria-hidden="true">
+                  {hasFailedLaunch ? <AlertTriangle size={20} /> : Icon ? <Icon size={20} /> : <Plus size={22} />}
+                </span>
+                <span className="quick-launch-slot-label">{hasFailedLaunch ? 'Blocked' : isLaunching ? 'Opening' : label}</span>
               </button>
 
               {isActive && (
@@ -1880,7 +1910,7 @@ function QuickLaunchTray({
                 <button
                   type="button"
                   onClick={() => setEditingSlot(index)}
-                  className="absolute -bottom-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-gray-500 shadow-sm hover:bg-gray-200 hover:text-primary-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  className={`quick-launch-edit-button ${isEditing ? 'quick-launch-edit-button-active' : ''}`}
                   aria-label={`Change ${label} shortcut`}
                   title="Change shortcut"
                 >
@@ -1941,6 +1971,7 @@ function QuickLaunchTray({
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">Choose App</h2>
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Slot {(editingSlot ?? 0) + 1}</p>
               </div>
               <button
                 type="button"
@@ -1966,10 +1997,10 @@ function QuickLaunchTray({
                     type="button"
                     onClick={() => assignSlot(app.id)}
                     disabled={isAlreadyUsed}
-                    className="flex items-center gap-3 rounded px-2.5 py-2 text-left text-sm font-bold text-gray-800 transition hover:bg-accent/10 hover:text-accent disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:text-gray-100 dark:hover:bg-gray-800 dark:hover:text-blue-100 dark:disabled:bg-gray-950 dark:disabled:text-gray-600"
+                    className="quick-launch-picker-option"
                     title={isAlreadyUsed ? 'Already in your dock' : app.label}
                   >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-accent/10 bg-accent/10 text-accent dark:bg-blue-950/70 dark:text-blue-100">
+                    <span className="quick-launch-picker-icon">
                       <Icon size={18} />
                     </span>
                     <span className="min-w-0 flex-1">{app.label}</span>
