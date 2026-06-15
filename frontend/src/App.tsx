@@ -25,6 +25,26 @@ const QUICK_LAUNCH_KEY = 'shield_quick_launch';
 const QUICK_LAUNCH_SLOT_COUNT = 8;
 const MODAL_CLOSE_MS = 220;
 const PASSWORD_REQUIREMENTS_MESSAGE = 'Password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.';
+const APP_BASE_PATH = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
+const ROUTER_BASENAME = APP_BASE_PATH || undefined;
+
+function withAppBase(path: string): string {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${APP_BASE_PATH}${normalizedPath}` || '/';
+}
+
+function getAppRelativePathname(): string {
+  if (!APP_BASE_PATH) {
+    return window.location.pathname;
+  }
+
+  const pathname = window.location.pathname;
+  if (pathname === APP_BASE_PATH || pathname.startsWith(`${APP_BASE_PATH}/`)) {
+    return pathname.slice(APP_BASE_PATH.length) || '/';
+  }
+
+  return pathname;
+}
 
 function isSecurePassword(password: string): boolean {
   return password.length >= 12 && /[A-Z]/u.test(password) && /[a-z]/u.test(password) && /\d/u.test(password) && /[^A-Za-z0-9]/u.test(password);
@@ -3093,7 +3113,7 @@ function getDefaultSetupEnvironment(status: SetupStatus | null): SetupEnvironmen
     DB_PASSWORD: '',
     DB_NAME: status?.database.name || 'shield',
     ALLOWED_ORIGINS: window.location.origin,
-    APP_BASE_URL: status?.appBaseUrl || window.location.origin,
+    APP_BASE_URL: status?.appBaseUrl || `${window.location.origin}${APP_BASE_PATH}`,
     API_BASE_URL: status?.apiUrl || apiUrl,
     SESSION_COOKIE_SECURE: window.location.protocol === 'https:' ? 'true' : 'false',
     SESSION_COOKIE_SAMESITE: 'lax',
@@ -3106,7 +3126,7 @@ function getDefaultSetupPayload(status: SetupStatus | null): CompleteSetupPayloa
   return {
     appName: status?.appName || 'SHIELD',
     siteName: status?.siteName || 'SHIELD Workspace',
-    appBaseUrl: status?.appBaseUrl || window.location.origin,
+    appBaseUrl: status?.appBaseUrl || `${window.location.origin}${APP_BASE_PATH}`,
     apiUrl: status?.apiUrl || inferredApiUrl,
     registrationMode: status?.registrationMode || 'invite-only',
     maintenanceMode: false,
@@ -3136,7 +3156,7 @@ function InstalledSetupClosedScreen({ appName, siteName }: { appName: string; si
         <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
           The first-run installer is locked after setup is complete. Environment changes should now be handled by an administrator on the server.
         </p>
-        <button type="button" onClick={() => window.location.replace('/')} className="btn-primary mt-6">
+        <button type="button" onClick={() => window.location.replace(withAppBase('/'))} className="btn-primary mt-6">
           Go to {siteName}
         </button>
       </div>
@@ -3786,13 +3806,15 @@ function App() {
       return;
     }
 
-    if (setupStatus.setupRequired && window.location.pathname !== '/install') {
-      window.history.replaceState({}, document.title, '/install');
+    const appPathname = getAppRelativePathname();
+
+    if (setupStatus.setupRequired && appPathname !== '/install') {
+      window.history.replaceState({}, document.title, withAppBase('/install'));
       return;
     }
 
-    if (!setupStatus.setupRequired && !setupStatus.installed && window.location.pathname === '/install') {
-      window.history.replaceState({}, document.title, '/');
+    if (!setupStatus.setupRequired && !setupStatus.installed && appPathname === '/install') {
+      window.history.replaceState({}, document.title, withAppBase('/'));
     }
   }, [isSetupLoading, setupStatus]);
 
@@ -3804,7 +3826,6 @@ function App() {
         'calendar-updated',
         'dashboard-updated',
         'device-updated',
-        'dispatch-updated',
         'error-updated',
         'media-updated',
         'messages-updated',
@@ -4571,7 +4592,6 @@ function App() {
     eventSource.addEventListener('calendar-updated', handleRealtimeAppUpdate('calendar-updated'));
     eventSource.addEventListener('dashboard-updated', handleRealtimeAppUpdate('dashboard-updated'));
     eventSource.addEventListener('device-updated', handleRealtimeAppUpdate('device-updated'));
-    eventSource.addEventListener('dispatch-updated', handleRealtimeAppUpdate('dispatch-updated'));
     eventSource.addEventListener('error-updated', handleRealtimeAppUpdate('error-updated'));
     eventSource.addEventListener('media-updated', handleRealtimeAppUpdate('media-updated'));
     eventSource.addEventListener('mileage-updated', handleRealtimeAppUpdate('mileage-updated'));
@@ -4856,7 +4876,7 @@ function App() {
     setIsNotificationsOpen(false);
 
     if (notification.entityType === 'dashboard_post' && notification.entityId) {
-      window.location.assign(`/updates/${encodeURIComponent(notification.entityId)}`);
+      window.location.assign(withAppBase(`/updates/${encodeURIComponent(notification.entityId)}`));
       return;
     }
 
@@ -4871,7 +4891,7 @@ function App() {
     }
 
     if (notification.entityType === 'performance_evaluation') {
-      window.location.assign('/evaluations');
+      window.location.assign(withAppBase('/evaluations'));
     }
   };
 
@@ -4986,7 +5006,7 @@ function App() {
   }, []);
 
   return (
-    <Router>
+    <Router basename={ROUTER_BASENAME}>
       <ToastHost toasts={toasts} />
       {showConfetti && <ConfettiOverlay />}
       {isSetupLoading || isSessionLoading ? (
@@ -5012,11 +5032,11 @@ function App() {
               registrationMode: settings.registrationMode,
               features: settings.features,
             } : currentStatus);
-            window.history.replaceState({}, document.title, '/');
+            window.history.replaceState({}, document.title, withAppBase('/'));
             handleLogin(account);
           }}
         />
-      ) : setupStatus?.installed && window.location.pathname === '/install' ? (
+      ) : setupStatus?.installed && getAppRelativePathname() === '/install' ? (
         <InstalledSetupClosedScreen appName={appName} siteName={siteName} />
       ) : !isAuthenticated ? (
         <LoginSplash onLogin={handleLogin} onToast={showToast} appName={appName} siteName={siteName} isExiting={isLoginTransitioning} />

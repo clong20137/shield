@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Mail, Pencil, Plus, Save, Search, ShieldCheck, X } from 'lucide-react';
 import { AuthAccount, AuthInvite, AuthRole, RegistrationSettings, authService } from '../services/api';
 
+const APP_BASE_PATH = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
+const DEFAULT_APP_BASE_URL = `${window.location.origin}${APP_BASE_PATH}`;
+
 interface PermissionsPageProps {
   account: AuthAccount;
   onAccountUpdate: (account: AuthAccount) => void;
@@ -38,7 +41,6 @@ const permissionGroups = [
     description: 'Daily work tools and inventory operations.',
     permissions: [
       { key: 'devices:manage', label: 'Manage devices' },
-      { key: 'dispatch:manage', label: 'Manage dispatch' },
       { key: 'calendar:manage', label: 'Manage calendar' },
       { key: 'calendar:view-profiles', label: 'View profile calendars' },
       { key: 'messages:send', label: 'Send messages' },
@@ -203,7 +205,7 @@ function PermissionsPage({
 
   const [registrationSettings, setRegistrationSettings] = useState<RegistrationSettings>({
     mode: 'public',
-    appBaseUrl: window.location.origin,
+    appBaseUrl: DEFAULT_APP_BASE_URL,
     maintenanceMode: false,
     loginWarningEnabled: true,
     loginWarningMessage: 'This is a Indiana State Police computer application system that is for Official use only. This system is subject to monitoring. Therefore, no expectation of privacy is to be assumed. Individuals found performing unauthorized activities may be subject to disciplinary action including criminal prosecution.',

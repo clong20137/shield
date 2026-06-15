@@ -29,7 +29,6 @@ const allowedPermissions = [
   'media:edit',
   'media:delete',
   'devices:manage',
-  'dispatch:manage',
   'calendar:manage',
   'calendar:view-profiles',
   'reports:trooper-dailies',

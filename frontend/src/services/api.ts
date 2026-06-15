@@ -253,54 +253,6 @@ export interface DashboardSummary {
   dueReminderNotificationsCreated: number;
 }
 
-export type DispatchUnitStatus = 'Available' | 'Assigned' | 'En Route' | 'On Scene' | 'Clear';
-
-export interface DispatchCall {
-  id: string;
-  callNumber: string;
-  title: string;
-  address: string;
-  latitude: number | null;
-  longitude: number | null;
-  priority: string;
-  status: 'Active' | 'Cleared';
-  trafficStatus: string;
-  etaMinutes: number;
-  distanceMiles: number;
-  createdBy: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface DispatchUnitAssignment {
-  id: string;
-  callId: string;
-  accountId: string;
-  unitLabel: string;
-  status: DispatchUnitStatus;
-  lastLatitude: number | null;
-  lastLongitude: number | null;
-  lastSpeedMph: number;
-  lastDistanceMiles: number;
-  lastGpsAt: string | null;
-  assignedAt: string | null;
-  enRouteAt: string | null;
-  onSceneAt: string | null;
-  clearedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface DispatchSummary {
-  call: DispatchCall;
-  assignment: DispatchUnitAssignment | null;
-  nearestUnits: DispatchUnitAssignment[];
-  automation: {
-    enRouteSpeedMph: number;
-    onSceneDistanceMiles: number;
-  };
-}
-
 export interface CreateUserPayload extends Omit<User, 'id' | 'createdAt' | 'updatedAt'> {
   password?: string;
 }
@@ -1147,20 +1099,6 @@ export const deviceService = {
 
   delete: (id: string, actor?: { actorId?: string; actorName?: string; eventNotes?: string }) =>
     api.delete(`/devices/${id}`, { data: actor }),
-};
-
-export const dispatchService = {
-  getActive: () =>
-    api.get<DispatchSummary>('/dispatch/active'),
-
-  assignSelf: (callId: string, unitLabel?: string) =>
-    api.post<DispatchUnitAssignment>(`/dispatch/calls/${callId}/assign`, { unitLabel }),
-
-  updateStatus: (assignmentId: string, status: DispatchUnitStatus) =>
-    api.put<DispatchUnitAssignment>(`/dispatch/assignments/${assignmentId}/status`, { status }),
-
-  recordLocation: (assignmentId: string, location: { latitude: number; longitude: number; speedMph?: number }) =>
-    api.post<DispatchUnitAssignment>(`/dispatch/assignments/${assignmentId}/location`, location),
 };
 
 export const messageService = {
