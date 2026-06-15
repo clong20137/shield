@@ -26,6 +26,9 @@ const QUICK_LAUNCH_SLOT_COUNT = 8;
 const QUICK_LAUNCH_PICKER_WIDTH = 320;
 const QUICK_LAUNCH_PICKER_GUTTER = 12;
 const QUICK_LAUNCH_PICKER_CLOSE_MS = 500;
+const QUICK_LAUNCH_CONTEXT_MENU_WIDTH = 190;
+const QUICK_LAUNCH_CONTEXT_MENU_HEIGHT = 150;
+const QUICK_LAUNCH_CONTEXT_MENU_GUTTER = 12;
 const MODAL_CLOSE_MS = 220;
 const PASSWORD_REQUIREMENTS_MESSAGE = 'Password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.';
 const APP_BASE_PATH = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
@@ -2041,8 +2044,14 @@ function QuickLaunchTray({
         <div
           className="quick-launch-context-menu pointer-events-auto fixed z-[70] min-w-40 overflow-hidden rounded border border-gray-200 bg-white p-1 text-sm shadow-2xl dark:border-gray-700 dark:bg-gray-900"
           style={{
-            left: Math.min(contextMenu.x, window.innerWidth - 180),
-            top: Math.min(contextMenu.y, window.innerHeight - 96),
+            left: Math.max(
+              QUICK_LAUNCH_CONTEXT_MENU_GUTTER,
+              Math.min(contextMenu.x, window.innerWidth - QUICK_LAUNCH_CONTEXT_MENU_WIDTH - QUICK_LAUNCH_CONTEXT_MENU_GUTTER),
+            ),
+            top: Math.max(
+              QUICK_LAUNCH_CONTEXT_MENU_GUTTER,
+              Math.min(contextMenu.y, window.innerHeight - QUICK_LAUNCH_CONTEXT_MENU_HEIGHT - QUICK_LAUNCH_CONTEXT_MENU_GUTTER),
+            ),
           }}
           onClick={(event) => event.stopPropagation()}
         >
