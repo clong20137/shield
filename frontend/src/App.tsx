@@ -159,6 +159,48 @@ function saveLegacyQuickLaunchSlots(storageKey: string, slots: QuickLaunchSlot[]
   }
 }
 
+function normalizeExternalAppUrl(value: string): string {
+  const trimmedValue = value.trim();
+
+  return /^https?:\/\//iu.test(trimmedValue) ? trimmedValue : `https://${trimmedValue}`;
+}
+
+function getExternalAppWindowName(label: string): string {
+  const normalizedLabel = label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '_')
+    .replace(/^_+|_+$/gu, '');
+
+  return `shield_app_${normalizedLabel || 'external'}`;
+}
+
+function openExternalAppPopup(slot: QuickLaunchExternalSlot) {
+  const url = normalizeExternalAppUrl(slot.url);
+  const width = Math.min(1280, Math.max(960, Math.round(window.screen.availWidth * 0.82)));
+  const height = Math.min(900, Math.max(700, Math.round(window.screen.availHeight * 0.82)));
+  const left = Math.max(0, Math.round((window.screen.availWidth - width) / 2));
+  const top = Math.max(0, Math.round((window.screen.availHeight - height) / 2));
+  const windowFeatures = [
+    'popup=yes',
+    'resizable=yes',
+    'scrollbars=yes',
+    `width=${width}`,
+    `height=${height}`,
+    `left=${left}`,
+    `top=${top}`,
+  ].join(',');
+  const popup = window.open(url, getExternalAppWindowName(slot.label), windowFeatures);
+
+  if (popup) {
+    popup.opener = null;
+    popup.focus();
+    return;
+  }
+
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 const WELCOME_SPLASH_KEY_PREFIX = 'shield_welcome_splash_seen';
 
 function getWelcomeSplashStorageKey(accountId: string): string {
@@ -1586,8 +1628,7 @@ function QuickLaunchTray({
 
   const openSlot = (slot: NonNullable<QuickLaunchSlot>) => {
     if (isExternalQuickLaunchSlot(slot)) {
-      const url = /^https?:\/\//iu.test(slot.url) ? slot.url : `https://${slot.url}`;
-      window.open(url, '_blank', 'noopener,noreferrer');
+      openExternalAppPopup(slot);
       return;
     }
 
