@@ -1,4 +1,4 @@
-import { CSSProperties, FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, FormEvent, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Command, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
@@ -23,6 +23,8 @@ const MESSAGE_PREFERENCES_KEY = 'shield_message_preferences';
 const SESSION_TIMEOUT_KEY = 'shield_session_timeout_minutes';
 const QUICK_LAUNCH_KEY = 'shield_quick_launch';
 const QUICK_LAUNCH_SLOT_COUNT = 8;
+const QUICK_LAUNCH_PICKER_WIDTH = 320;
+const QUICK_LAUNCH_PICKER_GUTTER = 12;
 const MODAL_CLOSE_MS = 220;
 const PASSWORD_REQUIREMENTS_MESSAGE = 'Password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.';
 const APP_BASE_PATH = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
@@ -1494,6 +1496,9 @@ function QuickLaunchTray({
   const [contextMenu, setContextMenu] = useState<{ index: number; x: number; y: number } | null>(null);
   const [draggingSlot, setDraggingSlot] = useState<number | null>(null);
   const didDragSlotRef = useRef(false);
+  const slotRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+  const [pickerPosition, setPickerPosition] = useState<{ left: number; top: number; arrowLeft: number } | null>(null);
   const [externalLabel, setExternalLabel] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
   const permissionSet = useMemo(() => new Set(permissions), [permissions]);
@@ -1528,6 +1533,17 @@ function QuickLaunchTray({
   );
   const editingExternalSlot = editingSlot !== null && isExternalQuickLaunchSlot(slots[editingSlot]) ? slots[editingSlot] : null;
   const activeModalAppSet = useMemo(() => new Set(activeModalApps), [activeModalApps]);
+
+  useEffect(() => {
+    if (editingExternalSlot) {
+      setExternalLabel(editingExternalSlot.label);
+      setExternalUrl(editingExternalSlot.url);
+      return;
+    }
+
+    setExternalLabel('');
+    setExternalUrl('');
+  }, [editingExternalSlot]);
 
   const isAppActive = (app: QuickLaunchApp) => {
     if (activeModalAppSet.has(app.id)) {
@@ -1593,6 +1609,40 @@ function QuickLaunchTray({
     return () => window.removeEventListener('shield:quick-launch-updated', loadQuickLaunchFromDatabase);
   }, [loadQuickLaunchFromDatabase]);
 
+  useLayoutEffect(() => {
+    if (editingSlot === null) {
+      setPickerPosition(null);
+      return undefined;
+    }
+
+    const updatePickerPosition = () => {
+      const slot = slotRefs.current[editingSlot];
+      if (!slot) return;
+
+      const rect = slot.getBoundingClientRect();
+      const slotCenter = rect.left + rect.width / 2;
+      const left = Math.min(
+        Math.max(QUICK_LAUNCH_PICKER_GUTTER, slotCenter - QUICK_LAUNCH_PICKER_WIDTH / 2),
+        Math.max(QUICK_LAUNCH_PICKER_GUTTER, window.innerWidth - QUICK_LAUNCH_PICKER_WIDTH - QUICK_LAUNCH_PICKER_GUTTER),
+      );
+
+      setPickerPosition({
+        left,
+        top: rect.top - 12,
+        arrowLeft: slotCenter - left,
+      });
+    };
+
+    updatePickerPosition();
+    window.addEventListener('resize', updatePickerPosition);
+    window.addEventListener('scroll', updatePickerPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updatePickerPosition);
+      window.removeEventListener('scroll', updatePickerPosition, true);
+    };
+  }, [editingSlot]);
+
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && editingSlot !== null) {
@@ -1609,6 +1659,30 @@ function QuickLaunchTray({
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
+  }, [editingSlot]);
+
+  useEffect(() => {
+    if (editingSlot === null) {
+      return undefined;
+    }
+
+    const closePicker = (event: MouseEvent) => {
+      if (pickerRef.current?.contains(event.target as Node)) {
+        return;
+      }
+
+      const activeSlot = slotRefs.current[editingSlot];
+      if (activeSlot?.contains(event.target as Node)) {
+        return;
+      }
+
+      setEditingSlot(null);
+      setExternalLabel('');
+      setExternalUrl('');
+    };
+
+    window.addEventListener('mousedown', closePicker);
+    return () => window.removeEventListener('mousedown', closePicker);
   }, [editingSlot]);
 
   useEffect(() => {
@@ -1703,7 +1777,7 @@ function QuickLaunchTray({
 
   return (
     <section className={`pointer-events-none fixed bottom-3 left-3 right-3 z-30 hidden select-none transition-all duration-200 sm:bottom-5 sm:right-6 md:block ${isSidebarCollapsed ? 'sm:left-24' : 'sm:left-[19.5rem]'}`}>
-      <div data-onboarding-target="quick-launch" className="pointer-events-auto mx-auto w-fit max-w-full rounded-2xl border border-gray-200 bg-white/85 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/80 sm:p-3">
+      <div data-onboarding-target="quick-launch" className="quick-launch-gold-frame pointer-events-auto mx-auto w-fit max-w-full rounded-2xl border border-transparent bg-white/85 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:bg-gray-950/80 sm:p-3">
         <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 sm:gap-2">
         {slots.map((slot, index) => {
           const app = typeof slot === 'string' ? availableApps.find((item) => item.id === slot) || null : null;
@@ -1718,6 +1792,9 @@ function QuickLaunchTray({
             <div
               key={`quick-launch-${index}`}
               className="relative"
+              ref={(element) => {
+                slotRefs.current[index] = element;
+              }}
               draggable={Boolean(visibleSlot)}
               onDragStart={(event) => {
                 if (!visibleSlot) {
@@ -1843,12 +1920,27 @@ function QuickLaunchTray({
       )}
 
       {editingSlot !== null && (
-        <div className="modal-backdrop pointer-events-auto fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center">
-          <div className="modal-window w-full max-w-lg overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-6">
-            <div className="mb-5 flex items-start justify-between gap-4">
+        <div
+          ref={pickerRef}
+          className="quick-launch-picker-enter pointer-events-auto fixed z-[75] max-h-[min(34rem,calc(100dvh-2rem))] overflow-y-auto rounded-lg border border-accent/30 bg-white p-3 text-gray-900 shadow-[0_24px_70px_rgba(15,23,42,0.28)] ring-1 ring-accent/10 dark:border-accent/40 dark:bg-gray-900 dark:text-gray-100"
+          style={{
+            left: pickerPosition?.left ?? QUICK_LAUNCH_PICKER_GUTTER,
+            top: pickerPosition?.top ?? window.innerHeight - 120,
+            width: QUICK_LAUNCH_PICKER_WIDTH,
+            transform: 'translateY(-100%)',
+            transformOrigin: `${pickerPosition?.arrowLeft ?? QUICK_LAUNCH_PICKER_WIDTH / 2}px bottom`,
+          }}
+          onClick={(event) => event.stopPropagation()}
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <span
+            className="absolute -bottom-1.5 h-3 w-3 -translate-x-1/2 rotate-45 border-b border-r border-accent/30 bg-white dark:border-accent/40 dark:bg-gray-900"
+            style={{ left: pickerPosition?.arrowLeft ?? QUICK_LAUNCH_PICKER_WIDTH / 2 }}
+          />
+          <div className="relative">
+            <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Choose App</h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Select what this quick-launch box should open.</p>
+                <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">Choose App</h2>
               </div>
               <button
                 type="button"
@@ -1864,7 +1956,7 @@ function QuickLaunchTray({
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="grid max-h-60 grid-cols-1 gap-1 overflow-y-auto pr-1">
               {availableApps.map((app) => {
                 const Icon = app.icon;
                 const isAlreadyUsed = usedAppIds.has(app.id);
@@ -1874,58 +1966,55 @@ function QuickLaunchTray({
                     type="button"
                     onClick={() => assignSlot(app.id)}
                     disabled={isAlreadyUsed}
-                    className="flex items-center gap-3 rounded border border-gray-200 px-4 py-3 text-left text-sm font-bold text-gray-800 hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-gray-800 dark:text-gray-100 dark:hover:border-accent dark:disabled:bg-gray-950 dark:disabled:text-gray-600"
+                    className="flex items-center gap-3 rounded px-2.5 py-2 text-left text-sm font-bold text-gray-800 transition hover:bg-accent/10 hover:text-accent disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:text-gray-100 dark:hover:bg-gray-800 dark:hover:text-blue-100 dark:disabled:bg-gray-950 dark:disabled:text-gray-600"
                     title={isAlreadyUsed ? 'Already in your dock' : app.label}
                   >
-                    <Icon size={18} />
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-accent/10 bg-accent/10 text-accent dark:bg-blue-950/70 dark:text-blue-100">
+                      <Icon size={18} />
+                    </span>
                     <span className="min-w-0 flex-1">{app.label}</span>
                     {isAlreadyUsed && <span className="text-xs font-semibold text-gray-400">Added</span>}
                   </button>
                 );
               })}
-              {editingExternalSlot && (
-                <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-danger dark:border-red-900 dark:bg-red-950/40 sm:col-span-2">
-                  <p className="font-bold">External site in this box</p>
-                  <p className="mt-1 break-all">{editingExternalSlot.label} - {editingExternalSlot.url}</p>
-                  <button
-                    type="button"
-                    onClick={() => assignSlot(null)}
-                    className="btn-danger mt-3 flex w-full items-center justify-start gap-3 px-4 py-3 text-left text-sm"
-                  >
-                    <Trash2 size={18} />
-                    Remove external site from this box
-                  </button>
-                </div>
-              )}
-              <form onSubmit={assignExternalSlot} className="rounded border border-gray-200 p-3 dark:border-gray-800 sm:col-span-2">
-                <div className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-800 dark:text-gray-100">
-                  <Link size={18} />
-                  External Site
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]">
-                  <input
-                    value={externalLabel}
-                    onChange={(event) => setExternalLabel(event.target.value)}
-                    placeholder="Name"
-                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-                  />
+            </div>
+
+            <form onSubmit={assignExternalSlot} className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-800">
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <Link size={15} />
+                External Site
+              </div>
+              <div className="grid gap-2">
+                <input
+                  value={externalLabel}
+                  onChange={(event) => setExternalLabel(event.target.value)}
+                  placeholder="Name"
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-gray-700 dark:bg-gray-950"
+                />
+                <div className="grid grid-cols-[1fr_auto] gap-2">
                   <input
                     value={externalUrl}
                     onChange={(event) => setExternalUrl(event.target.value)}
                     placeholder="https://example.com"
-                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                    className="min-w-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-gray-700 dark:bg-gray-950"
                   />
-                  <button type="submit" className="btn-primary" aria-label="Add external site">
+                  <button type="submit" className="btn-primary h-10 w-10 justify-center p-0" aria-label="Add external site" disabled={!externalLabel.trim() || !externalUrl.trim()}>
                     <Plus size={16} />
                   </button>
                 </div>
-              </form>
+              </div>
+            </form>
+
+            <div className="mt-3 grid gap-2 border-t border-gray-100 pt-2 dark:border-gray-800">
+              {editingExternalSlot && (
+                <p className="break-all rounded bg-accent/10 px-2 py-1 text-xs font-semibold text-accent">{editingExternalSlot.label} - {editingExternalSlot.url}</p>
+              )}
               <button
                 type="button"
                 onClick={() => assignSlot(null)}
-                className="btn-danger flex items-center justify-start gap-3 px-4 py-3 text-left text-sm sm:col-span-2"
+                className="flex items-center gap-3 rounded px-2.5 py-2 text-left text-sm font-bold text-danger transition hover:bg-red-50 dark:hover:bg-red-950"
               >
-                <Trash2 size={18} />
+                <Trash2 size={16} />
                 Clear this box
               </button>
             </div>

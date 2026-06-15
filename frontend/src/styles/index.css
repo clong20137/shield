@@ -184,6 +184,26 @@
   }
 }
 
+@keyframes quick-launch-gold-orbit {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@keyframes quick-launch-picker-enter {
+  0% {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(-100%) translateY(8px) scale(0.98);
+  }
+
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(-100%) translateY(0) scale(1);
+  }
+}
+
 @keyframes modal-backdrop-enter {
   0% {
     opacity: 0;
@@ -634,6 +654,49 @@
 
   .animate-shield-flash {
     animation: shield-flash 1.8s ease-in-out infinite;
+  }
+
+  .quick-launch-gold-frame {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+
+  .quick-launch-gold-frame::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    padding: 1.5px;
+    border-radius: inherit;
+    background:
+      conic-gradient(
+        from 0deg,
+        transparent 0deg,
+        transparent 54deg,
+        rgba(245, 158, 11, 0.92) 72deg,
+        rgba(255, 215, 128, 1) 92deg,
+        rgba(245, 158, 11, 0.92) 112deg,
+        transparent 132deg,
+        transparent 360deg
+      );
+    animation: quick-launch-gold-orbit 3.6s linear infinite;
+    pointer-events: none;
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  .quick-launch-gold-frame > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .quick-launch-picker-enter {
+    animation: quick-launch-picker-enter 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    will-change: opacity, transform, filter;
   }
 
   .modal-backdrop {
