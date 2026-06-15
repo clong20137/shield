@@ -233,6 +233,20 @@
   }
 }
 
+@keyframes quick-launch-picker-option-enter {
+  0% {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(0.35rem) scale(0.985);
+  }
+
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes quick-launch-tray-pop {
   0% {
     opacity: 0;
@@ -874,6 +888,10 @@
     pointer-events: none;
   }
 
+  .quick-launch-slot-shell {
+    will-change: transform;
+  }
+
   .quick-launch-slot {
     position: relative;
     display: flex;
@@ -1143,6 +1161,8 @@
     transition-property: color, background-color, box-shadow, opacity, transform;
     transition-duration: var(--shield-motion-duration);
     transition-timing-function: var(--shield-motion-ease);
+    animation: quick-launch-picker-option-enter 420ms var(--shield-motion-ease) backwards;
+    animation-delay: var(--quick-launch-stagger-delay, 0ms);
   }
 
   .quick-launch-picker-option:hover:not(:disabled),

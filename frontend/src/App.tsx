@@ -112,6 +112,18 @@ function isExternalQuickLaunchSlot(slot: QuickLaunchSlot): slot is QuickLaunchEx
   return typeof slot === 'object' && slot !== null && slot.type === 'external';
 }
 
+function getQuickLaunchSlotRenderKey(slot: QuickLaunchSlot, index: number): string {
+  if (typeof slot === 'string') {
+    return `app-${slot}`;
+  }
+
+  if (isExternalQuickLaunchSlot(slot)) {
+    return `external-${slot.label}-${slot.url}`;
+  }
+
+  return `empty-${index}`;
+}
+
 function getQuickLaunchStorageKey(accountId: string): string {
   return `${QUICK_LAUNCH_KEY}_${accountId}`;
 }
@@ -1507,6 +1519,8 @@ function QuickLaunchTray({
   const didDragSlotRef = useRef(false);
   const trayRef = useRef<HTMLDivElement | null>(null);
   const slotRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const slotAnimationRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const previousSlotRectsRef = useRef<Record<string, DOMRect> | null>(null);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const pickerCloseTimerRef = useRef<number | null>(null);
   const [pickerPosition, setPickerPosition] = useState<{ left: number; top: number; arrowLeft: number } | null>(null);
@@ -1819,11 +1833,47 @@ function QuickLaunchTray({
   const moveSlot = (fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex) return;
 
+    previousSlotRectsRef.current = Object.fromEntries(
+      Object.entries(slotAnimationRefs.current).flatMap(([key, element]) => {
+        if (!element) return [];
+        return [[key, element.getBoundingClientRect()]];
+      }),
+    );
+
     const nextSlots = [...slots];
     const [movedSlot] = nextSlots.splice(fromIndex, 1);
     nextSlots.splice(toIndex, 0, movedSlot);
     void saveQuickLaunchSlots(nextSlots);
   };
+
+  useLayoutEffect(() => {
+    const previousRects = previousSlotRectsRef.current;
+    if (!previousRects) return;
+
+    previousSlotRectsRef.current = null;
+
+    Object.entries(previousRects).forEach(([key, previousRect]) => {
+      const element = slotAnimationRefs.current[key];
+      if (!element) return;
+
+      const nextRect = element.getBoundingClientRect();
+      const deltaX = previousRect.left - nextRect.left;
+      const deltaY = previousRect.top - nextRect.top;
+
+      if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) return;
+
+      element.animate(
+        [
+          { transform: `translate(${deltaX}px, ${deltaY}px)` },
+          { transform: 'translate(0, 0)' },
+        ],
+        {
+          duration: 500,
+          easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+        },
+      );
+    });
+  }, [slots]);
 
   const editContextMenuSlot = () => {
     if (!contextMenu) return;
@@ -1897,6 +1947,7 @@ function QuickLaunchTray({
       <div ref={trayRef} data-onboarding-target="quick-launch" className="quick-launch-gold-frame quick-launch-tray-enter pointer-events-auto relative mx-auto w-fit max-w-full rounded-2xl border border-transparent bg-white/85 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:bg-gray-950/80 sm:p-3">
         <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 sm:gap-2">
         {slots.map((slot, index) => {
+          const slotRenderKey = getQuickLaunchSlotRenderKey(slot, index);
           const app = typeof slot === 'string' ? availableApps.find((item) => item.id === slot) || null : null;
           const isExternal = isExternalQuickLaunchSlot(slot);
           const visibleSlot = app || isExternal ? slot : null;
@@ -1924,10 +1975,11 @@ function QuickLaunchTray({
 
           return (
             <div
-              key={`quick-launch-${index}`}
-              className="relative"
+              key={slotRenderKey}
+              className="quick-launch-slot-shell relative"
               ref={(element) => {
                 slotRefs.current[index] = element;
+                slotAnimationRefs.current[slotRenderKey] = element;
               }}
               draggable={Boolean(visibleSlot)}
               onDragStart={(event) => {
@@ -2116,7 +2168,7 @@ function QuickLaunchTray({
             </div>
 
             <div className="grid max-h-60 grid-cols-1 gap-1 overflow-y-auto pr-1">
-              {availableApps.map((app) => {
+              {availableApps.map((app, appIndex) => {
                 const Icon = app.icon;
                 const isAlreadyUsed = usedAppIds.has(app.id);
                 return (
@@ -2126,6 +2178,7 @@ function QuickLaunchTray({
                     onClick={() => assignSlot(app.id)}
                     disabled={isAlreadyUsed}
                     className="quick-launch-picker-option"
+                    style={{ '--quick-launch-stagger-delay': `${Math.min(appIndex, 9) * 32}ms` } as CSSProperties}
                     title={isAlreadyUsed ? 'Already in your dock' : app.label}
                   >
                     <span className="quick-launch-picker-icon">
