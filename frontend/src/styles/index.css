@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@property --shield-border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 @keyframes toast-lifecycle {
   0% {
     opacity: 0;
@@ -184,9 +190,13 @@
   }
 }
 
-@keyframes quick-launch-gold-orbit {
-  to {
-    transform: rotate(1turn);
+@keyframes shield-border-spin {
+  0% {
+    --shield-border-angle: 0deg;
+  }
+
+  100% {
+    --shield-border-angle: 360deg;
   }
 }
 
@@ -379,6 +389,47 @@
 @layer base {
   * {
     -webkit-tap-highlight-color: transparent;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(26, 54, 93, 0.55) rgba(226, 232, 240, 0.35);
+  }
+
+  .dark * {
+    scrollbar-color: rgba(156, 134, 92, 0.72) rgba(15, 23, 42, 0.45);
+  }
+
+  *::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: rgba(226, 232, 240, 0.35);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: rgba(26, 54, 93, 0.55);
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(26, 54, 93, 0.75);
+    background-clip: content-box;
+  }
+
+  .dark *::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.45);
+  }
+
+  .dark *::-webkit-scrollbar-thumb {
+    background: rgba(156, 134, 92, 0.72);
+    background-clip: content-box;
+  }
+
+  .dark *::-webkit-scrollbar-thumb:hover {
+    background: rgba(156, 134, 92, 0.9);
+    background-clip: content-box;
   }
 
   body {
@@ -657,41 +708,31 @@
   }
 
   .quick-launch-gold-frame {
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
-  }
-
-  .quick-launch-gold-frame::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    padding: 1.5px;
-    border-radius: inherit;
+    border: 1px solid transparent;
     background:
+      linear-gradient(rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.86)) padding-box,
       conic-gradient(
-        from 0deg,
-        transparent 0deg,
-        transparent 54deg,
-        rgba(245, 158, 11, 0.92) 72deg,
-        rgba(255, 215, 128, 1) 92deg,
-        rgba(245, 158, 11, 0.92) 112deg,
-        transparent 132deg,
-        transparent 360deg
-      );
-    animation: quick-launch-gold-orbit 3.6s linear infinite;
-    pointer-events: none;
-    -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
+        from var(--shield-border-angle),
+        rgba(156, 134, 92, 0.18),
+        rgba(26, 54, 93, 0.72),
+        rgba(156, 134, 92, 0.9),
+        rgba(26, 54, 93, 0.26),
+        rgba(156, 134, 92, 0.18)
+      ) border-box;
+    animation: shield-border-spin 9s linear infinite;
   }
 
-  .quick-launch-gold-frame > * {
-    position: relative;
-    z-index: 1;
+  .dark .quick-launch-gold-frame {
+    background:
+      linear-gradient(rgba(3, 7, 18, 0.82), rgba(3, 7, 18, 0.82)) padding-box,
+      conic-gradient(
+        from var(--shield-border-angle),
+        rgba(156, 134, 92, 0.2),
+        rgba(147, 197, 253, 0.68),
+        rgba(156, 134, 92, 0.9),
+        rgba(59, 130, 246, 0.24),
+        rgba(156, 134, 92, 0.2)
+      ) border-box;
   }
 
   .quick-launch-picker-enter {
