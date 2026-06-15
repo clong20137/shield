@@ -1523,6 +1523,7 @@ function QuickLaunchTray({
   const previousSlotRectsRef = useRef<Record<string, DOMRect> | null>(null);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const pickerCloseTimerRef = useRef<number | null>(null);
+  const indicatorRemeasureTimersRef = useRef<number[]>([]);
   const [pickerPosition, setPickerPosition] = useState<{ left: number; top: number; arrowLeft: number } | null>(null);
   const [externalLabel, setExternalLabel] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
@@ -1609,6 +1610,7 @@ function QuickLaunchTray({
     if (pickerCloseTimerRef.current !== null) {
       window.clearTimeout(pickerCloseTimerRef.current);
     }
+    indicatorRemeasureTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
   }, []);
 
   const saveQuickLaunchSlots = useCallback(async (nextSlots: QuickLaunchSlot[]) => {
@@ -1936,13 +1938,21 @@ function QuickLaunchTray({
       setActiveIndicators(nextIndicators);
     };
 
+    const scheduleActiveIndicatorRemeasure = () => {
+      indicatorRemeasureTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+      indicatorRemeasureTimersRef.current = [80, 180, 320, 520].map((delay) => window.setTimeout(updateActiveIndicators, delay));
+    };
+
     updateActiveIndicators();
     const animationFrame = window.requestAnimationFrame(updateActiveIndicators);
+    scheduleActiveIndicatorRemeasure();
     window.addEventListener('resize', updateActiveIndicators);
     window.addEventListener('scroll', updateActiveIndicators, true);
 
     return () => {
       window.cancelAnimationFrame(animationFrame);
+      indicatorRemeasureTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+      indicatorRemeasureTimersRef.current = [];
       window.removeEventListener('resize', updateActiveIndicators);
       window.removeEventListener('scroll', updateActiveIndicators, true);
     };
