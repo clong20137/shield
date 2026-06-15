@@ -1515,7 +1515,7 @@ function QuickLaunchTray({
   const [launchingSlot, setLaunchingSlot] = useState<number | null>(null);
   const [failedLaunchSlot, setFailedLaunchSlot] = useState<number | null>(null);
   const [isPickerClosing, setIsPickerClosing] = useState(false);
-  const [activeIndicators, setActiveIndicators] = useState<Array<{ left: number; top: number }>>([]);
+  const [activeIndicators, setActiveIndicators] = useState<Array<{ key: string; left: number; top: number }>>([]);
   const didDragSlotRef = useRef(false);
   const trayRef = useRef<HTMLDivElement | null>(null);
   const slotRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -1882,29 +1882,32 @@ function QuickLaunchTray({
     setContextMenu(null);
   };
 
-  const activeQuickLaunchIndices = useMemo(() => {
-    const activeIndices = slots.reduce<number[]>((indices, slot, index) => {
+  const activeQuickLaunchTargets = useMemo(() => {
+    const activeTargets = slots.reduce<Array<{ key: string; index: number }>>((targets, slot, index) => {
       if (typeof slot !== 'string') {
-        return indices;
+        return targets;
       }
 
       const app = availableApps.find((item) => item.id === slot);
       if (app && isAppActive(app)) {
-        indices.push(index);
+        targets.push({ key: getQuickLaunchSlotRenderKey(slot, index), index });
       }
 
-      return indices;
+      return targets;
     }, []);
 
-    if (launchingSlot !== null && !activeIndices.includes(launchingSlot)) {
-      activeIndices.push(launchingSlot);
+    if (launchingSlot !== null && !activeTargets.some((target) => target.index === launchingSlot)) {
+      activeTargets.push({
+        key: getQuickLaunchSlotRenderKey(slots[launchingSlot], launchingSlot),
+        index: launchingSlot,
+      });
     }
 
-    return activeIndices.sort((left, right) => left - right);
+    return activeTargets.sort((left, right) => left.index - right.index);
   }, [activeModalAppSet, availableApps, launchingSlot, location.pathname, slots]);
 
   useLayoutEffect(() => {
-    if (activeQuickLaunchIndices.length === 0) {
+    if (activeQuickLaunchTargets.length === 0) {
       setActiveIndicators([]);
       return undefined;
     }
@@ -1918,12 +1921,13 @@ function QuickLaunchTray({
       }
 
       const trayRect = tray.getBoundingClientRect();
-      const nextIndicators = activeQuickLaunchIndices.flatMap((slotIndex) => {
-        const slot = slotRefs.current[slotIndex];
+      const nextIndicators = activeQuickLaunchTargets.flatMap((target) => {
+        const slot = slotAnimationRefs.current[target.key] || slotRefs.current[target.index];
         if (!slot) return [];
 
         const slotRect = slot.getBoundingClientRect();
         return [{
+          key: target.key,
           left: slotRect.left - trayRect.left + slotRect.width / 2,
           top: slotRect.bottom - trayRect.top + 6,
         }];
@@ -1933,14 +1937,16 @@ function QuickLaunchTray({
     };
 
     updateActiveIndicators();
+    const animationFrame = window.requestAnimationFrame(updateActiveIndicators);
     window.addEventListener('resize', updateActiveIndicators);
     window.addEventListener('scroll', updateActiveIndicators, true);
 
     return () => {
+      window.cancelAnimationFrame(animationFrame);
       window.removeEventListener('resize', updateActiveIndicators);
       window.removeEventListener('scroll', updateActiveIndicators, true);
     };
-  }, [activeQuickLaunchIndices, isSidebarCollapsed]);
+  }, [activeQuickLaunchTargets, isSidebarCollapsed]);
 
   return (
     <section className={`pointer-events-none fixed bottom-3 left-3 right-3 z-30 hidden select-none transition-all duration-200 sm:bottom-5 sm:right-6 md:block ${isSidebarCollapsed ? 'sm:left-24' : 'sm:left-[19.5rem]'}`}>
@@ -2080,9 +2086,9 @@ function QuickLaunchTray({
           );
         })}
         </div>
-        {activeIndicators.map((indicator, indicatorIndex) => (
+        {activeIndicators.map((indicator) => (
           <span
-            key={`quick-launch-active-indicator-${indicatorIndex}`}
+            key={`quick-launch-active-indicator-${indicator.key}`}
             className="quick-launch-active-indicator quick-launch-active-indicator-visible"
             style={{
               left: indicator.left,
