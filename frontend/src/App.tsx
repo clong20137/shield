@@ -25,6 +25,7 @@ const QUICK_LAUNCH_KEY = 'shield_quick_launch';
 const QUICK_LAUNCH_SLOT_COUNT = 8;
 const QUICK_LAUNCH_PICKER_WIDTH = 320;
 const QUICK_LAUNCH_PICKER_GUTTER = 12;
+const QUICK_LAUNCH_PICKER_CLOSE_MS = 500;
 const MODAL_CLOSE_MS = 220;
 const PASSWORD_REQUIREMENTS_MESSAGE = 'Password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.';
 const APP_BASE_PATH = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
@@ -1497,11 +1498,13 @@ function QuickLaunchTray({
   const [draggingSlot, setDraggingSlot] = useState<number | null>(null);
   const [launchingSlot, setLaunchingSlot] = useState<number | null>(null);
   const [failedLaunchSlot, setFailedLaunchSlot] = useState<number | null>(null);
-  const [activeIndicator, setActiveIndicator] = useState<{ left: number; top: number } | null>(null);
+  const [isPickerClosing, setIsPickerClosing] = useState(false);
+  const [activeIndicators, setActiveIndicators] = useState<Array<{ left: number; top: number }>>([]);
   const didDragSlotRef = useRef(false);
   const trayRef = useRef<HTMLDivElement | null>(null);
   const slotRefs = useRef<Array<HTMLDivElement | null>>([]);
   const pickerRef = useRef<HTMLDivElement | null>(null);
+  const pickerCloseTimerRef = useRef<number | null>(null);
   const [pickerPosition, setPickerPosition] = useState<{ left: number; top: number; arrowLeft: number } | null>(null);
   const [externalLabel, setExternalLabel] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
@@ -1529,7 +1532,7 @@ function QuickLaunchTray({
 
     return !app.adminOnly || isAdministrator;
   };
-  const availableApps = quickLaunchApps.filter(canUseQuickLaunchApp);
+  const availableApps = useMemo(() => quickLaunchApps.filter(canUseQuickLaunchApp), [isAdministrator, permissionSet, showCalendar]);
   const usedAppIds = new Set(
     slots
       .map((slot, index) => (index === editingSlot ? null : slot))
@@ -1556,6 +1559,39 @@ function QuickLaunchTray({
 
     return Boolean(app.path && location.pathname === app.path);
   };
+
+  const openQuickLaunchPicker = (index: number) => {
+    if (pickerCloseTimerRef.current !== null) {
+      window.clearTimeout(pickerCloseTimerRef.current);
+      pickerCloseTimerRef.current = null;
+    }
+
+    setIsPickerClosing(false);
+    setEditingSlot(index);
+  };
+
+  const closeQuickLaunchPicker = useCallback(() => {
+    if (editingSlot === null || isPickerClosing) return;
+
+    setIsPickerClosing(true);
+    if (pickerCloseTimerRef.current !== null) {
+      window.clearTimeout(pickerCloseTimerRef.current);
+    }
+
+    pickerCloseTimerRef.current = window.setTimeout(() => {
+      setEditingSlot(null);
+      setIsPickerClosing(false);
+      setExternalLabel('');
+      setExternalUrl('');
+      pickerCloseTimerRef.current = null;
+    }, QUICK_LAUNCH_PICKER_CLOSE_MS);
+  }, [editingSlot, isPickerClosing]);
+
+  useEffect(() => () => {
+    if (pickerCloseTimerRef.current !== null) {
+      window.clearTimeout(pickerCloseTimerRef.current);
+    }
+  }, []);
 
   const saveQuickLaunchSlots = useCallback(async (nextSlots: QuickLaunchSlot[]) => {
     const normalizedSlots = normalizeQuickLaunchSlots(nextSlots);
@@ -1651,9 +1687,7 @@ function QuickLaunchTray({
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && editingSlot !== null) {
         event.stopImmediatePropagation();
-        setEditingSlot(null);
-        setExternalLabel('');
-        setExternalUrl('');
+        closeQuickLaunchPicker();
       }
       if (event.key === 'Escape') {
         setContextMenu(null);
@@ -1663,7 +1697,7 @@ function QuickLaunchTray({
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [editingSlot]);
+  }, [closeQuickLaunchPicker, editingSlot]);
 
   useEffect(() => {
     if (editingSlot === null) {
@@ -1680,14 +1714,12 @@ function QuickLaunchTray({
         return;
       }
 
-      setEditingSlot(null);
-      setExternalLabel('');
-      setExternalUrl('');
+      closeQuickLaunchPicker();
     };
 
     window.addEventListener('mousedown', closePicker);
     return () => window.removeEventListener('mousedown', closePicker);
-  }, [editingSlot]);
+  }, [closeQuickLaunchPicker, editingSlot]);
 
   useEffect(() => {
     if (!contextMenu) {
@@ -1754,9 +1786,7 @@ function QuickLaunchTray({
     if (editingSlot === null) return;
     const nextSlots = slots.map((currentSlot, index) => (index === editingSlot ? slot : currentSlot));
     void saveQuickLaunchSlots(nextSlots);
-    setEditingSlot(null);
-    setExternalLabel('');
-    setExternalUrl('');
+    closeQuickLaunchPicker();
   };
 
   const removeSlot = (index: number) => {
@@ -1768,7 +1798,7 @@ function QuickLaunchTray({
   const removeAllSlots = () => {
     void saveQuickLaunchSlots(getEmptyQuickLaunchSlots());
     setContextMenu(null);
-    setEditingSlot(null);
+    closeQuickLaunchPicker();
   };
 
   const assignExternalSlot = (event: FormEvent<HTMLFormElement>) => {
@@ -1791,52 +1821,69 @@ function QuickLaunchTray({
     void saveQuickLaunchSlots(nextSlots);
   };
 
-  const activeQuickLaunchIndex = launchingSlot ?? slots.findIndex((slot) => {
-    if (typeof slot !== 'string') {
-      return false;
+  const activeQuickLaunchIndices = useMemo(() => {
+    const activeIndices = slots.reduce<number[]>((indices, slot, index) => {
+      if (typeof slot !== 'string') {
+        return indices;
+      }
+
+      const app = availableApps.find((item) => item.id === slot);
+      if (app && isAppActive(app)) {
+        indices.push(index);
+      }
+
+      return indices;
+    }, []);
+
+    if (launchingSlot !== null && !activeIndices.includes(launchingSlot)) {
+      activeIndices.push(launchingSlot);
     }
 
-    const app = availableApps.find((item) => item.id === slot);
-    return app ? isAppActive(app) : false;
-  });
+    return activeIndices.sort((left, right) => left - right);
+  }, [activeModalAppSet, availableApps, launchingSlot, location.pathname, slots]);
 
   useLayoutEffect(() => {
-    if (activeQuickLaunchIndex < 0) {
-      setActiveIndicator(null);
+    if (activeQuickLaunchIndices.length === 0) {
+      setActiveIndicators([]);
       return undefined;
     }
 
-    const updateActiveIndicator = () => {
+    const updateActiveIndicators = () => {
       const tray = trayRef.current;
-      const slot = slotRefs.current[activeQuickLaunchIndex];
 
-      if (!tray || !slot) {
-        setActiveIndicator(null);
+      if (!tray) {
+        setActiveIndicators([]);
         return;
       }
 
       const trayRect = tray.getBoundingClientRect();
-      const slotRect = slot.getBoundingClientRect();
+      const nextIndicators = activeQuickLaunchIndices.flatMap((slotIndex) => {
+        const slot = slotRefs.current[slotIndex];
+        if (!slot) return [];
 
-      setActiveIndicator({
-        left: slotRect.left - trayRect.left + slotRect.width / 2,
-        top: slotRect.bottom - trayRect.top + 6,
+        const slotRect = slot.getBoundingClientRect();
+        return [{
+          left: slotRect.left - trayRect.left + slotRect.width / 2,
+          top: slotRect.bottom - trayRect.top + 6,
+        }];
       });
+
+      setActiveIndicators(nextIndicators);
     };
 
-    updateActiveIndicator();
-    window.addEventListener('resize', updateActiveIndicator);
-    window.addEventListener('scroll', updateActiveIndicator, true);
+    updateActiveIndicators();
+    window.addEventListener('resize', updateActiveIndicators);
+    window.addEventListener('scroll', updateActiveIndicators, true);
 
     return () => {
-      window.removeEventListener('resize', updateActiveIndicator);
-      window.removeEventListener('scroll', updateActiveIndicator, true);
+      window.removeEventListener('resize', updateActiveIndicators);
+      window.removeEventListener('scroll', updateActiveIndicators, true);
     };
-  }, [activeQuickLaunchIndex, isSidebarCollapsed, slots]);
+  }, [activeQuickLaunchIndices, isSidebarCollapsed]);
 
   return (
     <section className={`pointer-events-none fixed bottom-3 left-3 right-3 z-30 hidden select-none transition-all duration-200 sm:bottom-5 sm:right-6 md:block ${isSidebarCollapsed ? 'sm:left-24' : 'sm:left-[19.5rem]'}`}>
-      <div ref={trayRef} data-onboarding-target="quick-launch" className="quick-launch-gold-frame pointer-events-auto relative mx-auto w-fit max-w-full rounded-2xl border border-transparent bg-white/85 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:bg-gray-950/80 sm:p-3">
+      <div ref={trayRef} data-onboarding-target="quick-launch" className="quick-launch-gold-frame quick-launch-tray-enter pointer-events-auto relative mx-auto w-fit max-w-full rounded-2xl border border-transparent bg-white/85 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:bg-gray-950/80 sm:p-3">
         <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 sm:gap-2">
         {slots.map((slot, index) => {
           const app = typeof slot === 'string' ? availableApps.find((item) => item.id === slot) || null : null;
@@ -1849,6 +1896,7 @@ function QuickLaunchTray({
           const isEditing = editingSlot === index;
           const isLaunching = launchingSlot === index;
           const hasFailedLaunch = failedLaunchSlot === index;
+          const previewLabel = visibleSlot ? `Open ${label}` : 'Add app';
           const slotStateClass = visibleSlot
             ? [
                 'quick-launch-slot-configured',
@@ -1916,7 +1964,7 @@ function QuickLaunchTray({
                     openSlot(index, visibleSlot);
                     return;
                   }
-                  setEditingSlot(index);
+                  openQuickLaunchPicker(index);
                 }}
                 onDragStart={(event) => {
                   if (!visibleSlot) {
@@ -1930,7 +1978,6 @@ function QuickLaunchTray({
                   event.dataTransfer.setData('text/plain', String(index));
                 }}
                 className={`quick-launch-slot group ${slotStateClass}`}
-                title={label || 'Add App'}
                 aria-label={visibleSlot ? `Open ${label}` : 'Add quick launch app'}
                 aria-pressed={isActive}
               >
@@ -1940,6 +1987,7 @@ function QuickLaunchTray({
                 </span>
                 <span className="quick-launch-slot-label">{hasFailedLaunch ? 'Blocked' : isLaunching ? 'Opening' : label}</span>
               </button>
+              <span className="quick-launch-hover-preview" role="presentation">{previewLabel}</span>
 
               {badgeCount > 0 && (
                 <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white shadow">
@@ -1950,7 +1998,7 @@ function QuickLaunchTray({
               {slot && (
                 <button
                   type="button"
-                  onClick={() => setEditingSlot(index)}
+                  onClick={() => openQuickLaunchPicker(index)}
                   className={`quick-launch-edit-button ${isEditing ? 'quick-launch-edit-button-active' : ''}`}
                   aria-label={`Change ${label} shortcut`}
                   title="Change shortcut"
@@ -1962,13 +2010,16 @@ function QuickLaunchTray({
           );
         })}
         </div>
-        <span
-          className={`quick-launch-active-indicator ${activeIndicator ? 'quick-launch-active-indicator-visible' : ''}`}
-          style={{
-            left: activeIndicator?.left ?? 0,
-            top: activeIndicator?.top ?? 0,
-          }}
-        />
+        {activeIndicators.map((indicator, indicatorIndex) => (
+          <span
+            key={`quick-launch-active-indicator-${indicatorIndex}`}
+            className="quick-launch-active-indicator quick-launch-active-indicator-visible"
+            style={{
+              left: indicator.left,
+              top: indicator.top,
+            }}
+          />
+        ))}
       </div>
 
       {contextMenu && (
@@ -2000,7 +2051,7 @@ function QuickLaunchTray({
       {editingSlot !== null && (
         <div
           ref={pickerRef}
-          className="quick-launch-picker-enter pointer-events-auto fixed z-[75] max-h-[min(34rem,calc(100dvh-2rem))] overflow-y-auto rounded-lg border border-accent/30 bg-white p-3 text-gray-900 shadow-[0_24px_70px_rgba(15,23,42,0.28)] ring-1 ring-accent/10 dark:border-accent/40 dark:bg-gray-900 dark:text-gray-100"
+          className={`quick-launch-picker-enter ${isPickerClosing ? 'quick-launch-picker-exit' : ''} pointer-events-auto fixed z-[75] max-h-[min(34rem,calc(100dvh-2rem))] overflow-y-auto rounded-lg border border-accent/30 bg-white p-3 text-gray-900 shadow-[0_24px_70px_rgba(15,23,42,0.28)] ring-1 ring-accent/10 dark:border-accent/40 dark:bg-gray-900 dark:text-gray-100`}
           style={{
             left: pickerPosition?.left ?? QUICK_LAUNCH_PICKER_GUTTER,
             top: pickerPosition?.top ?? window.innerHeight - 120,
@@ -2024,9 +2075,7 @@ function QuickLaunchTray({
               <button
                 type="button"
                 onClick={() => {
-                  setEditingSlot(null);
-                  setExternalLabel('');
-                  setExternalUrl('');
+                  closeQuickLaunchPicker();
                 }}
                 className="icon-close-button"
                 aria-label="Close quick launch picker"
