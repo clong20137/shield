@@ -312,6 +312,32 @@
   }
 }
 
+@keyframes dashboard-reaction-pop {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+
+  45% {
+    transform: translateY(-0.125rem) scale(1.12);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes dashboard-command-feed-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes modal-backdrop-enter {
   0% {
     opacity: 0;
@@ -648,6 +674,18 @@
 
   .empty-state {
     @apply text-center py-10 text-gray-500 text-base dark:text-gray-400;
+  }
+
+  .dashboard-command-feed-item {
+    animation: dashboard-command-feed-enter 460ms var(--shield-motion-ease) backwards;
+  }
+
+  .dashboard-reaction-button {
+    transform-origin: center;
+  }
+
+  .dashboard-reaction-pop {
+    animation: dashboard-reaction-pop 520ms var(--shield-motion-ease) both;
   }
 
   .toast-notification {

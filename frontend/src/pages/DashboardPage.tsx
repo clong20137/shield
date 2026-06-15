@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, dashboardSummaryService, DashboardSummary, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
@@ -29,6 +29,7 @@ const defaultPostForm: DashboardPostForm = {
 
 const MEDIA_PICKER_PAGE_SIZE = 18;
 const DASHBOARD_POST_MEDIA_FOLDER = 'dashboard-posts';
+const dashboardPostFilters: Array<DashboardPost['category'] | 'All'> = ['All', 'Update', 'News', 'Alert'];
 
 const reactionOptions: Array<{
   key: DashboardReaction;
@@ -40,6 +41,21 @@ const reactionOptions: Array<{
   { key: 'important', label: 'Important', Icon: AlertCircle },
   { key: 'thanks', label: 'Thanks', Icon: Heart },
 ];
+
+const getPostCategoryTone = (category: DashboardPost['category']) => {
+  if (category === 'Alert') {
+    return 'border-danger/30 bg-danger/10 text-danger dark:border-red-400/30 dark:bg-red-950/40 dark:text-red-100';
+  }
+
+  if (category === 'News') {
+    return 'border-blue-400/30 bg-blue-500/10 text-blue-700 dark:border-blue-300/30 dark:bg-blue-950/50 dark:text-blue-100';
+  }
+
+  return 'border-accent/30 bg-accent/10 text-accent';
+};
+
+const getPostReactionTotal = (post: DashboardPost) =>
+  reactionOptions.reduce((total, { key }) => total + (post.reactions?.[key] || 0), 0);
 
 const createDefaultEntryForm = (date: string): CalendarEntryForm => ({
   category: 'General Information',
@@ -239,6 +255,49 @@ function RichPostEditor({
         className="rich-post-editor min-h-64 w-full overflow-y-auto rounded border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
         data-placeholder="Write the update. Highlight text and use the toolbar, or click a style before typing."
       />
+    </div>
+  );
+}
+
+function PostReactionBar({
+  post,
+  reactionPulse,
+  onReact,
+}: {
+  post: DashboardPost;
+  reactionPulse: { postId: string; reaction: DashboardReaction } | null;
+  onReact: (post: DashboardPost, reaction: DashboardReaction) => void;
+}) {
+  const totalReactions = getPostReactionTotal(post);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="mr-1 inline-flex h-9 items-center rounded-full border border-gray-200 bg-white px-3 text-xs font-bold text-gray-500 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-400">
+        {totalReactions} {totalReactions === 1 ? 'reaction' : 'reactions'}
+      </span>
+      {reactionOptions.map(({ key, label, Icon }) => {
+        const isActive = post.myReaction === key;
+        const count = post.reactions?.[key] || 0;
+        const shouldPulse = reactionPulse?.postId === post.id && reactionPulse.reaction === key;
+
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onReact(post, key)}
+            className={`dashboard-reaction-button inline-flex h-9 items-center gap-2 rounded-full border px-3 text-sm font-semibold shadow-sm transition-all duration-500 ease-out ${
+              isActive
+                ? 'border-accent bg-accent/15 text-accent shadow-accent/10'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-accent hover:bg-accent/10 hover:text-accent dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300'
+            } ${shouldPulse ? 'dashboard-reaction-pop' : ''}`}
+            aria-label={`${label} reaction`}
+            title={label}
+          >
+            <Icon size={16} className={`transition-transform duration-500 ${isActive ? 'scale-110' : ''}`} />
+            <span className="min-w-[1ch] text-center">{count}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -665,7 +724,8 @@ function DashboardNews({
   initialPosts?: DashboardPost[];
 }) {
   const [posts, setPosts] = useState<DashboardPost[]>([]);
-  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [feedFilter, setFeedFilter] = useState<DashboardPost['category'] | 'All'>('All');
+  const [reactionPulse, setReactionPulse] = useState<{ postId: string; reaction: DashboardReaction } | null>(null);
   const [postForm, setPostForm] = useState<DashboardPostForm>(defaultPostForm);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isSavingPost, setIsSavingPost] = useState(false);
@@ -724,20 +784,22 @@ function DashboardNews({
     return () => window.removeEventListener('shield:dashboard-updated', handleDashboardUpdate);
   }, [initialPosts, loadPosts]);
 
-  const carouselPosts = posts.slice(0, 3);
+  const postCategoryCounts = useMemo(
+    () =>
+      dashboardPostFilters.reduce<Record<DashboardPost['category'] | 'All', number>>(
+        (counts, filter) => ({
+          ...counts,
+          [filter]: filter === 'All' ? posts.length : posts.filter((post) => post.category === filter).length,
+        }),
+        { All: 0, Update: 0, News: 0, Alert: 0 },
+      ),
+    [posts],
+  );
 
-  useEffect(() => {
-    if (carouselPosts.length < 2) {
-      setCarouselIndex(0);
-      return undefined;
-    }
-
-    const timer = window.setInterval(() => {
-      setCarouselIndex((currentIndex) => (currentIndex + 1) % carouselPosts.length);
-    }, 5000);
-
-    return () => window.clearInterval(timer);
-  }, [carouselPosts.length]);
+  const filteredPosts = useMemo(
+    () => (feedFilter === 'All' ? posts : posts.filter((post) => post.category === feedFilter)),
+    [feedFilter, posts],
+  );
 
   const createPost = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -883,7 +945,33 @@ function DashboardNews({
 
   const reactToPost = async (post: DashboardPost, reaction: DashboardReaction) => {
     const nextReaction = post.myReaction === reaction ? null : reaction;
+    const previousReaction = post.myReaction ?? null;
+    const optimisticReactions: Record<string, number> = { ...(post.reactions || {}) };
+
+    if (previousReaction) {
+      optimisticReactions[previousReaction] = Math.max(0, (optimisticReactions[previousReaction] || 0) - 1);
+    }
+
+    if (nextReaction) {
+      optimisticReactions[nextReaction] = (optimisticReactions[nextReaction] || 0) + 1;
+      setReactionPulse({ postId: post.id, reaction });
+    } else {
+      setReactionPulse(null);
+    }
+
     setPostError(null);
+    setPosts((currentPosts) =>
+      currentPosts.map((currentPost) =>
+        currentPost.id === post.id
+          ? {
+              ...currentPost,
+              myReaction: nextReaction,
+              reactions: optimisticReactions,
+            }
+          : currentPost,
+      ),
+    );
+
     try {
       const response = await dashboardPostService.react(post.id, nextReaction);
       setPosts((currentPosts) =>
@@ -891,7 +979,14 @@ function DashboardNews({
       );
     } catch (err) {
       console.error('Failed to update dashboard post reaction:', err);
+      setPosts((currentPosts) =>
+        currentPosts.map((currentPost) => (currentPost.id === post.id ? post : currentPost)),
+      );
       setPostError('Failed to update reaction.');
+    } finally {
+      window.setTimeout(() => {
+        setReactionPulse((currentPulse) => (currentPulse?.postId === post.id ? null : currentPulse));
+      }, 520);
     }
   };
 
@@ -922,104 +1017,118 @@ function DashboardNews({
       ) : posts.length === 0 ? (
         <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No updates posted yet.</div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
-            <div
-              className="flex h-full transition-transform duration-700 ease-in-out"
-              style={{ transform: `translateX(-${carouselIndex * 100}%)` }}
-            >
-              {carouselPosts.map((post) => (
-                <article key={post.id} className="flex min-w-full flex-col">
-                  {post.imageUrl ? (
-                    <Link to={`/updates/${post.id}`} className="block h-44 overflow-hidden bg-gray-100 dark:bg-gray-900 sm:h-52">
-                      <img
-                        src={getAssetThumbnailUrl(post.imageUrl, 480)}
-                        alt=""
-                        onError={(event) => handleAssetThumbnailError(event, post.imageUrl)}
-                        className="h-full w-full object-cover transition duration-700 hover:scale-[1.03]"
-                      />
-                    </Link>
-                  ) : (
-                    <div className="flex h-44 items-center justify-center bg-primary-500/10 text-primary-500 dark:bg-blue-950/40 dark:text-blue-100 sm:h-52">
-                      <Image size={34} />
-                    </div>
-                  )}
-                  <div className="flex min-h-0 flex-1 flex-col p-4">
-                    <div className="flex items-start justify-between gap-3">
+        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[190px_minmax(0,1fr)]">
+          <aside className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <span className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Command Feed</span>
+              <Bell size={16} className="text-accent" />
+            </div>
+            <div className="space-y-2">
+              {dashboardPostFilters.map((filter) => {
+                const isActive = feedFilter === filter;
+
+                return (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setFeedFilter(filter)}
+                    className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm font-bold transition-all duration-500 ease-out ${
+                      isActive
+                        ? 'border-accent bg-accent/10 text-accent shadow-sm'
+                        : 'border-transparent text-gray-600 hover:border-gray-200 hover:bg-white hover:text-gray-900 dark:text-gray-300 dark:hover:border-gray-800 dark:hover:bg-gray-900 dark:hover:text-gray-100'
+                    }`}
+                    aria-pressed={isActive}
+                  >
+                    <span>{filter}</span>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-xs text-gray-500 shadow-sm dark:bg-gray-900 dark:text-gray-300">
+                      {postCategoryCounts[filter]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4 rounded-md border border-dashed border-gray-300 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+              <span className="block text-xs font-bold uppercase text-gray-400">Latest Signal</span>
+              <span className="mt-1 block text-sm font-semibold text-gray-800 dark:text-gray-100">
+                {posts[0]?.title || 'No updates'}
+              </span>
+            </div>
+          </aside>
+
+          <div className="min-h-0 overflow-y-auto pr-1">
+            {filteredPosts.length === 0 ? (
+              <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No {feedFilter.toLowerCase()} posts found.</div>
+            ) : (
+              <div className="space-y-3">
+                {filteredPosts.map((post, index) => (
+                  <article
+                    key={post.id}
+                    className="dashboard-command-feed-item rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-all duration-500 ease-out hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-md dark:border-gray-800 dark:bg-gray-950 dark:hover:border-accent/50"
+                    style={{ animationDelay: `${Math.min(index * 45, 270)}ms` }}
+                  >
+                    <div className="grid gap-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
+                      <Link to={`/updates/${post.id}`} className="group flex aspect-[4/3] items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-gray-50 text-primary-500 dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100">
+                        {post.imageUrl ? (
+                          <img
+                            src={getAssetThumbnailUrl(post.imageUrl, 320)}
+                            alt=""
+                            onError={(event) => handleAssetThumbnailError(event, post.imageUrl)}
+                            className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.04]"
+                          />
+                        ) : (
+                          <Image size={28} />
+                        )}
+                      </Link>
+
                       <div className="min-w-0">
-                        <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold uppercase text-accent">{post.category}</span>
-                        <Link to={`/updates/${post.id}`} className="mt-3 line-clamp-2 text-lg font-bold leading-tight text-primary-500 hover:text-primary-700 dark:text-blue-100">
-                          {post.title}
-                        </Link>
-                      </div>
-                      {(canEditDashboardPosts || canDeleteDashboardPosts) && (
-                        <div className="flex shrink-0 gap-2">
-                          {canEditDashboardPosts && (
-                            <button type="button" onClick={() => openEditPost(post)} className="btn-secondary" aria-label="Edit post" title="Edit">
-                              <Pencil size={16} />
-                            </button>
-                          )}
-                          {canDeleteDashboardPosts && (
-                            <button type="button" onClick={() => setPostPendingDelete(post)} className="btn-danger" aria-label="Delete post" title="Delete">
-                              <Trash2 size={16} />
-                            </button>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`rounded-full border px-2.5 py-1 text-xs font-bold uppercase ${getPostCategoryTone(post.category)}`}>
+                                {post.category}
+                              </span>
+                              <span className="text-xs font-semibold text-gray-400">
+                                {new Date(post.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                              </span>
+                            </div>
+                            <Link to={`/updates/${post.id}`} className="mt-2 block line-clamp-2 text-lg font-bold leading-tight text-primary-500 transition-colors duration-500 hover:text-primary-700 dark:text-blue-100 dark:hover:text-white">
+                              {post.title}
+                            </Link>
+                          </div>
+                          {(canEditDashboardPosts || canDeleteDashboardPosts) && (
+                            <div className="flex shrink-0 gap-2">
+                              {canEditDashboardPosts && (
+                                <button type="button" onClick={() => openEditPost(post)} className="btn-secondary" aria-label="Edit post" title="Edit">
+                                  <Pencil size={16} />
+                                </button>
+                              )}
+                              {canDeleteDashboardPosts && (
+                                <button type="button" onClick={() => setPostPendingDelete(post)} className="btn-danger" aria-label="Delete post" title="Delete">
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-600 dark:text-gray-300">{getPostBodyText(post.body)}</p>
-                    <div className="mt-auto pt-4">
-                      <div className="mb-3 flex items-center justify-between gap-3 text-xs text-gray-400">
-                        <span>{post.authorName || 'Administrator'}</span>
-                        <span>{new Date(post.createdAt).toLocaleDateString()}</span>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link to={`/updates/${post.id}`} className="inline-flex h-9 items-center rounded-full border border-accent/30 px-3 text-sm font-bold text-accent transition hover:bg-accent/10">
-                          Read More
-                        </Link>
-                        {reactionOptions.map(({ key, label, Icon }) => {
-                          const isActive = post.myReaction === key;
-                          const count = post.reactions?.[key] || 0;
-
-                          return (
-                            <button
-                              key={key}
-                              type="button"
-                              onClick={() => reactToPost(post, key)}
-                              className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-sm font-semibold transition ${
-                                isActive
-                                  ? 'border-accent bg-accent/10 text-accent'
-                                  : 'border-gray-200 text-gray-600 hover:border-accent hover:text-accent dark:border-gray-800 dark:text-gray-300'
-                              }`}
-                              aria-label={`${label} reaction`}
-                              title={label}
-                            >
-                              <Icon size={16} />
-                              <span>{count}</span>
-                            </button>
-                          );
-                        })}
+                        <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-600 dark:text-gray-300">{getPostBodyText(post.body)}</p>
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3 dark:border-gray-800">
+                          <div className="text-xs font-semibold text-gray-400">
+                            {post.authorName || 'Administrator'} · {new Date(post.createdAt).toLocaleDateString()}
+                          </div>
+                          <Link to={`/updates/${post.id}`} className="inline-flex h-9 items-center rounded-full border border-accent/30 px-3 text-sm font-bold text-accent transition-all duration-500 hover:bg-accent/10">
+                            Read More
+                          </Link>
+                        </div>
+                        <div className="mt-3">
+                          <PostReactionBar post={post} reactionPulse={reactionPulse} onReact={reactToPost} />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </article>
-              ))}
-            </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
-          {carouselPosts.length > 1 && (
-            <div className="mt-4 flex justify-center gap-2">
-              {carouselPosts.map((post, index) => (
-                <button
-                  key={post.id}
-                  type="button"
-                  onClick={() => setCarouselIndex(index)}
-                  className={`h-2.5 rounded-full transition-all ${index === carouselIndex ? 'w-8 bg-accent' : 'w-2.5 bg-gray-300 dark:bg-gray-700'}`}
-                  aria-label={`Show update ${index + 1}`}
-                  title={`Show update ${index + 1}`}
-                />
-              ))}
-            </div>
-          )}
         </div>
       )}
       {(isCreatePostOpen || editingPost) && (
