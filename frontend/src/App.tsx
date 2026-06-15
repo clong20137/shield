@@ -1496,6 +1496,7 @@ function QuickLaunchTray({
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
   const [contextMenu, setContextMenu] = useState<{ index: number; x: number; y: number } | null>(null);
   const [draggingSlot, setDraggingSlot] = useState<number | null>(null);
+  const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
   const [launchingSlot, setLaunchingSlot] = useState<number | null>(null);
   const [failedLaunchSlot, setFailedLaunchSlot] = useState<number | null>(null);
   const [isPickerClosing, setIsPickerClosing] = useState(false);
@@ -1821,6 +1822,13 @@ function QuickLaunchTray({
     void saveQuickLaunchSlots(nextSlots);
   };
 
+  const editContextMenuSlot = () => {
+    if (!contextMenu) return;
+
+    openQuickLaunchPicker(contextMenu.index);
+    setContextMenu(null);
+  };
+
   const activeQuickLaunchIndices = useMemo(() => {
     const activeIndices = slots.reduce<number[]>((indices, slot, index) => {
       if (typeof slot !== 'string') {
@@ -1901,14 +1909,15 @@ function QuickLaunchTray({
             ? [
                 'quick-launch-slot-configured',
                 draggingSlot === index ? 'quick-launch-slot-dragging' : '',
+                dragOverSlot === index ? 'quick-launch-slot-drop-target' : '',
                 isActive ? 'quick-launch-slot-active' : '',
                 isEditing ? 'quick-launch-slot-editing' : '',
                 isLaunching ? 'quick-launch-slot-launching' : '',
                 hasFailedLaunch ? 'quick-launch-slot-failed' : '',
               ].filter(Boolean).join(' ')
             : isEditing
-              ? 'quick-launch-slot-empty quick-launch-slot-editing'
-              : 'quick-launch-slot-empty';
+              ? `quick-launch-slot-empty quick-launch-slot-editing ${dragOverSlot === index ? 'quick-launch-slot-drop-target' : ''}`
+              : `quick-launch-slot-empty ${dragOverSlot === index ? 'quick-launch-slot-drop-target' : ''}`;
 
           return (
             <div
@@ -1933,6 +1942,10 @@ function QuickLaunchTray({
                 if (draggingSlot === null || draggingSlot === index) return;
                 event.preventDefault();
                 event.dataTransfer.dropEffect = 'move';
+                setDragOverSlot(index);
+              }}
+              onDragLeave={() => {
+                setDragOverSlot((currentSlot) => (currentSlot === index ? null : currentSlot));
               }}
               onDrop={(event) => {
                 event.preventDefault();
@@ -1941,9 +1954,11 @@ function QuickLaunchTray({
                   moveSlot(sourceIndex, index);
                 }
                 setDraggingSlot(null);
+                setDragOverSlot(null);
               }}
               onDragEnd={() => {
                 setDraggingSlot(null);
+                setDragOverSlot(null);
                 window.setTimeout(() => {
                   didDragSlotRef.current = false;
                 }, 0);
@@ -1990,7 +2005,7 @@ function QuickLaunchTray({
               <span className="quick-launch-hover-preview" role="presentation">{previewLabel}</span>
 
               {badgeCount > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white shadow">
+                <span key={`quick-launch-badge-${index}-${badgeCount}`} className="quick-launch-badge">
                   {badgeCount > 9 ? '9+' : badgeCount}
                 </span>
               )}
@@ -2024,7 +2039,7 @@ function QuickLaunchTray({
 
       {contextMenu && (
         <div
-          className="pointer-events-auto fixed z-[70] min-w-40 overflow-hidden rounded border border-gray-200 bg-white p-1 text-sm shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+          className="quick-launch-context-menu pointer-events-auto fixed z-[70] min-w-40 overflow-hidden rounded border border-gray-200 bg-white p-1 text-sm shadow-2xl dark:border-gray-700 dark:bg-gray-900"
           style={{
             left: Math.min(contextMenu.x, window.innerWidth - 180),
             top: Math.min(contextMenu.y, window.innerHeight - 96),
@@ -2033,15 +2048,22 @@ function QuickLaunchTray({
         >
           <button
             type="button"
+            onClick={editContextMenuSlot}
+            className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
+          >
+            <Pencil size={15} /> Edit shortcut
+          </button>
+          <button
+            type="button"
             onClick={() => removeSlot(contextMenu.index)}
-            className="flex w-full items-center gap-2 rounded px-3 py-2 text-left font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+            className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
           >
             <Trash2 size={15} /> Remove
           </button>
           <button
             type="button"
             onClick={removeAllSlots}
-            className="flex w-full items-center gap-2 rounded px-3 py-2 text-left font-semibold text-danger hover:bg-red-50 dark:hover:bg-red-950"
+            className="quick-launch-context-menu-item quick-launch-context-menu-danger text-danger"
           >
             <X size={15} /> Remove All
           </button>
