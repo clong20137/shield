@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
-import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, dashboardSummaryService, DashboardSummary, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
@@ -1754,9 +1754,32 @@ function QuickNotesWidget({
     y: number;
     z: number;
     color: 'yellow' | 'blue' | 'green' | 'pink';
+    updatedAt: string;
   };
 
   const stickyColors: Array<StickyNote['color']> = ['yellow', 'blue', 'green', 'pink'];
+  const stickyColorMeta: Record<StickyNote['color'], { label: string; className: string; swatch: string }> = {
+    yellow: {
+      label: 'General',
+      className: 'bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-50',
+      swatch: 'bg-amber-300',
+    },
+    blue: {
+      label: 'Info',
+      className: 'bg-sky-100 text-sky-950 dark:bg-sky-950 dark:text-sky-50',
+      swatch: 'bg-sky-300',
+    },
+    green: {
+      label: 'Done',
+      className: 'bg-emerald-100 text-emerald-950 dark:bg-emerald-950 dark:text-emerald-50',
+      swatch: 'bg-emerald-300',
+    },
+    pink: {
+      label: 'Urgent',
+      className: 'bg-rose-100 text-rose-950 dark:bg-rose-950 dark:text-rose-50',
+      swatch: 'bg-rose-300',
+    },
+  };
 
   const parseStickyNotes = (value: string): StickyNote[] => {
     if (!value.trim()) {
@@ -1781,6 +1804,7 @@ function QuickNotesWidget({
               y: Number.isFinite(item.y) ? Number(item.y) : 18 + index * 28,
               z: Number.isFinite(item.z) ? Number(item.z) : index + 1,
               color,
+              updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : new Date().toISOString(),
             };
           })
           .filter((note): note is StickyNote => Boolean(note));
@@ -1796,6 +1820,7 @@ function QuickNotesWidget({
       y: 18,
       z: 1,
       color: 'yellow',
+      updatedAt: new Date().toISOString(),
     }];
   };
 
@@ -1805,6 +1830,7 @@ function QuickNotesWidget({
       notes: notes.map((note) => ({
         ...note,
         content: note.content.slice(0, 1800),
+        updatedAt: note.updatedAt,
       })),
     });
 
@@ -1921,6 +1947,16 @@ function QuickNotesWidget({
         ? 'Could not save'
         : 'Ready';
 
+  const formatNoteTimestamp = (value: string) => {
+    if (!value) return 'Edited just now';
+    const timestamp = new Date(value).getTime();
+    const elapsedSeconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
+    if (elapsedSeconds < 60) return 'Edited just now';
+    if (elapsedSeconds < 3600) return `Edited ${Math.round(elapsedSeconds / 60)}m ago`;
+    if (elapsedSeconds < 86400) return `Edited ${Math.round(elapsedSeconds / 3600)}h ago`;
+    return `Edited ${new Date(value).toLocaleDateString()}`;
+  };
+
   const addNote = () => {
     setNotes((currentNotes) => {
       const index = currentNotes.length;
@@ -1933,6 +1969,7 @@ function QuickNotesWidget({
           y: 18 + (index % 3) * 28,
           z: topNoteZ + 1,
           color: stickyColors[index % stickyColors.length],
+          updatedAt: new Date().toISOString(),
         },
       ];
     });
@@ -1951,7 +1988,35 @@ function QuickNotesWidget({
 
   const updateNoteContent = (id: string, content: string) => {
     setNotes((currentNotes) => currentNotes.map((note) => (
-      note.id === id ? { ...note, content } : note
+      note.id === id ? { ...note, content, updatedAt: new Date().toISOString() } : note
+    )));
+  };
+
+  const updateNoteColor = (id: string, color: StickyNote['color']) => {
+    setNotes((currentNotes) => currentNotes.map((note) => (
+      note.id === id ? { ...note, color, updatedAt: new Date().toISOString() } : note
+    )));
+  };
+
+  const duplicateNote = (note: StickyNote) => {
+    const nextZ = topNoteZ + 1;
+    setNotes((currentNotes) => [
+      ...currentNotes,
+      {
+        ...note,
+        id: `note-${Date.now()}`,
+        x: note.x + 18,
+        y: note.y + 18,
+        z: nextZ,
+        updatedAt: new Date().toISOString(),
+      },
+    ]);
+    setTopNoteZ(nextZ);
+  };
+
+  const cycleNoteColor = (id: string) => {
+    setNotes((currentNotes) => currentNotes.map((note) => (
+      note.id === id ? { ...note, color: stickyColors[(stickyColors.indexOf(note.color) + 1) % stickyColors.length], updatedAt: new Date().toISOString() } : note
     )));
   };
 
@@ -2012,19 +2077,32 @@ function QuickNotesWidget({
           <div
             key={note.id}
             onPointerDown={(event) => startDraggingNote(event, note)}
-            className={`absolute flex h-44 w-56 cursor-grab flex-col rounded-sm p-3 shadow-lg ring-1 ring-black/5 transition ${draggingNoteId === note.id ? 'cursor-grabbing shadow-2xl' : ''} ${
-              note.color === 'blue'
-                ? 'bg-sky-100 text-sky-950 dark:bg-sky-950 dark:text-sky-50'
-                : note.color === 'green'
-                  ? 'bg-emerald-100 text-emerald-950 dark:bg-emerald-950 dark:text-emerald-50'
-                  : note.color === 'pink'
-                    ? 'bg-rose-100 text-rose-950 dark:bg-rose-950 dark:text-rose-50'
-                    : 'bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-50'
-            }`}
+            className={`absolute flex h-44 w-56 cursor-grab flex-col rounded-sm p-3 shadow-lg ring-1 ring-black/5 transition-all duration-500 ease-out hover:-translate-y-0.5 hover:shadow-xl ${draggingNoteId === note.id ? 'cursor-grabbing scale-[1.035] rotate-1 shadow-2xl ring-2 ring-accent/40' : ''} ${stickyColorMeta[note.color].className}`}
             style={{ left: note.x, top: note.y, zIndex: note.z }}
           >
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="h-2 w-10 rounded-full bg-black/10 dark:bg-white/15" />
+            <div className="mb-2 flex items-center justify-between gap-1.5">
+              <button
+                type="button"
+                onClick={() => cycleNoteColor(note.id)}
+                className="flex h-7 items-center gap-1 rounded-full bg-black/10 px-2 text-[10px] font-bold uppercase tracking-wide text-current transition hover:bg-black/20 dark:bg-white/10 dark:hover:bg-white/20"
+                aria-label={`Change note priority from ${stickyColorMeta[note.color].label}`}
+                title={stickyColorMeta[note.color].label}
+              >
+                <span className={`h-2 w-2 rounded-full ${stickyColorMeta[note.color].swatch}`} />
+                {stickyColorMeta[note.color].label}
+              </button>
+              <span className="flex items-center text-current/45" title="Drag note">
+                <GripHorizontal size={15} />
+              </span>
+              <button
+                type="button"
+                onClick={() => duplicateNote(note)}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-black/10 text-current transition hover:bg-black/20 dark:bg-white/10 dark:hover:bg-white/20"
+                aria-label="Duplicate sticky note"
+                title="Duplicate Note"
+              >
+                <Plus size={13} />
+              </button>
               <button
                 type="button"
                 onClick={() => deleteNote(note.id)}
@@ -2035,6 +2113,18 @@ function QuickNotesWidget({
                 <X size={14} />
               </button>
             </div>
+            <div className="mb-2 flex gap-1">
+              {stickyColors.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => updateNoteColor(note.id, color)}
+                  className={`h-3 flex-1 rounded-full ${stickyColorMeta[color].swatch} ${note.color === color ? 'ring-2 ring-current ring-offset-1 ring-offset-transparent' : 'opacity-65 hover:opacity-100'}`}
+                  aria-label={`Set note priority to ${stickyColorMeta[color].label}`}
+                  title={stickyColorMeta[color].label}
+                />
+              ))}
+            </div>
             <textarea
               value={note.content}
               onChange={(event) => updateNoteContent(note.id, event.target.value)}
@@ -2042,6 +2132,10 @@ function QuickNotesWidget({
               maxLength={1800}
               className="sticky-note-editor min-h-0 flex-1 resize-none border-0 bg-transparent text-sm leading-5 outline-none placeholder:text-current/45"
             />
+            <div className="mt-2 flex items-center justify-between gap-2 border-t border-current/10 pt-2 text-[10px] font-semibold uppercase tracking-wide text-current/55">
+              <span>{formatNoteTimestamp(note.updatedAt)}</span>
+              <span>{note.content.length}/1800</span>
+            </div>
           </div>
         ))}
       </div>
