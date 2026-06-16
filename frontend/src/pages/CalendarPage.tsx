@@ -1602,8 +1602,8 @@ function CalendarPage({
               <div className="grid min-h-[34rem] grid-cols-1 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 md:col-span-2 lg:grid-cols-[17.25rem_minmax(0,1fr)]">
                 <aside className="border-b border-gray-200 bg-gray-50 p-2.5 dark:border-gray-800 dark:bg-gray-900 lg:border-b-0 lg:border-r">
                   <div className="mb-2 flex min-h-[7.25rem] flex-col justify-center rounded-md border border-accent/30 bg-accent/10 px-3 py-3">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent">Trooper Daily</p>
-                    <p className="mt-1 truncate text-sm font-bold text-gray-800 dark:text-gray-100">{getReadableDate(selectedDate)}</p>
+                    <p className="text-sm font-black uppercase tracking-[0.14em] text-accent">Trooper Daily</p>
+                    <p className="mt-1 truncate text-base font-black text-gray-800 dark:text-gray-100">{getReadableDate(selectedDate)}</p>
                   </div>
                   <nav className="grid gap-1 sm:grid-cols-2 lg:grid-cols-1" aria-label="Trooper Daily input sections">
                     {dailyPanelOptions.map((panel) => {
@@ -1998,7 +1998,7 @@ function CalendarPage({
                 </div>
               </div>
 
-              <div className="pointer-events-none fixed bottom-4 left-1/2 z-[70] w-[min(calc(100vw-2rem),32rem)] -translate-x-1/2">
+              <div className="pointer-events-none fixed bottom-4 right-28 z-[70] flex max-w-[calc(100vw-9rem)] justify-end max-lg:right-24 max-sm:left-4 max-sm:right-24">
                 <div className="pointer-events-auto ml-auto flex w-fit max-w-full flex-wrap items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-gray-800 dark:bg-gray-950/95">
                   {editingEntry && (
                     <button type="button" onClick={() => setEntryPendingDelete(editingEntry)} className="btn-danger" aria-label="Delete daily report" title="Delete Report">
