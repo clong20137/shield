@@ -786,8 +786,8 @@ export function AccountSettingsPage({
           {canChangeCalendarPreference && (
             <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
               <span>
-                <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Hide calendar</span>
-                <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Remove calendar shortcuts and widgets from your workspace.</span>
+                <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Hide profile calendar</span>
+                <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Hide the Calendar tab when others view your user profile.</span>
               </span>
               <input
                 type="checkbox"

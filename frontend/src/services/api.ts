@@ -260,6 +260,7 @@ export interface User {
   emergencyContactPhone: string;
   role: string;
   receivesMessages: boolean;
+  calendarHidden?: boolean;
   lastSeenAt?: string | null;
   createdAt: string;
   updatedAt: string;

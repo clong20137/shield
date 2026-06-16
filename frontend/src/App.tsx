@@ -2263,6 +2263,14 @@ function MessagesRouteRedirect({ onOpenMessages }: { onOpenMessages: () => void 
   return <Navigate to="/" replace />;
 }
 
+function CalendarRouteRedirect({ onOpenCalendar }: { onOpenCalendar: () => void }) {
+  useEffect(() => {
+    onOpenCalendar();
+  }, [onOpenCalendar]);
+
+  return <Navigate to="/" replace />;
+}
+
 function CreateUserRouteRedirect({ onOpenCreateUser }: { onOpenCreateUser: () => void }) {
   useEffect(() => {
     onOpenCreateUser();
@@ -4559,7 +4567,7 @@ function App() {
   };
 
   const loadSidebarCalendarEntries = useCallback(async (showLoading = false) => {
-    if (!currentUser || currentUser.calendarHidden) {
+    if (!currentUser) {
       setSidebarCalendarEntries([]);
       setIsSidebarCalendarLoading(false);
       return;
@@ -4838,7 +4846,7 @@ function App() {
 
   const isAdministrator = currentUser?.role === 'administrator';
   const hasPermission = (permission: string) => Boolean(isAdministrator || currentUser?.permissions?.includes(permission));
-  const showCalendar = Boolean(currentUser && !currentUser.calendarHidden);
+  const showCalendar = Boolean(currentUser);
   const canOpenAdminConsole = Boolean(currentUser && (
     isAdministrator ||
     hasPermission('admin:access')
@@ -5032,10 +5040,9 @@ function App() {
       return;
     }
 
-    if (isCalendarModalOpen) {
-      closeModal('calendar');
-    }
-    window.location.assign(withAppBase('/calendar'));
+    announceFloatingFocus('calendar');
+    setActiveFloatingApp('calendar');
+    setIsCalendarModalOpen(true);
   };
 
   const toggleCalendarModal = () => {
@@ -5180,16 +5187,13 @@ function App() {
 
     const previousUser = currentUser;
     handleAccountUpdate({ ...currentUser, calendarHidden });
-    if (calendarHidden && isCalendarModalOpen) {
-      closeModal('calendar');
-    }
 
     try {
       const response = await authService.updateCalendarPreferences(currentUser.id, calendarHidden);
       if (response.data.account) {
         handleAccountUpdate(response.data.account);
       }
-      showToast('success', calendarHidden ? 'Calendar hidden.' : 'Calendar shown.');
+      showToast('success', calendarHidden ? 'Profile calendar hidden.' : 'Profile calendar shown.');
     } catch (err) {
       console.error(err);
       handleAccountUpdate(previousUser);
@@ -5468,7 +5472,6 @@ function App() {
 
             <nav data-onboarding-target="navigation" className="flex shrink-0 flex-col gap-1.5 px-3 py-2">
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
-              {showCalendar && <SidebarLink to="/calendar" label="Calendar" compact={isSidebarCollapsed} icon={CalendarDays} />}
               {isAdministrator && <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />}
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
             </nav>
@@ -5725,15 +5728,10 @@ function App() {
               <div data-onboarding-target="workspace" className="min-h-[calc(100dvh-12rem)] min-w-0">
                 <Suspense fallback={<PageLoader label="Loading page..." />}>
                   <Routes>
-                    <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
+                    <Route path="/" element={<DashboardPage currentUser={currentUser} onOpenCalendar={openCalendarModal} />} />
                     {currentUser && <Route path="/updates/:postId" element={<DashboardPostPage currentUser={currentUser} onToast={showToast} />} />}
                     {currentUser && <Route path="/messages" element={<MessagesRouteRedirect onOpenMessages={openMessagesModal} />} />}
-                    {currentUser && showCalendar && (
-                      <Route
-                        path="/calendar"
-                        element={<CalendarPage currentUser={currentUser} onAccountUpdate={handleAccountUpdate} useMilitaryTime={messagePreferences.useMilitaryTime} />}
-                      />
-                    )}
+                    {currentUser && <Route path="/calendar" element={<CalendarRouteRedirect onOpenCalendar={openCalendarModal} />} />}
                     <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
                     {currentUser && (
                       <Route

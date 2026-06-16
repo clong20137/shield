@@ -38,6 +38,7 @@ export interface User {
   role: string;
   mustChangePassword?: boolean;
   receivesMessages: boolean;
+  calendarHidden?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -68,9 +68,13 @@ async function canViewHiddenUsers(account: { id: string; role: string }) {
   return permissions.includes('users:view-hidden');
 }
 
-async function canViewProfileCalendar(account: { id: string; role: string; displayName?: string; firstName?: string; lastName?: string; email?: string }, targetUser: { id: string; supervisor?: string }) {
+async function canViewProfileCalendar(account: { id: string; role: string; displayName?: string; firstName?: string; lastName?: string; email?: string }, targetUser: { id: string; supervisor?: string; calendarHidden?: boolean }) {
   if (account.id === targetUser.id || account.role === 'administrator') {
     return true;
+  }
+
+  if (targetUser.calendarHidden) {
+    return false;
   }
 
   const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);

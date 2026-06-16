@@ -203,11 +203,14 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const [deviceError, setDeviceError] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [presenceTick, setPresenceTick] = useState(0);
+  const canBypassHiddenProfileCalendar = currentUser?.id === user.id || currentUser?.role === 'administrator';
   const canViewProfileCalendar = Boolean(
-    currentUser?.id === user.id ||
-    currentUser?.role === 'administrator' ||
-    currentUser?.permissions?.includes('calendar:view-profiles') ||
-    isProfileSupervisor(user, currentUser),
+    (!user.calendarHidden || canBypassHiddenProfileCalendar) && (
+      currentUser?.id === user.id ||
+      currentUser?.role === 'administrator' ||
+      currentUser?.permissions?.includes('calendar:view-profiles') ||
+      isProfileSupervisor(user, currentUser)
+    ),
   );
   const tabs: Array<[ProfileTab, string]> = [
     ['personal', 'Personal'],
