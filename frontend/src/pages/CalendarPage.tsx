@@ -443,6 +443,10 @@ function isHourMatch(reportedHours: number, comparisonHours: number): boolean {
   return reportedHours > 0 && comparisonHours > 0 && Math.abs(reportedHours - comparisonHours) <= 0.01;
 }
 
+function areEntryFormsEqual(firstForm: CalendarEntryForm, secondForm: CalendarEntryForm): boolean {
+  return JSON.stringify(firstForm) === JSON.stringify(secondForm);
+}
+
 function isDetailComplete(details: Record<string, string> | undefined, key: string): boolean {
   return Boolean(details?.[key]?.trim());
 }
@@ -639,6 +643,11 @@ function CalendarPage({
   const dailyFormRef = useRef<HTMLFormElement | null>(null);
   const skipNextDailyDraftWriteRef = useRef(false);
   const backendAutosaveRequestRef = useRef(0);
+  const dailyUndoStackRef = useRef<CalendarEntryForm[]>([]);
+  const dailyRedoStackRef = useRef<CalendarEntryForm[]>([]);
+  const previousEntryFormRef = useRef<CalendarEntryForm | null>(entryForm);
+  const isRestoringDailyHistoryRef = useRef(false);
+  const pendingDailyFocusRef = useRef<'field' | 'submit' | null>(null);
 
   const actor = {
     actorId: currentUser.id,
@@ -717,10 +726,20 @@ function CalendarPage({
     const localDraft = readTrooperDailyDraft(currentUser.id, dateKey);
     const existingUpdatedAt = existingEntry?.updatedAt ? new Date(existingEntry.updatedAt).getTime() : 0;
     const shouldRestoreLocalDraft = Boolean(localDraft && localDraft.savedAt > existingUpdatedAt);
+    const nextForm = shouldRestoreLocalDraft && localDraft
+      ? localDraft.form
+      : existingEntry
+        ? createEntryFormFromEntry(existingEntry)
+        : createDefaultEntryForm(dateKey, currentUser);
     backendAutosaveRequestRef.current += 1;
+    dailyUndoStackRef.current = [];
+    dailyRedoStackRef.current = [];
+    previousEntryFormRef.current = nextForm;
+    isRestoringDailyHistoryRef.current = false;
+    pendingDailyFocusRef.current = null;
     setCalendarFocusDate(new Date(year, month - 1, day));
     setSelectedDate(dateKey);
-    setEntryForm(shouldRestoreLocalDraft && localDraft ? localDraft.form : existingEntry ? createEntryFormFromEntry(existingEntry) : createDefaultEntryForm(dateKey, currentUser));
+    setEntryForm(nextForm);
     setIsDutyHoursManual(Boolean(existingEntry));
     lastAutoDutyHoursRef.current = '';
     setEditingEntryId(shouldRestoreLocalDraft && localDraft ? localDraft.editingEntryId || existingEntry?.id || null : existingEntry?.id || null);
@@ -732,6 +751,46 @@ function CalendarPage({
     setReminderPriority('Normal');
     setReminderNotes('');
   };
+
+  useEffect(() => {
+    if (!selectedDate) {
+      previousEntryFormRef.current = entryForm;
+      dailyUndoStackRef.current = [];
+      dailyRedoStackRef.current = [];
+      return;
+    }
+
+    if (isRestoringDailyHistoryRef.current) {
+      previousEntryFormRef.current = entryForm;
+      isRestoringDailyHistoryRef.current = false;
+      return;
+    }
+
+    const previousForm = previousEntryFormRef.current;
+    if (previousForm && !areEntryFormsEqual(previousForm, entryForm)) {
+      dailyUndoStackRef.current = [...dailyUndoStackRef.current.slice(-39), previousForm];
+      dailyRedoStackRef.current = [];
+    }
+
+    previousEntryFormRef.current = entryForm;
+  }, [entryForm, selectedDate]);
+
+  useEffect(() => {
+    if (!pendingDailyFocusRef.current) {
+      return undefined;
+    }
+
+    const focusTarget = pendingDailyFocusRef.current;
+    pendingDailyFocusRef.current = null;
+    const timer = window.setTimeout(() => {
+      const selector = focusTarget === 'submit'
+        ? '[data-daily-submit]'
+        : '[data-daily-field]:not([disabled])';
+      dailyFormRef.current?.querySelector<HTMLElement>(selector)?.focus();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [activeDailyPanel]);
 
   useEffect(() => {
     if (!selectedDate || entryForm.date !== selectedDate) {
@@ -812,13 +871,85 @@ function CalendarPage({
     return () => window.clearTimeout(timer);
   }, [currentUser.id, editingEntryId, entryForm, selectedDate]);
 
+  const undoDailyChange = () => {
+    const previousForm = dailyUndoStackRef.current.pop();
+    if (!previousForm) {
+      return;
+    }
+
+    dailyRedoStackRef.current.push(entryForm);
+    isRestoringDailyHistoryRef.current = true;
+    setEntryForm(previousForm);
+  };
+
+  const redoDailyChange = () => {
+    const nextForm = dailyRedoStackRef.current.pop();
+    if (!nextForm) {
+      return;
+    }
+
+    dailyUndoStackRef.current.push(entryForm);
+    isRestoringDailyHistoryRef.current = true;
+    setEntryForm(nextForm);
+  };
+
+  const advanceDailyPanel = () => {
+    const currentIndex = dailyPanelOptions.indexOf(activeDailyPanel);
+    const nextPanel = dailyPanelOptions
+      .slice(currentIndex + 1)
+      .find((panel) => !hiddenDailySections.includes(panel));
+
+    if (nextPanel) {
+      pendingDailyFocusRef.current = 'field';
+      setActiveDailyPanel(nextPanel);
+      return;
+    }
+
+    pendingDailyFocusRef.current = 'submit';
+    window.setTimeout(() => {
+      pendingDailyFocusRef.current = null;
+      dailyFormRef.current?.querySelector<HTMLElement>('[data-daily-submit]')?.focus();
+    }, 0);
+  };
+
   const handleDailyKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
-    if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.metaKey) {
+    const key = event.key.toLowerCase();
+    const isCommandKey = event.ctrlKey || event.metaKey;
+
+    if (isCommandKey && key === 'z') {
+      event.preventDefault();
+      if (event.shiftKey) {
+        redoDailyChange();
+      } else {
+        undoDailyChange();
+      }
+      return;
+    }
+
+    if (isCommandKey && key === 'y') {
+      event.preventDefault();
+      redoDailyChange();
+      return;
+    }
+
+    if (isCommandKey && key === 's') {
+      event.preventDefault();
+      void saveEntry(event, 'Draft');
+      return;
+    }
+
+    if (isCommandKey && key === 'enter') {
+      event.preventDefault();
+      void saveEntry(event, 'Submitted');
+      return;
+    }
+
+    if (key !== 'enter' || event.shiftKey || event.ctrlKey || event.metaKey) {
       return;
     }
 
     const target = event.target;
-    if (!(target instanceof HTMLInputElement)) {
+    if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) {
       return;
     }
 
@@ -830,7 +961,13 @@ function CalendarPage({
     }
 
     event.preventDefault();
-    fields[currentIndex + 1]?.focus();
+    const nextField = fields[currentIndex + 1];
+    if (nextField) {
+      nextField.focus();
+      return;
+    }
+
+    advanceDailyPanel();
   };
 
   const changeMonth = (offset: number) => {
@@ -1225,6 +1362,28 @@ function CalendarPage({
     [],
   );
   const activeDailySection = visibleDailySections.find((section) => section.title === activeDailyPanel);
+  const activeHourGuidance = (() => {
+    if (!activeDailySection || !hasReportedHours) {
+      return null;
+    }
+
+    const sectionComparisons: Record<string, { label: string; value: number; isMatch: boolean }> = {
+      'Regular Duty': { label: 'Shift time', value: calculatedShiftHours, isMatch: shiftHoursMatch },
+      'Attendance Hours': { label: 'Attendance hours', value: attendanceHours, isMatch: attendanceHoursMatch },
+      'Duty Hours': { label: 'Duty activity hours', value: dutyActivityHours, isMatch: dutyActivityHoursMatch },
+    };
+    const comparison = sectionComparisons[activeDailySection.title];
+    if (!comparison || comparison.value <= 0) {
+      return null;
+    }
+
+    const difference = Math.abs(comparison.value - reportedDutyHours);
+    return {
+      ...comparison,
+      difference,
+      direction: comparison.value > reportedDutyHours ? 'over' : 'under',
+    };
+  })();
 
   useEffect(() => {
     if (!dailyPanelOptions.includes(activeDailyPanel)) {
@@ -1823,6 +1982,24 @@ function CalendarPage({
                           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                             {activeDailySection.fields.filter(([key]) => isDetailComplete(entryForm.details, key)).length} of {activeDailySection.fields.length} fields complete.
                           </p>
+                          {activeHourGuidance && (
+                            <p
+                              className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ring-1 transition-all duration-500 ${
+                                activeHourGuidance.isMatch
+                                  ? 'bg-green-50 text-green-700 ring-green-100 dark:bg-green-950/40 dark:text-green-200 dark:ring-green-900'
+                                  : 'bg-red-50 text-danger ring-red-100 dark:bg-red-950/40 dark:ring-red-900'
+                              }`}
+                            >
+                              {activeHourGuidance.isMatch ? (
+                                <CheckCircle2 size={14} className="text-green-600 dark:text-green-300" />
+                              ) : (
+                                <X size={14} className="text-danger" />
+                              )}
+                              {activeHourGuidance.isMatch
+                                ? `${activeHourGuidance.label} matches reported duty hours.`
+                                : `${activeHourGuidance.label} is ${formatHours(activeHourGuidance.difference)} hr ${activeHourGuidance.direction} reported duty hours.`}
+                            </p>
+                          )}
                         </div>
                         {activeDailySection.title === 'Regular Duty' && (
                           <div className="inline-flex rounded border border-gray-300 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-900" aria-label="Time input format">
@@ -1919,9 +2096,12 @@ function CalendarPage({
                 </section>
               </div>
 
-              <div className="flex flex-wrap items-center justify-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950 md:col-span-2">
+              <div className="sticky bottom-0 z-20 flex flex-wrap items-center justify-end gap-2 rounded-lg border border-gray-200 bg-gray-50/95 p-3 shadow-[0_-14px_32px_rgba(15,23,42,0.08)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/95 dark:shadow-[0_-14px_32px_rgba(0,0,0,0.24)] md:col-span-2">
                 <span className="mr-auto text-sm font-semibold text-gray-500 dark:text-gray-400">
                   Save keeps this as a draft. Submit sends the final report.
+                  <span className="ml-2 hidden text-xs font-bold text-gray-400 dark:text-gray-500 lg:inline">
+                    Ctrl+S save - Ctrl+Enter submit - Ctrl+Z undo - Ctrl+Y redo
+                  </span>
                   {backendDraftStatus === 'saving' && (
                     <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 ring-1 ring-blue-100 dark:bg-blue-950/40 dark:text-blue-200 dark:ring-blue-900">
                       <span className="h-2 w-2 animate-pulse rounded-full bg-blue-500" />
@@ -1956,7 +2136,7 @@ function CalendarPage({
                   <Save size={16} />
                   <span>Save Draft</span>
                 </button>
-                <button type="button" onClick={(event) => saveEntry(event, 'Submitted')} className="btn-success" aria-label="Submit daily report" title="Submit Report">
+                <button type="button" onClick={(event) => saveEntry(event, 'Submitted')} className="btn-success" data-daily-submit aria-label="Submit daily report" title="Submit Report">
                   <CheckCircle2 size={16} />
                   <span>Submit</span>
                 </button>
