@@ -6,7 +6,6 @@ import { districtOptions } from '../constants/districts';
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 type TimePeriod = 'AM' | 'PM';
 type CalendarView = 'day' | 'week' | 'month';
-type BackendDraftStatus = 'idle' | 'saving' | 'saved' | 'error';
 type StoredTrooperDailyDraft = {
   form: CalendarEntryForm;
   editingEntryId: string | null;
@@ -626,9 +625,6 @@ function CalendarPage({
   const [isCalendarLoading, setIsCalendarLoading] = useState(true);
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [isDutyHoursManual, setIsDutyHoursManual] = useState(false);
-  const [dailyDraftSavedAt, setDailyDraftSavedAt] = useState<number | null>(null);
-  const [backendDraftStatus, setBackendDraftStatus] = useState<BackendDraftStatus>('idle');
-  const [backendDraftSavedAt, setBackendDraftSavedAt] = useState<number | null>(null);
   const lastAutoDutyHoursRef = useRef('');
   const dailyFormRef = useRef<HTMLFormElement | null>(null);
   const skipNextDailyDraftWriteRef = useRef(false);
@@ -733,9 +729,6 @@ function CalendarPage({
     setIsDutyHoursManual(Boolean(existingEntry));
     lastAutoDutyHoursRef.current = '';
     setEditingEntryId(shouldRestoreLocalDraft && localDraft ? localDraft.editingEntryId || existingEntry?.id || null : existingEntry?.id || null);
-    setDailyDraftSavedAt(shouldRestoreLocalDraft && localDraft ? localDraft.savedAt : null);
-    setBackendDraftStatus(existingEntry?.submissionStatus === 'Draft' && !shouldRestoreLocalDraft ? 'saved' : 'idle');
-    setBackendDraftSavedAt(existingEntry?.submissionStatus === 'Draft' && existingEntry.updatedAt && !shouldRestoreLocalDraft ? new Date(existingEntry.updatedAt).getTime() : null);
   };
 
   useEffect(() => {
@@ -789,10 +782,7 @@ function CalendarPage({
     }
 
     const timer = window.setTimeout(() => {
-      const savedAt = writeTrooperDailyDraft(currentUser.id, entryForm, editingEntryId);
-      if (savedAt) {
-        setDailyDraftSavedAt(savedAt);
-      }
+      writeTrooperDailyDraft(currentUser.id, entryForm, editingEntryId);
     }, 350);
 
     return () => window.clearTimeout(timer);
@@ -815,7 +805,6 @@ function CalendarPage({
     const timer = window.setTimeout(() => {
       const requestId = backendAutosaveRequestRef.current + 1;
       backendAutosaveRequestRef.current = requestId;
-      setBackendDraftStatus('saving');
 
       const payload = {
         ...entryForm,
@@ -841,8 +830,6 @@ function CalendarPage({
             return [response.data, ...currentEntries];
           });
           setEditingEntryId(response.data.id);
-          setBackendDraftStatus('saved');
-          setBackendDraftSavedAt(Date.now());
         })
         .catch((err) => {
           if (backendAutosaveRequestRef.current !== requestId) {
@@ -850,7 +837,6 @@ function CalendarPage({
           }
 
           console.error('Failed to autosave calendar draft:', err);
-          setBackendDraftStatus('error');
         });
     }, 1800);
 
@@ -1032,9 +1018,6 @@ function CalendarPage({
         setEditingEntryId(response.data.id);
         setEntryForm(createEntryFormFromEntry(response.data));
       }
-      setDailyDraftSavedAt(null);
-      setBackendDraftStatus('saved');
-      setBackendDraftSavedAt(Date.now());
       setIsDutyHoursManual(true);
       lastAutoDutyHoursRef.current = '';
     } catch (err) {
@@ -1056,9 +1039,6 @@ function CalendarPage({
         setIsDutyHoursManual(false);
         lastAutoDutyHoursRef.current = '';
       }
-      setDailyDraftSavedAt(null);
-      setBackendDraftStatus('idle');
-      setBackendDraftSavedAt(null);
       setEntryPendingDelete(null);
     } catch (err) {
       console.error('Failed to delete calendar entry:', err);
@@ -1593,29 +1573,8 @@ function CalendarPage({
       {selectedDate && (
         <div className={isFloatingApp ? 'absolute inset-0 z-20 flex min-h-0 bg-white dark:bg-gray-900' : 'min-h-0 flex-1 pt-14 lg:pt-16'}>
           <div className={isFloatingApp ? 'h-full min-h-0 w-full overflow-y-auto rounded-lg bg-white p-3 shadow-none dark:bg-gray-900 sm:p-4' : 'h-full min-h-0 overflow-y-auto rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5'}>
-            <div className="mb-5 flex items-start justify-between gap-3 sm:gap-4">
-              <div className="flex min-w-0 items-start gap-3">
-                {!isFloatingApp && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedDate(null)}
-                    className="btn-secondary mt-0.5 shrink-0"
-                    aria-label="Back to calendar"
-                    title="Back to Calendar"
-                  >
-                    <ChevronLeft size={16} />
-                    <span>Back</span>
-                  </button>
-                )}
-                <div className="min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Trooper Daily</p>
-                  <h2 className="mt-1 truncate">{getReadableDate(selectedDate)}</h2>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {editingEntryId ? 'Update this daily report.' : 'Fill out this daily report.'}
-                  </p>
-                </div>
-              </div>
-              {isFloatingApp && (
+            <div className="mb-3 flex justify-end">
+              {isFloatingApp ? (
                 <button
                   type="button"
                   onClick={() => setSelectedDate(null)}
@@ -1625,10 +1584,21 @@ function CalendarPage({
                 >
                   <X size={20} />
                 </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate(null)}
+                  className="btn-secondary"
+                  aria-label="Back to calendar"
+                  title="Back to Calendar"
+                >
+                  <ChevronLeft size={16} />
+                  <span>Back</span>
+                </button>
               )}
             </div>
 
-            <form ref={dailyFormRef} onSubmit={(event) => saveEntry(event, 'Draft')} onKeyDown={handleDailyKeyDown} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <form ref={dailyFormRef} onSubmit={(event) => saveEntry(event, 'Draft')} onKeyDown={handleDailyKeyDown} className="grid grid-cols-1 gap-4 pb-24 md:grid-cols-2">
               <div className="grid items-center gap-2 rounded-lg border border-accent/30 bg-accent/5 p-2 md:col-span-2 lg:grid-cols-[auto_minmax(12rem,18rem)_auto_minmax(10rem,1fr)_auto]">
                 <div className="px-2">
                   <p className="text-xs font-bold uppercase tracking-wide text-accent">Shortcuts</p>
@@ -2028,46 +1998,22 @@ function CalendarPage({
                 </section>
               </div>
 
-              <div className="sticky bottom-0 z-20 flex flex-wrap items-center justify-end gap-2 rounded-lg border border-gray-200 bg-gray-50/95 p-3 shadow-[0_-14px_32px_rgba(15,23,42,0.08)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/95 dark:shadow-[0_-14px_32px_rgba(0,0,0,0.24)] md:col-span-2">
-                <span className="mr-auto flex flex-wrap items-center gap-2 text-sm font-semibold text-gray-500 dark:text-gray-400">
-                  {backendDraftStatus === 'saving' && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 ring-1 ring-blue-100 dark:bg-blue-950/40 dark:text-blue-200 dark:ring-blue-900">
-                      <span className="h-2 w-2 animate-pulse rounded-full bg-blue-500" />
-                      Saving to server
-                    </span>
+              <div className="pointer-events-none sticky bottom-3 z-30 flex justify-end md:col-span-2">
+                <div className="pointer-events-auto flex flex-wrap items-center justify-end gap-2 rounded-full border border-gray-200 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-gray-800 dark:bg-gray-950/95">
+                  {editingEntry && (
+                    <button type="button" onClick={() => setEntryPendingDelete(editingEntry)} className="btn-danger rounded-full" aria-label="Delete daily report" title="Delete Report">
+                      <Trash2 size={16} />
+                    </button>
                   )}
-                  {backendDraftStatus === 'saved' && backendDraftSavedAt && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-1 text-xs font-bold text-green-700 ring-1 ring-green-100 dark:bg-green-950/40 dark:text-green-200 dark:ring-green-900">
-                      <CheckCircle2 size={13} />
-                      Saved to server {new Date(backendDraftSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                    </span>
-                  )}
-                  {backendDraftStatus === 'error' && dailyDraftSavedAt && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900">
-                      <CheckCircle2 size={13} />
-                      Local draft saved {new Date(dailyDraftSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                    </span>
-                  )}
-                  {backendDraftStatus === 'idle' && dailyDraftSavedAt && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900">
-                      <CheckCircle2 size={13} />
-                      Local draft saved {new Date(dailyDraftSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                    </span>
-                  )}
-                </span>
-                {editingEntry && (
-                  <button type="button" onClick={() => setEntryPendingDelete(editingEntry)} className="btn-danger" aria-label="Delete daily report" title="Delete Report">
-                    <Trash2 size={16} />
+                  <button type="submit" className="btn-secondary rounded-full" aria-label="Save daily report as draft" title="Save Draft">
+                    <Save size={16} />
+                    <span>Save Draft</span>
                   </button>
-                )}
-                <button type="submit" className="btn-secondary" aria-label="Save daily report as draft" title="Save Draft">
-                  <Save size={16} />
-                  <span>Save Draft</span>
-                </button>
-                <button type="button" onClick={(event) => saveEntry(event, 'Submitted')} className="btn-success" data-daily-submit aria-label="Submit daily report" title="Submit Report">
-                  <CheckCircle2 size={16} />
-                  <span>Submit</span>
-                </button>
+                  <button type="button" onClick={(event) => saveEntry(event, 'Submitted')} className="btn-success rounded-full" data-daily-submit aria-label="Submit daily report" title="Submit Report">
+                    <CheckCircle2 size={16} />
+                    <span>Submit</span>
+                  </button>
+                </div>
               </div>
             </form>
 
