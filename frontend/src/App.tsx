@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation,
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { FloatingWindow } from './components/FloatingWindow';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, calendarService, clearAuthToken, CompleteSetupPayload, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, SetupEnvironmentValues, SetupStatus, urgentAlertService, UrgentAlert, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, CalendarEntryPayload, calendarService, clearAuthToken, CompleteSetupPayload, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, SetupEnvironmentValues, SetupStatus, urgentAlertService, UrgentAlert, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
@@ -1050,18 +1050,43 @@ function getSidebarCalendarDays(monthDate: Date) {
   });
 }
 
+function createSidebarDailyPayload(entry: CalendarEntry, date: string): CalendarEntryPayload {
+  return {
+    category: 'Trooper Daily',
+    date,
+    dutyHours: entry.dutyHours,
+    districtWorked: entry.districtWorked,
+    specialStatus: entry.specialStatus,
+    color: entry.color,
+    details: { ...(entry.details || {}) },
+    submissionStatus: 'Draft',
+    ownerAccountId: entry.ownerAccountId,
+  };
+}
+
 function SidebarCalendarWidget({
   compact,
   entries,
   onOpenCalendar,
+  copiedDaily,
+  onCopyDaily,
+  onPasteDaily,
+  onCopyPreviousDaily,
+  onAddReminder,
 }: {
   compact: boolean;
   entries: CalendarEntry[];
   onOpenCalendar: (dateKey?: string) => void;
+  copiedDaily: CalendarEntryPayload | null;
+  onCopyDaily: (dateKey: string) => void;
+  onPasteDaily: (dateKey: string) => void;
+  onCopyPreviousDaily: (dateKey: string) => void;
+  onAddReminder: (dateKey: string) => void;
 }) {
   const todayKey = getLocalDateKey();
   const [visibleMonth, setVisibleMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [hoveredDate, setHoveredDate] = useState<{ x: number; y: number; dateKey: string; entries: CalendarEntry[] } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; dateKey: string; entries: CalendarEntry[] } | null>(null);
   const calendarDays = useMemo(() => getSidebarCalendarDays(visibleMonth), [visibleMonth]);
   const entriesByDate = useMemo(() => entries.reduce<Record<string, CalendarEntry[]>>((groups, entry) => {
     const dateKey = getEntryDateKey(entry);
@@ -1072,6 +1097,7 @@ function SidebarCalendarWidget({
 
   const changeMonth = (offset: number) => {
     setHoveredDate(null);
+    setContextMenu(null);
     setVisibleMonth((currentMonth) => new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1));
   };
 
@@ -1084,6 +1110,32 @@ function SidebarCalendarWidget({
       entries: dayEntries,
     });
   };
+
+  const openContextMenu = (event: React.MouseEvent<HTMLElement>, dateKey: string, dayEntries: CalendarEntry[]) => {
+    event.preventDefault();
+    setHoveredDate(null);
+    setContextMenu({
+      x: Math.min(event.clientX, window.innerWidth - 224),
+      y: Math.min(event.clientY, window.innerHeight - 240),
+      dateKey,
+      entries: dayEntries,
+    });
+  };
+
+  useEffect(() => {
+    if (!contextMenu) {
+      return undefined;
+    }
+
+    const closeContextMenu = () => setContextMenu(null);
+    window.addEventListener('click', closeContextMenu);
+    window.addEventListener('scroll', closeContextMenu, true);
+
+    return () => {
+      window.removeEventListener('click', closeContextMenu);
+      window.removeEventListener('scroll', closeContextMenu, true);
+    };
+  }, [contextMenu]);
 
   if (compact) {
     return (
@@ -1144,6 +1196,7 @@ function SidebarCalendarWidget({
               onMouseLeave={() => setHoveredDate(null)}
               onFocus={(event) => showDateTooltip(event.currentTarget, dateKey, dayEntries)}
               onBlur={() => setHoveredDate(null)}
+              onContextMenu={(event) => openContextMenu(event, dateKey, dayEntries)}
               className={`relative flex aspect-square min-h-6 items-center justify-center rounded border text-[11px] font-black transition duration-300 hover:-translate-y-0.5 hover:shadow-sm ${
                 primaryEntry
                   ? 'trooper-daily-strip-filled border-transparent text-white'
@@ -1199,80 +1252,67 @@ function SidebarCalendarWidget({
           )}
         </div>
       )}
-    </div>
-  );
-}
 
-function SidebarRemindersWidget({
-  compact,
-  reminders,
-  isLoading,
-  onToggle,
-  onDelete,
-}: {
-  compact: boolean;
-  reminders: Reminder[];
-  isLoading: boolean;
-  onToggle: (id: string) => void;
-  onDelete: (id: string) => void;
-}) {
-  const activeReminders = reminders.filter((reminder) => !reminder.completedAt);
-  const visibleReminders = activeReminders.slice(0, 2);
-
-  if (compact) {
-    return (
-      <div
-        className="relative mb-3 flex h-11 w-full items-center justify-center rounded bg-white/10 text-white transition hover:bg-white/15"
-        aria-label="Reminders"
-        title="Reminders"
-      >
-        <ClipboardList size={20} />
-        {activeReminders.length > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
-            {activeReminders.length > 9 ? '9+' : activeReminders.length}
-          </span>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="mb-2 rounded-lg border border-white/10 bg-white/10 p-2.5 text-white">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-100">Reminders</p>
-          <p className="truncate text-sm font-bold">{isLoading ? 'Loading' : activeReminders.length > 0 ? `${activeReminders.length} active` : 'All clear'}</p>
+      {contextMenu && (
+        <div
+          className="quick-launch-context-menu fixed z-[100] min-w-52 overflow-hidden rounded border border-gray-200 bg-white p-1 text-sm shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              onOpenCalendar(contextMenu.dateKey);
+              setContextMenu(null);
+            }}
+            className="flex w-full items-center gap-2 rounded px-3 py-2 text-left font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            {contextMenu.entries[0] ? 'Open Daily' : 'Create Daily'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onCopyDaily(contextMenu.dateKey);
+              setContextMenu(null);
+            }}
+            disabled={!contextMenu.entries[0]}
+            className="flex w-full items-center gap-2 rounded px-3 py-2 text-left font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-45 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            Copy Daily
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onPasteDaily(contextMenu.dateKey);
+              setContextMenu(null);
+            }}
+            disabled={!copiedDaily}
+            className="flex w-full items-center gap-2 rounded px-3 py-2 text-left font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-45 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            Paste Daily
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onCopyPreviousDaily(contextMenu.dateKey);
+              setContextMenu(null);
+            }}
+            className="flex w-full items-center gap-2 rounded px-3 py-2 text-left font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            Copy Previous Daily
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onAddReminder(contextMenu.dateKey);
+              setContextMenu(null);
+            }}
+            className="flex w-full items-center gap-2 border-t border-gray-100 px-3 py-2 text-left font-semibold text-primary-500 hover:bg-gray-50 dark:border-gray-800 dark:text-blue-100 dark:hover:bg-gray-800"
+          >
+            Add Reminder
+          </button>
         </div>
-      </div>
-
-      <div className="space-y-1">
-        {isLoading ? (
-          <p className="rounded bg-black/15 px-2 py-2 text-xs font-semibold text-blue-100">
-            Loading reminders...
-          </p>
-        ) : visibleReminders.length > 0 ? (
-          visibleReminders.map((reminder) => (
-            <div key={reminder.id} className="flex min-w-0 items-center gap-2 rounded bg-black/15 px-2 py-1" onClick={(event) => event.stopPropagation()}>
-              <input
-                type="checkbox"
-                checked={Boolean(reminder.completedAt)}
-                onChange={() => onToggle(reminder.id)}
-                className="h-4 w-4 shrink-0 accent-primary-500"
-                aria-label={`Complete ${reminder.title}`}
-              />
-              <span className="min-w-0 flex-1 truncate text-xs font-bold text-white">{reminder.title}</span>
-              <span className="shrink-0 text-[10px] font-bold text-blue-100">{formatSidebarCalendarDate(reminder.remindOn)}</span>
-              <button type="button" onClick={() => onDelete(reminder.id)} className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-danger text-white shadow-sm hover:bg-red-800" aria-label={`Delete ${reminder.title}`} title="Delete Reminder">
-                <Trash2 size={13} />
-              </button>
-            </div>
-          ))
-        ) : (
-          <p className="rounded bg-black/15 px-2 py-2 text-xs font-semibold text-blue-100">
-            No reminders yet
-          </p>
-        )}
-      </div>
+      )}
     </div>
   );
 }
@@ -4206,8 +4246,7 @@ function App() {
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const [bugReports, setBugReports] = useState<BugReport[]>([]);
   const [sidebarCalendarEntries, setSidebarCalendarEntries] = useState<CalendarEntry[]>([]);
-  const [sidebarReminders, setSidebarReminders] = useState<Reminder[]>([]);
-  const [isSidebarRemindersLoading, setIsSidebarRemindersLoading] = useState(false);
+  const [copiedSidebarDaily, setCopiedSidebarDaily] = useState<CalendarEntryPayload | null>(null);
   const previousMessageUnreadCount = useRef<number | null>(null);
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
   const rateLimitToastRef = useRef(0);
@@ -4370,68 +4409,89 @@ function App() {
     }, 4500);
   };
 
-  const loadSidebarReminders = useCallback(async (showLoading = false) => {
+  const copySidebarDaily = (dateKey: string) => {
+    const entry = sidebarCalendarEntries.find((item) => getEntryDateKey(item) === dateKey);
+    if (!entry) {
+      showToast('error', 'There is no Trooper Daily content to copy for that date.', { saveToNotifications: false });
+      return;
+    }
+
+    setCopiedSidebarDaily(createSidebarDailyPayload(entry, dateKey));
+    showToast('success', `Copied daily for ${formatSidebarCalendarDate(dateKey)}.`, { saveToNotifications: false });
+  };
+
+  const pasteSidebarDaily = async (dateKey: string) => {
+    if (!currentUser || !copiedSidebarDaily) {
+      showToast('error', 'Copy a Trooper Daily before pasting.', { saveToNotifications: false });
+      return;
+    }
+
+    await saveSidebarDailyPayload(dateKey, copiedSidebarDaily, 'Pasted daily');
+  };
+
+  const saveSidebarDailyPayload = async (dateKey: string, daily: CalendarEntryPayload, successLabel: string) => {
     if (!currentUser) {
-      setSidebarReminders([]);
-      setIsSidebarRemindersLoading(false);
       return;
     }
 
-    if (showLoading) {
-      setIsSidebarRemindersLoading(true);
-    }
-
-    try {
-      const response = await reminderService.getAll();
-      setSidebarReminders(response.data);
-    } catch (error) {
-      console.error('Failed to load reminders:', error);
-      showToast('error', getErrorMessage(error, 'Failed to load reminders.'), { saveToNotifications: false });
-    } finally {
-      setIsSidebarRemindersLoading(false);
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
-    void loadSidebarReminders(true);
-
-    const handleReminderUpdate = () => {
-      void loadSidebarReminders(false);
+    const existingEntry = sidebarCalendarEntries.find((entry) => getEntryDateKey(entry) === dateKey);
+    const payload = {
+      ...daily,
+      date: dateKey,
+      submissionStatus: 'Draft' as const,
+      details: { ...(daily.details || {}) },
+      accountId: currentUser.id,
+      actorId: currentUser.id,
+      actorName: currentUser.displayName || currentUser.email,
     };
 
-    window.addEventListener('shield:reminder-updated', handleReminderUpdate);
-    const reminderCheckTimer = window.setInterval(() => {
-      void loadSidebarReminders(false);
-    }, 60 * 1000);
-
-    return () => {
-      window.removeEventListener('shield:reminder-updated', handleReminderUpdate);
-      window.clearInterval(reminderCheckTimer);
-    };
-  }, [loadSidebarReminders]);
-
-  const toggleSidebarReminder = async (id: string) => {
-    const reminder = sidebarReminders.find((item) => item.id === id);
-    if (!reminder) {
-      return;
-    }
-
     try {
-      const response = await reminderService.update(id, { completed: !reminder.completedAt });
-      setSidebarReminders((currentReminders) => currentReminders.map((item) => (item.id === id ? response.data : item)));
+      const response = existingEntry
+        ? await calendarService.update(existingEntry.id, payload)
+        : await calendarService.create(payload);
+      setSidebarCalendarEntries((currentEntries) => {
+        const withoutExisting = currentEntries.filter((entry) => entry.id !== response.data.id && getEntryDateKey(entry) !== dateKey);
+        return [...withoutExisting, response.data];
+      });
+      window.dispatchEvent(new Event('shield:calendar-updated'));
+      showToast('success', `${successLabel} to ${formatSidebarCalendarDate(dateKey)}.`, { saveToNotifications: false });
+      openCalendarModal(dateKey);
     } catch (error) {
-      console.error('Failed to update reminder:', error);
-      showToast('error', getErrorMessage(error, 'Failed to update reminder.'), { saveToNotifications: false });
+      console.error('Failed to paste daily:', error);
+      showToast('error', getErrorMessage(error, 'Failed to save Trooper Daily.'), { saveToNotifications: false });
     }
   };
 
-  const deleteSidebarReminder = async (id: string) => {
+  const copyPreviousSidebarDaily = async (dateKey: string) => {
+    const previousEntry = sidebarCalendarEntries
+      .filter((entry) => getEntryDateKey(entry) < dateKey)
+      .sort((firstEntry, secondEntry) => getEntryDateKey(secondEntry).localeCompare(getEntryDateKey(firstEntry)))[0];
+
+    if (!previousEntry) {
+      showToast('error', 'No previous Trooper Daily entry found to copy.', { saveToNotifications: false });
+      return;
+    }
+
+    await saveSidebarDailyPayload(dateKey, createSidebarDailyPayload(previousEntry, dateKey), 'Copied previous daily');
+  };
+
+  const addSidebarReminder = async (dateKey: string) => {
+    if (!currentUser) {
+      return;
+    }
+
+    const title = window.prompt(`Reminder for ${formatSidebarCalendarDate(dateKey)}`, 'Follow up');
+    if (!title?.trim()) {
+      return;
+    }
+
     try {
-      await reminderService.delete(id);
-      setSidebarReminders((currentReminders) => currentReminders.filter((reminder) => reminder.id !== id));
+      await reminderService.create(title.trim(), dateKey);
+      window.dispatchEvent(new Event('shield:reminder-updated'));
+      showToast('success', `Reminder added for ${formatSidebarCalendarDate(dateKey)}.`, { saveToNotifications: false });
     } catch (error) {
-      console.error('Failed to delete reminder:', error);
-      showToast('error', getErrorMessage(error, 'Failed to delete reminder.'), { saveToNotifications: false });
+      console.error('Failed to add reminder:', error);
+      showToast('error', getErrorMessage(error, 'Failed to add reminder.'), { saveToNotifications: false });
     }
   };
 
@@ -5555,21 +5615,17 @@ function App() {
             </nav>
 
             <div className={`shrink-0 border-t border-white/10 pt-2 ${isSidebarCollapsed ? 'px-3' : 'px-4'}`}>
-              <div data-onboarding-target="sidebar-reminders">
-                <SidebarRemindersWidget
-                  compact={isSidebarCollapsed}
-                  reminders={sidebarReminders}
-                  isLoading={isSidebarRemindersLoading}
-                  onToggle={toggleSidebarReminder}
-                  onDelete={deleteSidebarReminder}
-                />
-              </div>
               {showCalendar && (
                 <div data-onboarding-target="sidebar-calendar">
                   <SidebarCalendarWidget
                     compact={isSidebarCollapsed}
                     entries={sidebarCalendarEntries}
-                    onOpenCalendar={toggleCalendarModal}
+                    onOpenCalendar={openCalendarModal}
+                    copiedDaily={copiedSidebarDaily}
+                    onCopyDaily={copySidebarDaily}
+                    onPasteDaily={(dateKey) => void pasteSidebarDaily(dateKey)}
+                    onCopyPreviousDaily={copyPreviousSidebarDaily}
+                    onAddReminder={(dateKey) => void addSidebarReminder(dateKey)}
                   />
                 </div>
               )}
