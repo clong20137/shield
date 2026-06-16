@@ -1034,6 +1034,18 @@ function formatSidebarCalendarDate(value: string): string {
   return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+function getSidebarCalendarDays(monthDate: Date) {
+  const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const startDate = new Date(firstDay);
+  startDate.setDate(firstDay.getDate() - firstDay.getDay());
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + index);
+    return date;
+  });
+}
+
 function SidebarCalendarWidget({
   compact,
   entries,
@@ -1046,13 +1058,23 @@ function SidebarCalendarWidget({
   onOpenCalendar: () => void;
 }) {
   const todayKey = getLocalDateKey();
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const calendarDays = useMemo(() => getSidebarCalendarDays(visibleMonth), [visibleMonth]);
+  const entriesByDate = useMemo(() => entries.reduce<Record<string, CalendarEntry[]>>((groups, entry) => {
+    const dateKey = getEntryDateKey(entry);
+    groups[dateKey] = [...(groups[dateKey] || []), entry];
+    return groups;
+  }, {}), [entries]);
+  const visibleMonthLabel = visibleMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const todayEntryCount = entriesByDate[todayKey]?.length || 0;
   const upcomingEntries = entries
     .filter((entry) => getEntryDateKey(entry) >= todayKey)
     .sort((a, b) => getEntryDateKey(a).localeCompare(getEntryDateKey(b)))
-    .slice(0, 2);
-  const todayEntryCount = entries.filter((entry) => getEntryDateKey(entry) === todayKey).length;
-  const currentDay = new Date().toLocaleDateString(undefined, { day: '2-digit' });
-  const currentMonth = new Date().toLocaleDateString(undefined, { month: 'short' });
+    .slice(0, 1);
+
+  const changeMonth = (offset: number) => {
+    setVisibleMonth((currentMonth) => new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1));
+  };
 
   if (compact) {
     return (
@@ -1069,39 +1091,72 @@ function SidebarCalendarWidget({
   }
 
   return (
-    <button
-      type="button"
-      onClick={onOpenCalendar}
-      className="mb-2 w-full rounded-lg border border-white/10 bg-white/10 p-2.5 text-left text-white transition hover:bg-white/15"
-      aria-label="Open calendar"
-    >
-      <div className="mb-2 flex items-center gap-3">
-        <div className="w-11 shrink-0 overflow-hidden rounded bg-white text-center text-primary-500 shadow">
-          <div className="bg-danger px-1 py-0.5 text-[10px] font-bold uppercase text-white">{currentMonth}</div>
-          <div className="py-0.5 text-lg font-black leading-none">{currentDay}</div>
-        </div>
+    <div className="mb-2 rounded-lg border border-white/10 bg-white/10 p-2.5 text-white">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-100">Calendar</p>
-          <p className="truncate text-sm font-bold">
-            {isLoading ? 'Loading entries' : todayEntryCount > 0 ? `${todayEntryCount} today` : 'No entries today'}
-          </p>
+          <p className="truncate text-sm font-bold">{visibleMonthLabel}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <button type="button" onClick={() => changeMonth(-1)} className="flex h-7 w-7 items-center justify-center rounded bg-black/15 text-blue-100 hover:bg-white/15 hover:text-white" aria-label="Previous month" title="Previous Month">
+            <ChevronLeft size={15} />
+          </button>
+          <button type="button" onClick={() => setVisibleMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1))} className="flex h-7 w-7 items-center justify-center rounded bg-black/15 text-xs font-black text-blue-100 hover:bg-white/15 hover:text-white" aria-label="Current month" title="Current Month">
+            {new Date().toLocaleDateString(undefined, { day: 'numeric' })}
+          </button>
+          <button type="button" onClick={() => changeMonth(1)} className="flex h-7 w-7 items-center justify-center rounded bg-black/15 text-blue-100 hover:bg-white/15 hover:text-white" aria-label="Next month" title="Next Month">
+            <ChevronRight size={15} />
+          </button>
         </div>
       </div>
-      <div className="space-y-1">
-        {upcomingEntries.length > 0 ? (
-          upcomingEntries.map((entry) => (
-            <div key={entry.id} className="min-w-0 rounded bg-black/15 px-2 py-1">
-              <p className="truncate text-xs font-bold text-white">{formatSidebarCalendarDate(entry.date)} - {entry.category}</p>
-              <p className="truncate text-[11px] font-semibold text-blue-100">{entry.dutyHours || entry.specialStatus || entry.districtWorked || 'Calendar entry'}</p>
-            </div>
-          ))
-        ) : (
-          <p className="rounded bg-black/15 px-2 py-2 text-xs font-semibold text-blue-100">
-            {isLoading ? 'Checking calendar...' : 'No upcoming entries'}
-          </p>
-        )}
+
+      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black uppercase text-blue-100">
+        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((dayLabel, index) => (
+          <span key={`${dayLabel}-${index}`}>{dayLabel}</span>
+        ))}
       </div>
-    </button>
+      <div className="mt-1 grid grid-cols-7 gap-1">
+        {calendarDays.map((date) => {
+          const dateKey = getLocalDateKey(date);
+          const dayEntries = entriesByDate[dateKey] || [];
+          const isCurrentMonth = date.getMonth() === visibleMonth.getMonth();
+          const isToday = dateKey === todayKey;
+
+          return (
+            <button
+              key={dateKey}
+              type="button"
+              onClick={onOpenCalendar}
+              className={`relative flex aspect-square min-h-7 items-center justify-center rounded text-xs font-bold transition ${
+                isToday
+                  ? 'bg-white text-primary-500 shadow'
+                  : isCurrentMonth
+                    ? 'bg-black/15 text-white hover:bg-white/15'
+                    : 'bg-black/5 text-blue-100/45 hover:bg-white/10'
+              }`}
+              aria-label={`Open calendar for ${date.toLocaleDateString()}`}
+              title={dayEntries.length > 0 ? `${dayEntries.length} calendar ${dayEntries.length === 1 ? 'entry' : 'entries'}` : 'Open Calendar'}
+            >
+              {date.getDate()}
+              {dayEntries.length > 0 && (
+                <span className={`absolute bottom-0.5 h-1.5 min-w-1.5 rounded-full ${isToday ? 'bg-danger' : 'bg-accent'}`}>
+                  {dayEntries.length > 1 && <span className="sr-only">{dayEntries.length} entries</span>}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <button type="button" onClick={onOpenCalendar} className="mt-2 w-full rounded bg-black/15 px-2 py-2 text-left transition hover:bg-white/15" aria-label="Open calendar">
+        <span className="block truncate text-xs font-bold text-white">
+          {isLoading ? 'Loading entries' : todayEntryCount > 0 ? `${todayEntryCount} today` : 'No entries today'}
+        </span>
+        <span className="mt-0.5 block truncate text-[11px] font-semibold text-blue-100">
+          {upcomingEntries[0] ? `${formatSidebarCalendarDate(upcomingEntries[0].date)} - ${upcomingEntries[0].category}` : isLoading ? 'Checking calendar...' : 'No upcoming entries'}
+        </span>
+      </button>
+    </div>
   );
 }
 
