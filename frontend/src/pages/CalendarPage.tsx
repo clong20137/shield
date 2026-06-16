@@ -1714,8 +1714,8 @@ function CalendarPage({
             </div>
 
             <form ref={dailyFormRef} onSubmit={(event) => saveEntry(event, 'Draft')} onKeyDown={handleDailyKeyDown} className="space-y-3">
-              <div className="grid min-h-[34rem] grid-cols-1 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 md:col-span-2 lg:grid-cols-[17.25rem_minmax(0,1fr)]">
-                <aside className="border-b border-gray-200 bg-gray-50 p-2.5 dark:border-gray-800 dark:bg-gray-900 lg:border-b-0 lg:border-r">
+              <div className="grid min-h-[34rem] grid-cols-1 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 md:col-span-2 md:grid-cols-[19.5rem_minmax(0,1fr)] xl:grid-cols-[20.5rem_minmax(0,1fr)]">
+                <aside className="border-b border-gray-200 bg-gray-50 p-2.5 dark:border-gray-800 dark:bg-gray-900 md:border-b-0 md:border-r">
                   <div className="mb-2 flex min-h-[7.25rem] flex-col justify-center rounded-md border border-accent/30 bg-accent/10 px-3 py-3">
                     <p className="text-sm font-black uppercase tracking-[0.14em] text-accent">Trooper Daily</p>
                     <p className="mt-1 truncate text-base font-black text-gray-800 dark:text-gray-100">{getReadableDate(selectedDate)}</p>
@@ -1731,7 +1731,7 @@ function CalendarPage({
                       }
                       selectDailyPanel(panel, true);
                     }}
-                    className="mb-2 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-bold dark:border-gray-700 dark:bg-gray-950 lg:hidden"
+                    className="mb-2 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-bold dark:border-gray-700 dark:bg-gray-950 md:hidden"
                     aria-label="Trooper Daily section"
                   >
                     {dailyPanelOptions.map((panel) => (
@@ -1740,7 +1740,7 @@ function CalendarPage({
                       </option>
                     ))}
                   </select>
-                  <nav className="hidden gap-1 lg:grid" aria-label="Trooper Daily input sections">
+                  <nav className="hidden gap-1 md:grid" aria-label="Trooper Daily input sections">
                     {dailyPanelOptions.map((panel) => {
                       const panelSection = trooperDailySections.find((section) => section.title === panel);
                       const isHidden = Boolean(panelSection && hiddenDailySections.includes(panelSection.title));
@@ -1769,8 +1769,9 @@ function CalendarPage({
                               }
                               setActiveDailyPanel(panel);
                             }}
-                            className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded px-2.5 py-2 text-left text-sm font-bold leading-tight"
+                            className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded px-2.5 py-2 text-left text-[0.95rem] font-bold leading-tight"
                             aria-current={isActive ? 'step' : undefined}
+                            title={panel}
                           >
                             <span className="min-w-0 truncate">{panel}</span>
                             {isComplete ? (
