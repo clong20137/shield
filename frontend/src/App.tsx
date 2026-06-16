@@ -1396,14 +1396,54 @@ function SidebarCalendarWidget({
     }
 
     const closeContextMenu = () => setContextMenu(null);
+    const handleContextMenuKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      const consume = () => {
+        event.preventDefault();
+        event.stopPropagation();
+        setContextMenu(null);
+      };
+
+      if (key === 'enter' || key === 'o') {
+        consume();
+        onOpenCalendar(contextMenu.dateKey);
+        return;
+      }
+
+      if (key === 'c' && contextMenu.entries[0]) {
+        consume();
+        onCopyDaily(contextMenu.dateKey);
+        return;
+      }
+
+      if (key === 'v' && copiedDaily) {
+        consume();
+        onPasteDaily(contextMenu.dateKey);
+        return;
+      }
+
+      if (key === 'p') {
+        consume();
+        onCopyPreviousDaily(contextMenu.dateKey);
+        return;
+      }
+
+      if (key === 'r') {
+        consume();
+        onAddReminder(contextMenu.dateKey);
+      }
+    };
+
     window.addEventListener('click', closeContextMenu);
     window.addEventListener('scroll', closeContextMenu, true);
+    window.addEventListener('keydown', handleContextMenuKeyDown);
 
     return () => {
       window.removeEventListener('click', closeContextMenu);
       window.removeEventListener('scroll', closeContextMenu, true);
+      window.removeEventListener('keydown', handleContextMenuKeyDown);
     };
-  }, [contextMenu]);
+  }, [contextMenu, copiedDaily, onAddReminder, onCopyDaily, onCopyPreviousDaily, onOpenCalendar, onPasteDaily]);
 
   if (compact) {
     return (
@@ -1535,7 +1575,8 @@ function SidebarCalendarWidget({
             }}
             className="flex w-full items-center gap-2 rounded px-3 py-2 text-left font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
           >
-            {contextMenu.entries[0] ? 'Open Daily' : 'Create Daily'}
+            <span>{contextMenu.entries[0] ? 'Open Daily' : 'Create Daily'}</span>
+            <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">Enter</span>
           </button>
           <button
             type="button"
@@ -1546,7 +1587,8 @@ function SidebarCalendarWidget({
             disabled={!contextMenu.entries[0]}
             className="flex w-full items-center gap-2 rounded px-3 py-2 text-left font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-45 dark:text-gray-200 dark:hover:bg-gray-800"
           >
-            Copy Daily
+            <span>Copy Daily</span>
+            <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">Ctrl+C</span>
           </button>
           <button
             type="button"
@@ -1557,7 +1599,8 @@ function SidebarCalendarWidget({
             disabled={!copiedDaily}
             className="flex w-full items-center gap-2 rounded px-3 py-2 text-left font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-45 dark:text-gray-200 dark:hover:bg-gray-800"
           >
-            Paste Daily
+            <span>Paste Daily</span>
+            <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">Ctrl+V</span>
           </button>
           <button
             type="button"
@@ -1567,7 +1610,8 @@ function SidebarCalendarWidget({
             }}
             className="flex w-full items-center gap-2 rounded px-3 py-2 text-left font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
           >
-            Copy Previous Daily
+            <span>Copy Previous Daily</span>
+            <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">P</span>
           </button>
           <button
             type="button"
@@ -1577,7 +1621,8 @@ function SidebarCalendarWidget({
             }}
             className="flex w-full items-center gap-2 border-t border-gray-100 px-3 py-2 text-left font-semibold text-primary-500 hover:bg-gray-50 dark:border-gray-800 dark:text-blue-100 dark:hover:bg-gray-800"
           >
-            Add Reminder
+            <span>Add Reminder</span>
+            <span className="ml-auto text-xs font-black text-blue-200">R</span>
           </button>
         </div>
       )}

@@ -229,6 +229,29 @@ const createEntryFormFromEntry = (entry: CalendarEntry): CalendarEntryForm => ({
   details: entry.details || {},
 });
 
+const createOptimisticEntryFromForm = (form: CalendarEntryForm, currentUser: AuthAccount, existingEntry?: CalendarEntry): CalendarEntry => {
+  const timestamp = new Date().toISOString();
+  return {
+    id: existingEntry?.id || `local-draft-${currentUser.id}-${form.date}`,
+    ownerAccountId: existingEntry?.ownerAccountId || currentUser.id,
+    category: 'Trooper Daily',
+    date: form.date,
+    dutyHours: form.dutyHours || '0',
+    districtWorked: form.districtWorked,
+    specialStatus: form.specialStatus,
+    color: form.color,
+    details: { ...(form.details || {}) },
+    submissionStatus: form.submissionStatus || 'Draft',
+    reviewStatus: existingEntry?.reviewStatus || 'Pending',
+    reviewNotes: existingEntry?.reviewNotes || '',
+    reviewedBy: existingEntry?.reviewedBy || null,
+    reviewedByName: existingEntry?.reviewedByName || null,
+    reviewedAt: existingEntry?.reviewedAt || null,
+    createdAt: existingEntry?.createdAt || timestamp,
+    updatedAt: timestamp,
+  };
+};
+
 const hasMeaningfulTrooperDailyContent = (form: CalendarEntryForm, currentUser?: AuthAccount) => {
   const hasDetails = Object.values(form.details || {}).some((value) => String(value ?? '').trim() !== '');
 
@@ -892,6 +915,46 @@ function CalendarPage({
 
   useEffect(() => {
     if (!selectedDate || entryForm.date !== selectedDate) {
+      return;
+    }
+
+    setEntries((currentEntries) => {
+      const existingEntry = currentEntries.find((entry) => entry.date === entryForm.date);
+      const hasMeaningfulContent = hasMeaningfulTrooperDailyContent(entryForm, currentUser);
+
+      if (!hasMeaningfulContent) {
+        if (existingEntry?.id.startsWith('local-draft-')) {
+          return currentEntries.filter((entry) => entry.id !== existingEntry.id);
+        }
+
+        return currentEntries;
+      }
+
+      const optimisticEntry = createOptimisticEntryFromForm(entryForm, currentUser, existingEntry);
+      const nextEntries = [
+        optimisticEntry,
+        ...currentEntries.filter((entry) => entry.date !== entryForm.date),
+      ];
+
+      if (
+        existingEntry &&
+        existingEntry.id === optimisticEntry.id &&
+        existingEntry.dutyHours === optimisticEntry.dutyHours &&
+        existingEntry.districtWorked === optimisticEntry.districtWorked &&
+        existingEntry.specialStatus === optimisticEntry.specialStatus &&
+        existingEntry.color === optimisticEntry.color &&
+        existingEntry.submissionStatus === optimisticEntry.submissionStatus &&
+        JSON.stringify(existingEntry.details || {}) === JSON.stringify(optimisticEntry.details || {})
+      ) {
+        return currentEntries;
+      }
+
+      return nextEntries;
+    });
+  }, [currentUser, entryForm, selectedDate]);
+
+  useEffect(() => {
+    if (!selectedDate || entryForm.date !== selectedDate) {
       return undefined;
     }
 
@@ -934,7 +997,7 @@ function CalendarPage({
               return currentEntries.map((entry) => (entry.id === response.data.id ? response.data : entry));
             }
 
-            return [response.data, ...currentEntries];
+            return [response.data, ...currentEntries.filter((entry) => entry.date !== response.data.date)];
           });
           setEditingEntryId(response.data.id);
           setDailySaveStatus('saved');
@@ -1165,7 +1228,7 @@ function CalendarPage({
         ...actor,
       };
 
-      const existingEntryForDate = entries.find((entry) => entry.date === entryForm.date);
+      const existingEntryForDate = entries.find((entry) => entry.date === entryForm.date && !entry.id.startsWith('local-draft-'));
       const targetEntryId = editingEntryId || existingEntryForDate?.id || null;
 
       if (targetEntryId) {
@@ -1180,7 +1243,7 @@ function CalendarPage({
         setEntryForm(createEntryFormFromEntry(response.data));
       } else {
         const response = await calendarService.create(payload);
-        setEntries((currentEntries) => [response.data, ...currentEntries]);
+        setEntries((currentEntries) => [response.data, ...currentEntries.filter((entry) => entry.date !== response.data.date)]);
         removeTrooperDailyDraft(currentUser.id, response.data.date);
         skipNextDailyDraftWriteRef.current = true;
         setSelectedDate(response.data.date);
@@ -1479,6 +1542,54 @@ function CalendarPage({
     setIsDutyHoursManual(true);
     lastAutoDutyHoursRef.current = '';
   };
+
+  useEffect(() => {
+    if (!dailyStripContextMenu) {
+      return undefined;
+    }
+
+    const handleContextMenuKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      const consume = () => {
+        event.preventDefault();
+        event.stopPropagation();
+        setDailyStripContextMenu(null);
+      };
+
+      if (key === 'enter' || key === 'o') {
+        consume();
+        openDay(dailyStripContextMenu.dateKey);
+        return;
+      }
+
+      if (key === 'c' && (dailyStripContextMenu.entry || selectedDate === dailyStripContextMenu.dateKey)) {
+        consume();
+        copyDailyToClipboard(dailyStripContextMenu.dateKey, dailyStripContextMenu.entry);
+        return;
+      }
+
+      if (key === 'v' && copiedDailyForm) {
+        consume();
+        pasteCopiedDailyToDate(dailyStripContextMenu.dateKey);
+        return;
+      }
+
+      if (key === 'p') {
+        consume();
+        copyPreviousDailyToDate(dailyStripContextMenu.dateKey);
+        return;
+      }
+
+      if ((key === 'delete' || key === 'backspace') && dailyStripContextMenu.entry) {
+        consume();
+        setEntryPendingDelete(dailyStripContextMenu.entry);
+      }
+    };
+
+    window.addEventListener('keydown', handleContextMenuKeyDown);
+
+    return () => window.removeEventListener('keydown', handleContextMenuKeyDown);
+  }, [copiedDailyForm, currentUser, dailyStripContextMenu, editingEntryId, entries, entryForm, selectedDate]);
 
   useEffect(() => {
     const handleDailyClipboardShortcut = (event: KeyboardEvent) => {
@@ -2500,7 +2611,8 @@ function CalendarPage({
             }}
             className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
           >
-            {dailyStripContextMenu.entry ? 'Open Daily' : 'Create Daily'}
+            <span>{dailyStripContextMenu.entry ? 'Open Daily' : 'Create Daily'}</span>
+            <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">Enter</span>
           </button>
           <button
             type="button"
@@ -2511,7 +2623,8 @@ function CalendarPage({
             disabled={!dailyStripContextMenu.entry && selectedDate !== dailyStripContextMenu.dateKey}
             className="quick-launch-context-menu-item text-gray-700 disabled:cursor-not-allowed disabled:opacity-45 dark:text-gray-200"
           >
-            Copy Daily
+            <span>Copy Daily</span>
+            <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">Ctrl+C</span>
           </button>
           <button
             type="button"
@@ -2522,7 +2635,8 @@ function CalendarPage({
             disabled={!copiedDailyForm}
             className="quick-launch-context-menu-item text-gray-700 disabled:cursor-not-allowed disabled:opacity-45 dark:text-gray-200"
           >
-            Paste Daily
+            <span>Paste Daily</span>
+            <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">Ctrl+V</span>
           </button>
           <button
             type="button"
@@ -2532,7 +2646,8 @@ function CalendarPage({
             }}
             className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
           >
-            Copy Previous Daily
+            <span>Copy Previous Daily</span>
+            <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">P</span>
           </button>
           {dailyStripContextMenu.entry && (
             <button
@@ -2543,7 +2658,8 @@ function CalendarPage({
               }}
               className="quick-launch-context-menu-item quick-launch-context-menu-danger text-danger"
             >
-              Delete Daily
+              <span>Delete Daily</span>
+              <span className="ml-auto text-xs font-black text-red-300">Del</span>
             </button>
           )}
         </div>
