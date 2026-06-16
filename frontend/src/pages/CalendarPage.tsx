@@ -1965,7 +1965,7 @@ function CalendarPage({
                                   entry
                                     ? 'trooper-daily-strip-filled border-transparent text-white'
                                     : 'border-gray-300 bg-white text-gray-700 hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
-                                } ${isSelectedShortcutDay ? 'border-accent shadow-[inset_0_0_0_2px_rgba(156,134,92,0.95),0_8px_18px_rgba(15,23,42,0.18)]' : ''}`}
+                                } ${isSelectedShortcutDay ? 'trooper-daily-strip-selected border-accent' : ''}`}
                                 style={entry ? { backgroundColor: entry.color } : undefined}
                                 aria-label={`${entry ? 'Open' : 'Create'} daily report for ${dateKey}`}
                               title={`${entry ? 'Open' : 'Create'} ${dateKey}`}

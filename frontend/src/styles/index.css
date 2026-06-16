@@ -561,6 +561,16 @@
   }
 }
 
+@keyframes trooper-daily-strip-selected-pulse {
+  0%, 100% {
+    box-shadow: inset 0 0 0 2px rgba(156, 134, 92, 0.95), 0 0 0 0 rgba(156, 134, 92, 0.28), 0 8px 18px rgba(15, 23, 42, 0.18);
+  }
+
+  50% {
+    box-shadow: inset 0 0 0 2px rgba(156, 134, 92, 1), 0 0 0 5px rgba(156, 134, 92, 0.12), 0 10px 22px rgba(15, 23, 42, 0.22);
+  }
+}
+
 @layer base {
   * {
     -webkit-tap-highlight-color: transparent;
@@ -1538,6 +1548,10 @@
     overflow: visible;
     isolation: isolate;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -10px 18px rgba(15, 23, 42, 0.14);
+  }
+
+  .trooper-daily-strip-selected {
+    animation: trooper-daily-strip-selected-pulse 2.25s ease-in-out infinite;
   }
 
   .trooper-daily-strip-filled::before {
