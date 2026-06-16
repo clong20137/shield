@@ -1941,10 +1941,7 @@ function CalendarPage({
                     </div>
                   </div>
 
-                  <div className="grid items-center gap-2 border-b border-gray-200 bg-accent/5 p-2 dark:border-gray-800 2xl:grid-cols-[auto_minmax(12rem,18rem)_auto_minmax(10rem,1fr)_auto]">
-                    <div className="px-2">
-                      <p className="text-xs font-bold uppercase tracking-wide text-accent">Shortcuts</p>
-                    </div>
+                  <div className="grid items-center gap-2 border-b border-gray-200 bg-accent/5 p-2 dark:border-gray-800 2xl:grid-cols-[minmax(12rem,18rem)_auto_minmax(10rem,1fr)_auto]">
                     <select
                       value={selectedShortcutId}
                       onChange={(event) => {
