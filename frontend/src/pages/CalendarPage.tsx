@@ -228,6 +228,18 @@ const createEntryFormFromEntry = (entry: CalendarEntry): CalendarEntryForm => ({
   details: entry.details || {},
 });
 
+const hasMeaningfulTrooperDailyContent = (form: CalendarEntryForm, currentUser?: AuthAccount) => {
+  const hasDetails = Object.values(form.details || {}).some((value) => String(value ?? '').trim() !== '');
+
+  return Boolean(
+    form.dutyHours.trim() ||
+      hasDetails ||
+      form.districtWorked !== getDefaultDistrict(currentUser) ||
+      form.specialStatus !== specialStatusOptions[0] ||
+      form.color !== entryColors[0].value,
+  );
+};
+
 function getTrooperDailyDraftKey(accountId: string, date: string): string {
   return `${trooperDailyDraftStoragePrefix}:${accountId}:${date}`;
 }
@@ -736,7 +748,11 @@ function CalendarPage({
   const openDay = (dateKey: string) => {
     const [year, month, day] = dateKey.split('-').map(Number);
     const existingEntry = entries.find((entry) => entry.date === dateKey);
-    const localDraft = readTrooperDailyDraft(currentUser.id, dateKey);
+    let localDraft = readTrooperDailyDraft(currentUser.id, dateKey);
+    if (localDraft && !existingEntry && !hasMeaningfulTrooperDailyContent(localDraft.form, currentUser)) {
+      removeTrooperDailyDraft(currentUser.id, dateKey);
+      localDraft = null;
+    }
     const existingUpdatedAt = existingEntry?.updatedAt ? new Date(existingEntry.updatedAt).getTime() : 0;
     const shouldRestoreLocalDraft = Boolean(localDraft && localDraft.savedAt > existingUpdatedAt);
     const nextForm = shouldRestoreLocalDraft && localDraft
@@ -806,6 +822,12 @@ function CalendarPage({
       return undefined;
     }
 
+    if (!editingEntryId && !hasMeaningfulTrooperDailyContent(entryForm, currentUser)) {
+      setDailySaveStatus('idle');
+      setDailySaveStatusAt(null);
+      return undefined;
+    }
+
     if (skipNextDailyDraftWriteRef.current) {
       skipNextDailyDraftWriteRef.current = false;
       return undefined;
@@ -824,6 +846,10 @@ function CalendarPage({
 
   useEffect(() => {
     if (!selectedDate || entryForm.date !== selectedDate) {
+      return undefined;
+    }
+
+    if (!editingEntryId && !hasMeaningfulTrooperDailyContent(entryForm, currentUser)) {
       return undefined;
     }
 
@@ -1880,8 +1906,8 @@ function CalendarPage({
                   <div className="border-b border-gray-200 bg-gray-50 px-2 py-2 dark:border-gray-800 dark:bg-gray-900">
                     <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
                       <p className="px-2 text-xs font-bold uppercase tracking-wide text-accent">Daily</p>
-                      <div className="overflow-x-auto overflow-y-hidden pb-1">
-                        <div className="grid min-w-[58rem] grid-cols-[repeat(31,minmax(0,1fr))] gap-1">
+                      <div className="overflow-x-auto overflow-y-hidden px-1 py-1.5">
+                        <div className="grid min-w-[58rem] grid-cols-[repeat(31,minmax(0,1fr))] gap-1.5">
                           {dailyShortcutDays.map(({ day, dateKey, entry }) => {
                             const isSelectedShortcutDay = selectedDate === dateKey;
                             return (
@@ -1897,11 +1923,11 @@ function CalendarPage({
                                 onFocus={(event) => showDailyStripTooltip(event.currentTarget, dateKey, entry)}
                                 onBlur={() => setDailyStripTooltip(null)}
                                 onContextMenu={(event) => openDailyStripContextMenu(event, dateKey, entry)}
-                                className={`relative flex h-7 min-w-0 items-center justify-center rounded border text-xs font-black transition duration-300 hover:-translate-y-0.5 hover:shadow-sm ${
+                                className={`relative flex h-8 min-w-0 items-center justify-center rounded-md border text-xs font-black transition duration-300 hover:-translate-y-0.5 hover:shadow-sm ${
                                   entry
                                     ? 'border-transparent text-white'
                                     : 'border-gray-300 bg-white text-gray-700 hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
-                                } ${isSelectedShortcutDay ? 'ring-2 ring-accent ring-offset-1 ring-offset-white dark:ring-offset-gray-950' : ''}`}
+                                } ${isSelectedShortcutDay ? 'border-accent shadow-[inset_0_0_0_2px_rgba(156,134,92,0.95),0_8px_18px_rgba(15,23,42,0.18)]' : ''}`}
                                 style={entry ? { backgroundColor: entry.color } : undefined}
                                 aria-label={`${entry ? 'Open' : 'Create'} daily report for ${dateKey}`}
                               title={`${entry ? 'Open' : 'Create'} ${dateKey}`}
