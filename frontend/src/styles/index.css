@@ -1595,6 +1595,23 @@
     transform: scale(1.08);
   }
 
+  .trooper-daily-strip-today-marker {
+    position: absolute;
+    bottom: 0.1875rem;
+    left: 50%;
+    width: 1.05rem;
+    height: 0.1875rem;
+    border-radius: 9999px;
+    background: rgb(156, 134, 92);
+    box-shadow: 0 0 0 1px rgba(156, 134, 92, 0.18), 0 0 9px rgba(156, 134, 92, 0.45);
+    transform: translateX(-50%);
+  }
+
+  .trooper-daily-strip-today-marker-on-fill {
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.22), 0 0 8px rgba(255, 255, 255, 0.42);
+  }
+
   .shield-loader {
     @apply relative flex h-28 w-28 items-center justify-center text-gray-300 dark:text-gray-800;
   }

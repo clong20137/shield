@@ -1970,15 +1970,15 @@ function CalendarPage({
                                 aria-label={`${entry ? 'Open' : 'Create'} daily report for ${dateKey}`}
                               title={`${entry ? 'Open' : 'Create'} ${dateKey}`}
                             >
+                              {day}
                               {isTodayShortcutDay && (
                                 <span
-                                  className={`absolute right-1 top-1 h-1.5 w-1.5 rounded-full ${
-                                    isSelectedShortcutDay || entry ? 'bg-white shadow-[0_0_0_1px_rgba(15,23,42,0.25)]' : 'bg-accent'
+                                  className={`trooper-daily-strip-today-marker ${
+                                    isSelectedShortcutDay || entry ? 'trooper-daily-strip-today-marker-on-fill' : ''
                                   }`}
                                   aria-hidden="true"
                                 />
                               )}
-                              {day}
                               {entry && (
                                 <span
                                   className={`trooper-daily-strip-filled-icon ${
