@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCopy, Eye, EyeOff, Pencil, Save, Sparkles, Trash2, X } from 'lucide-react';
-import { AuthAccount, CalendarEntry, CalendarShortcut, authService, calendarService, reminderService } from '../services/api';
+import { CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCopy, Eye, EyeOff, Pencil, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { AuthAccount, CalendarEntry, CalendarShortcut, authService, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
@@ -455,37 +455,34 @@ function isSectionComplete(details: Record<string, string> | undefined, section:
   return section.fields.every(([key]) => isDetailComplete(details, key));
 }
 
-function HourSummaryCard({
+function HourMetricPill({
   label,
   value,
-  tone,
   helper,
   isMatch = false,
 }: {
   label: string;
   value: string;
-  tone: 'primary' | 'accent';
   helper?: string;
   isMatch?: boolean;
 }) {
   return (
     <div
-      className={`rounded border p-3 transition-all duration-300 ${
+      className={`flex min-w-0 items-center justify-between gap-2 rounded border px-2.5 py-1.5 transition-all duration-300 ${
         isMatch
           ? 'trooper-daily-match border-green-300 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-100'
-          : 'border-transparent'
+          : 'border-gray-200 bg-white text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200'
       }`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <p className={`text-xs font-bold uppercase ${isMatch ? 'text-green-700 dark:text-green-200' : 'text-gray-500 dark:text-gray-400'}`}>{label}</p>
-        {isMatch && <CheckCircle2 className="trooper-daily-check text-green-600 dark:text-green-300" size={19} />}
+      <div className="min-w-0">
+        <p className={`truncate text-[10px] font-bold uppercase tracking-wide ${isMatch ? 'text-green-700 dark:text-green-200' : 'text-gray-500 dark:text-gray-400'}`}>{label}</p>
+        {helper && (
+          <p className={`truncate text-[10px] font-semibold ${isMatch ? 'text-green-700 dark:text-green-300' : 'text-gray-500 dark:text-gray-400'}`}>{helper}</p>
+        )}
       </div>
-      <p className={`mt-1 text-2xl font-bold ${isMatch ? 'text-green-700 dark:text-green-200' : tone === 'accent' ? 'text-accent' : 'text-primary-500 dark:text-blue-100'}`}>
+      <p className={`shrink-0 text-sm font-black ${isMatch ? 'text-green-700 dark:text-green-200' : 'text-primary-500 dark:text-blue-100'}`}>
         {value}
       </p>
-      {helper && (
-        <p className={`text-xs font-semibold ${isMatch ? 'text-green-700 dark:text-green-300' : 'text-gray-500'}`}>{helper}</p>
-      )}
     </div>
   );
 }
@@ -595,13 +592,11 @@ function calculateShiftHours(details: Record<string, string>): number {
 function CalendarPage({
   currentUser,
   onAccountUpdate,
-  onToast,
   useMilitaryTime = false,
   isFloatingApp = false,
 }: {
   currentUser: AuthAccount;
   onAccountUpdate?: (account: AuthAccount) => void;
-  onToast?: (type: 'success' | 'error' | 'info', message: string) => void;
   useMilitaryTime?: boolean;
   isFloatingApp?: boolean;
 }) {
@@ -631,11 +626,6 @@ function CalendarPage({
   const [isCalendarLoading, setIsCalendarLoading] = useState(true);
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [isDutyHoursManual, setIsDutyHoursManual] = useState(false);
-  const [isReminderFormOpen, setIsReminderFormOpen] = useState(false);
-  const [reminderTitle, setReminderTitle] = useState('');
-  const [reminderPriority, setReminderPriority] = useState<'Low' | 'Normal' | 'High' | 'Critical'>('Normal');
-  const [reminderNotes, setReminderNotes] = useState('');
-  const [isSavingReminder, setIsSavingReminder] = useState(false);
   const [dailyDraftSavedAt, setDailyDraftSavedAt] = useState<number | null>(null);
   const [backendDraftStatus, setBackendDraftStatus] = useState<BackendDraftStatus>('idle');
   const [backendDraftSavedAt, setBackendDraftSavedAt] = useState<number | null>(null);
@@ -746,10 +736,6 @@ function CalendarPage({
     setDailyDraftSavedAt(shouldRestoreLocalDraft && localDraft ? localDraft.savedAt : null);
     setBackendDraftStatus(existingEntry?.submissionStatus === 'Draft' && !shouldRestoreLocalDraft ? 'saved' : 'idle');
     setBackendDraftSavedAt(existingEntry?.submissionStatus === 'Draft' && existingEntry.updatedAt && !shouldRestoreLocalDraft ? new Date(existingEntry.updatedAt).getTime() : null);
-    setIsReminderFormOpen(false);
-    setReminderTitle('');
-    setReminderPriority('Normal');
-    setReminderNotes('');
   };
 
   useEffect(() => {
@@ -1273,33 +1259,6 @@ function CalendarPage({
     lastAutoDutyHoursRef.current = '';
   };
 
-  const createCalendarReminder = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!selectedDate || !reminderTitle.trim()) {
-      setCalendarError('Enter a reminder title.');
-      return;
-    }
-
-    setIsSavingReminder(true);
-    setCalendarError(null);
-    try {
-      await reminderService.create(reminderTitle.trim(), selectedDate, reminderPriority, reminderNotes.trim());
-      window.dispatchEvent(new CustomEvent('shield:reminder-updated'));
-      setReminderTitle('');
-      setReminderPriority('Normal');
-      setReminderNotes('');
-      setIsReminderFormOpen(false);
-      onToast?.('success', 'Reminder created.');
-    } catch (err) {
-      console.error('Failed to create reminder:', err);
-      const message = getApiErrorMessage(err, 'Failed to create reminder.');
-      setCalendarError(message);
-      onToast?.('error', message);
-    } finally {
-      setIsSavingReminder(false);
-    }
-  };
-
   const visibleEntries = entries.filter((entry) => {
     const matchesDistrict = !districtFilter || entry.districtWorked === districtFilter;
     const matchesStatus = !statusFilter || entry.specialStatus === statusFilter;
@@ -1362,6 +1321,12 @@ function CalendarPage({
     [],
   );
   const activeDailySection = visibleDailySections.find((section) => section.title === activeDailyPanel);
+  const hourMetrics = [
+    { label: 'Reported', value: reportedDutyHours, helper: '', isMatch: false },
+    { label: 'Shift', value: calculatedShiftHours, helper: getDifferenceLabel(reportedDutyHours, calculatedShiftHours), isMatch: shiftHoursMatch },
+    { label: 'Attendance', value: attendanceHours, helper: getDifferenceLabel(reportedDutyHours, attendanceHours), isMatch: attendanceHoursMatch },
+    { label: 'Duty Activity', value: dutyActivityHours, helper: getDifferenceLabel(reportedDutyHours, dutyActivityHours), isMatch: dutyActivityHoursMatch },
+  ];
   const activeHourGuidance = (() => {
     if (!activeDailySection || !hasReportedHours) {
       return null;
@@ -1628,81 +1593,40 @@ function CalendarPage({
       {selectedDate && (
         <div className={isFloatingApp ? 'absolute inset-0 z-20 flex min-h-0 bg-white dark:bg-gray-900' : 'min-h-0 flex-1 pt-14 lg:pt-16'}>
           <div className={isFloatingApp ? 'h-full min-h-0 w-full overflow-y-auto rounded-lg bg-white p-3 shadow-none dark:bg-gray-900 sm:p-4' : 'h-full min-h-0 overflow-y-auto rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5'}>
-            <div className="mb-5 flex flex-wrap items-start justify-between gap-3 sm:gap-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Trooper Daily</p>
-                <h2 className="mt-1">{getReadableDate(selectedDate)}</h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {editingEntryId ? 'Update this daily report.' : 'Fill out this daily report.'}
-                </p>
+            <div className="mb-5 flex items-start justify-between gap-3 sm:gap-4">
+              <div className="flex min-w-0 items-start gap-3">
+                {!isFloatingApp && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDate(null)}
+                    className="btn-secondary mt-0.5 shrink-0"
+                    aria-label="Back to calendar"
+                    title="Back to Calendar"
+                  >
+                    <ChevronLeft size={16} />
+                    <span>Back</span>
+                  </button>
+                )}
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Trooper Daily</p>
+                  <h2 className="mt-1 truncate">{getReadableDate(selectedDate)}</h2>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {editingEntryId ? 'Update this daily report.' : 'Fill out this daily report.'}
+                  </p>
+                </div>
               </div>
-              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsReminderFormOpen((value) => !value)}
-                  className="btn-secondary"
-                  aria-label="Create reminder"
-                  title="Create Reminder"
-                >
-                  <Bell size={16} />
-                  <span className="hidden sm:inline">Create Reminder</span>
-                </button>
+              {isFloatingApp && (
                 <button
                   type="button"
                   onClick={() => setSelectedDate(null)}
-                  className={isFloatingApp ? 'icon-close-button' : 'btn-secondary'}
-                  aria-label={isFloatingApp ? 'Close calendar day' : 'Back to calendar'}
-                  title={isFloatingApp ? 'Close' : 'Back to Calendar'}
+                  className="icon-close-button shrink-0"
+                  aria-label="Close calendar day"
+                  title="Close"
                 >
-                  {isFloatingApp ? <X size={20} /> : <ChevronLeft size={16} />}
-                  {!isFloatingApp && <span>Back</span>}
+                  <X size={20} />
                 </button>
-              </div>
+              )}
             </div>
-            {isReminderFormOpen && (
-              <form onSubmit={createCalendarReminder} className="mb-5 grid grid-cols-1 gap-2 rounded-lg border border-accent/30 bg-accent/5 p-3 sm:grid-cols-[minmax(0,1fr)_10rem_auto_auto]">
-                <input
-                  value={reminderTitle}
-                  onChange={(event) => setReminderTitle(event.target.value)}
-                  placeholder={`Reminder for ${getReadableDate(selectedDate)}`}
-                  maxLength={90}
-                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-                  autoFocus
-                />
-                <select
-                  value={reminderPriority}
-                  onChange={(event) => setReminderPriority(event.target.value as typeof reminderPriority)}
-                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-                  aria-label="Reminder priority"
-                >
-                  {['Low', 'Normal', 'High', 'Critical'].map((priority) => <option key={priority}>{priority}</option>)}
-                </select>
-                <button type="submit" className="btn-primary" disabled={isSavingReminder} aria-label="Save reminder" title="Save Reminder">
-                  <Save size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setReminderTitle('');
-                    setReminderPriority('Normal');
-                    setReminderNotes('');
-                    setIsReminderFormOpen(false);
-                  }}
-                  className="btn-secondary"
-                  aria-label="Cancel reminder"
-                  title="Cancel"
-                >
-                  <X size={16} />
-                </button>
-                <textarea
-                  value={reminderNotes}
-                  onChange={(event) => setReminderNotes(event.target.value)}
-                  placeholder="Notes"
-                  maxLength={1000}
-                  className="min-h-20 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 sm:col-span-4"
-                />
-              </form>
-            )}
 
             <form ref={dailyFormRef} onSubmit={(event) => saveEntry(event, 'Draft')} onKeyDown={handleDailyKeyDown} className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="grid items-center gap-2 rounded-lg border border-accent/30 bg-accent/5 p-2 md:col-span-2 lg:grid-cols-[auto_minmax(12rem,18rem)_auto_minmax(10rem,1fr)_auto]">
@@ -1784,6 +1708,22 @@ function CalendarPage({
                     <Trash2 size={16} />
                   </button>
                 </div>
+              </div>
+
+              <div className={`sticky top-0 z-20 grid grid-cols-2 gap-2 rounded-lg border p-2 shadow-[0_10px_24px_rgba(15,23,42,0.08)] backdrop-blur md:col-span-2 lg:grid-cols-4 ${
+                hasHourMismatch
+                  ? 'border-danger/30 bg-red-50/95 dark:bg-red-950/80'
+                  : 'border-accent/30 bg-white/95 dark:bg-gray-950/95'
+              }`}>
+                {hourMetrics.map((metric) => (
+                  <HourMetricPill
+                    key={metric.label}
+                    label={metric.label}
+                    value={`${formatHours(metric.value || 0)}h`}
+                    helper={metric.helper}
+                    isMatch={metric.isMatch}
+                  />
+                ))}
               </div>
 
               <div className="grid min-h-[34rem] grid-cols-1 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 md:col-span-2 lg:grid-cols-[15.75rem_minmax(0,1fr)]">
@@ -1955,19 +1895,11 @@ function CalendarPage({
                         </label>
                       </div>
 
-                      <div className={`grid grid-cols-1 gap-3 rounded-lg border p-4 md:grid-cols-4 ${
-                        hasHourMismatch ? 'border-danger/40 bg-red-50 dark:bg-red-950/30' : 'border-accent/30 bg-accent/5'
-                      }`}>
-                        <HourSummaryCard label="Reported" value={`${formatHours(reportedDutyHours || 0)} hrs`} tone="primary" />
-                        <HourSummaryCard label="Shift Time" value={`${formatHours(calculatedShiftHours)} hrs`} tone="accent" helper={getDifferenceLabel(reportedDutyHours, calculatedShiftHours)} isMatch={shiftHoursMatch} />
-                        <HourSummaryCard label="Attendance" value={`${formatHours(attendanceHours)} hrs`} tone="primary" helper={getDifferenceLabel(reportedDutyHours, attendanceHours)} isMatch={attendanceHoursMatch} />
-                        <HourSummaryCard label="Duty Activity" value={`${formatHours(dutyActivityHours)} hrs`} tone="primary" helper={getDifferenceLabel(reportedDutyHours, dutyActivityHours)} isMatch={dutyActivityHoursMatch} />
-                        {hasHourMismatch && (
-                          <p className="text-sm font-semibold text-danger md:col-span-4">
-                            Hours do not match the reported duty hours. Review shift times, attendance hours, and duty activity hours before submitting.
-                          </p>
-                        )}
-                      </div>
+                      {hasHourMismatch && (
+                        <p className="rounded-lg border border-danger/30 bg-red-50 px-3 py-2 text-sm font-semibold text-danger dark:bg-red-950/30">
+                          Hours do not match the reported duty hours. Review shift times, attendance hours, and duty activity hours before submitting.
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -2097,31 +2029,27 @@ function CalendarPage({
               </div>
 
               <div className="sticky bottom-0 z-20 flex flex-wrap items-center justify-end gap-2 rounded-lg border border-gray-200 bg-gray-50/95 p-3 shadow-[0_-14px_32px_rgba(15,23,42,0.08)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/95 dark:shadow-[0_-14px_32px_rgba(0,0,0,0.24)] md:col-span-2">
-                <span className="mr-auto text-sm font-semibold text-gray-500 dark:text-gray-400">
-                  Save keeps this as a draft. Submit sends the final report.
-                  <span className="ml-2 hidden text-xs font-bold text-gray-400 dark:text-gray-500 lg:inline">
-                    Ctrl+S save - Ctrl+Enter submit - Ctrl+Z undo - Ctrl+Y redo
-                  </span>
+                <span className="mr-auto flex flex-wrap items-center gap-2 text-sm font-semibold text-gray-500 dark:text-gray-400">
                   {backendDraftStatus === 'saving' && (
-                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 ring-1 ring-blue-100 dark:bg-blue-950/40 dark:text-blue-200 dark:ring-blue-900">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 ring-1 ring-blue-100 dark:bg-blue-950/40 dark:text-blue-200 dark:ring-blue-900">
                       <span className="h-2 w-2 animate-pulse rounded-full bg-blue-500" />
                       Saving to server
                     </span>
                   )}
                   {backendDraftStatus === 'saved' && backendDraftSavedAt && (
-                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-1 text-xs font-bold text-green-700 ring-1 ring-green-100 dark:bg-green-950/40 dark:text-green-200 dark:ring-green-900">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-1 text-xs font-bold text-green-700 ring-1 ring-green-100 dark:bg-green-950/40 dark:text-green-200 dark:ring-green-900">
                       <CheckCircle2 size={13} />
                       Saved to server {new Date(backendDraftSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                     </span>
                   )}
                   {backendDraftStatus === 'error' && dailyDraftSavedAt && (
-                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900">
                       <CheckCircle2 size={13} />
                       Local draft saved {new Date(dailyDraftSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                     </span>
                   )}
                   {backendDraftStatus === 'idle' && dailyDraftSavedAt && (
-                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900">
                       <CheckCircle2 size={13} />
                       Local draft saved {new Date(dailyDraftSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                     </span>
