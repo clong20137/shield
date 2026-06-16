@@ -621,6 +621,7 @@ function CalendarPage({
   const [activeDailyPanel, setActiveDailyPanel] = useState<string>('Administrative');
   const [hiddenDailySections, setHiddenDailySections] = useState<string[]>(currentUser.trooperDailyHiddenSections || []);
   const [shortcuts, setShortcuts] = useState<CalendarShortcut[]>([]);
+  const [selectedShortcutId, setSelectedShortcutId] = useState('');
   const [shortcutName, setShortcutName] = useState('');
   const [editingShortcutId, setEditingShortcutId] = useState<string | null>(null);
   const [isSavingShortcut, setIsSavingShortcut] = useState(false);
@@ -993,6 +994,7 @@ function CalendarPage({
   };
 
   const startEditingShortcut = (shortcut: CalendarShortcut) => {
+    setSelectedShortcutId(shortcut.id);
     setShortcutName(shortcut.name);
     setEditingShortcutId(shortcut.id);
     applyShortcut(shortcut);
@@ -1044,6 +1046,9 @@ function CalendarPage({
     try {
       await calendarService.deleteShortcut(shortcut.id);
       setShortcuts((items) => items.filter((item) => item.id !== shortcut.id));
+      if (selectedShortcutId === shortcut.id) {
+        setSelectedShortcutId('');
+      }
       if (editingShortcutId === shortcut.id) {
         resetShortcutEditor();
       }
@@ -1557,62 +1562,84 @@ function CalendarPage({
             )}
 
             <form ref={dailyFormRef} onSubmit={(event) => saveEntry(event, 'Draft')} onKeyDown={handleDailyKeyDown} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 md:col-span-2">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Daily Shortcuts</h3>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      Apply your saved autofill shortcuts, copy your last entry, or zero out blank count fields.
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={copyPreviousDaily} className="btn-secondary" aria-label="Copy previous daily" title="Copy Previous Daily">
-                      <ClipboardCopy size={16} />
-                    </button>
-                    <button type="button" onClick={fillBlankNumericDetailsWithZero} className="btn-secondary" aria-label="Fill blank numeric fields with zero" title="Fill Blanks With Zero">
-                      <Sparkles size={16} />
-                    </button>
-                  </div>
+              <div className="grid items-center gap-2 rounded-lg border border-accent/30 bg-accent/5 p-2 md:col-span-2 lg:grid-cols-[auto_minmax(12rem,18rem)_auto_minmax(10rem,1fr)_auto]">
+                <div className="px-2">
+                  <p className="text-xs font-bold uppercase tracking-wide text-accent">Shortcuts</p>
                 </div>
-                {shortcuts.length > 0 && (
-                  <div className="border-t border-accent/20 pt-3">
-                    <p className="mb-2 text-xs font-bold uppercase text-gray-500 dark:text-gray-400">My Shortcuts</p>
-                    <div className="flex flex-wrap gap-2">
-                      {shortcuts.map((shortcut) => (
-                        <span key={shortcut.id} className="inline-flex overflow-hidden rounded border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-950">
-                          <button
-                            type="button"
-                            onClick={() => applyShortcut(shortcut)}
-                            className="px-3 py-2 text-sm font-bold text-primary-500 hover:text-accent dark:text-blue-100"
-                          >
-                            {shortcut.name}
-                          </button>
-                          <button type="button" onClick={() => startEditingShortcut(shortcut)} className="border-l border-gray-200 px-2 text-primary-500 hover:bg-gray-50 dark:border-gray-800 dark:text-blue-100 dark:hover:bg-gray-900" aria-label={`Edit ${shortcut.name}`} title="Edit Shortcut">
-                            <Pencil size={14} />
-                          </button>
-                          <button type="button" onClick={() => deleteShortcut(shortcut)} className="btn-danger h-8 w-8 rounded-none p-0" aria-label={`Delete ${shortcut.name}`} title="Delete Shortcut">
-                            <Trash2 size={14} />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div className="mt-3 grid grid-cols-1 gap-2 border-t border-accent/20 pt-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                  <input
-                    value={shortcutName}
-                    onChange={(event) => setShortcutName(event.target.value)}
-                    placeholder="Shortcut name"
-                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-                  />
-                  <button type="button" onClick={saveShortcut} className="btn-primary" disabled={isSavingShortcut} aria-label={editingShortcutId ? 'Update shortcut from current daily form' : 'Save current daily form as shortcut'} title={editingShortcutId ? 'Update Shortcut' : 'Save Shortcut'}>
+                <select
+                  value={selectedShortcutId}
+                  onChange={(event) => {
+                    const shortcut = shortcuts.find((item) => item.id === event.target.value);
+                    setSelectedShortcutId(event.target.value);
+                    if (shortcut) {
+                      applyShortcut(shortcut);
+                    }
+                  }}
+                  className="h-10 rounded border border-gray-300 bg-white px-3 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
+                  aria-label="Apply saved Trooper Daily shortcut"
+                  disabled={shortcuts.length === 0}
+                >
+                  <option value="">{shortcuts.length > 0 ? 'Apply saved shortcut' : 'No saved shortcuts'}</option>
+                  {shortcuts.map((shortcut) => (
+                    <option key={shortcut.id} value={shortcut.id}>{shortcut.name}</option>
+                  ))}
+                </select>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={copyPreviousDaily} className="btn-secondary" aria-label="Copy previous daily" title="Copy Previous Daily">
+                    <ClipboardCopy size={16} />
+                  </button>
+                  <button type="button" onClick={fillBlankNumericDetailsWithZero} className="btn-secondary" aria-label="Fill blank numeric fields with zero" title="Fill Blanks With Zero">
+                    <Sparkles size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const shortcut = shortcuts.find((item) => item.id === selectedShortcutId);
+                      if (shortcut) {
+                        startEditingShortcut(shortcut);
+                      }
+                    }}
+                    className="btn-secondary"
+                    disabled={!selectedShortcutId}
+                    aria-label="Edit selected shortcut"
+                    title="Edit Selected Shortcut"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                </div>
+                <input
+                  value={shortcutName}
+                  onChange={(event) => setShortcutName(event.target.value)}
+                  placeholder={editingShortcutId ? 'Update shortcut name' : 'Save current form as...'}
+                  className="h-10 rounded border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-950"
+                  aria-label="Shortcut name"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={saveShortcut} className="btn-primary" disabled={isSavingShortcut || !shortcutName.trim()} aria-label={editingShortcutId ? 'Update shortcut from current daily form' : 'Save current daily form as shortcut'} title={editingShortcutId ? 'Update Shortcut' : 'Save Shortcut'}>
                     <Save size={16} />
                   </button>
                   {editingShortcutId && (
-                    <button type="button" onClick={resetShortcutEditor} className="btn-secondary" aria-label="Cancel shortcut edit" title="Cancel Shortcut Edit">
-                      <X size={16} />
-                    </button>
+                    <>
+                      <button type="button" onClick={resetShortcutEditor} className="btn-secondary" aria-label="Cancel shortcut edit" title="Cancel Shortcut Edit">
+                        <X size={16} />
+                      </button>
+                    </>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const shortcut = shortcuts.find((item) => item.id === (editingShortcutId || selectedShortcutId));
+                      if (shortcut) {
+                        void deleteShortcut(shortcut);
+                      }
+                    }}
+                    className="btn-danger"
+                    disabled={!editingShortcutId && !selectedShortcutId}
+                    aria-label="Delete selected shortcut"
+                    title="Delete Selected Shortcut"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
 
