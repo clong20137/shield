@@ -1643,13 +1643,13 @@ function CalendarPage({
                 </div>
               </div>
 
-              <div className="grid min-h-[34rem] grid-cols-1 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 md:col-span-2 lg:grid-cols-[16rem_minmax(0,1fr)]">
-                <aside className="border-b border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900 lg:border-b-0 lg:border-r">
-                  <div className="mb-3 rounded-md border border-accent/30 bg-accent/10 px-3 py-3">
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Trooper Daily</p>
-                    <p className="mt-1 text-sm font-semibold text-gray-800 dark:text-gray-100">{getReadableDate(selectedDate)}</p>
+              <div className="grid min-h-[34rem] grid-cols-1 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 md:col-span-2 lg:grid-cols-[14.5rem_minmax(0,1fr)]">
+                <aside className="border-b border-gray-200 bg-gray-50 p-2.5 dark:border-gray-800 dark:bg-gray-900 lg:border-b-0 lg:border-r">
+                  <div className="mb-2 rounded-md border border-accent/30 bg-accent/10 px-2.5 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-accent">Trooper Daily</p>
+                    <p className="mt-0.5 truncate text-xs font-semibold text-gray-800 dark:text-gray-100">{getReadableDate(selectedDate)}</p>
                   </div>
-                  <nav className="grid max-h-[26rem] gap-1 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-1" aria-label="Trooper Daily input sections">
+                  <nav className="grid gap-1 sm:grid-cols-2 lg:grid-cols-1" aria-label="Trooper Daily input sections">
                     {dailyPanelOptions.map((panel) => {
                       const panelSection = visibleDailySections.find((section) => section.title === panel);
                       const isComplete = panel === 'Administrative'
@@ -1664,9 +1664,9 @@ function CalendarPage({
                           key={panel}
                           type="button"
                           onClick={() => setActiveDailyPanel(panel)}
-                          className={`group flex items-center justify-between gap-3 rounded-md border px-3 py-2.5 text-left text-sm font-bold transition-all duration-500 ${
+                          className={`group flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs font-bold leading-tight transition-all duration-500 ${
                             isActive
-                              ? 'border-accent bg-white text-accent shadow-sm dark:bg-gray-950'
+                              ? 'trooper-daily-active-pulse border-accent bg-white text-accent shadow-sm dark:bg-gray-950'
                               : 'border-transparent text-gray-600 hover:border-gray-200 hover:bg-white hover:text-primary-500 dark:text-gray-300 dark:hover:border-gray-800 dark:hover:bg-gray-950 dark:hover:text-blue-100'
                           }`}
                           aria-current={isActive ? 'step' : undefined}
@@ -1682,12 +1682,12 @@ function CalendarPage({
                     })}
                   </nav>
                   {hiddenDailySections.length > 0 && (
-                    <div className="mt-4 rounded-md border border-dashed border-gray-300 bg-white p-3 dark:border-gray-700 dark:bg-gray-950">
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <span className="text-xs font-bold uppercase text-gray-400">Hidden</span>
-                        <Eye size={15} className="text-accent" />
+                    <div className="mt-2 rounded-md border border-dashed border-gray-300 bg-white p-2 dark:border-gray-700 dark:bg-gray-950">
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold uppercase text-gray-400">Hidden</span>
+                        <Eye size={13} className="text-accent" />
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1">
                         {trooperDailySections
                           .filter((section) => hiddenDailySections.includes(section.title))
                           .map((section) => (
@@ -1695,7 +1695,7 @@ function CalendarPage({
                               key={section.title}
                               type="button"
                               onClick={() => showDailySection(section.title)}
-                              className="rounded border border-gray-200 px-2 py-1 text-xs font-bold text-primary-500 transition hover:border-accent hover:text-accent dark:border-gray-800 dark:text-blue-100"
+                              className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-bold text-primary-500 transition hover:border-accent hover:text-accent dark:border-gray-800 dark:text-blue-100"
                               aria-label={`Show ${section.title}`}
                               title={`Show ${section.title}`}
                             >
