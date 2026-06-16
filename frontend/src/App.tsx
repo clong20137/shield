@@ -5525,7 +5525,7 @@ function App() {
                 className={`w-full overflow-hidden rounded bg-white/10 text-left transition hover:bg-white/15 ${isSidebarCollapsed ? 'p-1.5' : 'p-2.5'}`}
                 title="Open profile"
               >
-                <div className="flex justify-center">
+                <div className={isSidebarCollapsed ? 'flex justify-center' : 'flex items-center gap-3'}>
                   {currentUser?.profilePictureUrl ? (
                     <img
                       src={getAssetThumbnailUrl(currentUser.profilePictureUrl, 96)}
@@ -5536,6 +5536,12 @@ function App() {
                   ) : (
                     <div className={`${isSidebarCollapsed ? 'h-10 w-10 text-sm' : 'h-12 w-12 text-base'} flex shrink-0 items-center justify-center rounded-full border border-white bg-white font-bold text-primary-500 shadow`}>
                       {currentUser ? getInitials(currentUser.displayName, currentUser.email) : <UserCircle size={32} />}
+                    </div>
+                  )}
+                  {!isSidebarCollapsed && (
+                    <div className="min-w-0 text-white">
+                      <p className="truncate text-sm font-bold">{currentUser?.displayName}</p>
+                      <p className="truncate text-xs capitalize text-blue-100">{currentUser?.role || 'User'}</p>
                     </div>
                   )}
                 </div>
