@@ -1613,7 +1613,7 @@ function CalendarPage({
               )}
             </div>
 
-            <form ref={dailyFormRef} onSubmit={(event) => saveEntry(event, 'Draft')} onKeyDown={handleDailyKeyDown} className="pb-28">
+            <form ref={dailyFormRef} onSubmit={(event) => saveEntry(event, 'Draft')} onKeyDown={handleDailyKeyDown} className="space-y-3">
               <div className="grid min-h-[34rem] grid-cols-1 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 md:col-span-2 lg:grid-cols-[17.25rem_minmax(0,1fr)]">
                 <aside className="border-b border-gray-200 bg-gray-50 p-2.5 dark:border-gray-800 dark:bg-gray-900 lg:border-b-0 lg:border-r">
                   <div className="mb-2 flex min-h-[7.25rem] flex-col justify-center rounded-md border border-accent/30 bg-accent/10 px-3 py-3">
@@ -1684,6 +1684,36 @@ function CalendarPage({
                 </aside>
 
                 <div className="min-w-0 bg-white dark:bg-gray-950">
+                  <div className="border-b border-gray-200 bg-gray-50 px-2 py-2 dark:border-gray-800 dark:bg-gray-900">
+                    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
+                      <p className="px-2 text-xs font-bold uppercase tracking-wide text-accent">Daily</p>
+                      <div className="overflow-x-auto pb-1">
+                        <div className="grid min-w-[58rem] grid-cols-[repeat(31,minmax(0,1fr))] gap-1">
+                          {dailyShortcutDays.map(({ day, dateKey, entry }) => {
+                            const isSelectedShortcutDay = selectedDate === dateKey;
+                            return (
+                              <button
+                                key={dateKey}
+                                type="button"
+                                onClick={() => openDay(dateKey)}
+                                className={`flex h-7 min-w-0 items-center justify-center rounded border text-xs font-black transition duration-300 hover:-translate-y-0.5 hover:shadow-sm ${
+                                  entry
+                                    ? 'border-transparent text-white'
+                                    : 'border-gray-300 bg-white text-gray-700 hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
+                                } ${isSelectedShortcutDay ? 'ring-2 ring-accent ring-offset-1 ring-offset-white dark:ring-offset-gray-950' : ''}`}
+                                style={entry ? { backgroundColor: entry.color } : undefined}
+                                aria-label={`${entry ? 'Open' : 'Create'} daily report for ${dateKey}`}
+                                title={`${entry ? 'Open' : 'Create'} ${dateKey}`}
+                              >
+                                {day}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid items-center gap-2 border-b border-gray-200 bg-accent/5 p-2 dark:border-gray-800 lg:grid-cols-[auto_minmax(12rem,18rem)_auto_minmax(10rem,1fr)_auto]">
                     <div className="px-2">
                       <p className="text-xs font-bold uppercase tracking-wide text-accent">Shortcuts</p>
@@ -1760,34 +1790,6 @@ function CalendarPage({
                       >
                         <Trash2 size={16} />
                       </button>
-                    </div>
-                  </div>
-
-                  <div className="border-b border-gray-200 bg-gray-50 px-2 py-2 dark:border-gray-800 dark:bg-gray-900">
-                    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
-                      <p className="px-2 text-xs font-bold uppercase tracking-wide text-accent">Daily</p>
-                      <div className="grid grid-cols-[repeat(auto-fit,minmax(1.65rem,1fr))] gap-1">
-                        {dailyShortcutDays.map(({ day, dateKey, entry }) => {
-                          const isSelectedShortcutDay = selectedDate === dateKey;
-                          return (
-                            <button
-                              key={dateKey}
-                              type="button"
-                              onClick={() => openDay(dateKey)}
-                              className={`flex h-7 min-w-0 items-center justify-center rounded border text-xs font-black transition duration-300 hover:-translate-y-0.5 hover:shadow-sm ${
-                                entry
-                                  ? 'border-transparent text-white'
-                                  : 'border-gray-300 bg-white text-gray-700 hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
-                              } ${isSelectedShortcutDay ? 'ring-2 ring-accent ring-offset-1 ring-offset-white dark:ring-offset-gray-950' : ''}`}
-                              style={entry ? { backgroundColor: entry.color } : undefined}
-                              aria-label={`${entry ? 'Open' : 'Create'} daily report for ${dateKey}`}
-                              title={`${entry ? 'Open' : 'Create'} ${dateKey}`}
-                            >
-                              {day}
-                            </button>
-                          );
-                        })}
-                      </div>
                     </div>
                   </div>
 
@@ -2041,8 +2043,8 @@ function CalendarPage({
                 </div>
               </div>
 
-              <div className="pointer-events-none fixed bottom-32 right-6 z-[70] flex max-w-[calc(100vw-2rem)] justify-end max-sm:bottom-28 max-sm:left-4 max-sm:right-4">
-                <div className="pointer-events-auto ml-auto flex w-fit max-w-full flex-wrap items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-gray-800 dark:bg-gray-950/95">
+              <div className="flex justify-end">
+                <div className="flex w-fit max-w-full flex-wrap items-center justify-end gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-sm dark:border-gray-800 dark:bg-gray-950">
                   {editingEntry && (
                     <button type="button" onClick={() => setEntryPendingDelete(editingEntry)} className="btn-danger" aria-label="Delete daily report" title="Delete Report">
                       <Trash2 size={16} />
