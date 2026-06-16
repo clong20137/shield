@@ -777,6 +777,17 @@ function CalendarPage({
     setInvalidDailyField(null);
   };
 
+  const jumpDailyShortcutMonth = (direction: -1 | 1) => {
+    const sourceDateKey = selectedDate || formatDateKey(calendarFocusDate);
+    const [sourceYear, sourceMonth, sourceDay] = sourceDateKey.split('-').map(Number);
+    const targetMonthIndex = sourceMonth - 1 + direction;
+    const targetYear = new Date(sourceYear, targetMonthIndex, 1).getFullYear();
+    const targetMonth = new Date(sourceYear, targetMonthIndex, 1).getMonth() + 1;
+    const targetDaysInMonth = new Date(targetYear, targetMonth, 0).getDate();
+    const targetDay = Math.min(sourceDay, targetDaysInMonth);
+    openDay(`${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`);
+  };
+
   useEffect(() => {
     if (!selectedDate) {
       previousEntryFormRef.current = entryForm;
@@ -1458,6 +1469,7 @@ function CalendarPage({
   const selectedDateParts = selectedDate?.split('-').map(Number);
   const dailyShortcutYear = selectedDateParts?.[0] || calendarMonth.getFullYear();
   const dailyShortcutMonth = selectedDateParts?.[1] || calendarMonth.getMonth() + 1;
+  const dailyShortcutMonthLabel = getMonthLabel(new Date(dailyShortcutYear, dailyShortcutMonth - 1, 1));
   const dailyShortcutDaysInMonth = new Date(dailyShortcutYear, dailyShortcutMonth, 0).getDate();
   const dailyShortcutDays = Array.from({ length: dailyShortcutDaysInMonth }, (_, index) => {
     const day = index + 1;
@@ -1903,13 +1915,37 @@ function CalendarPage({
                 </aside>
 
                 <div className="min-w-0 bg-white dark:bg-gray-950">
-                  <div className="border-b border-gray-200 bg-gray-50 px-2 py-2 dark:border-gray-800 dark:bg-gray-900">
-                    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
+                  <div className="border-b border-gray-200 bg-gray-50 px-2 pb-2 pt-1 dark:border-gray-800 dark:bg-gray-900">
+                    <div className="mb-[-1px] ml-2 inline-flex items-center overflow-hidden rounded-t-md border border-b-0 border-accent/50 bg-white text-accent shadow-sm dark:bg-gray-950">
+                      <button
+                        type="button"
+                        onClick={() => jumpDailyShortcutMonth(-1)}
+                        className="flex h-8 w-8 items-center justify-center border-r border-accent/20 transition duration-300 hover:bg-accent/10"
+                        aria-label="Previous daily report month"
+                        title="Previous Month"
+                      >
+                        <ChevronLeft size={15} />
+                      </button>
+                      <span className="min-w-36 px-3 text-center text-xs font-black uppercase tracking-wide">
+                        {dailyShortcutMonthLabel}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => jumpDailyShortcutMonth(1)}
+                        className="flex h-8 w-8 items-center justify-center border-l border-accent/20 transition duration-300 hover:bg-accent/10"
+                        aria-label="Next daily report month"
+                        title="Next Month"
+                      >
+                        <ChevronRight size={15} />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-md border border-gray-200 bg-white/70 px-1 py-1 dark:border-gray-800 dark:bg-gray-950/50">
                       <p className="px-2 text-xs font-bold uppercase tracking-wide text-accent">Daily</p>
                       <div className="overflow-x-auto overflow-y-hidden px-1 py-1.5">
                         <div className="grid min-w-[58rem] grid-cols-[repeat(31,minmax(0,1fr))] gap-1.5">
                           {dailyShortcutDays.map(({ day, dateKey, entry }) => {
                             const isSelectedShortcutDay = selectedDate === dateKey;
+                            const isTodayShortcutDay = dateKey === todayKey;
                             return (
                               <button
                                 key={dateKey}
@@ -1932,6 +1968,14 @@ function CalendarPage({
                                 aria-label={`${entry ? 'Open' : 'Create'} daily report for ${dateKey}`}
                               title={`${entry ? 'Open' : 'Create'} ${dateKey}`}
                             >
+                              {isTodayShortcutDay && (
+                                <span
+                                  className={`absolute right-1 top-1 h-1.5 w-1.5 rounded-full ${
+                                    isSelectedShortcutDay || entry ? 'bg-white shadow-[0_0_0_1px_rgba(15,23,42,0.25)]' : 'bg-accent'
+                                  }`}
+                                  aria-hidden="true"
+                                />
+                              )}
                               {day}
                             </button>
                           );
