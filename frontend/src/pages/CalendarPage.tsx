@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCopy, Eye, EyeOff, Pencil, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { BadgeCheck, CalendarClock, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCopy, Clock3, DollarSign, Eye, EyeOff, FileText, Gavel, LucideIcon, MapPin, Palette, Pencil, Pill, Save, ShieldAlert, Sparkles, Timer, Trash2, Truck, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { AuthAccount, CalendarEntry, CalendarShortcut, authService, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
@@ -140,14 +140,18 @@ const trooperDailySections = [
     title: 'Drug Activity',
     fields: [
       ['heroinArrests', 'Heroin Arrests'],
+      ['heroinGramsFound', 'Heroin Found (grams)'],
       ['heroinDefendants', 'Heroin Defendants'],
       ['cocaineArrests', 'Cocaine Arrests'],
+      ['cocaineGramsFound', 'Cocaine Found (grams)'],
       ['cocaineDefendants', 'Cocaine Defendants'],
       ['marijuanaArrests', 'Marijuana Arrests'],
+      ['marijuanaGramsFound', 'Marijuana Found (grams)'],
       ['marijuanaDefendants', 'Marijuana Defendants'],
       ['totalPlantsSeized', 'Total Plants Seized'],
       ['totalWeightSeizedGrams', 'Total Weight Seized(in Grams)'],
       ['methamphetamineArrests', 'Methamphetamine Arrests'],
+      ['methamphetamineGramsFound', 'Methamphetamine Found (grams)'],
       ['methamphetamineDefendants', 'Methamphetamine Defendants'],
       ['prescriptionArrests', 'Prescription Arrests'],
       ['prescriptionDefendants', 'Prescription Defendants'],
@@ -171,6 +175,13 @@ const timeDetailFields = new Set<string>([
 ]);
 
 const mileageDetailFields = new Set<string>(['regularDutyMiles']);
+
+const drugArrestGramFields: Record<string, string> = {
+  heroinGramsFound: 'heroinArrests',
+  cocaineGramsFound: 'cocaineArrests',
+  marijuanaGramsFound: 'marijuanaArrests',
+  methamphetamineGramsFound: 'methamphetamineArrests',
+};
 
 const attendanceHourFields = [
   'regularDutyHours',
@@ -199,7 +210,8 @@ const numericDetailFields: string[] = trooperDailySections
 const wholeNumberDetailFields = new Set<string>(
   trooperDailySections
     .filter((section) => !['Regular Duty', 'Attendance Hours', 'Duty Hours'].includes(section.title))
-    .flatMap((section) => section.fields.map(([key]) => key)),
+    .flatMap((section) => section.fields.map(([key]) => key))
+    .filter((key) => !key.toLowerCase().includes('grams')),
 );
 
 const getDefaultDistrict = (currentUser?: AuthAccount) =>
@@ -505,8 +517,32 @@ function isDetailComplete(details: Record<string, string> | undefined, key: stri
   return Boolean(details?.[key]?.trim());
 }
 
+function shouldShowDailyDetailField(details: Record<string, string> | undefined, key: string): boolean {
+  const controllingArrestField = drugArrestGramFields[key];
+  if (!controllingArrestField) {
+    return true;
+  }
+
+  return Number(details?.[controllingArrestField] || 0) > 0;
+}
+
+function getDailyFieldIcon(key: string): LucideIcon {
+  if (key.includes('Time') || key.includes('Start') || key.includes('End')) return Clock3;
+  if (key.includes('Hours') || key.includes('Hrs') || key.includes('Leave') || key.includes('Duty')) return Timer;
+  if (key.includes('Miles')) return Truck;
+  if (key.includes('Court') || key.includes('Citations') || key.includes('Defendants') || key.includes('Arrests')) return Gavel;
+  if (key.includes('Grams') || key.includes('Weight') || key.includes('Plants') || key.includes('Seized')) return ShieldAlert;
+  if (key.includes('Drug') || key.includes('heroin') || key.includes('cocaine') || key.includes('marijuana') || key.includes('methamphetamine') || key.includes('prescription')) return Pill;
+  if (key.includes('Criminal') || key.includes('Felony') || key.includes('HTI')) return BadgeCheck;
+  if (key.includes('Truck') || key.includes('trucks') || key.includes('mcsap') || key.includes('port')) return Truck;
+  if (key.includes('amount') || key.includes('Usc')) return DollarSign;
+  if (key.includes('Services') || key.includes('Warnings') || key.includes('Interactions')) return FileText;
+  return Sparkles;
+}
+
 function isSectionComplete(details: Record<string, string> | undefined, section: typeof trooperDailySections[number]): boolean {
-  return section.fields.every(([key]) => isDetailComplete(details, key));
+  const visibleFields = section.fields.filter(([key]) => shouldShowDailyDetailField(details, key));
+  return visibleFields.every(([key]) => isDetailComplete(details, key));
 }
 
 function HourMetricPill({
@@ -547,12 +583,14 @@ function TimeDetailInput({
   isComplete = false,
   useMilitaryTime = false,
   fieldId,
+  icon: Icon = Clock3,
 }: {
   value: string;
   onChange: (value: string) => void;
   isComplete?: boolean;
   useMilitaryTime?: boolean;
   fieldId?: string;
+  icon?: LucideIcon;
 }) {
   const parsedTime = parseTimeInput(value);
   const [displayTime, setDisplayTime] = useState(useMilitaryTime ? value : parsedTime.time);
@@ -578,6 +616,9 @@ function TimeDetailInput({
   return (
     <div className={`grid gap-2 ${useMilitaryTime ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_auto]'}`}>
       <div className="relative min-w-0">
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+          <Icon size={15} />
+        </span>
         <input
           type="text"
           value={displayTime}
@@ -598,7 +639,7 @@ function TimeDetailInput({
           inputMode="numeric"
           maxLength={5}
           data-daily-field={fieldId}
-          className={`w-full rounded border bg-white px-3 py-2 pr-8 text-sm transition dark:bg-gray-900 ${
+          className={`w-full rounded border bg-white py-2 pl-9 pr-8 text-sm transition dark:bg-gray-900 ${
             isComplete
               ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
               : 'border-gray-300 dark:border-gray-700'
@@ -2151,8 +2192,7 @@ function CalendarPage({
                         <ChevronRight size={15} />
                       </button>
                     </div>
-                    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-md border border-gray-200 bg-white/70 px-1 py-1 dark:border-gray-800 dark:bg-gray-950/50">
-                      <p className="px-2 text-xs font-bold uppercase tracking-wide text-accent">Daily</p>
+                    <div className="rounded-md border border-gray-200 bg-white/70 px-1 py-1 dark:border-gray-800 dark:bg-gray-950/50">
                       <div className="overflow-x-auto overflow-y-hidden px-1 py-1.5">
                         <div className="grid min-w-[58rem] grid-cols-[repeat(31,minmax(0,1fr))] gap-1.5">
                           {dailyShortcutDays.map(({ day, dateKey, entry }) => {
@@ -2311,26 +2351,34 @@ function CalendarPage({
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Date</span>
-                          <input
-                            type="date"
-                            value={entryForm.date}
-                            onChange={(event) => {
-                              setInvalidDailyField((field) => (field === 'entryDate' ? null : field));
-                              setEntryForm((currentForm) => ({ ...currentForm, date: event.target.value }));
-                            }}
-                            data-daily-field="entryDate"
-                            className={`w-full rounded border bg-white px-3 py-2 dark:bg-gray-950 ${
-                              invalidDailyField === 'entryDate'
-                                ? 'trooper-daily-field-guard border-danger ring-2 ring-danger/30'
-                                : 'border-gray-300 dark:border-gray-700'
-                            }`}
-                            required
-                          />
+                          <div className="relative">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+                              <CalendarDays size={16} />
+                            </span>
+                            <input
+                              type="date"
+                              value={entryForm.date}
+                              onChange={(event) => {
+                                setInvalidDailyField((field) => (field === 'entryDate' ? null : field));
+                                setEntryForm((currentForm) => ({ ...currentForm, date: event.target.value }));
+                              }}
+                              data-daily-field="entryDate"
+                              className={`w-full rounded border bg-white py-2 pl-9 pr-3 dark:bg-gray-950 ${
+                                invalidDailyField === 'entryDate'
+                                  ? 'trooper-daily-field-guard border-danger ring-2 ring-danger/30'
+                                  : 'border-gray-300 dark:border-gray-700'
+                              }`}
+                              required
+                            />
+                          </div>
                         </label>
 
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Duty Hours</span>
                           <div className="relative">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+                              <Timer size={16} />
+                            </span>
                             <input
                               type="text"
                               min="0"
@@ -2339,7 +2387,7 @@ function CalendarPage({
                               value={entryForm.dutyHours}
                               onChange={(event) => updateDutyHours(event.target.value)}
                               data-daily-field="dutyHours"
-                              className={`w-full rounded border bg-white px-3 py-2 pr-9 transition dark:bg-gray-950 ${
+                              className={`w-full rounded border bg-white py-2 pl-9 pr-9 transition dark:bg-gray-950 ${
                                 invalidDailyField === 'dutyHours'
                                   ? 'trooper-daily-field-guard border-danger ring-2 ring-danger/30'
                                   : entryForm.dutyHours
@@ -2363,48 +2411,63 @@ function CalendarPage({
 
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">District Worked</span>
-                          <select
-                            value={entryForm.districtWorked}
-                            onChange={(event) =>
-                              setEntryForm((currentForm) => ({ ...currentForm, districtWorked: event.target.value }))
-                            }
-                            data-daily-field="districtWorked"
-                            className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-                          >
-                            {districtOptions.map((district) => (
-                              <option key={district}>{district}</option>
-                            ))}
-                          </select>
+                          <div className="relative">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+                              <MapPin size={16} />
+                            </span>
+                            <select
+                              value={entryForm.districtWorked}
+                              onChange={(event) =>
+                                setEntryForm((currentForm) => ({ ...currentForm, districtWorked: event.target.value }))
+                              }
+                              data-daily-field="districtWorked"
+                              className="w-full rounded border border-gray-300 bg-white py-2 pl-9 pr-3 dark:border-gray-700 dark:bg-gray-950"
+                            >
+                              {districtOptions.map((district) => (
+                                <option key={district}>{district}</option>
+                              ))}
+                            </select>
+                          </div>
                         </label>
 
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Special Status</span>
-                          <select
-                            value={entryForm.specialStatus}
-                            onChange={(event) =>
-                              setEntryForm((currentForm) => ({ ...currentForm, specialStatus: event.target.value }))
-                            }
-                            data-daily-field="specialStatus"
-                            className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-                          >
-                            {specialStatusOptions.map((status) => (
-                              <option key={status}>{status}</option>
-                            ))}
-                          </select>
+                          <div className="relative">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+                              <BadgeCheck size={16} />
+                            </span>
+                            <select
+                              value={entryForm.specialStatus}
+                              onChange={(event) =>
+                                setEntryForm((currentForm) => ({ ...currentForm, specialStatus: event.target.value }))
+                              }
+                              data-daily-field="specialStatus"
+                              className="w-full rounded border border-gray-300 bg-white py-2 pl-9 pr-3 dark:border-gray-700 dark:bg-gray-950"
+                            >
+                              {specialStatusOptions.map((status) => (
+                                <option key={status}>{status}</option>
+                              ))}
+                            </select>
+                          </div>
                         </label>
 
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Color Code</span>
-                          <select
-                            value={entryForm.color}
-                            onChange={(event) => setEntryForm((currentForm) => ({ ...currentForm, color: event.target.value }))}
-                            data-daily-field="color"
-                            className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-                          >
-                            {entryColors.map((color) => (
-                              <option key={color.value} value={color.value}>{color.label}</option>
-                            ))}
-                          </select>
+                          <div className="relative">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+                              <Palette size={16} />
+                            </span>
+                            <select
+                              value={entryForm.color}
+                              onChange={(event) => setEntryForm((currentForm) => ({ ...currentForm, color: event.target.value }))}
+                              data-daily-field="color"
+                              className="w-full rounded border border-gray-300 bg-white py-2 pl-9 pr-3 dark:border-gray-700 dark:bg-gray-950"
+                            >
+                              {entryColors.map((color) => (
+                                <option key={color.value} value={color.value}>{color.label}</option>
+                              ))}
+                            </select>
+                          </div>
                         </label>
                       </div>
 
@@ -2425,7 +2488,7 @@ function CalendarPage({
                             {isSectionComplete(entryForm.details, activeDailySection) && <CheckCircle2 className="trooper-daily-check text-green-600 dark:text-green-300" size={18} />}
                           </h3>
                           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            {activeDailySection.fields.filter(([key]) => isDetailComplete(entryForm.details, key)).length} of {activeDailySection.fields.length} fields complete.
+                            {activeDailySection.fields.filter(([key]) => shouldShowDailyDetailField(entryForm.details, key) && isDetailComplete(entryForm.details, key)).length} of {activeDailySection.fields.filter(([key]) => shouldShowDailyDetailField(entryForm.details, key)).length} fields complete.
                           </p>
                           {activeHourGuidance && (
                             <p
@@ -2474,9 +2537,10 @@ function CalendarPage({
                         )}
                       </div>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        {activeDailySection.fields.map(([key, label]) => {
+                        {activeDailySection.fields.filter(([key]) => shouldShowDailyDetailField(entryForm.details, key)).map(([key, label]) => {
                           const isTimeField = timeDetailFields.has(key);
                           const isComplete = isDetailComplete(entryForm.details, key);
+                          const FieldIcon = getDailyFieldIcon(key);
                           return (
                             <label key={key} className="block">
                               <span className="mb-1 block text-xs font-bold uppercase text-gray-500 dark:text-gray-400">{label}</span>
@@ -2487,9 +2551,13 @@ function CalendarPage({
                                   isComplete={isComplete}
                                   useMilitaryTime={dailyUseMilitaryTime}
                                   fieldId={key}
+                                  icon={FieldIcon}
                                 />
                               ) : (
                                 <div className="relative">
+                                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+                                    <FieldIcon size={15} />
+                                  </span>
                                   <input
                                     type="text"
                                     inputMode={wholeNumberDetailFields.has(key) ? 'numeric' : 'decimal'}
@@ -2497,7 +2565,7 @@ function CalendarPage({
                                     value={entryForm.details?.[key] || ''}
                                     onChange={(event) => updateDailyDetail(key, event.target.value)}
                                     data-daily-field={key}
-                                    className={`w-full rounded border bg-white px-3 py-2 pr-8 text-sm transition dark:bg-gray-900 ${
+                                    className={`w-full rounded border bg-white py-2 pl-9 pr-8 text-sm transition dark:bg-gray-900 ${
                                       isComplete
                                         ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
                                         : 'border-gray-300 dark:border-gray-700'
@@ -2528,14 +2596,19 @@ function CalendarPage({
                           {(entryForm.details?.narrative || '').length}/{narrativeCharacterLimit}
                         </span>
                       </div>
-                      <textarea
-                        value={entryForm.details?.narrative || ''}
-                        onChange={(event) => updateDailyDetail('narrative', event.target.value)}
-                        placeholder="Type a narrative here"
-                        maxLength={narrativeCharacterLimit}
-                        data-daily-field="narrative"
-                        className="min-h-72 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-                      />
+                      <div className="relative">
+                        <span className="pointer-events-none absolute left-3 top-3 text-gray-400 dark:text-gray-500">
+                          <FileText size={16} />
+                        </span>
+                        <textarea
+                          value={entryForm.details?.narrative || ''}
+                          onChange={(event) => updateDailyDetail('narrative', event.target.value)}
+                          placeholder="Type a narrative here"
+                          maxLength={narrativeCharacterLimit}
+                          data-daily-field="narrative"
+                          className="min-h-72 w-full rounded border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-gray-700 dark:bg-gray-900"
+                        />
+                      </div>
                     </div>
                   )}
                 </section>
