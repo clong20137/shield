@@ -629,6 +629,7 @@ function CalendarPage({
   const [dailySaveStatus, setDailySaveStatus] = useState<DailySaveStatus>('idle');
   const [dailySaveStatusAt, setDailySaveStatusAt] = useState<number | null>(null);
   const [invalidDailyField, setInvalidDailyField] = useState<string | null>(null);
+  const [dailyStripTooltip, setDailyStripTooltip] = useState<{ x: number; y: number; dateKey: string; entry: CalendarEntry | null } | null>(null);
   const lastAutoDutyHoursRef = useRef('');
   const dailyFormRef = useRef<HTMLFormElement | null>(null);
   const skipNextDailyDraftWriteRef = useRef(false);
@@ -1444,6 +1445,16 @@ function CalendarPage({
 
     return 'Autosave issue';
   })();
+  const showDailyStripTooltip = (target: HTMLElement, dateKey: string, entry?: CalendarEntry) => {
+    const rect = target.getBoundingClientRect();
+    const safeX = Math.min(Math.max(rect.left + rect.width / 2, 104), window.innerWidth - 104);
+    setDailyStripTooltip({
+      x: safeX,
+      y: rect.bottom + 10,
+      dateKey,
+      entry: entry || null,
+    });
+  };
 
   useEffect(() => {
     if (!dailyPanelOptions.includes(activeDailyPanel)) {
@@ -1808,7 +1819,7 @@ function CalendarPage({
                   <div className="border-b border-gray-200 bg-gray-50 px-2 py-2 dark:border-gray-800 dark:bg-gray-900">
                     <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
                       <p className="px-2 text-xs font-bold uppercase tracking-wide text-accent">Daily</p>
-                      <div className="overflow-x-auto pb-1">
+                      <div className="overflow-x-auto overflow-y-hidden pb-1">
                         <div className="grid min-w-[58rem] grid-cols-[repeat(31,minmax(0,1fr))] gap-1">
                           {dailyShortcutDays.map(({ day, dateKey, entry }) => {
                             const isSelectedShortcutDay = selectedDate === dateKey;
@@ -1816,8 +1827,15 @@ function CalendarPage({
                               <button
                                 key={dateKey}
                                 type="button"
-                                onClick={() => openDay(dateKey)}
-                                className={`group/day relative flex h-7 min-w-0 items-center justify-center rounded border text-xs font-black transition duration-300 hover:-translate-y-0.5 hover:shadow-sm ${
+                                onClick={() => {
+                                  setDailyStripTooltip(null);
+                                  openDay(dateKey);
+                                }}
+                                onMouseEnter={(event) => showDailyStripTooltip(event.currentTarget, dateKey, entry)}
+                                onMouseLeave={() => setDailyStripTooltip(null)}
+                                onFocus={(event) => showDailyStripTooltip(event.currentTarget, dateKey, entry)}
+                                onBlur={() => setDailyStripTooltip(null)}
+                                className={`relative flex h-7 min-w-0 items-center justify-center rounded border text-xs font-black transition duration-300 hover:-translate-y-0.5 hover:shadow-sm ${
                                   entry
                                     ? 'border-transparent text-white'
                                     : 'border-gray-300 bg-white text-gray-700 hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
@@ -1827,17 +1845,6 @@ function CalendarPage({
                               title={`${entry ? 'Open' : 'Create'} ${dateKey}`}
                             >
                               {day}
-                              <span className="pointer-events-none absolute left-1/2 top-full z-40 mt-2 hidden w-44 -translate-x-1/2 rounded border border-gray-200 bg-white px-2.5 py-2 text-left text-xs font-bold text-gray-700 shadow-xl group-hover/day:block dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200">
-                                <span className="block text-accent">{dateKey}</span>
-                                {entry ? (
-                                  <>
-                                    <span className="mt-1 block">{entry.submissionStatus} - {entry.dutyHours || 0}h</span>
-                                    <span className="mt-0.5 block text-gray-500 dark:text-gray-400">{entry.districtWorked || 'No district'}</span>
-                                  </>
-                                ) : (
-                                  <span className="mt-1 block text-gray-500 dark:text-gray-400">No daily report yet</span>
-                                )}
-                              </span>
                             </button>
                           );
                         })}
@@ -2214,6 +2221,23 @@ function CalendarPage({
             </form>
 
           </div>
+        </div>
+      )}
+
+      {dailyStripTooltip && (
+        <div
+          className="pointer-events-none fixed z-[100] w-52 -translate-x-1/2 rounded-md bg-black px-3 py-2 text-left text-xs font-bold text-white shadow-2xl ring-1 ring-white/10"
+          style={{ left: dailyStripTooltip.x, top: dailyStripTooltip.y }}
+        >
+          <span className="block text-accent">{dailyStripTooltip.dateKey}</span>
+          {dailyStripTooltip.entry ? (
+            <>
+              <span className="mt-1 block">{dailyStripTooltip.entry.submissionStatus} - {dailyStripTooltip.entry.dutyHours || 0}h</span>
+              <span className="mt-0.5 block text-gray-300">{dailyStripTooltip.entry.districtWorked || 'No district'}</span>
+            </>
+          ) : (
+            <span className="mt-1 block text-gray-300">No daily report yet</span>
+          )}
         </div>
       )}
 
