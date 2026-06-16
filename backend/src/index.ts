@@ -183,8 +183,9 @@ app.use('/api/uploads', uploadsStaticMiddleware);
 app.use('/api', rateLimit({
   keyPrefix: 'api',
   windowMs: Number.isFinite(apiRateLimitWindowMs) && apiRateLimitWindowMs > 0 ? apiRateLimitWindowMs : 60 * 1000,
-  max: Number.isFinite(apiRateLimitMax) && apiRateLimitMax > 0 ? apiRateLimitMax : 300,
+  max: Number.isFinite(apiRateLimitMax) && apiRateLimitMax > 0 ? apiRateLimitMax : 1200,
   message: 'Too many API requests. Slow down and try again shortly.',
+  skipPaths: ['/events', '/messages/events'],
 }));
 app.use('/api', requestTimeout({
   timeoutMs: Number.isFinite(apiRequestTimeoutMs) && apiRequestTimeoutMs > 0 ? apiRequestTimeoutMs : 30 * 1000,

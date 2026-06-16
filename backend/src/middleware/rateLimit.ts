@@ -13,6 +13,7 @@ interface RateLimitOptions {
   message: string;
   keyPrefix: string;
   keyBy?: 'sessionOrClient' | 'client';
+  skipPaths?: string[];
 }
 
 const buckets = new Map<string, RateLimitRecord>();
@@ -34,6 +35,10 @@ function getClientKey(req: Request, keyPrefix: string, keyBy: RateLimitOptions['
 
 export function rateLimit(options: RateLimitOptions) {
   return (req: Request, res: Response, next: NextFunction) => {
+    if (options.skipPaths?.some((path) => req.path === path || req.path.startsWith(`${path}/`))) {
+      return next();
+    }
+
     const now = Date.now();
     const key = getClientKey(req, options.keyPrefix, options.keyBy);
     const existing = buckets.get(key);
