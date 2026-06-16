@@ -5185,7 +5185,8 @@ function App() {
     const dateQuery = typeof targetDate === 'string' ? `?date=${encodeURIComponent(targetDate)}` : '';
     const targetPath = `/calendar${dateQuery}`;
     if (`${getAppRelativePathname()}${window.location.search}` !== targetPath) {
-      window.location.assign(withAppBase(targetPath));
+      window.history.pushState({}, document.title, withAppBase(targetPath));
+      window.dispatchEvent(new PopStateEvent('popstate'));
     }
   };
 
