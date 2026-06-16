@@ -335,6 +335,14 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function isEditableShortcutTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
+}
+
 function parseNumericDetail(details: Record<string, string>, key: string): number {
   const value = Number(details[key]);
   return Number.isFinite(value) && value > 0 ? value : 0;
@@ -643,6 +651,7 @@ function CalendarPage({
   const [invalidDailyField, setInvalidDailyField] = useState<string | null>(null);
   const [dailyStripTooltip, setDailyStripTooltip] = useState<{ x: number; y: number; dateKey: string; entry: CalendarEntry | null } | null>(null);
   const [dailyStripContextMenu, setDailyStripContextMenu] = useState<{ x: number; y: number; dateKey: string; entry: CalendarEntry | null } | null>(null);
+  const [copiedDailyForm, setCopiedDailyForm] = useState<CalendarEntryForm | null>(null);
   const lastAutoDutyHoursRef = useRef('');
   const dailyFormRef = useRef<HTMLFormElement | null>(null);
   const skipNextDailyDraftWriteRef = useRef(false);
@@ -1404,6 +1413,70 @@ function CalendarPage({
     lastAutoDutyHoursRef.current = '';
   };
 
+  const copyDailyToClipboard = (dateKey: string, entry?: CalendarEntry | null) => {
+    const sourceForm = selectedDate === dateKey && (!entry || editingEntryId === entry.id)
+      ? entryForm
+      : entry
+        ? createEntryFormFromEntry(entry)
+        : null;
+
+    if (!sourceForm || !hasMeaningfulTrooperDailyContent(sourceForm, currentUser)) {
+      setCalendarError('There is no Trooper Daily content to copy for that date.');
+      return;
+    }
+
+    setCopiedDailyForm({
+      ...sourceForm,
+      details: { ...(sourceForm.details || {}) },
+      submissionStatus: 'Draft',
+    });
+    setCalendarError(null);
+  };
+
+  const pasteCopiedDailyToDate = (dateKey: string) => {
+    if (!copiedDailyForm) {
+      setCalendarError('Copy a Trooper Daily report before pasting.');
+      return;
+    }
+
+    const existingEntry = entries.find((entry) => entry.date === dateKey);
+    setCalendarError(null);
+    setSelectedDate(dateKey);
+    setCalendarFocusDate(new Date(`${dateKey}T00:00:00`));
+    setEntryForm({
+      ...copiedDailyForm,
+      date: dateKey,
+      submissionStatus: 'Draft',
+      details: { ...(copiedDailyForm.details || {}) },
+    });
+    setEditingEntryId(existingEntry?.id || null);
+    setIsDutyHoursManual(true);
+    lastAutoDutyHoursRef.current = '';
+  };
+
+  useEffect(() => {
+    const handleDailyClipboardShortcut = (event: KeyboardEvent) => {
+      if (!selectedDate || isEditableShortcutTarget(event.target) || (!event.ctrlKey && !event.metaKey) || event.shiftKey || event.altKey) {
+        return;
+      }
+
+      const shortcutKey = event.key.toLowerCase();
+      if (shortcutKey === 'c') {
+        event.preventDefault();
+        copyDailyToClipboard(selectedDate, entries.find((entry) => entry.date === selectedDate) || null);
+        return;
+      }
+
+      if (shortcutKey === 'v') {
+        event.preventDefault();
+        pasteCopiedDailyToDate(selectedDate);
+      }
+    };
+
+    document.addEventListener('keydown', handleDailyClipboardShortcut);
+    return () => document.removeEventListener('keydown', handleDailyClipboardShortcut);
+  }, [copiedDailyForm, currentUser, editingEntryId, entries, entryForm, selectedDate]);
+
   const visibleEntries = entries.filter((entry) => {
     const matchesDistrict = !districtFilter || entry.districtWorked === districtFilter;
     const matchesStatus = !statusFilter || entry.specialStatus === statusFilter;
@@ -1549,7 +1622,7 @@ function CalendarPage({
     setDailyStripTooltip(null);
     setDailyStripContextMenu({
       x: Math.min(event.clientX, window.innerWidth - 220),
-      y: Math.min(event.clientY, window.innerHeight - (entry ? 156 : 112)),
+      y: Math.min(event.clientY, window.innerHeight - (entry ? 236 : 192)),
       dateKey,
       entry: entry || null,
     });
@@ -2402,6 +2475,28 @@ function CalendarPage({
             className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
           >
             {dailyStripContextMenu.entry ? 'Open Daily' : 'Create Daily'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              copyDailyToClipboard(dailyStripContextMenu.dateKey, dailyStripContextMenu.entry);
+              setDailyStripContextMenu(null);
+            }}
+            disabled={!dailyStripContextMenu.entry && selectedDate !== dailyStripContextMenu.dateKey}
+            className="quick-launch-context-menu-item text-gray-700 disabled:cursor-not-allowed disabled:opacity-45 dark:text-gray-200"
+          >
+            Copy Daily
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              pasteCopiedDailyToDate(dailyStripContextMenu.dateKey);
+              setDailyStripContextMenu(null);
+            }}
+            disabled={!copiedDailyForm}
+            className="quick-launch-context-menu-item text-gray-700 disabled:cursor-not-allowed disabled:opacity-45 dark:text-gray-200"
+          >
+            Paste Daily
           </button>
           <button
             type="button"
