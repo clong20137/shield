@@ -684,6 +684,154 @@ function LoginSplash({
   );
 }
 
+function ReminderCreateModal({
+  date,
+  isSaving,
+  onClose,
+  onSave,
+}: {
+  date: string;
+  isSaving: boolean;
+  onClose: () => void;
+  onSave: (title: string) => void;
+}) {
+  const [title, setTitle] = useState('');
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    titleInputRef.current?.focus();
+  }, []);
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const cleanTitle = title.trim();
+    if (!cleanTitle) {
+      titleInputRef.current?.focus();
+      return;
+    }
+
+    onSave(cleanTitle);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
+      <form onSubmit={handleSubmit} className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.16em] text-primary-500 dark:text-blue-100">Reminder</p>
+            <h2 className="mt-1 text-xl font-bold text-gray-900 dark:text-gray-100">{formatSidebarCalendarDate(date)}</h2>
+          </div>
+          <button type="button" onClick={onClose} className="icon-close-button" aria-label="Close reminder">
+            <X size={18} />
+          </button>
+        </div>
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Reminder text</span>
+          <input
+            ref={titleInputRef}
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+            maxLength={120}
+          />
+        </label>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" className="btn-secondary" onClick={onClose} disabled={isSaving}>
+            Cancel
+          </button>
+          <button type="submit" className="btn-primary" disabled={isSaving || !title.trim()}>
+            {isSaving ? 'Adding...' : 'Add Reminder'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function LockScreen({
+  account,
+  appName,
+  siteName,
+  onUnlock,
+  onLogout,
+}: {
+  account: AuthAccount;
+  appName: string;
+  siteName: string;
+  onUnlock: (account: AuthAccount) => void;
+  onLogout: () => void;
+}) {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+  const passwordInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    passwordInputRef.current?.focus();
+  }, []);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!password) {
+      setError('Enter your password to unlock.');
+      return;
+    }
+
+    setIsUnlocking(true);
+    setError(null);
+    try {
+      const response = await authService.login(account.email, password);
+      if (response.data.requiresTwoFactor) {
+        setError('MFA is required for this account. Sign out and sign back in to continue.');
+        return;
+      }
+
+      if (response.data.account) {
+        onUnlock(response.data.account);
+      }
+    } catch (err) {
+      setError(getErrorMessage(err, 'Password was not accepted.'));
+      setPassword('');
+      window.setTimeout(() => passwordInputRef.current?.focus(), 0);
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] flex min-h-screen items-center justify-center bg-primary-500 p-6 text-white">
+      <form onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg border border-white/20 bg-white p-6 text-gray-900 shadow-2xl dark:bg-gray-900 dark:text-gray-100">
+        <div className="mb-6 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded bg-primary-500 text-white shadow">
+            <LockKeyhole size={28} />
+          </div>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">{siteName}</p>
+          <h1 className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{appName} Locked</h1>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{account.displayName || account.email}</p>
+        </div>
+        {error && <div className="error">{error}</div>}
+        <label className="mb-5 block">
+          <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Password</span>
+          <input
+            ref={passwordInputRef}
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+            autoComplete="current-password"
+          />
+        </label>
+        <button type="submit" className="btn-primary w-full py-3" disabled={isUnlocking}>
+          {isUnlocking ? 'Unlocking...' : 'Unlock'}
+        </button>
+        <button type="button" onClick={onLogout} className="mt-4 w-full text-sm font-semibold text-gray-500 hover:text-primary-500 dark:text-gray-400">
+          Sign out
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function ForcePasswordChange({
   account,
   onChanged,
@@ -2773,6 +2921,7 @@ function GlobalCommandPalette({
 function GlobalKeyboardShortcuts({
   canOpenAdminConsole,
   canCreateUsers,
+  isLocked,
   showCalendar,
   defaultAdminConsoleTab,
   onOpenMessages,
@@ -2780,9 +2929,11 @@ function GlobalKeyboardShortcuts({
   onOpenCalculator,
   onOpenCommandPalette,
   onOpenAdminConsole,
+  onLock,
 }: {
   canOpenAdminConsole: boolean;
   canCreateUsers: boolean;
+  isLocked: boolean;
   showCalendar: boolean;
   defaultAdminConsoleTab: AdminConsoleTab;
   onOpenMessages: () => void;
@@ -2790,6 +2941,7 @@ function GlobalKeyboardShortcuts({
   onOpenCalculator: () => void;
   onOpenCommandPalette: () => void;
   onOpenAdminConsole: (tab?: AdminConsoleTab) => void;
+  onLock: () => void;
 }) {
   const navigate = useNavigate();
 
@@ -2802,6 +2954,16 @@ function GlobalKeyboardShortcuts({
     };
 
     const handleShortcut = (event: KeyboardEvent) => {
+      if (event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === 'l') {
+        event.preventDefault();
+        onLock();
+        return;
+      }
+
+      if (isLocked) {
+        return;
+      }
+
       if (isEditableKeyboardTarget(event.target)) {
         return;
       }
@@ -2869,7 +3031,7 @@ function GlobalKeyboardShortcuts({
     document.addEventListener('keydown', handleShortcut);
 
     return () => document.removeEventListener('keydown', handleShortcut);
-  }, [canCreateUsers, canOpenAdminConsole, defaultAdminConsoleTab, navigate, onOpenAdminConsole, onOpenCalendar, onOpenCalculator, onOpenCommandPalette, onOpenMessages, showCalendar]);
+  }, [canCreateUsers, canOpenAdminConsole, defaultAdminConsoleTab, isLocked, navigate, onLock, onOpenAdminConsole, onOpenCalendar, onOpenCalculator, onOpenCommandPalette, onOpenMessages, showCalendar]);
 
   return null;
 }
@@ -4219,6 +4381,9 @@ function App() {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
+  const [isAppLocked, setIsAppLocked] = useState(false);
+  const [reminderModalDate, setReminderModalDate] = useState<string | null>(null);
+  const [isReminderSaving, setIsReminderSaving] = useState(false);
   const [activeFloatingApp, setActiveFloatingApp] = useState<FloatingAppId>('messages');
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [messageTargetUser, setMessageTargetUser] = useState<User | null>(null);
@@ -4475,23 +4640,30 @@ function App() {
     await saveSidebarDailyPayload(dateKey, createSidebarDailyPayload(previousEntry, dateKey), 'Copied previous daily');
   };
 
-  const addSidebarReminder = async (dateKey: string) => {
+  const addSidebarReminder = (dateKey: string) => {
     if (!currentUser) {
       return;
     }
 
-    const title = window.prompt(`Reminder for ${formatSidebarCalendarDate(dateKey)}`, 'Follow up');
-    if (!title?.trim()) {
+    setReminderModalDate(dateKey);
+  };
+
+  const saveSidebarReminder = async (title: string) => {
+    if (!currentUser || !reminderModalDate) {
       return;
     }
 
+    setIsReminderSaving(true);
     try {
-      await reminderService.create(title.trim(), dateKey);
+      await reminderService.create(title.trim(), reminderModalDate);
       window.dispatchEvent(new Event('shield:reminder-updated'));
-      showToast('success', `Reminder added for ${formatSidebarCalendarDate(dateKey)}.`, { saveToNotifications: false });
+      showToast('success', `Reminder added for ${formatSidebarCalendarDate(reminderModalDate)}.`, { saveToNotifications: false });
+      setReminderModalDate(null);
     } catch (error) {
       console.error('Failed to add reminder:', error);
       showToast('error', getErrorMessage(error, 'Failed to add reminder.'), { saveToNotifications: false });
+    } finally {
+      setIsReminderSaving(false);
     }
   };
 
@@ -4923,6 +5095,9 @@ function App() {
     setIsWelcomeSplashOpen(false);
     setShouldLaunchGuideAfterWelcome(false);
     setIsFirstLoginGuideOpen(false);
+    setIsAppLocked(false);
+    setReminderModalDate(null);
+    setIsReminderSaving(false);
     setNotifications([]);
     setUserNotifications([]);
     notificationRequestRef.current += 1;
@@ -4941,6 +5116,9 @@ function App() {
     setIsWelcomeSplashOpen(false);
     setShouldLaunchGuideAfterWelcome(false);
     setIsFirstLoginGuideOpen(false);
+    setIsAppLocked(false);
+    setReminderModalDate(null);
+    setIsReminderSaving(false);
     setNotifications([]);
     setUserNotifications([]);
     notificationRequestRef.current += 1;
@@ -4984,6 +5162,25 @@ function App() {
   const handleAccountUpdate = (account: AuthAccount) => {
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(account));
     setCurrentUser(account);
+  };
+
+  const lockApp = () => {
+    if (!currentUser || isAppLocked) {
+      return;
+    }
+
+    setIsCommandPaletteOpen(false);
+    setIsNotificationsOpen(false);
+    setIsAccountMenuOpen(false);
+    setReminderModalDate(null);
+    setIsAppLocked(true);
+  };
+
+  const unlockApp = (account: AuthAccount) => {
+    handleAccountUpdate(account);
+    setIsAuthenticated(true);
+    setIsAppLocked(false);
+    resetInactivityTimer();
   };
 
   const isAdministrator = currentUser?.role === 'administrator';
@@ -5788,6 +5985,16 @@ function App() {
                   onOpenMessages={toggleMessagesModal}
                 />
                 <button
+                  data-onboarding-control="lock"
+                  type="button"
+                  onClick={lockApp}
+                  className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                  aria-label="Lock screen"
+                  title="Lock screen (Ctrl+L)"
+                >
+                  <LockKeyhole size={18} />
+                </button>
+                <button
                   data-onboarding-control="theme"
                   type="button"
                   onClick={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
@@ -5931,6 +6138,7 @@ function App() {
           <GlobalKeyboardShortcuts
             canOpenAdminConsole={canOpenAdminConsole}
             canCreateUsers={canOpenAdminConsole && hasPermission('admin:create-user') && hasPermission('users:create')}
+            isLocked={isAppLocked}
             showCalendar={showCalendar}
             defaultAdminConsoleTab={getDefaultAdminConsoleTab()}
             onOpenMessages={openMessagesModal}
@@ -5938,6 +6146,7 @@ function App() {
             onOpenCalculator={openCalculator}
             onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
             onOpenAdminConsole={openAdminConsole}
+            onLock={lockApp}
           />
           <GlobalCommandPalette
             isOpen={isCommandPaletteOpen}
@@ -6249,10 +6458,31 @@ function App() {
               onLater={() => setIsFirstLoginGuideOpen(false)}
             />
           )}
+          {reminderModalDate && (
+            <ReminderCreateModal
+              date={reminderModalDate}
+              isSaving={isReminderSaving}
+              onClose={() => {
+                if (!isReminderSaving) {
+                  setReminderModalDate(null);
+                }
+              }}
+              onSave={(title) => void saveSidebarReminder(title)}
+            />
+          )}
           {shouldShowForcedPasswordModal && currentUser && (
             <ForcePasswordChange account={currentUser} onChanged={handleAccountUpdate} onLogout={handleLogout} onToast={showToast} />
           )}
           {isApiConnectionLost && <ConnectionLostOverlay lastConnectedAt={lastApiConnectedAt} />}
+          {isAppLocked && currentUser && (
+            <LockScreen
+              account={currentUser}
+              appName={appName}
+              siteName={siteName}
+              onUnlock={unlockApp}
+              onLogout={handleLogout}
+            />
+          )}
         </div>
       )}
     </Router>
