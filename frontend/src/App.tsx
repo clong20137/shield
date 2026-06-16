@@ -1036,10 +1036,14 @@ function formatSidebarCalendarDate(value: string): string {
 
 function getSidebarCalendarDays(monthDate: Date) {
   const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const lastDay = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
   const startDate = new Date(firstDay);
+  const endDate = new Date(lastDay);
   startDate.setDate(firstDay.getDate() - firstDay.getDay());
+  endDate.setDate(lastDay.getDate() + (6 - lastDay.getDay()));
+  const dayCount = Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
 
-  return Array.from({ length: 42 }, (_, index) => {
+  return Array.from({ length: dayCount }, (_, index) => {
     const date = new Date(startDate);
     date.setDate(startDate.getDate() + index);
     return date;
@@ -1049,16 +1053,15 @@ function getSidebarCalendarDays(monthDate: Date) {
 function SidebarCalendarWidget({
   compact,
   entries,
-  isLoading,
   onOpenCalendar,
 }: {
   compact: boolean;
   entries: CalendarEntry[];
-  isLoading: boolean;
   onOpenCalendar: () => void;
 }) {
   const todayKey = getLocalDateKey();
   const [visibleMonth, setVisibleMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [hoveredDate, setHoveredDate] = useState<{ x: number; y: number; dateKey: string; entries: CalendarEntry[] } | null>(null);
   const calendarDays = useMemo(() => getSidebarCalendarDays(visibleMonth), [visibleMonth]);
   const entriesByDate = useMemo(() => entries.reduce<Record<string, CalendarEntry[]>>((groups, entry) => {
     const dateKey = getEntryDateKey(entry);
@@ -1066,14 +1069,20 @@ function SidebarCalendarWidget({
     return groups;
   }, {}), [entries]);
   const visibleMonthLabel = visibleMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-  const todayEntryCount = entriesByDate[todayKey]?.length || 0;
-  const upcomingEntries = entries
-    .filter((entry) => getEntryDateKey(entry) >= todayKey)
-    .sort((a, b) => getEntryDateKey(a).localeCompare(getEntryDateKey(b)))
-    .slice(0, 1);
 
   const changeMonth = (offset: number) => {
+    setHoveredDate(null);
     setVisibleMonth((currentMonth) => new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1));
+  };
+
+  const showDateTooltip = (target: HTMLElement, dateKey: string, dayEntries: CalendarEntry[]) => {
+    const rect = target.getBoundingClientRect();
+    setHoveredDate({
+      x: Math.min(Math.max(rect.left + rect.width / 2, 104), window.innerWidth - 104),
+      y: rect.bottom + 8,
+      dateKey,
+      entries: dayEntries,
+    });
   };
 
   if (compact) {
@@ -1091,55 +1100,78 @@ function SidebarCalendarWidget({
   }
 
   return (
-    <div className="mb-2 rounded-lg border border-white/10 bg-white/10 p-2.5 text-white">
-      <div className="mb-2 flex items-center justify-between gap-2">
+    <div className="relative mb-2 rounded-lg border border-white/10 bg-white/10 p-2 text-white">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-100">Calendar</p>
-          <p className="truncate text-sm font-bold">{visibleMonthLabel}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-100">Calendar</p>
+          <p className="truncate text-sm font-bold leading-tight">{visibleMonthLabel}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <button type="button" onClick={() => changeMonth(-1)} className="flex h-7 w-7 items-center justify-center rounded bg-black/15 text-blue-100 hover:bg-white/15 hover:text-white" aria-label="Previous month" title="Previous Month">
+          <button type="button" onClick={() => changeMonth(-1)} className="flex h-6 w-6 items-center justify-center rounded bg-black/15 text-blue-100 hover:bg-white/15 hover:text-white" aria-label="Previous month" title="Previous Month">
             <ChevronLeft size={15} />
           </button>
-          <button type="button" onClick={() => setVisibleMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1))} className="flex h-7 w-7 items-center justify-center rounded bg-black/15 text-xs font-black text-blue-100 hover:bg-white/15 hover:text-white" aria-label="Current month" title="Current Month">
+          <button type="button" onClick={() => {
+            setHoveredDate(null);
+            setVisibleMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+          }} className="flex h-6 w-6 items-center justify-center rounded bg-black/15 text-xs font-black text-blue-100 hover:bg-white/15 hover:text-white" aria-label="Current month" title="Current Month">
             {new Date().toLocaleDateString(undefined, { day: 'numeric' })}
           </button>
-          <button type="button" onClick={() => changeMonth(1)} className="flex h-7 w-7 items-center justify-center rounded bg-black/15 text-blue-100 hover:bg-white/15 hover:text-white" aria-label="Next month" title="Next Month">
+          <button type="button" onClick={() => changeMonth(1)} className="flex h-6 w-6 items-center justify-center rounded bg-black/15 text-blue-100 hover:bg-white/15 hover:text-white" aria-label="Next month" title="Next Month">
             <ChevronRight size={15} />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black uppercase text-blue-100">
+      <div className="grid grid-cols-7 gap-0.5 text-center text-[9px] font-black uppercase text-blue-100">
         {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((dayLabel, index) => (
           <span key={`${dayLabel}-${index}`}>{dayLabel}</span>
         ))}
       </div>
-      <div className="mt-1 grid grid-cols-7 gap-1">
+      <div className="mt-1 grid grid-cols-7 gap-0.5">
         {calendarDays.map((date) => {
           const dateKey = getLocalDateKey(date);
           const dayEntries = entriesByDate[dateKey] || [];
           const isCurrentMonth = date.getMonth() === visibleMonth.getMonth();
           const isToday = dateKey === todayKey;
+          const primaryEntry = dayEntries[0];
 
           return (
             <button
               key={dateKey}
               type="button"
               onClick={onOpenCalendar}
-              className={`relative flex aspect-square min-h-7 items-center justify-center rounded text-xs font-bold transition ${
-                isToday
-                  ? 'bg-white text-primary-500 shadow'
-                  : isCurrentMonth
-                    ? 'bg-black/15 text-white hover:bg-white/15'
-                    : 'bg-black/5 text-blue-100/45 hover:bg-white/10'
+              onMouseEnter={(event) => showDateTooltip(event.currentTarget, dateKey, dayEntries)}
+              onMouseLeave={() => setHoveredDate(null)}
+              onFocus={(event) => showDateTooltip(event.currentTarget, dateKey, dayEntries)}
+              onBlur={() => setHoveredDate(null)}
+              className={`relative flex aspect-square min-h-6 items-center justify-center rounded border text-[11px] font-black transition duration-300 hover:-translate-y-0.5 hover:shadow-sm ${
+                primaryEntry
+                  ? 'trooper-daily-strip-filled border-transparent text-white'
+                  : isToday
+                    ? 'border-white bg-white text-primary-500 shadow'
+                    : isCurrentMonth
+                      ? 'border-transparent bg-black/15 text-white hover:border-accent hover:text-accent'
+                      : 'border-transparent bg-black/5 text-blue-100/45 hover:bg-white/10'
               }`}
+              style={primaryEntry ? { backgroundColor: primaryEntry.color } : undefined}
               aria-label={`Open calendar for ${date.toLocaleDateString()}`}
               title={dayEntries.length > 0 ? `${dayEntries.length} calendar ${dayEntries.length === 1 ? 'entry' : 'entries'}` : 'Open Calendar'}
             >
               {date.getDate()}
+              {isToday && (
+                <span
+                  className={`trooper-daily-strip-today-marker ${primaryEntry ? 'trooper-daily-strip-today-marker-on-fill' : ''}`}
+                  aria-hidden="true"
+                />
+              )}
               {dayEntries.length > 0 && (
-                <span className={`absolute bottom-0.5 h-1.5 min-w-1.5 rounded-full ${isToday ? 'bg-danger' : 'bg-accent'}`}>
+                <span
+                  className={`trooper-daily-strip-filled-icon ${
+                    primaryEntry?.submissionStatus === 'Submitted'
+                      ? 'trooper-daily-strip-filled-icon-submitted'
+                      : 'trooper-daily-strip-filled-icon-draft'
+                  }`}
+                >
                   {dayEntries.length > 1 && <span className="sr-only">{dayEntries.length} entries</span>}
                 </span>
               )}
@@ -1148,14 +1180,25 @@ function SidebarCalendarWidget({
         })}
       </div>
 
-      <button type="button" onClick={onOpenCalendar} className="mt-2 w-full rounded bg-black/15 px-2 py-2 text-left transition hover:bg-white/15" aria-label="Open calendar">
-        <span className="block truncate text-xs font-bold text-white">
-          {isLoading ? 'Loading entries' : todayEntryCount > 0 ? `${todayEntryCount} today` : 'No entries today'}
-        </span>
-        <span className="mt-0.5 block truncate text-[11px] font-semibold text-blue-100">
-          {upcomingEntries[0] ? `${formatSidebarCalendarDate(upcomingEntries[0].date)} - ${upcomingEntries[0].category}` : isLoading ? 'Checking calendar...' : 'No upcoming entries'}
-        </span>
-      </button>
+      {hoveredDate && (
+        <div
+          className="pointer-events-none fixed z-[100] w-52 -translate-x-1/2 rounded-md bg-black px-3 py-2 text-left text-xs font-bold text-white shadow-2xl ring-1 ring-white/10"
+          style={{ left: hoveredDate.x, top: hoveredDate.y }}
+        >
+          <span className="block text-accent">{hoveredDate.dateKey}</span>
+          {hoveredDate.entries.length > 0 ? (
+            <>
+              <span className="mt-1 block">{hoveredDate.entries[0].submissionStatus} - {hoveredDate.entries[0].dutyHours || 0}h</span>
+              <span className="mt-0.5 block text-gray-300">{hoveredDate.entries[0].districtWorked || 'No district'}</span>
+              {hoveredDate.entries.length > 1 && (
+                <span className="mt-0.5 block text-gray-400">+{hoveredDate.entries.length - 1} more</span>
+              )}
+            </>
+          ) : (
+            <span className="mt-1 block text-gray-300">No daily report yet</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -4163,7 +4206,6 @@ function App() {
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const [bugReports, setBugReports] = useState<BugReport[]>([]);
   const [sidebarCalendarEntries, setSidebarCalendarEntries] = useState<CalendarEntry[]>([]);
-  const [isSidebarCalendarLoading, setIsSidebarCalendarLoading] = useState(false);
   const [sidebarReminders, setSidebarReminders] = useState<Reminder[]>([]);
   const [isSidebarRemindersLoading, setIsSidebarRemindersLoading] = useState(false);
   const previousMessageUnreadCount = useRef<number | null>(null);
@@ -4613,15 +4655,10 @@ function App() {
     }
   };
 
-  const loadSidebarCalendarEntries = useCallback(async (showLoading = false) => {
+  const loadSidebarCalendarEntries = useCallback(async () => {
     if (!currentUser) {
       setSidebarCalendarEntries([]);
-      setIsSidebarCalendarLoading(false);
       return;
-    }
-
-    if (showLoading) {
-      setIsSidebarCalendarLoading(true);
     }
 
     try {
@@ -4629,16 +4666,14 @@ function App() {
       setSidebarCalendarEntries(response.data);
     } catch (err) {
       console.error('Failed to load sidebar calendar entries:', err);
-    } finally {
-      setIsSidebarCalendarLoading(false);
     }
   }, [currentUser]);
 
   useEffect(() => {
-    void loadSidebarCalendarEntries(true);
+    void loadSidebarCalendarEntries();
 
     const handleCalendarUpdate = () => {
-      void loadSidebarCalendarEntries(false);
+      void loadSidebarCalendarEntries();
     };
 
     window.addEventListener('shield:calendar-updated', handleCalendarUpdate);
@@ -5538,7 +5573,6 @@ function App() {
                   <SidebarCalendarWidget
                     compact={isSidebarCollapsed}
                     entries={sidebarCalendarEntries}
-                    isLoading={isSidebarCalendarLoading}
                     onOpenCalendar={toggleCalendarModal}
                   />
                 </div>
