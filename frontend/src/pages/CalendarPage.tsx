@@ -1786,8 +1786,8 @@ function CalendarPage({
             </div>
 
             <form ref={dailyFormRef} onSubmit={(event) => saveEntry(event, 'Draft')} onKeyDown={handleDailyKeyDown} className="space-y-3">
-              <div className="grid min-h-[34rem] grid-cols-1 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 md:col-span-2 md:grid-cols-[19.5rem_minmax(0,1fr)] xl:grid-cols-[20.5rem_minmax(0,1fr)]">
-                <aside className="border-b border-gray-200 bg-gray-50 p-2.5 dark:border-gray-800 dark:bg-gray-900 md:border-b-0 md:border-r">
+              <div className="grid min-h-[34rem] grid-cols-1 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 xl:grid-cols-[18.5rem_minmax(0,1fr)] 2xl:grid-cols-[20.5rem_minmax(0,1fr)]">
+                <aside className="border-b border-gray-200 bg-gray-50 p-2.5 dark:border-gray-800 dark:bg-gray-900 xl:border-b-0 xl:border-r">
                   <div className="mb-2 flex min-h-[7.25rem] flex-col justify-center rounded-md border border-accent/30 bg-accent/10 px-3 py-3">
                     <p className="text-sm font-black uppercase tracking-[0.14em] text-accent">Trooper Daily</p>
                     <p className="mt-1 truncate text-base font-black text-gray-800 dark:text-gray-100">{getReadableDate(selectedDate)}</p>
@@ -1803,7 +1803,7 @@ function CalendarPage({
                       }
                       selectDailyPanel(panel, true);
                     }}
-                    className="mb-2 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-bold dark:border-gray-700 dark:bg-gray-950 md:hidden"
+                    className="mb-2 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-bold dark:border-gray-700 dark:bg-gray-950 xl:hidden"
                     aria-label="Trooper Daily section"
                   >
                     {dailyPanelOptions.map((panel) => (
@@ -1812,7 +1812,7 @@ function CalendarPage({
                       </option>
                     ))}
                   </select>
-                  <nav className="hidden gap-1 md:grid" aria-label="Trooper Daily input sections">
+                  <nav className="hidden gap-1 xl:grid" aria-label="Trooper Daily input sections">
                     {dailyPanelOptions.map((panel) => {
                       const panelSection = trooperDailySections.find((section) => section.title === panel);
                       const isHidden = Boolean(panelSection && hiddenDailySections.includes(panelSection.title));
@@ -1915,7 +1915,7 @@ function CalendarPage({
                     </div>
                   </div>
 
-                  <div className="grid items-center gap-2 border-b border-gray-200 bg-accent/5 p-2 dark:border-gray-800 lg:grid-cols-[auto_minmax(12rem,18rem)_auto_minmax(10rem,1fr)_auto]">
+                  <div className="grid items-center gap-2 border-b border-gray-200 bg-accent/5 p-2 dark:border-gray-800 2xl:grid-cols-[auto_minmax(12rem,18rem)_auto_minmax(10rem,1fr)_auto]">
                     <div className="px-2">
                       <p className="text-xs font-bold uppercase tracking-wide text-accent">Shortcuts</p>
                     </div>

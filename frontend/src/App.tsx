@@ -5719,8 +5719,8 @@ function App() {
                 </div>
               </div>
 
-            <main className="flex-1 overflow-y-auto px-3 pb-28 pt-4 dark:bg-gray-950 sm:px-6 sm:pb-48 sm:pt-5 md:pb-48">
-              <div data-onboarding-target="workspace" className="min-h-[calc(100dvh-12rem)]">
+            <main className="min-w-0 flex-1 overflow-y-auto px-3 pb-28 pt-4 dark:bg-gray-950 sm:px-6 sm:pb-48 sm:pt-5 md:pb-48">
+              <div data-onboarding-target="workspace" className="min-h-[calc(100dvh-12rem)] min-w-0">
                 <Suspense fallback={<PageLoader label="Loading page..." />}>
                   <Routes>
                     <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
