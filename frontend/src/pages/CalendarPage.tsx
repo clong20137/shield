@@ -1573,7 +1573,7 @@ function CalendarPage({
       {selectedDate && (
         <div className={isFloatingApp ? 'absolute inset-0 z-20 flex min-h-0 bg-white dark:bg-gray-900' : 'min-h-0 flex-1 pt-14 lg:pt-16'}>
           <div className={isFloatingApp ? 'h-full min-h-0 w-full overflow-y-auto rounded-lg bg-white p-3 shadow-none dark:bg-gray-900 sm:p-4' : 'h-full min-h-0 overflow-y-auto rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5'}>
-            <div className="mb-3 flex justify-end">
+            <div className="mb-3 flex justify-start">
               {isFloatingApp ? (
                 <button
                   type="button"
@@ -1599,11 +1599,11 @@ function CalendarPage({
             </div>
 
             <form ref={dailyFormRef} onSubmit={(event) => saveEntry(event, 'Draft')} onKeyDown={handleDailyKeyDown} className="pb-28">
-              <div className="grid min-h-[34rem] grid-cols-1 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 md:col-span-2 lg:grid-cols-[15.75rem_minmax(0,1fr)]">
+              <div className="grid min-h-[34rem] grid-cols-1 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 md:col-span-2 lg:grid-cols-[17.25rem_minmax(0,1fr)]">
                 <aside className="border-b border-gray-200 bg-gray-50 p-2.5 dark:border-gray-800 dark:bg-gray-900 lg:border-b-0 lg:border-r">
-                  <div className="mb-2 rounded-md border border-accent/30 bg-accent/10 px-2.5 py-2">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-accent">Trooper Daily</p>
-                    <p className="mt-0.5 truncate text-xs font-semibold text-gray-800 dark:text-gray-100">{getReadableDate(selectedDate)}</p>
+                  <div className="mb-2 flex min-h-[7.25rem] flex-col justify-center rounded-md border border-accent/30 bg-accent/10 px-3 py-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent">Trooper Daily</p>
+                    <p className="mt-1 truncate text-sm font-bold text-gray-800 dark:text-gray-100">{getReadableDate(selectedDate)}</p>
                   </div>
                   <nav className="grid gap-1 sm:grid-cols-2 lg:grid-cols-1" aria-label="Trooper Daily input sections">
                     {dailyPanelOptions.map((panel) => {
@@ -1634,7 +1634,7 @@ function CalendarPage({
                               }
                               setActiveDailyPanel(panel);
                             }}
-                            className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded px-2.5 py-1.5 text-left text-xs font-bold leading-tight"
+                            className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded px-2.5 py-2 text-left text-sm font-bold leading-tight"
                             aria-current={isActive ? 'step' : undefined}
                           >
                             <span className="min-w-0 truncate">{panel}</span>
@@ -1998,8 +1998,8 @@ function CalendarPage({
                 </div>
               </div>
 
-              <div className="pointer-events-none fixed inset-x-4 bottom-4 z-[70] flex justify-end sm:inset-x-auto sm:right-6">
-                <div className="pointer-events-auto flex flex-wrap items-center justify-end gap-2 rounded-lg border border-gray-200 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-gray-800 dark:bg-gray-950/95">
+              <div className="pointer-events-none fixed bottom-4 left-1/2 z-[70] w-[min(calc(100vw-2rem),32rem)] -translate-x-1/2">
+                <div className="pointer-events-auto ml-auto flex w-fit max-w-full flex-wrap items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-gray-800 dark:bg-gray-950/95">
                   {editingEntry && (
                     <button type="button" onClick={() => setEntryPendingDelete(editingEntry)} className="btn-danger" aria-label="Delete daily report" title="Delete Report">
                       <Trash2 size={16} />
