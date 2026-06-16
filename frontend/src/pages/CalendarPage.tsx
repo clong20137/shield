@@ -1864,7 +1864,7 @@ function CalendarPage({
                       return (
                         <div
                           key={panel}
-                          className={`group flex items-center gap-1 rounded-md border transition-all duration-500 ${
+                          className={`group grid grid-cols-[minmax(0,1fr)_1.75rem] items-center rounded-md border transition-all duration-500 ${
                             isActive
                               ? 'trooper-daily-active-pulse border-accent bg-white text-accent shadow-sm dark:bg-gray-950'
                               : `border-transparent text-gray-600 hover:border-gray-200 hover:bg-white hover:text-primary-500 dark:text-gray-300 dark:hover:border-gray-800 dark:hover:bg-gray-950 dark:hover:text-blue-100 ${isHidden ? 'opacity-50' : ''}`
@@ -1879,7 +1879,7 @@ function CalendarPage({
                               }
                               setActiveDailyPanel(panel);
                             }}
-                            className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded px-2.5 py-2 text-left text-[0.95rem] font-bold leading-tight"
+                            className="grid min-w-0 grid-cols-[minmax(0,1fr)_1.25rem] items-center gap-2 rounded px-2.5 py-2 text-left text-[0.95rem] font-bold leading-tight"
                             aria-current={isActive ? 'step' : undefined}
                             title={panel}
                           >
@@ -1902,14 +1902,14 @@ function CalendarPage({
                                 }
                                 hideDailySection(panelSection.title);
                               }}
-                              className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-400 transition hover:bg-gray-100 hover:text-accent dark:hover:bg-gray-800"
+                              className="mx-auto flex h-6 w-6 items-center justify-center rounded text-gray-400 transition hover:bg-gray-100 hover:text-accent dark:hover:bg-gray-800"
                               aria-label={`${isHidden ? 'Show' : 'Hide'} ${panelSection.title}`}
                               title={`${isHidden ? 'Show' : 'Hide'} ${panelSection.title}`}
                             >
                               {isHidden ? <Eye size={13} /> : <EyeOff size={13} />}
                             </button>
                           )}
-                          {!panelSection && <span className="mr-1 h-6 w-6 shrink-0" aria-hidden="true" />}
+                          {!panelSection && <span className="mx-auto h-6 w-6" aria-hidden="true" />}
                         </div>
                       );
                     })}
