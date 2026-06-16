@@ -1563,9 +1563,17 @@
     position: absolute;
     bottom: 0.1875rem;
     right: 0.1875rem;
-    color: rgb(34, 197, 94);
-    opacity: 0.95;
+    display: flex;
+    width: 0.8125rem;
+    height: 0.8125rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: rgb(34, 197, 94);
+    color: white;
+    opacity: 1;
     animation: trooper-daily-strip-check-pop 520ms var(--shield-motion-ease) both;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
     filter:
       drop-shadow(0 0 1px rgba(255, 255, 255, 0.95))
       drop-shadow(0 1px 1px rgba(15, 23, 42, 0.32));

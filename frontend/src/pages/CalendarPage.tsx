@@ -1977,7 +1977,11 @@ function CalendarPage({
                                 />
                               )}
                               {day}
-                              {entry && <CheckCircle2 className="trooper-daily-strip-filled-icon" size={9} aria-hidden="true" />}
+                              {entry && (
+                                <span className="trooper-daily-strip-filled-icon" aria-hidden="true">
+                                  <CheckCircle2 size={8} />
+                                </span>
+                              )}
                             </button>
                           );
                         })}
