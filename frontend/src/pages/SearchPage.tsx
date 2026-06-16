@@ -924,7 +924,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                   className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
                 >
                   <option value="">No change</option>
-                  {['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Administrative Duty', 'Inactive'].map((status) => <option key={status} value={status}>{status}</option>)}
+                  {['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training', 'Administrative Duty', 'Inactive'].map((status) => <option key={status} value={status}>{status}</option>)}
                 </select>
               </label>
               <label className="block">
@@ -1083,7 +1083,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Status</span>
                   <select value={String(editForm.status || '')} onChange={(event) => updateEditField('status', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">
-                    {['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Administrative Duty', 'Inactive'].map((status) => <option key={status}>{status}</option>)}
+                    {['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training', 'Administrative Duty', 'Inactive'].map((status) => <option key={status}>{status}</option>)}
                   </select>
                 </label>
                 <label className="flex items-center justify-between gap-4 rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950">

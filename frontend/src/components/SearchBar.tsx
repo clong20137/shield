@@ -149,7 +149,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
           >
             <option value="">All Special Status</option>
-            {['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Administrative Duty', 'Inactive'].map((status) => (
+            {['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training', 'Administrative Duty', 'Inactive'].map((status) => (
               <option key={status} value={status}>{status}</option>
             ))}
           </select>

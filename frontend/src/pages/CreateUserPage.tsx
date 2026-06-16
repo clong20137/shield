@@ -13,7 +13,7 @@ interface CreateUserPageProps {
 }
 
 const employmentTypes = ['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inactive', 'Other', 'CPS'];
-const statusOptions = ['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Administrative Duty', 'Inactive'];
+const statusOptions = ['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training', 'Administrative Duty', 'Inactive'];
 const sexOptions = ['', 'Male', 'Female'];
 const maritalStatusOptions = ['', 'Single', 'Married', 'Divorced', 'Widowed'];
 const allowedPhotoExtensions = new Set(['jpg', 'jpeg', 'jfif', 'png', 'gif', 'webp']);

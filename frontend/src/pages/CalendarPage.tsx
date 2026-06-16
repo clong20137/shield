@@ -13,7 +13,7 @@ type StoredTrooperDailyDraft = {
   savedAt: number;
 };
 
-const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty'];
+const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training'];
 const narrativeCharacterLimit = 1000;
 const dailyInputCharacterLimit = 5;
 const trooperDailyDraftStoragePrefix = 'shield_trooper_daily_draft';

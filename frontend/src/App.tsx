@@ -64,6 +64,7 @@ interface MessagePreferences {
   playMessageSound: boolean;
   messageSound: 'classic' | 'soft' | 'chime' | 'msn';
   useMilitaryTime: boolean;
+  hideQuickLaunch: boolean;
 }
 
 type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'calculator' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
@@ -84,6 +85,7 @@ const defaultMessagePreferences: MessagePreferences = {
   playMessageSound: true,
   messageSound: 'classic',
   useMilitaryTime: false,
+  hideQuickLaunch: false,
 };
 
 const quickLaunchApps: QuickLaunchApp[] = [
@@ -5757,25 +5759,27 @@ function App() {
                   </Routes>
                 </Suspense>
               </div>
-              <QuickLaunchTray
-                isAdministrator={isAdministrator}
-                permissions={currentUser?.permissions || []}
-                isSidebarCollapsed={isSidebarCollapsed}
-                badgeCounts={{ messages: messageUnreadCount }}
-                activeModalApps={[
-                  ...(isMessagesModalOpen ? (['messages'] as const) : []),
-                  ...(isCalendarModalOpen ? (['calendar'] as const) : []),
-                  ...(isCalculatorOpen ? (['calculator'] as const) : []),
-                  ...(isAdminConsoleOpen && adminConsoleTab === 'create-user' ? (['create-user'] as const) : []),
-                ]}
-                storageKey={getQuickLaunchStorageKey(currentUser?.id || 'anonymous')}
-                accountId={currentUser?.id}
-                showCalendar={showCalendar}
-                onOpenMessages={toggleMessagesModal}
-                onOpenCalendar={toggleCalendarModal}
-                onOpenCalculator={toggleCalculator}
-                onOpenCreateUser={toggleCreateUserModal}
-              />
+              {!messagePreferences.hideQuickLaunch && (
+                <QuickLaunchTray
+                  isAdministrator={isAdministrator}
+                  permissions={currentUser?.permissions || []}
+                  isSidebarCollapsed={isSidebarCollapsed}
+                  badgeCounts={{ messages: messageUnreadCount }}
+                  activeModalApps={[
+                    ...(isMessagesModalOpen ? (['messages'] as const) : []),
+                    ...(isCalendarModalOpen ? (['calendar'] as const) : []),
+                    ...(isCalculatorOpen ? (['calculator'] as const) : []),
+                    ...(isAdminConsoleOpen && adminConsoleTab === 'create-user' ? (['create-user'] as const) : []),
+                  ]}
+                  storageKey={getQuickLaunchStorageKey(currentUser?.id || 'anonymous')}
+                  accountId={currentUser?.id}
+                  showCalendar={showCalendar}
+                  onOpenMessages={toggleMessagesModal}
+                  onOpenCalendar={toggleCalendarModal}
+                  onOpenCalculator={toggleCalculator}
+                  onOpenCreateUser={toggleCreateUserModal}
+                />
+              )}
             </main>
           </div>
           <MobileNavigation
@@ -5956,6 +5960,12 @@ function App() {
                         setMessagePreferences((preferences) => ({
                           ...preferences,
                           useMilitaryTime,
+                        }))
+                      }
+                      onQuickLaunchHiddenChange={(hideQuickLaunch) =>
+                        setMessagePreferences((preferences) => ({
+                          ...preferences,
+                          hideQuickLaunch,
                         }))
                       }
                       onCalendarHiddenChange={handleCalendarHiddenChange}
