@@ -350,7 +350,12 @@ function getSessionCookieSameSite(): 'lax' | 'strict' | 'none' {
 }
 
 function shouldUseSecureSessionCookie(req: Request): boolean {
-  return process.env.SESSION_COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production' || req.secure;
+  const configuredSecureCookie = process.env.SESSION_COOKIE_SECURE?.trim().toLowerCase();
+  if (configuredSecureCookie === 'true' || configuredSecureCookie === 'false') {
+    return configuredSecureCookie === 'true';
+  }
+
+  return process.env.NODE_ENV === 'production' || req.secure;
 }
 
 function setSessionCookie(req: Request, res: Response, token: string) {

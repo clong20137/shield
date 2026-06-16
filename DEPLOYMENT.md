@@ -32,6 +32,10 @@ NODE_ENV=production
 
 # CORS
 ALLOWED_ORIGINS=https://yourdomain.com
+APP_BASE_URL=https://yourdomain.com/shield
+SESSION_COOKIE_SECURE=true
+SESSION_COOKIE_SAMESITE=lax
+TRUST_PROXY=true
 
 # Email / password reset
 SMTP_HOST=smtp.your-provider.com
@@ -153,6 +157,32 @@ FLUSH PRIVILEGES;
 8. Add request validation
 9. Use database connection pooling
 10. Implement proper error handling (no stack traces in production)
+
+### Cookie Sessions Behind IIS
+
+SHIELD uses an HttpOnly `shield_session` cookie for login. If IIS terminates HTTPS and proxies API requests to Node, set `TRUST_PROXY=true` so Express can recognize forwarded secure requests.
+
+For HTTPS deployments, use:
+```env
+NODE_ENV=production
+APP_BASE_URL=https://yourdomain.com/shield
+ALLOWED_ORIGINS=https://yourdomain.com
+SESSION_COOKIE_SECURE=true
+SESSION_COOKIE_SAMESITE=lax
+TRUST_PROXY=true
+```
+
+For temporary internal HTTP-only testing, browsers will not store a `Secure` cookie. Use:
+```env
+NODE_ENV=production
+APP_BASE_URL=http://yourserver/shield
+ALLOWED_ORIGINS=http://yourserver
+SESSION_COOKIE_SECURE=false
+SESSION_COOKIE_SAMESITE=lax
+TRUST_PROXY=false
+```
+
+After changing cookie, origin, or proxy settings, restart the backend service.
 
 ## Monitoring
 
