@@ -1218,11 +1218,10 @@ function CalendarPage({
     [hiddenDailySections],
   );
   const dailyPanelOptions = useMemo(
-    () => ['Administrative', ...visibleDailySections.map((section) => section.title), 'Narrative'],
-    [visibleDailySections],
+    () => ['Administrative', ...trooperDailySections.map((section) => section.title), 'Narrative'],
+    [],
   );
   const activeDailySection = visibleDailySections.find((section) => section.title === activeDailyPanel);
-  const editingSubmissionStatus = editingEntry?.submissionStatus || entryForm.submissionStatus || 'Draft';
 
   useEffect(() => {
     if (!dailyPanelOptions.includes(activeDailyPanel)) {
@@ -1474,13 +1473,6 @@ function CalendarPage({
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   {editingEntryId ? 'Update this daily report.' : 'Fill out this daily report.'}
                 </p>
-                <span className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase ${
-                  editingSubmissionStatus === 'Submitted'
-                    ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-200'
-                    : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-200'
-                }`}>
-                  {editingSubmissionStatus === 'Submitted' ? 'Submitted report' : 'Saved draft'}
-                </span>
               </div>
               <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                 <button
@@ -1643,7 +1635,7 @@ function CalendarPage({
                 </div>
               </div>
 
-              <div className="grid min-h-[34rem] grid-cols-1 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 md:col-span-2 lg:grid-cols-[14.5rem_minmax(0,1fr)]">
+              <div className="grid min-h-[34rem] grid-cols-1 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 md:col-span-2 lg:grid-cols-[15.75rem_minmax(0,1fr)]">
                 <aside className="border-b border-gray-200 bg-gray-50 p-2.5 dark:border-gray-800 dark:bg-gray-900 lg:border-b-0 lg:border-r">
                   <div className="mb-2 rounded-md border border-accent/30 bg-accent/10 px-2.5 py-2">
                     <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-accent">Trooper Daily</p>
@@ -1651,7 +1643,8 @@ function CalendarPage({
                   </div>
                   <nav className="grid gap-1 sm:grid-cols-2 lg:grid-cols-1" aria-label="Trooper Daily input sections">
                     {dailyPanelOptions.map((panel) => {
-                      const panelSection = visibleDailySections.find((section) => section.title === panel);
+                      const panelSection = trooperDailySections.find((section) => section.title === panel);
+                      const isHidden = Boolean(panelSection && hiddenDailySections.includes(panelSection.title));
                       const isComplete = panel === 'Administrative'
                         ? Boolean(entryForm.date && entryForm.dutyHours && entryForm.districtWorked && entryForm.specialStatus)
                         : panel === 'Narrative'
@@ -1660,51 +1653,54 @@ function CalendarPage({
                       const isActive = activeDailyPanel === panel;
 
                       return (
-                        <button
+                        <div
                           key={panel}
-                          type="button"
-                          onClick={() => setActiveDailyPanel(panel)}
-                          className={`group flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs font-bold leading-tight transition-all duration-500 ${
+                          className={`group flex items-center gap-1 rounded-md border transition-all duration-500 ${
                             isActive
                               ? 'trooper-daily-active-pulse border-accent bg-white text-accent shadow-sm dark:bg-gray-950'
-                              : 'border-transparent text-gray-600 hover:border-gray-200 hover:bg-white hover:text-primary-500 dark:text-gray-300 dark:hover:border-gray-800 dark:hover:bg-gray-950 dark:hover:text-blue-100'
+                              : `border-transparent text-gray-600 hover:border-gray-200 hover:bg-white hover:text-primary-500 dark:text-gray-300 dark:hover:border-gray-800 dark:hover:bg-gray-950 dark:hover:text-blue-100 ${isHidden ? 'opacity-50' : ''}`
                           }`}
-                          aria-current={isActive ? 'step' : undefined}
                         >
-                          <span className="min-w-0 truncate">{panel}</span>
-                          {isComplete ? (
-                            <CheckCircle2 className="trooper-daily-check shrink-0 text-green-600 dark:text-green-300" size={16} />
-                          ) : (
-                            <span className={`h-2 w-2 shrink-0 rounded-full ${isActive ? 'bg-accent' : 'bg-gray-300 dark:bg-gray-700'}`} />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isHidden && panelSection) {
+                                showDailySection(panelSection.title);
+                                return;
+                              }
+                              setActiveDailyPanel(panel);
+                            }}
+                            className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded px-2.5 py-1.5 text-left text-xs font-bold leading-tight"
+                            aria-current={isActive ? 'step' : undefined}
+                          >
+                            <span className="min-w-0 truncate">{panel}</span>
+                            {isComplete ? (
+                              <CheckCircle2 className="trooper-daily-check shrink-0 text-green-600 dark:text-green-300" size={16} />
+                            ) : (
+                              <span className={`h-2 w-2 shrink-0 rounded-full ${isActive ? 'bg-accent' : 'bg-gray-300 dark:bg-gray-700'}`} />
+                            )}
+                          </button>
+                          {panelSection && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isHidden) {
+                                  showDailySection(panelSection.title);
+                                  return;
+                                }
+                                hideDailySection(panelSection.title);
+                              }}
+                              className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-400 transition hover:bg-gray-100 hover:text-accent dark:hover:bg-gray-800"
+                              aria-label={`${isHidden ? 'Show' : 'Hide'} ${panelSection.title}`}
+                              title={`${isHidden ? 'Show' : 'Hide'} ${panelSection.title}`}
+                            >
+                              {isHidden ? <Eye size={13} /> : <EyeOff size={13} />}
+                            </button>
                           )}
-                        </button>
+                        </div>
                       );
                     })}
                   </nav>
-                  {hiddenDailySections.length > 0 && (
-                    <div className="mt-2 rounded-md border border-dashed border-gray-300 bg-white p-2 dark:border-gray-700 dark:bg-gray-950">
-                      <div className="mb-1.5 flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-bold uppercase text-gray-400">Hidden</span>
-                        <Eye size={13} className="text-accent" />
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {trooperDailySections
-                          .filter((section) => hiddenDailySections.includes(section.title))
-                          .map((section) => (
-                            <button
-                              key={section.title}
-                              type="button"
-                              onClick={() => showDailySection(section.title)}
-                              className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-bold text-primary-500 transition hover:border-accent hover:text-accent dark:border-gray-800 dark:text-blue-100"
-                              aria-label={`Show ${section.title}`}
-                              title={`Show ${section.title}`}
-                            >
-                              {section.title}
-                            </button>
-                          ))}
-                      </div>
-                    </div>
-                  )}
                 </aside>
 
                 <section className="min-w-0 p-4">
@@ -1835,15 +1831,6 @@ function CalendarPage({
                             {activeDailySection.fields.filter(([key]) => isDetailComplete(entryForm.details, key)).length} of {activeDailySection.fields.length} fields complete.
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => hideDailySection(activeDailySection.title)}
-                          className="flex h-9 w-9 items-center justify-center rounded border border-gray-200 text-gray-500 transition hover:border-accent hover:text-accent dark:border-gray-800 dark:text-gray-400"
-                          aria-label={`Hide ${activeDailySection.title}`}
-                          title={`Hide ${activeDailySection.title}`}
-                        >
-                          <EyeOff size={16} />
-                        </button>
                       </div>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {activeDailySection.fields.map(([key, label]) => {
