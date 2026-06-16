@@ -96,6 +96,25 @@ const addDaysToDateKey = (dateKey: string, days: number) => {
   return formatDateKey(date);
 };
 
+const getReminderDueAt = (reminder: Reminder) => {
+  const dueDate = new Date(reminder.remindAt || `${reminder.remindOn}T00:00`);
+  return Number.isFinite(dueDate.getTime()) ? dueDate.getTime() : 0;
+};
+
+const getReminderDueLabel = (reminder: Reminder) => {
+  const dueDate = new Date(reminder.remindAt || `${reminder.remindOn}T00:00`);
+  if (!Number.isFinite(dueDate.getTime())) {
+    return getReadableDate(reminder.remindOn);
+  }
+
+  return dueDate.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
 const getReminderPriorityClass = (priority: Reminder['priority'] = 'Normal') => {
   if (priority === 'Critical') return 'bg-danger/10 text-danger';
   if (priority === 'High') return 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-100';
@@ -1669,11 +1688,11 @@ function MyDayWidget({
     .sort((a, b) => a.category.localeCompare(b.category));
   const openReminders = reminders
     .filter((reminder) => !reminder.completedAt)
-    .sort((a, b) => a.remindOn.localeCompare(b.remindOn) || a.title.localeCompare(b.title));
+    .sort((a, b) => getReminderDueAt(a) - getReminderDueAt(b) || a.title.localeCompare(b.title));
   const activeReminders = openReminders
-    .filter((reminder) => reminder.remindOn <= todayKey)
-    .sort((a, b) => a.remindOn.localeCompare(b.remindOn) || a.title.localeCompare(b.title));
-  const upcomingReminders = openReminders.filter((reminder) => reminder.remindOn > todayKey).slice(0, 3);
+    .filter((reminder) => getReminderDueAt(reminder) <= Date.now())
+    .sort((a, b) => getReminderDueAt(a) - getReminderDueAt(b) || a.title.localeCompare(b.title));
+  const upcomingReminders = openReminders.filter((reminder) => getReminderDueAt(reminder) > Date.now()).slice(0, 3);
   const overdueCount = activeReminders.filter((reminder) => reminder.remindOn < todayKey).length;
   const draftCount = todaysEntries.filter((entry) => entry.submissionStatus === 'Draft').length;
   const submittedCount = todaysEntries.filter((entry) => entry.submissionStatus === 'Submitted').length;
@@ -1695,6 +1714,7 @@ function MyDayWidget({
     try {
       const response = await reminderService.update(reminder.id, {
         remindOn: addDaysToDateKey(todayKey, 1),
+        remindAt: `${addDaysToDateKey(todayKey, 1)}T09:00`,
         completed: false,
       });
       setReminders((current) => current.map((item) => (item.id === reminder.id ? response.data : item)));
@@ -1806,7 +1826,7 @@ function MyDayWidget({
                           <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${getReminderPriorityClass(reminder.priority)}`}>{reminder.priority}</span>
                         </div>
                         <p className={`mt-1 flex items-center gap-1 text-xs ${reminder.remindOn < todayKey ? 'text-danger' : 'text-gray-500 dark:text-gray-400'}`}>
-                          <Bell size={12} /> {reminder.remindOn < todayKey ? `Due ${getReadableDate(reminder.remindOn)}` : 'Due today'}
+                          <Bell size={12} /> Due {getReminderDueLabel(reminder)}
                         </p>
                         {reminder.notes && <p className="mt-2 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">{reminder.notes}</p>}
                       </div>
@@ -1822,7 +1842,7 @@ function MyDayWidget({
                   </div>
                 ))}
                 {activeReminders.length === 0 && (
-                  <div className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No reminders due today.</div>
+                  <div className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No reminders due right now.</div>
                 )}
                 {upcomingReminders.length > 0 && (
                   <div className="space-y-2 border-t border-gray-200 pt-2 dark:border-gray-800">
@@ -1834,7 +1854,7 @@ function MyDayWidget({
                           <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${getReminderPriorityClass(reminder.priority)}`}>{reminder.priority}</span>
                         </div>
                         <p className="mt-1 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                          <Bell size={12} /> Due {getReadableDate(reminder.remindOn)}
+                          <Bell size={12} /> Due {getReminderDueLabel(reminder)}
                         </p>
                       </div>
                     ))}

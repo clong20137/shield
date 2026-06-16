@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation,
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { FloatingWindow } from './components/FloatingWindow';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, CalendarEntryPayload, calendarService, clearAuthToken, CompleteSetupPayload, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, SetupEnvironmentValues, SetupStatus, urgentAlertService, UrgentAlert, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, CalendarEntryPayload, calendarService, clearAuthToken, CompleteSetupPayload, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, SetupEnvironmentValues, SetupStatus, urgentAlertService, UrgentAlert, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
@@ -693,9 +693,14 @@ function ReminderCreateModal({
   date: string;
   isSaving: boolean;
   onClose: () => void;
-  onSave: (title: string) => void;
+  onSave: (reminder: { title: string; remindOn: string; remindAt: string; priority: Reminder['priority']; notes: string }) => void;
 }) {
+  const now = new Date();
   const [title, setTitle] = useState('');
+  const [remindOn, setRemindOn] = useState(date);
+  const [remindTime, setRemindTime] = useState(() => `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+  const [priority, setPriority] = useState<Reminder['priority']>('Normal');
+  const [notes, setNotes] = useState('');
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -710,7 +715,13 @@ function ReminderCreateModal({
       return;
     }
 
-    onSave(cleanTitle);
+    onSave({
+      title: cleanTitle,
+      remindOn,
+      remindAt: `${remindOn}T${remindTime || '09:00'}`,
+      priority,
+      notes: notes.trim(),
+    });
   };
 
   return (
@@ -719,7 +730,7 @@ function ReminderCreateModal({
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-black uppercase tracking-[0.16em] text-primary-500 dark:text-blue-100">Reminder</p>
-            <h2 className="mt-1 text-xl font-bold text-gray-900 dark:text-gray-100">{formatSidebarCalendarDate(date)}</h2>
+            <h2 className="mt-1 text-xl font-bold text-gray-900 dark:text-gray-100">{formatSidebarCalendarDate(remindOn)}</h2>
           </div>
           <button type="button" onClick={onClose} className="icon-close-button" aria-label="Close reminder">
             <X size={18} />
@@ -735,6 +746,48 @@ function ReminderCreateModal({
             maxLength={120}
           />
         </label>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Date</span>
+            <input
+              type="date"
+              value={remindOn}
+              onChange={(event) => setRemindOn(event.target.value || date)}
+              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Time</span>
+            <input
+              type="time"
+              value={remindTime}
+              onChange={(event) => setRemindTime(event.target.value || '09:00')}
+              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+            />
+          </label>
+        </div>
+        <label className="mt-4 block">
+          <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Priority</span>
+          <select
+            value={priority}
+            onChange={(event) => setPriority(event.target.value as Reminder['priority'])}
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+          >
+            {(['Low', 'Normal', 'High', 'Critical'] as const).map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </label>
+        <label className="mt-4 block">
+          <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Notes</span>
+          <textarea
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            rows={3}
+            className="w-full resize-none rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+            maxLength={1000}
+          />
+        </label>
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" className="btn-secondary" onClick={onClose} disabled={isSaving}>
             Cancel
@@ -744,6 +797,78 @@ function ReminderCreateModal({
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function getReminderDueAt(reminder: Reminder): number {
+  const dateTimeValue = reminder.remindAt || `${reminder.remindOn}T00:00`;
+  const dueDate = new Date(dateTimeValue);
+  return Number.isFinite(dueDate.getTime()) ? dueDate.getTime() : 0;
+}
+
+function formatReminderDueAt(reminder: Reminder): string {
+  const dateTimeValue = reminder.remindAt || `${reminder.remindOn}T00:00`;
+  const dueDate = new Date(dateTimeValue);
+  if (!Number.isFinite(dueDate.getTime())) {
+    return formatSidebarCalendarDate(reminder.remindOn);
+  }
+
+  return dueDate.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function ReminderDuePopup({
+  reminders,
+  isSaving,
+  onComplete,
+  onDismiss,
+}: {
+  reminders: Reminder[];
+  isSaving: boolean;
+  onComplete: (reminder: Reminder) => void;
+  onDismiss: () => void;
+}) {
+  const primaryReminder = reminders[0];
+  if (!primaryReminder) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/55 p-4">
+      <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+        <div className="mb-4 flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-primary-500 text-white">
+            <Bell size={22} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-primary-500 dark:text-blue-100">Reminder Due</p>
+            <h2 className="mt-1 truncate text-xl font-bold text-gray-900 dark:text-gray-100">{primaryReminder.title}</h2>
+            <p className="mt-1 text-sm font-semibold text-gray-500 dark:text-gray-400">{formatReminderDueAt(primaryReminder)}</p>
+          </div>
+          <button type="button" onClick={onDismiss} className="icon-close-button" aria-label="Dismiss reminder popup">
+            <X size={18} />
+          </button>
+        </div>
+        {primaryReminder.notes && <p className="mb-4 whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300">{primaryReminder.notes}</p>}
+        {reminders.length > 1 && (
+          <p className="mb-4 rounded bg-blue-50 px-3 py-2 text-sm font-semibold text-primary-500 dark:bg-blue-950/40 dark:text-blue-100">
+            {reminders.length - 1} more reminder{reminders.length - 1 === 1 ? '' : 's'} due.
+          </p>
+        )}
+        <div className="flex justify-end gap-2">
+          <button type="button" className="btn-secondary" onClick={onDismiss} disabled={isSaving}>
+            Dismiss
+          </button>
+          <button type="button" className="btn-primary" onClick={() => onComplete(primaryReminder)} disabled={isSaving}>
+            {isSaving ? 'Completing...' : 'Mark Complete'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -780,12 +905,7 @@ function LockScreen({
     setIsUnlocking(true);
     setError(null);
     try {
-      const response = await authService.login(account.email, password);
-      if (response.data.requiresTwoFactor) {
-        setError('MFA is required for this account. Sign out and sign back in to continue.');
-        return;
-      }
-
+      const response = await authService.verifyPassword(password);
       if (response.data.account) {
         onUnlock(response.data.account);
       }
@@ -4384,6 +4504,8 @@ function App() {
   const [isAppLocked, setIsAppLocked] = useState(false);
   const [reminderModalDate, setReminderModalDate] = useState<string | null>(null);
   const [isReminderSaving, setIsReminderSaving] = useState(false);
+  const [dueReminderPopup, setDueReminderPopup] = useState<Reminder[]>([]);
+  const [isCompletingDueReminder, setIsCompletingDueReminder] = useState(false);
   const [activeFloatingApp, setActiveFloatingApp] = useState<FloatingAppId>('messages');
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [messageTargetUser, setMessageTargetUser] = useState<User | null>(null);
@@ -4415,6 +4537,7 @@ function App() {
   const previousMessageUnreadCount = useRef<number | null>(null);
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
   const rateLimitToastRef = useRef(0);
+  const shownDueReminderIdsRef = useRef<Set<string>>(new Set());
   const notificationRequestRef = useRef(0);
   const apiConnectionWasLostRef = useRef(false);
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
@@ -4648,22 +4771,91 @@ function App() {
     setReminderModalDate(dateKey);
   };
 
-  const saveSidebarReminder = async (title: string) => {
+  const saveSidebarReminder = async (reminder: { title: string; remindOn: string; remindAt: string; priority: Reminder['priority']; notes: string }) => {
     if (!currentUser || !reminderModalDate) {
       return;
     }
 
     setIsReminderSaving(true);
     try {
-      await reminderService.create(title.trim(), reminderModalDate);
+      await reminderService.create(reminder.title, reminder.remindOn, reminder.priority, reminder.notes, reminder.remindAt);
       window.dispatchEvent(new Event('shield:reminder-updated'));
-      showToast('success', `Reminder added for ${formatSidebarCalendarDate(reminderModalDate)}.`, { saveToNotifications: false });
+      showToast('success', `Reminder added for ${formatSidebarCalendarDate(reminder.remindOn)}.`, { saveToNotifications: false });
       setReminderModalDate(null);
     } catch (error) {
       console.error('Failed to add reminder:', error);
       showToast('error', getErrorMessage(error, 'Failed to add reminder.'), { saveToNotifications: false });
     } finally {
       setIsReminderSaving(false);
+    }
+  };
+
+  const checkDueReminders = useCallback(async () => {
+    if (!currentUser || isAppLocked) {
+      return;
+    }
+
+    try {
+      const response = await reminderService.getAll();
+      const now = Date.now();
+      const dueReminders = response.data
+        .filter((reminder) => !reminder.completedAt && getReminderDueAt(reminder) <= now && !shownDueReminderIdsRef.current.has(reminder.id))
+        .sort((firstReminder, secondReminder) => getReminderDueAt(firstReminder) - getReminderDueAt(secondReminder));
+
+      if (dueReminders.length === 0) {
+        return;
+      }
+
+      dueReminders.forEach((reminder) => shownDueReminderIdsRef.current.add(reminder.id));
+      setDueReminderPopup(dueReminders);
+      showToast('info', dueReminders.length === 1 ? `Reminder due: ${dueReminders[0].title}` : `${dueReminders.length} reminders due`, { saveToNotifications: false });
+      window.dispatchEvent(new Event('shield:notification-updated'));
+    } catch (error) {
+      console.error('Failed to check due reminders:', error);
+    }
+  }, [currentUser, isAppLocked]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setDueReminderPopup([]);
+      return undefined;
+    }
+
+    void checkDueReminders();
+    const handleReminderUpdate = () => {
+      void checkDueReminders();
+    };
+    window.addEventListener('shield:reminder-updated', handleReminderUpdate);
+    const intervalId = window.setInterval(() => {
+      void checkDueReminders();
+    }, 30 * 1000);
+
+    return () => {
+      window.removeEventListener('shield:reminder-updated', handleReminderUpdate);
+      window.clearInterval(intervalId);
+    };
+  }, [checkDueReminders, currentUser]);
+
+  useEffect(() => {
+    if (!currentUser || !isAppLocked) {
+      return;
+    }
+
+    setDueReminderPopup([]);
+  }, [currentUser, isAppLocked]);
+
+  const completeDueReminder = async (reminder: Reminder) => {
+    setIsCompletingDueReminder(true);
+    try {
+      await reminderService.update(reminder.id, { completed: true });
+      setDueReminderPopup((currentReminders) => currentReminders.filter((item) => item.id !== reminder.id));
+      window.dispatchEvent(new Event('shield:reminder-updated'));
+      showToast('success', 'Reminder completed.', { saveToNotifications: false });
+    } catch (error) {
+      console.error('Failed to complete reminder:', error);
+      showToast('error', getErrorMessage(error, 'Failed to complete reminder.'), { saveToNotifications: false });
+    } finally {
+      setIsCompletingDueReminder(false);
     }
   };
 
@@ -5098,6 +5290,8 @@ function App() {
     setIsAppLocked(false);
     setReminderModalDate(null);
     setIsReminderSaving(false);
+    setDueReminderPopup([]);
+    shownDueReminderIdsRef.current = new Set();
     setNotifications([]);
     setUserNotifications([]);
     notificationRequestRef.current += 1;
@@ -5119,6 +5313,8 @@ function App() {
     setIsAppLocked(false);
     setReminderModalDate(null);
     setIsReminderSaving(false);
+    setDueReminderPopup([]);
+    shownDueReminderIdsRef.current = new Set();
     setNotifications([]);
     setUserNotifications([]);
     notificationRequestRef.current += 1;
@@ -6468,6 +6664,14 @@ function App() {
                 }
               }}
               onSave={(title) => void saveSidebarReminder(title)}
+            />
+          )}
+          {dueReminderPopup.length > 0 && !isAppLocked && (
+            <ReminderDuePopup
+              reminders={dueReminderPopup}
+              isSaving={isCompletingDueReminder}
+              onComplete={(reminder) => void completeDueReminder(reminder)}
+              onDismiss={() => setDueReminderPopup([])}
             />
           )}
           {shouldShowForcedPasswordModal && currentUser && (

@@ -11,6 +11,7 @@ const inviteLimiter = rateLimit({ keyPrefix: 'invite', windowMs: 15 * 60 * 1000,
 const passwordResetRequestLimiter = rateLimit({ keyPrefix: 'password-reset-request', windowMs: 15 * 60 * 1000, max: 5, message: 'Too many password reset requests. Try again later.' });
 const passwordResetConfirmLimiter = rateLimit({ keyPrefix: 'password-reset-confirm', windowMs: 15 * 60 * 1000, max: 10, message: 'Too many password reset attempts. Try again later.' });
 const passwordChangeLimiter = rateLimit({ keyPrefix: 'password-change', windowMs: 15 * 60 * 1000, max: 8, message: 'Too many password change attempts. Try again later.' });
+const passwordVerifyLimiter = rateLimit({ keyPrefix: 'password-verify', windowMs: 15 * 60 * 1000, max: 20, message: 'Too many unlock attempts. Try again later.' });
 const mfaLimiter = rateLimit({ keyPrefix: 'mfa', windowMs: 15 * 60 * 1000, max: 12, message: 'Too many MFA attempts. Try again later.' });
 const roleManagementLimiter = rateLimit({ keyPrefix: 'role-management', windowMs: 15 * 60 * 1000, max: 60, message: 'Too many role management requests. Try again later.' });
 const setupLimiter = rateLimit({ keyPrefix: 'setup', windowMs: 15 * 60 * 1000, max: 12, message: 'Too many setup attempts. Try again later.' });
@@ -37,6 +38,7 @@ router.get('/sessions', AuthController.listSessions);
 router.delete('/sessions/:sessionId', AuthController.revokeSession);
 router.post('/sessions/revoke-others', AuthController.revokeOtherSessions);
 router.post('/change-password', passwordChangeLimiter, requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.changePassword);
+router.post('/verify-password', passwordVerifyLimiter, AuthController.verifyPassword);
 router.post('/accounts/:accountId/reset-password', passwordChangeLimiter, requirePermission('roles:manage'), AuthController.adminResetPassword);
 router.post('/2fa/setup', mfaLimiter, requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.setupTwoFactor);
 router.post('/2fa/enable', mfaLimiter, requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), AuthController.enableTwoFactor);

@@ -10,6 +10,7 @@ export interface Reminder {
   priority: 'Low' | 'Normal' | 'High' | 'Critical';
   notes: string;
   remindOn: string;
+  remindAt: string | null;
   notifiedAt: Date | null;
   completedAt: Date | null;
   createdAt: Date;
@@ -23,6 +24,7 @@ interface ReminderRow extends RowDataPacket {
   priority: 'Low' | 'Normal' | 'High' | 'Critical' | null;
   notes: string | null;
   remindOn: Date | string | null;
+  remindAt: Date | string | null;
   notifiedAt: Date | null;
   completedAt: Date | null;
   createdAt: Date;
@@ -37,6 +39,7 @@ function toReminder(row: ReminderRow): Reminder {
     priority: row.priority || 'Normal',
     notes: row.notes || '',
     remindOn: formatDate(row.remindOn || row.createdAt),
+    remindAt: row.remindAt ? formatDateTime(row.remindAt) : null,
     notifiedAt: row.notifiedAt || null,
     completedAt: row.completedAt || null,
     createdAt: row.createdAt,
@@ -50,6 +53,27 @@ function formatDate(value: Date | string): string {
   }
 
   return value.toISOString().slice(0, 10);
+}
+
+function formatDateTime(value: Date | string): string {
+  if (typeof value === 'string') {
+    return value.replace(' ', 'T').slice(0, 16);
+  }
+
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  const hours = String(value.getHours()).padStart(2, '0');
+  const minutes = String(value.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function toSqlDateTime(value?: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  return `${value.slice(0, 10)} ${value.slice(11, 16)}:00`;
 }
 
 export class ReminderModel {
@@ -70,24 +94,24 @@ export class ReminderModel {
     }
   }
 
-  static async create(accountId: string, title: string, remindOn: string, priority: Reminder['priority'] = 'Normal', notes = ''): Promise<Reminder> {
+  static async create(accountId: string, title: string, remindOn: string, priority: Reminder['priority'] = 'Normal', notes = '', remindAt?: string | null): Promise<Reminder> {
     const conn = await pool.getConnection();
     try {
       const id = uuidv4();
       const now = new Date();
       await conn.query<ResultSetHeader>(
-        `INSERT INTO reminders (\`id\`, \`accountId\`, \`title\`, \`priority\`, \`notes\`, \`remindOn\`, \`notifiedAt\`, \`completedAt\`, \`createdAt\`, \`updatedAt\`)
-         VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)`,
-        [id, accountId, title, priority, notes, remindOn, now, now]
+        `INSERT INTO reminders (\`id\`, \`accountId\`, \`title\`, \`priority\`, \`notes\`, \`remindOn\`, \`remindAt\`, \`notifiedAt\`, \`completedAt\`, \`createdAt\`, \`updatedAt\`)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)`,
+        [id, accountId, title, priority, notes, remindOn, toSqlDateTime(remindAt), now, now]
       );
 
-      return { id, accountId, title, priority, notes, remindOn, notifiedAt: null, completedAt: null, createdAt: now, updatedAt: now };
+      return { id, accountId, title, priority, notes, remindOn, remindAt: remindAt || null, notifiedAt: null, completedAt: null, createdAt: now, updatedAt: now };
     } finally {
       conn.release();
     }
   }
 
-  static async update(id: string, accountId: string, updates: { title?: string; priority?: Reminder['priority']; notes?: string; remindOn?: string; completed?: boolean }): Promise<Reminder | null> {
+  static async update(id: string, accountId: string, updates: { title?: string; priority?: Reminder['priority']; notes?: string; remindOn?: string; remindAt?: string | null; completed?: boolean }): Promise<Reminder | null> {
     const conn = await pool.getConnection();
     try {
       const [existingRows] = await conn.query<ReminderRow[]>(
@@ -104,7 +128,11 @@ export class ReminderModel {
       const nextNotes = updates.notes ?? existingRows[0].notes ?? '';
       const existingRemindOn = formatDate(existingRows[0].remindOn || existingRows[0].createdAt);
       const nextRemindOn = updates.remindOn ?? existingRemindOn;
-      const shouldResetNotification = updates.remindOn !== undefined && updates.remindOn !== existingRemindOn;
+      const existingRemindAt = existingRows[0].remindAt ? formatDateTime(existingRows[0].remindAt) : null;
+      const nextRemindAt = updates.remindAt === undefined ? existingRemindAt : updates.remindAt;
+      const shouldResetNotification =
+        (updates.remindOn !== undefined && updates.remindOn !== existingRemindOn) ||
+        (updates.remindAt !== undefined && updates.remindAt !== existingRemindAt);
       const nextCompletedAt = typeof updates.completed === 'boolean'
         ? updates.completed ? new Date() : null
         : existingRows[0].completedAt;
@@ -112,9 +140,9 @@ export class ReminderModel {
 
       await conn.query<ResultSetHeader>(
         `UPDATE reminders
-         SET \`title\` = ?, \`priority\` = ?, \`notes\` = ?, \`remindOn\` = ?, \`notifiedAt\` = ?, \`completedAt\` = ?, \`updatedAt\` = ?
+         SET \`title\` = ?, \`priority\` = ?, \`notes\` = ?, \`remindOn\` = ?, \`remindAt\` = ?, \`notifiedAt\` = ?, \`completedAt\` = ?, \`updatedAt\` = ?
          WHERE \`id\` = ? AND \`accountId\` = ?`,
-        [nextTitle, nextPriority, nextNotes, nextRemindOn, nextNotifiedAt, nextCompletedAt, new Date(), id, accountId]
+        [nextTitle, nextPriority, nextNotes, nextRemindOn, toSqlDateTime(nextRemindAt), nextNotifiedAt, nextCompletedAt, new Date(), id, accountId]
       );
 
       const [rows] = await conn.query<ReminderRow[]>(
@@ -150,8 +178,8 @@ export class ReminderModel {
          WHERE \`accountId\` = ?
            AND \`completedAt\` IS NULL
            AND \`notifiedAt\` IS NULL
-           AND \`remindOn\` <= CURDATE()
-         ORDER BY \`remindOn\` ASC, \`createdAt\` ASC
+           AND COALESCE(\`remindAt\`, TIMESTAMP(\`remindOn\`, '00:00:00')) <= NOW()
+         ORDER BY COALESCE(\`remindAt\`, TIMESTAMP(\`remindOn\`, '00:00:00')) ASC, \`createdAt\` ASC
          LIMIT 25`,
         [accountId]
       );

@@ -6,6 +6,20 @@ import { cleanMultiline, cleanString, isOneOf, isValidIsoDate } from '../utils/v
 
 const reminderPriorities = ['Low', 'Normal', 'High', 'Critical'] as const;
 
+function isValidLocalDateTime(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/u.test(value)) {
+    return false;
+  }
+
+  const [datePart, timePart] = value.split('T');
+  if (!isValidIsoDate(datePart)) {
+    return false;
+  }
+
+  const [hour, minute] = timePart.split(':').map(Number);
+  return Number.isInteger(hour) && Number.isInteger(minute) && hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+}
+
 export class ReminderController {
   static async list(req: Request, res: Response) {
     try {
@@ -45,13 +59,18 @@ export class ReminderController {
         return res.status(400).json({ error: 'Reminder date must use YYYY-MM-DD format' });
       }
 
+      const remindAt = cleanString(req.body?.remindAt, 20) || `${remindOn}T09:00`;
+      if (!isValidLocalDateTime(remindAt) || remindAt.slice(0, 10) !== remindOn) {
+        return res.status(400).json({ error: 'Reminder time must be on the selected reminder date' });
+      }
+
       const priority = cleanString(req.body?.priority, 20) || 'Normal';
       if (!isOneOf(priority, reminderPriorities)) {
         return res.status(400).json({ error: 'Choose a valid reminder priority' });
       }
 
       const notes = cleanMultiline(req.body?.notes, 1000);
-      const reminder = await ReminderModel.create(account.id, title, remindOn, priority, notes);
+      const reminder = await ReminderModel.create(account.id, title, remindOn, priority, notes, remindAt);
       const dueCount = await ReminderModel.createDueNotifications(account.id);
       if (dueCount > 0) {
         broadcastAccountEvent(account.id, { type: 'notification-created', entityId: reminder.id });
@@ -81,6 +100,14 @@ export class ReminderController {
         return res.status(400).json({ error: 'Reminder date must use YYYY-MM-DD format' });
       }
 
+      const remindAt = req.body?.remindAt === undefined ? undefined : cleanString(req.body.remindAt, 20);
+      if (remindAt !== undefined) {
+        const comparisonDate = remindOn || (remindAt ? remindAt.slice(0, 10) : '');
+        if (!remindAt || !isValidLocalDateTime(remindAt) || remindAt.slice(0, 10) !== comparisonDate) {
+          return res.status(400).json({ error: 'Reminder time must be on the selected reminder date' });
+        }
+      }
+
       const priority = req.body?.priority === undefined ? undefined : cleanString(req.body.priority, 20);
       if (priority !== undefined && !isOneOf(priority, reminderPriorities)) {
         return res.status(400).json({ error: 'Choose a valid reminder priority' });
@@ -91,6 +118,7 @@ export class ReminderController {
         priority,
         notes: req.body?.notes === undefined ? undefined : cleanMultiline(req.body.notes, 1000),
         remindOn,
+        remindAt,
         completed: typeof req.body?.completed === 'boolean' ? req.body.completed : undefined,
       });
 

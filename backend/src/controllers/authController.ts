@@ -952,6 +952,30 @@ export class AuthController {
     }
   }
 
+  static async verifyPassword(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const password = typeof req.body?.password === 'string' ? req.body.password : '';
+      if (!password) {
+        return res.status(400).json({ error: 'Password is required' });
+      }
+
+      const verifiedAccount = await AuthAccountModel.verifyCurrentPassword(account.id, password);
+      if (!verifiedAccount) {
+        return res.status(401).json({ error: 'Password was not accepted' });
+      }
+
+      res.json({ account: await withPermissions(verifiedAccount) });
+    } catch (error) {
+      console.error('Verify password error:', error);
+      res.status(500).json({ error: 'Failed to verify password' });
+    }
+  }
+
   static async getMicrosoftSsoStatus(req: Request, res: Response) {
     try {
       res.json({ enabled: getMicrosoftSsoConfig(req).enabled });

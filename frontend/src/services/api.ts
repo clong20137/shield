@@ -813,6 +813,7 @@ export interface Reminder {
   priority: 'Low' | 'Normal' | 'High' | 'Critical';
   notes: string;
   remindOn: string;
+  remindAt: string | null;
   notifiedAt: string | null;
   completedAt: string | null;
   createdAt: string;
@@ -920,6 +921,9 @@ export const authService = {
 
   getSession: () =>
     api.get<AuthResponse>('/auth/session'),
+
+  verifyPassword: (password: string) =>
+    api.post<AuthResponse>('/auth/verify-password', { password }),
 
   logout: () =>
     api.post('/auth/logout'),
@@ -1299,10 +1303,10 @@ export const reminderService = {
   getAll: () =>
     api.get<Reminder[]>('/reminders'),
 
-  create: (title: string, remindOn: string, priority: Reminder['priority'] = 'Normal', notes = '') =>
-    api.post<Reminder>('/reminders', { title, remindOn, priority, notes }),
+  create: (title: string, remindOn: string, priority: Reminder['priority'] = 'Normal', notes = '', remindAt?: string | null) =>
+    api.post<Reminder>('/reminders', { title, remindOn, priority, notes, remindAt }),
 
-  update: (id: string, updates: { title?: string; remindOn?: string; priority?: Reminder['priority']; notes?: string; completed?: boolean }) =>
+  update: (id: string, updates: { title?: string; remindOn?: string; remindAt?: string | null; priority?: Reminder['priority']; notes?: string; completed?: boolean }) =>
     api.put<Reminder>(`/reminders/${id}`, updates),
 
   delete: (id: string) =>
