@@ -1884,11 +1884,13 @@ function CalendarPage({
                             title={panel}
                           >
                             <span className="min-w-0 truncate">{panel}</span>
-                            {isComplete ? (
-                              <CheckCircle2 className="trooper-daily-check shrink-0 text-green-600 dark:text-green-300" size={16} />
-                            ) : (
-                              <span className={`h-2 w-2 shrink-0 rounded-full ${isActive ? 'bg-accent' : 'bg-gray-300 dark:bg-gray-700'}`} />
-                            )}
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden="true">
+                              {isComplete ? (
+                                <CheckCircle2 className="trooper-daily-check text-green-600 dark:text-green-300" size={16} />
+                              ) : (
+                                <span className={`h-2 w-2 rounded-full ${isActive ? 'bg-accent' : 'bg-gray-300 dark:bg-gray-700'}`} />
+                              )}
+                            </span>
                           </button>
                           {panelSection && (
                             <button
