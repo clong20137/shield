@@ -1301,6 +1301,21 @@ function CalendarPage({
     [],
   );
   const activeDailySection = visibleDailySections.find((section) => section.title === activeDailyPanel);
+  const selectedDateParts = selectedDate?.split('-').map(Number);
+  const dailyShortcutYear = selectedDateParts?.[0] || calendarMonth.getFullYear();
+  const dailyShortcutMonth = selectedDateParts?.[1] || calendarMonth.getMonth() + 1;
+  const dailyShortcutDaysInMonth = new Date(dailyShortcutYear, dailyShortcutMonth, 0).getDate();
+  const dailyShortcutDays = Array.from({ length: dailyShortcutDaysInMonth }, (_, index) => {
+    const day = index + 1;
+    const dateKey = `${dailyShortcutYear}-${String(dailyShortcutMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const entry = entries.find((item) => item.date === dateKey);
+
+    return {
+      day,
+      dateKey,
+      entry,
+    };
+  });
   const hourMetrics = [
     { label: 'Reported', value: reportedDutyHours, helper: '', isMatch: false },
     { label: 'Shift', value: calculatedShiftHours, helper: getDifferenceLabel(reportedDutyHours, calculatedShiftHours), isMatch: shiftHoursMatch },
@@ -1748,6 +1763,34 @@ function CalendarPage({
                     </div>
                   </div>
 
+                  <div className="border-b border-gray-200 bg-gray-50 px-2 py-2 dark:border-gray-800 dark:bg-gray-900">
+                    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
+                      <p className="px-2 text-xs font-bold uppercase tracking-wide text-accent">Daily</p>
+                      <div className="grid grid-cols-[repeat(auto-fit,minmax(1.65rem,1fr))] gap-1">
+                        {dailyShortcutDays.map(({ day, dateKey, entry }) => {
+                          const isSelectedShortcutDay = selectedDate === dateKey;
+                          return (
+                            <button
+                              key={dateKey}
+                              type="button"
+                              onClick={() => openDay(dateKey)}
+                              className={`flex h-7 min-w-0 items-center justify-center rounded border text-xs font-black transition duration-300 hover:-translate-y-0.5 hover:shadow-sm ${
+                                entry
+                                  ? 'border-transparent text-white'
+                                  : 'border-gray-300 bg-white text-gray-700 hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
+                              } ${isSelectedShortcutDay ? 'ring-2 ring-accent ring-offset-1 ring-offset-white dark:ring-offset-gray-950' : ''}`}
+                              style={entry ? { backgroundColor: entry.color } : undefined}
+                              aria-label={`${entry ? 'Open' : 'Create'} daily report for ${dateKey}`}
+                              title={`${entry ? 'Open' : 'Create'} ${dateKey}`}
+                            >
+                              {day}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className={`sticky top-0 z-20 grid grid-cols-2 gap-2 border-b p-2 shadow-[0_10px_24px_rgba(15,23,42,0.08)] backdrop-blur lg:grid-cols-4 ${
                     hasHourMismatch
                       ? 'border-danger/30 bg-red-50/95 dark:bg-red-950/80'
@@ -1998,7 +2041,7 @@ function CalendarPage({
                 </div>
               </div>
 
-              <div className="pointer-events-none fixed bottom-4 right-28 z-[70] flex max-w-[calc(100vw-9rem)] justify-end max-lg:right-24 max-sm:left-4 max-sm:right-24">
+              <div className="pointer-events-none fixed bottom-32 right-6 z-[70] flex max-w-[calc(100vw-2rem)] justify-end max-sm:bottom-28 max-sm:left-4 max-sm:right-4">
                 <div className="pointer-events-auto ml-auto flex w-fit max-w-full flex-wrap items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-gray-800 dark:bg-gray-950/95">
                   {editingEntry && (
                     <button type="button" onClick={() => setEntryPendingDelete(editingEntry)} className="btn-danger" aria-label="Delete daily report" title="Delete Report">
