@@ -5729,7 +5729,7 @@ function App() {
                     {currentUser && showCalendar && (
                       <Route
                         path="/calendar"
-                        element={<CalendarPage currentUser={currentUser} onOpenCalculator={openCalculator} onAccountUpdate={handleAccountUpdate} onToast={showToast} useMilitaryTime={messagePreferences.useMilitaryTime} />}
+                        element={<CalendarPage currentUser={currentUser} onAccountUpdate={handleAccountUpdate} onToast={showToast} useMilitaryTime={messagePreferences.useMilitaryTime} />}
                       />
                     )}
                     <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
@@ -5896,7 +5896,7 @@ function App() {
                 </div>
                 <div className="min-h-0 flex-1">
                   <Suspense fallback={<PageLoader label="Loading calendar..." />}>
-                    <CalendarPage currentUser={currentUser} onOpenCalculator={openCalculator} onAccountUpdate={handleAccountUpdate} onToast={showToast} useMilitaryTime={messagePreferences.useMilitaryTime} isFloatingApp />
+                    <CalendarPage currentUser={currentUser} onAccountUpdate={handleAccountUpdate} onToast={showToast} useMilitaryTime={messagePreferences.useMilitaryTime} isFloatingApp />
                   </Suspense>
                 </div>
               </>

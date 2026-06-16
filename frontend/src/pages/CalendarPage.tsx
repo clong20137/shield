@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, Calculator, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCopy, Eye, EyeOff, Pencil, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { Bell, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCopy, Eye, EyeOff, Pencil, Save, Sparkles, Trash2, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, CalendarShortcut, authService, calendarService, reminderService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
@@ -590,14 +590,12 @@ function calculateShiftHours(details: Record<string, string>): number {
 
 function CalendarPage({
   currentUser,
-  onOpenCalculator,
   onAccountUpdate,
   onToast,
   useMilitaryTime = false,
   isFloatingApp = false,
 }: {
   currentUser: AuthAccount;
-  onOpenCalculator?: () => void;
   onAccountUpdate?: (account: AuthAccount) => void;
   onToast?: (type: 'success' | 'error' | 'info', message: string) => void;
   useMilitaryTime?: boolean;
@@ -619,6 +617,7 @@ function CalendarPage({
   const [statusFilter, setStatusFilter] = useState('');
   const [entryPendingDelete, setEntryPendingDelete] = useState<CalendarEntry | null>(null);
   const [activeDailyPanel, setActiveDailyPanel] = useState<string>('Administrative');
+  const [dailyUseMilitaryTime, setDailyUseMilitaryTime] = useState(useMilitaryTime);
   const [hiddenDailySections, setHiddenDailySections] = useState<string[]>(currentUser.trooperDailyHiddenSections || []);
   const [shortcuts, setShortcuts] = useState<CalendarShortcut[]>([]);
   const [selectedShortcutId, setSelectedShortcutId] = useState('');
@@ -645,6 +644,10 @@ function CalendarPage({
     actorId: currentUser.id,
     actorName: currentUser.displayName || currentUser.email,
   };
+
+  useEffect(() => {
+    setDailyUseMilitaryTime(useMilitaryTime);
+  }, [useMilitaryTime]);
 
   const loadCalendarEntries = async (showLoading = true) => {
     if (showLoading) {
@@ -1464,7 +1467,7 @@ function CalendarPage({
       )}
 
       {selectedDate && (
-        <div className={isFloatingApp ? 'absolute inset-0 z-20 flex min-h-0 bg-white dark:bg-gray-900' : 'min-h-0 flex-1'}>
+        <div className={isFloatingApp ? 'absolute inset-0 z-20 flex min-h-0 bg-white dark:bg-gray-900' : 'min-h-0 flex-1 pt-14 lg:pt-16'}>
           <div className={isFloatingApp ? 'h-full min-h-0 w-full overflow-y-auto rounded-lg bg-white p-3 shadow-none dark:bg-gray-900 sm:p-4' : 'h-full min-h-0 overflow-y-auto rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5'}>
             <div className="mb-5 flex flex-wrap items-start justify-between gap-3 sm:gap-4">
               <div>
@@ -1485,17 +1488,6 @@ function CalendarPage({
                   <Bell size={16} />
                   <span className="hidden sm:inline">Create Reminder</span>
                 </button>
-                {onOpenCalculator && (
-                  <button
-                    type="button"
-                    onClick={onOpenCalculator}
-                    className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
-                    aria-label="Open calculator"
-                    title="Calculator"
-                  >
-                    <Calculator size={18} />
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={() => setSelectedDate(null)}
@@ -1697,6 +1689,7 @@ function CalendarPage({
                               {isHidden ? <Eye size={13} /> : <EyeOff size={13} />}
                             </button>
                           )}
+                          {!panelSection && <span className="mr-1 h-6 w-6 shrink-0" aria-hidden="true" />}
                         </div>
                       );
                     })}
@@ -1831,6 +1824,32 @@ function CalendarPage({
                             {activeDailySection.fields.filter(([key]) => isDetailComplete(entryForm.details, key)).length} of {activeDailySection.fields.length} fields complete.
                           </p>
                         </div>
+                        {activeDailySection.title === 'Regular Duty' && (
+                          <div className="inline-flex rounded border border-gray-300 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-900" aria-label="Time input format">
+                            <button
+                              type="button"
+                              onClick={() => setDailyUseMilitaryTime(false)}
+                              className={`rounded px-2.5 py-1.5 text-xs font-bold transition ${
+                                !dailyUseMilitaryTime
+                                  ? 'bg-primary-500 text-white'
+                                  : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                              }`}
+                            >
+                              Standard
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDailyUseMilitaryTime(true)}
+                              className={`rounded px-2.5 py-1.5 text-xs font-bold transition ${
+                                dailyUseMilitaryTime
+                                  ? 'bg-primary-500 text-white'
+                                  : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                              }`}
+                            >
+                              Military
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {activeDailySection.fields.map(([key, label]) => {
@@ -1844,7 +1863,7 @@ function CalendarPage({
                                   value={entryForm.details?.[key] || ''}
                                   onChange={(value) => updateDailyDetail(key, value)}
                                   isComplete={isComplete}
-                                  useMilitaryTime={useMilitaryTime}
+                                  useMilitaryTime={dailyUseMilitaryTime}
                                   fieldId={key}
                                 />
                               ) : (
