@@ -630,6 +630,7 @@ function CalendarPage({
   const [dailySaveStatusAt, setDailySaveStatusAt] = useState<number | null>(null);
   const [invalidDailyField, setInvalidDailyField] = useState<string | null>(null);
   const [dailyStripTooltip, setDailyStripTooltip] = useState<{ x: number; y: number; dateKey: string; entry: CalendarEntry | null } | null>(null);
+  const [dailyStripContextMenu, setDailyStripContextMenu] = useState<{ x: number; y: number; dateKey: string; entry: CalendarEntry | null } | null>(null);
   const lastAutoDutyHoursRef = useRef('');
   const dailyFormRef = useRef<HTMLFormElement | null>(null);
   const skipNextDailyDraftWriteRef = useRef(false);
@@ -694,6 +695,12 @@ function CalendarPage({
         return;
       }
 
+      if (dailyStripContextMenu) {
+        event.stopPropagation();
+        setDailyStripContextMenu(null);
+        return;
+      }
+
       if (entryPendingDelete) {
         event.stopPropagation();
         setEntryPendingDelete(null);
@@ -709,7 +716,22 @@ function CalendarPage({
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [entryPendingDelete, selectedDate]);
+  }, [dailyStripContextMenu, entryPendingDelete, selectedDate]);
+
+  useEffect(() => {
+    if (!dailyStripContextMenu) {
+      return undefined;
+    }
+
+    const closeContextMenu = () => setDailyStripContextMenu(null);
+    window.addEventListener('click', closeContextMenu);
+    window.addEventListener('scroll', closeContextMenu, true);
+
+    return () => {
+      window.removeEventListener('click', closeContextMenu);
+      window.removeEventListener('scroll', closeContextMenu, true);
+    };
+  }, [dailyStripContextMenu]);
 
   const openDay = (dateKey: string) => {
     const [year, month, day] = dateKey.split('-').map(Number);
@@ -1317,6 +1339,34 @@ function CalendarPage({
     lastAutoDutyHoursRef.current = '';
   };
 
+  const copyPreviousDailyToDate = (dateKey: string) => {
+    const previousEntry = entries
+      .filter((entry) => entry.date < dateKey)
+      .sort((firstEntry, secondEntry) => secondEntry.date.localeCompare(firstEntry.date))[0];
+
+    if (!previousEntry) {
+      setCalendarError('No previous Trooper Daily entry found to copy.');
+      return;
+    }
+
+    setCalendarError(null);
+    setSelectedDate(dateKey);
+    setCalendarFocusDate(new Date(`${dateKey}T00:00:00`));
+    setEntryForm({
+      category: 'Trooper Daily',
+      date: dateKey,
+      dutyHours: previousEntry.dutyHours,
+      districtWorked: previousEntry.districtWorked || getDefaultDistrict(currentUser),
+      specialStatus: previousEntry.specialStatus,
+      color: previousEntry.color,
+      submissionStatus: 'Draft',
+      details: { ...(previousEntry.details || {}) },
+    });
+    setEditingEntryId(null);
+    setIsDutyHoursManual(true);
+    lastAutoDutyHoursRef.current = '';
+  };
+
   const visibleEntries = entries.filter((entry) => {
     const matchesDistrict = !districtFilter || entry.districtWorked === districtFilter;
     const matchesStatus = !statusFilter || entry.specialStatus === statusFilter;
@@ -1451,6 +1501,17 @@ function CalendarPage({
     setDailyStripTooltip({
       x: safeX,
       y: rect.bottom + 10,
+      dateKey,
+      entry: entry || null,
+    });
+  };
+
+  const openDailyStripContextMenu = (event: React.MouseEvent<HTMLElement>, dateKey: string, entry?: CalendarEntry) => {
+    event.preventDefault();
+    setDailyStripTooltip(null);
+    setDailyStripContextMenu({
+      x: Math.min(event.clientX, window.innerWidth - 220),
+      y: Math.min(event.clientY, window.innerHeight - (entry ? 156 : 112)),
       dateKey,
       entry: entry || null,
     });
@@ -1835,6 +1896,7 @@ function CalendarPage({
                                 onMouseLeave={() => setDailyStripTooltip(null)}
                                 onFocus={(event) => showDailyStripTooltip(event.currentTarget, dateKey, entry)}
                                 onBlur={() => setDailyStripTooltip(null)}
+                                onContextMenu={(event) => openDailyStripContextMenu(event, dateKey, entry)}
                                 className={`relative flex h-7 min-w-0 items-center justify-center rounded border text-xs font-black transition duration-300 hover:-translate-y-0.5 hover:shadow-sm ${
                                   entry
                                     ? 'border-transparent text-white'
@@ -2237,6 +2299,50 @@ function CalendarPage({
             </>
           ) : (
             <span className="mt-1 block text-gray-300">No daily report yet</span>
+          )}
+        </div>
+      )}
+
+      {dailyStripContextMenu && (
+        <div
+          className="quick-launch-context-menu fixed z-[100] min-w-52 overflow-hidden rounded border border-gray-200 bg-white p-1 text-sm shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+          style={{
+            left: dailyStripContextMenu.x,
+            top: dailyStripContextMenu.y,
+          }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              openDay(dailyStripContextMenu.dateKey);
+              setDailyStripContextMenu(null);
+            }}
+            className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
+          >
+            {dailyStripContextMenu.entry ? 'Open Daily' : 'Create Daily'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              copyPreviousDailyToDate(dailyStripContextMenu.dateKey);
+              setDailyStripContextMenu(null);
+            }}
+            className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
+          >
+            Copy Previous Daily
+          </button>
+          {dailyStripContextMenu.entry && (
+            <button
+              type="button"
+              onClick={() => {
+                setEntryPendingDelete(dailyStripContextMenu.entry);
+                setDailyStripContextMenu(null);
+              }}
+              className="quick-launch-context-menu-item quick-launch-context-menu-danger text-danger"
+            >
+              Delete Daily
+            </button>
           )}
         </div>
       )}
