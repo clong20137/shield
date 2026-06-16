@@ -2261,14 +2261,6 @@ function MessagesRouteRedirect({ onOpenMessages }: { onOpenMessages: () => void 
   return <Navigate to="/" replace />;
 }
 
-function CalendarRouteRedirect({ onOpenCalendar }: { onOpenCalendar: () => void }) {
-  useEffect(() => {
-    onOpenCalendar();
-  }, [onOpenCalendar]);
-
-  return <Navigate to="/" replace />;
-}
-
 function CreateUserRouteRedirect({ onOpenCreateUser }: { onOpenCreateUser: () => void }) {
   useEffect(() => {
     onOpenCreateUser();
@@ -5038,9 +5030,10 @@ function App() {
       return;
     }
 
-    announceFloatingFocus('calendar');
-    setActiveFloatingApp('calendar');
-    setIsCalendarModalOpen(true);
+    if (isCalendarModalOpen) {
+      closeModal('calendar');
+    }
+    window.location.assign(withAppBase('/calendar'));
   };
 
   const toggleCalendarModal = () => {
@@ -5473,6 +5466,7 @@ function App() {
 
             <nav data-onboarding-target="navigation" className="flex shrink-0 flex-col gap-1.5 px-3 py-2">
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
+              {showCalendar && <SidebarLink to="/calendar" label="Calendar" compact={isSidebarCollapsed} icon={CalendarDays} />}
               {isAdministrator && <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />}
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
             </nav>
@@ -5732,7 +5726,12 @@ function App() {
                     <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
                     {currentUser && <Route path="/updates/:postId" element={<DashboardPostPage currentUser={currentUser} onToast={showToast} />} />}
                     {currentUser && <Route path="/messages" element={<MessagesRouteRedirect onOpenMessages={openMessagesModal} />} />}
-                    {currentUser && showCalendar && <Route path="/calendar" element={<CalendarRouteRedirect onOpenCalendar={openCalendarModal} />} />}
+                    {currentUser && showCalendar && (
+                      <Route
+                        path="/calendar"
+                        element={<CalendarPage currentUser={currentUser} onOpenCalculator={openCalculator} onAccountUpdate={handleAccountUpdate} onToast={showToast} useMilitaryTime={messagePreferences.useMilitaryTime} />}
+                      />
+                    )}
                     <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
                     {currentUser && (
                       <Route

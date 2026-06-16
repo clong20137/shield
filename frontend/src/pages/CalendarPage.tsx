@@ -1227,6 +1227,8 @@ function CalendarPage({
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
+      {(!selectedDate || isFloatingApp) && (
+      <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => changeCalendarPeriod(-1)} className="btn-secondary" aria-label="Previous calendar period" title="Previous">
@@ -1454,10 +1456,12 @@ function CalendarPage({
           </div>
         )}
       </div>
+      </>
+      )}
 
       {selectedDate && (
-        <div className={isFloatingApp ? 'absolute inset-0 z-20 flex min-h-0 bg-white dark:bg-gray-900' : 'modal-backdrop fixed inset-0 z-[70] flex items-end justify-center bg-black/50 sm:items-center'}>
-          <div className={isFloatingApp ? 'h-full min-h-0 w-full overflow-y-auto rounded-lg bg-white p-3 shadow-none dark:bg-gray-900 sm:p-4' : 'modal-window max-h-[96dvh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:max-h-[92vh] sm:p-5'}>
+        <div className={isFloatingApp ? 'absolute inset-0 z-20 flex min-h-0 bg-white dark:bg-gray-900' : 'min-h-0 flex-1'}>
+          <div className={isFloatingApp ? 'h-full min-h-0 w-full overflow-y-auto rounded-lg bg-white p-3 shadow-none dark:bg-gray-900 sm:p-4' : 'h-full min-h-0 overflow-y-auto rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5'}>
             <div className="mb-5 flex flex-wrap items-start justify-between gap-3 sm:gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Trooper Daily</p>
@@ -1498,11 +1502,12 @@ function CalendarPage({
                 <button
                   type="button"
                   onClick={() => setSelectedDate(null)}
-                  className="icon-close-button"
-                  aria-label="Close calendar day"
-                  title="Close"
+                  className={isFloatingApp ? 'icon-close-button' : 'btn-secondary'}
+                  aria-label={isFloatingApp ? 'Close calendar day' : 'Back to calendar'}
+                  title={isFloatingApp ? 'Close' : 'Back to Calendar'}
                 >
-                  <X size={20} />
+                  {isFloatingApp ? <X size={20} /> : <ChevronLeft size={16} />}
+                  {!isFloatingApp && <span>Back</span>}
                 </button>
               </div>
             </div>
