@@ -1057,7 +1057,7 @@ function SidebarCalendarWidget({
 }: {
   compact: boolean;
   entries: CalendarEntry[];
-  onOpenCalendar: () => void;
+  onOpenCalendar: (dateKey?: string) => void;
 }) {
   const todayKey = getLocalDateKey();
   const [visibleMonth, setVisibleMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
@@ -1089,7 +1089,7 @@ function SidebarCalendarWidget({
     return (
       <button
         type="button"
-        onClick={onOpenCalendar}
+        onClick={() => onOpenCalendar()}
         className="mb-3 flex h-11 w-full items-center justify-center rounded bg-white/10 text-white transition hover:bg-white/15"
         aria-label="Open calendar"
         title="Open calendar"
@@ -1139,7 +1139,7 @@ function SidebarCalendarWidget({
             <button
               key={dateKey}
               type="button"
-              onClick={onOpenCalendar}
+              onClick={() => onOpenCalendar(dateKey)}
               onMouseEnter={(event) => showDateTooltip(event.currentTarget, dateKey, dayEntries)}
               onMouseLeave={() => setHoveredDate(null)}
               onFocus={(event) => showDateTooltip(event.currentTarget, dateKey, dayEntries)}
@@ -1154,7 +1154,7 @@ function SidebarCalendarWidget({
                       : 'border-transparent bg-black/5 text-blue-100/45 hover:bg-white/10'
               }`}
               style={primaryEntry ? { backgroundColor: primaryEntry.color } : undefined}
-              aria-label={`Open calendar for ${date.toLocaleDateString()}`}
+              aria-label={`Open Trooper Daily for ${date.toLocaleDateString()}`}
               title={dayEntries.length > 0 ? `${dayEntries.length} calendar ${dayEntries.length === 1 ? 'entry' : 'entries'}` : 'Open Calendar'}
             >
               {date.getDate()}
@@ -5117,13 +5117,15 @@ function App() {
     openMessagesModal();
   };
 
-  const openCalendarModal = () => {
+  const openCalendarModal = (targetDate?: unknown) => {
     if (!showCalendar) {
       return;
     }
 
-    if (getAppRelativePathname() !== '/calendar') {
-      window.location.assign(withAppBase('/calendar'));
+    const dateQuery = typeof targetDate === 'string' ? `?date=${encodeURIComponent(targetDate)}` : '';
+    const targetPath = `/calendar${dateQuery}`;
+    if (`${getAppRelativePathname()}${window.location.search}` !== targetPath) {
+      window.location.assign(withAppBase(targetPath));
     }
   };
 
@@ -5523,7 +5525,7 @@ function App() {
                 className={`w-full overflow-hidden rounded bg-white/10 text-left transition hover:bg-white/15 ${isSidebarCollapsed ? 'p-1.5' : 'p-2.5'}`}
                 title="Open profile"
               >
-                <div className={isSidebarCollapsed ? 'flex justify-center' : 'flex items-center gap-3'}>
+                <div className="flex justify-center">
                   {currentUser?.profilePictureUrl ? (
                     <img
                       src={getAssetThumbnailUrl(currentUser.profilePictureUrl, 96)}
@@ -5536,19 +5538,7 @@ function App() {
                       {currentUser ? getInitials(currentUser.displayName, currentUser.email) : <UserCircle size={32} />}
                     </div>
                   )}
-                  {!isSidebarCollapsed && (
-                    <div className="min-w-0 text-white">
-                      <p className="text-[11px] uppercase tracking-[0.14em] text-blue-100">Profile</p>
-                    <p className="truncate text-sm font-bold">{currentUser?.displayName}</p>
-                      <p className="truncate text-xs text-blue-100">{currentUser?.email}</p>
-                    </div>
-                  )}
                 </div>
-                {!isSidebarCollapsed && (
-                  <div className="mt-2 rounded bg-black/15 px-3 py-1.5 text-xs font-semibold text-white">
-                    {currentUser?.role || 'user'} - {currentUser?.twoFactorEnabled ? 'MFA enabled' : 'MFA not enabled'}
-                  </div>
-                )}
               </button>
             </div>
 

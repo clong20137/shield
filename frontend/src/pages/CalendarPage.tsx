@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCopy, Eye, EyeOff, Pencil, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { AuthAccount, CalendarEntry, CalendarShortcut, authService, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
@@ -293,6 +294,16 @@ const formatDateKey = (date: Date) => {
   const day = String(date.getDate()).padStart(2, '0');
 
   return `${year}-${month}-${day}`;
+};
+
+const isValidDateKey = (value: string | null) => {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return formatDateKey(date) === value;
 };
 
 const getMonthLabel = (date: Date) =>
@@ -620,6 +631,11 @@ function CalendarPage({
   useMilitaryTime?: boolean;
   isFloatingApp?: boolean;
 }) {
+  const location = useLocation();
+  const requestedDailyDate = useMemo(() => {
+    const date = new URLSearchParams(location.search).get('date');
+    return isValidDateKey(date) ? date : null;
+  }, [location.search]);
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -661,6 +677,7 @@ function CalendarPage({
   const previousEntryFormRef = useRef<CalendarEntryForm | null>(entryForm);
   const isRestoringDailyHistoryRef = useRef(false);
   const pendingDailyFocusRef = useRef<'field' | 'submit' | null>(null);
+  const openedQueryDateRef = useRef<string | null>(null);
 
   const actor = {
     actorId: currentUser.id,
@@ -785,6 +802,15 @@ function CalendarPage({
     setDailySaveStatusAt(shouldRestoreLocalDraft && localDraft ? localDraft.savedAt : existingEntry?.updatedAt ? new Date(existingEntry.updatedAt).getTime() : null);
     setInvalidDailyField(null);
   };
+
+  useEffect(() => {
+    if (isCalendarLoading || !requestedDailyDate || openedQueryDateRef.current === requestedDailyDate) {
+      return;
+    }
+
+    openedQueryDateRef.current = requestedDailyDate;
+    openDay(requestedDailyDate);
+  }, [entries, isCalendarLoading, requestedDailyDate]);
 
   const jumpDailyShortcutMonth = (direction: -1 | 1) => {
     const sourceDateKey = selectedDate || formatDateKey(calendarFocusDate);
