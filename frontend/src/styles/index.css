@@ -520,6 +520,16 @@
   }
 }
 
+@keyframes trooper-daily-field-guard {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+  }
+
+  45% {
+    box-shadow: 0 0 0 6px rgba(220, 38, 38, 0.16);
+  }
+}
+
 @layer base {
   * {
     -webkit-tap-highlight-color: transparent;
@@ -1483,6 +1493,10 @@
 
   .trooper-daily-active-pulse {
     animation: trooper-daily-active-pulse 2.4s ease-in-out infinite;
+  }
+
+  .trooper-daily-field-guard {
+    animation: trooper-daily-field-guard 900ms ease-in-out 2;
   }
 
   .shield-loader {
