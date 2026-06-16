@@ -1978,7 +1978,14 @@ function CalendarPage({
                               )}
                               {day}
                               {entry && (
-                                <span className="trooper-daily-strip-filled-icon" aria-hidden="true">
+                                <span
+                                  className={`trooper-daily-strip-filled-icon ${
+                                    entry.submissionStatus === 'Submitted'
+                                      ? 'trooper-daily-strip-filled-icon-submitted'
+                                      : 'trooper-daily-strip-filled-icon-draft'
+                                  }`}
+                                  aria-hidden="true"
+                                >
                                   <CheckCircle2 size={8} />
                                 </span>
                               )}
