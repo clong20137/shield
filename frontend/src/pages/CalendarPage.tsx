@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Bell, Calculator, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCopy, Eye, EyeOff, Pencil, Save, Sparkles, Trash2, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Bell, Calculator, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCopy, Eye, EyeOff, Pencil, Save, Sparkles, Trash2, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, CalendarShortcut, authService, calendarService, reminderService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
@@ -618,7 +618,7 @@ function CalendarPage({
   const [districtFilter, setDistrictFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [entryPendingDelete, setEntryPendingDelete] = useState<CalendarEntry | null>(null);
-  const [collapsedDailySections, setCollapsedDailySections] = useState<string[]>([]);
+  const [activeDailyPanel, setActiveDailyPanel] = useState<string>('Administrative');
   const [hiddenDailySections, setHiddenDailySections] = useState<string[]>(currentUser.trooperDailyHiddenSections || []);
   const [shortcuts, setShortcuts] = useState<CalendarShortcut[]>([]);
   const [shortcutName, setShortcutName] = useState('');
@@ -867,7 +867,9 @@ function CalendarPage({
 
     const hours = Number(entryForm.dutyHours);
 
-    if (!entryForm.date || Number.isNaN(hours) || hours < 0) {
+    if (!entryForm.date || !entryForm.dutyHours.trim() || Number.isNaN(hours) || hours < 0) {
+      setActiveDailyPanel('Administrative');
+      setCalendarError('Date and duty hours are required.');
       return;
     }
 
@@ -1070,10 +1072,14 @@ function CalendarPage({
       return;
     }
 
+    if (activeDailyPanel === sectionTitle) {
+      setActiveDailyPanel('Administrative');
+    }
     void saveHiddenDailySections([...hiddenDailySections, sectionTitle]);
   };
 
   const showDailySection = (sectionTitle: string) => {
+    setActiveDailyPanel(sectionTitle);
     void saveHiddenDailySections(hiddenDailySections.filter((title) => title !== sectionTitle));
   };
 
@@ -1202,8 +1208,22 @@ function CalendarPage({
     ((hasShiftTime && Math.abs(calculatedShiftHours - reportedDutyHours) > 0.01) ||
       (attendanceHours > 0 && Math.abs(attendanceHours - reportedDutyHours) > 0.01) ||
       (dutyActivityHours > 0 && Math.abs(dutyActivityHours - reportedDutyHours) > 0.01));
-  const visibleDailySections = trooperDailySections.filter((section) => !hiddenDailySections.includes(section.title));
+  const visibleDailySections = useMemo(
+    () => trooperDailySections.filter((section) => !hiddenDailySections.includes(section.title)),
+    [hiddenDailySections],
+  );
+  const dailyPanelOptions = useMemo(
+    () => ['Administrative', ...visibleDailySections.map((section) => section.title), 'Narrative'],
+    [visibleDailySections],
+  );
+  const activeDailySection = visibleDailySections.find((section) => section.title === activeDailyPanel);
   const editingSubmissionStatus = editingEntry?.submissionStatus || entryForm.submissionStatus || 'Draft';
+
+  useEffect(() => {
+    if (!dailyPanelOptions.includes(activeDailyPanel)) {
+      setActiveDailyPanel('Administrative');
+    }
+  }, [activeDailyPanel, dailyPanelOptions]);
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
@@ -1591,121 +1611,49 @@ function CalendarPage({
                 </div>
               </div>
 
-              <label className="block">
-                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Date</span>
-                <input
-                  type="date"
-                  value={entryForm.date}
-                  onChange={(event) =>
-                    setEntryForm((currentForm) => ({ ...currentForm, date: event.target.value }))
-                  }
-                  data-daily-field="entryDate"
-                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-                  required
-                />
-              </label>
+              <div className="grid min-h-[34rem] grid-cols-1 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 md:col-span-2 lg:grid-cols-[16rem_minmax(0,1fr)]">
+                <aside className="border-b border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900 lg:border-b-0 lg:border-r">
+                  <div className="mb-3 rounded-md border border-accent/30 bg-accent/10 px-3 py-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Trooper Daily</p>
+                    <p className="mt-1 text-sm font-semibold text-gray-800 dark:text-gray-100">{getReadableDate(selectedDate)}</p>
+                  </div>
+                  <nav className="grid max-h-[26rem] gap-1 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-1" aria-label="Trooper Daily input sections">
+                    {dailyPanelOptions.map((panel) => {
+                      const panelSection = visibleDailySections.find((section) => section.title === panel);
+                      const isComplete = panel === 'Administrative'
+                        ? Boolean(entryForm.date && entryForm.dutyHours && entryForm.districtWorked && entryForm.specialStatus)
+                        : panel === 'Narrative'
+                          ? Boolean(entryForm.details?.narrative?.trim())
+                          : Boolean(panelSection && isSectionComplete(entryForm.details, panelSection));
+                      const isActive = activeDailyPanel === panel;
 
-              <label className="block">
-                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Duty Hours</span>
-                <div className="relative">
-                  <input
-                    type="text"
-                    min="0"
-                    inputMode="decimal"
-                    maxLength={dailyInputCharacterLimit}
-                    value={entryForm.dutyHours}
-                    onChange={(event) => updateDutyHours(event.target.value)}
-                    data-daily-field="dutyHours"
-                    className={`w-full rounded border bg-white px-3 py-2 pr-9 transition dark:bg-gray-950 ${
-                      entryForm.dutyHours
-                        ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
-                        : 'border-gray-300 dark:border-gray-700'
-                    }`}
-                    required
-                  />
-                  {entryForm.dutyHours && (
-                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-green-600 dark:text-green-300">
-                      <CheckCircle2 className="trooper-daily-check" size={17} />
-                    </span>
-                  )}
-                </div>
-                {calculatedShiftHours > 0 && (
-                  <span className="mt-1 block text-xs font-semibold text-gray-500 dark:text-gray-400">
-                    Shift times calculate to {formatHours(calculatedShiftHours)} hrs.
-                  </span>
-                )}
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">District Worked</span>
-                <select
-                  value={entryForm.districtWorked}
-                  onChange={(event) =>
-                    setEntryForm((currentForm) => ({ ...currentForm, districtWorked: event.target.value }))
-                  }
-                  data-daily-field="districtWorked"
-                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-                >
-                  {districtOptions.map((district) => (
-                    <option key={district}>{district}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Special Status</span>
-                <select
-                  value={entryForm.specialStatus}
-                  onChange={(event) =>
-                    setEntryForm((currentForm) => ({ ...currentForm, specialStatus: event.target.value }))
-                  }
-                  data-daily-field="specialStatus"
-                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-                >
-                  {specialStatusOptions.map((status) => (
-                    <option key={status}>{status}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Color Code</span>
-                <select
-                  value={entryForm.color}
-                  onChange={(event) => setEntryForm((currentForm) => ({ ...currentForm, color: event.target.value }))}
-                  data-daily-field="color"
-                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-                >
-                  {entryColors.map((color) => (
-                    <option key={color.value} value={color.value}>{color.label}</option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="md:col-span-2">
-                <div className={`mb-4 grid grid-cols-1 gap-3 rounded-lg border p-4 md:grid-cols-4 ${
-                  hasHourMismatch ? 'border-danger/40 bg-red-50 dark:bg-red-950/30' : 'border-accent/30 bg-accent/5'
-                }`}>
-                  <HourSummaryCard label="Reported" value={`${formatHours(reportedDutyHours || 0)} hrs`} tone="primary" />
-                  <HourSummaryCard label="Shift Time" value={`${formatHours(calculatedShiftHours)} hrs`} tone="accent" helper={getDifferenceLabel(reportedDutyHours, calculatedShiftHours)} isMatch={shiftHoursMatch} />
-                  <HourSummaryCard label="Attendance" value={`${formatHours(attendanceHours)} hrs`} tone="primary" helper={getDifferenceLabel(reportedDutyHours, attendanceHours)} isMatch={attendanceHoursMatch} />
-                  <HourSummaryCard label="Duty Activity" value={`${formatHours(dutyActivityHours)} hrs`} tone="primary" helper={getDifferenceLabel(reportedDutyHours, dutyActivityHours)} isMatch={dutyActivityHoursMatch} />
-                  {hasHourMismatch && (
-                    <p className="text-sm font-semibold text-danger md:col-span-4">
-                      Hours do not match the reported duty hours. Review shift times, attendance hours, and duty activity hours before submitting.
-                    </p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+                      return (
+                        <button
+                          key={panel}
+                          type="button"
+                          onClick={() => setActiveDailyPanel(panel)}
+                          className={`group flex items-center justify-between gap-3 rounded-md border px-3 py-2.5 text-left text-sm font-bold transition-all duration-500 ${
+                            isActive
+                              ? 'border-accent bg-white text-accent shadow-sm dark:bg-gray-950'
+                              : 'border-transparent text-gray-600 hover:border-gray-200 hover:bg-white hover:text-primary-500 dark:text-gray-300 dark:hover:border-gray-800 dark:hover:bg-gray-950 dark:hover:text-blue-100'
+                          }`}
+                          aria-current={isActive ? 'step' : undefined}
+                        >
+                          <span className="min-w-0 truncate">{panel}</span>
+                          {isComplete ? (
+                            <CheckCircle2 className="trooper-daily-check shrink-0 text-green-600 dark:text-green-300" size={16} />
+                          ) : (
+                            <span className={`h-2 w-2 shrink-0 rounded-full ${isActive ? 'bg-accent' : 'bg-gray-300 dark:bg-gray-700'}`} />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </nav>
                   {hiddenDailySections.length > 0 && (
-                    <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900 xl:col-span-2">
-                      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Hidden Sections</h3>
-                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">These stay hidden for your account until you show them again.</p>
-                        </div>
-                        <Eye size={18} className="text-accent" />
+                    <div className="mt-4 rounded-md border border-dashed border-gray-300 bg-white p-3 dark:border-gray-700 dark:bg-gray-950">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold uppercase text-gray-400">Hidden</span>
+                        <Eye size={15} className="text-accent" />
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {trooperDailySections
@@ -1715,125 +1663,222 @@ function CalendarPage({
                               key={section.title}
                               type="button"
                               onClick={() => showDailySection(section.title)}
-                              className="inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-primary-500 shadow-sm hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-950 dark:text-blue-100"
+                              className="rounded border border-gray-200 px-2 py-1 text-xs font-bold text-primary-500 transition hover:border-accent hover:text-accent dark:border-gray-800 dark:text-blue-100"
                               aria-label={`Show ${section.title}`}
                               title={`Show ${section.title}`}
                             >
-                              <Eye size={15} />
-                              <span>{section.title}</span>
+                              {section.title}
                             </button>
                           ))}
                       </div>
                     </div>
                   )}
+                </aside>
 
-                  {visibleDailySections.map((section) => {
-                    const isCollapsed = collapsedDailySections.includes(section.title);
-                    return (
-                      <section
-                        key={section.title}
-                        className={`self-start rounded-lg border bg-white p-4 transition-all duration-300 overflow-hidden dark:bg-gray-950 ${
-                          isSectionComplete(entryForm.details, section)
-                            ? 'trooper-daily-match border-green-300 dark:border-green-800'
-                            : 'border-gray-200 dark:border-gray-800'
-                        }`}
-                      >
-                        <div className={`${isCollapsed ? '' : 'mb-4'} flex items-center justify-between gap-3`}>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setCollapsedDailySections((sections) =>
-                                sections.includes(section.title)
-                                  ? sections.filter((title) => title !== section.title)
-                                  : [...sections, section.title],
-                              )
+                <section className="min-w-0 p-4">
+                  {activeDailyPanel === 'Administrative' && (
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Administrative</h3>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Set the report date, hours, district, status, and color coding.</p>
+                      </div>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <label className="block">
+                          <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Date</span>
+                          <input
+                            type="date"
+                            value={entryForm.date}
+                            onChange={(event) =>
+                              setEntryForm((currentForm) => ({ ...currentForm, date: event.target.value }))
                             }
-                            className="flex min-w-0 items-center gap-2 text-left"
-                            aria-expanded={!isCollapsed}
-                          >
-                            <ChevronDown className={`shrink-0 text-gray-400 transition ${isCollapsed ? '-rotate-90' : ''}`} size={18} />
-                            <h3 className="flex min-w-0 items-center gap-2 text-base font-bold text-gray-900 dark:text-gray-100">
-                              {section.title}
-                              {isSectionComplete(entryForm.details, section) && <CheckCircle2 className="trooper-daily-check shrink-0 text-green-600 dark:text-green-300" size={18} />}
-                            </h3>
-                          </button>
-                          <div className="flex shrink-0 items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => hideDailySection(section.title)}
-                              className="flex h-8 w-8 items-center justify-center rounded border border-gray-200 text-gray-500 hover:border-accent hover:text-accent dark:border-gray-800 dark:text-gray-400"
-                              aria-label={`Hide ${section.title}`}
-                              title={`Hide ${section.title}`}
-                            >
-                              <EyeOff size={15} />
-                            </button>
-                            <span className={`h-1.5 w-10 rounded-full ${isSectionComplete(entryForm.details, section) ? 'bg-green-500' : 'bg-accent'}`} />
+                            data-daily-field="entryDate"
+                            className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                            required
+                          />
+                        </label>
+
+                        <label className="block">
+                          <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Duty Hours</span>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              min="0"
+                              inputMode="decimal"
+                              maxLength={dailyInputCharacterLimit}
+                              value={entryForm.dutyHours}
+                              onChange={(event) => updateDutyHours(event.target.value)}
+                              data-daily-field="dutyHours"
+                              className={`w-full rounded border bg-white px-3 py-2 pr-9 transition dark:bg-gray-950 ${
+                                entryForm.dutyHours
+                                  ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
+                                  : 'border-gray-300 dark:border-gray-700'
+                              }`}
+                              required
+                            />
+                            {entryForm.dutyHours && (
+                              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-green-600 dark:text-green-300">
+                                <CheckCircle2 className="trooper-daily-check" size={17} />
+                              </span>
+                            )}
                           </div>
+                          {calculatedShiftHours > 0 && (
+                            <span className="mt-1 block text-xs font-semibold text-gray-500 dark:text-gray-400">
+                              Shift times calculate to {formatHours(calculatedShiftHours)} hrs.
+                            </span>
+                          )}
+                        </label>
+
+                        <label className="block">
+                          <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">District Worked</span>
+                          <select
+                            value={entryForm.districtWorked}
+                            onChange={(event) =>
+                              setEntryForm((currentForm) => ({ ...currentForm, districtWorked: event.target.value }))
+                            }
+                            data-daily-field="districtWorked"
+                            className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                          >
+                            {districtOptions.map((district) => (
+                              <option key={district}>{district}</option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="block">
+                          <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Special Status</span>
+                          <select
+                            value={entryForm.specialStatus}
+                            onChange={(event) =>
+                              setEntryForm((currentForm) => ({ ...currentForm, specialStatus: event.target.value }))
+                            }
+                            data-daily-field="specialStatus"
+                            className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                          >
+                            {specialStatusOptions.map((status) => (
+                              <option key={status}>{status}</option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="block">
+                          <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Color Code</span>
+                          <select
+                            value={entryForm.color}
+                            onChange={(event) => setEntryForm((currentForm) => ({ ...currentForm, color: event.target.value }))}
+                            data-daily-field="color"
+                            className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                          >
+                            {entryColors.map((color) => (
+                              <option key={color.value} value={color.value}>{color.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+
+                      <div className={`grid grid-cols-1 gap-3 rounded-lg border p-4 md:grid-cols-4 ${
+                        hasHourMismatch ? 'border-danger/40 bg-red-50 dark:bg-red-950/30' : 'border-accent/30 bg-accent/5'
+                      }`}>
+                        <HourSummaryCard label="Reported" value={`${formatHours(reportedDutyHours || 0)} hrs`} tone="primary" />
+                        <HourSummaryCard label="Shift Time" value={`${formatHours(calculatedShiftHours)} hrs`} tone="accent" helper={getDifferenceLabel(reportedDutyHours, calculatedShiftHours)} isMatch={shiftHoursMatch} />
+                        <HourSummaryCard label="Attendance" value={`${formatHours(attendanceHours)} hrs`} tone="primary" helper={getDifferenceLabel(reportedDutyHours, attendanceHours)} isMatch={attendanceHoursMatch} />
+                        <HourSummaryCard label="Duty Activity" value={`${formatHours(dutyActivityHours)} hrs`} tone="primary" helper={getDifferenceLabel(reportedDutyHours, dutyActivityHours)} isMatch={dutyActivityHoursMatch} />
+                        {hasHourMismatch && (
+                          <p className="text-sm font-semibold text-danger md:col-span-4">
+                            Hours do not match the reported duty hours. Review shift times, attendance hours, and duty activity hours before submitting.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeDailySection && (
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h3 className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-gray-100">
+                            {activeDailySection.title}
+                            {isSectionComplete(entryForm.details, activeDailySection) && <CheckCircle2 className="trooper-daily-check text-green-600 dark:text-green-300" size={18} />}
+                          </h3>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            {activeDailySection.fields.filter(([key]) => isDetailComplete(entryForm.details, key)).length} of {activeDailySection.fields.length} fields complete.
+                          </p>
                         </div>
-                        <div className={`overflow-hidden transition-all duration-300 ${isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[1200px] opacity-100'}`}>
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            {section.fields.map(([key, label]) => {
-                              const isTimeField = timeDetailFields.has(key);
-                              const isComplete = isDetailComplete(entryForm.details, key);
-                              return (
-                                <label key={key} className="block">
-                                  <span className="mb-1 block text-xs font-bold uppercase text-gray-500 dark:text-gray-400">{label}</span>
-                                  {isTimeField ? (
-                                    <TimeDetailInput
-                                      value={entryForm.details?.[key] || ''}
-                                      onChange={(value) => updateDailyDetail(key, value)}
-                                      isComplete={isComplete}
-                                      useMilitaryTime={useMilitaryTime}
-                                      fieldId={key}
-                                    />
-                                  ) : (
-                                    <div className="relative">
-                                      <input
-                                        type="text"
-                                        inputMode={wholeNumberDetailFields.has(key) ? 'numeric' : 'decimal'}
-                                        maxLength={dailyInputCharacterLimit}
-                                        value={entryForm.details?.[key] || ''}
-                                        onChange={(event) => updateDailyDetail(key, event.target.value)}
-                                        data-daily-field={key}
-                                        className={`w-full rounded border bg-white px-3 py-2 pr-8 text-sm transition dark:bg-gray-900 ${
-                                          isComplete
-                                            ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
-                                            : 'border-gray-300 dark:border-gray-700'
-                                        }`}
-                                      />
-                                      {isComplete && (
-                                        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-green-600 dark:text-green-300">
-                                          <CheckCircle2 className="trooper-daily-check" size={16} />
-                                        </span>
-                                      )}
-                                    </div>
+                        <button
+                          type="button"
+                          onClick={() => hideDailySection(activeDailySection.title)}
+                          className="flex h-9 w-9 items-center justify-center rounded border border-gray-200 text-gray-500 transition hover:border-accent hover:text-accent dark:border-gray-800 dark:text-gray-400"
+                          aria-label={`Hide ${activeDailySection.title}`}
+                          title={`Hide ${activeDailySection.title}`}
+                        >
+                          <EyeOff size={16} />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {activeDailySection.fields.map(([key, label]) => {
+                          const isTimeField = timeDetailFields.has(key);
+                          const isComplete = isDetailComplete(entryForm.details, key);
+                          return (
+                            <label key={key} className="block">
+                              <span className="mb-1 block text-xs font-bold uppercase text-gray-500 dark:text-gray-400">{label}</span>
+                              {isTimeField ? (
+                                <TimeDetailInput
+                                  value={entryForm.details?.[key] || ''}
+                                  onChange={(value) => updateDailyDetail(key, value)}
+                                  isComplete={isComplete}
+                                  useMilitaryTime={useMilitaryTime}
+                                  fieldId={key}
+                                />
+                              ) : (
+                                <div className="relative">
+                                  <input
+                                    type="text"
+                                    inputMode={wholeNumberDetailFields.has(key) ? 'numeric' : 'decimal'}
+                                    maxLength={dailyInputCharacterLimit}
+                                    value={entryForm.details?.[key] || ''}
+                                    onChange={(event) => updateDailyDetail(key, event.target.value)}
+                                    data-daily-field={key}
+                                    className={`w-full rounded border bg-white px-3 py-2 pr-8 text-sm transition dark:bg-gray-900 ${
+                                      isComplete
+                                        ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
+                                        : 'border-gray-300 dark:border-gray-700'
+                                    }`}
+                                  />
+                                  {isComplete && (
+                                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-green-600 dark:text-green-300">
+                                      <CheckCircle2 className="trooper-daily-check" size={16} />
+                                    </span>
                                   )}
-                                </label>
+                                </div>
+                              )}
+                            </label>
                           );
                         })}
                       </div>
                     </div>
-                    </section>
-                    );
-                  })}
+                  )}
 
-                  <section className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950 xl:col-span-2">
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                      <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Narrative</h3>
-                      <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
-                        {(entryForm.details?.narrative || '').length}/{narrativeCharacterLimit}
-                      </span>
+                  {activeDailyPanel === 'Narrative' && (
+                    <div>
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Narrative</h3>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Add context for the daily report.</p>
+                        </div>
+                        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
+                          {(entryForm.details?.narrative || '').length}/{narrativeCharacterLimit}
+                        </span>
+                      </div>
+                      <textarea
+                        value={entryForm.details?.narrative || ''}
+                        onChange={(event) => updateDailyDetail('narrative', event.target.value)}
+                        placeholder="Type a narrative here"
+                        maxLength={narrativeCharacterLimit}
+                        data-daily-field="narrative"
+                        className="min-h-72 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                      />
                     </div>
-                    <textarea
-                      value={entryForm.details?.narrative || ''}
-                      onChange={(event) => updateDailyDetail('narrative', event.target.value)}
-                      placeholder="Type a narrative here"
-                      maxLength={narrativeCharacterLimit}
-                      data-daily-field="narrative"
-                      className="min-h-40 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-                    />
-                  </section>
-                </div>
+                  )}
+                </section>
               </div>
 
               <div className="flex flex-wrap items-center justify-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950 md:col-span-2">
