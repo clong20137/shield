@@ -1601,12 +1601,10 @@ function MyDayWidget({
   currentUser,
   initialEntries,
   initialReminders,
-  onOpenCalendar,
 }: {
   currentUser: AuthAccount | null;
   initialEntries?: CalendarEntry[];
   initialReminders?: Reminder[];
-  onOpenCalendar: () => void;
 }) {
   const [entries, setEntries] = useState<CalendarEntry[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -1730,9 +1728,9 @@ function MyDayWidget({
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{getReadableDate(todayKey)}</p>
           </div>
         </div>
-        <button type="button" onClick={onOpenCalendar} className="btn-secondary shrink-0" aria-label="Open calendar" title="Open Calendar">
+        <Link to="/calendar" className="btn-secondary shrink-0" aria-label="Open calendar" title="Open Calendar">
           <CalendarDays size={16} />
-        </button>
+        </Link>
       </div>
 
       <div className="mb-4 grid grid-cols-3 gap-2">
@@ -1765,7 +1763,7 @@ function MyDayWidget({
             ) : (
               <div className="space-y-2">
                 {todaysEntries.slice(0, 4).map((entry) => (
-                  <button key={entry.id} type="button" onClick={onOpenCalendar} className="block w-full rounded border border-gray-200 bg-gray-50 p-3 text-left transition hover:border-accent hover:bg-white dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900">
+                  <Link key={entry.id} to="/calendar" className="block rounded border border-gray-200 bg-gray-50 p-3 transition hover:border-accent hover:bg-white dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900">
                     <div className="flex items-center justify-between gap-3">
                       <span className="truncate text-sm font-bold text-gray-900 dark:text-gray-100">{entry.category}</span>
                       <span className={`rounded-full px-2 py-1 text-xs font-bold ${entry.submissionStatus === 'Submitted' ? 'bg-success/10 text-success' : 'bg-accent/10 text-accent'}`}>
@@ -1775,7 +1773,7 @@ function MyDayWidget({
                     <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
                       {entry.districtWorked || 'No district'} - {entry.dutyHours || '0'} hrs
                     </p>
-                  </button>
+                  </Link>
                 ))}
               </div>
             )}
@@ -2254,7 +2252,7 @@ function QuickNotesWidget({
   );
 }
 
-const DashboardPage: React.FC<{ currentUser: AuthAccount | null; onOpenCalendar: () => void }> = ({ currentUser, onOpenCalendar }) => {
+const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUser }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -2459,7 +2457,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null; onOpenCalendar:
         </div>
         <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} initialProfiles={dashboardSummary?.pinnedProfiles} />
         <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)]">
-          <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} onOpenCalendar={onOpenCalendar} />
+          <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} />
           <DashboardNews currentUser={currentUser} initialPosts={dashboardSummary?.posts} />
         </div>
         <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
@@ -2483,7 +2481,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null; onOpenCalendar:
 
       <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} initialProfiles={dashboardSummary?.pinnedProfiles} />
       <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)]">
-        <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} onOpenCalendar={onOpenCalendar} />
+        <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} />
         <DashboardNews currentUser={currentUser} initialPosts={dashboardSummary?.posts} />
       </div>
       <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
