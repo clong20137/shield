@@ -1109,6 +1109,12 @@ export const calendarService = {
   getShortcuts: () =>
     api.get<CalendarShortcut[]>('/calendar/shortcuts'),
 
+  getTCodeOptions: () =>
+    api.get<{ options: string[] }>('/calendar/t-code-options'),
+
+  updateTCodeOptions: (options: string[]) =>
+    api.put<{ options: string[] }>('/calendar/t-code-options', { options }),
+
   createShortcut: (shortcut: Omit<CalendarShortcut, 'id' | 'createdAt' | 'updatedAt'>) =>
     api.post<CalendarShortcut>('/calendar/shortcuts', shortcut),
 

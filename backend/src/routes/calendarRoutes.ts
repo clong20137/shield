@@ -7,6 +7,8 @@ const router = Router();
 
 router.get('/', requirePermission('calendar:manage'), CalendarController.listEntries);
 router.get('/profile/:accountId', requireAuthenticated(), CalendarController.listProfileEntries);
+router.get('/t-code-options', requirePermission('calendar:manage'), CalendarController.listTCodeOptions);
+router.put('/t-code-options', requirePermission('admin:general'), CalendarController.updateTCodeOptions);
 router.get('/shortcuts', requirePermission('calendar:manage'), CalendarController.listShortcuts);
 router.post('/shortcuts', requirePermission('calendar:manage'), CalendarController.createShortcut);
 router.put('/shortcuts/:id', requirePermission('calendar:manage'), CalendarController.updateShortcut);

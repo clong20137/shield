@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BadgeCheck, CalendarClock, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCopy, Clock3, DollarSign, Eye, EyeOff, FileText, Gavel, LucideIcon, MapPin, Palette, Pencil, Pill, Save, ShieldAlert, Sparkles, Timer, Trash2, Truck, X } from 'lucide-react';
+import { BadgeCheck, CalendarClock, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCopy, Clock3, DollarSign, Eye, EyeOff, FileText, Gavel, ListChecks, LucideIcon, MapPin, Palette, Pencil, Pill, Plus, Save, ShieldAlert, Sparkles, Timer, Trash2, Truck, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { AuthAccount, CalendarEntry, CalendarShortcut, authService, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
@@ -23,6 +23,12 @@ const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Li
 const narrativeCharacterLimit = 1000;
 const dailyInputCharacterLimit = 5;
 const trooperDailyDraftStoragePrefix = 'shield_trooper_daily_draft';
+const tCodeDetailsKey = 'tCodes';
+type TrooperDailyTCode = {
+  id: string;
+  code: string;
+  timeWorked: string;
+};
 
 const entryColors = [
   { label: 'Accent', value: '#9C865C' },
@@ -531,6 +537,48 @@ function areEntryFormsEqual(firstForm: CalendarEntryForm, secondForm: CalendarEn
   return JSON.stringify(firstForm) === JSON.stringify(secondForm);
 }
 
+function createTCodeId(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function parseTCodeDetails(details: Record<string, string> | undefined): TrooperDailyTCode[] {
+  const rawValue = details?.[tCodeDetailsKey];
+  if (!rawValue) {
+    return [];
+  }
+
+  try {
+    const rows = JSON.parse(rawValue) as Array<Partial<TrooperDailyTCode>>;
+    if (!Array.isArray(rows)) {
+      return [];
+    }
+
+    return rows
+      .map((row) => ({
+        id: row.id || createTCodeId(),
+        code: String(row.code || '').slice(0, 80),
+        timeWorked: sanitizeDecimalInput(String(row.timeWorked || ''), 5),
+      }))
+      .filter((row) => row.code || row.timeWorked)
+      .slice(0, 25);
+  } catch {
+    return [];
+  }
+}
+
+function serializeTCodeDetails(rows: TrooperDailyTCode[]): string {
+  return JSON.stringify(rows
+    .map((row) => ({
+      id: row.id,
+      code: row.code.trim(),
+      timeWorked: sanitizeDecimalInput(row.timeWorked, 5),
+    }))
+    .filter((row) => row.code || row.timeWorked)
+    .slice(0, 25));
+}
+
 function isDetailComplete(details: Record<string, string> | undefined, key: string): boolean {
   return Boolean(details?.[key]?.trim());
 }
@@ -737,6 +785,7 @@ function CalendarPage({
   const [dailyUseMilitaryTime, setDailyUseMilitaryTime] = useState(useMilitaryTime);
   const [hiddenDailySections, setHiddenDailySections] = useState<string[]>(currentUser.trooperDailyHiddenSections || []);
   const [shortcuts, setShortcuts] = useState<CalendarShortcut[]>([]);
+  const [tCodeOptions, setTCodeOptions] = useState<string[]>([]);
   const [selectedShortcutId, setSelectedShortcutId] = useState('');
   const [shortcutName, setShortcutName] = useState('');
   const [editingShortcutId, setEditingShortcutId] = useState<string | null>(null);
@@ -796,9 +845,20 @@ function CalendarPage({
     }
   };
 
+  const loadTCodeOptions = async () => {
+    try {
+      const response = await calendarService.getTCodeOptions();
+      setTCodeOptions(response.data.options);
+    } catch (err) {
+      console.error('Failed to load T-Code options:', err);
+      setCalendarError(getApiErrorMessage(err, 'Failed to load T-Code options.'));
+    }
+  };
+
   useEffect(() => {
     loadCalendarEntries();
     void loadShortcuts();
+    void loadTCodeOptions();
     const handleCalendarUpdate = () => loadCalendarEntries(false);
 
     window.addEventListener('shield:calendar-updated', handleCalendarUpdate);
@@ -1385,6 +1445,42 @@ function CalendarPage({
     });
   };
 
+  const updateTCodeRows = (rows: TrooperDailyTCode[]) => {
+    setEntryForm((currentForm) => {
+      const nextDetails = { ...(currentForm.details || {}) };
+      const serializedRows = serializeTCodeDetails(rows);
+      if (serializedRows === '[]') {
+        delete nextDetails[tCodeDetailsKey];
+      } else {
+        nextDetails[tCodeDetailsKey] = serializedRows;
+      }
+
+      return {
+        ...currentForm,
+        details: nextDetails,
+      };
+    });
+  };
+
+  const addTCodeRow = () => {
+    updateTCodeRows([
+      ...parseTCodeDetails(entryForm.details),
+      {
+        id: createTCodeId(),
+        code: tCodeOptions[0] || '',
+        timeWorked: '',
+      },
+    ]);
+  };
+
+  const updateTCodeRow = (rowId: string, updates: Partial<Omit<TrooperDailyTCode, 'id'>>) => {
+    updateTCodeRows(parseTCodeDetails(entryForm.details).map((row) => row.id === rowId ? { ...row, ...updates } : row));
+  };
+
+  const deleteTCodeRow = (rowId: string) => {
+    updateTCodeRows(parseTCodeDetails(entryForm.details).filter((row) => row.id !== rowId));
+  };
+
   const updateDutyHours = (value: string) => {
     const nextValue = sanitizeDecimalInput(value);
     setInvalidDailyField((field) => (field === 'dutyHours' ? null : field));
@@ -1787,6 +1883,7 @@ function CalendarPage({
       : getDayLabel(calendarFocusDate);
   const reportedDutyHours = Number(entryForm.dutyHours) || 0;
   const entryDetails = entryForm.details || {};
+  const tCodeRows = parseTCodeDetails(entryDetails);
   const calculatedShiftHours = calculateShiftHours(entryDetails);
   const attendanceHours = attendanceHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
   const dutyActivityHours = dutyActivityHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
@@ -2690,6 +2787,95 @@ function CalendarPage({
                           );
                         })}
                       </div>
+                      {activeDailySection.title === 'Drug Activity' && (
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900/60">
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <h4 className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">
+                                <ListChecks size={16} className="text-accent" />
+                                T-Codes
+                              </h4>
+                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Add each T-Code worked and the time spent on it.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={addTCodeRow}
+                              className="btn-secondary"
+                              disabled={tCodeOptions.length === 0}
+                              aria-label="Add T-Code"
+                              title="Add T-Code"
+                            >
+                              <Plus size={16} />
+                              <span>Add T-Code</span>
+                            </button>
+                          </div>
+
+                          {tCodeOptions.length === 0 ? (
+                            <div className="rounded border border-dashed border-gray-300 px-3 py-3 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                              No T-Code options are configured.
+                            </div>
+                          ) : tCodeRows.length === 0 ? (
+                            <div className="rounded border border-dashed border-gray-300 px-3 py-3 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                              No T-Codes added.
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {tCodeRows.map((row) => (
+                                <div key={row.id} className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
+                                  <label className="block">
+                                    <span className="mb-1 block text-xs font-bold uppercase text-gray-500 dark:text-gray-400">T-Code</span>
+                                    <div className="relative">
+                                      <select
+                                        value={row.code}
+                                        onChange={(event) => updateTCodeRow(row.id, { code: event.target.value })}
+                                        className="w-full appearance-none rounded border border-gray-300 bg-white px-3 py-2 pr-9 text-sm dark:border-gray-700 dark:bg-gray-950"
+                                        aria-label="T-Code option"
+                                      >
+                                        {tCodeOptions.map((option) => (
+                                          <option key={option} value={option}>{option}</option>
+                                        ))}
+                                      </select>
+                                      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-300 dark:text-gray-200">
+                                        <ChevronRight className="rotate-90" size={17} />
+                                      </span>
+                                    </div>
+                                  </label>
+                                  <label className="block">
+                                    <span className="mb-1 block text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Time Worked</span>
+                                    <div className="relative">
+                                      <span className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center text-gray-400 dark:text-gray-500">
+                                        <Timer size={15} />
+                                      </span>
+                                      <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={row.timeWorked}
+                                        onChange={(event) => updateTCodeRow(row.id, { timeWorked: sanitizeDecimalInput(event.target.value, 5) })}
+                                        className="trooper-daily-field-with-icon w-full rounded border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-gray-700 dark:bg-gray-950"
+                                        aria-label="T-Code time worked"
+                                      />
+                                    </div>
+                                  </label>
+                                  <div className="flex items-end">
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteTCodeRow(row.id)}
+                                      className="btn-danger w-full justify-center sm:w-auto"
+                                      aria-label="Delete T-Code"
+                                      title="Delete T-Code"
+                                    >
+                                      <Trash2 size={16} />
+                                      <span>Delete</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 

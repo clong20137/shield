@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { CalendarEntryModel } from '../models/CalendarEntry';
 import { CalendarShortcutModel } from '../models/CalendarShortcut';
+import { SystemSettingModel } from '../models/SystemSetting';
 import { AuditLogModel } from '../models/AuditLog';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { UserModel } from '../models/User';
@@ -41,6 +42,29 @@ const districtOptions = [
 ] as const;
 const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training', 'Day Off'] as const;
 const submissionStatusOptions = ['Draft', 'Submitted'] as const;
+const tCodeOptionsSettingKey = 'trooperDaily.tCodeOptions';
+const defaultTCodeOptions = ['T-1', 'T-2', 'T-3'];
+
+function normalizeTCodeOptions(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(new Set(value
+    .map((option) => cleanString(option, 80))
+    .filter((option): option is string => Boolean(option))))
+    .slice(0, 100);
+}
+
+async function getTCodeOptions(): Promise<string[]> {
+  const storedValue = await SystemSettingModel.getString(tCodeOptionsSettingKey, JSON.stringify(defaultTCodeOptions));
+  try {
+    const options = normalizeTCodeOptions(JSON.parse(storedValue));
+    return options.length > 0 ? options : defaultTCodeOptions;
+  } catch {
+    return defaultTCodeOptions;
+  }
+}
 
 function getAuditActor(account: { id: string; displayName: string; email: string } | null) {
   return {
@@ -146,7 +170,7 @@ function validateCalendarEntryPayload(body: Record<string, unknown>) {
       specialStatus,
       color,
       submissionStatus,
-      details: cleanRecord(body.details, 160, 1000),
+      details: cleanRecord(body.details, 160, 5000),
     },
   };
 }
@@ -185,12 +209,33 @@ function validateCalendarShortcutPayload(body: Record<string, unknown>) {
       districtWorked,
       specialStatus,
       color,
-      details: cleanRecord(body.details, 160, 1000),
+      details: cleanRecord(body.details, 160, 5000),
     },
   };
 }
 
 export class CalendarController {
+  static async listTCodeOptions(req: Request, res: Response) {
+    try {
+      const options = await getTCodeOptions();
+      res.json({ options });
+    } catch (error) {
+      console.error('T-Code options list error:', error);
+      res.status(500).json({ error: 'Failed to load T-Code options' });
+    }
+  }
+
+  static async updateTCodeOptions(req: Request, res: Response) {
+    try {
+      const options = normalizeTCodeOptions((req.body as { options?: unknown }).options);
+      await SystemSettingModel.setString(tCodeOptionsSettingKey, JSON.stringify(options));
+      res.json({ options });
+    } catch (error) {
+      console.error('T-Code options update error:', error);
+      res.status(500).json({ error: 'Failed to save T-Code options' });
+    }
+  }
+
   static async listProfileEntries(req: Request, res: Response) {
     try {
       const account = await getSessionAccount(req);

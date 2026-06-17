@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { AlertTriangle, Award, Bug, ClipboardList, Images, LockKeyhole, Radio, Settings, UserPlus } from 'lucide-react';
+import { AlertTriangle, Award, Bug, ClipboardList, Images, LockKeyhole, ListChecks, Radio, Settings, UserPlus } from 'lucide-react';
 import { AuthAccount, BugReport, BugReportStatus, User } from '../services/api';
 
 const AchievementsPage = lazy(() => import('./AchievementsPage'));
@@ -9,9 +9,10 @@ const CreateUserPage = lazy(() => import('./CreateUserPage'));
 const ErrorLogPage = lazy(() => import('./ErrorLogPage'));
 const MediaLibraryPage = lazy(() => import('./MediaLibraryPage'));
 const PermissionsPage = lazy(() => import('./PermissionsPage'));
+const TCodeOptionsPage = lazy(() => import('./TCodeOptionsPage'));
 const UrgentAlertsPage = lazy(() => import('./UrgentAlertsPage'));
 
-export type AdminConsoleTab = 'general' | 'permissions' | 'achievements' | 'create-user' | 'media' | 'alerts' | 'audit' | 'errors' | 'bugs';
+export type AdminConsoleTab = 'general' | 'permissions' | 'achievements' | 'create-user' | 'media' | 'alerts' | 't-codes' | 'audit' | 'errors' | 'bugs';
 
 interface AdminConsolePageProps {
   account: AuthAccount;
@@ -31,6 +32,7 @@ const tabs: Array<{ id: AdminConsoleTab; label: string; icon: typeof Settings }>
   { id: 'create-user', label: 'Create User', icon: UserPlus },
   { id: 'media', label: 'Media', icon: Images },
   { id: 'alerts', label: 'Urgent Alerts', icon: Radio },
+  { id: 't-codes', label: 'T-Codes', icon: ListChecks },
   { id: 'bugs', label: 'Bug Tracker', icon: Bug },
   { id: 'audit', label: 'Audit Log', icon: ClipboardList },
   { id: 'errors', label: 'Error Log', icon: AlertTriangle },
@@ -52,6 +54,7 @@ function getVisibleTabs(account: AuthAccount): Array<{ id: AdminConsoleTab; labe
     if (tab.id === 'create-user') return hasPermission(account, 'admin:create-user') && hasPermission(account, 'users:create');
     if (tab.id === 'media') return hasPermission(account, 'admin:media') && (hasPermission(account, 'media:view') || hasPermission(account, 'media:upload') || hasPermission(account, 'media:edit') || hasPermission(account, 'media:delete'));
     if (tab.id === 'alerts') return hasPermission(account, 'admin:alerts') && hasPermission(account, 'alerts:send');
+    if (tab.id === 't-codes') return hasPermission(account, 'admin:general') && hasPermission(account, 'calendar:manage');
     if (tab.id === 'bugs') return hasPermission(account, 'admin:bugs') && hasPermission(account, 'bugs:manage');
     if (tab.id === 'audit') return hasPermission(account, 'admin:audit') && hasPermission(account, 'audit:view');
     if (tab.id === 'errors') return hasPermission(account, 'admin:errors') && hasPermission(account, 'audit:view');
@@ -163,6 +166,13 @@ export function AdminConsolePage({
           {currentTab === 'errors' && <ErrorLogPage />}
 
           {currentTab === 'alerts' && <UrgentAlertsPage onToast={onToast} />}
+
+          {currentTab === 't-codes' && (
+            <TCodeOptionsPage
+              onToast={onToast}
+              getErrorMessage={getErrorMessage}
+            />
+          )}
 
           {currentTab === 'bugs' && (
             onBugStatusChange ? (
