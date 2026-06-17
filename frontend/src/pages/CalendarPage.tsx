@@ -17,6 +17,10 @@ type StoredTrooperDailyDraft = {
   editingEntryId: string | null;
   savedAt: number;
 };
+type DeletedDailyUndo = {
+  entry: CalendarEntry;
+  wasSelected: boolean;
+};
 
 const dayOffStatus = 'Day Off';
 const dayOffColor = '#64748B';
@@ -871,6 +875,7 @@ function CalendarPage({
   const [statusFilter, setStatusFilter] = useState('');
   const [entryPendingDelete, setEntryPendingDelete] = useState<CalendarEntry | null>(null);
   const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
+  const [isRestoringDeletedDaily, setIsRestoringDeletedDaily] = useState(false);
   const [activeDailyPanel, setActiveDailyPanel] = useState<string>('Administrative');
   const [dailyUseMilitaryTime, setDailyUseMilitaryTime] = useState(useMilitaryTime);
   const [hiddenDailySections, setHiddenDailySections] = useState<string[]>(currentUser.trooperDailyHiddenSections || []);
@@ -895,6 +900,7 @@ function CalendarPage({
   const skipNextDailyDraftWriteRef = useRef(false);
   const backendAutosaveRequestRef = useRef(0);
   const entriesRef = useRef<CalendarEntry[]>([]);
+  const deletedDailyUndoRef = useRef<DeletedDailyUndo | null>(null);
   const dailyUndoStackRef = useRef<CalendarEntryForm[]>([]);
   const dailyRedoStackRef = useRef<CalendarEntryForm[]>([]);
   const previousEntryFormRef = useRef<CalendarEntryForm | null>(entryForm);
@@ -1328,7 +1334,11 @@ function CalendarPage({
       if (event.shiftKey) {
         redoDailyChange();
       } else {
-        undoDailyChange();
+        void restoreDeletedDaily().then((didRestore) => {
+          if (!didRestore) {
+            undoDailyChange();
+          }
+        });
       }
       return;
     }
@@ -1519,6 +1529,10 @@ function CalendarPage({
         await calendarService.delete(entry.id, { ...actor, accountId: currentUser.id });
       }
 
+      deletedDailyUndoRef.current = {
+        entry,
+        wasSelected: selectedDate === entry.date,
+      };
       setEntries((currentEntries) => currentEntries.filter((currentEntry) => currentEntry.id !== entry.id));
       removeTrooperDailyDraft(currentUser.id, entry.date);
       if (editingEntryId === entry.id) {
@@ -1534,6 +1548,59 @@ function CalendarPage({
       setCalendarError(getApiErrorMessage(err, 'Failed to delete calendar entry.'));
     } finally {
       setDeletingEntryId(null);
+    }
+  };
+
+  const restoreDeletedDaily = async () => {
+    const undo = deletedDailyUndoRef.current;
+    if (!undo || isRestoringDeletedDaily) {
+      return false;
+    }
+
+    setCalendarError(null);
+    setIsRestoringDeletedDaily(true);
+    backendAutosaveRequestRef.current += 1;
+    try {
+      const form = createEntryFormFromEntry(undo.entry);
+      let restoredEntry = undo.entry;
+
+      if (undo.entry.id.startsWith('local-draft-')) {
+        const savedAt = writeTrooperDailyDraft(currentUser.id, form, undo.entry.id);
+        restoredEntry = {
+          ...undo.entry,
+          updatedAt: new Date(savedAt || Date.now()).toISOString(),
+        };
+        setEntries((currentEntries) => mergeSavedCalendarEntry(currentEntries, restoredEntry));
+      } else {
+        const response = await calendarService.create({
+          ...form,
+          accountId: currentUser.id,
+          ...actor,
+        });
+        restoredEntry = response.data;
+        setEntries((currentEntries) => mergeSavedCalendarEntry(currentEntries, restoredEntry));
+        removeTrooperDailyDraft(currentUser.id, restoredEntry.date);
+      }
+
+      deletedDailyUndoRef.current = null;
+      skipNextDailyDraftWriteRef.current = true;
+      if (undo.wasSelected || selectedDate === restoredEntry.date) {
+        setSelectedDate(restoredEntry.date);
+        setCalendarFocusDate(new Date(`${restoredEntry.date}T00:00:00`));
+        setEditingEntryId(restoredEntry.id);
+        setEntryForm(createEntryFormFromEntry(restoredEntry));
+        setIsDutyHoursManual(true);
+        setDailySaveStatus('saved');
+        setDailySaveStatusAt(Date.now());
+        lastAutoDutyHoursRef.current = '';
+      }
+      return true;
+    } catch (err) {
+      console.error('Failed to undo daily delete:', err);
+      setCalendarError(getApiErrorMessage(err, 'Failed to undo deleted daily.'));
+      return false;
+    } finally {
+      setIsRestoringDeletedDaily(false);
     }
   };
 
@@ -1981,6 +2048,24 @@ function CalendarPage({
     document.addEventListener('keydown', handleDailyClipboardShortcut);
     return () => document.removeEventListener('keydown', handleDailyClipboardShortcut);
   }, [copiedDailyForm, currentUser, editingEntryId, entries, entryForm, selectedDate]);
+
+  useEffect(() => {
+    const handleDeletedDailyUndoShortcut = (event: KeyboardEvent) => {
+      if (isEditableShortcutTarget(event.target) || (!event.ctrlKey && !event.metaKey) || event.shiftKey || event.altKey || event.key.toLowerCase() !== 'z') {
+        return;
+      }
+
+      if (!deletedDailyUndoRef.current) {
+        return;
+      }
+
+      event.preventDefault();
+      void restoreDeletedDaily();
+    };
+
+    document.addEventListener('keydown', handleDeletedDailyUndoShortcut);
+    return () => document.removeEventListener('keydown', handleDeletedDailyUndoShortcut);
+  }, [currentUser.id, isRestoringDeletedDaily, selectedDate]);
 
   const visibleEntries = entries.filter((entry) => {
     const matchesDistrict = !districtFilter || entry.districtWorked === districtFilter;
