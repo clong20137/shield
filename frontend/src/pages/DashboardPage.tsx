@@ -30,16 +30,16 @@ const defaultPostForm: DashboardPostForm = {
 const MEDIA_PICKER_PAGE_SIZE = 18;
 const DASHBOARD_POST_MEDIA_FOLDER = 'dashboard-posts';
 
-const getPostCategoryTone = (category: DashboardPost['category']) => {
+const getPostCategoryBannerClass = (category: DashboardPost['category']) => {
   if (category === 'Alert') {
-    return 'border-danger/30 bg-danger/10 text-danger dark:border-red-400/30 dark:bg-red-950/40 dark:text-red-100';
+    return 'bg-danger text-white shadow-red-950/30';
   }
 
   if (category === 'News') {
-    return 'border-blue-400/30 bg-blue-500/10 text-blue-700 dark:border-blue-300/30 dark:bg-blue-950/50 dark:text-blue-100';
+    return 'bg-primary-500 text-white shadow-blue-950/30';
   }
 
-  return 'border-accent/30 bg-accent/10 text-accent';
+  return 'bg-accent text-white shadow-black/25';
 };
 
 const createDefaultEntryForm = (date: string): CalendarEntryForm => ({
@@ -895,21 +895,7 @@ function DashboardNews({
   };
 
   return (
-    <section data-onboarding-target="dashboard-news" className="flex h-full min-h-[32rem] flex-col rounded-lg bg-white p-4 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:p-5">
-      {canCreateDashboardPosts && (
-        <div className="mb-3 flex justify-end">
-          <button
-            type="button"
-            onClick={() => setIsCreatePostOpen(true)}
-            className="btn-primary"
-            aria-label="Create update or news post"
-            title="Create Update"
-          >
-            <Plus size={16} />
-          </button>
-        </div>
-      )}
-
+    <section data-onboarding-target="dashboard-news" className="flex h-full min-h-[24rem] flex-col rounded-lg bg-white p-3 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:p-4">
       {postError && <div className="error">{postError}</div>}
 
       {isLoadingPosts ? (
@@ -935,15 +921,12 @@ function DashboardNews({
                     </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                  <span className={`absolute left-4 top-4 rounded-full border px-3 py-1 text-xs font-black uppercase backdrop-blur ${getPostCategoryTone(activeFeaturedPost.category)}`}>
+                  <span className={`absolute left-0 top-4 min-w-32 rounded-r px-5 py-2 pr-8 text-xs font-black uppercase tracking-[0.18em] shadow-lg [clip-path:polygon(0_0,100%_0,calc(100%-14px)_50%,100%_100%,0_100%)] ${getPostCategoryBannerClass(activeFeaturedPost.category)}`}>
                     {activeFeaturedPost.category}
                   </span>
                 </Link>
                 <div className="flex min-w-0 flex-col justify-between p-5 sm:p-6">
                   <div>
-                    <p className={`inline-flex rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.18em] ${getPostCategoryTone(activeFeaturedPost.category)}`}>
-                      {activeFeaturedPost.category}
-                    </p>
                     <Link to={`/updates/${activeFeaturedPost.id}`} className="mt-3 block text-2xl font-black leading-tight text-white transition hover:text-blue-100 sm:text-3xl">
                       {activeFeaturedPost.title}
                     </Link>
@@ -993,6 +976,21 @@ function DashboardNews({
             </div>
           )}
 
+        </div>
+      )}
+
+      {canCreateDashboardPosts && (
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setIsCreatePostOpen(true)}
+            className="btn-primary"
+            aria-label="Create new story"
+            title="New Story"
+          >
+            <Plus size={16} />
+            <span>New Story</span>
+          </button>
         </div>
       )}
 
@@ -1583,7 +1581,7 @@ function MyDayWidget({
   };
 
   return (
-    <section data-onboarding-target="my-day" className="flex h-full min-h-[32rem] flex-col rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
+    <section data-onboarding-target="my-day" className="flex h-full min-h-[24rem] flex-col rounded-lg border border-gray-200 bg-white p-3 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-4">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-primary-500/10 text-primary-500 dark:bg-blue-950 dark:text-blue-100">
@@ -2322,7 +2320,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
           <h1>Dashboard</h1>
         </div>
         <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} initialProfiles={dashboardSummary?.pinnedProfiles} />
-        <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)]">
+        <div className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)]">
           <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} />
           <DashboardNews currentUser={currentUser} initialPosts={dashboardSummary?.posts} />
         </div>
@@ -2346,7 +2344,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
       {error && <div className="error">{error}</div>}
 
       <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} initialProfiles={dashboardSummary?.pinnedProfiles} />
-      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)]">
+      <div className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)]">
         <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} />
         <DashboardNews currentUser={currentUser} initialPosts={dashboardSummary?.posts} />
       </div>
