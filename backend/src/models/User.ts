@@ -335,6 +335,7 @@ export class UserModel {
   static async getUserByPeNumber(peNumber: string): Promise<User | null> {
     const normalizedPeNumber = peNumber.trim().toLowerCase();
     const compactPeNumber = normalizedPeNumber.replace(/^pe[\s_-]*/iu, '').replace(/[^a-z0-9]/giu, '');
+    const compactPeNumberWithoutLeadingZeros = compactPeNumber.replace(/^0+(?=\d)/u, '');
     if (!normalizedPeNumber) {
       return null;
     }
@@ -345,8 +346,9 @@ export class UserModel {
         `SELECT * FROM users
          WHERE LOWER(COALESCE(\`peNumber\`, '')) = ?
             OR REPLACE(REPLACE(REPLACE(REPLACE(LOWER(COALESCE(\`peNumber\`, '')), ' ', ''), '-', ''), '_', ''), 'pe', '') = ?
+            OR TRIM(LEADING '0' FROM REPLACE(REPLACE(REPLACE(REPLACE(LOWER(COALESCE(\`peNumber\`, '')), ' ', ''), '-', ''), '_', ''), 'pe', '')) = ?
          LIMIT 1`,
-        [normalizedPeNumber, compactPeNumber]
+        [normalizedPeNumber, compactPeNumber, compactPeNumberWithoutLeadingZeros]
       );
       const users = rows as User[];
       return users.length > 0 ? users[0] : null;

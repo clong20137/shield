@@ -307,7 +307,7 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-bold text-gray-900 dark:text-white">Import Roster & Photos</h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Import accounts from Excel, or upload profile photos named by PE number. Existing photos are skipped.</p>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Import accounts from Excel, or upload profile photos named by PE number.</p>
           </div>
           <div className="flex gap-2">
             <button type="button" onClick={() => spreadsheetInputRef.current?.click()} className="btn-secondary" disabled={isImporting} aria-label="Import Excel roster" title={isImporting ? 'Importing' : 'Import Excel roster'}>

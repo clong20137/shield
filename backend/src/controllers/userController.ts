@@ -142,10 +142,14 @@ function getPeCandidatesFromFileName(fileName: string): string[] {
   const tokenMatches = baseName
     .split(/[^a-z0-9]+/giu)
     .filter((token) => /^(?:pe)?[a-z0-9]{3,12}$/iu.test(token));
+  const candidates = [baseName, compactName, ...peLabelMatches, ...numericMatches, ...tokenMatches]
+    .map(normalizePeLookupValue)
+    .filter(Boolean);
+  const withoutLeadingZeros = candidates
+    .filter((candidate) => /^\d+$/u.test(candidate))
+    .map((candidate) => candidate.replace(/^0+(?=\d)/u, ''));
 
-  return Array.from(
-    new Set([baseName, compactName, ...peLabelMatches, ...numericMatches, ...tokenMatches].map(normalizePeLookupValue).filter(Boolean)),
-  );
+  return Array.from(new Set([...candidates, ...withoutLeadingZeros].filter(Boolean)));
 }
 
 function formatImportedName(value: string): string {
@@ -654,11 +658,6 @@ export class UserController {
 
         if (isHiddenFromRequester(targetUser, actor?.id, canViewHidden)) {
           skipFile('No user found with that PE number');
-          continue;
-        }
-
-        if (targetUser.profilePictureUrl?.trim()) {
-          skipFile('Profile picture already exists');
           continue;
         }
 
