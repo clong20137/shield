@@ -30,9 +30,22 @@ Deployment verification required:
 
 ## Phase 2 - Sensitive Data Protection
 
-Status: planned
+Status: in progress
 
-- Add field-level encryption for highly sensitive profile fields such as personal phone, residential address, mailing address, identifiers, and other protected personnel data.
+Implemented in this pass:
+
+- Added application-level AES-256-GCM encryption for sensitive profile fields:
+  - personal phone number
+  - residential address
+  - mailing address
+  - emergency contact name
+  - emergency contact relationship
+  - emergency contact phone
+- Added keyed blind indexes for personal phone and emergency contact phone lookups.
+- Added startup protection for existing plaintext sensitive profile values when `DATA_ENCRYPTION_KEY` is configured.
+- Added production warnings for missing data encryption and blind-index keys.
+
+- Expand field-level encryption to additional identifiers only after search/import behavior is redesigned to avoid breaking PE, badge, PeopleSoft, and public-safety ID workflows.
 - Store encryption keys outside the database using a vault or cloud KMS.
 - Add key rotation procedures and emergency key revocation procedures.
 - Encrypt uploaded media storage and backups.

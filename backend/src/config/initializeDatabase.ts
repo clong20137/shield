@@ -96,7 +96,8 @@ export async function initializeDatabase() {
       \`carNumber\` VARCHAR(50),
       \`badgeNumber\` VARCHAR(50) UNIQUE,
       \`radioNumber\` VARCHAR(50),
-      \`personalPhoneNumber\` VARCHAR(50),
+      \`personalPhoneNumber\` TEXT,
+      \`personalPhoneNumberHash\` VARCHAR(64),
       \`departmentPhoneNumber\` VARCHAR(50),
       \`assignedTo\` VARCHAR(100),
       \`district\` VARCHAR(100),
@@ -115,7 +116,8 @@ export async function initializeDatabase() {
       \`mailingAddress\` TEXT,
       \`emergencyContactName\` VARCHAR(150),
       \`emergencyContactRelationship\` VARCHAR(100),
-      \`emergencyContactPhone\` VARCHAR(50),
+      \`emergencyContactPhone\` TEXT,
+      \`emergencyContactPhoneHash\` VARCHAR(64),
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX \`idx_firstName\` (\`firstName\`),
@@ -149,14 +151,18 @@ export async function initializeDatabase() {
   await ensureColumn('users', 'twoFactorRecoveryCodes', '`twoFactorRecoveryCodes` TEXT');
   await ensureColumn('users', 'peopleSoftId', '`peopleSoftId` VARCHAR(50)');
   await ensureColumn('users', 'radioNumber', '`radioNumber` VARCHAR(50)');
-  await ensureColumn('users', 'personalPhoneNumber', '`personalPhoneNumber` VARCHAR(50)');
+  await ensureColumn('users', 'personalPhoneNumber', '`personalPhoneNumber` TEXT');
+  await pool.query('ALTER TABLE `users` MODIFY COLUMN `personalPhoneNumber` TEXT');
+  await ensureColumn('users', 'personalPhoneNumberHash', '`personalPhoneNumberHash` VARCHAR(64)');
   await ensureColumn('users', 'departmentPhoneNumber', '`departmentPhoneNumber` VARCHAR(50)');
   await ensureColumn('users', 'maritalStatus', '`maritalStatus` VARCHAR(50)');
   await ensureColumn('users', 'residentialAddress', '`residentialAddress` TEXT');
   await ensureColumn('users', 'mailingAddress', '`mailingAddress` TEXT');
   await ensureColumn('users', 'emergencyContactName', '`emergencyContactName` VARCHAR(150)');
   await ensureColumn('users', 'emergencyContactRelationship', '`emergencyContactRelationship` VARCHAR(100)');
-  await ensureColumn('users', 'emergencyContactPhone', '`emergencyContactPhone` VARCHAR(50)');
+  await ensureColumn('users', 'emergencyContactPhone', '`emergencyContactPhone` TEXT');
+  await pool.query('ALTER TABLE `users` MODIFY COLUMN `emergencyContactPhone` TEXT');
+  await ensureColumn('users', 'emergencyContactPhoneHash', '`emergencyContactPhoneHash` VARCHAR(64)');
   await ensureIndex('users', 'idx_users_email', '`email`');
   await ensureIndex('users', 'idx_users_microsoft_id', '`microsoftUserId`');
   await ensureIndex('users', 'idx_users_hidden', '`isHidden`, `lastName`, `firstName`');
@@ -167,6 +173,8 @@ export async function initializeDatabase() {
   await ensureIndex('users', 'idx_users_people_soft', '`peopleSoftId`');
   await ensureIndex('users', 'idx_users_radio', '`radioNumber`');
   await ensureIndex('users', 'idx_users_public_safety', '`publicSafetyId`');
+  await ensureIndex('users', 'idx_users_personal_phone_hash', '`personalPhoneNumberHash`');
+  await ensureIndex('users', 'idx_users_emergency_phone_hash', '`emergencyContactPhoneHash`');
 
   if (await tableExists('auth_accounts')) {
     await ensureColumn('auth_accounts', 'twoFactorSecret', '`twoFactorSecret` VARCHAR(64)');

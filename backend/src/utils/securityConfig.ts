@@ -27,6 +27,8 @@ export function getProductionSecurityFindings(): SecurityFinding[] {
   const appBaseUrl = (process.env.APP_BASE_URL || '').trim();
   const apiBaseUrl = (process.env.API_BASE_URL || '').trim();
   const ssoStateSecret = (process.env.SSO_STATE_SECRET || '').trim();
+  const dataEncryptionKey = (process.env.DATA_ENCRYPTION_KEY || '').trim();
+  const dataIndexKey = (process.env.DATA_INDEX_KEY || '').trim();
 
   if (sessionCookieSecure !== 'true') {
     findings.push({
@@ -77,6 +79,20 @@ export function getProductionSecurityFindings(): SecurityFinding[] {
     });
   }
 
+  if (!dataEncryptionKey || dataEncryptionKey.includes('replace_with_')) {
+    findings.push({
+      key: 'DATA_ENCRYPTION_KEY',
+      message: 'DATA_ENCRYPTION_KEY is required in production for encrypted sensitive profile fields.',
+    });
+  }
+
+  if (!dataIndexKey || dataIndexKey.includes('replace_with_')) {
+    findings.push({
+      key: 'DATA_INDEX_KEY',
+      message: 'DATA_INDEX_KEY should be set separately from DATA_ENCRYPTION_KEY for blind-indexed lookups.',
+    });
+  }
+
   return findings;
 }
 
@@ -94,4 +110,3 @@ export function logProductionSecurityFindings() {
     console.warn(`- ${finding.key}: ${finding.message}`);
   });
 }
-

@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS users (
   `carNumber` VARCHAR(50),
   `badgeNumber` VARCHAR(50) UNIQUE,
   `radioNumber` VARCHAR(50),
-  `personalPhoneNumber` VARCHAR(50),
+  `personalPhoneNumber` TEXT,
+  `personalPhoneNumberHash` VARCHAR(64),
   `departmentPhoneNumber` VARCHAR(50),
   `assignedTo` VARCHAR(100),
   `district` VARCHAR(100),
@@ -38,6 +39,10 @@ CREATE TABLE IF NOT EXISTS users (
   `maritalStatus` VARCHAR(50),
   `residentialAddress` TEXT,
   `mailingAddress` TEXT,
+  `emergencyContactName` VARCHAR(150),
+  `emergencyContactRelationship` VARCHAR(100),
+  `emergencyContactPhone` TEXT,
+  `emergencyContactPhoneHash` VARCHAR(64),
   `createdAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updatedAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_firstName` (`firstName`),
@@ -55,6 +60,8 @@ CREATE TABLE IF NOT EXISTS users (
   INDEX `idx_users_name` (`lastName`, `firstName`),
   INDEX `idx_users_people_soft` (`peopleSoftId`),
   INDEX `idx_users_radio` (`radioNumber`),
+  INDEX `idx_users_personal_phone_hash` (`personalPhoneNumberHash`),
+  INDEX `idx_users_emergency_phone_hash` (`emergencyContactPhoneHash`),
   FULLTEXT INDEX `ft_search` (`firstName`, `lastName`, `email`, `peNumber`, `peopleSoftId`, `badgeNumber`, `publicSafetyId`, `district`)
 );
 

@@ -33,6 +33,7 @@ import { requestTimeout } from './middleware/requestTimeout';
 import { csrfProtection } from './middleware/csrfProtection';
 import { ErrorLogModel } from './models/ErrorLog';
 import { createImageThumbnail } from './services/imageThumbnails';
+import { protectExistingSensitiveUserData } from './services/sensitiveDataProtection';
 import { isAllowedOrigin, parseAllowedOrigins } from './utils/originPolicy';
 import { logProductionSecurityFindings } from './utils/securityConfig';
 
@@ -277,6 +278,15 @@ app.use((error: Error, req: Request, res: Response, next: express.NextFunction) 
 // setup can write a backend .env file and guide the operator through restart.
 initializeDatabase()
   .then(() => {
+    protectExistingSensitiveUserData()
+      .then((updatedCount) => {
+        if (updatedCount > 0) {
+          console.info(`Protected sensitive profile fields for ${updatedCount} existing user record${updatedCount === 1 ? '' : 's'}.`);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to protect existing sensitive profile fields:', error);
+      });
     startSecurityCleanupJob();
   })
   .catch((error) => {

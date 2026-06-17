@@ -2,6 +2,7 @@ import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database';
 import { createPasswordHash } from './AuthAccount';
+import { createPhoneBlindIndex, decryptFieldValue, encryptFieldValue } from '../utils/fieldEncryption';
 
 export interface User {
   id: string;
@@ -48,6 +49,15 @@ export type CreateUserInput = Omit<User, 'id' | 'createdAt' | 'updatedAt'> & {
 };
 
 export class UserModel {
+  private static readonly encryptedFields = new Set([
+    'personalPhoneNumber',
+    'residentialAddress',
+    'mailingAddress',
+    'emergencyContactName',
+    'emergencyContactRelationship',
+    'emergencyContactPhone',
+  ]);
+
   private static readonly editableFields = [
     'firstName',
     'lastName',
@@ -147,7 +157,27 @@ export class UserModel {
       return value === false ? false : true;
     }
 
+    if (UserModel.encryptedFields.has(key)) {
+      return encryptFieldValue(typeof value === 'string' ? value : '');
+    }
+
     return value as string | boolean | Date | null;
+  }
+
+  private static toPublicUser(row: User): User {
+    return {
+      ...row,
+      personalPhoneNumber: decryptFieldValue(row.personalPhoneNumber),
+      residentialAddress: decryptFieldValue(row.residentialAddress),
+      mailingAddress: decryptFieldValue(row.mailingAddress),
+      emergencyContactName: decryptFieldValue(row.emergencyContactName),
+      emergencyContactRelationship: decryptFieldValue(row.emergencyContactRelationship),
+      emergencyContactPhone: decryptFieldValue(row.emergencyContactPhone),
+    };
+  }
+
+  private static toPublicUsers(rows: User[]): User[] {
+    return rows.map((row) => UserModel.toPublicUser(row));
   }
 
   static async searchUsers(
@@ -197,13 +227,14 @@ export class UserModel {
           );
         });
 
+        const phoneIndex = createPhoneBlindIndex(trimmedSearchTerm);
         conditions.push(
           `(
             LOWER(COALESCE(\`firstName\`, '')) LIKE ? OR LOWER(COALESCE(\`lastName\`, '')) LIKE ? OR LOWER(CONCAT_WS(' ', \`firstName\`, \`lastName\`)) LIKE ?
             OR LOWER(COALESCE(\`email\`, '')) LIKE ? OR LOWER(COALESCE(\`peNumber\`, '')) LIKE ? OR LOWER(COALESCE(\`peopleSoftId\`, '')) LIKE ?
             OR LOWER(COALESCE(\`badgeNumber\`, '')) LIKE ? OR LOWER(COALESCE(\`radioNumber\`, '')) LIKE ? OR LOWER(COALESCE(\`publicSafetyId\`, '')) LIKE ?
             OR LOWER(COALESCE(\`district\`, '')) LIKE ? OR LOWER(COALESCE(\`employmentType\`, '')) LIKE ? OR LOWER(COALESCE(\`status\`, '')) LIKE ?
-            OR LOWER(COALESCE(\`supervisor\`, '')) LIKE ? OR LOWER(COALESCE(\`personalPhoneNumber\`, '')) LIKE ? OR LOWER(COALESCE(\`departmentPhoneNumber\`, '')) LIKE ?
+            OR LOWER(COALESCE(\`supervisor\`, '')) LIKE ? OR LOWER(COALESCE(\`personalPhoneNumber\`, '')) LIKE ? OR \`personalPhoneNumberHash\` = ? OR LOWER(COALESCE(\`departmentPhoneNumber\`, '')) LIKE ?
             ${tokenConditions.length > 0 ? `OR (${tokenConditions.join(' AND ')})` : ''}
           )`
         );
@@ -224,6 +255,7 @@ export class UserModel {
           likeTerm,
           likeTerm,
           likeTerm,
+          phoneIndex || '__no_phone_index__',
           likeTerm,
           ...tokenParams
         );
@@ -315,7 +347,7 @@ export class UserModel {
         : ' ORDER BY `lastName`, `firstName` LIMIT ? OFFSET ?';
 
       const [rows] = await conn.query(query, [...params, ...orderParams, options.limit ?? 100, options.offset ?? 0]);
-      return rows as User[];
+      return UserModel.toPublicUsers(rows as User[]);
     } finally {
       conn.release();
     }
@@ -326,7 +358,7 @@ export class UserModel {
     try {
       const [rows] = await conn.query('SELECT * FROM users WHERE `id` = ?', [id]);
       const users = rows as User[];
-      return users.length > 0 ? users[0] : null;
+      return users.length > 0 ? UserModel.toPublicUser(users[0]) : null;
     } finally {
       conn.release();
     }
@@ -351,7 +383,7 @@ export class UserModel {
         [normalizedPeNumber, compactPeNumber, compactPeNumberWithoutLeadingZeros]
       );
       const users = rows as User[];
-      return users.length > 0 ? users[0] : null;
+      return users.length > 0 ? UserModel.toPublicUser(users[0]) : null;
     } finally {
       conn.release();
     }
@@ -364,7 +396,7 @@ export class UserModel {
         `SELECT * FROM users ${includeHidden ? '' : 'WHERE COALESCE(`isHidden`, 0) = 0'} ORDER BY \`lastName\`, \`firstName\` LIMIT ? OFFSET ?`,
         [limit, offset]
       );
-      return rows as User[];
+      return UserModel.toPublicUsers(rows as User[]);
     } finally {
       conn.release();
     }
@@ -379,7 +411,7 @@ export class UserModel {
          ${includeHidden ? '' : 'AND COALESCE(`isHidden`, 0) = 0'}
          ORDER BY \`lastName\`, \`firstName\``
       );
-      return rows as User[];
+      return UserModel.toPublicUsers(rows as User[]);
     } finally {
       conn.release();
     }
@@ -413,7 +445,7 @@ export class UserModel {
         params
       );
       const users = rows as User[];
-      return users.length > 0 ? users[0] : null;
+      return users.length > 0 ? UserModel.toPublicUser(users[0]) : null;
     } finally {
       conn.release();
     }
@@ -448,7 +480,7 @@ export class UserModel {
         [...params, limit]
       );
 
-      return rows as User[];
+      return UserModel.toPublicUsers(rows as User[]);
     } finally {
       conn.release();
     }
@@ -463,12 +495,12 @@ export class UserModel {
       await conn.query(
         `INSERT INTO users (
           \`id\`, \`firstName\`, \`lastName\`, \`email\`, \`profilePictureUrl\`, \`displayName\`, \`passwordHash\`, \`role\`, \`mustChangePassword\`, \`peNumber\`, \`peopleSoftId\`, \`carNumber\`, \`badgeNumber\`,
-          \`radioNumber\`, \`personalPhoneNumber\`, \`departmentPhoneNumber\`, \`assignedTo\`, \`district\`, \`rank\`,
+          \`radioNumber\`, \`personalPhoneNumber\`, \`personalPhoneNumberHash\`, \`departmentPhoneNumber\`, \`assignedTo\`, \`district\`, \`rank\`,
           \`isActive\`, \`isHidden\`, \`employmentType\`, \`typeDetails\`, \`status\`, \`supervisor\`, \`specialtyCertifications\`,
           \`publicSafetyId\`, \`race\`, \`sex\`, \`maritalStatus\`, \`residentialAddress\`, \`mailingAddress\`,
-          \`emergencyContactName\`, \`emergencyContactRelationship\`, \`emergencyContactPhone\`,
+          \`emergencyContactName\`, \`emergencyContactRelationship\`, \`emergencyContactPhone\`, \`emergencyContactPhoneHash\`,
           \`receivesMessages\`, \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           user.firstName,
@@ -484,7 +516,8 @@ export class UserModel {
           user.carNumber,
           UserModel.blankToNull(user.badgeNumber),
           user.radioNumber,
-          user.personalPhoneNumber,
+          encryptFieldValue(user.personalPhoneNumber),
+          createPhoneBlindIndex(user.personalPhoneNumber),
           user.departmentPhoneNumber,
           user.assignedTo,
           user.district,
@@ -500,11 +533,12 @@ export class UserModel {
           user.race,
           user.sex,
           user.maritalStatus,
-          user.residentialAddress,
-          user.mailingAddress,
-          user.emergencyContactName,
-          user.emergencyContactRelationship,
-          user.emergencyContactPhone,
+          encryptFieldValue(user.residentialAddress),
+          encryptFieldValue(user.mailingAddress),
+          encryptFieldValue(user.emergencyContactName),
+          encryptFieldValue(user.emergencyContactRelationship),
+          encryptFieldValue(user.emergencyContactPhone),
+          createPhoneBlindIndex(user.emergencyContactPhone),
           user.receivesMessages === false ? 0 : 1,
           now,
           now,
@@ -528,6 +562,16 @@ export class UserModel {
         if (UserModel.editableFields.includes(key as typeof UserModel.editableFields[number])) {
           fields.push(`${UserModel.columnNames[key as typeof UserModel.editableFields[number]]} = ?`);
           values.push(UserModel.normalizeUpdateValue(key, value));
+
+          if (key === 'personalPhoneNumber') {
+            fields.push('`personalPhoneNumberHash` = ?');
+            values.push(createPhoneBlindIndex(typeof value === 'string' ? value : ''));
+          }
+
+          if (key === 'emergencyContactPhone') {
+            fields.push('`emergencyContactPhoneHash` = ?');
+            values.push(createPhoneBlindIndex(typeof value === 'string' ? value : ''));
+          }
         }
       });
 
