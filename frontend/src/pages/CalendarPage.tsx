@@ -290,6 +290,16 @@ const createOptimisticEntryFromForm = (form: CalendarEntryForm, currentUser: Aut
   };
 };
 
+function mergeSavedCalendarEntry(currentEntries: CalendarEntry[], savedEntry: CalendarEntry, previousEntryId?: string | null) {
+  const hasSavedEntry = currentEntries.some((entry) => entry.id === savedEntry.id);
+  const nextEntries = currentEntries
+    .filter((entry) => !previousEntryId || previousEntryId === savedEntry.id || entry.id !== previousEntryId)
+    .filter((entry) => !(entry.id.startsWith('local-draft-') && entry.date === savedEntry.date))
+    .map((entry) => (entry.id === savedEntry.id ? savedEntry : entry));
+
+  return hasSavedEntry ? nextEntries : [savedEntry, ...nextEntries];
+}
+
 const hasMeaningfulTrooperDailyContent = (form: CalendarEntryForm, currentUser?: AuthAccount) => {
   const hasDetails = Object.values(form.details || {}).some((value) => String(value ?? '').trim() !== '');
 
@@ -1183,14 +1193,7 @@ function CalendarPage({
             return;
           }
 
-          setEntries((currentEntries) => {
-            const hasEntry = currentEntries.some((entry) => entry.id === response.data.id);
-            if (hasEntry) {
-              return currentEntries.map((entry) => (entry.id === response.data.id ? response.data : entry));
-            }
-
-            return [response.data, ...currentEntries.filter((entry) => entry.date !== response.data.date)];
-          });
+          setEntries((currentEntries) => mergeSavedCalendarEntry(currentEntries, response.data, editingEntryId));
           setEditingEntryId(response.data.id);
           setDailySaveStatus('saved');
           setDailySaveStatusAt(Date.now());
@@ -1442,7 +1445,7 @@ function CalendarPage({
         setEntryForm(createEntryFormFromEntry(response.data));
       } else {
         const response = await calendarService.create(payload);
-        setEntries((currentEntries) => [response.data, ...currentEntries.filter((entry) => entry.date !== response.data.date)]);
+        setEntries((currentEntries) => mergeSavedCalendarEntry(currentEntries, response.data));
         removeTrooperDailyDraft(currentUser.id, response.data.date);
         skipNextDailyDraftWriteRef.current = true;
         setSelectedDate(response.data.date);
@@ -1833,10 +1836,7 @@ function CalendarPage({
         ? await calendarService.update(existingEntry.id, payload)
         : await calendarService.create(payload);
 
-      setEntries((currentEntries) => [
-        response.data,
-        ...currentEntries.filter((entry) => entry.date !== response.data.date),
-      ]);
+      setEntries((currentEntries) => mergeSavedCalendarEntry(currentEntries, response.data, existingEntry?.id));
       removeTrooperDailyDraft(currentUser.id, dateKey);
       skipNextDailyDraftWriteRef.current = true;
       setCalendarFocusDate(new Date(`${dateKey}T00:00:00`));

@@ -4968,7 +4968,9 @@ function App() {
         ? await calendarService.update(existingEntry.id, payload)
         : await calendarService.create(payload);
       setSidebarCalendarEntries((currentEntries) => {
-        const withoutExisting = currentEntries.filter((entry) => entry.id !== response.data.id && getEntryDateKey(entry) !== dateKey);
+        const withoutExisting = currentEntries
+          .filter((entry) => entry.id !== response.data.id)
+          .filter((entry) => !(entry.id === existingEntry?.id && getEntryDateKey(entry) === dateKey));
         return [...withoutExisting, response.data];
       });
       window.dispatchEvent(new Event('shield:calendar-updated'));
