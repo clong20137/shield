@@ -24,6 +24,7 @@ const narrativeCharacterLimit = 1000;
 const dailyInputCharacterLimit = 5;
 const trooperDailyDraftStoragePrefix = 'shield_trooper_daily_draft';
 const tCodeDetailsKey = 'tCodes';
+const noTCodeDetailsKey = 'noTCodes';
 type TrooperDailyTCode = {
   id: string;
   code: string;
@@ -577,6 +578,15 @@ function serializeTCodeDetails(rows: TrooperDailyTCode[]): string {
     }))
     .filter((row) => row.code || row.timeWorked)
     .slice(0, 25));
+}
+
+function hasNoTCodeSelection(details: Record<string, string> | undefined): boolean {
+  return details?.[noTCodeDetailsKey] === 'true';
+}
+
+function isTCodeSectionComplete(details: Record<string, string> | undefined): boolean {
+  const rows = parseTCodeDetails(details);
+  return hasNoTCodeSelection(details) || (rows.length > 0 && rows.every((row) => row.code.trim() && row.timeWorked.trim()));
 }
 
 function isDetailComplete(details: Record<string, string> | undefined, key: string): boolean {
@@ -1453,6 +1463,7 @@ function CalendarPage({
         delete nextDetails[tCodeDetailsKey];
       } else {
         nextDetails[tCodeDetailsKey] = serializedRows;
+        delete nextDetails[noTCodeDetailsKey];
       }
 
       return {
@@ -1479,6 +1490,23 @@ function CalendarPage({
 
   const deleteTCodeRow = (rowId: string) => {
     updateTCodeRows(parseTCodeDetails(entryForm.details).filter((row) => row.id !== rowId));
+  };
+
+  const setNoTCodes = (enabled: boolean) => {
+    setEntryForm((currentForm) => {
+      const nextDetails = { ...(currentForm.details || {}) };
+      if (enabled) {
+        delete nextDetails[tCodeDetailsKey];
+        nextDetails[noTCodeDetailsKey] = 'true';
+      } else {
+        delete nextDetails[noTCodeDetailsKey];
+      }
+
+      return {
+        ...currentForm,
+        details: nextDetails,
+      };
+    });
   };
 
   const updateDutyHours = (value: string) => {
@@ -1884,6 +1912,8 @@ function CalendarPage({
   const reportedDutyHours = Number(entryForm.dutyHours) || 0;
   const entryDetails = entryForm.details || {};
   const tCodeRows = parseTCodeDetails(entryDetails);
+  const hasNoTCodes = hasNoTCodeSelection(entryDetails);
+  const isTCodeComplete = isTCodeSectionComplete(entryDetails);
   const calculatedShiftHours = calculateShiftHours(entryDetails);
   const attendanceHours = attendanceHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
   const dutyActivityHours = dutyActivityHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
@@ -2297,11 +2327,12 @@ function CalendarPage({
                   <nav className="hidden gap-1 xl:grid" aria-label="Trooper Daily input sections">
                     {dailyPanelOptions.map((panel) => {
                       const panelSection = trooperDailySections.find((section) => section.title === panel);
-                      const isHidden = Boolean(panelSection && hiddenDailySections.includes(panelSection.title));
+                      const isHideablePanel = Boolean(panelSection || panel === 'T-Codes');
+                      const isHidden = Boolean(isHideablePanel && hiddenDailySections.includes(panel));
                       const isComplete = panel === 'Administrative'
                         ? Boolean(entryForm.date && entryForm.dutyHours && entryForm.districtWorked && entryForm.specialStatus)
                         : panel === 'T-Codes'
-                          ? tCodeRows.length > 0 && tCodeRows.every((row) => row.code.trim() && row.timeWorked.trim())
+                          ? isTCodeComplete
                         : panel === 'Narrative'
                           ? Boolean(entryForm.details?.narrative?.trim())
                           : Boolean(panelSection && isSectionComplete(entryForm.details, panelSection));
@@ -2319,8 +2350,8 @@ function CalendarPage({
                           <button
                             type="button"
                             onClick={() => {
-                              if (isHidden && panelSection) {
-                                showDailySection(panelSection.title);
+                              if (isHidden && isHideablePanel) {
+                                showDailySection(panel);
                                 return;
                               }
                               setActiveDailyPanel(panel);
@@ -2338,24 +2369,24 @@ function CalendarPage({
                               )}
                             </span>
                           </button>
-                          {panelSection && (
+                          {isHideablePanel && (
                             <button
                               type="button"
                               onClick={() => {
                                 if (isHidden) {
-                                  showDailySection(panelSection.title);
+                                  showDailySection(panel);
                                   return;
                                 }
-                                hideDailySection(panelSection.title);
+                                hideDailySection(panel);
                               }}
                               className="mx-auto flex h-6 w-6 items-center justify-center rounded text-gray-400 transition hover:bg-gray-100 hover:text-accent dark:hover:bg-gray-800"
-                              aria-label={`${isHidden ? 'Show' : 'Hide'} ${panelSection.title}`}
-                              title={`${isHidden ? 'Show' : 'Hide'} ${panelSection.title}`}
+                              aria-label={`${isHidden ? 'Show' : 'Hide'} ${panel}`}
+                              title={`${isHidden ? 'Show' : 'Hide'} ${panel}`}
                             >
                               {isHidden ? <Eye size={13} /> : <EyeOff size={13} />}
                             </button>
                           )}
-                          {!panelSection && <span className="mx-auto h-6 w-6" aria-hidden="true" />}
+                          {!isHideablePanel && <span className="mx-auto h-6 w-6" aria-hidden="true" />}
                         </div>
                       );
                     })}
@@ -2803,7 +2834,7 @@ function CalendarPage({
                           <h3 className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-gray-100">
                             <ListChecks size={18} className="text-accent" />
                             T-Codes
-                            {tCodeRows.length > 0 && tCodeRows.every((row) => row.code.trim() && row.timeWorked.trim()) && (
+                            {isTCodeComplete && (
                               <CheckCircle2 className="trooper-daily-check text-green-600 dark:text-green-300" size={18} />
                             )}
                           </h3>
@@ -2824,7 +2855,21 @@ function CalendarPage({
                         </button>
                       </div>
 
-                      {tCodeOptions.length === 0 ? (
+                      <label className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-sm font-bold text-gray-700 dark:border-gray-800 dark:bg-gray-900/60 dark:text-gray-200">
+                        <input
+                          type="checkbox"
+                          checked={hasNoTCodes}
+                          onChange={(event) => setNoTCodes(event.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent"
+                        />
+                        <span>No T-Codes</span>
+                      </label>
+
+                      {hasNoTCodes ? (
+                        <div className="rounded border border-green-200 bg-green-50 px-3 py-4 text-sm font-semibold text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-200">
+                          Marked complete with no T-Codes.
+                        </div>
+                      ) : tCodeOptions.length === 0 ? (
                         <div className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
                           No T-Code options are configured.
                         </div>
