@@ -45,6 +45,7 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [moderatingCommentId, setModeratingCommentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reactionPulseMap, setReactionPulseMap] = useState<Record<string, number>>({});
   const isAdministrator = currentUser?.role === 'administrator';
 
   const loadPost = async () => {
@@ -221,6 +222,10 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
       return;
     }
 
+    setReactionPulseMap((currentMap) => ({
+      ...currentMap,
+      [reaction]: (currentMap[reaction] || 0) + 1,
+    }));
     setError(null);
     try {
       const nextReaction = post.myReaction === reaction ? null : reaction;
@@ -289,12 +294,13 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
             const Icon = option.icon;
             const isActive = post.myReaction === option.value;
             const count = post.reactions?.[option.value] || 0;
+            const pulseCount = reactionPulseMap[option.value] || 0;
             return (
               <button
                 key={option.value}
                 type="button"
                 onClick={() => void reactToPost(option.value)}
-                className={`inline-flex h-9 items-center gap-2 rounded border px-3 text-sm font-bold transition ${
+                className={`dashboard-reaction-button inline-flex h-9 items-center gap-1.5 rounded border px-2.5 text-xs font-bold shadow-sm transition ${
                   isActive
                     ? 'border-accent bg-accent text-white'
                     : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-accent hover:bg-accent/10 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200'
@@ -302,9 +308,10 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
                 aria-label={`${option.label} reaction`}
                 title={option.label}
               >
-                <Icon size={15} />
-                <span>{option.label}</span>
-                <span className={isActive ? 'text-white/80' : 'text-gray-400'}>{count}</span>
+                <span key={pulseCount} className={`inline-flex ${pulseCount ? 'dashboard-reaction-pop' : ''}`}>
+                  <Icon size={13} />
+                </span>
+                <span>{count}</span>
               </button>
             );
           })}

@@ -115,7 +115,7 @@ const getReminderPriorityClass = (priority: Reminder['priority'] = 'Normal') => 
   return 'bg-primary-500/10 text-primary-500 dark:text-blue-100';
 };
 
-const postHtmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span|h1|h2|h3|blockquote|a)\b[^>]*>/iu;
+const postHtmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span|h1|h2|h3|blockquote|a|figure|img)\b[^>]*>/iu;
 const internalPostLinks = [
   { value: 'account-preferences', label: 'Account Preferences' },
   { value: 'calendar', label: 'Calendar' },
@@ -148,12 +148,16 @@ function getPostBodyText(value: string): string {
 function RichPostEditor({
   value,
   onChange,
+  onImageUpload,
 }: {
   value: string;
   onChange: (value: string) => void;
+  onImageUpload?: (file: File) => Promise<string>;
 }) {
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [isLinkPopoverOpen, setIsLinkPopoverOpen] = useState(false);
+  const [isUploadingInlineImage, setIsUploadingInlineImage] = useState(false);
   const [linkType, setLinkType] = useState<'internal' | 'external'>('external');
   const [internalLinkTarget, setInternalLinkTarget] = useState(internalPostLinks[0]?.value || '');
   const [externalLinkUrl, setExternalLinkUrl] = useState('');
@@ -246,6 +250,26 @@ function RichPostEditor({
     closeLinkPopover();
   };
 
+  const insertInlineImage = async (file: File) => {
+    if (!onImageUpload || !editorRef.current) {
+      return;
+    }
+
+    setIsUploadingInlineImage(true);
+    try {
+      const imageUrl = await onImageUpload(file);
+      editorRef.current.focus();
+      document.execCommand(
+        'insertHTML',
+        false,
+        `<figure><img src="${escapePostHtml(imageUrl)}" alt="" /></figure><p><br></p>`,
+      );
+      onChange(editorRef.current.innerHTML || '');
+    } finally {
+      setIsUploadingInlineImage(false);
+    }
+  };
+
   const preserveEditorFocus = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
   };
@@ -317,6 +341,35 @@ function RichPostEditor({
         >
           <Link2 size={16} />
         </button>
+        {onImageUpload && (
+          <>
+            <button
+              type="button"
+              onMouseDown={preserveEditorFocus}
+              onClick={() => imageInputRef.current?.click()}
+              className="btn-secondary"
+              disabled={isUploadingInlineImage}
+              aria-label="Insert image into story"
+              title={isUploadingInlineImage ? 'Uploading Image' : 'Insert Image'}
+            >
+              <Image size={16} />
+            </button>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              className="hidden"
+              disabled={isUploadingInlineImage}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                if (file) {
+                  void insertInlineImage(file);
+                }
+              }}
+            />
+          </>
+        )}
       </div>
       {isLinkPopoverOpen && (
         <div className="mb-2 w-full max-w-xl rounded border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-800 dark:bg-gray-950">
@@ -1041,6 +1094,23 @@ function DashboardNews({
     }
   };
 
+  const uploadInlineStoryImage = async (file: File) => {
+    if (!canUploadMedia) {
+      setPostError('You do not have permission to upload media.');
+      throw new Error('Missing media upload permission');
+    }
+
+    setPostError(null);
+    try {
+      const response = await dashboardPostService.uploadImage(file);
+      return response.data.imageUrl;
+    } catch (err) {
+      console.error('Failed to upload inline story image:', err);
+      setPostError('Failed to insert image into story.');
+      throw err;
+    }
+  };
+
   const updatePost = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -1078,7 +1148,21 @@ function DashboardNews({
         <div className="loading p-4">Loading updates...</div>
       ) : posts.length === 0 ? (
         <div className="m-3 rounded border border-dashed border-gray-300 dark:border-gray-700 sm:m-4">
-          <div className="empty-state">No updates posted yet.</div>
+          <div className="empty-state flex flex-col items-center gap-3">
+            <span>No updates posted yet.</span>
+            {canCreateDashboardPosts && (
+              <button
+                type="button"
+                onClick={() => setIsCreatePostOpen(true)}
+                className="btn-primary"
+                aria-label="Create new story"
+                title="New Story"
+              >
+                <Plus size={16} />
+                <span>New Story</span>
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="relative min-h-0 flex-1 overflow-hidden bg-gray-950 text-white">
@@ -1107,33 +1191,46 @@ function DashboardNews({
                 <span className={`absolute left-0 top-4 z-10 min-w-32 rounded-r px-5 py-2 pr-8 text-xs font-black uppercase tracking-[0.18em] shadow-lg [clip-path:polygon(0_0,100%_0,calc(100%-14px)_50%,100%_100%,0_100%)] ${getPostCategoryBannerClass(post.category)}`}>
                   {post.category}
                 </span>
+                <div className="absolute right-4 top-4 z-20 flex flex-wrap justify-end gap-2">
+                  {canCreateDashboardPosts && index === normalizedActiveFeaturedIndex && (
+                    <button
+                      type="button"
+                      onClick={() => setIsCreatePostOpen(true)}
+                      className="inline-flex h-8 items-center gap-1.5 rounded border border-accent/60 bg-accent px-2.5 text-xs font-bold text-white shadow-lg backdrop-blur transition hover:bg-accent/90"
+                      aria-label="Create new story"
+                      title="New Story"
+                    >
+                      <Plus size={14} />
+                      <span>New Story</span>
+                    </button>
+                  )}
+                  {canEditDashboardPosts && (
+                    <button
+                      type="button"
+                      onClick={() => startEditingPost(post)}
+                      className="inline-flex h-8 items-center gap-1.5 rounded border border-white/20 bg-black/35 px-2.5 text-xs font-bold text-white shadow-lg backdrop-blur transition hover:bg-white/15"
+                      aria-label={`Edit ${post.title}`}
+                      title="Edit Story"
+                    >
+                      <Pencil size={14} />
+                      <span>Edit</span>
+                    </button>
+                  )}
+                  {canDeleteDashboardPosts && (
+                    <button
+                      type="button"
+                      onClick={() => setPostPendingDelete(post)}
+                      className="inline-flex h-8 items-center gap-1.5 rounded border border-red-300/40 bg-red-500/25 px-2.5 text-xs font-bold text-red-100 shadow-lg backdrop-blur transition hover:bg-red-500/35"
+                      aria-label={`Delete ${post.title}`}
+                      title="Delete Story"
+                    >
+                      <Trash2 size={14} />
+                      <span>Delete</span>
+                    </button>
+                  )}
+                </div>
                 <div className="relative z-10 flex min-h-[24rem] max-w-3xl flex-col justify-between p-5 pb-16 sm:p-6 sm:pb-16 lg:p-7 lg:pb-16">
-                  <div className="flex flex-wrap gap-2">
-                    {canEditDashboardPosts && (
-                      <button
-                        type="button"
-                        onClick={() => startEditingPost(post)}
-                        className="inline-flex h-8 items-center gap-1.5 rounded border border-white/20 bg-black/25 px-2.5 text-xs font-bold text-white backdrop-blur transition hover:bg-white/15"
-                        aria-label={`Edit ${post.title}`}
-                        title="Edit Story"
-                      >
-                        <Pencil size={14} />
-                        <span>Edit</span>
-                      </button>
-                    )}
-                    {canDeleteDashboardPosts && (
-                      <button
-                        type="button"
-                        onClick={() => setPostPendingDelete(post)}
-                        className="inline-flex h-8 items-center gap-1.5 rounded border border-red-300/40 bg-red-500/20 px-2.5 text-xs font-bold text-red-100 backdrop-blur transition hover:bg-red-500/30"
-                        aria-label={`Delete ${post.title}`}
-                        title="Delete Story"
-                      >
-                        <Trash2 size={14} />
-                        <span>Delete</span>
-                      </button>
-                    )}
-                  </div>
+                  <div />
                   <div>
                     <Link to={`/updates/${post.id}`} className="block text-2xl font-black leading-tight text-white drop-shadow transition hover:text-blue-100 sm:text-4xl">
                       {post.title}
@@ -1218,21 +1315,6 @@ function DashboardNews({
         </div>
       )}
 
-      {canCreateDashboardPosts && (
-        <div className="flex justify-end p-3 sm:p-4">
-          <button
-            type="button"
-            onClick={() => setIsCreatePostOpen(true)}
-            className="btn-primary"
-            aria-label="Create new story"
-            title="New Story"
-          >
-            <Plus size={16} />
-            <span>New Story</span>
-          </button>
-        </div>
-      )}
-
       {(isCreatePostOpen || editingPost) && (
         <div className="modal-backdrop fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-4">
           <div className="modal-window max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900 sm:p-6">
@@ -1276,6 +1358,7 @@ function DashboardNews({
                 <RichPostEditor
                   value={postForm.body}
                   onChange={(body) => setPostForm((form) => ({ ...form, body }))}
+                  onImageUpload={canUploadMedia ? uploadInlineStoryImage : undefined}
                 />
               </div>
               <div className="rounded border border-gray-200 p-3 dark:border-gray-800">

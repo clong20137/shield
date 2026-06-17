@@ -817,6 +817,14 @@
     animation: dashboard-reaction-pop 520ms var(--shield-motion-ease) both;
   }
 
+  .formatted-content figure {
+    @apply my-5 overflow-hidden rounded-lg border border-gray-200 bg-gray-100 shadow-sm dark:border-gray-800 dark:bg-gray-950;
+  }
+
+  .formatted-content img {
+    @apply block max-h-[36rem] w-full object-contain;
+  }
+
   .toast-notification {
     --toast-status: #9C865C;
     @apply relative overflow-hidden rounded-lg border border-gray-200 bg-white text-gray-900 shadow-[0_18px_45px_rgba(15,23,42,0.18)] ring-1 ring-black/5 transition-all duration-300 ease-out dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 dark:ring-white/10;

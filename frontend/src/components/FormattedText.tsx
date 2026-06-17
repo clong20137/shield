@@ -6,7 +6,7 @@ interface FormattedTextProps {
 }
 
 const inlinePattern = /(\*\*[^*]+\*\*|\*[^*]+\*|\+\+[^+]+\+\+)/gu;
-const htmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span|h1|h2|h3|blockquote|a)\b[^>]*>/iu;
+const htmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span|h1|h2|h3|blockquote|a|figure|img)\b[^>]*>/iu;
 const internalLinkTargets = new Set([
   'account-preferences',
   'calendar',
@@ -28,6 +28,11 @@ function getSafeExternalHref(value: string): string {
   return /^(https?:|mailto:)/iu.test(cleanValue) ? cleanValue : '';
 }
 
+function getSafeImageSrc(value: string): string {
+  const cleanValue = value.trim();
+  return cleanValue.startsWith('/uploads/dashboard-posts/') ? cleanValue : '';
+}
+
 function sanitizeFormattedHtml(html: string): string {
   if (typeof window === 'undefined' || !htmlPattern.test(html)) {
     return '';
@@ -35,7 +40,7 @@ function sanitizeFormattedHtml(html: string): string {
 
   const parser = new DOMParser();
   const document = parser.parseFromString(`<div>${html}</div>`, 'text/html');
-  const allowedTags = new Set(['P', 'DIV', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'UL', 'OL', 'LI', 'SPAN', 'H1', 'H2', 'H3', 'BLOCKQUOTE', 'A']);
+  const allowedTags = new Set(['P', 'DIV', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'UL', 'OL', 'LI', 'SPAN', 'H1', 'H2', 'H3', 'BLOCKQUOTE', 'A', 'FIGURE', 'IMG']);
 
   const cleanNode = (node: Node) => {
     Array.from(node.childNodes).forEach((child) => {
@@ -48,6 +53,8 @@ function sanitizeFormattedHtml(html: string): string {
 
         const textAlign = getSafeTextAlign(element.style.textAlign || element.getAttribute('align'));
         const href = element.tagName === 'A' ? element.getAttribute('href') || '' : '';
+        const imageSrc = element.tagName === 'IMG' ? getSafeImageSrc(element.getAttribute('src') || '') : '';
+        const imageAlt = element.tagName === 'IMG' ? (element.getAttribute('alt') || '').slice(0, 160) : '';
         const internalTarget = href.startsWith('shield://') ? href.replace('shield://', '').trim().toLowerCase() : '';
         const externalHref = element.tagName === 'A' ? getSafeExternalHref(href) : '';
         Array.from(element.attributes).forEach((attribute) => element.removeAttribute(attribute.name));
@@ -63,6 +70,15 @@ function sanitizeFormattedHtml(html: string): string {
             element.replaceWith(document.createTextNode(element.textContent || ''));
             return;
           }
+        }
+        if (element.tagName === 'IMG') {
+          if (!imageSrc) {
+            element.remove();
+            return;
+          }
+          element.setAttribute('src', imageSrc);
+          element.setAttribute('alt', imageAlt);
+          element.setAttribute('loading', 'lazy');
         }
         if (textAlign) {
           element.style.textAlign = textAlign;
