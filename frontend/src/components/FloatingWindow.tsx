@@ -1,4 +1,5 @@
 import React, { CSSProperties, ReactNode, RefObject, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface FloatingWindowPosition {
   x: number;
@@ -158,7 +159,7 @@ export function FloatingWindow({
 
   const style: CSSProperties | undefined = isMobileLayout ? undefined : { left: position.x, top: position.y };
 
-  return (
+  const floatingWindow = (
     <div className="pointer-events-none fixed inset-0" style={{ zIndex }}>
       <div
         {...windowAttributes}
@@ -175,4 +176,6 @@ export function FloatingWindow({
       </div>
     </div>
   );
+
+  return createPortal(floatingWindow, document.body);
 }

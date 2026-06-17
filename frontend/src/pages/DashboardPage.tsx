@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Image, Indent, Italic, Link2, List, ListOrdered, NotebookPen, Outdent, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, dashboardSummaryService, DashboardSummary, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
@@ -2361,14 +2362,13 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
       const height = profileWindowRef.current?.offsetHeight || Math.min(window.innerHeight - 24, 760);
       const maxX = Math.max(12, window.innerWidth - width - 12);
       const maxY = Math.max(12, window.innerHeight - height - 12);
-      const scale = getDocumentScale();
       setProfileWindowPosition({
         x: Math.min(
-          Math.max(12, profileDragStartRef.current.windowX + ((event.clientX - profileDragStartRef.current.pointerX) / scale)),
+          Math.max(12, profileDragStartRef.current.windowX + (event.clientX - profileDragStartRef.current.pointerX)),
           maxX,
         ),
         y: Math.min(
-          Math.max(12, profileDragStartRef.current.windowY + ((event.clientY - profileDragStartRef.current.pointerY) / scale)),
+          Math.max(12, profileDragStartRef.current.windowY + (event.clientY - profileDragStartRef.current.pointerY)),
           maxY,
         ),
       });
@@ -2496,7 +2496,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
     return <div className="loading">Loading dashboard...</div>;
   }
 
-  const profileWindow = selectedProfile ? (
+  const profileWindow = selectedProfile ? createPortal((
     <div className="pointer-events-none fixed inset-0" style={{ zIndex: profileZIndex }}>
       <div
         ref={profileWindowRef}
@@ -2519,7 +2519,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
         />
       </div>
     </div>
-  ) : null;
+  ), document.body) : null;
 
   if (!isAdministrator) {
     return (
