@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
-import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, Link2, List, ListOrdered, LucideIcon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Image, Indent, Italic, Link2, List, ListOrdered, NotebookPen, Outdent, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, dashboardSummaryService, DashboardSummary, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
+import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, dashboardSummaryService, DashboardSummary, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { UserDetail } from '../components/UserDetail';
 
@@ -29,18 +29,6 @@ const defaultPostForm: DashboardPostForm = {
 
 const MEDIA_PICKER_PAGE_SIZE = 18;
 const DASHBOARD_POST_MEDIA_FOLDER = 'dashboard-posts';
-const dashboardPostFilters: Array<DashboardPost['category'] | 'All'> = ['All', 'Update', 'News', 'Alert'];
-
-const reactionOptions: Array<{
-  key: DashboardReaction;
-  label: string;
-  Icon: LucideIcon;
-}> = [
-  { key: 'like', label: 'Like', Icon: ThumbsUp },
-  { key: 'celebrate', label: 'Celebrate', Icon: PartyPopper },
-  { key: 'important', label: 'Important', Icon: AlertCircle },
-  { key: 'thanks', label: 'Thanks', Icon: Heart },
-];
 
 const getPostCategoryTone = (category: DashboardPost['category']) => {
   if (category === 'Alert') {
@@ -53,9 +41,6 @@ const getPostCategoryTone = (category: DashboardPost['category']) => {
 
   return 'border-accent/30 bg-accent/10 text-accent';
 };
-
-const getPostReactionTotal = (post: DashboardPost) =>
-  reactionOptions.reduce((total, { key }) => total + (post.reactions?.[key] || 0), 0);
 
 const createDefaultEntryForm = (date: string): CalendarEntryForm => ({
   category: 'General Information',
@@ -133,48 +118,6 @@ const internalPostLinks = [
   { value: 'search', label: 'Search' },
   { value: 'evaluations', label: 'Evaluations' },
 ];
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/gu, '&amp;')
-    .replace(/</gu, '&lt;')
-    .replace(/>/gu, '&gt;');
-}
-
-function renderLegacyInlineFormatting(value: string): string {
-  return escapeHtml(value)
-    .replace(/\+\+([^+]+)\+\+/gu, '<u>$1</u>')
-    .replace(/\*\*([^*]+)\*\*/gu, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/gu, '<em>$1</em>');
-}
-
-function legacyPostBodyToHtml(value: string): string {
-  if (postHtmlPattern.test(value)) {
-    return value;
-  }
-
-  const blocks: string[] = [];
-  let listItems: string[] = [];
-  const flushList = () => {
-    if (listItems.length === 0) return;
-    blocks.push(`<ul>${listItems.join('')}</ul>`);
-    listItems = [];
-  };
-
-  value.split(/\r?\n/u).forEach((line) => {
-    const listMatch = line.match(/^\s*[-*]\s+(.+)$/u);
-    if (listMatch) {
-      listItems.push(`<li>${renderLegacyInlineFormatting(listMatch[1])}</li>`);
-      return;
-    }
-
-    flushList();
-    blocks.push(line.trim() ? `<p>${renderLegacyInlineFormatting(line)}</p>` : '<p><br></p>');
-  });
-
-  flushList();
-  return blocks.join('');
-}
 
 function getPostBodyText(value: string): string {
   if (!postHtmlPattern.test(value)) {
@@ -318,49 +261,6 @@ function RichPostEditor({
         className="rich-post-editor min-h-64 w-full overflow-y-auto rounded border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
         data-placeholder="Write the update. Highlight text and use the toolbar, or click a style before typing."
       />
-    </div>
-  );
-}
-
-function PostReactionBar({
-  post,
-  reactionPulse,
-  onReact,
-}: {
-  post: DashboardPost;
-  reactionPulse: { postId: string; reaction: DashboardReaction } | null;
-  onReact: (post: DashboardPost, reaction: DashboardReaction) => void;
-}) {
-  const totalReactions = getPostReactionTotal(post);
-
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="mr-1 inline-flex h-9 items-center rounded-full border border-gray-200 bg-white px-3 text-xs font-bold text-gray-500 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-400">
-        {totalReactions} {totalReactions === 1 ? 'reaction' : 'reactions'}
-      </span>
-      {reactionOptions.map(({ key, label, Icon }) => {
-        const isActive = post.myReaction === key;
-        const count = post.reactions?.[key] || 0;
-        const shouldPulse = reactionPulse?.postId === post.id && reactionPulse.reaction === key;
-
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onReact(post, key)}
-            className={`dashboard-reaction-button inline-flex h-9 items-center gap-2 rounded-full border px-3 text-sm font-semibold shadow-sm transition-all duration-500 ease-out ${
-              isActive
-                ? 'border-accent bg-accent/15 text-accent shadow-accent/10'
-                : 'border-gray-200 bg-white text-gray-600 hover:border-accent hover:bg-accent/10 hover:text-accent dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300'
-            } ${shouldPulse ? 'dashboard-reaction-pop' : ''}`}
-            aria-label={`${label} reaction`}
-            title={label}
-          >
-            <Icon size={16} className={`transition-transform duration-500 ${isActive ? 'scale-110' : ''}`} />
-            <span className="min-w-[1ch] text-center">{count}</span>
-          </button>
-        );
-      })}
     </div>
   );
 }
@@ -787,9 +687,7 @@ function DashboardNews({
   initialPosts?: DashboardPost[];
 }) {
   const [posts, setPosts] = useState<DashboardPost[]>([]);
-  const [feedFilter, setFeedFilter] = useState<DashboardPost['category'] | 'All'>('All');
   const [activeFeaturedIndex, setActiveFeaturedIndex] = useState(0);
-  const [reactionPulse, setReactionPulse] = useState<{ postId: string; reaction: DashboardReaction } | null>(null);
   const [postForm, setPostForm] = useState<DashboardPostForm>(defaultPostForm);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isSavingPost, setIsSavingPost] = useState(false);
@@ -805,7 +703,6 @@ function DashboardNews({
   const canManageDashboard = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('dashboard:manage'));
   const canCreateDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:create'));
   const canEditDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:edit'));
-  const canDeleteDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:delete'));
   const canUploadMedia = canCreateDashboardPosts || canEditDashboardPosts || Boolean(currentUser?.permissions?.includes('media:upload'));
 
   useEffect(() => {
@@ -848,22 +745,6 @@ function DashboardNews({
     return () => window.removeEventListener('shield:dashboard-updated', handleDashboardUpdate);
   }, [initialPosts, loadPosts]);
 
-  const postCategoryCounts = useMemo(
-    () =>
-      dashboardPostFilters.reduce<Record<DashboardPost['category'] | 'All', number>>(
-        (counts, filter) => ({
-          ...counts,
-          [filter]: filter === 'All' ? posts.length : posts.filter((post) => post.category === filter).length,
-        }),
-        { All: 0, Update: 0, News: 0, Alert: 0 },
-      ),
-    [posts],
-  );
-
-  const filteredPosts = useMemo(
-    () => (feedFilter === 'All' ? posts : posts.filter((post) => post.category === feedFilter)),
-    [feedFilter, posts],
-  );
   const featuredPosts = useMemo(() => posts.slice(0, 4), [posts]);
   const activeFeaturedPost = featuredPosts[activeFeaturedIndex % Math.max(featuredPosts.length, 1)];
 
@@ -924,18 +805,6 @@ function DashboardNews({
       console.error('Failed to delete dashboard post:', err);
       setPostError('Failed to delete update.');
     }
-  };
-
-  const openEditPost = (post: DashboardPost) => {
-    setEditingPost(post);
-    setPostForm({
-      title: post.title,
-      body: legacyPostBodyToHtml(post.body),
-      category: post.category,
-      imageUrl: post.imageUrl || '',
-      allowComments: post.allowComments,
-    });
-    setIsCreatePostOpen(false);
   };
 
   const closePostForm = () => {
@@ -1025,61 +894,10 @@ function DashboardNews({
     }
   };
 
-  const reactToPost = async (post: DashboardPost, reaction: DashboardReaction) => {
-    const nextReaction = post.myReaction === reaction ? null : reaction;
-    const previousReaction = post.myReaction ?? null;
-    const optimisticReactions: Record<string, number> = { ...(post.reactions || {}) };
-
-    if (previousReaction) {
-      optimisticReactions[previousReaction] = Math.max(0, (optimisticReactions[previousReaction] || 0) - 1);
-    }
-
-    if (nextReaction) {
-      optimisticReactions[nextReaction] = (optimisticReactions[nextReaction] || 0) + 1;
-      setReactionPulse({ postId: post.id, reaction });
-    } else {
-      setReactionPulse(null);
-    }
-
-    setPostError(null);
-    setPosts((currentPosts) =>
-      currentPosts.map((currentPost) =>
-        currentPost.id === post.id
-          ? {
-              ...currentPost,
-              myReaction: nextReaction,
-              reactions: optimisticReactions,
-            }
-          : currentPost,
-      ),
-    );
-
-    try {
-      const response = await dashboardPostService.react(post.id, nextReaction);
-      setPosts((currentPosts) =>
-        currentPosts.map((currentPost) => (currentPost.id === post.id ? response.data : currentPost)),
-      );
-    } catch (err) {
-      console.error('Failed to update dashboard post reaction:', err);
-      setPosts((currentPosts) =>
-        currentPosts.map((currentPost) => (currentPost.id === post.id ? post : currentPost)),
-      );
-      setPostError('Failed to update reaction.');
-    } finally {
-      window.setTimeout(() => {
-        setReactionPulse((currentPulse) => (currentPulse?.postId === post.id ? null : currentPulse));
-      }, 520);
-    }
-  };
-
   return (
-    <section data-onboarding-target="dashboard-news" className="flex h-full min-h-[32rem] flex-col rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2>Updates & News</h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Administrative posts for everyone using SHIELD.</p>
-        </div>
-        {canCreateDashboardPosts && (
+    <section data-onboarding-target="dashboard-news" className="flex h-full min-h-[32rem] flex-col rounded-lg bg-white p-4 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:p-5">
+      {canCreateDashboardPosts && (
+        <div className="mb-3 flex justify-end">
           <button
             type="button"
             onClick={() => setIsCreatePostOpen(true)}
@@ -1089,8 +907,8 @@ function DashboardNews({
           >
             <Plus size={16} />
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {postError && <div className="error">{postError}</div>}
 
@@ -1099,9 +917,9 @@ function DashboardNews({
       ) : posts.length === 0 ? (
         <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No updates posted yet.</div>
       ) : (
-        <div className="min-h-0 flex-1 space-y-4">
+        <div className="min-h-0 flex-1">
           {activeFeaturedPost && (
-            <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-950 text-white shadow-sm dark:border-gray-800">
+            <div key={activeFeaturedPost.id} className="dashboard-news-carousel-slide overflow-hidden rounded-lg border border-gray-200 bg-gray-950 text-white shadow-sm dark:border-gray-800">
               <div className="grid min-h-[17rem] lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
                 <Link to={`/updates/${activeFeaturedPost.id}`} className="group relative min-h-[15rem] overflow-hidden bg-gray-900">
                   {activeFeaturedPost.imageUrl ? (
@@ -1123,7 +941,9 @@ function DashboardNews({
                 </Link>
                 <div className="flex min-w-0 flex-col justify-between p-5 sm:p-6">
                   <div>
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100/75">News Carousel</p>
+                    <p className={`inline-flex rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.18em] ${getPostCategoryTone(activeFeaturedPost.category)}`}>
+                      {activeFeaturedPost.category}
+                    </p>
                     <Link to={`/updates/${activeFeaturedPost.id}`} className="mt-3 block text-2xl font-black leading-tight text-white transition hover:text-blue-100 sm:text-3xl">
                       {activeFeaturedPost.title}
                     </Link>
@@ -1173,113 +993,9 @@ function DashboardNews({
             </div>
           )}
 
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="mr-auto flex items-center gap-2 text-xs font-black uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                <Bell size={15} className="text-accent" />
-                Command Feed
-              </span>
-              {dashboardPostFilters.map((filter) => {
-                const isActive = feedFilter === filter;
-
-                return (
-                  <button
-                    key={filter}
-                    type="button"
-                    onClick={() => setFeedFilter(filter)}
-                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-left text-sm font-bold transition-all duration-500 ease-out ${
-                      isActive
-                        ? 'border-accent bg-accent/10 text-accent shadow-sm'
-                        : 'border-gray-200 bg-white text-gray-600 hover:border-accent/40 hover:text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-accent/40 dark:hover:text-gray-100'
-                    }`}
-                    aria-pressed={isActive}
-                  >
-                    <span>{filter}</span>
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-300">
-                      {postCategoryCounts[filter]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="min-h-0 overflow-y-auto pr-1">
-            {filteredPosts.length === 0 ? (
-              <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No {feedFilter.toLowerCase()} posts found.</div>
-            ) : (
-              <div className="grid gap-3 xl:grid-cols-2">
-                {filteredPosts.map((post, index) => (
-                  <article
-                    key={post.id}
-                    className="dashboard-command-feed-item rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-all duration-500 ease-out hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-md dark:border-gray-800 dark:bg-gray-950 dark:hover:border-accent/50"
-                    style={{ animationDelay: `${Math.min(index * 45, 270)}ms` }}
-                  >
-                    <div className="grid gap-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
-                      <Link to={`/updates/${post.id}`} className="group flex aspect-[4/3] items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-gray-50 text-primary-500 dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100">
-                        {post.imageUrl ? (
-                          <img
-                            src={getAssetThumbnailUrl(post.imageUrl, 320)}
-                            alt=""
-                            onError={(event) => handleAssetThumbnailError(event, post.imageUrl)}
-                            className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.04]"
-                          />
-                        ) : (
-                          <Image size={28} />
-                        )}
-                      </Link>
-
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className={`rounded-full border px-2.5 py-1 text-xs font-bold uppercase ${getPostCategoryTone(post.category)}`}>
-                                {post.category}
-                              </span>
-                              <span className="text-xs font-semibold text-gray-400">
-                                {new Date(post.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                              </span>
-                            </div>
-                            <Link to={`/updates/${post.id}`} className="mt-2 block line-clamp-2 text-lg font-bold leading-tight text-primary-500 transition-colors duration-500 hover:text-primary-700 dark:text-blue-100 dark:hover:text-white">
-                              {post.title}
-                            </Link>
-                          </div>
-                          {(canEditDashboardPosts || canDeleteDashboardPosts) && (
-                            <div className="flex shrink-0 gap-2">
-                              {canEditDashboardPosts && (
-                                <button type="button" onClick={() => openEditPost(post)} className="btn-secondary" aria-label="Edit post" title="Edit">
-                                  <Pencil size={16} />
-                                </button>
-                              )}
-                              {canDeleteDashboardPosts && (
-                                <button type="button" onClick={() => setPostPendingDelete(post)} className="btn-danger" aria-label="Delete post" title="Delete">
-                                  <Trash2 size={16} />
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-600 dark:text-gray-300">{getPostBodyText(post.body)}</p>
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3 dark:border-gray-800">
-                          <div className="text-xs font-semibold text-gray-400">
-                            {post.authorName || 'Administrator'} · {new Date(post.createdAt).toLocaleDateString()}
-                          </div>
-                          <Link to={`/updates/${post.id}`} className="inline-flex h-9 items-center rounded-full border border-accent/30 px-3 text-sm font-bold text-accent transition-all duration-500 hover:bg-accent/10">
-                            Read More
-                          </Link>
-                        </div>
-                        <div className="mt-3">
-                          <PostReactionBar post={post} reactionPulse={reactionPulse} onReact={reactToPost} />
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       )}
+
       {(isCreatePostOpen || editingPost) && (
         <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
           <div className="modal-window max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900 sm:p-6">
@@ -1449,7 +1165,7 @@ function DashboardNews({
           <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Post</h2>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Delete "{postPendingDelete.title}" from Updates & News?
+              Delete "{postPendingDelete.title}" from the dashboard?
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setPostPendingDelete(null)} className="btn-secondary" aria-label="Cancel delete post" title="Cancel">
@@ -2641,3 +2357,4 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
 };
 
 export default DashboardPage;
+
