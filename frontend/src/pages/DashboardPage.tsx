@@ -1,8 +1,8 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Image, Indent, Italic, Link2, List, ListOrdered, NotebookPen, Outdent, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, Trash2, Underline, Upload, X } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, Link2, List, ListOrdered, LucideIcon, Megaphone, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, dashboardSummaryService, DashboardSummary, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
+import { authService, AuthAccount, calendarService, CalendarEntry, DashboardReaction, dashboardPostService, DashboardPost, dashboardSummaryService, DashboardSummary, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { UserDetail } from '../components/UserDetail';
 
@@ -27,6 +27,13 @@ const defaultPostForm: DashboardPostForm = {
   imageUrl: '',
   allowComments: true,
 };
+
+const dashboardReactionOptions: Array<{ value: DashboardReaction; label: string; icon: LucideIcon }> = [
+  { value: 'like', label: 'Like', icon: ThumbsUp },
+  { value: 'celebrate', label: 'Celebrate', icon: PartyPopper },
+  { value: 'important', label: 'Important', icon: Megaphone },
+  { value: 'thanks', label: 'Thanks', icon: Heart },
+];
 
 const MEDIA_PICKER_PAGE_SIZE = 18;
 const DASHBOARD_POST_MEDIA_FOLDER = 'dashboard-posts';
@@ -829,6 +836,7 @@ function DashboardNews({
   const canManageDashboard = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('dashboard:manage'));
   const canCreateDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:create'));
   const canEditDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:edit'));
+  const canDeleteDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:delete'));
   const canUploadMedia = canCreateDashboardPosts || canEditDashboardPosts || Boolean(currentUser?.permissions?.includes('media:upload'));
 
   useEffect(() => {
@@ -929,6 +937,38 @@ function DashboardNews({
     } catch (err) {
       console.error('Failed to delete dashboard post:', err);
       setPostError('Failed to delete update.');
+    }
+  };
+
+  const startEditingPost = (post: DashboardPost) => {
+    setEditingPost(post);
+    setPostForm({
+      title: post.title,
+      body: post.body,
+      category: post.category,
+      imageUrl: post.imageUrl || '',
+      allowComments: post.allowComments,
+    });
+    setPostError(null);
+    setIsCreatePostOpen(false);
+  };
+
+  const reactToPost = async (post: DashboardPost, reaction: DashboardReaction) => {
+    if (!currentUser) {
+      setPostError('Sign in to react to stories.');
+      return;
+    }
+
+    setPostError(null);
+    try {
+      const nextReaction = post.myReaction === reaction ? null : reaction;
+      const response = await dashboardPostService.react(post.id, nextReaction);
+      setPosts((currentPosts) => currentPosts.map((currentPost) => (
+        currentPost.id === post.id ? response.data : currentPost
+      )));
+    } catch (err) {
+      console.error('Failed to update dashboard reaction:', err);
+      setPostError('Failed to update reaction.');
     }
   };
 
@@ -1048,7 +1088,7 @@ function DashboardNews({
                       src={getAssetThumbnailUrl(post.imageUrl, 960)}
                       alt=""
                       onError={(event) => handleAssetThumbnailError(event, post.imageUrl)}
-                      className={`h-full min-h-[15rem] w-full object-cover opacity-90 transition duration-700 ease-out group-hover:scale-[1.035] ${index === normalizedActiveFeaturedIndex ? 'dashboard-news-image-outward' : ''}`}
+                      className={`h-full min-h-[15rem] w-full object-contain opacity-95 transition duration-700 ease-out group-hover:scale-[1.02] ${index === normalizedActiveFeaturedIndex ? 'dashboard-news-image-outward' : ''}`}
                     />
                   ) : (
                     <div className="flex h-full min-h-[15rem] items-center justify-center bg-primary-500/30 text-blue-100">
@@ -1062,6 +1102,32 @@ function DashboardNews({
                 </Link>
                 <div className="flex min-w-0 flex-col justify-between p-5 sm:p-6">
                   <div>
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {canEditDashboardPosts && (
+                        <button
+                          type="button"
+                          onClick={() => startEditingPost(post)}
+                          className="inline-flex h-8 items-center gap-1.5 rounded border border-white/20 bg-white/10 px-2.5 text-xs font-bold text-white transition hover:bg-white/15"
+                          aria-label={`Edit ${post.title}`}
+                          title="Edit Story"
+                        >
+                          <Pencil size={14} />
+                          <span>Edit</span>
+                        </button>
+                      )}
+                      {canDeleteDashboardPosts && (
+                        <button
+                          type="button"
+                          onClick={() => setPostPendingDelete(post)}
+                          className="inline-flex h-8 items-center gap-1.5 rounded border border-red-300/40 bg-red-500/15 px-2.5 text-xs font-bold text-red-100 transition hover:bg-red-500/25"
+                          aria-label={`Delete ${post.title}`}
+                          title="Delete Story"
+                        >
+                          <Trash2 size={14} />
+                          <span>Delete</span>
+                        </button>
+                      )}
+                    </div>
                     <Link to={`/updates/${post.id}`} className="mt-3 block text-2xl font-black leading-tight text-white transition hover:text-blue-100 sm:text-3xl">
                       {post.title}
                     </Link>
@@ -1070,9 +1136,35 @@ function DashboardNews({
                       {post.authorName || 'Administrator'} - {new Date(post.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
                     </p>
                   </div>
-                  <Link to={`/updates/${post.id}`} className="mt-6 inline-flex h-9 w-fit items-center rounded border border-accent/50 px-3 text-sm font-bold text-accent transition hover:bg-accent/15">
-                    Read More
-                  </Link>
+                  <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+                    <div className="flex flex-wrap gap-1.5">
+                      {dashboardReactionOptions.map((option) => {
+                        const Icon = option.icon;
+                        const isActive = post.myReaction === option.value;
+                        const count = post.reactions?.[option.value] || 0;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => void reactToPost(post, option.value)}
+                            className={`inline-flex h-8 items-center gap-1.5 rounded border px-2 text-xs font-bold transition ${
+                              isActive
+                                ? 'border-accent bg-accent text-white'
+                                : 'border-white/15 bg-white/10 text-gray-200 hover:bg-white/15'
+                            }`}
+                            aria-label={`${option.label} reaction`}
+                            title={option.label}
+                          >
+                            <Icon size={13} />
+                            <span>{count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <Link to={`/updates/${post.id}`} className="inline-flex h-9 w-fit items-center rounded border border-accent/50 px-3 text-sm font-bold text-accent transition hover:bg-accent/15">
+                      Read More
+                    </Link>
+                  </div>
                 </div>
               </div>
             ))}
@@ -1264,7 +1356,7 @@ function DashboardNews({
                 )}
                 {postForm.imageUrl ? (
                   <div className="mt-3 overflow-hidden rounded border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-950">
-                    <img src={getAssetUrl(postForm.imageUrl)} alt="" onError={handleAssetImageError} className="h-48 w-full object-cover" />
+                    <img src={getAssetUrl(postForm.imageUrl)} alt="" onError={handleAssetImageError} className="max-h-72 w-full object-contain" />
                   </div>
                 ) : (
                   <div className="mt-3 flex h-28 items-center justify-center rounded border border-dashed border-gray-300 text-gray-400 dark:border-gray-700">

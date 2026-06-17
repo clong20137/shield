@@ -2,14 +2,21 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import type { EmojiClickData } from 'emoji-picker-react';
-import { Flag, MessageSquare, Pin, PinOff, Send, Smile, Trash2, X } from 'lucide-react';
+import { Flag, Heart, LucideIcon, Megaphone, MessageSquare, PartyPopper, Pin, PinOff, Send, Smile, ThumbsUp, Trash2, X } from 'lucide-react';
 import { UserDetail } from '../components/UserDetail';
 import { FormattedText } from '../components/FormattedText';
 import { MentionTextarea } from '../components/MentionTextarea';
 import { MentionText } from '../components/MentionText';
-import { AuthAccount, DashboardPost, DashboardPostComment, User, dashboardPostService, getAssetUrl, handleAssetImageError, userService } from '../services/api';
+import { AuthAccount, DashboardPost, DashboardPostComment, DashboardReaction, User, dashboardPostService, getAssetUrl, handleAssetImageError, userService } from '../services/api';
 
 const EmojiPicker = lazy(() => import('emoji-picker-react'));
+
+const dashboardReactionOptions: Array<{ value: DashboardReaction; label: string; icon: LucideIcon }> = [
+  { value: 'like', label: 'Like', icon: ThumbsUp },
+  { value: 'celebrate', label: 'Celebrate', icon: PartyPopper },
+  { value: 'important', label: 'Important', icon: Megaphone },
+  { value: 'thanks', label: 'Thanks', icon: Heart },
+];
 
 interface DashboardPostPageProps {
   currentUser: AuthAccount | null;
@@ -208,6 +215,23 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
     setIsEmojiPickerOpen(false);
   };
 
+  const reactToPost = async (reaction: DashboardReaction) => {
+    if (!post || !currentUser) {
+      setError('Sign in to react to stories.');
+      return;
+    }
+
+    setError(null);
+    try {
+      const nextReaction = post.myReaction === reaction ? null : reaction;
+      const response = await dashboardPostService.react(post.id, nextReaction);
+      setPost(response.data);
+    } catch (err) {
+      console.error('Failed to update reaction:', err);
+      setError('Failed to update reaction.');
+    }
+  };
+
   const getCommentInitials = (comment: DashboardPostComment) =>
     (comment.authorName || comment.authorEmail || 'User')
       .split(/\s+/u)
@@ -256,10 +280,35 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
         </div>
         {post.imageUrl && (
           <div className="mt-6 overflow-hidden rounded border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-950">
-            <img src={getAssetUrl(post.imageUrl)} alt="" onError={handleAssetImageError} className="max-h-[520px] w-full object-cover" />
+            <img src={getAssetUrl(post.imageUrl)} alt="" onError={handleAssetImageError} className="max-h-[620px] w-full object-contain" />
           </div>
         )}
         <FormattedText text={post.body} className="mt-6 text-base leading-8 text-gray-700 dark:text-gray-300" />
+        <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-gray-200 pt-4 dark:border-gray-800">
+          {dashboardReactionOptions.map((option) => {
+            const Icon = option.icon;
+            const isActive = post.myReaction === option.value;
+            const count = post.reactions?.[option.value] || 0;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => void reactToPost(option.value)}
+                className={`inline-flex h-9 items-center gap-2 rounded border px-3 text-sm font-bold transition ${
+                  isActive
+                    ? 'border-accent bg-accent text-white'
+                    : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-accent hover:bg-accent/10 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200'
+                }`}
+                aria-label={`${option.label} reaction`}
+                title={option.label}
+              >
+                <Icon size={15} />
+                <span>{option.label}</span>
+                <span className={isActive ? 'text-white/80' : 'text-gray-400'}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
       </article>
 
       <section className="mt-6 rounded-lg bg-white p-4 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:p-6">
