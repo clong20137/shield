@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import { getSessionAccount } from '../middleware/authSession';
-import { ReminderModel } from '../models/Reminder';
+import { ReminderModel, ReminderRecurrenceRule } from '../models/Reminder';
 import { broadcastAccountEvent } from '../services/appEvents';
 import { cleanMultiline, cleanString, isOneOf, isValidIsoDate } from '../utils/validation';
 
 const reminderPriorities = ['Low', 'Normal', 'High', 'Critical'] as const;
+const reminderRecurrenceRules: ReminderRecurrenceRule[] = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
 
 function isValidLocalDateTime(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/u.test(value)) {
@@ -69,8 +70,13 @@ export class ReminderController {
         return res.status(400).json({ error: 'Choose a valid reminder priority' });
       }
 
+      const recurrenceRule = cleanString(req.body?.recurrenceRule, 20) || 'none';
+      if (!isOneOf(recurrenceRule, reminderRecurrenceRules)) {
+        return res.status(400).json({ error: 'Choose a valid reminder repeat option' });
+      }
+
       const notes = cleanMultiline(req.body?.notes, 1000);
-      const reminder = await ReminderModel.create(account.id, title, remindOn, priority, notes, remindAt);
+      const reminder = await ReminderModel.create(account.id, title, remindOn, priority, notes, remindAt, recurrenceRule);
       const dueCount = await ReminderModel.createDueNotifications(account.id);
       if (dueCount > 0) {
         broadcastAccountEvent(account.id, { type: 'notification-created', entityId: reminder.id });
@@ -113,12 +119,18 @@ export class ReminderController {
         return res.status(400).json({ error: 'Choose a valid reminder priority' });
       }
 
+      const recurrenceRule = req.body?.recurrenceRule === undefined ? undefined : cleanString(req.body.recurrenceRule, 20);
+      if (recurrenceRule !== undefined && !isOneOf(recurrenceRule, reminderRecurrenceRules)) {
+        return res.status(400).json({ error: 'Choose a valid reminder repeat option' });
+      }
+
       const reminder = await ReminderModel.update(req.params.id, account.id, {
         title,
         priority,
         notes: req.body?.notes === undefined ? undefined : cleanMultiline(req.body.notes, 1000),
         remindOn,
         remindAt,
+        recurrenceRule,
         completed: typeof req.body?.completed === 'boolean' ? req.body.completed : undefined,
       });
 

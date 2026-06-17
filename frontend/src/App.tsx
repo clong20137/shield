@@ -712,7 +712,7 @@ function ReminderCreateModal({
   isSaving: boolean;
   alarmSound: ReminderAlarmSound;
   onClose: () => void;
-  onSave: (reminder: { title: string; remindOn: string; remindAt: string; priority: Reminder['priority']; notes: string }) => void;
+  onSave: (reminder: { title: string; remindOn: string; remindAt: string; priority: Reminder['priority']; notes: string; recurrenceRule: Reminder['recurrenceRule'] }) => void;
   onAlarmSoundChange: (sound: ReminderAlarmSound) => void;
 }) {
   const now = new Date();
@@ -720,6 +720,7 @@ function ReminderCreateModal({
   const [remindOn, setRemindOn] = useState(date);
   const [remindTime, setRemindTime] = useState(() => `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
   const [priority, setPriority] = useState<Reminder['priority']>('Normal');
+  const [recurrenceRule, setRecurrenceRule] = useState<Reminder['recurrenceRule']>('none');
   const [notes, setNotes] = useState('');
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -741,12 +742,13 @@ function ReminderCreateModal({
       remindAt: `${remindOn}T${remindTime || '09:00'}`,
       priority,
       notes: notes.trim(),
+      recurrenceRule,
     });
   };
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+      <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-lg border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-900">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-black uppercase tracking-[0.16em] text-primary-500 dark:text-blue-100">Reminder</p>
@@ -786,7 +788,7 @@ function ReminderCreateModal({
             />
           </label>
         </div>
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <label className="block">
             <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Priority</span>
             <select
@@ -809,6 +811,20 @@ function ReminderCreateModal({
               {reminderAlarmSoundOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Repeat</span>
+            <select
+              value={recurrenceRule}
+              onChange={(event) => setRecurrenceRule(event.target.value as Reminder['recurrenceRule'])}
+              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+            >
+              <option value="none">None</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
             </select>
           </label>
         </div>
@@ -897,7 +913,7 @@ function ReminderDuePopup({
             {reminders.length - 1} more reminder{reminders.length - 1 === 1 ? '' : 's'} due.
           </p>
         )}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           <label className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-300">
             <span>Snooze</span>
             <select
@@ -919,7 +935,7 @@ function ReminderDuePopup({
           <button type="button" className="btn-secondary" onClick={() => onSnooze(primaryReminder, snoozeMinutes)} disabled={isSaving}>
             {isSaving ? 'Saving...' : 'Snooze'}
           </button>
-          <button type="button" className="btn-primary" onClick={() => onComplete(primaryReminder)} disabled={isSaving}>
+          <button type="button" className="btn-primary whitespace-nowrap" onClick={() => onComplete(primaryReminder)} disabled={isSaving}>
             {isSaving ? 'Completing...' : 'Mark Complete'}
           </button>
         </div>
@@ -1397,6 +1413,7 @@ function createSidebarDailyPayload(entry: CalendarEntry, date: string): Calendar
 function SidebarCalendarWidget({
   compact,
   entries,
+  reminders,
   onOpenCalendar,
   copiedDaily,
   onCopyDaily,
@@ -1408,6 +1425,7 @@ function SidebarCalendarWidget({
 }: {
   compact: boolean;
   entries: CalendarEntry[];
+  reminders: Reminder[];
   onOpenCalendar: (dateKey?: string) => void;
   copiedDaily: CalendarEntryPayload | null;
   onCopyDaily: (dateKey: string) => void;
@@ -1419,7 +1437,7 @@ function SidebarCalendarWidget({
 }) {
   const todayKey = getLocalDateKey();
   const [visibleMonth, setVisibleMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
-  const [hoveredDate, setHoveredDate] = useState<{ x: number; y: number; dateKey: string; entries: CalendarEntry[] } | null>(null);
+  const [hoveredDate, setHoveredDate] = useState<{ x: number; y: number; dateKey: string; entries: CalendarEntry[]; reminders: Reminder[] } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; dateKey: string; entries: CalendarEntry[] } | null>(null);
   const calendarDays = useMemo(() => getSidebarCalendarDays(visibleMonth), [visibleMonth]);
   const entriesByDate = useMemo(() => entries.reduce<Record<string, CalendarEntry[]>>((groups, entry) => {
@@ -1427,6 +1445,14 @@ function SidebarCalendarWidget({
     groups[dateKey] = [...(groups[dateKey] || []), entry];
     return groups;
   }, {}), [entries]);
+  const remindersByDate = useMemo(() => reminders.reduce<Record<string, Reminder[]>>((groups, reminder) => {
+    if (reminder.completedAt) {
+      return groups;
+    }
+    const dateKey = reminder.remindOn.slice(0, 10);
+    groups[dateKey] = [...(groups[dateKey] || []), reminder];
+    return groups;
+  }, {}), [reminders]);
   const visibleMonthLabel = visibleMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 
   const changeMonth = (offset: number) => {
@@ -1435,13 +1461,14 @@ function SidebarCalendarWidget({
     setVisibleMonth((currentMonth) => new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1));
   };
 
-  const showDateTooltip = (target: HTMLElement, dateKey: string, dayEntries: CalendarEntry[]) => {
+  const showDateTooltip = (target: HTMLElement, dateKey: string, dayEntries: CalendarEntry[], dayReminders: Reminder[]) => {
     const rect = target.getBoundingClientRect();
     setHoveredDate({
       x: Math.min(Math.max(rect.left + rect.width / 2, 104), window.innerWidth - 104),
       y: rect.bottom + 8,
       dateKey,
       entries: dayEntries,
+      reminders: dayReminders,
     });
   };
 
@@ -1570,6 +1597,7 @@ function SidebarCalendarWidget({
         {calendarDays.map((date) => {
           const dateKey = getLocalDateKey(date);
           const dayEntries = entriesByDate[dateKey] || [];
+          const dayReminders = remindersByDate[dateKey] || [];
           const isCurrentMonth = date.getMonth() === visibleMonth.getMonth();
           const isToday = dateKey === todayKey;
           const primaryEntry = dayEntries[0];
@@ -1579,9 +1607,9 @@ function SidebarCalendarWidget({
               key={dateKey}
               type="button"
               onClick={() => onOpenCalendar(dateKey)}
-              onMouseEnter={(event) => showDateTooltip(event.currentTarget, dateKey, dayEntries)}
+              onMouseEnter={(event) => showDateTooltip(event.currentTarget, dateKey, dayEntries, dayReminders)}
               onMouseLeave={() => setHoveredDate(null)}
-              onFocus={(event) => showDateTooltip(event.currentTarget, dateKey, dayEntries)}
+              onFocus={(event) => showDateTooltip(event.currentTarget, dateKey, dayEntries, dayReminders)}
               onBlur={() => setHoveredDate(null)}
               onContextMenu={(event) => openContextMenu(event, dateKey, dayEntries)}
               className={`relative flex aspect-square min-h-6 items-center justify-center rounded border text-[11px] font-black transition duration-300 hover:-translate-y-0.5 hover:shadow-sm ${
@@ -1595,7 +1623,7 @@ function SidebarCalendarWidget({
               }`}
               style={primaryEntry ? { backgroundColor: primaryEntry.color } : undefined}
               aria-label={`Open Trooper Daily for ${date.toLocaleDateString()}`}
-              title={dayEntries.length > 0 ? `${dayEntries.length} calendar ${dayEntries.length === 1 ? 'entry' : 'entries'}` : 'Open Calendar'}
+              title={dayEntries.length > 0 || dayReminders.length > 0 ? `${dayEntries.length} calendar ${dayEntries.length === 1 ? 'entry' : 'entries'}, ${dayReminders.length} ${dayReminders.length === 1 ? 'reminder' : 'reminders'}` : 'Open Calendar'}
             >
               {date.getDate()}
               {isToday && (
@@ -1614,6 +1642,9 @@ function SidebarCalendarWidget({
                 >
                   {dayEntries.length > 1 && <span className="sr-only">{dayEntries.length} entries</span>}
                 </span>
+              )}
+              {dayReminders.length > 0 && (
+                <span className="absolute left-1 top-1 flex h-2 w-2 rounded-full border border-white bg-amber-300 shadow" aria-hidden="true" />
               )}
             </button>
           );
@@ -1636,6 +1667,12 @@ function SidebarCalendarWidget({
             </>
           ) : (
             <span className="mt-1 block text-gray-300">No daily report yet</span>
+          )}
+          {hoveredDate.reminders.length > 0 && (
+            <span className="mt-1.5 block border-t border-white/10 pt-1.5 text-amber-200">
+              {hoveredDate.reminders.length} reminder{hoveredDate.reminders.length === 1 ? '' : 's'}
+              {hoveredDate.reminders[0]?.title ? ` - ${hoveredDate.reminders[0].title}` : ''}
+            </span>
           )}
         </div>
       )}
@@ -4681,6 +4718,7 @@ function App() {
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const [bugReports, setBugReports] = useState<BugReport[]>([]);
   const [sidebarCalendarEntries, setSidebarCalendarEntries] = useState<CalendarEntry[]>([]);
+  const [sidebarReminders, setSidebarReminders] = useState<Reminder[]>([]);
   const [copiedSidebarDaily, setCopiedSidebarDaily] = useState<CalendarEntryPayload | null>(null);
   const previousMessageUnreadCount = useRef<number | null>(null);
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
@@ -4996,19 +5034,26 @@ function App() {
       const gain = audioContext.createGain();
       const tones = {
         classic: [
-          { type: 'triangle' as OscillatorType, frequency: 740, start: 0, duration: 0.18, volume: 0.13 },
-          { type: 'sine' as OscillatorType, frequency: 988, start: 0.18, duration: 0.22, volume: 0.11 },
-          { type: 'triangle' as OscillatorType, frequency: 740, start: 0.44, duration: 0.2, volume: 0.1 },
+          { type: 'triangle' as OscillatorType, frequency: 740, start: 0, duration: 0.24, volume: 0.13 },
+          { type: 'sine' as OscillatorType, frequency: 988, start: 0.28, duration: 0.28, volume: 0.11 },
+          { type: 'triangle' as OscillatorType, frequency: 740, start: 0.74, duration: 0.24, volume: 0.12 },
+          { type: 'sine' as OscillatorType, frequency: 988, start: 1.02, duration: 0.32, volume: 0.1 },
+          { type: 'triangle' as OscillatorType, frequency: 587.33, start: 1.54, duration: 0.38, volume: 0.09 },
         ],
         soft: [
-          { type: 'sine' as OscillatorType, frequency: 523.25, start: 0, duration: 0.22, volume: 0.08 },
-          { type: 'sine' as OscillatorType, frequency: 659.25, start: 0.2, duration: 0.28, volume: 0.07 },
+          { type: 'sine' as OscillatorType, frequency: 523.25, start: 0, duration: 0.38, volume: 0.08 },
+          { type: 'sine' as OscillatorType, frequency: 659.25, start: 0.34, duration: 0.44, volume: 0.07 },
+          { type: 'sine' as OscillatorType, frequency: 783.99, start: 0.86, duration: 0.5, volume: 0.065 },
+          { type: 'sine' as OscillatorType, frequency: 659.25, start: 1.42, duration: 0.54, volume: 0.06 },
         ],
         urgent: [
-          { type: 'square' as OscillatorType, frequency: 784, start: 0, duration: 0.12, volume: 0.12 },
-          { type: 'square' as OscillatorType, frequency: 1046.5, start: 0.18, duration: 0.12, volume: 0.12 },
-          { type: 'square' as OscillatorType, frequency: 784, start: 0.36, duration: 0.12, volume: 0.12 },
-          { type: 'square' as OscillatorType, frequency: 1046.5, start: 0.54, duration: 0.16, volume: 0.1 },
+          { type: 'square' as OscillatorType, frequency: 784, start: 0, duration: 0.16, volume: 0.12 },
+          { type: 'square' as OscillatorType, frequency: 1046.5, start: 0.22, duration: 0.16, volume: 0.12 },
+          { type: 'square' as OscillatorType, frequency: 784, start: 0.48, duration: 0.16, volume: 0.12 },
+          { type: 'square' as OscillatorType, frequency: 1046.5, start: 0.7, duration: 0.18, volume: 0.11 },
+          { type: 'square' as OscillatorType, frequency: 784, start: 1.08, duration: 0.16, volume: 0.12 },
+          { type: 'square' as OscillatorType, frequency: 1046.5, start: 1.3, duration: 0.16, volume: 0.12 },
+          { type: 'square' as OscillatorType, frequency: 1174.66, start: 1.62, duration: 0.28, volume: 0.1 },
         ],
         none: [],
       }[messagePreferences.reminderAlarmSound];
@@ -5028,7 +5073,7 @@ function App() {
         oscillator.stop(audioContext.currentTime + tone.start + tone.duration);
       });
 
-      window.setTimeout(() => void audioContext.close().catch(() => undefined), 1200);
+      window.setTimeout(() => void audioContext.close().catch(() => undefined), 2600);
     } catch (error) {
       console.error('Failed to play reminder alarm sound:', error);
     }
@@ -5074,15 +5119,16 @@ function App() {
     scheduledReminderTimeoutsRef.current.set(reminder.id, timeoutId);
   }, [clearScheduledReminder, showDueReminders]);
 
-  const saveSidebarReminder = async (reminder: { title: string; remindOn: string; remindAt: string; priority: Reminder['priority']; notes: string }) => {
+  const saveSidebarReminder = async (reminder: { title: string; remindOn: string; remindAt: string; priority: Reminder['priority']; notes: string; recurrenceRule: Reminder['recurrenceRule'] }) => {
     if (!currentUser || !reminderModalDate) {
       return;
     }
 
     setIsReminderSaving(true);
     try {
-      const response = await reminderService.create(reminder.title, reminder.remindOn, reminder.priority, reminder.notes, reminder.remindAt);
+      const response = await reminderService.create(reminder.title, reminder.remindOn, reminder.priority, reminder.notes, reminder.remindAt, reminder.recurrenceRule);
       shownDueReminderIdsRef.current.delete(response.data.id);
+      setSidebarReminders((currentReminders) => [response.data, ...currentReminders.filter((item) => item.id !== response.data.id)]);
       scheduleReminder(response.data);
       window.dispatchEvent(new Event('shield:reminder-updated'));
       showToast('success', `Reminder added for ${formatSidebarCalendarDate(reminder.remindOn)}.`, { saveToNotifications: false });
@@ -5102,6 +5148,7 @@ function App() {
 
     try {
       const response = await reminderService.getAll();
+      setSidebarReminders(response.data);
       const activeReminders = response.data.filter((reminder) => !reminder.completedAt);
       const activeReminderIds = new Set(activeReminders.map((reminder) => reminder.id));
       scheduledReminderTimeoutsRef.current.forEach((timeoutId, reminderId) => {
@@ -5124,6 +5171,7 @@ function App() {
   useEffect(() => {
     if (!currentUser) {
       setDueReminderPopup([]);
+      setSidebarReminders([]);
       clearScheduledReminders();
       return undefined;
     }
@@ -5154,11 +5202,16 @@ function App() {
   const completeDueReminder = async (reminder: Reminder) => {
     setIsCompletingDueReminder(true);
     try {
-      await reminderService.update(reminder.id, { completed: true });
+      const response = await reminderService.update(reminder.id, { completed: true });
       clearScheduledReminder(reminder.id);
+      shownDueReminderIdsRef.current.delete(reminder.id);
+      setSidebarReminders((currentReminders) => [response.data, ...currentReminders.filter((item) => item.id !== response.data.id)]);
       setDueReminderPopup((currentReminders) => currentReminders.filter((item) => item.id !== reminder.id));
+      if (!response.data.completedAt) {
+        scheduleReminder(response.data);
+      }
       window.dispatchEvent(new Event('shield:reminder-updated'));
-      showToast('success', 'Reminder completed.', { saveToNotifications: false });
+      showToast('success', response.data.recurrenceRule === 'none' ? 'Reminder completed.' : 'Reminder advanced to the next repeat.', { saveToNotifications: false });
     } catch (error) {
       console.error('Failed to complete reminder:', error);
       showToast('error', getErrorMessage(error, 'Failed to complete reminder.'), { saveToNotifications: false });
@@ -5179,6 +5232,7 @@ function App() {
         remindAt: `${remindOn}T${remindTime}`,
       });
       shownDueReminderIdsRef.current.delete(reminder.id);
+      setSidebarReminders((currentReminders) => [response.data, ...currentReminders.filter((item) => item.id !== response.data.id)]);
       setDueReminderPopup((currentReminders) => currentReminders.filter((item) => item.id !== reminder.id));
       scheduleReminder(response.data);
       window.dispatchEvent(new Event('shield:reminder-updated'));
@@ -6375,6 +6429,7 @@ function App() {
                   <SidebarCalendarWidget
                     compact={isSidebarCollapsed}
                     entries={sidebarCalendarEntries}
+                    reminders={sidebarReminders}
                     onOpenCalendar={openCalendarModal}
                     copiedDaily={copiedSidebarDaily}
                     onCopyDaily={copySidebarDaily}

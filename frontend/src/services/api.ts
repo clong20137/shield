@@ -822,6 +822,7 @@ export interface Reminder {
   notes: string;
   remindOn: string;
   remindAt: string | null;
+  recurrenceRule: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
   notifiedAt: string | null;
   completedAt: string | null;
   createdAt: string;
@@ -1327,10 +1328,10 @@ export const reminderService = {
   getAll: () =>
     api.get<Reminder[]>('/reminders'),
 
-  create: (title: string, remindOn: string, priority: Reminder['priority'] = 'Normal', notes = '', remindAt?: string | null) =>
-    api.post<Reminder>('/reminders', { title, remindOn, priority, notes, remindAt }),
+  create: (title: string, remindOn: string, priority: Reminder['priority'] = 'Normal', notes = '', remindAt?: string | null, recurrenceRule: Reminder['recurrenceRule'] = 'none') =>
+    api.post<Reminder>('/reminders', { title, remindOn, priority, notes, remindAt, recurrenceRule }),
 
-  update: (id: string, updates: { title?: string; remindOn?: string; remindAt?: string | null; priority?: Reminder['priority']; notes?: string; completed?: boolean }) =>
+  update: (id: string, updates: { title?: string; remindOn?: string; remindAt?: string | null; priority?: Reminder['priority']; notes?: string; recurrenceRule?: Reminder['recurrenceRule']; completed?: boolean }) =>
     api.put<Reminder>(`/reminders/${id}`, updates),
 
   delete: (id: string) =>

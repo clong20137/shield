@@ -644,6 +644,7 @@ export async function initializeDatabase() {
       \`notes\` TEXT,
       \`remindOn\` DATE NOT NULL,
       \`remindAt\` DATETIME NULL,
+      \`recurrenceRule\` VARCHAR(20) NOT NULL DEFAULT 'none',
       \`notifiedAt\` TIMESTAMP NULL,
       \`completedAt\` TIMESTAMP NULL,
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -655,6 +656,7 @@ export async function initializeDatabase() {
   `);
   await ensureColumn('reminders', 'remindOn', '`remindOn` DATE NULL');
   await ensureColumn('reminders', 'remindAt', '`remindAt` DATETIME NULL');
+  await ensureColumn('reminders', 'recurrenceRule', "`recurrenceRule` VARCHAR(20) NOT NULL DEFAULT 'none'");
   await ensureColumn('reminders', 'priority', "`priority` VARCHAR(20) NOT NULL DEFAULT 'Normal'");
   await ensureColumn('reminders', 'notes', '`notes` TEXT');
   await ensureColumn('reminders', 'notifiedAt', '`notifiedAt` TIMESTAMP NULL');

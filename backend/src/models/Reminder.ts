@@ -11,11 +11,14 @@ export interface Reminder {
   notes: string;
   remindOn: string;
   remindAt: string | null;
+  recurrenceRule: ReminderRecurrenceRule;
   notifiedAt: Date | null;
   completedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
+
+export type ReminderRecurrenceRule = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 interface ReminderRow extends RowDataPacket {
   id: string;
@@ -25,6 +28,7 @@ interface ReminderRow extends RowDataPacket {
   notes: string | null;
   remindOn: Date | string | null;
   remindAt: Date | string | null;
+  recurrenceRule: ReminderRecurrenceRule | null;
   notifiedAt: Date | null;
   completedAt: Date | null;
   createdAt: Date;
@@ -40,6 +44,7 @@ function toReminder(row: ReminderRow): Reminder {
     notes: row.notes || '',
     remindOn: formatDate(row.remindOn || row.createdAt),
     remindAt: row.remindAt ? formatDateTime(row.remindAt) : null,
+    recurrenceRule: row.recurrenceRule || 'none',
     notifiedAt: row.notifiedAt || null,
     completedAt: row.completedAt || null,
     createdAt: row.createdAt,
@@ -76,6 +81,31 @@ function toSqlDateTime(value?: string | null): string | null {
   return `${value.slice(0, 10)} ${value.slice(11, 16)}:00`;
 }
 
+function addRecurrenceDate(dateValue: string, recurrenceRule: ReminderRecurrenceRule): string {
+  const [year, month, day] = dateValue.slice(0, 10).split('-').map(Number);
+  const date = new Date(year, (month || 1) - 1, day || 1);
+
+  if (recurrenceRule === 'daily') {
+    date.setDate(date.getDate() + 1);
+  } else if (recurrenceRule === 'weekly') {
+    date.setDate(date.getDate() + 7);
+  } else if (recurrenceRule === 'monthly') {
+    date.setMonth(date.getMonth() + 1);
+  } else if (recurrenceRule === 'yearly') {
+    date.setFullYear(date.getFullYear() + 1);
+  }
+
+  return formatDate(date);
+}
+
+function moveDateTimeToDate(dateTimeValue: string | null, dateValue: string): string | null {
+  if (!dateTimeValue) {
+    return null;
+  }
+
+  return `${dateValue}T${dateTimeValue.slice(11, 16)}`;
+}
+
 export class ReminderModel {
   static async list(accountId: string): Promise<Reminder[]> {
     const conn = await pool.getConnection();
@@ -94,24 +124,24 @@ export class ReminderModel {
     }
   }
 
-  static async create(accountId: string, title: string, remindOn: string, priority: Reminder['priority'] = 'Normal', notes = '', remindAt?: string | null): Promise<Reminder> {
+  static async create(accountId: string, title: string, remindOn: string, priority: Reminder['priority'] = 'Normal', notes = '', remindAt?: string | null, recurrenceRule: ReminderRecurrenceRule = 'none'): Promise<Reminder> {
     const conn = await pool.getConnection();
     try {
       const id = uuidv4();
       const now = new Date();
       await conn.query<ResultSetHeader>(
-        `INSERT INTO reminders (\`id\`, \`accountId\`, \`title\`, \`priority\`, \`notes\`, \`remindOn\`, \`remindAt\`, \`notifiedAt\`, \`completedAt\`, \`createdAt\`, \`updatedAt\`)
-         VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)`,
-        [id, accountId, title, priority, notes, remindOn, toSqlDateTime(remindAt), now, now]
+        `INSERT INTO reminders (\`id\`, \`accountId\`, \`title\`, \`priority\`, \`notes\`, \`remindOn\`, \`remindAt\`, \`recurrenceRule\`, \`notifiedAt\`, \`completedAt\`, \`createdAt\`, \`updatedAt\`)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)`,
+        [id, accountId, title, priority, notes, remindOn, toSqlDateTime(remindAt), recurrenceRule, now, now]
       );
 
-      return { id, accountId, title, priority, notes, remindOn, remindAt: remindAt || null, notifiedAt: null, completedAt: null, createdAt: now, updatedAt: now };
+      return { id, accountId, title, priority, notes, remindOn, remindAt: remindAt || null, recurrenceRule, notifiedAt: null, completedAt: null, createdAt: now, updatedAt: now };
     } finally {
       conn.release();
     }
   }
 
-  static async update(id: string, accountId: string, updates: { title?: string; priority?: Reminder['priority']; notes?: string; remindOn?: string; remindAt?: string | null; completed?: boolean }): Promise<Reminder | null> {
+  static async update(id: string, accountId: string, updates: { title?: string; priority?: Reminder['priority']; notes?: string; remindOn?: string; remindAt?: string | null; recurrenceRule?: ReminderRecurrenceRule; completed?: boolean }): Promise<Reminder | null> {
     const conn = await pool.getConnection();
     try {
       const [existingRows] = await conn.query<ReminderRow[]>(
@@ -129,20 +159,29 @@ export class ReminderModel {
       const existingRemindOn = formatDate(existingRows[0].remindOn || existingRows[0].createdAt);
       const nextRemindOn = updates.remindOn ?? existingRemindOn;
       const existingRemindAt = existingRows[0].remindAt ? formatDateTime(existingRows[0].remindAt) : null;
-      const nextRemindAt = updates.remindAt === undefined ? existingRemindAt : updates.remindAt;
-      const shouldResetNotification =
-        (updates.remindOn !== undefined && updates.remindOn !== existingRemindOn) ||
-        (updates.remindAt !== undefined && updates.remindAt !== existingRemindAt);
-      const nextCompletedAt = typeof updates.completed === 'boolean'
+      let nextRemindAt = updates.remindAt === undefined ? existingRemindAt : updates.remindAt;
+      const nextRecurrenceRule = updates.recurrenceRule ?? existingRows[0].recurrenceRule ?? 'none';
+      let nextCompletedAt = typeof updates.completed === 'boolean'
         ? updates.completed ? new Date() : null
         : existingRows[0].completedAt;
+      let finalRemindOn = nextRemindOn;
+      if (updates.completed === true && nextRecurrenceRule !== 'none') {
+        finalRemindOn = addRecurrenceDate(nextRemindOn, nextRecurrenceRule);
+        nextRemindAt = moveDateTimeToDate(nextRemindAt, finalRemindOn);
+        nextCompletedAt = null;
+      }
+      const shouldResetNotification =
+        finalRemindOn !== existingRemindOn ||
+        (updates.remindAt !== undefined && updates.remindAt !== existingRemindAt) ||
+        updates.completed === true ||
+        updates.recurrenceRule !== undefined;
       const nextNotifiedAt = shouldResetNotification ? null : existingRows[0].notifiedAt;
 
       await conn.query<ResultSetHeader>(
         `UPDATE reminders
-         SET \`title\` = ?, \`priority\` = ?, \`notes\` = ?, \`remindOn\` = ?, \`remindAt\` = ?, \`notifiedAt\` = ?, \`completedAt\` = ?, \`updatedAt\` = ?
+         SET \`title\` = ?, \`priority\` = ?, \`notes\` = ?, \`remindOn\` = ?, \`remindAt\` = ?, \`recurrenceRule\` = ?, \`notifiedAt\` = ?, \`completedAt\` = ?, \`updatedAt\` = ?
          WHERE \`id\` = ? AND \`accountId\` = ?`,
-        [nextTitle, nextPriority, nextNotes, nextRemindOn, toSqlDateTime(nextRemindAt), nextNotifiedAt, nextCompletedAt, new Date(), id, accountId]
+        [nextTitle, nextPriority, nextNotes, finalRemindOn, toSqlDateTime(nextRemindAt), nextRecurrenceRule, nextNotifiedAt, nextCompletedAt, new Date(), id, accountId]
       );
 
       const [rows] = await conn.query<ReminderRow[]>(
