@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { getSessionAccount } from './authSession';
+import { auditSecurityEvent } from '../utils/securityAudit';
 
 export async function getRequestAccount(req: Request) {
   return getSessionAccount(req);
@@ -33,6 +34,12 @@ export function requirePermission(permission: string) {
       const account = await getRequestAccount(req);
 
       if (!account) {
+        void auditSecurityEvent({
+          req,
+          action: 'security.auth_required',
+          entityType: 'access-control',
+          details: { permission, reason: 'missing_session' },
+        }).catch((error) => console.error('Security audit error:', error));
         return res.status(401).json({ error: 'Sign in required' });
       }
 
@@ -46,6 +53,14 @@ export function requirePermission(permission: string) {
 
       const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
       if (!permissions.includes(permission)) {
+        void auditSecurityEvent({
+          req,
+          actor: account,
+          action: 'security.permission_denied',
+          entityType: 'access-control',
+          entityId: account.id,
+          details: { permission, reason: 'permission_missing' },
+        }).catch((error) => console.error('Security audit error:', error));
         return res.status(403).json({ error: 'Permission denied' });
       }
 
@@ -63,6 +78,12 @@ export function requireAnyPermission(requiredPermissions: string[]) {
       const account = await getRequestAccount(req);
 
       if (!account) {
+        void auditSecurityEvent({
+          req,
+          action: 'security.auth_required',
+          entityType: 'access-control',
+          details: { requiredPermissions, reason: 'missing_session' },
+        }).catch((error) => console.error('Security audit error:', error));
         return res.status(401).json({ error: 'Sign in required' });
       }
 
@@ -76,6 +97,14 @@ export function requireAnyPermission(requiredPermissions: string[]) {
 
       const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
       if (!requiredPermissions.some((permission) => permissions.includes(permission))) {
+        void auditSecurityEvent({
+          req,
+          actor: account,
+          action: 'security.permission_denied',
+          entityType: 'access-control',
+          entityId: account.id,
+          details: { requiredPermissions, reason: 'permission_missing' },
+        }).catch((error) => console.error('Security audit error:', error));
         return res.status(403).json({ error: 'Permission denied' });
       }
 
@@ -93,6 +122,12 @@ export function requireSelfOrPermission(getTargetId: (req: Request) => string | 
       const account = await getRequestAccount(req);
 
       if (!account) {
+        void auditSecurityEvent({
+          req,
+          action: 'security.auth_required',
+          entityType: 'access-control',
+          details: { permission, targetId: getTargetId(req), reason: 'missing_session' },
+        }).catch((error) => console.error('Security audit error:', error));
         return res.status(401).json({ error: 'Sign in required' });
       }
 
@@ -106,6 +141,14 @@ export function requireSelfOrPermission(getTargetId: (req: Request) => string | 
 
       const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
       if (!permissions.includes(permission)) {
+        void auditSecurityEvent({
+          req,
+          actor: account,
+          action: 'security.permission_denied',
+          entityType: 'access-control',
+          entityId: account.id,
+          details: { permission, targetId: getTargetId(req), reason: 'not_self_or_permission_missing' },
+        }).catch((error) => console.error('Security audit error:', error));
         return res.status(403).json({ error: 'Permission denied' });
       }
 
