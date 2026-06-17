@@ -955,18 +955,46 @@ export class AuthController {
   static async verifyPassword(req: Request, res: Response) {
     try {
       const account = await getSessionAccount(req);
-      if (!account) {
-        return res.status(401).json({ error: 'Sign in required' });
-      }
-
       const password = typeof req.body?.password === 'string' ? req.body.password : '';
       if (!password) {
         return res.status(400).json({ error: 'Password is required' });
       }
 
-      const verifiedAccount = await AuthAccountModel.verifyCurrentPassword(account.id, password);
+      const unlockEmail = typeof req.body?.email === 'string' ? req.body.email : '';
+      const unlockAccountId = typeof req.body?.accountId === 'string' ? req.body.accountId : '';
+      let verifiedAccount = account ? await AuthAccountModel.verifyCurrentPassword(account.id, password) : null;
+      let refreshedSession = false;
+      if (!verifiedAccount && unlockEmail && unlockAccountId) {
+        verifiedAccount = await AuthAccountModel.verifyPasswordByEmail(unlockEmail, password);
+        if (verifiedAccount?.id !== unlockAccountId) {
+          verifiedAccount = null;
+        }
+      }
+
       if (!verifiedAccount) {
         return res.status(401).json({ error: 'Password was not accepted' });
+      }
+
+      if (account && verifiedAccount.id !== account.id) {
+        return res.status(401).json({ error: 'Password was not accepted' });
+      }
+
+      if (unlockEmail) {
+        const token = await AuthSessionModel.createSession(verifiedAccount.id);
+        setSessionCookie(req, res, token);
+        refreshedSession = true;
+      }
+
+      if (refreshedSession) {
+        await AuditLogModel.create({
+          actorId: verifiedAccount.id,
+          actorName: verifiedAccount.displayName || verifiedAccount.email,
+          action: 'auth.unlock',
+          entityType: 'session',
+          entityId: verifiedAccount.id,
+          details: JSON.stringify({ email: verifiedAccount.email }),
+          ...requestAuditFields(req),
+        });
       }
 
       res.json({ account: await withPermissions(verifiedAccount) });

@@ -450,6 +450,25 @@ export class AuthAccountModel {
     }
   }
 
+  static async verifyPasswordByEmail(email: string, password: string): Promise<AuthAccount | null> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<AuthAccountRow[]>(
+        'SELECT * FROM users WHERE LOWER(`email`) = ? AND `passwordHash` IS NOT NULL AND `isActive` = 1 LIMIT 1',
+        [normalizeEmail(email)]
+      );
+      const account = rows[0];
+
+      if (!account?.passwordHash || !verifyPassword(password, account.passwordHash)) {
+        return null;
+      }
+
+      return toPublicAccount(account);
+    } finally {
+      conn.release();
+    }
+  }
+
   static async resetPassword(accountId: string, newPassword: string): Promise<boolean> {
     const conn = await pool.getConnection();
     try {

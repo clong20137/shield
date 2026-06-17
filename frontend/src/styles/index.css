@@ -1722,7 +1722,7 @@ select {
   background-clip: padding-box;
 }
 
-input.trooper-daily-field-with-icon,
+input:not([type='checkbox']):not([type='radio']).trooper-daily-field-with-icon,
 textarea.trooper-daily-field-with-icon,
 select.trooper-daily-field-with-icon {
   padding-left: 3rem !important;

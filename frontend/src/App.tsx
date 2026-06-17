@@ -905,7 +905,7 @@ function LockScreen({
     setIsUnlocking(true);
     setError(null);
     try {
-      const response = await authService.verifyPassword(password);
+      const response = await authService.verifyPassword(password, account);
       if (response.data.account) {
         onUnlock(response.data.account);
       }
@@ -6225,16 +6225,6 @@ function App() {
                   unreadCount={messageUnreadCount}
                   onOpenMessages={toggleMessagesModal}
                 />
-                <button
-                  data-onboarding-control="lock"
-                  type="button"
-                  onClick={lockApp}
-                  className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
-                  aria-label="Lock screen"
-                  title="Lock screen (Ctrl+L)"
-                >
-                  <LockKeyhole size={18} />
-                </button>
                 <button
                   data-onboarding-control="theme"
                   type="button"

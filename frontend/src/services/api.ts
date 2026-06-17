@@ -922,8 +922,8 @@ export const authService = {
   getSession: () =>
     api.get<AuthResponse>('/auth/session'),
 
-  verifyPassword: (password: string) =>
-    api.post<AuthResponse>('/auth/verify-password', { password }),
+  verifyPassword: (password: string, account?: Pick<AuthAccount, 'id' | 'email'>) =>
+    api.post<AuthResponse>('/auth/verify-password', { password, accountId: account?.id, email: account?.email }),
 
   logout: () =>
     api.post('/auth/logout'),
