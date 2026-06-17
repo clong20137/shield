@@ -642,23 +642,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           <div className="rounded bg-accent/10 px-4 py-2 text-sm font-bold text-accent">
             {devices.length} total devices
           </div>
-          {canManageDevices && (
-            <button type="button" onClick={openAddDeviceModal} className="btn-primary" title="Add Device" aria-label="Add Device">
-              <Plus size={16} />
-              <span>Add Device</span>
-            </button>
-          )}
-          <button type="button" onClick={exportCsv} className="btn-secondary" title="Export CSV" aria-label="Export CSV">
-            <Download size={16} />
-            <span>Export</span>
-          </button>
-          {canManageDevices && (
-            <label className="btn-secondary cursor-pointer" title="Import CSV" aria-label="Import CSV">
-              <Upload size={16} />
-              <span>Import</span>
-              <input type="file" accept=".csv" className="hidden" onChange={importCsv} />
-            </label>
-          )}
         </div>
       </div>
 
@@ -679,10 +662,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 Search inventory, filter lifecycle status, or scan a device identifier.
               </p>
-            </div>
-            <div className="flex items-center gap-2 rounded bg-accent/10 px-3 py-2 text-sm font-bold text-accent">
-              <QrCode size={16} />
-              <span>{devices.filter((device) => device.assetTag).length} labels ready</span>
             </div>
           </div>
 
@@ -786,7 +765,23 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             {paginatedDevices.map((device) => {
               const DeviceIcon = deviceIconMap[device.type];
               return (
-                <article key={device.id} className="rounded-lg border border-gray-200 p-3 transition-colors hover:border-accent/40 hover:bg-accent/10 dark:hover:bg-gray-800/70">
+                <article
+                  key={device.id}
+                  onClick={() => {
+                    if (canManageDevices) {
+                      editDevice(device);
+                    }
+                  }}
+                  className={`rounded-lg border border-gray-200 p-3 transition-colors hover:border-accent/40 hover:bg-accent/10 dark:hover:bg-gray-800/70 ${canManageDevices ? 'cursor-pointer' : ''}`}
+                  role={canManageDevices ? 'button' : undefined}
+                  tabIndex={canManageDevices ? 0 : undefined}
+                  onKeyDown={(event) => {
+                    if (canManageDevices && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault();
+                      editDevice(device);
+                    }
+                  }}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 font-bold text-gray-900 dark:text-gray-100">
@@ -804,8 +799,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                     <Detail label="Replacement" value={formatDate(device.replacementDueDate)} />
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {canManageDevices && <button type="button" onClick={() => editDevice(device)} className="btn-secondary" aria-label="Edit device" title="Edit"><Pencil size={15} /><span>Edit</span></button>}
-                    {canManageDevices && <button type="button" onClick={() => setDevicePendingDelete(device)} className="btn-danger" aria-label="Delete device" title="Delete"><Trash2 size={15} /><span>Remove</span></button>}
+                    {canManageDevices && <button type="button" onClick={(event) => { event.stopPropagation(); editDevice(device); }} className="btn-secondary" aria-label="Edit device" title="Edit"><Pencil size={15} /><span>Edit</span></button>}
+                    {canManageDevices && <button type="button" onClick={(event) => { event.stopPropagation(); setDevicePendingDelete(device); }} className="btn-danger" aria-label="Delete device" title="Delete"><Trash2 size={15} /><span>Remove</span></button>}
                   </div>
                 </article>
               );
@@ -827,8 +822,16 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 {paginatedDevices.map((device) => {
                   const DeviceIcon = deviceIconMap[device.type];
                   return (
-                    <tr key={device.id} className="border-b border-gray-100 text-sm transition-colors hover:bg-accent/10 dark:border-gray-800 dark:hover:bg-gray-800/70">
-                      <td className="px-2 py-2"><input type="checkbox" checked={selectedDevices.includes(device.id)} onChange={(event) => setSelectedDevices((ids) => event.target.checked ? [...ids, device.id] : ids.filter((id) => id !== device.id))} /></td>
+                    <tr
+                      key={device.id}
+                      onClick={() => {
+                        if (canManageDevices) {
+                          editDevice(device);
+                        }
+                      }}
+                      className={`border-b border-gray-100 text-sm transition-colors hover:bg-accent/10 dark:border-gray-800 dark:hover:bg-gray-800/70 ${canManageDevices ? 'cursor-pointer' : ''}`}
+                    >
+                      <td className="px-2 py-2"><input type="checkbox" checked={selectedDevices.includes(device.id)} onClick={(event) => event.stopPropagation()} onChange={(event) => setSelectedDevices((ids) => event.target.checked ? [...ids, device.id] : ids.filter((id) => id !== device.id))} /></td>
                       <td className="px-2 py-2">
                         <span className="flex min-w-0 items-center gap-2 text-left">
                           <DeviceIcon size={17} className="shrink-0 text-accent" />
@@ -843,8 +846,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                       <td className={`px-2 py-2 ${isDueSoon(device.maintenanceDueDate) ? 'font-bold text-danger' : ''}`}>{formatDate(device.maintenanceDueDate)}</td>
                       <td className="px-2 py-2">
                         <div className="flex justify-end gap-1.5">
-                          {canManageDevices && <button type="button" onClick={() => editDevice(device)} className="btn-secondary h-8 w-8 p-0" aria-label="Edit device" title="Edit"><Pencil size={14} /></button>}
-                          {canManageDevices && <button type="button" onClick={() => setDevicePendingDelete(device)} className="btn-danger h-8 w-8 p-0" aria-label="Delete device" title="Delete"><Trash2 size={14} /></button>}
+                          {canManageDevices && <button type="button" onClick={(event) => { event.stopPropagation(); editDevice(device); }} className="btn-secondary h-8 w-8 p-0" aria-label="Edit device" title="Edit"><Pencil size={14} /></button>}
+                          {canManageDevices && <button type="button" onClick={(event) => { event.stopPropagation(); setDevicePendingDelete(device); }} className="btn-danger h-8 w-8 p-0" aria-label="Delete device" title="Delete"><Trash2 size={14} /></button>}
                         </div>
                       </td>
                     </tr>
@@ -855,6 +858,25 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           </div>
           </>
         )}
+        <div className="mt-5 flex flex-wrap justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-800">
+          {canManageDevices && (
+            <button type="button" onClick={openAddDeviceModal} className="btn-primary" title="Add Device" aria-label="Add Device">
+              <Plus size={16} />
+              <span>Add Device</span>
+            </button>
+          )}
+          <button type="button" onClick={exportCsv} className="btn-secondary" title="Export CSV" aria-label="Export CSV">
+            <Download size={16} />
+            <span>Export</span>
+          </button>
+          {canManageDevices && (
+            <label className="btn-secondary cursor-pointer" title="Import CSV" aria-label="Import CSV">
+              <Upload size={16} />
+              <span>Import</span>
+              <input type="file" accept=".csv" className="hidden" onChange={importCsv} />
+            </label>
+          )}
+        </div>
       </section>
       </div>
 
