@@ -871,7 +871,6 @@ function DashboardNews({
   }, [initialPosts, loadPosts]);
 
   const featuredPosts = useMemo(() => posts.slice(0, 4), [posts]);
-  const activeFeaturedPost = featuredPosts[activeFeaturedIndex % Math.max(featuredPosts.length, 1)];
 
   useEffect(() => {
     setActiveFeaturedIndex(0);
@@ -1019,25 +1018,34 @@ function DashboardNews({
     }
   };
 
+  const showFeaturedPost = (index: number) => {
+    setActiveFeaturedIndex((index + featuredPosts.length) % featuredPosts.length);
+  };
+
   return (
-    <section data-onboarding-target="dashboard-news" className="flex h-full min-h-[24rem] flex-col rounded-lg bg-white p-3 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:p-4">
-      {postError && <div className="error">{postError}</div>}
+    <section data-onboarding-target="dashboard-news" className="flex h-full min-h-[24rem] flex-col overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+      {postError && <div className="error m-3 sm:m-4">{postError}</div>}
 
       {isLoadingPosts ? (
-        <div className="loading">Loading updates...</div>
+        <div className="loading p-4">Loading updates...</div>
       ) : posts.length === 0 ? (
-        <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No updates posted yet.</div>
+        <div className="m-3 rounded border border-dashed border-gray-300 dark:border-gray-700 sm:m-4">
+          <div className="empty-state">No updates posted yet.</div>
+        </div>
       ) : (
-        <div className="min-h-0 flex-1">
-          {activeFeaturedPost && (
-            <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-950 text-white shadow-sm dark:border-gray-800">
-              <div key={activeFeaturedPost.id} className="dashboard-news-carousel-slide grid min-h-[17rem] lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
-                <Link to={`/updates/${activeFeaturedPost.id}`} className="group relative min-h-[15rem] overflow-hidden bg-gray-900">
-                  {activeFeaturedPost.imageUrl ? (
+        <div className="min-h-0 flex-1 overflow-hidden bg-gray-950 text-white">
+          <div
+            className="flex h-full transition-transform duration-500 ease-out"
+            style={{ transform: `translateX(-${(activeFeaturedIndex % Math.max(featuredPosts.length, 1)) * 100}%)` }}
+          >
+            {featuredPosts.map((post) => (
+              <div key={post.id} className="grid min-h-[17rem] w-full shrink-0 lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
+                <Link to={`/updates/${post.id}`} className="group relative min-h-[15rem] overflow-hidden bg-gray-900">
+                  {post.imageUrl ? (
                     <img
-                      src={getAssetThumbnailUrl(activeFeaturedPost.imageUrl, 960)}
+                      src={getAssetThumbnailUrl(post.imageUrl, 960)}
                       alt=""
-                      onError={(event) => handleAssetThumbnailError(event, activeFeaturedPost.imageUrl)}
+                      onError={(event) => handleAssetThumbnailError(event, post.imageUrl)}
                       className="h-full min-h-[15rem] w-full object-cover opacity-90 transition duration-700 ease-out group-hover:scale-[1.035]"
                     />
                   ) : (
@@ -1046,66 +1054,67 @@ function DashboardNews({
                     </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                  <span className={`absolute left-0 top-4 min-w-32 rounded-r px-5 py-2 pr-8 text-xs font-black uppercase tracking-[0.18em] shadow-lg [clip-path:polygon(0_0,100%_0,calc(100%-14px)_50%,100%_100%,0_100%)] ${getPostCategoryBannerClass(activeFeaturedPost.category)}`}>
-                    {activeFeaturedPost.category}
+                  <span className={`absolute left-0 top-4 min-w-32 rounded-r px-5 py-2 pr-8 text-xs font-black uppercase tracking-[0.18em] shadow-lg [clip-path:polygon(0_0,100%_0,calc(100%-14px)_50%,100%_100%,0_100%)] ${getPostCategoryBannerClass(post.category)}`}>
+                    {post.category}
                   </span>
                 </Link>
                 <div className="flex min-w-0 flex-col justify-between p-5 sm:p-6">
                   <div>
-                    <Link to={`/updates/${activeFeaturedPost.id}`} className="mt-3 block text-2xl font-black leading-tight text-white transition hover:text-blue-100 sm:text-3xl">
-                      {activeFeaturedPost.title}
+                    <Link to={`/updates/${post.id}`} className="mt-3 block text-2xl font-black leading-tight text-white transition hover:text-blue-100 sm:text-3xl">
+                      {post.title}
                     </Link>
-                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-300">{getPostBodyText(activeFeaturedPost.body)}</p>
+                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-300">{getPostBodyText(post.body)}</p>
                     <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                      {activeFeaturedPost.authorName || 'Administrator'} - {new Date(activeFeaturedPost.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
+                      {post.authorName || 'Administrator'} - {new Date(post.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
                     </p>
                   </div>
-                  <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-1.5">
-                      {featuredPosts.map((post, index) => (
-                        <button
-                          key={post.id}
-                          type="button"
-                          onClick={() => setActiveFeaturedIndex(index)}
-                          className={`h-2.5 rounded-full transition-all ${index === activeFeaturedIndex ? 'w-8 bg-accent' : 'w-2.5 bg-white/35 hover:bg-white/60'}`}
-                          aria-label={`Show featured post ${index + 1}`}
-                        />
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setActiveFeaturedIndex((index) => (index - 1 + featuredPosts.length) % featuredPosts.length)}
-                        className="flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
-                        aria-label="Previous featured post"
-                        title="Previous"
-                      >
-                        <ChevronLeft size={17} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveFeaturedIndex((index) => (index + 1) % featuredPosts.length)}
-                        className="flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
-                        aria-label="Next featured post"
-                        title="Next"
-                      >
-                        <ChevronRight size={17} />
-                      </button>
-                      <Link to={`/updates/${activeFeaturedPost.id}`} className="inline-flex h-9 items-center rounded border border-accent/50 px-3 text-sm font-bold text-accent transition hover:bg-accent/15">
-                        Read More
-                      </Link>
-                    </div>
-                  </div>
+                  <Link to={`/updates/${post.id}`} className="mt-6 inline-flex h-9 w-fit items-center rounded border border-accent/50 px-3 text-sm font-bold text-accent transition hover:bg-accent/15">
+                    Read More
+                  </Link>
                 </div>
+              </div>
+            ))}
+          </div>
+          {featuredPosts.length > 1 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 bg-gray-950 px-5 py-3 sm:px-6">
+              <div className="flex items-center gap-1.5">
+                {featuredPosts.map((post, index) => (
+                  <button
+                    key={post.id}
+                    type="button"
+                    onClick={() => showFeaturedPost(index)}
+                    className={`h-2.5 rounded-full transition-all ${index === activeFeaturedIndex ? 'w-8 bg-accent' : 'w-2.5 bg-white/35 hover:bg-white/60'}`}
+                    aria-label={`Show featured post ${index + 1}`}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => showFeaturedPost(activeFeaturedIndex - 1)}
+                  className="flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+                  aria-label="Previous featured post"
+                  title="Previous"
+                >
+                  <ChevronLeft size={17} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => showFeaturedPost(activeFeaturedIndex + 1)}
+                  className="flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+                  aria-label="Next featured post"
+                  title="Next"
+                >
+                  <ChevronRight size={17} />
+                </button>
               </div>
             </div>
           )}
-
         </div>
       )}
 
       {canCreateDashboardPosts && (
-        <div className="mt-3 flex justify-end">
+        <div className="flex justify-end p-3 sm:p-4">
           <button
             type="button"
             onClick={() => setIsCreatePostOpen(true)}
@@ -1120,7 +1129,7 @@ function DashboardNews({
       )}
 
       {(isCreatePostOpen || editingPost) && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+        <div className="modal-backdrop fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-4">
           <div className="modal-window max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900 sm:p-6">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
@@ -1284,7 +1293,7 @@ function DashboardNews({
         </div>
       )}
       {postPendingDelete && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+        <div className="modal-backdrop fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-4">
           <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Post</h2>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
@@ -2138,7 +2147,7 @@ function QuickNotesWidget({
   };
 
   return (
-    <section data-onboarding-target="quick-notes" className="flex h-full min-h-[32rem] flex-col rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
+    <section data-onboarding-target="quick-notes" className="relative z-0 isolate flex h-full min-h-[32rem] flex-col rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">
