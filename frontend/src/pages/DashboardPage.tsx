@@ -1685,15 +1685,7 @@ function MyDayWidget({
     .sort((a, b) => getReminderDueAt(a) - getReminderDueAt(b) || a.title.localeCompare(b.title));
   const upcomingReminders = openReminders.filter((reminder) => getReminderDueAt(reminder) > Date.now()).slice(0, 3);
   const overdueCount = activeReminders.filter((reminder) => reminder.remindOn < todayKey).length;
-  const draftCount = todaysEntries.filter((entry) => entry.submissionStatus === 'Draft').length;
   const submittedCount = todaysEntries.filter((entry) => entry.submissionStatus === 'Submitted').length;
-  const dayStatusLabel = overdueCount > 0
-    ? `${overdueCount} overdue`
-    : activeReminders.length > 0
-      ? `${activeReminders.length} due now`
-      : draftCount > 0
-        ? `${draftCount} draft${draftCount === 1 ? '' : 's'}`
-        : 'Clear';
 
   const completeReminder = async (reminder: Reminder) => {
     try {
@@ -1756,21 +1748,6 @@ function MyDayWidget({
           <p className="mt-1 text-xs font-semibold text-blue-100/90 dark:text-gray-400">
             {new Date(`${weekStartKey}T00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - {new Date(`${weekEndKey}T00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
           </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-px border-b border-gray-200 bg-gray-200 dark:border-gray-800 dark:bg-gray-800">
-        <div className="bg-gray-50 px-3 py-3 dark:bg-gray-950">
-          <p className="text-[10px] font-black uppercase tracking-wide text-gray-400">Entries</p>
-          <p className="mt-1 text-xl font-black text-primary-500 dark:text-blue-100">{todaysEntries.length}</p>
-        </div>
-        <div className="bg-gray-50 px-3 py-3 dark:bg-gray-950">
-          <p className="text-[10px] font-black uppercase tracking-wide text-gray-400">Status</p>
-          <p className={`mt-1 truncate text-lg font-black ${overdueCount > 0 ? 'text-danger' : activeReminders.length > 0 ? 'text-accent' : 'text-success'}`}>{dayStatusLabel}</p>
-        </div>
-        <div className="bg-gray-50 px-3 py-3 dark:bg-gray-950">
-          <p className="text-[10px] font-black uppercase tracking-wide text-gray-400">Reminders</p>
-          <p className="mt-1 text-xl font-black text-primary-500 dark:text-blue-100">{openReminders.length}</p>
         </div>
       </div>
 
