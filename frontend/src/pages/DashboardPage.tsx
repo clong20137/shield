@@ -833,6 +833,7 @@ function DashboardNews({
   const [editingPost, setEditingPost] = useState<DashboardPost | null>(null);
   const [postPendingDelete, setPostPendingDelete] = useState<DashboardPost | null>(null);
   const [postError, setPostError] = useState<string | null>(null);
+  const [reactionPulseMap, setReactionPulseMap] = useState<Record<string, number>>({});
   const canManageDashboard = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('dashboard:manage'));
   const canCreateDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:create'));
   const canEditDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:edit'));
@@ -959,6 +960,11 @@ function DashboardNews({
       return;
     }
 
+    const pulseId = `${post.id}:${reaction}`;
+    setReactionPulseMap((currentMap) => ({
+      ...currentMap,
+      [pulseId]: (currentMap[pulseId] || 0) + 1,
+    }));
     setPostError(null);
     try {
       const nextReaction = post.myReaction === reaction ? null : reaction;
@@ -1075,119 +1081,123 @@ function DashboardNews({
           <div className="empty-state">No updates posted yet.</div>
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-hidden bg-gray-950 text-white">
+        <div className="relative min-h-0 flex-1 overflow-hidden bg-gray-950 text-white">
           <div
             className="flex h-full transition-transform duration-500 ease-out"
             style={{ transform: `translateX(-${normalizedActiveFeaturedIndex * 100}%)` }}
           >
             {featuredPosts.map((post, index) => (
-              <div key={post.id} className="grid min-h-[17rem] w-full shrink-0 lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
-                <Link to={`/updates/${post.id}`} className="group relative min-h-[15rem] overflow-hidden bg-gray-900">
+              <div key={post.id} className="relative min-h-[24rem] w-full shrink-0 overflow-hidden">
+                <Link to={`/updates/${post.id}`} className="group absolute inset-0 overflow-hidden bg-gray-900" aria-label={`Read ${post.title}`}>
                   {post.imageUrl ? (
                     <img
                       src={getAssetThumbnailUrl(post.imageUrl, 960)}
                       alt=""
                       onError={(event) => handleAssetThumbnailError(event, post.imageUrl)}
-                      className={`h-full min-h-[15rem] w-full object-contain opacity-95 transition duration-700 ease-out group-hover:scale-[1.02] ${index === normalizedActiveFeaturedIndex ? 'dashboard-news-image-outward' : ''}`}
+                      className={`h-full w-full object-cover opacity-95 transition duration-700 ease-out group-hover:scale-[1.025] ${index === normalizedActiveFeaturedIndex ? 'dashboard-news-image-outward' : ''}`}
                     />
                   ) : (
-                    <div className="flex h-full min-h-[15rem] items-center justify-center bg-primary-500/30 text-blue-100">
+                    <div className="flex h-full items-center justify-center bg-primary-500/30 text-blue-100">
                       <Image size={52} />
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                  <span className={`absolute left-0 top-4 min-w-32 rounded-r px-5 py-2 pr-8 text-xs font-black uppercase tracking-[0.18em] shadow-lg [clip-path:polygon(0_0,100%_0,calc(100%-14px)_50%,100%_100%,0_100%)] ${getPostCategoryBannerClass(post.category)}`}>
-                    {post.category}
-                  </span>
                 </Link>
-                <div className="flex min-w-0 flex-col justify-between p-5 sm:p-6">
+                <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/45 to-black/10" />
+                <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/85 to-transparent" />
+                <span className={`absolute left-0 top-4 z-10 min-w-32 rounded-r px-5 py-2 pr-8 text-xs font-black uppercase tracking-[0.18em] shadow-lg [clip-path:polygon(0_0,100%_0,calc(100%-14px)_50%,100%_100%,0_100%)] ${getPostCategoryBannerClass(post.category)}`}>
+                  {post.category}
+                </span>
+                <div className="relative z-10 flex min-h-[24rem] max-w-3xl flex-col justify-between p-5 pb-16 sm:p-6 sm:pb-16 lg:p-7 lg:pb-16">
+                  <div className="flex flex-wrap gap-2">
+                    {canEditDashboardPosts && (
+                      <button
+                        type="button"
+                        onClick={() => startEditingPost(post)}
+                        className="inline-flex h-8 items-center gap-1.5 rounded border border-white/20 bg-black/25 px-2.5 text-xs font-bold text-white backdrop-blur transition hover:bg-white/15"
+                        aria-label={`Edit ${post.title}`}
+                        title="Edit Story"
+                      >
+                        <Pencil size={14} />
+                        <span>Edit</span>
+                      </button>
+                    )}
+                    {canDeleteDashboardPosts && (
+                      <button
+                        type="button"
+                        onClick={() => setPostPendingDelete(post)}
+                        className="inline-flex h-8 items-center gap-1.5 rounded border border-red-300/40 bg-red-500/20 px-2.5 text-xs font-bold text-red-100 backdrop-blur transition hover:bg-red-500/30"
+                        aria-label={`Delete ${post.title}`}
+                        title="Delete Story"
+                      >
+                        <Trash2 size={14} />
+                        <span>Delete</span>
+                      </button>
+                    )}
+                  </div>
                   <div>
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      {canEditDashboardPosts && (
-                        <button
-                          type="button"
-                          onClick={() => startEditingPost(post)}
-                          className="inline-flex h-8 items-center gap-1.5 rounded border border-white/20 bg-white/10 px-2.5 text-xs font-bold text-white transition hover:bg-white/15"
-                          aria-label={`Edit ${post.title}`}
-                          title="Edit Story"
-                        >
-                          <Pencil size={14} />
-                          <span>Edit</span>
-                        </button>
-                      )}
-                      {canDeleteDashboardPosts && (
-                        <button
-                          type="button"
-                          onClick={() => setPostPendingDelete(post)}
-                          className="inline-flex h-8 items-center gap-1.5 rounded border border-red-300/40 bg-red-500/15 px-2.5 text-xs font-bold text-red-100 transition hover:bg-red-500/25"
-                          aria-label={`Delete ${post.title}`}
-                          title="Delete Story"
-                        >
-                          <Trash2 size={14} />
-                          <span>Delete</span>
-                        </button>
-                      )}
-                    </div>
-                    <Link to={`/updates/${post.id}`} className="mt-3 block text-2xl font-black leading-tight text-white transition hover:text-blue-100 sm:text-3xl">
+                    <Link to={`/updates/${post.id}`} className="block text-2xl font-black leading-tight text-white drop-shadow transition hover:text-blue-100 sm:text-4xl">
                       {post.title}
                     </Link>
-                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-300">{getPostBodyText(post.body)}</p>
-                    <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    <p className="mt-3 line-clamp-3 max-w-2xl text-sm leading-6 text-gray-100/90 sm:text-base">{getPostBodyText(post.body)}</p>
+                    <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-200/80">
                       {post.authorName || 'Administrator'} - {new Date(post.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
                     </p>
-                  </div>
-                  <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="mt-5 flex flex-wrap items-center gap-3">
                       {dashboardReactionOptions.map((option) => {
                         const Icon = option.icon;
                         const isActive = post.myReaction === option.value;
                         const count = post.reactions?.[option.value] || 0;
+                        const pulseId = `${post.id}:${option.value}`;
+                        const pulseCount = reactionPulseMap[pulseId] || 0;
                         return (
                           <button
                             key={option.value}
                             type="button"
                             onClick={() => void reactToPost(post, option.value)}
-                            className={`inline-flex h-8 items-center gap-1.5 rounded border px-2 text-xs font-bold transition ${
+                            className={`dashboard-reaction-button inline-flex h-9 items-center gap-1.5 rounded border px-2.5 text-xs font-bold shadow-lg backdrop-blur transition ${
                               isActive
                                 ? 'border-accent bg-accent text-white'
-                                : 'border-white/15 bg-white/10 text-gray-200 hover:bg-white/15'
+                                : 'border-white/20 bg-black/25 text-gray-100 hover:bg-white/15'
                             }`}
                             aria-label={`${option.label} reaction`}
                             title={option.label}
                           >
-                            <Icon size={13} />
+                            <span key={pulseCount} className={`inline-flex ${pulseCount ? 'dashboard-reaction-pop' : ''}`}>
+                              <Icon size={13} />
+                            </span>
                             <span>{count}</span>
                           </button>
                         );
                       })}
+                      <Link to={`/updates/${post.id}`} className="inline-flex h-9 w-fit items-center rounded border border-accent/60 bg-black/25 px-3 text-sm font-bold text-accent shadow-lg backdrop-blur transition hover:bg-accent/15">
+                        Read More
+                      </Link>
                     </div>
-                    <Link to={`/updates/${post.id}`} className="inline-flex h-9 w-fit items-center rounded border border-accent/50 px-3 text-sm font-bold text-accent transition hover:bg-accent/15">
-                      Read More
-                    </Link>
                   </div>
                 </div>
               </div>
             ))}
           </div>
           {featuredPosts.length > 1 && (
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-white/10 bg-gray-950 px-5 py-3 sm:px-6">
-              <div />
-              <div className="flex items-center justify-center gap-1.5">
-                {featuredPosts.map((post, index) => (
-                  <button
-                    key={post.id}
-                    type="button"
-                    onClick={() => showFeaturedPost(index)}
-                    className={`h-2.5 rounded-full transition-all ${index === normalizedActiveFeaturedIndex ? 'w-8 bg-accent' : 'w-2.5 bg-white/35 hover:bg-white/60'}`}
-                    aria-label={`Show featured post ${index + 1}`}
-                  />
-                ))}
+            <>
+              <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex items-center justify-center">
+                <div className="pointer-events-auto flex items-center justify-center gap-2 rounded-full border border-white/15 bg-black/35 px-3 py-2 shadow-lg backdrop-blur">
+                  {featuredPosts.map((post, index) => (
+                    <button
+                      key={post.id}
+                      type="button"
+                      onClick={() => showFeaturedPost(index)}
+                      className={`h-2.5 rounded-full transition-all ${index === normalizedActiveFeaturedIndex ? 'w-8 bg-accent' : 'w-2.5 bg-white/45 hover:bg-white/75'}`}
+                      aria-label={`Show featured post ${index + 1}`}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="flex items-center justify-end gap-2">
+              <div className="pointer-events-none absolute inset-y-0 left-0 right-0 z-20 flex items-center justify-between px-3">
                 <button
                   type="button"
                   onClick={() => showFeaturedPost(activeFeaturedIndex - 1)}
-                  className="flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+                  className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition hover:bg-white/15"
                   aria-label="Previous featured post"
                   title="Previous"
                 >
@@ -1196,14 +1206,14 @@ function DashboardNews({
                 <button
                   type="button"
                   onClick={() => showFeaturedPost(activeFeaturedIndex + 1)}
-                  className="flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+                  className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition hover:bg-white/15"
                   aria-label="Next featured post"
                   title="Next"
                 >
                   <ChevronRight size={17} />
                 </button>
               </div>
-            </div>
+            </>
           )}
         </div>
       )}
