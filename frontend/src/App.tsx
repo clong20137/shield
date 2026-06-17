@@ -893,7 +893,7 @@ function ReminderDuePopup({
 
   return (
     <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/55 p-4">
-      <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+      <div className="w-full max-w-xl rounded-lg border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-900">
         <div className="mb-4 flex items-start gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-primary-500 text-white">
             <Bell size={22} />
@@ -913,7 +913,7 @@ function ReminderDuePopup({
             {reminders.length - 1} more reminder{reminders.length - 1 === 1 ? '' : 's'} due.
           </p>
         )}
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
           <label className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-300">
             <span>Snooze</span>
             <select
