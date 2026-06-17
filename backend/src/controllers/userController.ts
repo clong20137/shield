@@ -619,6 +619,7 @@ export class UserController {
 
       const actor = await getSessionAccount(req);
       const canViewHidden = await canViewHiddenUsers(req);
+      const overwriteExisting = req.body?.overwriteExisting !== 'false';
       const uploaded: Array<Pick<User, 'id' | 'firstName' | 'lastName' | 'peNumber'> & { profilePictureUrl: string; fileName: string }> = [];
       const skippedFiles: Array<{ fileName: string; peNumber: string; reason: string }> = [];
 
@@ -661,6 +662,11 @@ export class UserController {
           continue;
         }
 
+        if (!overwriteExisting && targetUser.profilePictureUrl?.trim()) {
+          skipFile('Profile picture already exists');
+          continue;
+        }
+
         await createImageThumbnails(file.path, [96, 256]);
         const profilePictureUrl = `/uploads/profile-pictures/${file.filename}`;
         const success = await UserModel.updateUser(targetUser.id, { profilePictureUrl });
@@ -695,6 +701,7 @@ export class UserController {
           totalFiles: files.length,
           uploadedCount: uploaded.length,
           skippedCount: skippedFiles.length,
+          overwriteExisting,
         }),
         ...requestAuditFields(req),
       });
@@ -703,6 +710,7 @@ export class UserController {
         totalFiles: files.length,
         uploadedCount: uploaded.length,
         skippedCount: skippedFiles.length,
+        overwriteExisting,
         uploaded,
         skippedFiles,
       });

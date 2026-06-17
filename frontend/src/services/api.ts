@@ -323,6 +323,7 @@ export interface UserPhotoImportResponse {
   totalFiles: number;
   uploadedCount: number;
   skippedCount: number;
+  overwriteExisting: boolean;
   uploaded: Array<Pick<User, 'id' | 'firstName' | 'lastName' | 'peNumber'> & { profilePictureUrl: string; fileName: string }>;
   skippedFiles: Array<{ fileName: string; peNumber: string; reason: string }>;
 }
@@ -1023,6 +1024,7 @@ export const userService = {
 
   importProfilePictures: (files: File[], onProgress?: (progress: number) => void) => {
     const formData = new FormData();
+    formData.append('overwriteExisting', 'true');
     files.forEach((file) => formData.append('photos', file));
     return api.post<UserPhotoImportResponse>('/users/profile-pictures/import', formData, {
       timeout: 300000,
