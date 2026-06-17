@@ -383,6 +383,13 @@ const getDayLabel = (date: Date) =>
 const getShortDayLabel = (date: Date) =>
   date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
+function getViewportMenuPosition(clientX: number, clientY: number, width: number, height: number, gutter = 8) {
+  return {
+    x: Math.min(Math.max(gutter, clientX), Math.max(gutter, window.innerWidth - width - gutter)),
+    y: Math.min(Math.max(gutter, clientY), Math.max(gutter, window.innerHeight - height - gutter)),
+  };
+}
+
 const getReadableDate = (dateKey: string) => {
   const [year, month, day] = dateKey.split('-').map(Number);
   return new Date(year, month - 1, day).toLocaleDateString(undefined, {
@@ -2021,9 +2028,10 @@ function CalendarPage({
   const openDailyStripContextMenu = (event: React.MouseEvent<HTMLElement>, dateKey: string, entry?: CalendarEntry) => {
     event.preventDefault();
     setDailyStripTooltip(null);
+    const menuPosition = getViewportMenuPosition(event.clientX, event.clientY, 220, entry ? 236 : 196);
     setDailyStripContextMenu({
-      x: Math.min(event.clientX, window.innerWidth - 220),
-      y: Math.min(event.clientY, window.innerHeight - (entry ? 236 : 192)),
+      x: menuPosition.x,
+      y: menuPosition.y,
       dateKey,
       entry: entry || null,
     });

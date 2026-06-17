@@ -1323,6 +1323,13 @@ function getSidebarCalendarDays(monthDate: Date) {
   });
 }
 
+function getViewportMenuPosition(clientX: number, clientY: number, width: number, height: number, gutter = 8) {
+  return {
+    x: Math.min(Math.max(gutter, clientX), Math.max(gutter, window.innerWidth - width - gutter)),
+    y: Math.min(Math.max(gutter, clientY), Math.max(gutter, window.innerHeight - height - gutter)),
+  };
+}
+
 function createSidebarDailyPayload(entry: CalendarEntry, date: string): CalendarEntryPayload {
   return {
     category: 'Trooper Daily',
@@ -1391,9 +1398,10 @@ function SidebarCalendarWidget({
   const openContextMenu = (event: React.MouseEvent<HTMLElement>, dateKey: string, dayEntries: CalendarEntry[]) => {
     event.preventDefault();
     setHoveredDate(null);
+    const menuPosition = getViewportMenuPosition(event.clientX, event.clientY, 224, dayEntries[0] ? 308 : 268);
     setContextMenu({
-      x: Math.min(event.clientX, window.innerWidth - 224),
-      y: Math.min(event.clientY, window.innerHeight - 240),
+      x: menuPosition.x,
+      y: menuPosition.y,
       dateKey,
       entries: dayEntries,
     });
