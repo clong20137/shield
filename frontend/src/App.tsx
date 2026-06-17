@@ -58,6 +58,7 @@ function isSecurePassword(password: string): boolean {
 
 type ClosingModal = 'messages' | 'calendar' | 'calculator' | 'profile' | 'adminConsole' | 'reportBug' | 'bugTracker';
 type FloatingAppId = 'messages' | 'calendar' | 'calculator' | 'profile' | 'adminConsole';
+type AppScale = AuthAccount['appScale'];
 
 interface MessagePreferences {
   receiveMessages: boolean;
@@ -124,6 +125,10 @@ function getQuickLaunchSlotRenderKey(slot: QuickLaunchSlot, index: number): stri
   }
 
   return `empty-${index}`;
+}
+
+function normalizeAppScale(value?: string | null): AppScale {
+  return value === 'compact' || value === 'large' ? value : 'comfortable';
 }
 
 function getQuickLaunchStorageKey(accountId: string): string {
@@ -4994,6 +4999,12 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
+    const appScale = normalizeAppScale(currentUser?.appScale);
+    document.documentElement.classList.remove('app-scale-compact', 'app-scale-comfortable', 'app-scale-large');
+    document.documentElement.classList.add(`app-scale-${appScale}`);
+  }, [currentUser?.appScale]);
+
+  useEffect(() => {
     window.localStorage.setItem(MESSAGE_PREFERENCES_KEY, JSON.stringify(messagePreferences));
   }, [messagePreferences]);
 
@@ -5784,6 +5795,27 @@ function App() {
     }
   };
 
+  const handleAppScaleChange = async (appScale: AppScale) => {
+    if (!currentUser) {
+      return;
+    }
+
+    const previousUser = currentUser;
+    handleAccountUpdate({ ...currentUser, appScale });
+
+    try {
+      const response = await authService.updateAppScalePreference(currentUser.id, appScale);
+      if (response.data.account) {
+        handleAccountUpdate(response.data.account);
+      }
+      showToast('success', `App scale set to ${appScale}.`);
+    } catch (err) {
+      console.error(err);
+      handleAccountUpdate(previousUser);
+      showToast('error', 'Failed to update app scale preference.');
+    }
+  };
+
   const openBugTrackerFromNotification = () => {
     setIsNotificationsOpen(false);
     openAdminConsole('bugs');
@@ -6546,6 +6578,7 @@ function App() {
                         }))
                       }
                       onCalendarHiddenChange={handleCalendarHiddenChange}
+                      onAppScaleChange={handleAppScaleChange}
                       onReplayGuide={replayGuide}
                       onOpenEvaluations={() => closeModal('profile')}
                       onAccountUpdate={handleAccountUpdate}

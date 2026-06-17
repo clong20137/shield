@@ -1724,6 +1724,34 @@ export class AuthController {
     }
   }
 
+  static async updateAppScalePreference(req: Request, res: Response) {
+    try {
+      const { appScale } = req.body as { appScale?: unknown };
+      const { accountId } = req.params;
+      const sessionAccount = await getSessionAccount(req);
+
+      if (!sessionAccount || sessionAccount.id !== accountId) {
+        return res.status(403).json({ error: 'You can only update your own app scale preference' });
+      }
+
+      if (appScale !== 'compact' && appScale !== 'comfortable' && appScale !== 'large') {
+        return res.status(400).json({ error: 'App scale preference is required' });
+      }
+
+      const account = await AuthAccountModel.updateAppScalePreference(accountId, appScale);
+
+      if (!account) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+
+      broadcastAppEvent({ type: 'user-updated', entityId: accountId });
+      res.json({ account: await withPermissions(account) });
+    } catch (error) {
+      console.error('Update app scale preference error:', error);
+      res.status(500).json({ error: 'Failed to update app scale preference' });
+    }
+  }
+
   static async updateTrooperDailyPreferences(req: Request, res: Response) {
     try {
       const { hiddenSections } = req.body as { hiddenSections?: unknown };

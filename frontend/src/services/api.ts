@@ -393,6 +393,7 @@ export interface AuthAccount {
   lastSsoLoginAt?: string | null;
   receivesMessages: boolean;
   calendarHidden: boolean;
+  appScale: 'compact' | 'comfortable' | 'large';
   hasCompletedOnboarding: boolean;
   trooperDailyHiddenSections: string[];
   twoFactorEnabled: boolean;
@@ -984,6 +985,9 @@ export const authService = {
 
   updateCalendarPreferences: (accountId: string, calendarHidden: boolean) =>
     api.put<AuthResponse>(`/auth/accounts/${accountId}/calendar-preferences`, { calendarHidden }),
+
+  updateAppScalePreference: (accountId: string, appScale: AuthAccount['appScale']) =>
+    api.put<AuthResponse>(`/auth/accounts/${accountId}/app-scale-preference`, { appScale }),
 
   updateTrooperDailyPreferences: (accountId: string, hiddenSections: string[]) =>
     api.put<AuthResponse>(`/auth/accounts/${accountId}/trooper-daily-preferences`, { hiddenSections }),

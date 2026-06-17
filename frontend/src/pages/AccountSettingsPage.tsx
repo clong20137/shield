@@ -21,6 +21,7 @@ interface AccountSettingsPageProps {
   onMilitaryTimeChange: (useMilitaryTime: boolean) => void;
   onQuickLaunchHiddenChange: (hideQuickLaunch: boolean) => void;
   onCalendarHiddenChange: (calendarHidden: boolean) => void;
+  onAppScaleChange: (appScale: AuthAccount['appScale']) => void;
   onOpenEvaluations?: () => void;
   onReplayGuide?: () => void;
   onAccountUpdate: (account: AuthAccount) => void;
@@ -54,6 +55,7 @@ export function AccountSettingsPage({
   onMilitaryTimeChange,
   onQuickLaunchHiddenChange,
   onCalendarHiddenChange,
+  onAppScaleChange,
   onOpenEvaluations,
   onReplayGuide,
   onAccountUpdate,
@@ -816,6 +818,20 @@ export function AccountSettingsPage({
               checked={messagePreferences.hideQuickLaunch}
               onChange={(event) => onQuickLaunchHiddenChange(event.target.checked)}
             />
+          </label>
+
+          <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
+            <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">App scale</span>
+            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Adjust the overall size of text, controls, and spacing.</span>
+            <select
+              value={account.appScale || 'comfortable'}
+              onChange={(event) => onAppScaleChange(event.target.value as AuthAccount['appScale'])}
+              className="mt-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+            >
+              <option value="compact">Compact</option>
+              <option value="comfortable">Comfortable</option>
+              <option value="large">Large</option>
+            </select>
           </label>
 
           {canChangeCalendarPreference && (

@@ -20,6 +20,7 @@ export interface AuthAccount {
   lastSsoLoginAt: Date | null;
   receivesMessages: boolean;
   calendarHidden: boolean;
+  appScale: 'compact' | 'comfortable' | 'large';
   hasCompletedOnboarding: boolean;
   trooperDailyHiddenSections: string[];
   twoFactorEnabled: boolean;
@@ -51,6 +52,7 @@ interface AuthAccountRow extends RowDataPacket {
   lastSsoLoginAt: Date | null;
   receivesMessages: boolean | number;
   calendarHidden: boolean | number;
+  appScale: string | null;
   hasCompletedOnboarding: boolean | number;
   trooperDailyHiddenSections: string | null;
   passwordHash: string | null;
@@ -227,6 +229,7 @@ function toPublicAccount(account: AuthAccountRow): AuthAccount {
     lastSsoLoginAt: account.lastSsoLoginAt || null,
     receivesMessages: account.receivesMessages !== false && account.receivesMessages !== 0,
     calendarHidden: Boolean(account.calendarHidden),
+    appScale: account.appScale === 'compact' || account.appScale === 'large' ? account.appScale : 'comfortable',
     hasCompletedOnboarding: Boolean(account.hasCompletedOnboarding),
     trooperDailyHiddenSections,
     twoFactorEnabled: Boolean(account.twoFactorEnabled),
@@ -309,6 +312,7 @@ export class AuthAccountModel {
           lastSsoLoginAt: existingUser.lastSsoLoginAt || null,
           receivesMessages: existingUser.receivesMessages !== false && existingUser.receivesMessages !== 0,
           calendarHidden: Boolean(existingUser.calendarHidden),
+          appScale: existingUser.appScale === 'compact' || existingUser.appScale === 'large' ? existingUser.appScale : 'comfortable',
           hasCompletedOnboarding: Boolean(existingUser.hasCompletedOnboarding),
           trooperDailyHiddenSections: [],
           twoFactorEnabled: Boolean(existingUser.twoFactorEnabled),
@@ -341,6 +345,7 @@ export class AuthAccountModel {
         lastSsoLoginAt: null,
         receivesMessages: true,
         calendarHidden: false,
+        appScale: 'comfortable',
         hasCompletedOnboarding: false,
         trooperDailyHiddenSections: [],
         twoFactorEnabled: false,
@@ -855,6 +860,26 @@ export class AuthAccountModel {
       await conn.query<ResultSetHeader>(
         'UPDATE users SET `calendarHidden` = ?, `updatedAt` = ? WHERE `id` = ? AND `passwordHash` IS NOT NULL',
         [calendarHidden ? 1 : 0, new Date(), accountId]
+      );
+
+      const [rows] = await conn.query<AuthAccountRow[]>(
+        'SELECT * FROM users WHERE `id` = ? AND `passwordHash` IS NOT NULL LIMIT 1',
+        [accountId]
+      );
+      const account = rows[0];
+
+      return account ? toPublicAccount(account) : null;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async updateAppScalePreference(accountId: string, appScale: AuthAccount['appScale']): Promise<AuthAccount | null> {
+    const conn = await pool.getConnection();
+    try {
+      await conn.query<ResultSetHeader>(
+        'UPDATE users SET `appScale` = ?, `updatedAt` = ? WHERE `id` = ? AND `passwordHash` IS NOT NULL',
+        [appScale, new Date(), accountId]
       );
 
       const [rows] = await conn.query<AuthAccountRow[]>(

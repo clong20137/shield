@@ -140,6 +140,7 @@ export async function initializeDatabase() {
   await ensureColumn('users', 'lastSsoLoginAt', '`lastSsoLoginAt` DATETIME');
   await ensureColumn('users', 'receivesMessages', '`receivesMessages` BOOLEAN DEFAULT 1');
   await ensureColumn('users', 'calendarHidden', '`calendarHidden` BOOLEAN DEFAULT 0');
+  await ensureColumn('users', 'appScale', "`appScale` VARCHAR(20) NOT NULL DEFAULT 'comfortable'");
   await ensureColumn('users', 'isHidden', '`isHidden` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'hasCompletedOnboarding', '`hasCompletedOnboarding` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'trooperDailyHiddenSections', '`trooperDailyHiddenSections` TEXT');

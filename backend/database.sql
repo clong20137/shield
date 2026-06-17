@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
   `passwordHash` VARCHAR(255),
   `role` VARCHAR(20) NOT NULL DEFAULT 'user',
   `receivesMessages` BOOLEAN DEFAULT 1,
+  `appScale` VARCHAR(20) NOT NULL DEFAULT 'comfortable',
   `twoFactorSecret` VARCHAR(64),
   `twoFactorEnabled` BOOLEAN DEFAULT 0,
   `peNumber` VARCHAR(50) UNIQUE,
