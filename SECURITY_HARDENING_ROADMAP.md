@@ -70,7 +70,13 @@ Implemented in this pass:
 
 ## Phase 4 - Monitoring and Incident Response
 
-Status: planned
+Status: in progress
+
+Implemented in this pass:
+
+- Added security monitoring on new audit log entries.
+- Added admin security notifications for repeated failed sign-ins, repeated unlock failures, repeated permission denials, role changes, MFA disablement, administrator password resets, user deletion, and user imports.
+- Added `INCIDENT_RESPONSE_CHECKLIST.md` for account compromise, privilege changes, failed access attempts, lost devices, ransomware/server compromise, and incident closure.
 
 - Add security alerts for repeated failed login attempts, permission denials, mass exports, mass media access, role changes, and disabled MFA.
 - Add audit-log export with date range, actor, action, IP address, and entity filters.

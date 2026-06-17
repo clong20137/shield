@@ -2,6 +2,7 @@ import { RowDataPacket } from 'mysql2';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database';
 import { broadcastAppEvent } from '../services/appEvents';
+import { evaluateSecurityAuditLog } from '../services/securityMonitoring';
 
 export interface AuditLog {
   id: string;
@@ -45,12 +46,13 @@ export class AuditLogModel {
   static async create(log: Omit<AuditLog, 'id' | 'createdAt'>): Promise<void> {
     const conn = await pool.getConnection();
     try {
+      const id = uuidv4();
       await conn.query(
         `INSERT INTO audit_logs (
           \`id\`, \`actorId\`, \`actorName\`, \`action\`, \`entityType\`, \`entityId\`, \`details\`, \`ipAddress\`, \`userAgent\`
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          uuidv4(),
+          id,
           log.actorId,
           log.actorName,
           log.action,
@@ -62,6 +64,9 @@ export class AuditLogModel {
         ]
       );
       broadcastAppEvent({ type: 'audit-updated', entityId: log.entityId || undefined });
+      void evaluateSecurityAuditLog({ ...log, id, createdAt: new Date() }).catch((error) => {
+        console.error('Security monitoring error:', error);
+      });
     } finally {
       conn.release();
     }
