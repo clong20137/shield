@@ -370,6 +370,21 @@ export class UserModel {
     }
   }
 
+  static async getUsersWithProfilePictures(includeHidden = true): Promise<User[]> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query(
+        `SELECT * FROM users
+         WHERE COALESCE(\`profilePictureUrl\`, '') <> ''
+         ${includeHidden ? '' : 'AND COALESCE(`isHidden`, 0) = 0'}
+         ORDER BY \`lastName\`, \`firstName\``
+      );
+      return rows as User[];
+    } finally {
+      conn.release();
+    }
+  }
+
   static async findByImportIdentity(email: string, peNumber: string): Promise<User | null> {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedPeNumber = peNumber.trim().toLowerCase();

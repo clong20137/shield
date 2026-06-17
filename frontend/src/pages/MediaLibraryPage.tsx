@@ -1,5 +1,5 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Check, ChevronLeft, ChevronRight, ExternalLink, Folder, FolderUp, HardDrive, Image, Pencil, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { Camera, Check, ChevronLeft, ChevronRight, ExternalLink, Folder, FolderUp, HardDrive, Image, Pencil, Plus, Search, Trash2, Upload, Wrench, X } from 'lucide-react';
 import { AuthAccount, getAssetThumbnailUrl, getAssetUrl, handleAssetThumbnailError, MediaLibraryFolder, MediaLibraryItem, mediaService, userService } from '../services/api';
 
 const pageSize = 60;
@@ -58,6 +58,7 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
   } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isImportingProfilePhotos, setIsImportingProfilePhotos] = useState(false);
+  const [isRepairingProfilePhotos, setIsRepairingProfilePhotos] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
@@ -247,6 +248,22 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
     }
   };
 
+  const repairMissingProfilePhotos = async () => {
+    setIsRepairingProfilePhotos(true);
+    try {
+      const response = await userService.repairMissingProfilePictures();
+      const repairedCount = response.data.repairedCount;
+      onToast('success', repairedCount === 0
+        ? `Checked ${response.data.scannedCount} profile photo link${response.data.scannedCount === 1 ? '' : 's'}; none were missing.`
+        : `Cleared ${repairedCount} missing profile photo link${repairedCount === 1 ? '' : 's'}.`);
+      await loadMedia();
+    } catch (err) {
+      onToast('error', getErrorMessage(err, 'Failed to repair missing profile photos.'));
+    } finally {
+      setIsRepairingProfilePhotos(false);
+    }
+  };
+
   const renameImage = async (item: MediaLibraryItem) => {
     if (!renamingImageName.trim()) return;
 
@@ -350,6 +367,9 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
                 </button>
                 <button type="button" onClick={() => profilePhotoFolderInputRef.current?.click()} className="btn-secondary" disabled={isImportingProfilePhotos} aria-label="Import PE profile photo folder" title={isImportingProfilePhotos ? 'Importing PE profile photos' : 'Import a folder of PE-numbered profile photos'}>
                   <FolderUp size={16} />
+                </button>
+                <button type="button" onClick={() => void repairMissingProfilePhotos()} className="btn-secondary" disabled={isRepairingProfilePhotos || isImportingProfilePhotos} aria-label="Repair missing profile photos" title={isRepairingProfilePhotos ? 'Repairing profile photos' : 'Clear profile picture links for missing image files'}>
+                  <Wrench size={16} />
                 </button>
                 <input ref={profilePhotoInputRef} type="file" multiple accept=".jpg,.jpeg,.jfif,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={importProfilePhotos} />
                 <input

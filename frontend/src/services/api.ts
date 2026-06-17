@@ -328,6 +328,12 @@ export interface UserPhotoImportResponse {
   skippedFiles: Array<{ fileName: string; peNumber: string; reason: string }>;
 }
 
+export interface ProfilePictureRepairResponse {
+  scannedCount: number;
+  repairedCount: number;
+  repairedUsers: Array<Pick<User, 'id' | 'firstName' | 'lastName' | 'peNumber'> & { missingProfilePictureUrl: string }>;
+}
+
 export interface MediaLibraryItem {
   id: string;
   folder: string;
@@ -1035,6 +1041,9 @@ export const userService = {
       },
     });
   },
+
+  repairMissingProfilePictures: () =>
+    api.post<ProfilePictureRepairResponse>('/users/profile-pictures/repair-missing'),
   
   update: (id: string, updates: Partial<User>) =>
     api.put(`/users/${id}`, updates),

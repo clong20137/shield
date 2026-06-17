@@ -33,6 +33,7 @@ router.get('/address-suggestions', addressLookupLimiter, requirePermission('user
 router.post('/', userCreateLimiter, requirePermission('users:create'), UserController.createUser);
 router.post('/import', userImportLimiter, requirePermission('users:create'), spreadsheetUpload.single('spreadsheet'), UserController.importUsers);
 router.post('/profile-pictures/import', profilePictureImportLimiter, requirePermission('users:profile-picture'), profilePictureImportUpload.array('photos', 3000), UserController.importProfilePictures);
+router.post('/profile-pictures/repair-missing', requirePermission('users:profile-picture'), UserController.repairMissingProfilePictures);
 router.post('/:id/profile-picture', profilePictureLimiter, requireSelfOrPermission((req) => req.params.id, 'users:profile-picture'), profilePictureUpload.single('profilePicture'), UserController.uploadProfilePicture);
 router.put('/:id/profile-picture', profilePictureLimiter, requireSelfOrPermission((req) => req.params.id, 'users:profile-picture'), UserController.setProfilePicture);
 router.delete('/:id/profile-picture', profilePictureLimiter, requireSelfOrPermission((req) => req.params.id, 'users:profile-picture'), UserController.removeProfilePicture);

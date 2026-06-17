@@ -134,6 +134,23 @@ function normalizePeLookupValue(value: string): string {
   return value.trim().toLowerCase().replace(/^pe[\s_-]*/iu, '').replace(/[^a-z0-9]/giu, '');
 }
 
+function getUploadFilePath(uploadUrl?: string | null): string | null {
+  const normalizedUrl = (uploadUrl || '').trim().replace(/\\/gu, '/');
+  const uploadMatch = normalizedUrl.match(/(?:^|\/)(?:api\/)?uploads\/(.+)$/u);
+  if (!uploadMatch?.[1]) {
+    return null;
+  }
+
+  const uploadRoot = path.resolve(process.cwd(), 'uploads');
+  const filePath = path.resolve(uploadRoot, uploadMatch[1]);
+  return filePath.startsWith(uploadRoot + path.sep) || filePath === uploadRoot ? filePath : null;
+}
+
+function profilePictureFileExists(profilePictureUrl?: string | null): boolean {
+  const filePath = getUploadFilePath(profilePictureUrl);
+  return Boolean(filePath && fs.existsSync(filePath));
+}
+
 function getPeCandidatesFromFileName(fileName: string): string[] {
   const baseName = path.parse(fileName).name.trim();
   const compactName = normalizePeLookupValue(baseName);
@@ -717,6 +734,58 @@ export class UserController {
     } catch (error) {
       console.error('Import profile pictures error:', error);
       res.status(500).json({ error: 'Failed to import profile pictures' });
+    }
+  }
+
+  static async repairMissingProfilePictures(req: Request, res: Response) {
+    try {
+      const actor = await getSessionAccount(req);
+      const users = await UserModel.getUsersWithProfilePictures(true);
+      const repairedUsers: Array<Pick<User, 'id' | 'firstName' | 'lastName' | 'peNumber'> & { missingProfilePictureUrl: string }> = [];
+
+      for (const user of users) {
+        if (!user.profilePictureUrl?.trim() || profilePictureFileExists(user.profilePictureUrl)) {
+          continue;
+        }
+
+        const success = await UserModel.updateUser(user.id, { profilePictureUrl: '' });
+        if (success) {
+          repairedUsers.push({
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            peNumber: user.peNumber,
+            missingProfilePictureUrl: user.profilePictureUrl,
+          });
+        }
+      }
+
+      if (repairedUsers.length > 0) {
+        broadcastAppEvent({ type: 'user-updated' });
+        broadcastAppEvent({ type: 'dashboard-updated' });
+      }
+
+      await AuditLogModel.create({
+        actorId: actor?.id || null,
+        actorName: actor?.displayName || actor?.email || null,
+        action: 'users.profile_pictures_repaired',
+        entityType: 'user',
+        entityId: null,
+        details: JSON.stringify({
+          scannedCount: users.length,
+          repairedCount: repairedUsers.length,
+        }),
+        ...requestAuditFields(req),
+      });
+
+      res.json({
+        scannedCount: users.length,
+        repairedCount: repairedUsers.length,
+        repairedUsers,
+      });
+    } catch (error) {
+      console.error('Repair missing profile pictures error:', error);
+      res.status(500).json({ error: 'Failed to repair missing profile pictures' });
     }
   }
 
