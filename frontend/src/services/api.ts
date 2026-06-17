@@ -375,6 +375,47 @@ export interface SystemStatistics {
   standardAccounts: number;
 }
 
+export interface AccessReviewAccount {
+  id: string;
+  displayName: string;
+  email: string;
+  role: string;
+  district: string;
+  rank: string;
+  isActive: boolean;
+  isHidden: boolean;
+  twoFactorEnabled: boolean;
+  lastSeenAt: string | null;
+  lastSsoLoginAt: string | null;
+  createdAt: string;
+  activeSessionCount: number;
+  permissions: string[];
+  privilegedPermissions: string[];
+  reviewFlags: string[];
+}
+
+export interface AccessReviewResponse {
+  generatedAt: string;
+  staleAfterDays: number;
+  summary: {
+    totalAccounts: number;
+    activeAccounts: number;
+    inactiveAccounts: number;
+    administratorAccounts: number;
+    mfaEnabledAccounts: number;
+    mfaMissingAccounts: number;
+    staleAccounts: number;
+    neverSeenAccounts: number;
+    activeSessions: number;
+  };
+  roles: Array<{
+    role: string;
+    accountCount: number;
+    permissions: string[];
+  }>;
+  accounts: AccessReviewAccount[];
+}
+
 export interface ReportRow {
   rank?: string;
   district?: string;
@@ -1083,6 +1124,9 @@ export const reportService = {
   
   getStatistics: () =>
     api.get<SystemStatistics>('/reports/statistics'),
+
+  getAccessReview: () =>
+    api.get<AccessReviewResponse>('/reports/access-review'),
   
   getDetailedReport: (filters?: UserFilters) =>
     api.get('/reports/detailed', { params: filters }),

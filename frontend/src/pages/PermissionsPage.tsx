@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Mail, Pencil, Plus, Save, Search, ShieldCheck, X } from 'lucide-react';
-import { AuthAccount, AuthInvite, AuthRole, RegistrationSettings, authService } from '../services/api';
+import { AlertTriangle, Mail, Pencil, Plus, Save, Search, ShieldCheck, ShieldAlert, X } from 'lucide-react';
+import { AccessReviewResponse, AuthAccount, AuthInvite, AuthRole, RegistrationSettings, authService, reportService } from '../services/api';
 
 const APP_BASE_PATH = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
 const DEFAULT_APP_BASE_URL = `${window.location.origin}${APP_BASE_PATH}`;
@@ -216,6 +216,8 @@ function PermissionsPage({
   const [latestInvite, setLatestInvite] = useState<AuthInvite | null>(null);
   const [isSavingRegistration, setIsSavingRegistration] = useState(false);
   const [isSendingInvite, setIsSendingInvite] = useState(false);
+  const [accessReview, setAccessReview] = useState<AccessReviewResponse | null>(null);
+  const [isLoadingAccessReview, setIsLoadingAccessReview] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -229,12 +231,14 @@ function PermissionsPage({
       const rolesResponse = await authService.getRoles(account.id);
       const registrationResponse = await authService.getRegistrationSettings();
       const invitesResponse = await authService.listInvites();
+      const accessReviewResponse = await reportService.getAccessReview();
       setRoles(rolesResponse.data);
       setRegistrationSettings(registrationResponse.data);
       try {
         window.localStorage.setItem(SESSION_TIMEOUT_KEY, String(registrationResponse.data.sessionTimeoutMinutes || 0));
       } catch {}
       setInvites(invitesResponse.data);
+      setAccessReview(accessReviewResponse.data);
     } catch (err) {
       const message = getErrorMessage(err, 'Failed to load admin settings.');
       setError(message);
@@ -377,6 +381,29 @@ function PermissionsPage({
     }
   };
 
+  const refreshAccessReview = async () => {
+    setIsLoadingAccessReview(true);
+    setError(null);
+    try {
+      const response = await reportService.getAccessReview();
+      setAccessReview(response.data);
+      onToast('success', 'Access review refreshed.');
+    } catch (err) {
+      const message = getErrorMessage(err, 'Failed to refresh access review.');
+      setError(message);
+      onToast('error', message);
+    } finally {
+      setIsLoadingAccessReview(false);
+    }
+  };
+
+  const flaggedAccounts = accessReview?.accounts.filter((item) => item.reviewFlags.length > 0).slice(0, 8) || [];
+  const formatDate = (value?: string | null) => {
+    if (!value) return 'Never';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 'Unknown' : date.toLocaleDateString();
+  };
+
   return (
     <div>
       {!isModalView && (
@@ -394,6 +421,94 @@ function PermissionsPage({
       )}
 
       {error && <div className="error">{error}</div>}
+
+      {(section === 'all' || section === 'permissions') && (
+      <section className="mb-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-gray-100">
+              <ShieldAlert size={20} className="text-accent" />
+              Access Review
+            </h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Review privileged access, MFA enrollment, stale accounts, and active sessions.</p>
+          </div>
+          <button type="button" onClick={refreshAccessReview} className="btn-secondary" disabled={isLoadingAccessReview} aria-label="Refresh access review" title="Refresh">
+            <ShieldCheck size={16} />
+            {isLoadingAccessReview ? 'Refreshing' : 'Refresh'}
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="loading">Loading access review...</div>
+        ) : !accessReview ? (
+          <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">Access review is not available.</div>
+        ) : (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {[
+                ['Accounts', accessReview.summary.totalAccounts],
+                ['Admins', accessReview.summary.administratorAccounts],
+                ['MFA Missing', accessReview.summary.mfaMissingAccounts],
+                ['Active Sessions', accessReview.summary.activeSessions],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                  <span className="block text-xs font-bold uppercase tracking-[0.14em] text-gray-400">{label}</span>
+                  <span className="mt-1 block text-2xl font-bold text-gray-900 dark:text-gray-100">{value}</span>
+                </div>
+              ))}
+            </div>
+
+            {flaggedAccounts.length > 0 ? (
+              <div className="overflow-hidden rounded border border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/20">
+                <div className="flex items-center gap-2 border-b border-amber-200 px-3 py-2 text-sm font-bold text-amber-900 dark:border-amber-900/60 dark:text-amber-100">
+                  <AlertTriangle size={16} />
+                  Accounts Needing Review
+                </div>
+                <div className="divide-y divide-amber-200 dark:divide-amber-900/60">
+                  {flaggedAccounts.map((reviewAccount) => (
+                    <div key={reviewAccount.id} className="grid gap-2 px-3 py-2 text-sm md:grid-cols-[minmax(0,1.2fr)_0.8fr_1fr]">
+                      <div className="min-w-0">
+                        <span className="block truncate font-bold text-gray-900 dark:text-gray-100">{reviewAccount.displayName}</span>
+                        <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{reviewAccount.email}</span>
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-300">
+                        <span className="block font-semibold">{reviewAccount.role}</span>
+                        <span>Last seen {formatDate(reviewAccount.lastSeenAt)}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {reviewAccount.reviewFlags.map((flag) => (
+                          <span key={flag} className="rounded bg-white px-2 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-amber-800 ring-1 ring-amber-200 dark:bg-gray-950 dark:text-amber-100 dark:ring-amber-900">
+                            {flag.replace(/_/gu, ' ')}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm font-semibold text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-100">
+                No accounts currently need review.
+              </div>
+            )}
+
+            <div className="grid gap-3 md:grid-cols-2">
+              {accessReview.roles.map((role) => (
+                <div key={role.role} className="rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-bold text-gray-900 dark:text-gray-100">{role.role}</span>
+                    <span className="rounded bg-white px-2 py-1 text-xs font-bold text-gray-500 ring-1 ring-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-800">
+                      {role.accountCount} account{role.accountCount === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{role.permissions.length} permission{role.permissions.length === 1 ? '' : 's'} assigned</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+      )}
 
       {(section === 'all' || section === 'permissions') && (
       <>

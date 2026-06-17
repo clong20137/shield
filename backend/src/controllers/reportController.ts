@@ -53,7 +53,62 @@ interface CountRow extends RowDataPacket {
   total: number;
 }
 
+interface AccessReviewSummaryRow extends RowDataPacket {
+  totalAccounts: number;
+  activeAccounts: number;
+  inactiveAccounts: number;
+  administratorAccounts: number;
+  mfaEnabledAccounts: number;
+  mfaMissingAccounts: number;
+  staleAccounts: number;
+  neverSeenAccounts: number;
+  activeSessions: number;
+}
+
+interface AccessReviewAccountRow extends RowDataPacket {
+  id: string;
+  displayName: string | null;
+  email: string | null;
+  role: string | null;
+  district: string | null;
+  rank: string | null;
+  isActive: boolean | number;
+  isHidden: boolean | number;
+  twoFactorEnabled: boolean | number;
+  lastSeenAt: Date | null;
+  lastSsoLoginAt: Date | null;
+  createdAt: Date;
+  activeSessionCount: number;
+  permissions: string | null;
+}
+
+interface PermissionDistributionRow extends RowDataPacket {
+  role: string;
+  accountCount: number;
+  permissions: string | null;
+}
+
 const reviewStatuses = ['Approved', 'Returned'] as const;
+const privilegedPermissions = new Set([
+  'roles:manage',
+  'audit:view',
+  'users:create',
+  'users:edit',
+  'users:view-hidden',
+  'users:profile-picture',
+  'media:upload',
+  'media:edit',
+  'media:delete',
+  'devices:manage',
+  'reports:trooper-dailies',
+  'alerts:send',
+  'dashboard:manage',
+  'dashboard:create',
+  'dashboard:edit',
+  'dashboard:delete',
+  'bugs:manage',
+  'admin:access',
+]);
 
 function formatReportDate(value: Date | string): string {
   if (typeof value === 'string') {
@@ -77,6 +132,23 @@ function parseDetails(value: string | Record<string, string> | null): Record<str
   }
 }
 
+function parsePermissionList(value: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function isStaleLastSeen(value: Date | null, staleBefore: Date): boolean {
+  return !value || value.getTime() < staleBefore.getTime();
+}
+
 async function canViewHiddenUsers(req: Request): Promise<boolean> {
   const account = await getSessionAccount(req);
   if (!account) return false;
@@ -87,6 +159,131 @@ async function canViewHiddenUsers(req: Request): Promise<boolean> {
 }
 
 export class ReportController {
+  static async getAccessReview(req: Request, res: Response) {
+    let conn;
+    try {
+      conn = await pool.getConnection();
+      const staleBefore = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
+      const [summaryRows] = await conn.query<AccessReviewSummaryRow[]>(
+        `SELECT
+          COUNT(*) AS totalAccounts,
+          SUM(CASE WHEN u.\`isActive\` = 1 THEN 1 ELSE 0 END) AS activeAccounts,
+          SUM(CASE WHEN u.\`isActive\` = 0 THEN 1 ELSE 0 END) AS inactiveAccounts,
+          SUM(CASE WHEN u.\`role\` = 'administrator' THEN 1 ELSE 0 END) AS administratorAccounts,
+          SUM(CASE WHEN COALESCE(u.\`twoFactorEnabled\`, 0) = 1 THEN 1 ELSE 0 END) AS mfaEnabledAccounts,
+          SUM(CASE WHEN COALESCE(u.\`twoFactorEnabled\`, 0) = 0 THEN 1 ELSE 0 END) AS mfaMissingAccounts,
+          SUM(CASE WHEN u.\`lastSeenAt\` IS NULL THEN 1 ELSE 0 END) AS neverSeenAccounts,
+          SUM(CASE WHEN u.\`lastSeenAt\` IS NULL OR u.\`lastSeenAt\` < ? THEN 1 ELSE 0 END) AS staleAccounts,
+          (
+            SELECT COUNT(*)
+            FROM user_sessions s
+            WHERE s.\`revokedAt\` IS NULL AND s.\`expiresAt\` > NOW()
+          ) AS activeSessions
+        FROM users u
+        WHERE u.\`passwordHash\` IS NOT NULL`,
+        [staleBefore],
+      );
+
+      const [accountRows] = await conn.query<AccessReviewAccountRow[]>(
+        `SELECT
+          u.\`id\`,
+          u.\`displayName\`,
+          u.\`email\`,
+          u.\`role\`,
+          u.\`district\`,
+          u.\`rank\`,
+          u.\`isActive\`,
+          u.\`isHidden\`,
+          u.\`twoFactorEnabled\`,
+          u.\`lastSeenAt\`,
+          u.\`lastSsoLoginAt\`,
+          u.\`createdAt\`,
+          COALESCE(activeSessions.\`activeSessionCount\`, 0) AS activeSessionCount,
+          r.\`permissions\`
+        FROM users u
+        LEFT JOIN roles r ON r.\`name\` = u.\`role\`
+        LEFT JOIN (
+          SELECT \`userId\`, COUNT(*) AS activeSessionCount
+          FROM user_sessions
+          WHERE \`revokedAt\` IS NULL AND \`expiresAt\` > NOW()
+          GROUP BY \`userId\`
+        ) activeSessions ON activeSessions.\`userId\` = u.\`id\`
+        WHERE u.\`passwordHash\` IS NOT NULL
+        ORDER BY
+          CASE WHEN u.\`role\` = 'administrator' THEN 0 ELSE 1 END,
+          COALESCE(u.\`twoFactorEnabled\`, 0),
+          u.\`lastSeenAt\`,
+          u.\`displayName\`,
+          u.\`email\`
+        LIMIT 500`,
+      );
+
+      const [distributionRows] = await conn.query<PermissionDistributionRow[]>(
+        `SELECT u.\`role\`, COUNT(*) AS accountCount, r.\`permissions\`
+        FROM users u
+        LEFT JOIN roles r ON r.\`name\` = u.\`role\`
+        WHERE u.\`passwordHash\` IS NOT NULL
+        GROUP BY u.\`role\`, r.\`permissions\`
+        ORDER BY accountCount DESC, u.\`role\``,
+      );
+
+      const accounts = accountRows.map((row) => {
+        const permissions = parsePermissionList(row.permissions);
+        return {
+          id: row.id,
+          displayName: row.displayName || row.email || 'Unknown account',
+          email: row.email || '',
+          role: row.role || 'user',
+          district: row.district || '',
+          rank: row.rank || '',
+          isActive: row.isActive !== false && row.isActive !== 0,
+          isHidden: Boolean(row.isHidden),
+          twoFactorEnabled: Boolean(row.twoFactorEnabled),
+          lastSeenAt: row.lastSeenAt,
+          lastSsoLoginAt: row.lastSsoLoginAt,
+          createdAt: row.createdAt,
+          activeSessionCount: Number(row.activeSessionCount) || 0,
+          permissions,
+          privilegedPermissions: permissions.filter((permission) => privilegedPermissions.has(permission)),
+          reviewFlags: [
+            row.role === 'administrator' && !row.twoFactorEnabled ? 'administrator_missing_mfa' : '',
+            row.isActive !== false && row.isActive !== 0 && !row.twoFactorEnabled ? 'mfa_missing' : '',
+            row.isActive !== false && row.isActive !== 0 && isStaleLastSeen(row.lastSeenAt, staleBefore) ? 'stale_or_never_seen' : '',
+            Number(row.activeSessionCount) > 3 ? 'multiple_active_sessions' : '',
+            Boolean(row.isHidden) ? 'hidden_account' : '',
+          ].filter(Boolean),
+        };
+      });
+
+      res.json({
+        generatedAt: new Date(),
+        staleAfterDays: 45,
+        summary: summaryRows[0] || {
+          totalAccounts: 0,
+          activeAccounts: 0,
+          inactiveAccounts: 0,
+          administratorAccounts: 0,
+          mfaEnabledAccounts: 0,
+          mfaMissingAccounts: 0,
+          staleAccounts: 0,
+          neverSeenAccounts: 0,
+          activeSessions: 0,
+        },
+        roles: distributionRows.map((row) => ({
+          role: row.role || 'user',
+          accountCount: Number(row.accountCount) || 0,
+          permissions: parsePermissionList(row.permissions),
+        })),
+        accounts,
+      });
+    } catch (error) {
+      console.error('Access review report error:', error);
+      res.status(500).json({ error: 'Failed to generate access review' });
+    } finally {
+      conn?.release();
+    }
+  }
+
   static async getTrooperDailies(req: Request, res: Response) {
     let conn;
     try {

@@ -54,13 +54,19 @@ Implemented in this pass:
 
 ## Phase 3 - Agency Isolation and Access Reviews
 
-Status: planned
+Status: in progress
+
+Implemented in this pass:
+
+- Added an admin access-review report for privileged access, MFA gaps, stale accounts, hidden accounts, and active sessions.
+- Added role permission distribution so administrators can review which roles carry sensitive permissions.
+- Added an Admin Console access-review panel in Permissions for quick security review.
 
 - Add an agency or tenant boundary if multiple agencies will use the same deployment.
 - Enforce agency scoping in every backend query, not only in the frontend.
 - Add supervisor/district scoping options for profiles, calendar records, messages, and reports.
 - Add periodic access review reports for administrators.
-- Add an admin view for inactive accounts, stale sessions, MFA enrollment, and privileged roles.
+- Expand the access-review view into scheduled/periodic reports with export and acknowledgement workflow.
 
 ## Phase 4 - Monitoring and Incident Response
 
