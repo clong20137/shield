@@ -64,9 +64,12 @@ interface MessagePreferences {
   receiveMessages: boolean;
   playMessageSound: boolean;
   messageSound: 'classic' | 'soft' | 'chime' | 'msn';
+  reminderAlarmSound: ReminderAlarmSound;
   useMilitaryTime: boolean;
   hideQuickLaunch: boolean;
 }
+
+type ReminderAlarmSound = 'classic' | 'soft' | 'urgent' | 'none';
 
 type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'calculator' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
 type QuickLaunchExternalSlot = ApiQuickLaunchExternalSlot;
@@ -85,9 +88,17 @@ const defaultMessagePreferences: MessagePreferences = {
   receiveMessages: true,
   playMessageSound: true,
   messageSound: 'classic',
+  reminderAlarmSound: 'classic',
   useMilitaryTime: false,
   hideQuickLaunch: false,
 };
+
+const reminderAlarmSoundOptions: Array<{ value: ReminderAlarmSound; label: string }> = [
+  { value: 'classic', label: 'Classic alarm' },
+  { value: 'soft', label: 'Soft chime' },
+  { value: 'urgent', label: 'Urgent pulse' },
+  { value: 'none', label: 'No sound' },
+];
 
 const quickLaunchApps: QuickLaunchApp[] = [
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -692,13 +703,17 @@ function LoginSplash({
 function ReminderCreateModal({
   date,
   isSaving,
+  alarmSound,
   onClose,
   onSave,
+  onAlarmSoundChange,
 }: {
   date: string;
   isSaving: boolean;
+  alarmSound: ReminderAlarmSound;
   onClose: () => void;
   onSave: (reminder: { title: string; remindOn: string; remindAt: string; priority: Reminder['priority']; notes: string }) => void;
+  onAlarmSoundChange: (sound: ReminderAlarmSound) => void;
 }) {
   const now = new Date();
   const [title, setTitle] = useState('');
@@ -771,18 +786,32 @@ function ReminderCreateModal({
             />
           </label>
         </div>
-        <label className="mt-4 block">
-          <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Priority</span>
-          <select
-            value={priority}
-            onChange={(event) => setPriority(event.target.value as Reminder['priority'])}
-            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
-          >
-            {(['Low', 'Normal', 'High', 'Critical'] as const).map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-        </label>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Priority</span>
+            <select
+              value={priority}
+              onChange={(event) => setPriority(event.target.value as Reminder['priority'])}
+              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+            >
+              {(['Low', 'Normal', 'High', 'Critical'] as const).map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Alarm Sound</span>
+            <select
+              value={alarmSound}
+              onChange={(event) => onAlarmSoundChange(event.target.value as ReminderAlarmSound)}
+              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+            >
+              {reminderAlarmSoundOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
         <label className="mt-4 block">
           <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Notes</span>
           <textarea
@@ -832,13 +861,16 @@ function ReminderDuePopup({
   isSaving,
   onComplete,
   onDismiss,
+  onSnooze,
 }: {
   reminders: Reminder[];
   isSaving: boolean;
   onComplete: (reminder: Reminder) => void;
   onDismiss: () => void;
+  onSnooze: (reminder: Reminder, minutes: number) => void;
 }) {
   const primaryReminder = reminders[0];
+  const [snoozeMinutes, setSnoozeMinutes] = useState(10);
   if (!primaryReminder) {
     return null;
   }
@@ -865,9 +897,27 @@ function ReminderDuePopup({
             {reminders.length - 1} more reminder{reminders.length - 1 === 1 ? '' : 's'} due.
           </p>
         )}
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <label className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-300">
+            <span>Snooze</span>
+            <select
+              value={snoozeMinutes}
+              onChange={(event) => setSnoozeMinutes(Number(event.target.value))}
+              className="rounded border border-gray-300 bg-white px-2 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+              disabled={isSaving}
+            >
+              <option value={5}>5 min</option>
+              <option value={10}>10 min</option>
+              <option value={15}>15 min</option>
+              <option value={30}>30 min</option>
+              <option value={60}>1 hour</option>
+            </select>
+          </label>
           <button type="button" className="btn-secondary" onClick={onDismiss} disabled={isSaving}>
             Dismiss
+          </button>
+          <button type="button" className="btn-secondary" onClick={() => onSnooze(primaryReminder, snoozeMinutes)} disabled={isSaving}>
+            {isSaving ? 'Saving...' : 'Snooze'}
           </button>
           <button type="button" className="btn-primary" onClick={() => onComplete(primaryReminder)} disabled={isSaving}>
             {isSaving ? 'Completing...' : 'Mark Complete'}
@@ -4638,6 +4688,7 @@ function App() {
   const shownDueReminderIdsRef = useRef<Set<string>>(new Set());
   const notificationRequestRef = useRef(0);
   const apiConnectionWasLostRef = useRef(false);
+  const scheduledReminderTimeoutsRef = useRef<Map<string, number>>(new Map());
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
 
   useEffect(() => {
@@ -4919,6 +4970,110 @@ function App() {
     setReminderModalDate(dateKey);
   };
 
+  const clearScheduledReminder = useCallback((reminderId: string) => {
+    const timeoutId = scheduledReminderTimeoutsRef.current.get(reminderId);
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+      scheduledReminderTimeoutsRef.current.delete(reminderId);
+    }
+  }, []);
+
+  const clearScheduledReminders = useCallback(() => {
+    scheduledReminderTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    scheduledReminderTimeoutsRef.current.clear();
+  }, []);
+
+  const playReminderAlarmSound = useCallback(() => {
+    if (messagePreferences.reminderAlarmSound === 'none') {
+      return;
+    }
+
+    try {
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) return;
+
+      const audioContext = new AudioContextClass();
+      const gain = audioContext.createGain();
+      const tones = {
+        classic: [
+          { type: 'triangle' as OscillatorType, frequency: 740, start: 0, duration: 0.18, volume: 0.13 },
+          { type: 'sine' as OscillatorType, frequency: 988, start: 0.18, duration: 0.22, volume: 0.11 },
+          { type: 'triangle' as OscillatorType, frequency: 740, start: 0.44, duration: 0.2, volume: 0.1 },
+        ],
+        soft: [
+          { type: 'sine' as OscillatorType, frequency: 523.25, start: 0, duration: 0.22, volume: 0.08 },
+          { type: 'sine' as OscillatorType, frequency: 659.25, start: 0.2, duration: 0.28, volume: 0.07 },
+        ],
+        urgent: [
+          { type: 'square' as OscillatorType, frequency: 784, start: 0, duration: 0.12, volume: 0.12 },
+          { type: 'square' as OscillatorType, frequency: 1046.5, start: 0.18, duration: 0.12, volume: 0.12 },
+          { type: 'square' as OscillatorType, frequency: 784, start: 0.36, duration: 0.12, volume: 0.12 },
+          { type: 'square' as OscillatorType, frequency: 1046.5, start: 0.54, duration: 0.16, volume: 0.1 },
+        ],
+        none: [],
+      }[messagePreferences.reminderAlarmSound];
+
+      gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+      gain.connect(audioContext.destination);
+
+      tones.forEach((tone) => {
+        const oscillator = audioContext.createOscillator();
+        oscillator.type = tone.type;
+        oscillator.frequency.value = tone.frequency;
+        oscillator.connect(gain);
+        gain.gain.setValueAtTime(0.0001, audioContext.currentTime + tone.start);
+        gain.gain.exponentialRampToValueAtTime(tone.volume, audioContext.currentTime + tone.start + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + tone.start + tone.duration);
+        oscillator.start(audioContext.currentTime + tone.start);
+        oscillator.stop(audioContext.currentTime + tone.start + tone.duration);
+      });
+
+      window.setTimeout(() => void audioContext.close().catch(() => undefined), 1200);
+    } catch (error) {
+      console.error('Failed to play reminder alarm sound:', error);
+    }
+  }, [messagePreferences.reminderAlarmSound]);
+
+  const showDueReminders = useCallback((reminders: Reminder[]) => {
+    const dueReminders = reminders
+      .filter((reminder) => !reminder.completedAt && !shownDueReminderIdsRef.current.has(reminder.id))
+      .sort((firstReminder, secondReminder) => getReminderDueAt(firstReminder) - getReminderDueAt(secondReminder));
+
+    if (dueReminders.length === 0) {
+      return;
+    }
+
+    dueReminders.forEach((reminder) => {
+      shownDueReminderIdsRef.current.add(reminder.id);
+      clearScheduledReminder(reminder.id);
+    });
+    setDueReminderPopup((currentReminders) => {
+      const currentIds = new Set(currentReminders.map((reminder) => reminder.id));
+      return [...currentReminders, ...dueReminders.filter((reminder) => !currentIds.has(reminder.id))];
+    });
+    playReminderAlarmSound();
+    showToast('info', dueReminders.length === 1 ? `Reminder due: ${dueReminders[0].title}` : `${dueReminders.length} reminders due`, { saveToNotifications: false });
+    window.dispatchEvent(new Event('shield:notification-updated'));
+  }, [clearScheduledReminder, playReminderAlarmSound]);
+
+  const scheduleReminder = useCallback((reminder: Reminder) => {
+    clearScheduledReminder(reminder.id);
+
+    if (reminder.completedAt) {
+      return;
+    }
+
+    const dueAt = getReminderDueAt(reminder);
+    const delay = dueAt - Date.now();
+    if (delay <= 0) {
+      showDueReminders([reminder]);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => showDueReminders([reminder]), Math.min(delay, 2147483647));
+    scheduledReminderTimeoutsRef.current.set(reminder.id, timeoutId);
+  }, [clearScheduledReminder, showDueReminders]);
+
   const saveSidebarReminder = async (reminder: { title: string; remindOn: string; remindAt: string; priority: Reminder['priority']; notes: string }) => {
     if (!currentUser || !reminderModalDate) {
       return;
@@ -4926,7 +5081,9 @@ function App() {
 
     setIsReminderSaving(true);
     try {
-      await reminderService.create(reminder.title, reminder.remindOn, reminder.priority, reminder.notes, reminder.remindAt);
+      const response = await reminderService.create(reminder.title, reminder.remindOn, reminder.priority, reminder.notes, reminder.remindAt);
+      shownDueReminderIdsRef.current.delete(response.data.id);
+      scheduleReminder(response.data);
       window.dispatchEvent(new Event('shield:reminder-updated'));
       showToast('success', `Reminder added for ${formatSidebarCalendarDate(reminder.remindOn)}.`, { saveToNotifications: false });
       setReminderModalDate(null);
@@ -4945,27 +5102,29 @@ function App() {
 
     try {
       const response = await reminderService.getAll();
+      const activeReminders = response.data.filter((reminder) => !reminder.completedAt);
+      const activeReminderIds = new Set(activeReminders.map((reminder) => reminder.id));
+      scheduledReminderTimeoutsRef.current.forEach((timeoutId, reminderId) => {
+        if (!activeReminderIds.has(reminderId)) {
+          window.clearTimeout(timeoutId);
+          scheduledReminderTimeoutsRef.current.delete(reminderId);
+        }
+      });
+      activeReminders.forEach(scheduleReminder);
       const now = Date.now();
-      const dueReminders = response.data
-        .filter((reminder) => !reminder.completedAt && getReminderDueAt(reminder) <= now && !shownDueReminderIdsRef.current.has(reminder.id))
+      const dueReminders = activeReminders
+        .filter((reminder) => getReminderDueAt(reminder) <= now)
         .sort((firstReminder, secondReminder) => getReminderDueAt(firstReminder) - getReminderDueAt(secondReminder));
-
-      if (dueReminders.length === 0) {
-        return;
-      }
-
-      dueReminders.forEach((reminder) => shownDueReminderIdsRef.current.add(reminder.id));
-      setDueReminderPopup(dueReminders);
-      showToast('info', dueReminders.length === 1 ? `Reminder due: ${dueReminders[0].title}` : `${dueReminders.length} reminders due`, { saveToNotifications: false });
-      window.dispatchEvent(new Event('shield:notification-updated'));
+      showDueReminders(dueReminders);
     } catch (error) {
       console.error('Failed to check due reminders:', error);
     }
-  }, [currentUser, isAppLocked]);
+  }, [currentUser, isAppLocked, scheduleReminder, showDueReminders]);
 
   useEffect(() => {
     if (!currentUser) {
       setDueReminderPopup([]);
+      clearScheduledReminders();
       return undefined;
     }
 
@@ -4996,12 +5155,37 @@ function App() {
     setIsCompletingDueReminder(true);
     try {
       await reminderService.update(reminder.id, { completed: true });
+      clearScheduledReminder(reminder.id);
       setDueReminderPopup((currentReminders) => currentReminders.filter((item) => item.id !== reminder.id));
       window.dispatchEvent(new Event('shield:reminder-updated'));
       showToast('success', 'Reminder completed.', { saveToNotifications: false });
     } catch (error) {
       console.error('Failed to complete reminder:', error);
       showToast('error', getErrorMessage(error, 'Failed to complete reminder.'), { saveToNotifications: false });
+    } finally {
+      setIsCompletingDueReminder(false);
+    }
+  };
+
+  const snoozeDueReminder = async (reminder: Reminder, minutes: number) => {
+    const snoozeUntil = new Date(Date.now() + minutes * 60 * 1000);
+    const remindOn = getLocalDateKey(snoozeUntil);
+    const remindTime = `${String(snoozeUntil.getHours()).padStart(2, '0')}:${String(snoozeUntil.getMinutes()).padStart(2, '0')}`;
+
+    setIsCompletingDueReminder(true);
+    try {
+      const response = await reminderService.update(reminder.id, {
+        remindOn,
+        remindAt: `${remindOn}T${remindTime}`,
+      });
+      shownDueReminderIdsRef.current.delete(reminder.id);
+      setDueReminderPopup((currentReminders) => currentReminders.filter((item) => item.id !== reminder.id));
+      scheduleReminder(response.data);
+      window.dispatchEvent(new Event('shield:reminder-updated'));
+      showToast('success', `Reminder snoozed for ${minutes} minute${minutes === 1 ? '' : 's'}.`, { saveToNotifications: false });
+    } catch (error) {
+      console.error('Failed to snooze reminder:', error);
+      showToast('error', getErrorMessage(error, 'Failed to snooze reminder.'), { saveToNotifications: false });
     } finally {
       setIsCompletingDueReminder(false);
     }
@@ -5446,6 +5630,7 @@ function App() {
     setIsReminderSaving(false);
     setDueReminderPopup([]);
     shownDueReminderIdsRef.current = new Set();
+    clearScheduledReminders();
     setNotifications([]);
     setUserNotifications([]);
     notificationRequestRef.current += 1;
@@ -5469,6 +5654,7 @@ function App() {
     setIsReminderSaving(false);
     setDueReminderPopup([]);
     shownDueReminderIdsRef.current = new Set();
+    clearScheduledReminders();
     setNotifications([]);
     setUserNotifications([]);
     notificationRequestRef.current += 1;
@@ -6665,6 +6851,12 @@ function App() {
                           messageSound,
                         }))
                       }
+                      onReminderAlarmSoundSelect={(reminderAlarmSound) =>
+                        setMessagePreferences((preferences) => ({
+                          ...preferences,
+                          reminderAlarmSound,
+                        }))
+                      }
                       onMilitaryTimeChange={(useMilitaryTime) =>
                         setMessagePreferences((preferences) => ({
                           ...preferences,
@@ -6826,12 +7018,19 @@ function App() {
             <ReminderCreateModal
               date={reminderModalDate}
               isSaving={isReminderSaving}
+              alarmSound={messagePreferences.reminderAlarmSound}
               onClose={() => {
                 if (!isReminderSaving) {
                   setReminderModalDate(null);
                 }
               }}
               onSave={(title) => void saveSidebarReminder(title)}
+              onAlarmSoundChange={(reminderAlarmSound) =>
+                setMessagePreferences((preferences) => ({
+                  ...preferences,
+                  reminderAlarmSound,
+                }))
+              }
             />
           )}
           {dueReminderPopup.length > 0 && !isAppLocked && (
@@ -6840,6 +7039,7 @@ function App() {
               isSaving={isCompletingDueReminder}
               onComplete={(reminder) => void completeDueReminder(reminder)}
               onDismiss={() => setDueReminderPopup([])}
+              onSnooze={(reminder, minutes) => void snoozeDueReminder(reminder, minutes)}
             />
           )}
           {shouldShowForcedPasswordModal && currentUser && (

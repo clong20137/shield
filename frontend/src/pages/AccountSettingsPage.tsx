@@ -12,12 +12,14 @@ interface AccountSettingsPageProps {
     receiveMessages: boolean;
     playMessageSound: boolean;
     messageSound: 'classic' | 'soft' | 'chime' | 'msn';
+    reminderAlarmSound: 'classic' | 'soft' | 'urgent' | 'none';
     useMilitaryTime: boolean;
     hideQuickLaunch: boolean;
   };
   onReceiveMessagesChange: (receiveMessages: boolean) => void;
   onMessageSoundChange: (playMessageSound: boolean) => void;
   onMessageSoundSelect: (messageSound: 'classic' | 'soft' | 'chime' | 'msn') => void;
+  onReminderAlarmSoundSelect: (reminderAlarmSound: 'classic' | 'soft' | 'urgent' | 'none') => void;
   onMilitaryTimeChange: (useMilitaryTime: boolean) => void;
   onQuickLaunchHiddenChange: (hideQuickLaunch: boolean) => void;
   onCalendarHiddenChange: (calendarHidden: boolean) => void;
@@ -52,6 +54,7 @@ export function AccountSettingsPage({
   onReceiveMessagesChange,
   onMessageSoundChange,
   onMessageSoundSelect,
+  onReminderAlarmSoundSelect,
   onMilitaryTimeChange,
   onQuickLaunchHiddenChange,
   onCalendarHiddenChange,
@@ -780,6 +783,21 @@ export function AccountSettingsPage({
               <option value="soft">Soft alert</option>
               <option value="chime">Bright chime</option>
               <option value="msn">MSN Messenger</option>
+            </select>
+          </label>
+
+          <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
+            <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Reminder alarm sound</span>
+            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose the alarm used when a reminder is due.</span>
+            <select
+              value={messagePreferences.reminderAlarmSound}
+              onChange={(event) => onReminderAlarmSoundSelect(event.target.value as 'classic' | 'soft' | 'urgent' | 'none')}
+              className="mt-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+            >
+              <option value="classic">Classic alarm</option>
+              <option value="soft">Soft chime</option>
+              <option value="urgent">Urgent pulse</option>
+              <option value="none">No sound</option>
             </select>
           </label>
 
