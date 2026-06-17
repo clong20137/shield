@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { lazy, Suspense } from 'react';
-import { Camera, Download, Image, KeyRound, MessageSquare, Save, Send, Users, X } from 'lucide-react';
+import { Download, Image, KeyRound, MessageSquare, Save, Send, Users, X } from 'lucide-react';
 import type { EmojiClickData } from 'emoji-picker-react';
 import { useSearchParams } from 'react-router-dom';
 import { AuthAccount, AuthRole, authService, getAssetUrl, handleAssetImageError, MediaLibraryItem, messageService, userService, User, UserFilters } from '../services/api';
@@ -179,7 +179,6 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const [isProfileMediaPickerOpen, setIsProfileMediaPickerOpen] = useState(false);
-  const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
   const searchRequestRef = useRef(0);
   const [addressLookupQuery, setAddressLookupQuery] = useState('');
   const [searchParams] = useSearchParams();
@@ -359,38 +358,6 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     }
 
     setIsProfileMediaPickerOpen(true);
-  };
-
-  const handleProfilePictureUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-
-    if (!file || !editingUser) {
-      return;
-    }
-
-    if (!canEditProfilePictures) {
-      onToast('error', 'Profile photo permission required.');
-      return;
-    }
-
-    setIsUploadingPicture(true);
-    try {
-      const response = await userService.uploadProfilePicture(editingUser.id, file);
-      const updatedUser = response.data.user;
-      setEditForm(updatedUser);
-      setEditingUser(updatedUser);
-      setSelectedUser(updatedUser);
-      setUsers((currentUsers) =>
-        currentUsers.map((user) => (user.id === updatedUser.id ? updatedUser : user)),
-      );
-      onToast('success', 'Profile picture uploaded.');
-    } catch (err) {
-      console.error(err);
-      onToast('error', 'Failed to upload profile picture.');
-    } finally {
-      setIsUploadingPicture(false);
-      event.target.value = '';
-    }
   };
 
   const selectProfilePictureFromMedia = async (item: MediaLibraryItem) => {
@@ -1048,18 +1015,32 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
               <div className={`mb-6 flex w-full flex-col items-center gap-3 rounded border border-gray-200 bg-gray-50 p-4 text-center dark:border-gray-800 dark:bg-gray-950 sm:flex-row sm:gap-4 sm:text-left ${canEditProfilePictures ? 'hover:border-accent' : 'opacity-60'}`}>
-                {editForm.profilePictureUrl ? (
-                  <img
-                    src={getAssetUrl(String(editForm.profilePictureUrl))}
-                    alt="Profile"
-                    onError={handleAssetImageError}
-                  className="h-20 w-20 shrink-0 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-primary-500 text-2xl font-bold text-white">
-                    {String(editForm.firstName || 'U').slice(0, 1)}{String(editForm.lastName || '').slice(0, 1)}
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={updateProfilePicture}
+                  disabled={isUploadingPicture || !canEditProfilePictures}
+                  className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white text-accent transition hover:border-accent focus:border-accent disabled:cursor-not-allowed dark:border-gray-700 dark:bg-gray-900"
+                  aria-label="Choose profile picture from media library"
+                  title={canEditProfilePictures ? 'Choose Profile Picture' : 'Profile photo permission required'}
+                >
+                  {editForm.profilePictureUrl ? (
+                    <img
+                      src={getAssetUrl(String(editForm.profilePictureUrl))}
+                      alt="Profile"
+                      onError={handleAssetImageError}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center bg-primary-500 text-2xl font-bold text-white">
+                      {String(editForm.firstName || 'U').slice(0, 1)}{String(editForm.lastName || '').slice(0, 1)}
+                    </span>
+                  )}
+                  {canEditProfilePictures && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
+                      <Image size={22} />
+                    </span>
+                  )}
+                </button>
                 <div className="min-w-0">
                   <p className="flex items-center justify-center gap-2 font-bold text-gray-800 dark:text-gray-100 sm:justify-start">
                     <Image size={18} className="text-accent" />
@@ -1068,32 +1049,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                   <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {isUploadingPicture ? 'Updating picture...' : canEditProfilePictures ? 'Click to choose from the media library.' : 'Profile photo permission required.'}
                   </p>
-                  {canEditProfilePictures && (
-                    <span className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
-                      <button type="button" onClick={updateProfilePicture} className="btn-secondary py-1.5 text-xs" disabled={isUploadingPicture}>
-                        <Image size={14} />
-                        Media Library
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => profilePictureInputRef.current?.click()}
-                        className="btn-secondary py-1.5 text-xs"
-                        disabled={isUploadingPicture}
-                      >
-                        <Camera size={14} />
-                        Upload
-                      </button>
-                    </span>
-                  )}
                 </div>
               </div>
-              <input
-                ref={profilePictureInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleProfilePictureUpload}
-                className="hidden"
-              />
               {editForm.profilePictureUrl && (
                 <button
                   type="button"
