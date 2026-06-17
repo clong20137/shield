@@ -1346,6 +1346,8 @@ function SidebarCalendarWidget({
   onPasteDaily,
   onCopyPreviousDaily,
   onAddReminder,
+  onMarkDayOff,
+  onDeleteDaily,
 }: {
   compact: boolean;
   entries: CalendarEntry[];
@@ -1355,6 +1357,8 @@ function SidebarCalendarWidget({
   onPasteDaily: (dateKey: string) => void;
   onCopyPreviousDaily: (dateKey: string) => void;
   onAddReminder: (dateKey: string) => void;
+  onMarkDayOff: (dateKey: string) => void;
+  onDeleteDaily: (dateKey: string) => void;
 }) {
   const todayKey = getLocalDateKey();
   const [visibleMonth, setVisibleMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
@@ -1433,9 +1437,21 @@ function SidebarCalendarWidget({
         return;
       }
 
+      if (key === 'd') {
+        consume();
+        onMarkDayOff(contextMenu.dateKey);
+        return;
+      }
+
       if (key === 'r') {
         consume();
         onAddReminder(contextMenu.dateKey);
+        return;
+      }
+
+      if ((key === 'delete' || key === 'backspace') && contextMenu.entries[0]) {
+        consume();
+        onDeleteDaily(contextMenu.dateKey);
       }
     };
 
@@ -1448,7 +1464,7 @@ function SidebarCalendarWidget({
       window.removeEventListener('scroll', closeContextMenu, true);
       window.removeEventListener('keydown', handleContextMenuKeyDown);
     };
-  }, [contextMenu, copiedDaily, onAddReminder, onCopyDaily, onCopyPreviousDaily, onOpenCalendar, onPasteDaily]);
+  }, [contextMenu, copiedDaily, onAddReminder, onCopyDaily, onCopyPreviousDaily, onDeleteDaily, onMarkDayOff, onOpenCalendar, onPasteDaily]);
 
   if (compact) {
     return (
@@ -1621,6 +1637,17 @@ function SidebarCalendarWidget({
           <button
             type="button"
             onClick={() => {
+              onMarkDayOff(contextMenu.dateKey);
+              setContextMenu(null);
+            }}
+            className="flex w-full items-center gap-2 rounded px-3 py-2 text-left font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            <span>Mark Day Off</span>
+            <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">D</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               onAddReminder(contextMenu.dateKey);
               setContextMenu(null);
             }}
@@ -1629,6 +1656,19 @@ function SidebarCalendarWidget({
             <span>Add Reminder</span>
             <span className="ml-auto text-xs font-black text-blue-200">R</span>
           </button>
+          {contextMenu.entries[0] && (
+            <button
+              type="button"
+              onClick={() => {
+                onDeleteDaily(contextMenu.dateKey);
+                setContextMenu(null);
+              }}
+              className="flex w-full items-center gap-2 border-t border-gray-100 px-3 py-2 text-left font-semibold text-danger hover:bg-red-50 dark:border-gray-800 dark:hover:bg-red-950/40"
+            >
+              <span>Delete Daily</span>
+              <span className="ml-auto text-xs font-black text-red-300">Del</span>
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -4813,6 +4853,56 @@ function App() {
     await saveSidebarDailyPayload(dateKey, createSidebarDailyPayload(previousEntry, dateKey), 'Copied previous daily');
   };
 
+  const markSidebarDailyDayOff = async (dateKey: string) => {
+    if (!currentUser) {
+      return;
+    }
+
+    const existingEntry = sidebarCalendarEntries.find((entry) => getEntryDateKey(entry) === dateKey);
+    const dayOffPayload: CalendarEntryPayload = {
+      category: 'Trooper Daily',
+      date: dateKey,
+      dutyHours: '0',
+      districtWorked: existingEntry?.districtWorked || currentUser.district || 'Indianapolis',
+      specialStatus: 'Day Off',
+      color: '#64748B',
+      details: {
+        ...(existingEntry?.details || {}),
+        regularDaysOff: '1',
+      },
+      submissionStatus: 'Draft',
+      ownerAccountId: existingEntry?.ownerAccountId,
+    };
+
+    await saveSidebarDailyPayload(dateKey, dayOffPayload, 'Marked day off');
+  };
+
+  const deleteSidebarDaily = async (dateKey: string) => {
+    if (!currentUser) {
+      return;
+    }
+
+    const existingEntry = sidebarCalendarEntries.find((entry) => getEntryDateKey(entry) === dateKey);
+    if (!existingEntry) {
+      showToast('error', 'There is no Trooper Daily report to delete for that date.', { saveToNotifications: false });
+      return;
+    }
+
+    try {
+      await calendarService.delete(existingEntry.id, {
+        accountId: currentUser.id,
+        actorId: currentUser.id,
+        actorName: currentUser.displayName || currentUser.email,
+      });
+      setSidebarCalendarEntries((currentEntries) => currentEntries.filter((entry) => entry.id !== existingEntry.id));
+      window.dispatchEvent(new Event('shield:calendar-updated'));
+      showToast('success', `Deleted daily for ${formatSidebarCalendarDate(dateKey)}.`, { saveToNotifications: false });
+    } catch (error) {
+      console.error('Failed to delete daily:', error);
+      showToast('error', getErrorMessage(error, 'Failed to delete Trooper Daily.'), { saveToNotifications: false });
+    }
+  };
+
   const addSidebarReminder = (dateKey: string) => {
     if (!currentUser) {
       return;
@@ -6097,6 +6187,8 @@ function App() {
                     onPasteDaily={(dateKey) => void pasteSidebarDaily(dateKey)}
                     onCopyPreviousDaily={copyPreviousSidebarDaily}
                     onAddReminder={(dateKey) => void addSidebarReminder(dateKey)}
+                    onMarkDayOff={(dateKey) => void markSidebarDailyDayOff(dateKey)}
+                    onDeleteDaily={(dateKey) => void deleteSidebarDaily(dateKey)}
                   />
                 </div>
               )}

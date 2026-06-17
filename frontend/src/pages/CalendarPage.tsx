@@ -2141,6 +2141,7 @@ function CalendarPage({
                 key={dateKey}
                 type="button"
                 onClick={() => openDay(dateKey)}
+                onContextMenu={(event) => openDailyStripContextMenu(event, dateKey, dayEntries[0])}
                 className={`min-h-14 rounded border bg-gray-50 p-1 text-left transition hover:border-accent hover:bg-accent/5 dark:bg-gray-950 sm:min-h-24 sm:p-2 ${
                   isToday
                     ? 'border-accent ring-2 ring-accent/20'
@@ -2198,6 +2199,7 @@ function CalendarPage({
                   key={dateKey}
                   type="button"
                   onClick={() => openDay(dateKey)}
+                  onContextMenu={(event) => openDailyStripContextMenu(event, dateKey, dayEntries[0])}
                   className={`min-h-36 rounded-lg border bg-gray-50 p-3 text-left transition hover:border-accent hover:bg-accent/5 dark:bg-gray-950 ${
                     isToday ? 'border-accent ring-2 ring-accent/20' : 'border-gray-200 dark:border-gray-800'
                   }`}
@@ -2237,6 +2239,7 @@ function CalendarPage({
               <button
                 type="button"
                 onClick={() => openDay(focusDateKey)}
+                onContextMenu={(event) => openDailyStripContextMenu(event, focusDateKey)}
                 className="empty-state w-full rounded border border-dashed border-gray-300 py-10 text-left dark:border-gray-700"
               >
                 No Trooper Daily report for this day. Click to create one.
@@ -2248,6 +2251,7 @@ function CalendarPage({
                     key={entry.id}
                     type="button"
                     onClick={() => openDay(entry.date)}
+                    onContextMenu={(event) => openDailyStripContextMenu(event, entry.date, entry)}
                     className="w-full rounded border border-gray-200 p-4 text-left transition hover:border-accent hover:bg-accent/5 dark:border-gray-800"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-3">
