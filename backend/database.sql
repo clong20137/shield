@@ -65,11 +65,23 @@ CREATE TABLE IF NOT EXISTS user_messages (
   `subject` VARCHAR(200) NOT NULL,
   `body` TEXT NOT NULL,
   `isRead` BOOLEAN DEFAULT 0,
+  `isArchived` BOOLEAN DEFAULT 0,
+  `senderDeleted` BOOLEAN DEFAULT 0,
+  `recipientDeleted` BOOLEAN DEFAULT 0,
+  `senderReaction` VARCHAR(30),
+  `recipientReaction` VARCHAR(30),
+  `threadId` VARCHAR(36),
+  `threadType` VARCHAR(30) DEFAULT 'direct',
+  `threadTitle` VARCHAR(200),
+  `threadParticipantIds` TEXT,
+  `threadParticipantNames` TEXT,
+  `groupMessageId` VARCHAR(36),
   `createdAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX `idx_messages_sender` (`senderAccountId`),
   INDEX `idx_messages_recipient` (`recipientUserId`),
   INDEX `idx_messages_sender_created` (`senderAccountId`, `createdAt`),
-  INDEX `idx_messages_recipient_read_created` (`recipientUserId`, `isRead`, `createdAt`)
+  INDEX `idx_messages_recipient_read_created` (`recipientUserId`, `isRead`, `createdAt`),
+  INDEX `idx_messages_group_thread_created` (`threadId`, `createdAt`)
 );
 
 CREATE TABLE IF NOT EXISTS devices (

@@ -1,5 +1,5 @@
 import { FormEvent, KeyboardEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, CheckCheck, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Send, Trash2, X } from 'lucide-react';
+import { Building2, Check, CheckCheck, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Send, Trash2, Users, X } from 'lucide-react';
 import type { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, userService, User, UserMessage } from '../services/api';
 import { RankBadge } from '../components/RankBadge';
@@ -24,6 +24,9 @@ interface MessageThread {
   contactProfilePictureUrl: string;
   contactLastSeenAt: string | null;
   contactReceivesMessages: boolean;
+  participantIds: string[];
+  participantNames: string[];
+  threadType: string;
   subject: string;
   latestMessage?: UserMessage;
   messages: UserMessage[];
@@ -99,10 +102,56 @@ function PresenceDot({ isOnline, className = '' }: { isOnline: boolean; classNam
 }
 
 function getThreadId(message: UserMessage, currentUserId: string): string {
+  if (message.threadId) {
+    return message.threadId;
+  }
+
   return message.senderAccountId === currentUserId ? message.recipientUserId : message.senderAccountId;
 }
 
+function parseThreadList(value?: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function getThreadType(message: UserMessage): string {
+  return message.threadType || 'direct';
+}
+
+function getParticipantIds(message: UserMessage): string[] {
+  const parsedIds = parseThreadList(message.threadParticipantIds);
+  if (parsedIds.length > 0) {
+    return parsedIds;
+  }
+
+  return Array.from(new Set([message.senderAccountId, message.recipientUserId].filter(Boolean)));
+}
+
+function getParticipantNames(message: UserMessage, currentUserId: string): string[] {
+  const parsedNames = parseThreadList(message.threadParticipantNames);
+  if (parsedNames.length > 0) {
+    return parsedNames;
+  }
+
+  return [
+    message.senderAccountId === currentUserId ? 'You' : message.senderName || message.senderEmail || 'Sender',
+    message.recipientUserId === currentUserId ? 'You' : message.recipientName || message.recipientEmail || 'Recipient',
+  ];
+}
+
 function getContactName(message: UserMessage, currentUserId: string): string {
+  if (getThreadType(message) !== 'direct') {
+    return message.threadTitle || getParticipantNames(message, currentUserId).filter((name) => name !== 'You').join(', ') || 'Group Message';
+  }
+
   return message.senderAccountId === currentUserId
     ? message.recipientName || message.recipientEmail || 'Unknown'
     : message.senderName || message.senderEmail || 'Unknown';
@@ -133,6 +182,10 @@ function getContactLastSeenAt(message: UserMessage, currentUserId: string): stri
 }
 
 function getContactReceivesMessages(message: UserMessage, currentUserId: string): boolean {
+  if (getThreadType(message) !== 'direct') {
+    return true;
+  }
+
   return message.senderAccountId === currentUserId
     ? message.recipientReceivesMessages !== false
     : message.senderReceivesMessages !== false;
@@ -209,6 +262,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const [recipientQuery, setRecipientQuery] = useState('');
   const [recipientResults, setRecipientResults] = useState<User[]>([]);
   const [draftRecipient, setDraftRecipient] = useState<User | null>(null);
+  const [draftGroupRecipients, setDraftGroupRecipients] = useState<User[]>([]);
+  const [draftThreadTitle, setDraftThreadTitle] = useState('');
+  const [isLoadingDistrictRecipients, setIsLoadingDistrictRecipients] = useState(false);
   const [isRecipientSearching, setIsRecipientSearching] = useState(false);
   const [messagePendingDelete, setMessagePendingDelete] = useState<UserMessage | null>(null);
   const [threadPendingDelete, setThreadPendingDelete] = useState<MessageThread | null>(null);
@@ -230,6 +286,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     }
 
     setDraftRecipient(targetRecipient);
+    setDraftGroupRecipients([]);
+    setDraftThreadTitle('');
     setSelectedThreadId(targetRecipient.id);
     setIsComposeOpen(false);
     setRecipientQuery('');
@@ -353,6 +411,14 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   }, [currentUser.id, pinnedThreadIds]);
 
   useEffect(() => {
+    if (draftGroupRecipients.length === 0) {
+      return;
+    }
+
+    setSelectedThreadId(`draft-group:${draftGroupRecipients.map((user) => user.id).sort().join(',')}`);
+  }, [draftGroupRecipients]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => {
       const now = Date.now();
       setTypingByThread((current) => {
@@ -376,9 +442,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       try {
         const response = await userService.search(recipientQuery);
         if (isMounted) {
+          const selectedIds = new Set(draftGroupRecipients.map((user) => user.id));
           setRecipientResults(
             response.data
-              .filter((user: User) => user.id !== currentUser.id)
+              .filter((user: User) => user.id !== currentUser.id && !selectedIds.has(user.id))
               .slice(0, 8),
           );
         }
@@ -395,7 +462,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       isMounted = false;
       window.clearTimeout(timer);
     };
-  }, [currentUser.id, isComposeOpen, recipientQuery]);
+  }, [currentUser.id, draftGroupRecipients, isComposeOpen, recipientQuery]);
 
   const threads = useMemo<MessageThread[]>(() => {
     const threadMap = new Map<string, MessageThread>();
@@ -417,6 +484,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           contactProfilePictureUrl: getContactProfilePicture(message, currentUser.id),
           contactLastSeenAt: getContactLastSeenAt(message, currentUser.id),
           contactReceivesMessages: getContactReceivesMessages(message, currentUser.id),
+          participantIds: getParticipantIds(message),
+          participantNames: getParticipantNames(message, currentUser.id),
+          threadType: getThreadType(message),
           subject,
           latestMessage: message,
           messages: [message],
@@ -425,9 +495,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         return;
       }
 
-      existingThread.messages.push(message);
+      if (!existingThread.messages.some((item) => (item.groupMessageId || item.id) === (message.groupMessageId || message.id))) {
+        existingThread.messages.push(message);
+      }
       existingThread.latestMessage = message;
       existingThread.contactLastSeenAt = getContactLastSeenAt(message, currentUser.id);
+      existingThread.participantIds = Array.from(new Set([...existingThread.participantIds, ...getParticipantIds(message)]));
+      existingThread.participantNames = Array.from(new Set([...existingThread.participantNames, ...getParticipantNames(message, currentUser.id)]));
       existingThread.subject = existingThread.subject || subject;
       if (message.recipientUserId === currentUser.id && !message.isRead) {
         existingThread.unreadCount += 1;
@@ -447,6 +521,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
   const filteredThreads = useMemo(() => {
     const existingDraftThread = draftRecipient && threads.some((thread) => thread.id === draftRecipient.id);
+    const draftGroupId = draftGroupRecipients.length > 0
+      ? `draft-group:${draftGroupRecipients.map((user) => user.id).sort().join(',')}`
+      : '';
     const draftThread: MessageThread | null = draftRecipient && !existingDraftThread
       ? {
           id: draftRecipient.id,
@@ -456,12 +533,32 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           contactProfilePictureUrl: draftRecipient.profilePictureUrl || '',
           contactLastSeenAt: draftRecipient.lastSeenAt || null,
           contactReceivesMessages: draftRecipient.receivesMessages !== false,
+          participantIds: [currentUser.id, draftRecipient.id],
+          participantNames: ['You', `${draftRecipient.firstName || ''} ${draftRecipient.lastName || ''}`.trim() || draftRecipient.email || 'Recipient'],
+          threadType: 'direct',
           subject: 'Message',
           messages: [],
           unreadCount: 0,
         }
       : null;
-    const visibleThreads = draftThread ? [draftThread, ...threads] : threads;
+    const draftGroupThread: MessageThread | null = draftGroupRecipients.length > 0
+      ? {
+          id: draftGroupId,
+          contactName: draftThreadTitle.trim() || `Group: ${draftGroupRecipients.slice(0, 3).map((user) => `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email).join(', ')}${draftGroupRecipients.length > 3 ? ` +${draftGroupRecipients.length - 3}` : ''}`,
+          contactEmail: '',
+          contactRank: `${draftGroupRecipients.length} recipients`,
+          contactProfilePictureUrl: '',
+          contactLastSeenAt: null,
+          contactReceivesMessages: true,
+          participantIds: [currentUser.id, ...draftGroupRecipients.map((user) => user.id)],
+          participantNames: ['You', ...draftGroupRecipients.map((user) => `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Recipient')],
+          threadType: 'group',
+          subject: draftThreadTitle.trim() || 'Group Message',
+          messages: [],
+          unreadCount: 0,
+        }
+      : null;
+    const visibleThreads = [draftGroupThread, draftThread, ...threads].filter((thread): thread is MessageThread => Boolean(thread));
     const term = searchTerm.trim().toLowerCase();
     if (!term) return visibleThreads;
 
@@ -474,7 +571,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         ...thread.messages.map((message) => message.body),
       ].join(' ').toLowerCase().includes(term),
     );
-  }, [draftRecipient, searchTerm, threads]);
+  }, [currentUser.id, draftGroupRecipients, draftRecipient, draftThreadTitle, searchTerm, threads]);
 
   const selectedThread = filteredThreads.find((thread) => thread.id === selectedThreadId) || null;
   const selectedThreadAcceptsMessages = selectedThread?.contactReceivesMessages !== false;
@@ -500,6 +597,14 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     );
   }, [selectedThread, threadSearchTerm]);
   const getThreadPresence = (thread: MessageThread) => {
+    if (thread.threadType !== 'direct') {
+      return {
+        online: false,
+        lastSeenAt: null,
+        label: `${Math.max(thread.participantIds.length - 1, 0)} members`,
+      };
+    }
+
     const realtimePresence = presenceByAccount[thread.id];
     const lastSeenAt = realtimePresence?.lastSeenAt || thread.contactLastSeenAt;
     const online = realtimePresence?.online === true;
@@ -620,7 +725,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const updateReplyBody = (value: string) => {
     setReplyBody(value);
 
-    if (!selectedThread || !selectedThreadAcceptsMessages) {
+    if (!selectedThread || !selectedThreadAcceptsMessages || selectedThread.threadType !== 'direct') {
       return;
     }
 
@@ -640,12 +745,14 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     }
 
     typingStopTimerRef.current = window.setTimeout(() => {
-      messageService.sendTyping(
-        currentUser.id,
-        selectedThread.id,
-        currentUser.displayName || currentUser.email || 'Someone',
-        false,
-      ).catch((err) => console.error('Failed to clear typing status:', err));
+      if (selectedThread.threadType === 'direct') {
+        messageService.sendTyping(
+          currentUser.id,
+          selectedThread.id,
+          currentUser.displayName || currentUser.email || 'Someone',
+          false,
+        ).catch((err) => console.error('Failed to clear typing status:', err));
+      }
     }, 1800);
   };
 
@@ -660,6 +767,60 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     } catch (err) {
       console.error('Failed to react to message:', err);
       onToast('error', 'Failed to update reaction.');
+    }
+  };
+
+  const addGroupRecipient = (user: User) => {
+    if (user.id === currentUser.id || user.receivesMessages === false) {
+      return;
+    }
+
+    setDraftRecipient(null);
+    setDraftGroupRecipients((recipients) => (
+      recipients.some((recipient) => recipient.id === user.id) ? recipients : [...recipients, user]
+    ));
+    setSelectedThreadId(null);
+    setRecipientQuery('');
+    setRecipientResults([]);
+    setReplyBody('');
+    setReplyAttachments([]);
+  };
+
+  const removeGroupRecipient = (userId: string) => {
+    setDraftGroupRecipients((recipients) => recipients.filter((recipient) => recipient.id !== userId));
+  };
+
+  const loadDistrictRecipients = async () => {
+    if (!currentUser.district) {
+      onToast('error', 'Your account does not have a district assigned.');
+      return;
+    }
+
+    setIsLoadingDistrictRecipients(true);
+    try {
+      const response = await userService.search('', { district: currentUser.district });
+      const users = (response.data as User[]).filter((user) =>
+        user.id !== currentUser.id &&
+        user.receivesMessages !== false &&
+        user.isActive !== false,
+      );
+
+      if (users.length === 0) {
+        onToast('info', `No message-enabled users found for ${currentUser.district}.`);
+        return;
+      }
+
+      setDraftRecipient(null);
+      setDraftGroupRecipients(users);
+      setDraftThreadTitle(`${currentUser.district} District`);
+      setSelectedThreadId(null);
+      setIsComposeOpen(true);
+      onToast('success', `Added ${users.length} ${currentUser.district} district member${users.length === 1 ? '' : 's'}.`);
+    } catch (err) {
+      console.error('Failed to load district recipients:', err);
+      onToast('error', 'Failed to load district members.');
+    } finally {
+      setIsLoadingDistrictRecipients(false);
     }
   };
 
@@ -678,24 +839,42 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
     setIsSending(true);
     try {
-      await messageService.send({
-        senderAccountId: currentUser.id,
-        recipientUserId: selectedThread.id,
-        subject: selectedThread.subject,
-        body: withAttachmentSummary(replyBody, replyAttachments),
-      });
+      if (selectedThread.threadType !== 'direct') {
+        const recipientIds = selectedThread.participantIds.filter((id) => id !== currentUser.id);
+        const response = await messageService.sendGroup({
+          senderAccountId: currentUser.id,
+          recipientUserIds: recipientIds,
+          subject: selectedThread.subject || selectedThread.contactName,
+          body: withAttachmentSummary(replyBody, replyAttachments),
+          audienceType: selectedThread.threadType === 'district' ? 'district' : 'group',
+          threadId: selectedThread.id.startsWith('draft-group:') ? undefined : selectedThread.id,
+          threadTitle: selectedThread.contactName,
+        });
+        setSelectedThreadId(response.data.threadId);
+      } else {
+        await messageService.send({
+          senderAccountId: currentUser.id,
+          recipientUserId: selectedThread.id,
+          subject: selectedThread.subject,
+          body: withAttachmentSummary(replyBody, replyAttachments),
+        });
+      }
       setReplyBody('');
       setReplyAttachments([]);
       if (typingStopTimerRef.current) {
         window.clearTimeout(typingStopTimerRef.current);
       }
-      messageService.sendTyping(
-        currentUser.id,
-        selectedThread.id,
-        currentUser.displayName || currentUser.email || 'Someone',
-        false,
-      ).catch((err) => console.error('Failed to clear typing status:', err));
+      if (selectedThread.threadType === 'direct') {
+        messageService.sendTyping(
+          currentUser.id,
+          selectedThread.id,
+          currentUser.displayName || currentUser.email || 'Someone',
+          false,
+        ).catch((err) => console.error('Failed to clear typing status:', err));
+      }
       setDraftRecipient(null);
+      setDraftGroupRecipients([]);
+      setDraftThreadTitle('');
       await loadMessages(false);
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
     } catch (err) {
@@ -724,10 +903,18 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const deleteThread = async (thread: MessageThread) => {
     try {
       const deletedMessageIds = new Set(thread.messages.map((message) => message.id));
-      await Promise.all(thread.messages.map((message) => messageService.delete(message.id, currentUser.id)));
+      if (thread.threadType !== 'direct' && !thread.id.startsWith('draft-group:')) {
+        await messageService.deleteThread(thread.id, currentUser.id);
+      } else {
+        await Promise.all(thread.messages.map((message) => messageService.delete(message.id, currentUser.id)));
+      }
       setInboxMessages((messages) => messages.filter((message) => !deletedMessageIds.has(message.id)));
       setSentMessages((messages) => messages.filter((message) => !deletedMessageIds.has(message.id)));
       setDraftRecipient((recipient) => (recipient?.id === thread.id ? null : recipient));
+      if (thread.id.startsWith('draft-group:')) {
+        setDraftGroupRecipients([]);
+        setDraftThreadTitle('');
+      }
       setPinnedThreadIds((ids) => ids.filter((id) => id !== thread.id));
       setReplyBody('');
       setReplyAttachments([]);
@@ -831,6 +1018,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                     setIsComposeOpen(false);
                     setRecipientQuery('');
                     setRecipientResults([]);
+                    setDraftGroupRecipients([]);
+                    setDraftThreadTitle('');
                   }}
                   className="icon-close-button h-8 w-8"
                   aria-label="Close new chat search"
@@ -845,26 +1034,48 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                 placeholder="Type a name"
                 className="w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-900"
               />
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void loadDistrictRecipients()}
+                  disabled={isLoadingDistrictRecipients}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 text-xs font-bold text-accent hover:bg-accent/15 disabled:opacity-60"
+                  aria-label="Message district members"
+                  title="Message district members"
+                >
+                  <Building2 size={14} />
+                  <span>{isLoadingDistrictRecipients ? 'Loading...' : 'My District'}</span>
+                </button>
+              </div>
+              {draftGroupRecipients.length > 0 && (
+                <div className="mt-3 rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-900">
+                  <input
+                    value={draftThreadTitle}
+                    onChange={(event) => setDraftThreadTitle(event.target.value)}
+                    placeholder="Group name"
+                    className="mb-2 w-full rounded border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold dark:border-gray-700 dark:bg-gray-950"
+                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    {draftGroupRecipients.map((user) => (
+                      <span key={user.id} className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-1 text-xs font-bold text-accent">
+                        {`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email}
+                        <button type="button" onClick={() => removeGroupRecipient(user.id)} aria-label="Remove recipient" title="Remove">
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
               {(recipientResults.length > 0 || isRecipientSearching) && (
                 <div className="mt-3 max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
                   {isRecipientSearching ? (
                     <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>
                   ) : (
                     recipientResults.map((user) => (
-                      <button
+                      <div
                         key={user.id}
-                        type="button"
-                        disabled={user.receivesMessages === false}
-                        onClick={() => {
-                          setDraftRecipient(user);
-                          setSelectedThreadId(user.id);
-                          setRecipientQuery('');
-                          setRecipientResults([]);
-                          setIsComposeOpen(false);
-                          setReplyBody('');
-                          setReplyAttachments([]);
-                        }}
-                    className="flex w-full items-center gap-2 px-2 py-2 text-left text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-red-50 disabled:text-danger dark:hover:bg-gray-800 dark:disabled:bg-red-950 sm:gap-3 sm:px-3"
+                        className="flex w-full items-center gap-2 px-2 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 sm:gap-3 sm:px-3"
                       >
                         {user.profilePictureUrl ? (
                           <img
@@ -883,7 +1094,35 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                           <span className="block truncate text-xs text-gray-500">{user.email || user.peNumber}</span>
                         </span>
                         {user.receivesMessages === false && <span className="text-xs font-bold text-danger">Off</span>}
-                      </button>
+                        {user.receivesMessages !== false && (
+                          <span className="flex shrink-0 gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDraftRecipient(user);
+                                setDraftGroupRecipients([]);
+                                setDraftThreadTitle('');
+                                setSelectedThreadId(user.id);
+                                setRecipientQuery('');
+                                setRecipientResults([]);
+                                setIsComposeOpen(false);
+                                setReplyBody('');
+                                setReplyAttachments([]);
+                              }}
+                              className="rounded-full bg-primary-500 px-2 py-1 text-[11px] font-bold text-white hover:bg-primary-600"
+                            >
+                              Chat
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => addGroupRecipient(user)}
+                              className="rounded-full bg-accent px-2 py-1 text-[11px] font-bold text-white hover:bg-accent/90"
+                            >
+                              Add
+                            </button>
+                          </span>
+                        )}
+                      </div>
                     ))
                   )}
                 </div>
@@ -912,7 +1151,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                       className="relative shrink-0"
                       aria-label={`Open ${thread.contactName}`}
                     >
-                      {thread.contactProfilePictureUrl ? (
+                      {thread.threadType !== 'direct' ? (
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-primary-500/10 text-primary-500 dark:border-gray-700 dark:text-blue-100">
+                          {thread.threadType === 'district' ? <Building2 size={17} /> : <Users size={17} />}
+                        </span>
+                      ) : thread.contactProfilePictureUrl ? (
                         <img
                           src={getAssetThumbnailUrl(thread.contactProfilePictureUrl, 96)}
                           alt={thread.contactName}
@@ -924,7 +1167,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                           {getInitials(thread.contactName)}
                         </span>
                       )}
-                      <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-gray-900 ${presence.online ? 'bg-green-500' : 'bg-gray-400'}`} />
+                      {thread.threadType === 'direct' && <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-gray-900 ${presence.online ? 'bg-green-500' : 'bg-gray-400'}`} />}
                     </button>
                     <button
                       type="button"
@@ -983,6 +1226,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
               setIsComposeOpen((value) => !value);
               setRecipientQuery('');
               setRecipientResults([]);
+              if (isComposeOpen) {
+                setDraftGroupRecipients([]);
+                setDraftThreadTitle('');
+              }
             }}
             className="absolute bottom-4 right-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary-500 text-white shadow-lg hover:bg-primary-600"
             aria-label="New message"
@@ -1001,7 +1248,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
                   <div className="relative shrink-0">
-                    {selectedThread.contactProfilePictureUrl ? (
+                    {selectedThread.threadType !== 'direct' ? (
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-primary-500/10 text-primary-500 shadow-sm dark:border-gray-700 dark:text-blue-100">
+                        {selectedThread.threadType === 'district' ? <Building2 size={20} /> : <Users size={20} />}
+                      </div>
+                    ) : selectedThread.contactProfilePictureUrl ? (
                       <img
                         src={getAssetThumbnailUrl(selectedThread.contactProfilePictureUrl, 96)}
                         alt={selectedThread.contactName}
@@ -1017,7 +1268,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   <div className="min-w-0 text-left">
                     <div className="flex min-w-0 items-center gap-2">
                       <h2 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">{selectedThread.contactName}</h2>
-                      <PresenceDot isOnline={selectedPresence?.online === true} />
+                      {selectedThread.threadType === 'direct' && <PresenceDot isOnline={selectedPresence?.online === true} />}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <RankBadge rank={selectedThread.contactRank} compact subtle />

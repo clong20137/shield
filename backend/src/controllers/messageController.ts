@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { UserMessageModel } from '../models/UserMessage';
 import { addMessageEventClient, broadcastMessageEvent } from '../services/messageEvents';
@@ -77,6 +78,115 @@ export class MessageController {
     } catch (error) {
       console.error('Create message error:', error);
       res.status(500).json({ error: 'Failed to send message' });
+    }
+  }
+
+  static async createGroupMessage(req: Request, res: Response) {
+    try {
+      const senderAccountId = cleanString(req.body?.senderAccountId, 36);
+      const subject = cleanString(req.body?.subject, 180) || 'Group Message';
+      const body = cleanMultiline(req.body?.body, 5000);
+      const audienceType = cleanString(req.body?.audienceType, 30);
+      const requestedThreadId = cleanString(req.body?.threadId, 36);
+      const requestedTitle = cleanString(req.body?.threadTitle, 180);
+      const rawRecipientIds: unknown[] = Array.isArray(req.body?.recipientUserIds) ? req.body.recipientUserIds : [];
+
+      if (!senderAccountId) {
+        return res.status(400).json({ error: 'Sender is required' });
+      }
+
+      if (!body) {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+
+      const sender = await AuthAccountModel.getAccountById(senderAccountId);
+      if (!sender) {
+        return res.status(404).json({ error: 'Sender account not found' });
+      }
+
+      const accounts = await AuthAccountModel.listAccounts();
+      const recipientMap = new Map<string, Awaited<ReturnType<typeof AuthAccountModel.listAccounts>>[number]>();
+
+      if (audienceType === 'district') {
+        const senderDistrict = sender.district || '';
+        accounts
+          .filter((account) =>
+            account.id !== senderAccountId &&
+            account.isActive &&
+            account.receivesMessages &&
+            Boolean(senderDistrict) &&
+            account.district === senderDistrict,
+          )
+          .forEach((account) => recipientMap.set(account.id, account));
+      }
+
+      rawRecipientIds
+        .map((value) => cleanString(value, 36))
+        .filter(Boolean)
+        .forEach((recipientId: string) => {
+          const account = accounts.find((item) => item.id === recipientId);
+          if (account && account.id !== senderAccountId && account.isActive && account.receivesMessages) {
+            recipientMap.set(account.id, account);
+          }
+        });
+
+      const recipients = Array.from(recipientMap.values());
+      if (recipients.length === 0) {
+        return res.status(400).json({ error: 'Choose at least one recipient that can receive messages' });
+      }
+
+      const participantIds = [senderAccountId, ...recipients.map((recipient) => recipient.id)];
+      const participantNames = [
+        sender.displayName || sender.email,
+        ...recipients.map((recipient) => recipient.displayName || recipient.email),
+      ];
+      const threadId = requestedThreadId || uuidv4();
+      const groupMessageId = uuidv4();
+      const threadTitle = requestedTitle || (audienceType === 'district' && sender.district
+        ? `${sender.district} District`
+        : `Group: ${recipients.slice(0, 3).map((recipient) => recipient.displayName || recipient.email).join(', ')}${recipients.length > 3 ? ` +${recipients.length - 3}` : ''}`);
+
+      const createdMessages = await Promise.all(recipients.map((recipient) =>
+        UserMessageModel.createMessage({
+          senderAccountId,
+          recipientUserId: recipient.id,
+          subject,
+          body,
+          threadId,
+          threadType: audienceType === 'district' ? 'district' : 'group',
+          threadTitle,
+          threadParticipantIds: JSON.stringify(participantIds),
+          threadParticipantNames: JSON.stringify(participantNames),
+          groupMessageId,
+        }),
+      ));
+
+      const enrichedMessages = await Promise.all(createdMessages.map((message) => UserMessageModel.getById(message.id)));
+      const firstMessage = enrichedMessages.find(Boolean) || createdMessages[0];
+
+      await notifyMentions(body, {
+        actorId: senderAccountId,
+        actorName: sender.displayName || sender.email || 'A user',
+        entityType: 'user_message',
+        entityId: groupMessageId,
+        title: 'You were mentioned in a group message',
+        message: `${sender.displayName || sender.email || 'A user'} mentioned you in Messages.`,
+      });
+
+      broadcastMessageEvent(participantIds, {
+        type: 'message-created',
+        message: firstMessage,
+        actorAccountId: senderAccountId,
+      });
+
+      res.status(201).json({
+        threadId,
+        groupMessageId,
+        messages: enrichedMessages.filter(Boolean).length > 0 ? enrichedMessages.filter(Boolean) : createdMessages,
+      });
+    } catch (error) {
+      console.error('Create group message error:', error);
+      res.status(500).json({ error: 'Failed to send group message' });
     }
   }
 
@@ -281,6 +391,32 @@ export class MessageController {
     } catch (error) {
       console.error('Delete message error:', error);
       res.status(500).json({ error: 'Failed to delete message' });
+    }
+  }
+
+  static async deleteThread(req: Request, res: Response) {
+    try {
+      const accountId = cleanString(req.body?.accountId, 36);
+      const threadId = cleanString(req.params.threadId, 36);
+
+      if (!accountId || !threadId) {
+        return res.status(400).json({ error: 'Account and thread are required' });
+      }
+
+      const updated = await UserMessageModel.deleteThreadForUser(threadId, accountId);
+      if (!updated) {
+        return res.status(404).json({ error: 'Conversation not found' });
+      }
+
+      broadcastMessageEvent([accountId], {
+        type: 'message-deleted',
+        actorAccountId: accountId,
+      });
+
+      res.json({ message: 'Conversation deleted' });
+    } catch (error) {
+      console.error('Delete thread error:', error);
+      res.status(500).json({ error: 'Failed to delete conversation' });
     }
   }
 }

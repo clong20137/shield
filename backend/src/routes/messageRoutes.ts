@@ -11,6 +11,7 @@ const messageMutationLimiter = rateLimit({ keyPrefix: 'messages-mutate', windowM
 
 router.get('/events', MessageController.streamEvents);
 router.post('/', messageSendLimiter, requirePermission('messages:send'), requireSelfOrPermission((req) => req.body?.senderAccountId, 'roles:manage'), MessageController.createMessage);
+router.post('/group', messageSendLimiter, requirePermission('messages:send'), requireSelfOrPermission((req) => req.body?.senderAccountId, 'roles:manage'), MessageController.createGroupMessage);
 router.get('/inbox/:accountId', messageReadLimiter, requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), MessageController.listInbox);
 router.get('/sent/:accountId', messageReadLimiter, requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), MessageController.listSent);
 router.get('/user/:userId', messageReadLimiter, requireSelfOrPermission((req) => req.params.userId, 'roles:manage'), MessageController.listMessagesForUser);
@@ -18,6 +19,7 @@ router.post('/typing', messageTypingLimiter, requireSelfOrPermission((req) => re
 router.put('/:id/read', messageMutationLimiter, requireSelfOrPermission((req) => req.body?.recipientUserId, 'roles:manage'), MessageController.markRead);
 router.put('/:id/reaction', messageMutationLimiter, requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), MessageController.setReaction);
 router.put('/:id/archive', messageMutationLimiter, requireSelfOrPermission((req) => req.body?.recipientUserId, 'roles:manage'), MessageController.archiveMessage);
+router.delete('/thread/:threadId', messageMutationLimiter, requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), MessageController.deleteThread);
 router.delete('/:id', messageMutationLimiter, requireSelfOrPermission((req) => req.body?.accountId, 'roles:manage'), MessageController.deleteMessage);
 
 export default router;

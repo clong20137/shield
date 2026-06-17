@@ -14,6 +14,12 @@ export interface UserMessage {
   recipientDeleted: boolean;
   senderReaction?: string | null;
   recipientReaction?: string | null;
+  threadId?: string | null;
+  threadType?: string | null;
+  threadTitle?: string | null;
+  threadParticipantIds?: string | null;
+  threadParticipantNames?: string | null;
+  groupMessageId?: string | null;
   createdAt: Date;
   senderName?: string;
   senderEmail?: string;
@@ -41,6 +47,12 @@ interface UserMessageRow extends RowDataPacket {
   recipientDeleted: boolean | number;
   senderReaction?: string | null;
   recipientReaction?: string | null;
+  threadId?: string | null;
+  threadType?: string | null;
+  threadTitle?: string | null;
+  threadParticipantIds?: string | null;
+  threadParticipantNames?: string | null;
+  groupMessageId?: string | null;
   createdAt: Date;
   senderName?: string;
   senderEmail?: string;
@@ -69,6 +81,12 @@ function toUserMessage(row: UserMessageRow): UserMessage {
     recipientDeleted: Boolean(row.recipientDeleted),
     senderReaction: row.senderReaction || null,
     recipientReaction: row.recipientReaction || null,
+    threadId: row.threadId || null,
+    threadType: row.threadType || 'direct',
+    threadTitle: row.threadTitle || null,
+    threadParticipantIds: row.threadParticipantIds || null,
+    threadParticipantNames: row.threadParticipantNames || null,
+    groupMessageId: row.groupMessageId || row.id,
     createdAt: row.createdAt,
     senderName: row.senderName,
     senderEmail: row.senderEmail,
@@ -94,9 +112,22 @@ export class UserMessageModel {
 
       await conn.query<ResultSetHeader>(
         `INSERT INTO user_messages (
-          \`id\`, \`senderAccountId\`, \`recipientUserId\`, \`subject\`, \`body\`, \`isRead\`, \`createdAt\`
-        ) VALUES (?, ?, ?, ?, ?, 0, ?)`,
-        [id, message.senderAccountId, message.recipientUserId, message.subject, message.body, now]
+          \`id\`, \`senderAccountId\`, \`recipientUserId\`, \`subject\`, \`body\`, \`isRead\`, \`threadId\`, \`threadType\`, \`threadTitle\`, \`threadParticipantIds\`, \`threadParticipantNames\`, \`groupMessageId\`, \`createdAt\`
+        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          message.senderAccountId,
+          message.recipientUserId,
+          message.subject,
+          message.body,
+          message.threadId || null,
+          message.threadType || 'direct',
+          message.threadTitle || null,
+          message.threadParticipantIds || null,
+          message.threadParticipantNames || null,
+          message.groupMessageId || id,
+          now,
+        ]
       );
 
       return {
@@ -106,6 +137,12 @@ export class UserMessageModel {
         isArchived: false,
         senderDeleted: false,
         recipientDeleted: false,
+        threadId: message.threadId || null,
+        threadType: message.threadType || 'direct',
+        threadTitle: message.threadTitle || null,
+        threadParticipantIds: message.threadParticipantIds || null,
+        threadParticipantNames: message.threadParticipantNames || null,
+        groupMessageId: message.groupMessageId || id,
         createdAt: now,
       };
     } finally {
@@ -281,6 +318,24 @@ export class UserMessageModel {
           \`senderDeleted\` = CASE WHEN \`senderAccountId\` = ? THEN 1 ELSE \`senderDeleted\` END
         WHERE \`id\` = ? AND (\`recipientUserId\` = ? OR \`senderAccountId\` = ?)`,
         [accountId, accountId, messageId, accountId, accountId]
+      );
+
+      return result.affectedRows > 0;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async deleteThreadForUser(threadId: string, accountId: string): Promise<boolean> {
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>(
+        `UPDATE user_messages
+        SET
+          \`recipientDeleted\` = CASE WHEN \`recipientUserId\` = ? THEN 1 ELSE \`recipientDeleted\` END,
+          \`senderDeleted\` = CASE WHEN \`senderAccountId\` = ? THEN 1 ELSE \`senderDeleted\` END
+        WHERE \`threadId\` = ? AND (\`recipientUserId\` = ? OR \`senderAccountId\` = ?)`,
+        [accountId, accountId, threadId, accountId, accountId]
       );
 
       return result.affectedRows > 0;

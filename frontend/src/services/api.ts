@@ -707,6 +707,12 @@ export interface UserMessage {
   isRead: boolean;
   senderReaction?: string | null;
   recipientReaction?: string | null;
+  threadId?: string | null;
+  threadType?: 'direct' | 'group' | 'district' | string | null;
+  threadTitle?: string | null;
+  threadParticipantIds?: string | null;
+  threadParticipantNames?: string | null;
+  groupMessageId?: string | null;
   createdAt: string;
   senderName?: string;
   senderEmail?: string;
@@ -1166,6 +1172,16 @@ export const messageService = {
   send: (message: Pick<UserMessage, 'senderAccountId' | 'recipientUserId' | 'subject' | 'body'>) =>
     api.post<UserMessage>('/messages', message),
 
+  sendGroup: (message: {
+    senderAccountId: string;
+    recipientUserIds: string[];
+    subject: string;
+    body: string;
+    audienceType?: 'group' | 'district';
+    threadId?: string;
+    threadTitle?: string;
+  }) => api.post<{ threadId: string; groupMessageId: string; messages: UserMessage[] }>('/messages/group', message),
+
   getForUser: (userId: string) =>
     api.get<UserMessage[]>(`/messages/user/${userId}`),
 
@@ -1189,6 +1205,9 @@ export const messageService = {
 
   delete: (messageId: string, accountId: string) =>
     api.delete(`/messages/${messageId}`, { data: { accountId } }),
+
+  deleteThread: (threadId: string, accountId: string) =>
+    api.delete(`/messages/thread/${threadId}`, { data: { accountId } }),
 };
 
 export const dashboardPostService = {
