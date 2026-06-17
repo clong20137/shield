@@ -7,6 +7,7 @@ import { districtOptions } from '../constants/districts';
 type DailyStripStyle = React.CSSProperties & {
   '--trooper-daily-strip-rgb'?: string;
 };
+type OverlayPosition = { x: number; y: number; strategy: 'fixed' | 'absolute' };
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 type TimePeriod = 'AM' | 'PM';
 type CalendarView = 'day' | 'week' | 'month';
@@ -387,6 +388,38 @@ function getViewportMenuPosition(clientX: number, clientY: number, width: number
   return {
     x: Math.min(Math.max(gutter, clientX), Math.max(gutter, window.innerWidth - width - gutter)),
     y: Math.min(Math.max(gutter, clientY), Math.max(gutter, window.innerHeight - height - gutter)),
+  };
+}
+
+function getTransformedOverlayContainer(element: HTMLElement): HTMLElement | null {
+  let parent = element.parentElement;
+  while (parent && parent !== document.body) {
+    const style = window.getComputedStyle(parent);
+    if (style.transform !== 'none' || style.filter !== 'none' || style.perspective !== 'none' || style.contain.includes('paint')) {
+      return parent;
+    }
+    parent = parent.parentElement;
+  }
+
+  return null;
+}
+
+function getOverlayPositionForTarget(target: HTMLElement, width: number, height: number, align: 'center' | 'left' = 'left'): OverlayPosition {
+  const rect = target.getBoundingClientRect();
+  const baseX = align === 'center' ? rect.left + rect.width / 2 - width / 2 : rect.left;
+  const baseY = rect.bottom + 8;
+  const viewportPosition = getViewportMenuPosition(baseX, baseY, width, height);
+  const transformedContainer = getTransformedOverlayContainer(target);
+
+  if (!transformedContainer) {
+    return { ...viewportPosition, strategy: 'fixed' };
+  }
+
+  const containerRect = transformedContainer.getBoundingClientRect();
+  return {
+    x: viewportPosition.x - containerRect.left + transformedContainer.scrollLeft,
+    y: viewportPosition.y - containerRect.top + transformedContainer.scrollTop,
+    strategy: 'absolute',
   };
 }
 
@@ -813,8 +846,8 @@ function CalendarPage({
   const [dailySaveStatus, setDailySaveStatus] = useState<DailySaveStatus>('idle');
   const [dailySaveStatusAt, setDailySaveStatusAt] = useState<number | null>(null);
   const [invalidDailyField, setInvalidDailyField] = useState<string | null>(null);
-  const [dailyStripTooltip, setDailyStripTooltip] = useState<{ x: number; y: number; dateKey: string; entry: CalendarEntry | null } | null>(null);
-  const [dailyStripContextMenu, setDailyStripContextMenu] = useState<{ x: number; y: number; dateKey: string; entry: CalendarEntry | null } | null>(null);
+  const [dailyStripTooltip, setDailyStripTooltip] = useState<(OverlayPosition & { dateKey: string; entry: CalendarEntry | null }) | null>(null);
+  const [dailyStripContextMenu, setDailyStripContextMenu] = useState<(OverlayPosition & { dateKey: string; entry: CalendarEntry | null }) | null>(null);
   const [copiedDailyForm, setCopiedDailyForm] = useState<CalendarEntryForm | null>(null);
   const lastAutoDutyHoursRef = useRef('');
   const dailyFormRef = useRef<HTMLFormElement | null>(null);
@@ -2015,11 +2048,9 @@ function CalendarPage({
     return 'Autosave issue';
   })();
   const showDailyStripTooltip = (target: HTMLElement, dateKey: string, entry?: CalendarEntry) => {
-    const rect = target.getBoundingClientRect();
-    const safeX = Math.min(Math.max(rect.left + rect.width / 2, 104), window.innerWidth - 104);
+    const tooltipPosition = getOverlayPositionForTarget(target, 208, 96, 'center');
     setDailyStripTooltip({
-      x: safeX,
-      y: rect.bottom + 10,
+      ...tooltipPosition,
       dateKey,
       entry: entry || null,
     });
@@ -2028,10 +2059,9 @@ function CalendarPage({
   const openDailyStripContextMenu = (event: React.MouseEvent<HTMLElement>, dateKey: string, entry?: CalendarEntry) => {
     event.preventDefault();
     setDailyStripTooltip(null);
-    const menuPosition = getViewportMenuPosition(event.clientX, event.clientY, 220, entry ? 236 : 196);
+    const menuPosition = getOverlayPositionForTarget(event.currentTarget, 260, entry ? 236 : 196, 'left');
     setDailyStripContextMenu({
-      x: menuPosition.x,
-      y: menuPosition.y,
+      ...menuPosition,
       dateKey,
       entry: entry || null,
     });
@@ -3013,8 +3043,8 @@ function CalendarPage({
 
       {dailyStripTooltip && (
         <div
-          className="pointer-events-none fixed z-[100] w-52 -translate-x-1/2 rounded-md bg-black px-3 py-2 text-left text-xs font-bold text-white shadow-2xl ring-1 ring-white/10"
-          style={{ left: dailyStripTooltip.x, top: dailyStripTooltip.y }}
+          className="pointer-events-none z-[100] w-52 rounded-md bg-black px-3 py-2 text-left text-xs font-bold text-white shadow-2xl ring-1 ring-white/10"
+          style={{ position: dailyStripTooltip.strategy, left: dailyStripTooltip.x, top: dailyStripTooltip.y }}
         >
           <span className="block text-accent">{dailyStripTooltip.dateKey}</span>
           {dailyStripTooltip.entry ? (
@@ -3030,8 +3060,9 @@ function CalendarPage({
 
       {dailyStripContextMenu && (
         <div
-          className="quick-launch-context-menu fixed z-[100] min-w-52 overflow-hidden rounded border border-gray-200 bg-white p-1 text-sm shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+          className="quick-launch-context-menu z-[100] min-w-64 overflow-hidden rounded border border-gray-200 bg-white p-1 text-sm shadow-2xl dark:border-gray-700 dark:bg-gray-900"
           style={{
+            position: dailyStripContextMenu.strategy,
             left: dailyStripContextMenu.x,
             top: dailyStripContextMenu.y,
           }}

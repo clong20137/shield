@@ -142,6 +142,12 @@ function normalizeAppScale(value?: string | null): AppScale {
   return value === 'compact' || value === 'large' ? value : 'comfortable';
 }
 
+const appScaleOptions: Array<{ value: AppScale; label: string; description: string }> = [
+  { value: 'compact', label: 'Compact', description: 'Fits more on screen.' },
+  { value: 'comfortable', label: 'Comfortable', description: 'Balanced default.' },
+  { value: 'large', label: 'Large', description: 'Bigger text and controls.' },
+];
+
 function getQuickLaunchStorageKey(accountId: string): string {
   return `${QUICK_LAUNCH_KEY}_${accountId}`;
 }
@@ -3551,6 +3557,7 @@ interface OnboardingStep {
   title: string;
   body: string;
   placement?: 'right' | 'below';
+  showAppScalePicker?: boolean;
 }
 
 const onboardingSteps: OnboardingStep[] = [
@@ -3559,6 +3566,13 @@ const onboardingSteps: OnboardingStep[] = [
     eyebrow: 'Start Here',
     title: 'Your daily workspace',
     body: 'The dashboard is the first stop for pinned people, your day, quick notes, updates, news, and the main work happening across SHIELD.',
+  },
+  {
+    target: 'workspace',
+    eyebrow: 'Display Scale',
+    title: 'Choose your workspace size',
+    body: 'Pick the scale that feels best for your screen. You can change it later from Account Settings.',
+    showAppScalePicker: true,
   },
   {
     target: 'pinned-profiles',
@@ -3671,10 +3685,12 @@ const findOnboardingElement = (target: string) => {
 
 function FirstLoginGuide({
   account,
+  onAppScaleChange,
   onFinish,
   onLater,
 }: {
   account: AuthAccount;
+  onAppScaleChange: (appScale: AppScale) => void;
   onFinish: () => void;
   onLater: () => void;
 }) {
@@ -3814,6 +3830,29 @@ function FirstLoginGuide({
           </div>
         </div>
         <p className="text-sm leading-6 text-gray-600 dark:text-gray-400">{step.body}</p>
+        {step.showAppScalePicker && (
+          <div className="mt-4 grid gap-2">
+            {appScaleOptions.map((option) => {
+              const isSelected = normalizeAppScale(account.appScale) === option.value;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => onAppScaleChange(option.value)}
+                  className={`rounded border px-3 py-2 text-left transition ${
+                    isSelected
+                      ? 'border-accent bg-accent/10 text-accent shadow-sm'
+                      : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-accent hover:bg-white dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-900'
+                  }`}
+                >
+                  <span className="block text-sm font-black">{option.label}</span>
+                  <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{option.description}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
         <p className="mt-3 text-xs text-gray-500 dark:text-gray-500">
           Signed in as {account.displayName || account.email}
         </p>
@@ -5754,7 +5793,7 @@ function App() {
     setIsWelcomeSplashOpen(false);
     setShouldLaunchGuideAfterWelcome(false);
     closeModal('profile');
-    window.history.pushState({}, document.title, '/');
+    window.history.pushState({}, document.title, withAppBase('/'));
     window.dispatchEvent(new PopStateEvent('popstate'));
     window.setTimeout(() => setIsFirstLoginGuideOpen(true), MODAL_CLOSE_MS + 40);
   };
@@ -7121,6 +7160,7 @@ function App() {
           {isFirstLoginGuideOpen && currentUser && (
             <FirstLoginGuide
               account={currentUser}
+              onAppScaleChange={handleAppScaleChange}
               onFinish={finishFirstLoginGuide}
               onLater={() => setIsFirstLoginGuideOpen(false)}
             />
