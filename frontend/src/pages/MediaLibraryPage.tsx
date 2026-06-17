@@ -1,8 +1,9 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, ExternalLink, Folder, HardDrive, Image, Pencil, Plus, Search, Trash2, Upload, X } from 'lucide-react';
-import { AuthAccount, getAssetThumbnailUrl, getAssetUrl, handleAssetThumbnailError, MediaLibraryFolder, MediaLibraryItem, mediaService } from '../services/api';
+import { Camera, Check, ChevronLeft, ChevronRight, ExternalLink, Folder, FolderUp, HardDrive, Image, Pencil, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { AuthAccount, getAssetThumbnailUrl, getAssetUrl, handleAssetThumbnailError, MediaLibraryFolder, MediaLibraryItem, mediaService, userService } from '../services/api';
 
 const pageSize = 60;
+const allowedProfilePhotoExtensions = new Set(['jpg', 'jpeg', 'jfif', 'png', 'gif', 'webp']);
 
 function formatBytes(value: number): string {
   if (value < 1024) return `${value} B`;
@@ -31,6 +32,11 @@ function hasPermission(account: AuthAccount, permission: string): boolean {
   return account.role === 'administrator' || Boolean(account.permissions?.includes(permission));
 }
 
+function isAllowedProfilePhoto(file: File): boolean {
+  const extension = file.name.split('.').pop()?.toLowerCase() || '';
+  return allowedProfilePhotoExtensions.has(extension);
+}
+
 export default function MediaLibraryPage({ account, onToast, getErrorMessage }: MediaLibraryPageProps) {
   const [items, setItems] = useState<MediaLibraryItem[]>([]);
   const [folders, setFolders] = useState<MediaLibraryFolder[]>([]);
@@ -44,7 +50,14 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
   const [renamingImageId, setRenamingImageId] = useState('');
   const [renamingImageName, setRenamingImageName] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [profilePhotoProgress, setProfilePhotoProgress] = useState(0);
+  const [profileImportSummary, setProfileImportSummary] = useState<{
+    uploadedCount: number;
+    skippedFiles: Array<{ fileName: string; peNumber: string; reason: string }>;
+    ignoredCount: number;
+  } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isImportingProfilePhotos, setIsImportingProfilePhotos] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
@@ -52,7 +65,10 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
-  const canViewMedia = hasPermission(account, 'media:view') || hasPermission(account, 'media:upload') || hasPermission(account, 'media:edit') || hasPermission(account, 'media:delete');
+  const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const profilePhotoFolderInputRef = useRef<HTMLInputElement | null>(null);
+  const canImportProfilePhotos = hasPermission(account, 'users:profile-picture');
+  const canViewMedia = hasPermission(account, 'media:view') || hasPermission(account, 'media:upload') || hasPermission(account, 'media:edit') || hasPermission(account, 'media:delete') || canImportProfilePhotos;
   const canUploadMedia = hasPermission(account, 'media:upload');
   const canEditMedia = hasPermission(account, 'media:edit');
   const canDeleteMedia = hasPermission(account, 'media:delete');
@@ -188,6 +204,49 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
     }
   };
 
+  const importProfilePhotos = async (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(event.target.files || []);
+    event.target.value = '';
+
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    const files = selectedFiles.filter(isAllowedProfilePhoto);
+    const ignoredCount = selectedFiles.length - files.length;
+
+    if (files.length === 0) {
+      onToast('error', 'No supported image files were selected. Use JPG, JPEG, JFIF, PNG, GIF, or WEBP.');
+      return;
+    }
+
+    setIsImportingProfilePhotos(true);
+    setProfilePhotoProgress(0);
+    setProfileImportSummary(null);
+    try {
+      const response = await userService.importProfilePictures(files, setProfilePhotoProgress);
+      setProfilePhotoProgress(100);
+      setProfileImportSummary({
+        uploadedCount: response.data.uploadedCount,
+        skippedFiles: response.data.skippedFiles,
+        ignoredCount,
+      });
+      const ignoredText = ignoredCount > 0 ? `\n${ignoredCount} unsupported file${ignoredCount === 1 ? '' : 's'} ignored` : '';
+      onToast('success', `${response.data.uploadedCount} PE profile photo${response.data.uploadedCount === 1 ? '' : 's'} assigned\n${response.data.skippedCount} skipped${ignoredText}`);
+      await loadMedia();
+    } catch (err) {
+      const message = getErrorMessage(err, 'Failed to import PE profile photos.');
+      setProfileImportSummary({
+        uploadedCount: 0,
+        skippedFiles: [{ fileName: 'Import failed', peNumber: '', reason: message }],
+        ignoredCount,
+      });
+      onToast('error', message);
+    } finally {
+      setIsImportingProfilePhotos(false);
+    }
+  };
+
   const renameImage = async (item: MediaLibraryItem) => {
     if (!renamingImageName.trim()) return;
 
@@ -284,6 +343,26 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
                 <input ref={uploadInputRef} type="file" multiple accept=".jpg,.jpeg,.jfif,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={uploadImages} />
               </>
             )}
+            {canImportProfilePhotos && (
+              <>
+                <button type="button" onClick={() => profilePhotoInputRef.current?.click()} className="btn-secondary" disabled={isImportingProfilePhotos} aria-label="Import PE profile photos" title={isImportingProfilePhotos ? 'Importing PE profile photos' : 'Import PE profile photos'}>
+                  <Camera size={16} />
+                </button>
+                <button type="button" onClick={() => profilePhotoFolderInputRef.current?.click()} className="btn-secondary" disabled={isImportingProfilePhotos} aria-label="Import PE profile photo folder" title={isImportingProfilePhotos ? 'Importing PE profile photos' : 'Import a folder of PE-numbered profile photos'}>
+                  <FolderUp size={16} />
+                </button>
+                <input ref={profilePhotoInputRef} type="file" multiple accept=".jpg,.jpeg,.jfif,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={importProfilePhotos} />
+                <input
+                  ref={profilePhotoFolderInputRef}
+                  type="file"
+                  multiple
+                  accept=".jpg,.jpeg,.jfif,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp"
+                  className="hidden"
+                  onChange={importProfilePhotos}
+                  {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
+                />
+              </>
+            )}
             {activeFolderDetails && (
               <button type="button" onClick={closeFolder} className="btn-secondary">
                 <ChevronLeft size={16} />
@@ -304,6 +383,36 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
           <div className="h-3 overflow-hidden rounded-full bg-white dark:bg-gray-900">
             <div className="h-full rounded-full bg-primary-500 transition-all" style={{ width: `${uploadProgress}%` }} />
           </div>
+        </div>
+      )}
+      {isImportingProfilePhotos && (
+        <div className="rounded border border-blue-100 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/40">
+          <div className="mb-2 flex items-center justify-between text-sm font-semibold text-primary-500 dark:text-blue-100">
+            <span>Assigning PE profile photos</span>
+            <span>{profilePhotoProgress}%</span>
+          </div>
+          <div className="h-3 overflow-hidden rounded-full bg-white dark:bg-gray-900">
+            <div className="h-full rounded-full bg-primary-500 transition-all" style={{ width: `${profilePhotoProgress}%` }} />
+          </div>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Large batches may keep processing after the upload reaches 100% while thumbnails are generated.</p>
+        </div>
+      )}
+      {profileImportSummary && (
+        <div className="rounded border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-gray-950">
+          <p className="font-semibold text-gray-900 dark:text-white">{profileImportSummary.uploadedCount} PE profile photo{profileImportSummary.uploadedCount === 1 ? '' : 's'} assigned.</p>
+          {profileImportSummary.ignoredCount > 0 && (
+            <p className="mt-1 text-gray-600 dark:text-gray-300">{profileImportSummary.ignoredCount} unsupported file{profileImportSummary.ignoredCount === 1 ? '' : 's'} ignored.</p>
+          )}
+          {profileImportSummary.skippedFiles.length > 0 && (
+            <div className="mt-2 max-h-40 overflow-auto text-gray-600 dark:text-gray-300">
+              {profileImportSummary.skippedFiles.slice(0, 20).map((file) => (
+                <p key={`${file.fileName}-${file.reason}`}>
+                  {file.fileName}{file.peNumber ? ` (PE ${file.peNumber})` : ''}: {file.reason}
+                </p>
+              ))}
+              {profileImportSummary.skippedFiles.length > 20 && <p>{profileImportSummary.skippedFiles.length - 20} more skipped files.</p>}
+            </div>
+          )}
         </div>
       )}
 

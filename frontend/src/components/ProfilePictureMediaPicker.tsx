@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, Folder, Image, Search, X } from 'lucide-react';
 import { getAssetThumbnailUrl, handleAssetThumbnailError, MediaLibraryFolder, MediaLibraryItem, mediaService } from '../services/api';
 
@@ -29,6 +29,13 @@ export function ProfilePictureMediaPicker({
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const onErrorRef = useRef(onError);
+  const getErrorMessageRef = useRef(getErrorMessage);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+    getErrorMessageRef.current = getErrorMessage;
+  }, [getErrorMessage, onError]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -48,6 +55,8 @@ export function ProfilePictureMediaPicker({
       return;
     }
 
+    let isCurrentRequest = true;
+
     setIsLoading(true);
     mediaService.getAll({
       folder: activeFolder || undefined,
@@ -56,15 +65,31 @@ export function ProfilePictureMediaPicker({
       limit: pageSize,
     })
       .then((response) => {
+        if (!isCurrentRequest) {
+          return;
+        }
+
         setItems(response.data.items);
         setFolders(response.data.folders);
         setTotal(response.data.total);
       })
       .catch((error) => {
-        onError(getErrorMessage(error, 'Failed to load media library.'));
+        if (!isCurrentRequest) {
+          return;
+        }
+
+        onErrorRef.current(getErrorMessageRef.current(error, 'Failed to load media library.'));
       })
-      .finally(() => setIsLoading(false));
-  }, [activeFolder, debouncedSearchTerm, getErrorMessage, isOpen, onError, page]);
+      .finally(() => {
+        if (isCurrentRequest) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [activeFolder, debouncedSearchTerm, isOpen, page]);
 
   useEffect(() => {
     if (!isOpen) {
