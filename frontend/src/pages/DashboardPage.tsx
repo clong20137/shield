@@ -1021,6 +1021,7 @@ function DashboardNews({
   const showFeaturedPost = (index: number) => {
     setActiveFeaturedIndex((index + featuredPosts.length) % featuredPosts.length);
   };
+  const normalizedActiveFeaturedIndex = activeFeaturedIndex % Math.max(featuredPosts.length, 1);
 
   return (
     <section data-onboarding-target="dashboard-news" className="flex h-full min-h-[24rem] flex-col overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
@@ -1036,9 +1037,9 @@ function DashboardNews({
         <div className="min-h-0 flex-1 overflow-hidden bg-gray-950 text-white">
           <div
             className="flex h-full transition-transform duration-500 ease-out"
-            style={{ transform: `translateX(-${(activeFeaturedIndex % Math.max(featuredPosts.length, 1)) * 100}%)` }}
+            style={{ transform: `translateX(-${normalizedActiveFeaturedIndex * 100}%)` }}
           >
-            {featuredPosts.map((post) => (
+            {featuredPosts.map((post, index) => (
               <div key={post.id} className="grid min-h-[17rem] w-full shrink-0 lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
                 <Link to={`/updates/${post.id}`} className="group relative min-h-[15rem] overflow-hidden bg-gray-900">
                   {post.imageUrl ? (
@@ -1046,7 +1047,7 @@ function DashboardNews({
                       src={getAssetThumbnailUrl(post.imageUrl, 960)}
                       alt=""
                       onError={(event) => handleAssetThumbnailError(event, post.imageUrl)}
-                      className="h-full min-h-[15rem] w-full object-cover opacity-90 transition duration-700 ease-out group-hover:scale-[1.035]"
+                      className={`h-full min-h-[15rem] w-full object-cover opacity-90 transition duration-700 ease-out group-hover:scale-[1.035] ${index === normalizedActiveFeaturedIndex ? 'dashboard-news-image-outward' : ''}`}
                     />
                   ) : (
                     <div className="flex h-full min-h-[15rem] items-center justify-center bg-primary-500/30 text-blue-100">
@@ -1076,19 +1077,20 @@ function DashboardNews({
             ))}
           </div>
           {featuredPosts.length > 1 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 bg-gray-950 px-5 py-3 sm:px-6">
-              <div className="flex items-center gap-1.5">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-white/10 bg-gray-950 px-5 py-3 sm:px-6">
+              <div />
+              <div className="flex items-center justify-center gap-1.5">
                 {featuredPosts.map((post, index) => (
                   <button
                     key={post.id}
                     type="button"
                     onClick={() => showFeaturedPost(index)}
-                    className={`h-2.5 rounded-full transition-all ${index === activeFeaturedIndex ? 'w-8 bg-accent' : 'w-2.5 bg-white/35 hover:bg-white/60'}`}
+                    className={`h-2.5 rounded-full transition-all ${index === normalizedActiveFeaturedIndex ? 'w-8 bg-accent' : 'w-2.5 bg-white/35 hover:bg-white/60'}`}
                     aria-label={`Show featured post ${index + 1}`}
                   />
                 ))}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => showFeaturedPost(activeFeaturedIndex - 1)}

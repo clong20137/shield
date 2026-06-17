@@ -338,6 +338,16 @@
   }
 }
 
+@keyframes dashboard-news-image-outward {
+  0% {
+    transform: scale(1);
+  }
+
+  100% {
+    transform: scale(1.065);
+  }
+}
+
 @keyframes modal-backdrop-enter {
   0% {
     opacity: 0;
@@ -761,6 +771,11 @@
 
   .dashboard-command-feed-item {
     animation: dashboard-command-feed-enter 460ms var(--shield-motion-ease) backwards;
+  }
+
+  .dashboard-news-image-outward {
+    animation: dashboard-news-image-outward 6.5s linear both;
+    transform-origin: center;
   }
 
   .dashboard-reaction-button {
