@@ -1,4 +1,5 @@
 import { FormEvent, KeyboardEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Building2, Check, CheckCheck, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Send, Trash2, Users, X } from 'lucide-react';
 import type { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, userService, User, UserMessage } from '../services/api';
@@ -270,9 +271,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const [threadPendingDelete, setThreadPendingDelete] = useState<MessageThread | null>(null);
   const [selectedMentionUser, setSelectedMentionUser] = useState<User | null>(null);
   const [presenceByAccount, setPresenceByAccount] = useState<Record<string, { online: boolean; lastSeenAt: string | null }>>({});
+  const [composePopoverPosition, setComposePopoverPosition] = useState({ right: 16, bottom: 88 });
   const typingStopTimerRef = useRef<number | null>(null);
   const lastTypingSentRef = useRef(0);
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
+  const composeButtonRef = useRef<HTMLButtonElement | null>(null);
   const emojiButtonLabel = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
 
   useEffect(() => {
@@ -417,6 +420,33 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
     setSelectedThreadId(`draft-group:${draftGroupRecipients.map((user) => user.id).sort().join(',')}`);
   }, [draftGroupRecipients]);
+
+  useEffect(() => {
+    if (!isComposeOpen) {
+      return undefined;
+    }
+
+    const syncComposePopoverPosition = () => {
+      const rect = composeButtonRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
+      }
+
+      setComposePopoverPosition({
+        right: Math.max(12, window.innerWidth - rect.right),
+        bottom: Math.max(12, window.innerHeight - rect.top + 12),
+      });
+    };
+
+    syncComposePopoverPosition();
+    window.addEventListener('resize', syncComposePopoverPosition);
+    window.addEventListener('scroll', syncComposePopoverPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', syncComposePopoverPosition);
+      window.removeEventListener('scroll', syncComposePopoverPosition, true);
+    };
+  }, [isComposeOpen]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -1099,8 +1129,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
               })}
             </div>
           )}
-          {isComposeOpen && (
-            <div className="quick-launch-context-menu absolute bottom-20 left-3 right-3 z-30 max-h-[min(34rem,calc(100%-6rem))] overflow-y-auto rounded-lg border border-gray-200 bg-white p-3 shadow-2xl ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-950 dark:ring-white/10 sm:left-auto sm:w-[25rem]">
+          {isComposeOpen && createPortal((
+            <div
+              className="quick-launch-context-menu fixed z-[95] max-h-[min(34rem,calc(100vh-6rem))] w-[min(25rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-gray-200 bg-white p-3 shadow-2xl ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-950 dark:ring-white/10"
+              style={{ right: composePopoverPosition.right, bottom: composePopoverPosition.bottom }}
+            >
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-primary-500/10 text-primary-500 dark:text-blue-100">
@@ -1246,8 +1279,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                 )}
               </div>
             </div>
-          )}
+          ), document.body)}
           <button
+            ref={composeButtonRef}
             type="button"
             onClick={() => {
               setIsComposeOpen((value) => !value);
