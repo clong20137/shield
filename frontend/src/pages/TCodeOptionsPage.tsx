@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import { calendarService } from '../services/api';
 
@@ -16,6 +16,13 @@ export default function TCodeOptionsPage({ onToast, getErrorMessage }: TCodeOpti
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [newOption, setNewOption] = useState('');
+  const getErrorMessageRef = useRef(getErrorMessage);
+  const onToastRef = useRef(onToast);
+
+  useEffect(() => {
+    getErrorMessageRef.current = getErrorMessage;
+    onToastRef.current = onToast;
+  }, [getErrorMessage, onToast]);
 
   useEffect(() => {
     let isMounted = true;
@@ -27,7 +34,7 @@ export default function TCodeOptionsPage({ onToast, getErrorMessage }: TCodeOpti
       })
       .catch((error) => {
         if (isMounted) {
-          onToast('error', getErrorMessage(error, 'Failed to load T-Code options.'));
+          onToastRef.current('error', getErrorMessageRef.current(error, 'Failed to load T-Code options.'));
         }
       })
       .finally(() => {
@@ -39,7 +46,7 @@ export default function TCodeOptionsPage({ onToast, getErrorMessage }: TCodeOpti
     return () => {
       isMounted = false;
     };
-  }, [getErrorMessage, onToast]);
+  }, []);
 
   const addOption = () => {
     const option = newOption.trim();
@@ -53,10 +60,12 @@ export default function TCodeOptionsPage({ onToast, getErrorMessage }: TCodeOpti
 
   const saveOptions = async (event: FormEvent) => {
     event.preventDefault();
+    const optionsToSave = normalizeOptions([...options, newOption]);
     setIsSaving(true);
     try {
-      const response = await calendarService.updateTCodeOptions(normalizeOptions(options));
+      const response = await calendarService.updateTCodeOptions(optionsToSave);
       setOptions(response.data.options);
+      setNewOption('');
       onToast('success', 'T-Code options saved.');
     } catch (error) {
       onToast('error', getErrorMessage(error, 'Failed to save T-Code options.'));
