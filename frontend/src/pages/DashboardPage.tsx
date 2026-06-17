@@ -1335,6 +1335,11 @@ function isMobileViewport() {
   return window.innerWidth < 768;
 }
 
+function getDocumentScale() {
+  const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize || '16');
+  return Number.isFinite(rootFontSize) && rootFontSize > 0 ? rootFontSize / 16 : 1;
+}
+
 function getInitialProfileWindowPosition() {
   const width = Math.min(window.innerWidth - 24, 920);
   return {
@@ -1856,7 +1861,18 @@ function MyDayWidget({
                           <div key={reminder.id} className="rounded border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
                             <div className="flex items-center justify-between gap-2">
                               <p className="truncate text-sm font-bold text-gray-900 dark:text-gray-100">{reminder.title}</p>
-                              <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${getReminderPriorityClass(reminder.priority)}`}>{reminder.priority}</span>
+                              <div className="flex shrink-0 items-center gap-1.5">
+                                <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${getReminderPriorityClass(reminder.priority)}`}>{reminder.priority}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => void deleteReminder(reminder)}
+                                  className="flex h-7 w-7 items-center justify-center rounded border border-red-200 text-danger transition hover:bg-red-50 dark:border-red-900/60 dark:hover:bg-red-950/40"
+                                  aria-label={`Delete ${reminder.title}`}
+                                  title="Delete Reminder"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
                             </div>
                             <p className="mt-1 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                               <Bell size={12} /> Due {getReminderDueLabel(reminder)}
@@ -1979,6 +1995,7 @@ function QuickNotesWidget({
   const hasLoadedNoteRef = useRef(false);
   const boardRef = useRef<HTMLDivElement | null>(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const dragStartRef = useRef({ pointerX: 0, pointerY: 0, noteX: 0, noteY: 0 });
 
   useEffect(() => {
     if (!currentUser) {
@@ -2057,8 +2074,15 @@ function QuickNotesWidget({
       const noteHeight = 184;
       const maxX = Math.max(0, rect.width - noteWidth - 8);
       const maxY = Math.max(0, rect.height - noteHeight - 8);
-      const nextX = Math.min(Math.max(8, event.clientX - rect.left - dragOffsetRef.current.x), maxX);
-      const nextY = Math.min(Math.max(8, event.clientY - rect.top - dragOffsetRef.current.y), maxY);
+      const scale = getDocumentScale();
+      const nextX = Math.min(
+        Math.max(8, dragStartRef.current.noteX + ((event.clientX - dragStartRef.current.pointerX) / scale)),
+        maxX,
+      );
+      const nextY = Math.min(
+        Math.max(8, dragStartRef.current.noteY + ((event.clientY - dragStartRef.current.pointerY) / scale)),
+        maxY,
+      );
 
       setNotes((currentNotes) => currentNotes.map((note) => (
         note.id === draggingNoteId ? { ...note, x: Math.round(nextX), y: Math.round(nextY) } : note
@@ -2172,6 +2196,12 @@ function QuickNotesWidget({
     dragOffsetRef.current = {
       x: event.clientX - card.left,
       y: event.clientY - card.top,
+    };
+    dragStartRef.current = {
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      noteX: note.x,
+      noteY: note.y,
     };
     setDraggingNoteId(note.id);
   };
@@ -2293,6 +2323,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
   const [profileZIndex, setProfileZIndex] = useState(85);
   const profileWindowRef = useRef<HTMLDivElement | null>(null);
   const profileDragOffsetRef = useRef({ x: 0, y: 0 });
+  const profileDragStartRef = useRef({ pointerX: 0, pointerY: 0, windowX: 0, windowY: 0 });
   const isAdministrator = currentUser?.role === 'administrator';
 
   useEffect(() => {
@@ -2330,9 +2361,16 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
       const height = profileWindowRef.current?.offsetHeight || Math.min(window.innerHeight - 24, 760);
       const maxX = Math.max(12, window.innerWidth - width - 12);
       const maxY = Math.max(12, window.innerHeight - height - 12);
+      const scale = getDocumentScale();
       setProfileWindowPosition({
-        x: Math.min(Math.max(12, event.clientX - profileDragOffsetRef.current.x), maxX),
-        y: Math.min(Math.max(12, event.clientY - profileDragOffsetRef.current.y), maxY),
+        x: Math.min(
+          Math.max(12, profileDragStartRef.current.windowX + ((event.clientX - profileDragStartRef.current.pointerX) / scale)),
+          maxX,
+        ),
+        y: Math.min(
+          Math.max(12, profileDragStartRef.current.windowY + ((event.clientY - profileDragStartRef.current.pointerY) / scale)),
+          maxY,
+        ),
       });
     };
 
@@ -2397,6 +2435,12 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
     profileDragOffsetRef.current = {
       x: event.clientX - rect.left,
       y: event.clientY - rect.top,
+    };
+    profileDragStartRef.current = {
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      windowX: profileWindowPosition.x,
+      windowY: profileWindowPosition.y,
     };
     setIsProfileDragging(true);
   };

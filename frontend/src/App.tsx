@@ -3617,12 +3617,6 @@ const onboardingSteps: OnboardingStep[] = [
     body: 'Use the left navigation for dashboard, devices, and reports based on your permissions. Calendar and reminders live in the sidebar widgets below.',
   },
   {
-    target: 'sidebar-reminders',
-    eyebrow: 'Reminders',
-    title: 'Track date reminders',
-    body: 'Review upcoming reminders here. Create reminders from the calendar on the date you want, and SHIELD will notify you when they are due.',
-  },
-  {
     target: 'sidebar-calendar',
     eyebrow: 'Calendar',
     title: 'Open your calendar widget',
@@ -3842,7 +3836,7 @@ function FirstLoginGuide({
                   onClick={() => onAppScaleChange(option.value)}
                   className={`rounded border px-3 py-2 text-left transition ${
                     isSelected
-                      ? 'border-accent bg-accent/10 text-accent shadow-sm'
+                      ? 'onboarding-scale-choice-selected border-accent bg-accent/10 text-accent shadow-sm'
                       : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-accent hover:bg-white dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-900'
                   }`}
                 >

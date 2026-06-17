@@ -506,6 +506,17 @@
   }
 }
 
+@keyframes onboarding-scale-choice-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(156, 134, 92, 0.34);
+  }
+
+  50% {
+    box-shadow: 0 0 0 0.42em rgba(156, 134, 92, 0.1);
+  }
+}
+
 @keyframes trooper-daily-match-pop {
   0% {
     transform: scale(0.985);
@@ -1545,6 +1556,10 @@
     animation: onboarding-control-enter 260ms ease-out both;
     transition: left 300ms ease, top 300ms ease, opacity 180ms ease;
     will-change: transform, opacity, left, top;
+  }
+
+  .onboarding-scale-choice-selected {
+    animation: onboarding-scale-choice-pulse 1.8s ease-in-out infinite;
   }
 
   [contenteditable][data-placeholder]:empty::before {
