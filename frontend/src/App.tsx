@@ -6007,6 +6007,50 @@ function App() {
     setIsProfileModalOpen(true);
   };
 
+  useEffect(() => {
+    const openAppPath = (path: string) => {
+      window.history.pushState({}, document.title, withAppBase(path));
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    };
+
+    const handleInternalLink = (event: Event) => {
+      const target = ((event as CustomEvent<{ target?: string }>).detail?.target || '').toLowerCase();
+      if (!target) {
+        return;
+      }
+
+      if (target === 'account-preferences') {
+        openProfileSettings();
+        return;
+      }
+
+      if (target === 'calendar') {
+        openCalendarModal();
+        return;
+      }
+
+      if (target === 'messages') {
+        openMessagesModal();
+        return;
+      }
+
+      const routeByTarget: Record<string, string> = {
+        dashboard: '/',
+        devices: '/devices',
+        reports: '/reports',
+        search: '/search',
+        evaluations: '/evaluations',
+      };
+      const route = routeByTarget[target];
+      if (route) {
+        openAppPath(route);
+      }
+    };
+
+    window.addEventListener('shield:internal-link', handleInternalLink);
+    return () => window.removeEventListener('shield:internal-link', handleInternalLink);
+  }, [showCalendar, isMessagesModalOpen]);
+
   const closeActiveFloatingApp = () => {
     if (activeFloatingApp === 'calculator' && isCalculatorOpen) {
       closeModal('calculator');

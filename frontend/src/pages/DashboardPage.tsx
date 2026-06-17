@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
-import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, List, ListOrdered, LucideIcon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, Link2, List, ListOrdered, LucideIcon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService, AuthAccount, calendarService, CalendarEntry, dashboardPostService, DashboardPost, DashboardReaction, dashboardSummaryService, DashboardSummary, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
@@ -122,7 +122,17 @@ const getReminderPriorityClass = (priority: Reminder['priority'] = 'Normal') => 
   return 'bg-primary-500/10 text-primary-500 dark:text-blue-100';
 };
 
-const postHtmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span|h1|h2|h3|blockquote)\b[^>]*>/iu;
+const postHtmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span|h1|h2|h3|blockquote|a)\b[^>]*>/iu;
+const internalPostLinks = [
+  { value: 'account-preferences', label: 'Account Preferences' },
+  { value: 'calendar', label: 'Calendar' },
+  { value: 'messages', label: 'Messages' },
+  { value: 'dashboard', label: 'Dashboard' },
+  { value: 'devices', label: 'Devices' },
+  { value: 'reports', label: 'Reports' },
+  { value: 'search', label: 'Search' },
+  { value: 'evaluations', label: 'Evaluations' },
+];
 
 function escapeHtml(value: string): string {
   return value
@@ -201,6 +211,22 @@ function RichPostEditor({
     runCommand('formatBlock', block);
   };
 
+  const insertInternalLink = (target: string) => {
+    const link = internalPostLinks.find((item) => item.value === target);
+    if (!link || !editorRef.current) {
+      return;
+    }
+
+    editorRef.current.focus();
+    const selection = window.getSelection();
+    if (selection?.rangeCount && !selection.isCollapsed && editorRef.current.contains(selection.anchorNode)) {
+      document.execCommand('createLink', false, `shield://${link.value}`);
+    } else {
+      document.execCommand('insertHTML', false, `<a href="shield://${link.value}">${link.label}</a>`);
+    }
+    onChange(editorRef.current.innerHTML || '');
+  };
+
   const preserveEditorFocus = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
   };
@@ -260,6 +286,24 @@ function RichPostEditor({
         <button type="button" onMouseDown={preserveEditorFocus} onClick={() => applyBlockStyle('blockquote')} className="btn-secondary" aria-label="Apply quote style" title="Quote">
           <Quote size={16} />
         </button>
+        <label className="flex h-10 min-w-[12rem] items-center gap-2 rounded border border-gray-300 bg-white px-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+          <Link2 size={15} className="text-gray-400" />
+          <select
+            defaultValue=""
+            onChange={(event) => {
+              insertInternalLink(event.target.value);
+              event.target.value = '';
+            }}
+            className="min-w-0 flex-1 bg-transparent outline-none"
+            aria-label="Insert internal link"
+            title="Internal Link"
+          >
+            <option value="">Internal link</option>
+            {internalPostLinks.map((link) => (
+              <option key={link.value} value={link.value}>{link.label}</option>
+            ))}
+          </select>
+        </label>
       </div>
       <div
         ref={editorRef}
@@ -744,6 +788,7 @@ function DashboardNews({
 }) {
   const [posts, setPosts] = useState<DashboardPost[]>([]);
   const [feedFilter, setFeedFilter] = useState<DashboardPost['category'] | 'All'>('All');
+  const [activeFeaturedIndex, setActiveFeaturedIndex] = useState(0);
   const [reactionPulse, setReactionPulse] = useState<{ postId: string; reaction: DashboardReaction } | null>(null);
   const [postForm, setPostForm] = useState<DashboardPostForm>(defaultPostForm);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
@@ -819,6 +864,24 @@ function DashboardNews({
     () => (feedFilter === 'All' ? posts : posts.filter((post) => post.category === feedFilter)),
     [feedFilter, posts],
   );
+  const featuredPosts = useMemo(() => posts.slice(0, 4), [posts]);
+  const activeFeaturedPost = featuredPosts[activeFeaturedIndex % Math.max(featuredPosts.length, 1)];
+
+  useEffect(() => {
+    setActiveFeaturedIndex(0);
+  }, [posts.length]);
+
+  useEffect(() => {
+    if (featuredPosts.length < 2) {
+      return undefined;
+    }
+
+    const timer = window.setInterval(() => {
+      setActiveFeaturedIndex((index) => (index + 1) % featuredPosts.length);
+    }, 6500);
+
+    return () => window.clearInterval(timer);
+  }, [featuredPosts.length]);
 
   const createPost = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1036,13 +1099,86 @@ function DashboardNews({
       ) : posts.length === 0 ? (
         <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No updates posted yet.</div>
       ) : (
-        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[190px_minmax(0,1fr)]">
-          <aside className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <span className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Command Feed</span>
-              <Bell size={16} className="text-accent" />
+        <div className="min-h-0 flex-1 space-y-4">
+          {activeFeaturedPost && (
+            <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-950 text-white shadow-sm dark:border-gray-800">
+              <div className="grid min-h-[17rem] lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
+                <Link to={`/updates/${activeFeaturedPost.id}`} className="group relative min-h-[15rem] overflow-hidden bg-gray-900">
+                  {activeFeaturedPost.imageUrl ? (
+                    <img
+                      src={getAssetThumbnailUrl(activeFeaturedPost.imageUrl, 960)}
+                      alt=""
+                      onError={(event) => handleAssetThumbnailError(event, activeFeaturedPost.imageUrl)}
+                      className="h-full min-h-[15rem] w-full object-cover opacity-90 transition duration-700 ease-out group-hover:scale-[1.035]"
+                    />
+                  ) : (
+                    <div className="flex h-full min-h-[15rem] items-center justify-center bg-primary-500/30 text-blue-100">
+                      <Image size={52} />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                  <span className={`absolute left-4 top-4 rounded-full border px-3 py-1 text-xs font-black uppercase backdrop-blur ${getPostCategoryTone(activeFeaturedPost.category)}`}>
+                    {activeFeaturedPost.category}
+                  </span>
+                </Link>
+                <div className="flex min-w-0 flex-col justify-between p-5 sm:p-6">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100/75">News Carousel</p>
+                    <Link to={`/updates/${activeFeaturedPost.id}`} className="mt-3 block text-2xl font-black leading-tight text-white transition hover:text-blue-100 sm:text-3xl">
+                      {activeFeaturedPost.title}
+                    </Link>
+                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-300">{getPostBodyText(activeFeaturedPost.body)}</p>
+                    <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                      {activeFeaturedPost.authorName || 'Administrator'} - {new Date(activeFeaturedPost.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
+                    </p>
+                  </div>
+                  <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-1.5">
+                      {featuredPosts.map((post, index) => (
+                        <button
+                          key={post.id}
+                          type="button"
+                          onClick={() => setActiveFeaturedIndex(index)}
+                          className={`h-2.5 rounded-full transition-all ${index === activeFeaturedIndex ? 'w-8 bg-accent' : 'w-2.5 bg-white/35 hover:bg-white/60'}`}
+                          aria-label={`Show featured post ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveFeaturedIndex((index) => (index - 1 + featuredPosts.length) % featuredPosts.length)}
+                        className="flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+                        aria-label="Previous featured post"
+                        title="Previous"
+                      >
+                        <ChevronLeft size={17} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveFeaturedIndex((index) => (index + 1) % featuredPosts.length)}
+                        className="flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+                        aria-label="Next featured post"
+                        title="Next"
+                      >
+                        <ChevronRight size={17} />
+                      </button>
+                      <Link to={`/updates/${activeFeaturedPost.id}`} className="inline-flex h-9 items-center rounded border border-accent/50 px-3 text-sm font-bold text-accent transition hover:bg-accent/15">
+                        Read More
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
+          )}
+
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="mr-auto flex items-center gap-2 text-xs font-black uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <Bell size={15} className="text-accent" />
+                Command Feed
+              </span>
               {dashboardPostFilters.map((filter) => {
                 const isActive = feedFilter === filter;
 
@@ -1051,34 +1187,28 @@ function DashboardNews({
                     key={filter}
                     type="button"
                     onClick={() => setFeedFilter(filter)}
-                    className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm font-bold transition-all duration-500 ease-out ${
+                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-left text-sm font-bold transition-all duration-500 ease-out ${
                       isActive
                         ? 'border-accent bg-accent/10 text-accent shadow-sm'
-                        : 'border-transparent text-gray-600 hover:border-gray-200 hover:bg-white hover:text-gray-900 dark:text-gray-300 dark:hover:border-gray-800 dark:hover:bg-gray-900 dark:hover:text-gray-100'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-accent/40 hover:text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-accent/40 dark:hover:text-gray-100'
                     }`}
                     aria-pressed={isActive}
                   >
                     <span>{filter}</span>
-                    <span className="rounded-full bg-white px-2 py-0.5 text-xs text-gray-500 shadow-sm dark:bg-gray-900 dark:text-gray-300">
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-300">
                       {postCategoryCounts[filter]}
                     </span>
                   </button>
                 );
               })}
             </div>
-            <div className="mt-4 rounded-md border border-dashed border-gray-300 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
-              <span className="block text-xs font-bold uppercase text-gray-400">Latest Signal</span>
-              <span className="mt-1 block text-sm font-semibold text-gray-800 dark:text-gray-100">
-                {posts[0]?.title || 'No updates'}
-              </span>
-            </div>
-          </aside>
+          </div>
 
           <div className="min-h-0 overflow-y-auto pr-1">
             {filteredPosts.length === 0 ? (
               <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No {feedFilter.toLowerCase()} posts found.</div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid gap-3 xl:grid-cols-2">
                 {filteredPosts.map((post, index) => (
                   <article
                     key={post.id}

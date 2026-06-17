@@ -1546,6 +1546,11 @@
     @apply my-3 border-l-4 border-accent/50 pl-4 italic text-gray-600 dark:text-gray-300;
   }
 
+  .rich-post-editor a,
+  .formatted-content a {
+    @apply cursor-pointer font-bold text-accent underline decoration-accent/40 decoration-2 underline-offset-4 transition hover:text-primary-500 hover:decoration-primary-500 dark:hover:text-blue-100;
+  }
+
   .trooper-daily-match {
     animation: trooper-daily-match-pop 520ms ease-out both;
   }

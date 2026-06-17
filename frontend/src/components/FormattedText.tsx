@@ -6,7 +6,17 @@ interface FormattedTextProps {
 }
 
 const inlinePattern = /(\*\*[^*]+\*\*|\*[^*]+\*|\+\+[^+]+\+\+)/gu;
-const htmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span|h1|h2|h3|blockquote)\b[^>]*>/iu;
+const htmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span|h1|h2|h3|blockquote|a)\b[^>]*>/iu;
+const internalLinkTargets = new Set([
+  'account-preferences',
+  'calendar',
+  'messages',
+  'dashboard',
+  'devices',
+  'reports',
+  'search',
+  'evaluations',
+]);
 
 function getSafeTextAlign(value: string | null): '' | 'left' | 'center' | 'right' {
   const cleanValue = (value || '').trim().toLowerCase();
@@ -20,7 +30,7 @@ function sanitizeFormattedHtml(html: string): string {
 
   const parser = new DOMParser();
   const document = parser.parseFromString(`<div>${html}</div>`, 'text/html');
-  const allowedTags = new Set(['P', 'DIV', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'UL', 'OL', 'LI', 'SPAN', 'H1', 'H2', 'H3', 'BLOCKQUOTE']);
+  const allowedTags = new Set(['P', 'DIV', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'UL', 'OL', 'LI', 'SPAN', 'H1', 'H2', 'H3', 'BLOCKQUOTE', 'A']);
 
   const cleanNode = (node: Node) => {
     Array.from(node.childNodes).forEach((child) => {
@@ -32,7 +42,18 @@ function sanitizeFormattedHtml(html: string): string {
         }
 
         const textAlign = getSafeTextAlign(element.style.textAlign || element.getAttribute('align'));
+        const href = element.tagName === 'A' ? element.getAttribute('href') || '' : '';
+        const internalTarget = href.startsWith('shield://') ? href.replace('shield://', '').trim().toLowerCase() : '';
         Array.from(element.attributes).forEach((attribute) => element.removeAttribute(attribute.name));
+        if (element.tagName === 'A') {
+          if (!internalLinkTargets.has(internalTarget)) {
+            element.replaceWith(document.createTextNode(element.textContent || ''));
+            return;
+          }
+
+          element.setAttribute('href', `shield://${internalTarget}`);
+          element.setAttribute('data-shield-link', internalTarget);
+        }
         if (textAlign) {
           element.style.textAlign = textAlign;
         }
@@ -77,11 +98,23 @@ function renderInline(text: string): React.ReactNode[] {
 }
 
 export function FormattedText({ text, className = '' }: FormattedTextProps) {
+  const handleClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const anchor = (event.target as HTMLElement).closest('a[data-shield-link]') as HTMLAnchorElement | null;
+    const target = anchor?.dataset.shieldLink;
+    if (!target) {
+      return;
+    }
+
+    event.preventDefault();
+    window.dispatchEvent(new CustomEvent('shield:internal-link', { detail: { target } }));
+  };
+
   const sanitizedHtml = sanitizeFormattedHtml(text);
   if (sanitizedHtml) {
     return (
       <div
         className={`formatted-content space-y-2 whitespace-normal ${className}`}
+        onClick={handleClick}
         dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
       />
     );
