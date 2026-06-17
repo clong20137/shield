@@ -300,6 +300,35 @@ function mergeSavedCalendarEntry(currentEntries: CalendarEntry[], savedEntry: Ca
   return hasSavedEntry ? nextEntries : [savedEntry, ...nextEntries];
 }
 
+function getCalendarEntryForDate(entries: CalendarEntry[], dateKey: string, preferredEntryId?: string | null) {
+  return entries
+    .filter((entry) => entry.date === dateKey)
+    .sort((firstEntry, secondEntry) => {
+      if (preferredEntryId) {
+        if (firstEntry.id === preferredEntryId) return -1;
+        if (secondEntry.id === preferredEntryId) return 1;
+      }
+
+      const firstIsLocal = firstEntry.id.startsWith('local-draft-');
+      const secondIsLocal = secondEntry.id.startsWith('local-draft-');
+      if (firstIsLocal !== secondIsLocal) {
+        return firstIsLocal ? 1 : -1;
+      }
+
+      return new Date(secondEntry.updatedAt || 0).getTime() - new Date(firstEntry.updatedAt || 0).getTime();
+    })[0] || null;
+}
+
+function isExpectedAutosaveDraftError(error: unknown) {
+  if (typeof error !== 'object' || error === null || !('response' in error)) {
+    return false;
+  }
+
+  const response = (error as { response?: { status?: number; data?: { error?: string } } }).response;
+  const message = response?.data?.error || '';
+  return response?.status === 404 || response?.status === 409 || message.includes('Submitted reports cannot be autosaved');
+}
+
 const hasMeaningfulTrooperDailyContent = (form: CalendarEntryForm, currentUser?: AuthAccount) => {
   const hasDetails = Object.values(form.details || {}).some((value) => String(value ?? '').trim() !== '');
 
@@ -841,6 +870,7 @@ function CalendarPage({
   const [districtFilter, setDistrictFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [entryPendingDelete, setEntryPendingDelete] = useState<CalendarEntry | null>(null);
+  const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
   const [activeDailyPanel, setActiveDailyPanel] = useState<string>('Administrative');
   const [dailyUseMilitaryTime, setDailyUseMilitaryTime] = useState(useMilitaryTime);
   const [hiddenDailySections, setHiddenDailySections] = useState<string[]>(currentUser.trooperDailyHiddenSections || []);
@@ -864,6 +894,7 @@ function CalendarPage({
   const dailyFormRef = useRef<HTMLFormElement | null>(null);
   const skipNextDailyDraftWriteRef = useRef(false);
   const backendAutosaveRequestRef = useRef(0);
+  const entriesRef = useRef<CalendarEntry[]>([]);
   const dailyUndoStackRef = useRef<CalendarEntryForm[]>([]);
   const dailyRedoStackRef = useRef<CalendarEntryForm[]>([]);
   const previousEntryFormRef = useRef<CalendarEntryForm | null>(entryForm);
@@ -875,6 +906,10 @@ function CalendarPage({
     actorId: currentUser.id,
     actorName: currentUser.displayName || currentUser.email,
   };
+
+  useEffect(() => {
+    entriesRef.current = entries;
+  }, [entries]);
 
   useEffect(() => {
     setDailyUseMilitaryTime(useMilitaryTime);
@@ -991,7 +1026,7 @@ function CalendarPage({
 
   const openDay = (dateKey: string) => {
     const [year, month, day] = dateKey.split('-').map(Number);
-    const existingEntry = entries.find((entry) => entry.date === dateKey);
+    const existingEntry = getCalendarEntryForDate(entries, dateKey, editingEntryId);
     let localDraft = readTrooperDailyDraft(currentUser.id, dateKey);
     if (localDraft && !existingEntry && !hasMeaningfulTrooperDailyContent(localDraft.form, currentUser)) {
       removeTrooperDailyDraft(currentUser.id, dateKey);
@@ -1161,8 +1196,9 @@ function CalendarPage({
       return undefined;
     }
 
-    const editingEntry = editingEntryId
-      ? entries.find((entry) => entry.id === editingEntryId && !entry.id.startsWith('local-draft-'))
+    const currentEditingEntryId = editingEntryId && !editingEntryId.startsWith('local-draft-') ? editingEntryId : null;
+    const editingEntry = currentEditingEntryId
+      ? entriesRef.current.find((entry) => entry.id === currentEditingEntryId)
       : null;
     if (editingEntry?.submissionStatus === 'Submitted') {
       return undefined;
@@ -1184,7 +1220,7 @@ function CalendarPage({
         submissionStatus: 'Draft' as const,
         dutyHours: hours.toFixed(2).replace(/\.?0+$/u, ''),
         accountId: currentUser.id,
-        entryId: editingEntryId,
+        entryId: currentEditingEntryId,
       };
 
       void calendarService.autosaveDraft(payload)
@@ -1193,13 +1229,18 @@ function CalendarPage({
             return;
           }
 
-          setEntries((currentEntries) => mergeSavedCalendarEntry(currentEntries, response.data, editingEntryId));
+          setEntries((currentEntries) => mergeSavedCalendarEntry(currentEntries, response.data, currentEditingEntryId));
           setEditingEntryId(response.data.id);
           setDailySaveStatus('saved');
           setDailySaveStatusAt(Date.now());
         })
         .catch((err) => {
           if (backendAutosaveRequestRef.current !== requestId) {
+            return;
+          }
+
+          if (isExpectedAutosaveDraftError(err)) {
+            setDailySaveStatus('idle');
             return;
           }
 
@@ -1468,8 +1509,16 @@ function CalendarPage({
 
   const deleteEntry = async (entry: CalendarEntry) => {
     setCalendarError(null);
+    if (deletingEntryId) {
+      return;
+    }
+
+    setDeletingEntryId(entry.id);
     try {
-      await calendarService.delete(entry.id, { ...actor, accountId: currentUser.id });
+      if (!entry.id.startsWith('local-draft-')) {
+        await calendarService.delete(entry.id, { ...actor, accountId: currentUser.id });
+      }
+
       setEntries((currentEntries) => currentEntries.filter((currentEntry) => currentEntry.id !== entry.id));
       removeTrooperDailyDraft(currentUser.id, entry.date);
       if (editingEntryId === entry.id) {
@@ -1483,6 +1532,8 @@ function CalendarPage({
     } catch (err) {
       console.error('Failed to delete calendar entry:', err);
       setCalendarError(getApiErrorMessage(err, 'Failed to delete calendar entry.'));
+    } finally {
+      setDeletingEntryId(null);
     }
   };
 
@@ -1788,7 +1839,7 @@ function CalendarPage({
       return;
     }
 
-    const existingEntry = entries.find((entry) => entry.date === dateKey);
+    const existingEntry = getCalendarEntryForDate(entries, dateKey);
     setCalendarError(null);
     setSelectedDate(dateKey);
     setCalendarFocusDate(new Date(`${dateKey}T00:00:00`));
@@ -1804,7 +1855,8 @@ function CalendarPage({
   };
 
   const markDailyAsDayOff = async (dateKey: string) => {
-    const existingEntry = entries.find((entry) => entry.date === dateKey && !entry.id.startsWith('local-draft-'));
+    const existingEntry = getCalendarEntryForDate(entries, dateKey);
+    const savedExistingEntry = existingEntry && !existingEntry.id.startsWith('local-draft-') ? existingEntry : null;
     const localEntry = selectedDate === dateKey
       ? entryForm
       : existingEntry
@@ -1832,11 +1884,11 @@ function CalendarPage({
 
     setCalendarError(null);
     try {
-      const response = existingEntry
-        ? await calendarService.update(existingEntry.id, payload)
+      const response = savedExistingEntry
+        ? await calendarService.update(savedExistingEntry.id, payload)
         : await calendarService.create(payload);
 
-      setEntries((currentEntries) => mergeSavedCalendarEntry(currentEntries, response.data, existingEntry?.id));
+      setEntries((currentEntries) => mergeSavedCalendarEntry(currentEntries, response.data, savedExistingEntry?.id));
       removeTrooperDailyDraft(currentUser.id, dateKey);
       skipNextDailyDraftWriteRef.current = true;
       setCalendarFocusDate(new Date(`${dateKey}T00:00:00`));
@@ -1916,7 +1968,7 @@ function CalendarPage({
       const shortcutKey = event.key.toLowerCase();
       if (shortcutKey === 'c') {
         event.preventDefault();
-        copyDailyToClipboard(selectedDate, entries.find((entry) => entry.date === selectedDate) || null);
+        copyDailyToClipboard(selectedDate, getCalendarEntryForDate(entries, selectedDate, editingEntryId));
         return;
       }
 
@@ -2007,7 +2059,7 @@ function CalendarPage({
   const dailyShortcutDays = Array.from({ length: dailyShortcutDaysInMonth }, (_, index) => {
     const day = index + 1;
     const dateKey = `${dailyShortcutYear}-${String(dailyShortcutMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const entry = entries.find((item) => item.date === dateKey);
+    const entry = getCalendarEntryForDate(entries, dateKey, selectedDate === dateKey ? editingEntryId : null);
 
     return {
       day,
@@ -3161,7 +3213,7 @@ function CalendarPage({
       )}
 
       {entryPendingDelete && (
-        <div className="modal-backdrop fixed inset-0 z-[80] flex items-end justify-center bg-black/45 sm:items-center">
+        <div className="modal-backdrop fixed inset-0 z-[140] flex items-end justify-center bg-black/45 sm:items-center">
           <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <div className="mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Entry</h2>
@@ -3173,8 +3225,8 @@ function CalendarPage({
               <button type="button" onClick={() => setEntryPendingDelete(null)} className="btn-secondary" aria-label="Cancel delete" title="Cancel">
                 Cancel
               </button>
-              <button type="button" onClick={() => deleteEntry(entryPendingDelete)} className="btn-danger" aria-label="Delete entry" title="Delete">
-                Delete
+              <button type="button" onClick={() => deleteEntry(entryPendingDelete)} className="btn-danger" disabled={deletingEntryId === entryPendingDelete.id} aria-label="Delete entry" title={deletingEntryId === entryPendingDelete.id ? 'Deleting' : 'Delete'}>
+                {deletingEntryId === entryPendingDelete.id ? 'Deleting' : 'Delete'}
               </button>
             </div>
           </div>
