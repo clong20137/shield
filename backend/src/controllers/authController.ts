@@ -918,6 +918,15 @@ export class AuthController {
       }
 
       if (result.requiresTwoFactor) {
+        await AuditLogModel.create({
+          actorId: result.account?.id || null,
+          actorName: result.account?.displayName || result.account?.email || normalizeEmail(email),
+          action: 'auth.2fa_required',
+          entityType: 'session',
+          entityId: result.account?.id || null,
+          details: JSON.stringify({ email: normalizeEmail(email) }),
+          ...requestAuditFields(req),
+        });
         return res.status(202).json({ requiresTwoFactor: true });
       }
 
@@ -972,10 +981,35 @@ export class AuthController {
       }
 
       if (!verifiedAccount) {
+        await AuditLogModel.create({
+          actorId: account?.id || unlockAccountId || null,
+          actorName: account?.displayName || account?.email || normalizeEmail(unlockEmail) || null,
+          action: 'auth.unlock_failed',
+          entityType: 'session',
+          entityId: account?.id || unlockAccountId || null,
+          details: JSON.stringify({
+            email: unlockEmail ? normalizeEmail(unlockEmail) : account?.email,
+            sessionPresent: Boolean(account),
+            reason: 'invalid_password',
+          }),
+          ...requestAuditFields(req),
+        });
         return res.status(401).json({ error: 'Password was not accepted' });
       }
 
       if (account && verifiedAccount.id !== account.id) {
+        await AuditLogModel.create({
+          actorId: account.id,
+          actorName: account.displayName || account.email,
+          action: 'auth.unlock_failed',
+          entityType: 'session',
+          entityId: account.id,
+          details: JSON.stringify({
+            attemptedAccountId: verifiedAccount.id,
+            reason: 'account_mismatch',
+          }),
+          ...requestAuditFields(req),
+        });
         return res.status(401).json({ error: 'Password was not accepted' });
       }
 
@@ -1072,10 +1106,28 @@ export class AuthController {
       }
 
       if (!account.isActive) {
+        await AuditLogModel.create({
+          actorId: account.id,
+          actorName: account.displayName || account.email,
+          action: 'auth.sso_failed',
+          entityType: 'session',
+          entityId: account.id,
+          details: JSON.stringify({ provider: 'microsoft', email: account.email, reason: 'inactive' }),
+          ...requestAuditFields(req),
+        });
         return redirectWithError('This SHIELD account is inactive. Contact an administrator.');
       }
 
       if (maintenanceMode && account.role !== 'administrator') {
+        await AuditLogModel.create({
+          actorId: account.id,
+          actorName: account.displayName || account.email,
+          action: 'auth.sso_failed',
+          entityType: 'session',
+          entityId: account.id,
+          details: JSON.stringify({ provider: 'microsoft', email: account.email, reason: 'maintenance' }),
+          ...requestAuditFields(req),
+        });
         return redirectWithError('SHIELD is in maintenance mode. Only administrators can sign in right now.');
       }
 
@@ -1404,6 +1456,16 @@ export class AuthController {
         return res.status(404).json({ error: 'Account not found' });
       }
 
+      const account = await getSessionAccount(req);
+      await AuditLogModel.create({
+        actorId: account?.id || cleanAccountId,
+        actorName: account?.displayName || account?.email || cleanAccountId,
+        action: 'auth.2fa_setup_started',
+        entityType: 'user',
+        entityId: cleanAccountId,
+        details: JSON.stringify({ accountId: cleanAccountId }),
+        ...requestAuditFields(req),
+      });
       res.json(setup);
     } catch (error) {
       console.error('Setup 2FA error:', error);

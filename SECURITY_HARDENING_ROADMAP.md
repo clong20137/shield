@@ -4,14 +4,15 @@ BlueLine Command is intended for law-enforcement agency data, including personne
 
 ## Phase 1 - Immediate Application Controls
 
-Status: in progress
+Status: implemented in application, pending deployment verification
 
 - Keep all authentication in HttpOnly session cookies.
 - Keep CSRF/origin checks enabled for unsafe API requests.
 - Keep Helmet security headers and no-store API caching enabled.
 - Require strong passwords and support authenticator app MFA.
-- Audit successful sign-ins, failed sign-ins, password resets, MFA changes, role changes, and logout/session revocation.
+- Audit successful sign-ins, failed sign-ins, MFA prompts, lock-screen unlock failures, password resets, MFA changes, role changes, and logout/session revocation.
 - Audit backend permission denials and missing-session attempts against protected routes.
+- Warn on unsafe production security configuration during backend startup.
 - Use strict production environment settings:
   - `NODE_ENV=production`
   - `SESSION_COOKIE_SECURE=true`
@@ -19,6 +20,13 @@ Status: in progress
   - `TRUST_PROXY=true` only behind the approved reverse proxy
   - `ALLOWED_ORIGINS` set to the exact app origin
   - `ALLOW_CONSOLE_RESET_LINKS=false`
+
+Deployment verification required:
+
+- Confirm HTTPS is enforced before any production agency use.
+- Confirm `ALLOWED_ORIGINS`, `APP_BASE_URL`, and `API_BASE_URL` use exact production HTTPS origins.
+- Confirm security audit events appear in the audit log after failed login, denied permission, MFA challenge, and session revocation tests.
+- Confirm administrators have MFA enabled before agency rollout.
 
 ## Phase 2 - Sensitive Data Protection
 
@@ -73,4 +81,3 @@ Status: planned
 - Keep deployment diagrams and data-flow diagrams current.
 - Track risk acceptance decisions with an owner and review date.
 - Prepare an agency-facing security packet that explains what is encrypted, where data is stored, who can access it, how logs are retained, and how incidents are handled.
-

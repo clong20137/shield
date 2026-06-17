@@ -34,8 +34,10 @@ import { csrfProtection } from './middleware/csrfProtection';
 import { ErrorLogModel } from './models/ErrorLog';
 import { createImageThumbnail } from './services/imageThumbnails';
 import { isAllowedOrigin, parseAllowedOrigins } from './utils/originPolicy';
+import { logProductionSecurityFindings } from './utils/securityConfig';
 
 dotenv.config();
+logProductionSecurityFindings();
 
 const app: Express = express();
 const PORT = process.env.PORT || 5000;

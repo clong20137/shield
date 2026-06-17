@@ -386,7 +386,7 @@ export class AuthAccountModel {
 
       if (account.twoFactorEnabled && account.twoFactorSecret) {
         if (!twoFactorCode) {
-          return { account: null, requiresTwoFactor: true };
+          return { account: toPublicAccount(account), requiresTwoFactor: true };
         }
 
         const isValidTotp = verifyTotp(account.twoFactorSecret, twoFactorCode);
