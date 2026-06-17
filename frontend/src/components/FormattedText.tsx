@@ -23,6 +23,11 @@ function getSafeTextAlign(value: string | null): '' | 'left' | 'center' | 'right
   return cleanValue === 'left' || cleanValue === 'center' || cleanValue === 'right' ? cleanValue : '';
 }
 
+function getSafeExternalHref(value: string): string {
+  const cleanValue = value.trim();
+  return /^(https?:|mailto:)/iu.test(cleanValue) ? cleanValue : '';
+}
+
 function sanitizeFormattedHtml(html: string): string {
   if (typeof window === 'undefined' || !htmlPattern.test(html)) {
     return '';
@@ -44,15 +49,20 @@ function sanitizeFormattedHtml(html: string): string {
         const textAlign = getSafeTextAlign(element.style.textAlign || element.getAttribute('align'));
         const href = element.tagName === 'A' ? element.getAttribute('href') || '' : '';
         const internalTarget = href.startsWith('shield://') ? href.replace('shield://', '').trim().toLowerCase() : '';
+        const externalHref = element.tagName === 'A' ? getSafeExternalHref(href) : '';
         Array.from(element.attributes).forEach((attribute) => element.removeAttribute(attribute.name));
         if (element.tagName === 'A') {
-          if (!internalLinkTargets.has(internalTarget)) {
+          if (internalLinkTargets.has(internalTarget)) {
+            element.setAttribute('href', `shield://${internalTarget}`);
+            element.setAttribute('data-shield-link', internalTarget);
+          } else if (externalHref) {
+            element.setAttribute('href', externalHref);
+            element.setAttribute('target', '_blank');
+            element.setAttribute('rel', 'noopener noreferrer');
+          } else {
             element.replaceWith(document.createTextNode(element.textContent || ''));
             return;
           }
-
-          element.setAttribute('href', `shield://${internalTarget}`);
-          element.setAttribute('data-shield-link', internalTarget);
         }
         if (textAlign) {
           element.style.textAlign = textAlign;

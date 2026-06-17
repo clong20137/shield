@@ -119,6 +119,14 @@ const internalPostLinks = [
   { value: 'evaluations', label: 'Evaluations' },
 ];
 
+const escapePostHtml = (value: string) =>
+  value
+    .replace(/&/gu, '&amp;')
+    .replace(/</gu, '&lt;')
+    .replace(/>/gu, '&gt;')
+    .replace(/"/gu, '&quot;')
+    .replace(/'/gu, '&#39;');
+
 function getPostBodyText(value: string): string {
   if (!postHtmlPattern.test(value)) {
     return value.trim();
@@ -137,6 +145,11 @@ function RichPostEditor({
   onChange: (value: string) => void;
 }) {
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const [isLinkPopoverOpen, setIsLinkPopoverOpen] = useState(false);
+  const [linkType, setLinkType] = useState<'internal' | 'external'>('external');
+  const [internalLinkTarget, setInternalLinkTarget] = useState(internalPostLinks[0]?.value || '');
+  const [externalLinkUrl, setExternalLinkUrl] = useState('');
+  const savedLinkRangeRef = useRef<Range | null>(null);
 
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== value) {
@@ -154,20 +167,75 @@ function RichPostEditor({
     runCommand('formatBlock', block);
   };
 
-  const insertInternalLink = (target: string) => {
-    const link = internalPostLinks.find((item) => item.value === target);
-    if (!link || !editorRef.current) {
+  const getCurrentEditorRange = () => {
+    const selection = window.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    if (!range || !editorRef.current) {
+      return null;
+    }
+
+    const containsStart = editorRef.current.contains(range.startContainer);
+    const containsEnd = editorRef.current.contains(range.endContainer);
+    return containsStart && containsEnd ? range : null;
+  };
+
+  const restoreSavedLinkRange = () => {
+    const range = savedLinkRangeRef.current;
+    if (!range) {
+      return null;
+    }
+
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    return range;
+  };
+
+  const openLinkPopover = () => {
+    const range = getCurrentEditorRange();
+    savedLinkRangeRef.current = range ? range.cloneRange() : null;
+    setIsLinkPopoverOpen(true);
+  };
+
+  const closeLinkPopover = () => {
+    setIsLinkPopoverOpen(false);
+    savedLinkRangeRef.current = null;
+  };
+
+  const getNormalizedExternalUrl = () => {
+    const trimmedUrl = externalLinkUrl.trim();
+    if (!trimmedUrl) {
+      return '';
+    }
+
+    return /^(https?:|mailto:)/iu.test(trimmedUrl) ? trimmedUrl : `https://${trimmedUrl}`;
+  };
+
+  const applyLink = () => {
+    if (!editorRef.current) {
+      return;
+    }
+
+    const selectedInternalLink = internalPostLinks.find((item) => item.value === internalLinkTarget);
+    const href = linkType === 'internal' && selectedInternalLink
+      ? `shield://${selectedInternalLink.value}`
+      : getNormalizedExternalUrl();
+
+    if (!href) {
       return;
     }
 
     editorRef.current.focus();
+    const range = restoreSavedLinkRange() || getCurrentEditorRange();
     const selection = window.getSelection();
-    if (selection?.rangeCount && !selection.isCollapsed && editorRef.current.contains(selection.anchorNode)) {
-      document.execCommand('createLink', false, `shield://${link.value}`);
+    if (range && selection?.rangeCount && !selection.isCollapsed) {
+      document.execCommand('createLink', false, href);
     } else {
-      document.execCommand('insertHTML', false, `<a href="shield://${link.value}">${link.label}</a>`);
+      const label = linkType === 'internal' && selectedInternalLink ? selectedInternalLink.label : href;
+      document.execCommand('insertHTML', false, `<a href="${escapePostHtml(href)}">${escapePostHtml(label)}</a>`);
     }
     onChange(editorRef.current.innerHTML || '');
+    closeLinkPopover();
   };
 
   const preserveEditorFocus = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -229,25 +297,82 @@ function RichPostEditor({
         <button type="button" onMouseDown={preserveEditorFocus} onClick={() => applyBlockStyle('blockquote')} className="btn-secondary" aria-label="Apply quote style" title="Quote">
           <Quote size={16} />
         </button>
-        <label className="flex h-10 min-w-[12rem] items-center gap-2 rounded border border-gray-300 bg-white px-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-          <Link2 size={15} className="text-gray-400" />
-          <select
-            defaultValue=""
-            onChange={(event) => {
-              insertInternalLink(event.target.value);
-              event.target.value = '';
-            }}
-            className="min-w-0 flex-1 bg-transparent outline-none"
-            aria-label="Insert internal link"
-            title="Internal Link"
-          >
-            <option value="">Internal link</option>
-            {internalPostLinks.map((link) => (
-              <option key={link.value} value={link.value}>{link.label}</option>
-            ))}
-          </select>
-        </label>
+        <button
+          type="button"
+          onMouseDown={(event) => {
+            event.preventDefault();
+            openLinkPopover();
+          }}
+          className="btn-secondary"
+          aria-label="Add link to selected text"
+          title="Link"
+        >
+          <Link2 size={16} />
+        </button>
       </div>
+      {isLinkPopoverOpen && (
+        <div className="mb-2 w-full max-w-xl rounded border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-800 dark:bg-gray-950">
+          <div className="mb-3 inline-flex rounded border border-gray-200 bg-gray-50 p-1 text-sm font-semibold dark:border-gray-800 dark:bg-gray-900">
+            <button
+              type="button"
+              onMouseDown={preserveEditorFocus}
+              onClick={() => setLinkType('external')}
+              className={`rounded px-3 py-1.5 transition ${linkType === 'external' ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'}`}
+            >
+              External
+            </button>
+            <button
+              type="button"
+              onMouseDown={preserveEditorFocus}
+              onClick={() => setLinkType('internal')}
+              className={`rounded px-3 py-1.5 transition ${linkType === 'internal' ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'}`}
+            >
+              Internal
+            </button>
+          </div>
+          {linkType === 'external' ? (
+            <label className="block">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">External link</span>
+              <input
+                value={externalLinkUrl}
+                onChange={(event) => setExternalLinkUrl(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    applyLink();
+                  }
+                }}
+                placeholder="https://example.com"
+                className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                autoFocus
+              />
+            </label>
+          ) : (
+            <label className="block">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Internal link</span>
+              <select
+                value={internalLinkTarget}
+                onChange={(event) => setInternalLinkTarget(event.target.value)}
+                className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+              >
+                {internalPostLinks.map((link) => (
+                  <option key={link.value} value={link.value}>{link.label}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          <div className="mt-3 flex justify-end gap-2">
+            <button type="button" onMouseDown={preserveEditorFocus} onClick={closeLinkPopover} className="btn-secondary">
+              <X size={16} />
+              <span>Cancel</span>
+            </button>
+            <button type="button" onMouseDown={preserveEditorFocus} onClick={applyLink} className="btn-primary">
+              <Link2 size={16} />
+              <span>Apply Link</span>
+            </button>
+          </div>
+        </div>
+      )}
       <div
         ref={editorRef}
         contentEditable
@@ -905,8 +1030,8 @@ function DashboardNews({
       ) : (
         <div className="min-h-0 flex-1">
           {activeFeaturedPost && (
-            <div key={activeFeaturedPost.id} className="dashboard-news-carousel-slide overflow-hidden rounded-lg border border-gray-200 bg-gray-950 text-white shadow-sm dark:border-gray-800">
-              <div className="grid min-h-[17rem] lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
+            <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-950 text-white shadow-sm dark:border-gray-800">
+              <div key={activeFeaturedPost.id} className="dashboard-news-carousel-slide grid min-h-[17rem] lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
                 <Link to={`/updates/${activeFeaturedPost.id}`} className="group relative min-h-[15rem] overflow-hidden bg-gray-900">
                   {activeFeaturedPost.imageUrl ? (
                     <img
