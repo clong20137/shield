@@ -616,7 +616,7 @@ function TimeDetailInput({
   return (
     <div className={`grid gap-2 ${useMilitaryTime ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_auto]'}`}>
       <div className="relative min-w-0">
-        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+        <span className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center text-gray-400 dark:text-gray-500">
           <Icon size={15} />
         </span>
         <input
@@ -2352,7 +2352,7 @@ function CalendarPage({
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Date</span>
                           <div className="relative">
-                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center text-gray-400 dark:text-gray-500">
                               <CalendarDays size={16} />
                             </span>
                             <input
@@ -2376,7 +2376,7 @@ function CalendarPage({
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Duty Hours</span>
                           <div className="relative">
-                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center text-gray-400 dark:text-gray-500">
                               <Timer size={16} />
                             </span>
                             <input
@@ -2412,7 +2412,7 @@ function CalendarPage({
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">District Worked</span>
                           <div className="relative">
-                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center text-gray-400 dark:text-gray-500">
                               <MapPin size={16} />
                             </span>
                             <select
@@ -2436,7 +2436,7 @@ function CalendarPage({
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Special Status</span>
                           <div className="relative">
-                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center text-gray-400 dark:text-gray-500">
                               <BadgeCheck size={16} />
                             </span>
                             <select
@@ -2460,7 +2460,7 @@ function CalendarPage({
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Color Code</span>
                           <div className="relative">
-                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center text-gray-400 dark:text-gray-500">
                               <Palette size={16} />
                             </span>
                             <select
@@ -2564,7 +2564,7 @@ function CalendarPage({
                                 />
                               ) : (
                                 <div className="relative">
-                                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+                                  <span className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center text-gray-400 dark:text-gray-500">
                                     <FieldIcon size={15} />
                                   </span>
                                   <input
@@ -2606,7 +2606,7 @@ function CalendarPage({
                         </span>
                       </div>
                       <div className="relative">
-                        <span className="pointer-events-none absolute left-3 top-3 text-gray-400 dark:text-gray-500">
+                        <span className="pointer-events-none absolute left-3 top-3 z-10 text-gray-400 dark:text-gray-500">
                           <FileText size={16} />
                         </span>
                         <textarea
