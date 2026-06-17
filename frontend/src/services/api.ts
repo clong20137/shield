@@ -1039,6 +1039,9 @@ export const userService = {
     return api.post<{ profilePictureUrl: string; user: User }>(`/users/${id}/profile-picture`, formData);
   },
 
+  setProfilePicture: (id: string, profilePictureUrl: string) =>
+    api.put<{ profilePictureUrl: string; user: User }>(`/users/${id}/profile-picture`, { profilePictureUrl }),
+
   removeProfilePicture: (id: string) =>
     api.delete<{ profilePictureUrl: string; user: User }>(`/users/${id}/profile-picture`),
   

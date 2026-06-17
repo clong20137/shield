@@ -1,14 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { lazy, Suspense } from 'react';
-import { Camera, Download, KeyRound, MessageSquare, Save, Send, Users, X } from 'lucide-react';
+import { Camera, Download, Image, KeyRound, MessageSquare, Save, Send, Users, X } from 'lucide-react';
 import type { EmojiClickData } from 'emoji-picker-react';
 import { useSearchParams } from 'react-router-dom';
-import { AuthAccount, AuthRole, authService, getAssetUrl, handleAssetImageError, messageService, userService, User, UserFilters } from '../services/api';
+import { AuthAccount, AuthRole, authService, getAssetUrl, handleAssetImageError, MediaLibraryItem, messageService, userService, User, UserFilters } from '../services/api';
 import { SearchBar } from '../components/SearchBar';
 import { UserTable } from '../components/UserTable';
 import { UserDetail } from '../components/UserDetail';
 import { FloatingWindow } from '../components/FloatingWindow';
+import { ProfilePictureMediaPicker } from '../components/ProfilePictureMediaPicker';
 import { rankOptions } from '../constants/ranks';
 import { districtOptions } from '../constants/districts';
 
@@ -177,6 +178,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
+  const [isProfileMediaPickerOpen, setIsProfileMediaPickerOpen] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
   const searchRequestRef = useRef(0);
   const [addressLookupQuery, setAddressLookupQuery] = useState('');
@@ -356,7 +358,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       return;
     }
 
-    profilePictureInputRef.current?.click();
+    setIsProfileMediaPickerOpen(true);
   };
 
   const handleProfilePictureUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -388,6 +390,36 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     } finally {
       setIsUploadingPicture(false);
       event.target.value = '';
+    }
+  };
+
+  const selectProfilePictureFromMedia = async (item: MediaLibraryItem) => {
+    if (!editingUser) {
+      return;
+    }
+
+    if (!canEditProfilePictures) {
+      onToast('error', 'Profile photo permission required.');
+      return;
+    }
+
+    setIsUploadingPicture(true);
+    try {
+      const response = await userService.setProfilePicture(editingUser.id, item.url);
+      const updatedUser = response.data.user;
+      setEditForm(updatedUser);
+      setEditingUser(updatedUser);
+      setSelectedUser(updatedUser);
+      setUsers((currentUsers) =>
+        currentUsers.map((user) => (user.id === updatedUser.id ? updatedUser : user)),
+      );
+      setIsProfileMediaPickerOpen(false);
+      onToast('success', 'Profile picture updated.');
+    } catch (err) {
+      console.error(err);
+      onToast('error', 'Failed to update profile picture.');
+    } finally {
+      setIsUploadingPicture(false);
     }
   };
 
@@ -987,6 +1019,14 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
         >
           {({ dragHandleProps, isDragging }) => (
           <form onSubmit={handleSaveUser} className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-none bg-white dark:bg-gray-900 md:rounded-lg">
+            <ProfilePictureMediaPicker
+              isOpen={isProfileMediaPickerOpen}
+              isSaving={isUploadingPicture}
+              onClose={() => setIsProfileMediaPickerOpen(false)}
+              onSelect={selectProfilePictureFromMedia}
+              onError={(message) => onToast('error', message)}
+              getErrorMessage={getErrorMessage}
+            />
             <div
               {...dragHandleProps}
               className={`flex shrink-0 select-none items-center justify-between gap-4 bg-primary-500 px-4 py-4 text-white sm:px-5 md:cursor-grab ${isDragging ? 'md:cursor-grabbing' : ''}`}
@@ -1007,12 +1047,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
-              <button
-                type="button"
-                onClick={updateProfilePicture}
-                disabled={!canEditProfilePictures}
-                className="mb-6 flex w-full flex-col items-center gap-3 rounded border border-gray-200 bg-gray-50 p-4 text-center hover:border-accent disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-800 dark:bg-gray-950 sm:flex-row sm:gap-4 sm:text-left"
-              >
+              <div className={`mb-6 flex w-full flex-col items-center gap-3 rounded border border-gray-200 bg-gray-50 p-4 text-center dark:border-gray-800 dark:bg-gray-950 sm:flex-row sm:gap-4 sm:text-left ${canEditProfilePictures ? 'hover:border-accent' : 'opacity-60'}`}>
                 {editForm.profilePictureUrl ? (
                   <img
                     src={getAssetUrl(String(editForm.profilePictureUrl))}
@@ -1027,14 +1062,31 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                 )}
                 <div className="min-w-0">
                   <p className="flex items-center justify-center gap-2 font-bold text-gray-800 dark:text-gray-100 sm:justify-start">
-                    <Camera size={18} className="text-accent" />
+                    <Image size={18} className="text-accent" />
                     Profile Picture
                   </p>
                   <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {isUploadingPicture ? 'Uploading picture...' : canEditProfilePictures ? 'Click to upload or change the profile picture.' : 'Profile photo permission required.'}
+                    {isUploadingPicture ? 'Updating picture...' : canEditProfilePictures ? 'Click to choose from the media library.' : 'Profile photo permission required.'}
                   </p>
+                  {canEditProfilePictures && (
+                    <span className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
+                      <button type="button" onClick={updateProfilePicture} className="btn-secondary py-1.5 text-xs" disabled={isUploadingPicture}>
+                        <Image size={14} />
+                        Media Library
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => profilePictureInputRef.current?.click()}
+                        className="btn-secondary py-1.5 text-xs"
+                        disabled={isUploadingPicture}
+                      >
+                        <Camera size={14} />
+                        Upload
+                      </button>
+                    </span>
+                  )}
                 </div>
-              </button>
+              </div>
               <input
                 ref={profilePictureInputRef}
                 type="file"

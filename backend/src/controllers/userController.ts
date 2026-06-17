@@ -863,6 +863,50 @@ export class UserController {
     }
   }
 
+  static async setProfilePicture(req: Request, res: Response) {
+    try {
+      const targetUser = await UserModel.getUserById(req.params.id);
+      const sessionAccount = await getSessionAccount(req);
+      const profilePictureUrl = cleanString(req.body?.profilePictureUrl, 500);
+
+      if (!profilePictureUrl || !profilePictureUrl.startsWith('/uploads/')) {
+        return res.status(400).json({ error: 'Choose an image from the media library' });
+      }
+
+      if (!targetUser || isHiddenFromRequester(targetUser, sessionAccount?.id, await canViewHiddenUsers(req))) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const success = await UserModel.updateUser(req.params.id, { profilePictureUrl });
+
+      if (!success) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const user = await UserModel.getUserById(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      broadcastAppEvent({ type: 'user-updated', entityId: req.params.id });
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: req.params.id });
+      const actor = await getSessionAccount(req);
+      await AuditLogModel.create({
+        actorId: actor?.id || null,
+        actorName: actor?.displayName || actor?.email || null,
+        action: 'users.profile_picture_updated',
+        entityType: 'user',
+        entityId: req.params.id,
+        details: JSON.stringify({ profilePictureUrl, source: 'media-library' }),
+        ...requestAuditFields(req),
+      });
+      res.json({ profilePictureUrl, user });
+    } catch (error) {
+      console.error('Profile picture media selection error:', error);
+      res.status(500).json({ error: 'Failed to update profile picture' });
+    }
+  }
+
   static async removeProfilePicture(req: Request, res: Response) {
     try {
       const targetUser = await UserModel.getUserById(req.params.id);

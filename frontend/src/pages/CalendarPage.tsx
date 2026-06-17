@@ -4,6 +4,9 @@ import { useLocation } from 'react-router-dom';
 import { AuthAccount, CalendarEntry, CalendarShortcut, authService, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 
+type DailyStripStyle = React.CSSProperties & {
+  '--trooper-daily-strip-rgb'?: string;
+};
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 type TimePeriod = 'AM' | 'PM';
 type CalendarView = 'day' | 'week' | 'month';
@@ -27,6 +30,19 @@ const entryColors = [
   { label: 'Red', value: '#DC2626' },
   { label: 'Purple', value: '#7C3AED' },
 ];
+
+function getHexColorRgb(value?: string): string {
+  const cleanValue = (value || entryColors[0].value).trim().replace(/^#/u, '');
+  const hex = cleanValue.length === 3
+    ? cleanValue.split('').map((character) => `${character}${character}`).join('')
+    : cleanValue;
+  const numericColor = /^[0-9a-f]{6}$/iu.test(hex) ? Number.parseInt(hex, 16) : Number.parseInt(entryColors[0].value.slice(1), 16);
+  const red = (numericColor >> 16) & 255;
+  const green = (numericColor >> 8) & 255;
+  const blue = numericColor & 255;
+
+  return `${red}, ${green}, ${blue}`;
+}
 
 const trooperDailySections = [
   {
@@ -790,6 +806,21 @@ function CalendarPage({
   useEffect(() => {
     setHiddenDailySections(currentUser.trooperDailyHiddenSections || []);
   }, [currentUser.trooperDailyHiddenSections]);
+
+  useEffect(() => {
+    const defaultDistrict = getDefaultDistrict(currentUser);
+    if (!defaultDistrict || entryForm.districtWorked === defaultDistrict || editingEntryId) {
+      return;
+    }
+
+    const onlyDefaultDistrictChanged = !hasMeaningfulTrooperDailyContent(
+      { ...entryForm, districtWorked: getDefaultDistrict(undefined) },
+      currentUser,
+    );
+    if (entryForm.districtWorked === getDefaultDistrict(undefined) && onlyDefaultDistrictChanged) {
+      setEntryForm((currentForm) => ({ ...currentForm, districtWorked: defaultDistrict }));
+    }
+  }, [currentUser, editingEntryId, entryForm]);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -2198,6 +2229,12 @@ function CalendarPage({
                           {dailyShortcutDays.map(({ day, dateKey, entry }) => {
                             const isSelectedShortcutDay = selectedDate === dateKey;
                             const isTodayShortcutDay = dateKey === todayKey;
+                            const dailyStripStyle: DailyStripStyle | undefined = entry || isSelectedShortcutDay
+                              ? {
+                                  ...(entry ? { backgroundColor: entry.color } : {}),
+                                  '--trooper-daily-strip-rgb': getHexColorRgb(entry?.color || entryForm.color),
+                                }
+                              : undefined;
                             return (
                               <button
                                 key={dateKey}
@@ -2216,7 +2253,7 @@ function CalendarPage({
                                     ? 'trooper-daily-strip-filled border-transparent text-white'
                                     : 'border-gray-300 bg-white text-gray-700 hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
                                 } ${isSelectedShortcutDay ? 'trooper-daily-strip-selected border-accent' : ''}`}
-                                style={entry ? { backgroundColor: entry.color } : undefined}
+                                style={dailyStripStyle}
                                 aria-label={`${entry ? 'Open' : 'Create'} daily report for ${dateKey}`}
                               title={`${entry ? 'Open' : 'Create'} ${dateKey}`}
                             >

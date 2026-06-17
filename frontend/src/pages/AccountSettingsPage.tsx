@@ -1,8 +1,9 @@
 import QRCode from 'qrcode';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Camera, Download, ExternalLink, KeyRound, Laptop, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, X } from 'lucide-react';
-import { AuthAccount, AuthSession, DeviceRecord, TwoFactorSetupResponse, authService, deviceService, getAssetUrl, handleAssetImageError, performanceEvaluationService, userService } from '../services/api';
+import { Camera, Download, ExternalLink, Image, KeyRound, Laptop, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, X } from 'lucide-react';
+import { AuthAccount, AuthSession, DeviceRecord, MediaLibraryItem, TwoFactorSetupResponse, authService, deviceService, getAssetUrl, handleAssetImageError, performanceEvaluationService, userService } from '../services/api';
+import { ProfilePictureMediaPicker } from '../components/ProfilePictureMediaPicker';
 import { downloadPerformanceEvaluationPdf } from '../utils/performanceEvaluationPdf';
 
 interface AccountSettingsPageProps {
@@ -76,6 +77,7 @@ export function AccountSettingsPage({
   const [isAssignedDevicesLoading, setIsAssignedDevicesLoading] = useState(false);
   const [isRevokingSessions, setIsRevokingSessions] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'devices' | 'reports' | 'preferences'>('general');
+  const [isProfileMediaPickerOpen, setIsProfileMediaPickerOpen] = useState(false);
   const [evaluationCount, setEvaluationCount] = useState<number | null>(null);
   const [isEvaluationsLoading, setIsEvaluationsLoading] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
@@ -241,6 +243,21 @@ export function AccountSettingsPage({
     }
   };
 
+  const selectProfilePictureFromMedia = async (item: MediaLibraryItem) => {
+    setIsProfilePictureSaving(true);
+
+    try {
+      const response = await userService.setProfilePicture(account.id, item.url);
+      onAccountUpdate({ ...account, profilePictureUrl: response.data.profilePictureUrl });
+      setIsProfileMediaPickerOpen(false);
+      onToast('success', 'Profile picture updated.');
+    } catch (error) {
+      onToast('error', getErrorMessage(error, 'Failed to update profile picture.'));
+    } finally {
+      setIsProfilePictureSaving(false);
+    }
+  };
+
   const handleEnableTwoFactor = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsTwoFactorSaving(true);
@@ -360,15 +377,23 @@ export function AccountSettingsPage({
 
       {activeTab === 'general' && (
       <>
+      <ProfilePictureMediaPicker
+        isOpen={isProfileMediaPickerOpen}
+        isSaving={isProfilePictureSaving}
+        onClose={() => setIsProfileMediaPickerOpen(false)}
+        onSelect={selectProfilePictureFromMedia}
+        onError={(message) => onToast('error', message)}
+        getErrorMessage={getErrorMessage}
+      />
       <section className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950 sm:p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-col items-center gap-3 text-center sm:flex-row sm:gap-4 sm:text-left">
             <button
               type="button"
-              onClick={() => profilePictureInputRef.current?.click()}
+              onClick={() => setIsProfileMediaPickerOpen(true)}
               className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white text-accent dark:border-gray-700 dark:bg-gray-900"
-              aria-label="Update profile picture"
-              title="Update profile picture"
+              aria-label="Choose profile picture from media library"
+              title="Choose from media library"
               disabled={isProfilePictureSaving}
             >
               {account.profilePictureUrl ? (
@@ -384,7 +409,7 @@ export function AccountSettingsPage({
                 </span>
               )}
               <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-white opacity-0 transition group-hover:opacity-100">
-                <Camera size={18} />
+                <Image size={18} />
               </span>
             </button>
             <input
@@ -399,6 +424,16 @@ export function AccountSettingsPage({
               <p className="truncate text-sm text-gray-500 dark:text-gray-400">
                 {isProfilePictureSaving ? 'Updating profile picture...' : account.email}
               </p>
+              <div className="mt-2 flex flex-wrap justify-center gap-2 sm:justify-start">
+                <button type="button" onClick={() => setIsProfileMediaPickerOpen(true)} className="btn-secondary py-1.5 text-xs" disabled={isProfilePictureSaving}>
+                  <Image size={14} />
+                  Media Library
+                </button>
+                <button type="button" onClick={() => profilePictureInputRef.current?.click()} className="btn-secondary py-1.5 text-xs" disabled={isProfilePictureSaving}>
+                  <Camera size={14} />
+                  Upload
+                </button>
+              </div>
             </div>
           </div>
 
