@@ -1902,7 +1902,11 @@ function CalendarPage({
     [hiddenDailySections],
   );
   const dailyPanelOptions = useMemo(
-    () => ['Administrative', ...trooperDailySections.map((section) => section.title), 'Narrative'],
+    () => [
+      'Administrative',
+      ...trooperDailySections.flatMap((section) => section.title === 'Drug Activity' ? [section.title, 'T-Codes'] : [section.title]),
+      'Narrative',
+    ],
     [],
   );
   const activeDailySection = visibleDailySections.find((section) => section.title === activeDailyPanel);
@@ -2296,6 +2300,8 @@ function CalendarPage({
                       const isHidden = Boolean(panelSection && hiddenDailySections.includes(panelSection.title));
                       const isComplete = panel === 'Administrative'
                         ? Boolean(entryForm.date && entryForm.dutyHours && entryForm.districtWorked && entryForm.specialStatus)
+                        : panel === 'T-Codes'
+                          ? tCodeRows.length > 0 && tCodeRows.every((row) => row.code.trim() && row.timeWorked.trim())
                         : panel === 'Narrative'
                           ? Boolean(entryForm.details?.narrative?.trim())
                           : Boolean(panelSection && isSectionComplete(entryForm.details, panelSection));
@@ -2787,93 +2793,97 @@ function CalendarPage({
                           );
                         })}
                       </div>
-                      {activeDailySection.title === 'Drug Activity' && (
-                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900/60">
-                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                            <div>
-                              <h4 className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">
-                                <ListChecks size={16} className="text-accent" />
-                                T-Codes
-                              </h4>
-                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                Add each T-Code worked and the time spent on it.
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={addTCodeRow}
-                              className="btn-secondary"
-                              disabled={tCodeOptions.length === 0}
-                              aria-label="Add T-Code"
-                              title="Add T-Code"
-                            >
-                              <Plus size={16} />
-                              <span>Add T-Code</span>
-                            </button>
-                          </div>
+                    </div>
+                  )}
 
-                          {tCodeOptions.length === 0 ? (
-                            <div className="rounded border border-dashed border-gray-300 px-3 py-3 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                              No T-Code options are configured.
-                            </div>
-                          ) : tCodeRows.length === 0 ? (
-                            <div className="rounded border border-dashed border-gray-300 px-3 py-3 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                              No T-Codes added.
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              {tCodeRows.map((row) => (
-                                <div key={row.id} className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
-                                  <label className="block">
-                                    <span className="mb-1 block text-xs font-bold uppercase text-gray-500 dark:text-gray-400">T-Code</span>
-                                    <div className="relative">
-                                      <select
-                                        value={row.code}
-                                        onChange={(event) => updateTCodeRow(row.id, { code: event.target.value })}
-                                        className="w-full appearance-none rounded border border-gray-300 bg-white px-3 py-2 pr-9 text-sm dark:border-gray-700 dark:bg-gray-950"
-                                        aria-label="T-Code option"
-                                      >
-                                        {tCodeOptions.map((option) => (
-                                          <option key={option} value={option}>{option}</option>
-                                        ))}
-                                      </select>
-                                      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-300 dark:text-gray-200">
-                                        <ChevronRight className="rotate-90" size={17} />
-                                      </span>
-                                    </div>
-                                  </label>
-                                  <label className="block">
-                                    <span className="mb-1 block text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Time Worked</span>
-                                    <div className="relative">
-                                      <span className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center text-gray-400 dark:text-gray-500">
-                                        <Timer size={15} />
-                                      </span>
-                                      <input
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={row.timeWorked}
-                                        onChange={(event) => updateTCodeRow(row.id, { timeWorked: sanitizeDecimalInput(event.target.value, 5) })}
-                                        className="trooper-daily-field-with-icon w-full rounded border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-gray-700 dark:bg-gray-950"
-                                        aria-label="T-Code time worked"
-                                      />
-                                    </div>
-                                  </label>
-                                  <div className="flex items-end">
-                                    <button
-                                      type="button"
-                                      onClick={() => deleteTCodeRow(row.id)}
-                                      className="btn-danger w-full justify-center sm:w-auto"
-                                      aria-label="Delete T-Code"
-                                      title="Delete T-Code"
-                                    >
-                                      <Trash2 size={16} />
-                                      <span>Delete</span>
-                                    </button>
-                                  </div>
+                  {activeDailyPanel === 'T-Codes' && (
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h3 className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-gray-100">
+                            <ListChecks size={18} className="text-accent" />
+                            T-Codes
+                            {tCodeRows.length > 0 && tCodeRows.every((row) => row.code.trim() && row.timeWorked.trim()) && (
+                              <CheckCircle2 className="trooper-daily-check text-green-600 dark:text-green-300" size={18} />
+                            )}
+                          </h3>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            Add each T-Code worked and the time spent on it.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={addTCodeRow}
+                          className="btn-secondary"
+                          disabled={tCodeOptions.length === 0}
+                          aria-label="Add T-Code"
+                          title="Add T-Code"
+                        >
+                          <Plus size={16} />
+                          <span>Add T-Code</span>
+                        </button>
+                      </div>
+
+                      {tCodeOptions.length === 0 ? (
+                        <div className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                          No T-Code options are configured.
+                        </div>
+                      ) : tCodeRows.length === 0 ? (
+                        <div className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                          No T-Codes added.
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {tCodeRows.map((row) => (
+                            <div key={row.id} className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900/60 sm:grid-cols-[minmax(0,1fr)_10rem_auto]">
+                              <label className="block">
+                                <span className="mb-1 block text-xs font-bold uppercase text-gray-500 dark:text-gray-400">T-Code</span>
+                                <div className="relative">
+                                  <select
+                                    value={row.code}
+                                    onChange={(event) => updateTCodeRow(row.id, { code: event.target.value })}
+                                    className="w-full appearance-none rounded border border-gray-300 bg-white px-3 py-2 pr-9 text-sm dark:border-gray-700 dark:bg-gray-950"
+                                    aria-label="T-Code option"
+                                  >
+                                    {tCodeOptions.map((option) => (
+                                      <option key={option} value={option}>{option}</option>
+                                    ))}
+                                  </select>
+                                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-300 dark:text-gray-200">
+                                    <ChevronRight className="rotate-90" size={17} />
+                                  </span>
                                 </div>
-                              ))}
+                              </label>
+                              <label className="block">
+                                <span className="mb-1 block text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Time Worked</span>
+                                <div className="relative">
+                                  <span className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center text-gray-400 dark:text-gray-500">
+                                    <Timer size={15} />
+                                  </span>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={row.timeWorked}
+                                    onChange={(event) => updateTCodeRow(row.id, { timeWorked: sanitizeDecimalInput(event.target.value, 5) })}
+                                    className="trooper-daily-field-with-icon w-full rounded border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-gray-700 dark:bg-gray-950"
+                                    aria-label="T-Code time worked"
+                                  />
+                                </div>
+                              </label>
+                              <div className="flex items-end">
+                                <button
+                                  type="button"
+                                  onClick={() => deleteTCodeRow(row.id)}
+                                  className="btn-danger w-full justify-center sm:w-auto"
+                                  aria-label="Delete T-Code"
+                                  title="Delete T-Code"
+                                >
+                                  <Trash2 size={16} />
+                                  <span>Delete</span>
+                                </button>
+                              </div>
                             </div>
-                          )}
+                          ))}
                         </div>
                       )}
                     </div>
