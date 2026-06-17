@@ -1,7 +1,6 @@
 import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArchiveX, Ban, CheckCircle2, Download, Eye, FileText, Laptop, MapPinOff, PackageCheck, Pencil, Plus, Printer, QrCode, Radio, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
-import QRCode from 'qrcode';
-import { authService, AuthAccount, deviceService, DeviceEvent, DeviceRecord } from '../services/api';
+import { AlertTriangle, ArchiveX, CheckCircle2, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, QrCode, Radio, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
+import { authService, AuthAccount, deviceService, DeviceRecord } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
 
 type DeviceType = DeviceRecord['type'];
@@ -220,10 +219,6 @@ function getDeviceHealthChips(device: DeviceRecord): Array<{ label: string; tone
   return chips;
 }
 
-function getDeviceQrPayload(device: DeviceRecord): string {
-  return device.assetTag;
-}
-
 function normalizeScanValue(value: string): string {
   return value
     .trim()
@@ -269,15 +264,12 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
-  const [detailDevice, setDetailDevice] = useState<DeviceRecord | null>(null);
   const [devicePendingDelete, setDevicePendingDelete] = useState<DeviceRecord | null>(null);
-  const [deviceHistory, setDeviceHistory] = useState<DeviceEvent[]>([]);
   const [eventNotes, setEventNotes] = useState('');
   const [scanValue, setScanValue] = useState('');
   const [scanMode, setScanMode] = useState<ScanMode>('lookup');
   const [scanAssignee, setScanAssignee] = useState('');
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
-  const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -308,43 +300,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     };
   }, [currentUser?.id]);
 
-  useEffect(() => {
-    if (!detailDevice) {
-      return;
-    }
-
-    const handleDeviceDetailUpdate = () => {
-      void loadDeviceHistory(detailDevice);
-    };
-
-    window.addEventListener('shield:device-updated', handleDeviceDetailUpdate);
-    return () => window.removeEventListener('shield:device-updated', handleDeviceDetailUpdate);
-  }, [detailDevice?.id]);
-
-  useEffect(() => {
-    if (!detailDevice) {
-      setQrCodeUrl('');
-      return;
-    }
-
-    let isCurrent = true;
-    QRCode.toDataURL(getDeviceQrPayload(detailDevice), { width: 176, margin: 1 })
-      .then((url) => {
-        if (isCurrent) {
-          setQrCodeUrl(url);
-        }
-      })
-      .catch(() => {
-        if (isCurrent) {
-          setQrCodeUrl('');
-        }
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [detailDevice?.id, detailDevice?.assetTag]);
-
   const loadRegisteredUsers = async () => {
     if (!currentUser) {
       setRegisteredUsers([]);
@@ -373,18 +328,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       setError('Failed to load device inventory. Check that the backend is running.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadDeviceHistory = async (device: DeviceRecord) => {
-    setDetailDevice(device);
-    setEventNotes('');
-    try {
-      const response = await deviceService.getHistory(device.id);
-      setDeviceHistory(response.data);
-    } catch (err) {
-      console.error('Failed to load device history:', err);
-      setDeviceHistory([]);
     }
   };
 
@@ -440,20 +383,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           ? devices.filter((device) => !device.assignedTo).length
           : devices.filter((device) => device.status === status).length,
     }));
-  }, [devices]);
-
-  const commandCenterStats = useMemo(() => {
-    const maintenanceAttention = devices.filter((device) => isDueSoon(device.maintenanceDueDate)).length;
-    const warrantyAttention = devices.filter((device) => isDueSoon(device.warrantyExpiration)).length;
-    const unassigned = devices.filter((device) => !device.assignedTo).length;
-    const inService = devices.filter((device) => !['Lost', 'Retired'].includes(device.status)).length;
-
-    return [
-      { label: 'In Service', value: inService, detail: 'Active inventory' },
-      { label: 'Unassigned', value: unassigned, detail: 'Ready or needs owner' },
-      { label: 'Maintenance Watch', value: maintenanceAttention, detail: 'Due or overdue' },
-      { label: 'Warranty Watch', value: warrantyAttention, detail: 'Due or expired' },
-    ];
   }, [devices]);
 
   const saveDevice = async (event: FormEvent<HTMLFormElement>) => {
@@ -526,7 +455,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     device: DeviceRecord,
     status: DeviceStatus,
     action: string,
-    options: { assignedTo?: string; notes?: string; showDetails?: boolean } = {},
+    options: { assignedTo?: string; notes?: string } = {},
   ) => {
     if (!canManageDevices) return;
 
@@ -541,10 +470,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         eventNotes: options.notes || eventNotes || action,
       });
       setDevices((currentDevices) => currentDevices.map((item) => (item.id === device.id ? response.data : item)));
-      if (options.showDetails !== false) {
-        setDetailDevice(response.data);
-        await loadDeviceHistory(response.data);
-      }
     } catch (err) {
       console.error('Failed to update device status:', err);
       setError('Failed to update device status.');
@@ -565,8 +490,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setScanFeedback(null);
 
     if (scanMode === 'lookup') {
-      await loadDeviceHistory(scannedDevice);
-      setScanFeedback(`Opened ${scannedDevice.assetTag}.`);
+      setScanFeedback(`Found ${scannedDevice.assetTag}: ${scannedDevice.type} - ${scannedDevice.makeModel}.`);
       setScanValue('');
       return;
     }
@@ -588,29 +512,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     await updateDeviceStatus(scannedDevice, nextStatus, action, {
       assignedTo: assignee,
       notes: scanMode === 'check-in' ? `Scanned in from ${scanValue}.` : `Scanned out to ${assignee}.`,
-      showDetails: true,
     });
     setScanFeedback(`${scannedDevice.assetTag} ${scanMode === 'check-in' ? 'checked in' : `checked out to ${assignee}`}.`);
     setScanValue('');
-  };
-
-  const addHistoryNote = async () => {
-    if (!detailDevice || !eventNotes.trim()) return;
-
-    try {
-      const response = await deviceService.addHistory(detailDevice.id, {
-        action: 'Note',
-        assignedTo: detailDevice.assignedTo,
-        status: detailDevice.status,
-        notes: eventNotes,
-        ...actor,
-      });
-      setDeviceHistory((history) => [response.data, ...history]);
-      setEventNotes('');
-    } catch (err) {
-      console.error('Failed to add device note:', err);
-      setError('Failed to add device note.');
-    }
   };
 
   const deleteDevice = async (device: DeviceRecord) => {
@@ -817,9 +721,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         )}
       </section>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[280px_minmax(0,1fr)_420px]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
       <DeviceStatusRail
-        commandCenterStats={commandCenterStats}
         statusCounts={statusCounts}
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
@@ -886,7 +789,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             {paginatedDevices.map((device) => {
               const DeviceIcon = deviceIconMap[device.type];
               return (
-                <article key={device.id} className={`rounded-lg border p-3 transition-colors hover:border-accent/40 hover:bg-accent/10 dark:hover:bg-gray-800/70 ${detailDevice?.id === device.id ? 'border-accent bg-accent/10 dark:border-accent/70 dark:bg-gray-800/80' : 'border-gray-200 dark:border-gray-800'}`}>
+                <article key={device.id} className="rounded-lg border border-gray-200 p-3 transition-colors hover:border-accent/40 hover:bg-accent/10 dark:hover:bg-gray-800/70">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 font-bold text-gray-900 dark:text-gray-100">
@@ -904,7 +807,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                     <Detail label="Replacement" value={formatDate(device.replacementDueDate)} />
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => loadDeviceHistory(device)} className="btn-secondary" aria-label="View device" title="View"><Eye size={15} /><span>View</span></button>
                     {canManageDevices && <button type="button" onClick={() => editDevice(device)} className="btn-secondary" aria-label="Edit device" title="Edit"><Pencil size={15} /><span>Edit</span></button>}
                     {canManageDevices && <button type="button" onClick={() => setDevicePendingDelete(device)} className="btn-danger" aria-label="Delete device" title="Delete"><Trash2 size={15} /><span>Remove</span></button>}
                   </div>
@@ -928,23 +830,22 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 {paginatedDevices.map((device) => {
                   const DeviceIcon = deviceIconMap[device.type];
                   return (
-                    <tr key={device.id} className={`border-b text-sm transition-colors hover:bg-accent/10 dark:hover:bg-gray-800/70 ${detailDevice?.id === device.id ? 'border-accent/40 bg-accent/10 dark:bg-gray-800/80' : 'border-gray-100 dark:border-gray-800'}`}>
+                    <tr key={device.id} className="border-b border-gray-100 text-sm transition-colors hover:bg-accent/10 dark:border-gray-800 dark:hover:bg-gray-800/70">
                       <td className="px-2 py-2"><input type="checkbox" checked={selectedDevices.includes(device.id)} onChange={(event) => setSelectedDevices((ids) => event.target.checked ? [...ids, device.id] : ids.filter((id) => id !== device.id))} /></td>
                       <td className="px-2 py-2">
-                        <button type="button" onClick={() => loadDeviceHistory(device)} className="flex min-w-0 items-center gap-2 text-left" aria-label={`View ${device.assetTag}`}>
+                        <span className="flex min-w-0 items-center gap-2 text-left">
                           <DeviceIcon size={17} className="shrink-0 text-accent" />
                           <span className="min-w-0">
                             <span className="block truncate font-bold text-gray-900 dark:text-gray-100">{device.assetTag}</span>
                             <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{device.type} - {device.makeModel}</span>
                           </span>
-                        </button>
+                        </span>
                       </td>
                       <td className="max-w-[220px] truncate px-2 py-2">{device.assignedTo || 'Unassigned'}</td>
                       <td className="px-2 py-2"><DeviceStatusCluster device={device} /></td>
                       <td className={`px-2 py-2 ${isDueSoon(device.maintenanceDueDate) ? 'font-bold text-danger' : ''}`}>{formatDate(device.maintenanceDueDate)}</td>
                       <td className="px-2 py-2">
                         <div className="flex justify-end gap-1.5">
-                          <button type="button" onClick={() => loadDeviceHistory(device)} className="btn-secondary h-8 w-8 p-0" aria-label="View device" title="View"><Eye size={14} /></button>
                           {canManageDevices && <button type="button" onClick={() => editDevice(device)} className="btn-secondary h-8 w-8 p-0" aria-label="Edit device" title="Edit"><Pencil size={14} /></button>}
                           {canManageDevices && <button type="button" onClick={() => setDevicePendingDelete(device)} className="btn-danger h-8 w-8 p-0" aria-label="Delete device" title="Delete"><Trash2 size={14} /></button>}
                         </div>
@@ -958,19 +859,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           </>
         )}
       </section>
-
-      <DeviceCommandPanel
-        canManageDevices={canManageDevices}
-        detailDevice={detailDevice}
-        deviceHistory={deviceHistory}
-        eventNotes={eventNotes}
-        qrCodeUrl={qrCodeUrl}
-        setDetailDevice={setDetailDevice}
-        setEventNotes={setEventNotes}
-        setScanValue={setScanValue}
-        addHistoryNote={addHistoryNote}
-        updateDeviceStatus={updateDeviceStatus}
-      />
       </div>
 
       {canManageDevices && isDeviceFormOpen && (
@@ -1106,12 +994,10 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function DeviceStatusRail({
-  commandCenterStats,
   statusCounts,
   statusFilter,
   setStatusFilter,
 }: {
-  commandCenterStats: Array<{ label: string; value: number; detail: string }>;
   statusCounts: Array<{ status: DeviceStatusFilter; count: number }>;
   statusFilter: DeviceStatusFilter;
   setStatusFilter: (status: DeviceStatusFilter) => void;
@@ -1168,163 +1054,6 @@ function DeviceStatusRail({
         })}
       </div>
 
-      <div className="mt-4 border-t border-gray-200 pt-3 dark:border-gray-800">
-        <p className="px-1 text-xs font-black uppercase tracking-[0.14em] text-gray-400">Command Snapshot</p>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {commandCenterStats.map((item) => (
-            <div key={item.label} className="rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-950">
-              <p className="text-xl font-black text-primary-500 dark:text-blue-100">{item.value}</p>
-              <p className="mt-0.5 truncate text-[11px] font-bold uppercase text-gray-500 dark:text-gray-400" title={item.label}>{item.label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-function DeviceCommandPanel({
-  canManageDevices,
-  detailDevice,
-  deviceHistory,
-  eventNotes,
-  qrCodeUrl,
-  setDetailDevice,
-  setEventNotes,
-  setScanValue,
-  addHistoryNote,
-  updateDeviceStatus,
-}: {
-  canManageDevices: boolean;
-  detailDevice: DeviceRecord | null;
-  deviceHistory: DeviceEvent[];
-  eventNotes: string;
-  qrCodeUrl: string;
-  setDetailDevice: (device: DeviceRecord | null) => void;
-  setEventNotes: (value: string) => void;
-  setScanValue: (value: string) => void;
-  addHistoryNote: () => Promise<void>;
-  updateDeviceStatus: (
-    device: DeviceRecord,
-    status: DeviceStatus,
-    action: string,
-    options?: { assignedTo?: string; notes?: string; showDetails?: boolean },
-  ) => Promise<void>;
-}) {
-  if (!detailDevice) {
-    return (
-      <aside className="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900 xl:sticky xl:top-5 xl:self-start">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-accent/10 text-accent">
-          <Eye size={24} />
-        </div>
-        <h2 className="mt-4 text-xl">Device Command Panel</h2>
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          Select a device to review status, identifiers, QR label, quick actions, and ownership timeline.
-        </p>
-      </aside>
-    );
-  }
-
-  const DeviceIcon = deviceIconMap[detailDevice.type];
-
-  return (
-    <aside className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 xl:sticky xl:top-5 xl:max-h-[calc(100vh-2.5rem)] xl:overflow-y-auto">
-      <div className="mb-5 flex items-start justify-between gap-3 border-b border-gray-200 pb-4 dark:border-gray-800">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <DeviceIcon size={22} className="shrink-0 text-accent" />
-            <h2 className="truncate">{detailDevice.assetTag}</h2>
-          </div>
-          <p className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">{detailDevice.type} - {detailDevice.makeModel}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <StatusBadge status={detailDevice.status} />
-            {getDeviceHealthChips(detailDevice).map((chip) => (
-              <span key={chip.label} className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${chip.tone}`}>{chip.label}</span>
-            ))}
-          </div>
-        </div>
-        <button type="button" onClick={() => setDetailDevice(null)} className="icon-close-button" aria-label="Close device details" title="Close"><X size={20} /></button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <Detail label="Assigned" value={detailDevice.assignedTo || 'Unassigned'} />
-        <Detail label="Condition" value={detailDevice.condition || 'Good'} />
-        <Detail label="Location" value={detailDevice.location || 'N/A'} />
-        <Detail label="Serial" value={detailDevice.serialNumber || 'N/A'} />
-        <Detail label="Phone" value={detailDevice.phoneNumber || 'N/A'} />
-        <Detail label="IMEI" value={detailDevice.imei || 'N/A'} />
-        <Detail label="ICCID" value={detailDevice.simNumber || 'N/A'} />
-        <Detail label="Radio ID" value={detailDevice.radioId || 'N/A'} />
-        <Detail label="Warranty" value={formatDate(detailDevice.warrantyExpiration)} />
-        <Detail label="Maintenance" value={formatDate(detailDevice.maintenanceDueDate)} />
-        <Detail label="Replacement" value={formatDate(detailDevice.replacementDueDate)} />
-        <Detail label="Updated" value={formatDate(detailDevice.updatedAt)} />
-      </div>
-
-      <div className="mt-4 rounded border border-gray-200 p-3 dark:border-gray-800">
-        <p className="mb-2 text-sm font-bold text-gray-700 dark:text-gray-300">QR Label</p>
-        <div className="flex items-center gap-3">
-          <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded border border-gray-200 bg-white p-2 text-primary-500 dark:border-gray-700">
-            {qrCodeUrl ? <img src={qrCodeUrl} alt={`${detailDevice.assetTag} QR label`} className="h-full w-full" /> : <QrCode size={44} />}
-          </div>
-          <div className="min-w-0 text-sm text-gray-500 dark:text-gray-400">
-            <p className="truncate font-bold text-gray-800 dark:text-gray-100">{getDeviceQrPayload(detailDevice)}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={() => window.print()} className="btn-secondary" aria-label="Print label" title="Print Label"><Printer size={16} /></button>
-              <button
-                type="button"
-                onClick={() => {
-                  setScanValue(getDeviceQrPayload(detailDevice));
-                  setDetailDevice(null);
-                }}
-                className="btn-secondary"
-                aria-label="Send asset tag to scanner"
-                title="Send To Scanner"
-              >
-                <QrCode size={16} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {canManageDevices && (
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Available', 'Checked In')} className="btn-secondary" aria-label="Check in device" title="Check In"><CheckCircle2 size={16} /><span>Check In</span></button>
-          <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Maintenance', 'Maintenance')} className="btn-secondary" aria-label="Move device to maintenance" title="Maintenance"><Wrench size={16} /><span>Maint.</span></button>
-          <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Damaged', 'Marked Damaged')} className="btn-secondary" aria-label="Mark device damaged" title="Damaged"><AlertTriangle size={16} /><span>Damaged</span></button>
-          <button type="button" onClick={() => updateDeviceStatus(detailDevice, 'Lost', 'Marked Lost')} className="btn-danger" aria-label="Mark device lost" title="Lost"><Ban size={16} /><span>Lost</span></button>
-        </div>
-      )}
-
-      <div className="mt-5 border-t border-gray-200 pt-4 dark:border-gray-800">
-        <h3 className="mb-3 text-lg font-bold">Timeline</h3>
-        {canManageDevices && (
-          <div className="mb-4 rounded border border-gray-200 p-3 dark:border-gray-800">
-            <textarea value={eventNotes} onChange={(event) => setEventNotes(event.target.value)} placeholder="Add a note or reason" className="mb-2 min-h-20 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
-            <button type="button" onClick={addHistoryNote} className="btn-primary" aria-label="Add history note" title="Add Note"><FileText size={16} /><span>Add Note</span></button>
-          </div>
-        )}
-        <div className="relative space-y-0 pl-5 before:absolute before:left-1.5 before:top-2 before:h-[calc(100%-1rem)] before:w-px before:bg-gray-200 dark:before:bg-gray-800">
-          {deviceHistory.length === 0 ? (
-            <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No history yet.</div>
-          ) : (
-            deviceHistory.map((event) => (
-              <div key={event.id} className="relative pb-4">
-                <span className="absolute -left-[1.18rem] top-1.5 h-3 w-3 rounded-full border-2 border-white bg-accent shadow dark:border-gray-900" />
-                <div className="rounded border border-gray-200 p-3 text-sm transition hover:border-accent/40 hover:bg-accent/10 dark:border-gray-800 dark:hover:bg-gray-800/70">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-bold text-gray-800 dark:text-gray-100">{event.action}</p>
-                    <p className="shrink-0 text-right text-xs text-gray-400">{new Date(event.createdAt).toLocaleString()}</p>
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{event.actorName || 'System'} - {event.status || detailDevice.status}</p>
-                  {event.notes && <p className="mt-2 text-gray-600 dark:text-gray-300">{event.notes}</p>}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
     </aside>
   );
 }
