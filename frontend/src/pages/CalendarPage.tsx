@@ -639,7 +639,7 @@ function TimeDetailInput({
           inputMode="numeric"
           maxLength={5}
           data-daily-field={fieldId}
-          className={`w-full rounded border bg-white py-2 pl-9 pr-8 text-sm transition dark:bg-gray-900 ${
+          className={`trooper-daily-field-with-icon w-full rounded border bg-white py-2 pl-9 pr-8 text-sm transition dark:bg-gray-900 ${
             isComplete
               ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
               : 'border-gray-300 dark:border-gray-700'
@@ -2363,7 +2363,7 @@ function CalendarPage({
                                 setEntryForm((currentForm) => ({ ...currentForm, date: event.target.value }));
                               }}
                               data-daily-field="entryDate"
-                              className={`w-full rounded border bg-white py-2 pl-10 pr-3 dark:bg-gray-950 ${
+                              className={`trooper-daily-field-with-icon w-full rounded border bg-white py-2 pl-10 pr-3 dark:bg-gray-950 ${
                                 invalidDailyField === 'entryDate'
                                   ? 'trooper-daily-field-guard border-danger ring-2 ring-danger/30'
                                   : 'border-gray-300 dark:border-gray-700'
@@ -2387,7 +2387,7 @@ function CalendarPage({
                               value={entryForm.dutyHours}
                               onChange={(event) => updateDutyHours(event.target.value)}
                               data-daily-field="dutyHours"
-                              className={`w-full rounded border bg-white py-2 pl-10 pr-9 transition dark:bg-gray-950 ${
+                              className={`trooper-daily-field-with-icon w-full rounded border bg-white py-2 pl-10 pr-9 transition dark:bg-gray-950 ${
                                 invalidDailyField === 'dutyHours'
                                   ? 'trooper-daily-field-guard border-danger ring-2 ring-danger/30'
                                   : entryForm.dutyHours
@@ -2421,7 +2421,7 @@ function CalendarPage({
                                 setEntryForm((currentForm) => ({ ...currentForm, districtWorked: event.target.value }))
                               }
                               data-daily-field="districtWorked"
-                              className="w-full appearance-none rounded border border-gray-300 bg-white py-2 pl-10 pr-10 dark:border-gray-700 dark:bg-gray-950"
+                              className="trooper-daily-field-with-icon w-full appearance-none rounded border border-gray-300 bg-white py-2 pl-10 pr-10 dark:border-gray-700 dark:bg-gray-950"
                             >
                               {districtOptions.map((district) => (
                                 <option key={district}>{district}</option>
@@ -2445,7 +2445,7 @@ function CalendarPage({
                                 setEntryForm((currentForm) => ({ ...currentForm, specialStatus: event.target.value }))
                               }
                               data-daily-field="specialStatus"
-                              className="w-full appearance-none rounded border border-gray-300 bg-white py-2 pl-10 pr-10 dark:border-gray-700 dark:bg-gray-950"
+                              className="trooper-daily-field-with-icon w-full appearance-none rounded border border-gray-300 bg-white py-2 pl-10 pr-10 dark:border-gray-700 dark:bg-gray-950"
                             >
                               {specialStatusOptions.map((status) => (
                                 <option key={status}>{status}</option>
@@ -2467,7 +2467,7 @@ function CalendarPage({
                               value={entryForm.color}
                               onChange={(event) => setEntryForm((currentForm) => ({ ...currentForm, color: event.target.value }))}
                               data-daily-field="color"
-                              className="w-full appearance-none rounded border border-gray-300 bg-white py-2 pl-10 pr-10 dark:border-gray-700 dark:bg-gray-950"
+                              className="trooper-daily-field-with-icon w-full appearance-none rounded border border-gray-300 bg-white py-2 pl-10 pr-10 dark:border-gray-700 dark:bg-gray-950"
                             >
                               {entryColors.map((color) => (
                                 <option key={color.value} value={color.value}>{color.label}</option>
@@ -2574,7 +2574,7 @@ function CalendarPage({
                                     value={entryForm.details?.[key] || ''}
                                     onChange={(event) => updateDailyDetail(key, event.target.value)}
                                     data-daily-field={key}
-                                    className={`w-full rounded border bg-white py-2 pl-9 pr-8 text-sm transition dark:bg-gray-900 ${
+                                    className={`trooper-daily-field-with-icon w-full rounded border bg-white py-2 pl-9 pr-8 text-sm transition dark:bg-gray-900 ${
                                       isComplete
                                         ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
                                         : 'border-gray-300 dark:border-gray-700'
@@ -2615,7 +2615,7 @@ function CalendarPage({
                           placeholder="Type a narrative here"
                           maxLength={narrativeCharacterLimit}
                           data-daily-field="narrative"
-                          className="min-h-72 w-full rounded border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm dark:border-gray-700 dark:bg-gray-900"
+                          className="trooper-daily-field-with-icon min-h-72 w-full rounded border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm dark:border-gray-700 dark:bg-gray-900"
                         />
                       </div>
                     </div>

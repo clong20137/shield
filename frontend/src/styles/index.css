@@ -1722,6 +1722,16 @@ select {
   background-clip: padding-box;
 }
 
+input.trooper-daily-field-with-icon,
+textarea.trooper-daily-field-with-icon,
+select.trooper-daily-field-with-icon {
+  padding-left: 3rem !important;
+}
+
+select.trooper-daily-field-with-icon {
+  padding-right: 2.75rem !important;
+}
+
 @media (max-width: 640px) {
   input,
   select,
