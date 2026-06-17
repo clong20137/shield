@@ -1609,6 +1609,7 @@ function MyDayWidget({
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'entries' | 'reminders'>('entries');
   const todayKey = formatDateKey(new Date());
 
   useEffect(() => {
@@ -1666,6 +1667,16 @@ function MyDayWidget({
   const todaysEntries = entries
     .filter((entry) => entry.date === todayKey)
     .sort((a, b) => a.category.localeCompare(b.category));
+  const weekStart = new Date();
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  const weekStartKey = formatDateKey(weekStart);
+  const weekEndKey = formatDateKey(weekEnd);
+  const weeklyMiles = entries
+    .filter((entry) => entry.date >= weekStartKey && entry.date <= weekEndKey)
+    .reduce((total, entry) => total + (Number.parseFloat(entry.details?.regularDutyMiles || '0') || 0), 0);
   const openReminders = reminders
     .filter((reminder) => !reminder.completedAt)
     .sort((a, b) => getReminderDueAt(a) - getReminderDueAt(b) || a.title.localeCompare(b.title));
@@ -1676,7 +1687,6 @@ function MyDayWidget({
   const overdueCount = activeReminders.filter((reminder) => reminder.remindOn < todayKey).length;
   const draftCount = todaysEntries.filter((entry) => entry.submissionStatus === 'Draft').length;
   const submittedCount = todaysEntries.filter((entry) => entry.submissionStatus === 'Submitted').length;
-  const completedEntryPercent = todaysEntries.length > 0 ? Math.round((submittedCount / todaysEntries.length) * 100) : 0;
   const dayStatusLabel = overdueCount > 0
     ? `${overdueCount} overdue`
     : activeReminders.length > 0
@@ -1727,9 +1737,9 @@ function MyDayWidget({
   return (
     <section data-onboarding-target="my-day" className="relative flex h-full min-h-[24rem] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
       <div className="border-b border-white/10 bg-primary-500 px-4 py-4 text-white dark:bg-gray-950 sm:px-5">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
           <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-white/12 text-white ring-1 ring-white/15">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-danger text-white shadow-lg shadow-red-950/25 ring-1 ring-white/15">
               <CalendarDays size={20} />
             </div>
             <div className="min-w-0">
@@ -1737,21 +1747,15 @@ function MyDayWidget({
               <h2 className="mt-1 truncate text-xl font-black text-white">{getReadableDate(todayKey)}</h2>
             </div>
           </div>
-          <Link to="/calendar" className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-white/20 bg-white/10 text-white transition hover:bg-white/15" aria-label="Open calendar" title="Open Calendar">
-            <CalendarDays size={17} />
-          </Link>
         </div>
         <div className="mt-4 rounded border border-white/15 bg-white/10 p-3">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-bold uppercase tracking-wide text-blue-100 dark:text-gray-400">Daily completion</span>
-            <span className="text-sm font-black text-white">{completedEntryPercent}%</span>
+            <span className="text-xs font-bold uppercase tracking-wide text-blue-100 dark:text-gray-400">Miles reported this week</span>
+            <span className="text-2xl font-black text-white">{weeklyMiles.toLocaleString(undefined, { maximumFractionDigits: 1 })}</span>
           </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/20">
-            <div
-              className="h-full rounded-full bg-accent transition-all"
-              style={{ width: `${completedEntryPercent}%` }}
-            />
-          </div>
+          <p className="mt-1 text-xs font-semibold text-blue-100/90 dark:text-gray-400">
+            {new Date(`${weekStartKey}T00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - {new Date(`${weekEndKey}T00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+          </p>
         </div>
       </div>
 
@@ -1775,99 +1779,115 @@ function MyDayWidget({
         {isLoading ? (
           <div className="loading">Loading your day...</div>
         ) : (
-        <div className="min-h-0 h-full space-y-4 overflow-y-auto pr-1">
-          <div>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <h3 className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                <NotebookPen size={15} />
-                Calendar
-              </h3>
-              {submittedCount > 0 && <span className="text-xs font-semibold text-success">{submittedCount} submitted</span>}
-            </div>
-            {todaysEntries.length === 0 ? (
-              <div className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No calendar entries for today.</div>
-            ) : (
-              <div className="space-y-2">
-                {todaysEntries.slice(0, 4).map((entry) => (
-                  <Link key={entry.id} to="/calendar" className="group relative block overflow-hidden rounded border border-gray-200 bg-gray-50 p-3 pl-4 transition hover:-translate-y-0.5 hover:border-accent hover:bg-white hover:shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900">
-                    <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: entry.color || entryColors[0].value }} />
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="truncate text-sm font-bold text-gray-900 dark:text-gray-100">{entry.category}</span>
-                      <span className={`rounded-full px-2 py-1 text-xs font-bold ${entry.submissionStatus === 'Submitted' ? 'bg-success/10 text-success' : 'bg-accent/10 text-accent'}`}>
-                        {entry.submissionStatus}
-                      </span>
-                    </div>
-                    <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
-                      {entry.districtWorked || 'No district'} - {entry.dutyHours || '0'} hrs
-                    </p>
-                  </Link>
-                ))}
-              </div>
-            )}
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="mb-3 grid grid-cols-2 gap-2 rounded bg-gray-100 p-1 dark:bg-gray-950">
+            <button
+              type="button"
+              onClick={() => setActiveTab('entries')}
+              className={`flex items-center justify-center gap-2 rounded px-3 py-2 text-sm font-black transition ${activeTab === 'entries' ? 'bg-white text-primary-500 shadow-sm dark:bg-gray-900 dark:text-blue-100' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'}`}
+            >
+              <NotebookPen size={15} />
+              Entries
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('reminders')}
+              className={`flex items-center justify-center gap-2 rounded px-3 py-2 text-sm font-black transition ${activeTab === 'reminders' ? 'bg-white text-primary-500 shadow-sm dark:bg-gray-900 dark:text-blue-100' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'}`}
+            >
+              <Bell size={15} />
+              Reminders
+            </button>
           </div>
-
-          <div>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <h3 className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                <Bell size={15} />
-                Reminders
-              </h3>
-              {overdueCount > 0 && <span className="text-xs font-semibold text-danger">{overdueCount} overdue</span>}
-            </div>
-            {openReminders.length === 0 ? (
-              <div className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No open reminders.</div>
-            ) : (
-              <div className="space-y-2">
-                {activeReminders.slice(0, 5).map((reminder) => (
-                  <div key={reminder.id} className={`rounded border p-3 shadow-sm ${reminder.remindOn < todayKey ? 'border-danger/30 bg-danger/5 dark:bg-red-950/20' : 'border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950'}`}>
-                    <div className="flex items-start gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void completeReminder(reminder)}
-                        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-300 text-gray-400 transition hover:border-success hover:text-success dark:border-gray-700"
-                        aria-label={`Complete ${reminder.title}`}
-                        title="Complete"
-                      >
-                        <CheckCircle2 size={15} />
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex min-w-0 flex-wrap items-center gap-2">
-                          <p className="min-w-0 flex-1 truncate text-sm font-bold text-gray-900 dark:text-gray-100">{reminder.title}</p>
-                          <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${getReminderPriorityClass(reminder.priority)}`}>{reminder.priority}</span>
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            {activeTab === 'entries' ? (
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-black uppercase tracking-wide text-gray-500 dark:text-gray-400">Today</h3>
+                  {submittedCount > 0 && <span className="text-xs font-semibold text-success">{submittedCount} submitted</span>}
+                </div>
+                {todaysEntries.length === 0 ? (
+                  <div className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No calendar entries for today.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {todaysEntries.slice(0, 5).map((entry) => (
+                      <Link key={entry.id} to="/calendar" className="group relative block overflow-hidden rounded border border-gray-200 bg-gray-50 p-3 pl-4 transition hover:-translate-y-0.5 hover:border-accent hover:bg-white hover:shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900">
+                        <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: entry.color || entryColors[0].value }} />
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="truncate text-sm font-bold text-gray-900 dark:text-gray-100">{entry.category}</span>
+                          <span className={`rounded-full px-2 py-1 text-xs font-bold ${entry.submissionStatus === 'Submitted' ? 'bg-success/10 text-success' : 'bg-accent/10 text-accent'}`}>
+                            {entry.submissionStatus}
+                          </span>
                         </div>
-                        <p className={`mt-1 flex items-center gap-1 text-xs ${reminder.remindOn < todayKey ? 'text-danger' : 'text-gray-500 dark:text-gray-400'}`}>
-                          <Bell size={12} /> Due {getReminderDueLabel(reminder)}
+                        <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
+                          {entry.districtWorked || 'No district'} - {entry.dutyHours || '0'} hrs
                         </p>
-                        {reminder.notes && <p className="mt-2 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">{reminder.notes}</p>}
-                      </div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2 pl-9">
-                      <button type="button" onClick={() => void snoozeReminder(reminder)} className="btn-secondary px-2 py-1 text-xs" aria-label={`Snooze ${reminder.title}`} title="Snooze until tomorrow">
-                        <Clock3 size={13} />
-                      </button>
-                      <button type="button" onClick={() => void deleteReminder(reminder)} className="btn-danger px-2 py-1 text-xs" aria-label={`Delete ${reminder.title}`} title="Delete Reminder">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
+                      </Link>
+                    ))}
                   </div>
-                ))}
-                {activeReminders.length === 0 && (
-                  <div className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No reminders due right now.</div>
                 )}
-                {upcomingReminders.length > 0 && (
-                  <div className="space-y-2 border-t border-gray-200 pt-2 dark:border-gray-800">
-                    <p className="text-xs font-bold uppercase text-gray-400">Upcoming</p>
-                    {upcomingReminders.map((reminder) => (
-                      <div key={reminder.id} className="rounded border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="truncate text-sm font-bold text-gray-900 dark:text-gray-100">{reminder.title}</p>
-                          <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${getReminderPriorityClass(reminder.priority)}`}>{reminder.priority}</span>
+              </div>
+            ) : (
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-black uppercase tracking-wide text-gray-500 dark:text-gray-400">Open reminders</h3>
+                  {overdueCount > 0 && <span className="text-xs font-semibold text-danger">{overdueCount} overdue</span>}
+                </div>
+                {openReminders.length === 0 ? (
+                  <div className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No open reminders.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {activeReminders.slice(0, 5).map((reminder) => (
+                      <div key={reminder.id} className={`rounded border p-3 shadow-sm ${reminder.remindOn < todayKey ? 'border-danger/30 bg-danger/5 dark:bg-red-950/20' : 'border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950'}`}>
+                        <div className="flex items-start gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void completeReminder(reminder)}
+                            className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-300 text-gray-400 transition hover:border-success hover:text-success dark:border-gray-700"
+                            aria-label={`Complete ${reminder.title}`}
+                            title="Complete"
+                          >
+                            <CheckCircle2 size={15} />
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                              <p className="min-w-0 flex-1 truncate text-sm font-bold text-gray-900 dark:text-gray-100">{reminder.title}</p>
+                              <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${getReminderPriorityClass(reminder.priority)}`}>{reminder.priority}</span>
+                            </div>
+                            <p className={`mt-1 flex items-center gap-1 text-xs ${reminder.remindOn < todayKey ? 'text-danger' : 'text-gray-500 dark:text-gray-400'}`}>
+                              <Bell size={12} /> Due {getReminderDueLabel(reminder)}
+                            </p>
+                            {reminder.notes && <p className="mt-2 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">{reminder.notes}</p>}
+                          </div>
                         </div>
-                        <p className="mt-1 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                          <Bell size={12} /> Due {getReminderDueLabel(reminder)}
-                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2 pl-9">
+                          <button type="button" onClick={() => void snoozeReminder(reminder)} className="btn-secondary px-2 py-1 text-xs" aria-label={`Snooze ${reminder.title}`} title="Snooze until tomorrow">
+                            <Clock3 size={13} />
+                          </button>
+                          <button type="button" onClick={() => void deleteReminder(reminder)} className="btn-danger px-2 py-1 text-xs" aria-label={`Delete ${reminder.title}`} title="Delete Reminder">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
                     ))}
+                    {activeReminders.length === 0 && (
+                      <div className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No reminders due right now.</div>
+                    )}
+                    {upcomingReminders.length > 0 && (
+                      <div className="space-y-2 border-t border-gray-200 pt-2 dark:border-gray-800">
+                        <p className="text-xs font-bold uppercase text-gray-400">Upcoming</p>
+                        {upcomingReminders.map((reminder) => (
+                          <div key={reminder.id} className="rounded border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="truncate text-sm font-bold text-gray-900 dark:text-gray-100">{reminder.title}</p>
+                              <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${getReminderPriorityClass(reminder.priority)}`}>{reminder.priority}</span>
+                            </div>
+                            <p className="mt-1 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                              <Bell size={12} /> Due {getReminderDueLabel(reminder)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
