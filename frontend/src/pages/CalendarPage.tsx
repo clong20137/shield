@@ -843,6 +843,7 @@ function CalendarPage({
   const [isCalendarLoading, setIsCalendarLoading] = useState(true);
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [isDutyHoursManual, setIsDutyHoursManual] = useState(false);
+  const [isSavingDaily, setIsSavingDaily] = useState(false);
   const [dailySaveStatus, setDailySaveStatus] = useState<DailySaveStatus>('idle');
   const [dailySaveStatusAt, setDailySaveStatusAt] = useState<number | null>(null);
   const [invalidDailyField, setInvalidDailyField] = useState<string | null>(null);
@@ -1150,6 +1151,13 @@ function CalendarPage({
       return undefined;
     }
 
+    const editingEntry = editingEntryId
+      ? entries.find((entry) => entry.id === editingEntryId && !entry.id.startsWith('local-draft-'))
+      : null;
+    if (editingEntry?.submissionStatus === 'Submitted') {
+      return undefined;
+    }
+
     const hours = Number(entryForm.dutyHours || 0);
     if (!entryForm.date || !Number.isFinite(hours) || hours < 0 || hours > 24) {
       return undefined;
@@ -1383,6 +1391,10 @@ function CalendarPage({
   const saveEntry = async (event: React.SyntheticEvent, submissionStatus: CalendarEntry['submissionStatus'] = 'Draft') => {
     event.preventDefault();
 
+    if (isSavingDaily) {
+      return;
+    }
+
     const hours = Number(entryForm.dutyHours);
 
     if (!entryForm.date) {
@@ -1403,6 +1415,9 @@ function CalendarPage({
 
     setInvalidDailyField(null);
     setCalendarError(null);
+    setIsSavingDaily(true);
+    setDailySaveStatus('saving');
+    backendAutosaveRequestRef.current += 1;
     try {
       const payload = {
         ...entryForm,
@@ -1441,6 +1456,10 @@ function CalendarPage({
     } catch (err) {
       console.error('Failed to save calendar entry:', err);
       setCalendarError(getApiErrorMessage(err, 'Failed to save calendar entry.'));
+      setDailySaveStatus('error');
+      setDailySaveStatusAt(Date.now());
+    } finally {
+      setIsSavingDaily(false);
     }
   };
 
@@ -3025,13 +3044,13 @@ function CalendarPage({
                       <Trash2 size={16} />
                     </button>
                   )}
-                  <button type="submit" className="btn-secondary" aria-label="Save daily report as draft" title="Save Draft">
+                  <button type="submit" className="btn-secondary" disabled={isSavingDaily} aria-label="Save daily report as draft" title={isSavingDaily ? 'Saving Draft' : 'Save Draft'}>
                     <Save size={16} />
-                    <span>Save Draft</span>
+                    <span>{isSavingDaily ? 'Saving' : 'Save Draft'}</span>
                   </button>
-                  <button type="button" onClick={(event) => saveEntry(event, 'Submitted')} className="btn-success" data-daily-submit aria-label="Submit daily report" title="Submit Report">
+                  <button type="button" onClick={(event) => saveEntry(event, 'Submitted')} className="btn-success" disabled={isSavingDaily} data-daily-submit aria-label="Submit daily report" title={isSavingDaily ? 'Submitting Report' : 'Submit Report'}>
                     <CheckCircle2 size={16} />
-                    <span>Submit</span>
+                    <span>{isSavingDaily ? 'Submitting' : 'Submit'}</span>
                   </button>
                 </div>
               </div>
