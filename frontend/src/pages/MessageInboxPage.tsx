@@ -1008,127 +1008,6 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
               </div>
             </div>
           )}
-          {isComposeOpen && (
-            <div className="border-b border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-sm font-bold text-gray-900 dark:text-gray-100">New Chat</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsComposeOpen(false);
-                    setRecipientQuery('');
-                    setRecipientResults([]);
-                    setDraftGroupRecipients([]);
-                    setDraftThreadTitle('');
-                  }}
-                  className="icon-close-button h-8 w-8"
-                  aria-label="Close new chat search"
-                  title="Close"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <input
-                value={recipientQuery}
-                onChange={(event) => setRecipientQuery(event.target.value)}
-                placeholder="Type a name"
-                className="w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-900"
-              />
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => void loadDistrictRecipients()}
-                  disabled={isLoadingDistrictRecipients}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 text-xs font-bold text-accent hover:bg-accent/15 disabled:opacity-60"
-                  aria-label="Message district members"
-                  title="Message district members"
-                >
-                  <Building2 size={14} />
-                  <span>{isLoadingDistrictRecipients ? 'Loading...' : 'My District'}</span>
-                </button>
-              </div>
-              {draftGroupRecipients.length > 0 && (
-                <div className="mt-3 rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-900">
-                  <input
-                    value={draftThreadTitle}
-                    onChange={(event) => setDraftThreadTitle(event.target.value)}
-                    placeholder="Group name"
-                    className="mb-2 w-full rounded border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold dark:border-gray-700 dark:bg-gray-950"
-                  />
-                  <div className="flex flex-wrap gap-1.5">
-                    {draftGroupRecipients.map((user) => (
-                      <span key={user.id} className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-1 text-xs font-bold text-accent">
-                        {`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email}
-                        <button type="button" onClick={() => removeGroupRecipient(user.id)} aria-label="Remove recipient" title="Remove">
-                          <X size={12} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {(recipientResults.length > 0 || isRecipientSearching) && (
-                <div className="mt-3 max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                  {isRecipientSearching ? (
-                    <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>
-                  ) : (
-                    recipientResults.map((user) => (
-                      <div
-                        key={user.id}
-                        className="flex w-full items-center gap-2 px-2 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 sm:gap-3 sm:px-3"
-                      >
-                        {user.profilePictureUrl ? (
-                          <img
-                            src={getAssetThumbnailUrl(user.profilePictureUrl, 96)}
-                            alt={`${user.firstName} ${user.lastName}`}
-                            onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)}
-                            className="h-8 w-8 rounded-full object-cover sm:h-9 sm:w-9"
-                          />
-                        ) : (
-                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/10 text-xs font-bold text-accent sm:h-9 sm:w-9">
-                            {getInitials(`${user.firstName} ${user.lastName}`)}
-                          </span>
-                        )}
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-semibold">{user.firstName} {user.lastName}</span>
-                          <span className="block truncate text-xs text-gray-500">{user.email || user.peNumber}</span>
-                        </span>
-                        {user.receivesMessages === false && <span className="text-xs font-bold text-danger">Off</span>}
-                        {user.receivesMessages !== false && (
-                          <span className="flex shrink-0 gap-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDraftRecipient(user);
-                                setDraftGroupRecipients([]);
-                                setDraftThreadTitle('');
-                                setSelectedThreadId(user.id);
-                                setRecipientQuery('');
-                                setRecipientResults([]);
-                                setIsComposeOpen(false);
-                                setReplyBody('');
-                                setReplyAttachments([]);
-                              }}
-                              className="rounded-full bg-primary-500 px-2 py-1 text-[11px] font-bold text-white hover:bg-primary-600"
-                            >
-                              Chat
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => addGroupRecipient(user)}
-                              className="rounded-full bg-accent px-2 py-1 text-[11px] font-bold text-white hover:bg-accent/90"
-                            >
-                              Add
-                            </button>
-                          </span>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-          )}
           {isLoading ? (
             <div className="loading">Loading conversations...</div>
           ) : filteredThreads.length === 0 ? (
@@ -1218,6 +1097,154 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   </div>
                 );
               })}
+            </div>
+          )}
+          {isComposeOpen && (
+            <div className="quick-launch-context-menu absolute bottom-20 left-3 right-3 z-30 max-h-[min(34rem,calc(100%-6rem))] overflow-y-auto rounded-lg border border-gray-200 bg-white p-3 shadow-2xl ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-950 dark:ring-white/10 sm:left-auto sm:w-[25rem]">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-primary-500/10 text-primary-500 dark:text-blue-100">
+                    <Send size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-gray-900 dark:text-gray-100">New Message</p>
+                    <p className="truncate text-xs font-semibold text-gray-500 dark:text-gray-400">Start a chat, group, or district message</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsComposeOpen(false);
+                    setRecipientQuery('');
+                    setRecipientResults([]);
+                    setDraftGroupRecipients([]);
+                    setDraftThreadTitle('');
+                  }}
+                  className="icon-close-button h-8 w-8"
+                  aria-label="Close new message"
+                  title="Close"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <input
+                  value={recipientQuery}
+                  onChange={(event) => setRecipientQuery(event.target.value)}
+                  placeholder="Search name, PE, or email"
+                  className="global-search-input w-full rounded border border-gray-300 bg-white py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                  autoFocus
+                />
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void loadDistrictRecipients()}
+                  disabled={isLoadingDistrictRecipients}
+                  className="inline-flex h-9 items-center gap-1.5 rounded border border-accent/30 bg-accent/10 px-3 text-xs font-bold text-accent transition hover:bg-accent/15 disabled:opacity-60"
+                  aria-label="Message district members"
+                  title="Message district members"
+                >
+                  <Building2 size={14} />
+                  <span>{isLoadingDistrictRecipients ? 'Loading...' : 'My District'}</span>
+                </button>
+                {draftGroupRecipients.length > 0 && (
+                  <span className="inline-flex h-9 items-center rounded border border-primary-500/20 bg-primary-500/10 px-3 text-xs font-bold text-primary-500 dark:text-blue-100">
+                    {draftGroupRecipients.length} selected
+                  </span>
+                )}
+              </div>
+
+              {draftGroupRecipients.length > 0 && (
+                <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900">
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Group name</span>
+                    <input
+                      value={draftThreadTitle}
+                      onChange={(event) => setDraftThreadTitle(event.target.value)}
+                      placeholder="Optional group name"
+                      className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
+                    />
+                  </label>
+                  <div className="mt-2 flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
+                    {draftGroupRecipients.map((user) => (
+                      <span key={user.id} className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-1 text-xs font-bold text-accent">
+                        {`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email}
+                        <button type="button" onClick={() => removeGroupRecipient(user.id)} aria-label="Remove recipient" title="Remove">
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-3 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+                {isRecipientSearching ? (
+                  <div className="px-3 py-4 text-sm font-semibold text-gray-500 dark:text-gray-400">Searching...</div>
+                ) : recipientResults.length === 0 ? (
+                  <div className="px-3 py-4 text-sm font-semibold text-gray-500 dark:text-gray-400">
+                    {recipientQuery.trim().length < 2 ? 'Type at least 2 characters to search people.' : 'No matching users found.'}
+                  </div>
+                ) : (
+                  recipientResults.map((user) => (
+                    <div
+                      key={user.id}
+                      className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      {user.profilePictureUrl ? (
+                        <img
+                          src={getAssetThumbnailUrl(user.profilePictureUrl, 96)}
+                          alt={`${user.firstName} ${user.lastName}`}
+                          onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)}
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 text-xs font-bold text-accent">
+                          {getInitials(`${user.firstName} ${user.lastName}`)}
+                        </span>
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-bold text-gray-800 dark:text-gray-100">{user.firstName} {user.lastName}</span>
+                        <span className="block truncate text-xs font-semibold text-gray-500">{user.email || user.peNumber}</span>
+                      </span>
+                      {user.receivesMessages === false ? (
+                        <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-danger dark:bg-red-950">Off</span>
+                      ) : (
+                        <span className="flex shrink-0 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDraftRecipient(user);
+                              setDraftGroupRecipients([]);
+                              setDraftThreadTitle('');
+                              setSelectedThreadId(user.id);
+                              setRecipientQuery('');
+                              setRecipientResults([]);
+                              setIsComposeOpen(false);
+                              setReplyBody('');
+                              setReplyAttachments([]);
+                            }}
+                            className="inline-flex h-8 items-center rounded bg-primary-500 px-2.5 text-xs font-bold text-white hover:bg-primary-600"
+                          >
+                            Chat
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => addGroupRecipient(user)}
+                            className="inline-flex h-8 items-center rounded bg-accent px-2.5 text-xs font-bold text-white hover:bg-accent/90"
+                          >
+                            Add
+                          </button>
+                        </span>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
           <button
