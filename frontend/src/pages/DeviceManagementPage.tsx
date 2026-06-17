@@ -665,62 +665,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       {error && <div className="error">{error}</div>}
       {loading && <div className="loading">Loading device inventory...</div>}
 
-      <section className="mb-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2>Scanner & Labels</h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Scan a QR label or type an identifier to open an item, check it in, or check it out.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 rounded bg-accent/10 px-3 py-2 text-sm font-bold text-accent">
-            <QrCode size={16} />
-            <span>{devices.filter((device) => device.assetTag).length} labels ready</span>
-          </div>
-        </div>
-
-        <form onSubmit={handleScannerSubmit} className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.5fr)_180px_minmax(0,1fr)_auto]">
-          <input
-            value={scanValue}
-            onChange={(event) => setScanValue(event.target.value)}
-            placeholder="Scan or enter asset tag, serial, IMEI, ICCID, radio ID, hostname, router ID, or phone"
-            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-            autoComplete="off"
-          />
-          <select
-            value={scanMode}
-            onChange={(event) => setScanMode(event.target.value as ScanMode)}
-            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-          >
-            <option value="lookup">Lookup</option>
-            <option value="check-in">Check In</option>
-            <option value="check-out">Check Out</option>
-          </select>
-          <select
-            value={scanAssignee}
-            onChange={(event) => setScanAssignee(event.target.value)}
-            disabled={scanMode !== 'check-out'}
-            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950"
-            aria-label="Check out assignee"
-          >
-            <option value="">Select assignee</option>
-            {registeredUsers.map((user) => (
-              <option key={user.id} value={user.email}>{user.displayName || user.email}</option>
-            ))}
-          </select>
-          <button type="submit" className="btn-primary justify-center" aria-label="Apply scan" title="Apply Scan">
-            <QrCode size={16} />
-            <span>Apply</span>
-          </button>
-        </form>
-
-        {scanFeedback && (
-          <div className="mt-3 rounded border border-accent/30 bg-accent/10 px-3 py-2 text-sm font-semibold text-accent">
-            {scanFeedback}
-          </div>
-        )}
-      </section>
-
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
       <DeviceStatusRail
         statusCounts={statusCounts}
@@ -728,9 +672,62 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         setStatusFilter={setStatusFilter}
       />
       <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <h2>Inventory</h2>
-          <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-auto lg:grid-cols-4">
+        <div className="mb-5 flex flex-col gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2>Inventory</h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Search inventory, filter lifecycle status, or scan a device identifier.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 rounded bg-accent/10 px-3 py-2 text-sm font-bold text-accent">
+              <QrCode size={16} />
+              <span>{devices.filter((device) => device.assetTag).length} labels ready</span>
+            </div>
+          </div>
+
+          <form onSubmit={handleScannerSubmit} className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_160px_minmax(0,1fr)_auto]">
+            <input
+              value={scanValue}
+              onChange={(event) => setScanValue(event.target.value)}
+              placeholder="Scan or enter asset tag, serial, IMEI, ICCID, radio ID, hostname, router ID, or phone"
+              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+              autoComplete="off"
+            />
+            <select
+              value={scanMode}
+              onChange={(event) => setScanMode(event.target.value as ScanMode)}
+              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+            >
+              <option value="lookup">Lookup</option>
+              <option value="check-in">Check In</option>
+              <option value="check-out">Check Out</option>
+            </select>
+            <select
+              value={scanAssignee}
+              onChange={(event) => setScanAssignee(event.target.value)}
+              disabled={scanMode !== 'check-out'}
+              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950"
+              aria-label="Check out assignee"
+            >
+              <option value="">Select assignee</option>
+              {registeredUsers.map((user) => (
+                <option key={user.id} value={user.email}>{user.displayName || user.email}</option>
+              ))}
+            </select>
+            <button type="submit" className="btn-primary justify-center" aria-label="Apply scan" title="Apply Scan">
+              <QrCode size={16} />
+              <span>Apply</span>
+            </button>
+          </form>
+
+          {scanFeedback && (
+            <div className="rounded border border-accent/30 bg-accent/10 px-3 py-2 text-sm font-semibold text-accent">
+              {scanFeedback}
+            </div>
+          )}
+
+          <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <select value={filter} onChange={(event) => setFilter(event.target.value as DeviceType | 'All')} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
               <option>All</option>
               {deviceTypes.map((type) => <option key={type}>{type}</option>)}
@@ -971,10 +968,11 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setDevicePendingDelete(null)} className="btn-secondary" aria-label="Cancel device deletion" title="Cancel">
-                <X size={16} />
+                <span>Cancel</span>
               </button>
               <button type="button" onClick={() => deleteDevice(devicePendingDelete)} className="btn-danger" aria-label="Delete device" title="Delete">
                 <Trash2 size={16} />
+                <span>Delete</span>
               </button>
             </div>
           </div>
