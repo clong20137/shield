@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Award, Bug, ClipboardList, Images, LockKeyhole, ListChecks, Radio, Settings, UserPlus } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { AuthAccount, BugReport, BugReportStatus, User } from '../services/api';
 
 const AchievementsPage = lazy(() => import('./AchievementsPage'));
@@ -72,116 +73,141 @@ export function AdminConsolePage({
   bugReports = [],
   onBugStatusChange,
 }: AdminConsolePageProps) {
-  const [activeTab, setActiveTab] = useState<AdminConsoleTab>(initialTab);
-  const visibleTabs = getVisibleTabs(account);
+  const navigate = useNavigate();
+  const params = useParams<{ tab?: string }>();
+  const routeTab = tabs.some((tab) => tab.id === params.tab) ? params.tab as AdminConsoleTab : undefined;
+  const [activeTab, setActiveTab] = useState<AdminConsoleTab>(routeTab || initialTab);
+  const visibleTabs = useMemo(() => getVisibleTabs(account), [account]);
   const currentTab = visibleTabs.some((tab) => tab.id === activeTab) ? activeTab : visibleTabs[0]?.id || 'alerts';
 
   useEffect(() => {
-    setActiveTab(initialTab);
-  }, [initialTab]);
+    setActiveTab(routeTab || initialTab);
+  }, [initialTab, routeTab]);
+
+  useEffect(() => {
+    if (visibleTabs.length === 0) {
+      return;
+    }
+
+    if (!visibleTabs.some((tab) => tab.id === activeTab)) {
+      const fallbackTab = visibleTabs[0].id;
+      setActiveTab(fallbackTab);
+      navigate(`/admin/${fallbackTab}`, { replace: true });
+    }
+  }, [activeTab, navigate, visibleTabs]);
 
   const activeTabConfig = visibleTabs.find((tab) => tab.id === currentTab);
   const ActiveIcon = activeTabConfig?.icon || Settings;
+  const openTab = (tab: AdminConsoleTab) => {
+    setActiveTab(tab);
+    navigate(`/admin/${tab}`);
+  };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 md:flex-row">
+    <div className="min-h-[calc(100dvh-12rem)]">
       {visibleTabs.length === 0 ? (
         <div className="empty-state">You do not have access to any Admin Console tools.</div>
       ) : (
       <>
-      <aside className="shrink-0 border-b border-gray-200 pb-3 dark:border-gray-800 md:w-56 md:border-r md:border-b-0 md:pr-3 md:pb-0">
-        <div className="mb-3 flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-950">
-          <ActiveIcon size={17} className="text-primary-500" />
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Admin Console</p>
-            <p className="truncate text-sm font-bold text-gray-900 dark:text-white">{activeTabConfig?.label || 'Admin'}</p>
-          </div>
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.16em] text-accent">Administration</p>
+          <h1 className="mt-1 text-3xl font-black text-gray-900 dark:text-gray-100">Admin Console</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage settings, permissions, users, media, alerts, audit history, and system health.</p>
         </div>
+        <div className="flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-700 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200">
+          <ActiveIcon size={17} className="text-accent" />
+          {activeTabConfig?.label || 'Admin'}
+        </div>
+      </div>
 
-        <nav className="flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0" aria-label="Admin console navigation">
-          {visibleTabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex shrink-0 items-center gap-2 rounded px-3 py-2 text-left text-sm font-bold transition md:w-full ${
-                  currentTab === tab.id
-                    ? 'bg-primary-500 text-white shadow-sm'
-                    : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800'
-                }`}
-              >
-                <Icon size={16} />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </aside>
+      <div className="grid min-h-[calc(100dvh-18rem)] gap-5 xl:grid-cols-[17rem_minmax(0,1fr)]">
+        <aside className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <nav className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-1" aria-label="Admin console navigation">
+            {visibleTabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => openTab(tab.id)}
+                  className={`grid min-h-11 grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-2 rounded px-3 py-2 text-left text-sm font-bold transition ${
+                    currentTab === tab.id
+                      ? 'bg-primary-500 text-white shadow-sm'
+                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <Icon size={16} />
+                  <span className="truncate">{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-        <Suspense fallback={<div className="loading">Loading admin tools...</div>}>
-          {currentTab === 'general' && (
-            <PermissionsPage
-              account={account}
-              onAccountUpdate={onAccountUpdate}
-              onToast={onToast}
-              getErrorMessage={getErrorMessage}
-              section="settings"
-              isModalView
-            />
-          )}
+        <section className="min-w-0 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5">
+          <Suspense fallback={<div className="loading">Loading admin tools...</div>}>
+            {currentTab === 'general' && (
+              <PermissionsPage
+                account={account}
+                onAccountUpdate={onAccountUpdate}
+                onToast={onToast}
+                getErrorMessage={getErrorMessage}
+                section="settings"
+                isModalView
+              />
+            )}
 
-          {currentTab === 'permissions' && (
-            <PermissionsPage
-              account={account}
-              onAccountUpdate={onAccountUpdate}
-              onToast={onToast}
-              getErrorMessage={getErrorMessage}
-              section="permissions"
-              isModalView
-            />
-          )}
+            {currentTab === 'permissions' && (
+              <PermissionsPage
+                account={account}
+                onAccountUpdate={onAccountUpdate}
+                onToast={onToast}
+                getErrorMessage={getErrorMessage}
+                section="permissions"
+                isModalView
+              />
+            )}
 
-          {currentTab === 'create-user' && (
-            <CreateUserPage
-              onToast={onToast}
-              isModalView
-              onCreated={onUserCreated}
-            />
-          )}
+            {currentTab === 'create-user' && (
+              <CreateUserPage
+                onToast={onToast}
+                isModalView
+                onCreated={onUserCreated}
+              />
+            )}
 
-          {currentTab === 'achievements' && (
-            <AchievementsPage
-              onToast={onToast}
-              getErrorMessage={getErrorMessage}
-            />
-          )}
+            {currentTab === 'achievements' && (
+              <AchievementsPage
+                onToast={onToast}
+                getErrorMessage={getErrorMessage}
+              />
+            )}
 
-          {currentTab === 'media' && <MediaLibraryPage account={account} onToast={onToast} getErrorMessage={getErrorMessage} />}
+            {currentTab === 'media' && <MediaLibraryPage account={account} onToast={onToast} getErrorMessage={getErrorMessage} />}
 
-          {currentTab === 'audit' && <AuditLogPage isModalView />}
+            {currentTab === 'audit' && <AuditLogPage isModalView />}
 
-          {currentTab === 'errors' && <ErrorLogPage />}
+            {currentTab === 'errors' && <ErrorLogPage />}
 
-          {currentTab === 'alerts' && <UrgentAlertsPage onToast={onToast} />}
+            {currentTab === 'alerts' && <UrgentAlertsPage onToast={onToast} />}
 
-          {currentTab === 't-codes' && (
-            <TCodeOptionsPage
-              onToast={onToast}
-              getErrorMessage={getErrorMessage}
-            />
-          )}
+            {currentTab === 't-codes' && (
+              <TCodeOptionsPage
+                onToast={onToast}
+                getErrorMessage={getErrorMessage}
+              />
+            )}
 
-          {currentTab === 'bugs' && (
-            onBugStatusChange ? (
-              <BugTrackerPage reports={bugReports} onStatusChange={onBugStatusChange} />
-            ) : (
-              <div className="empty-state">Bug tracker is unavailable.</div>
-            )
-          )}
-        </Suspense>
+            {currentTab === 'bugs' && (
+              onBugStatusChange ? (
+                <BugTrackerPage reports={bugReports} onStatusChange={onBugStatusChange} />
+              ) : (
+                <div className="empty-state">Bug tracker is unavailable.</div>
+              )
+            )}
+          </Suspense>
+        </section>
       </div>
       </>
       )}

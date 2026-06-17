@@ -56,8 +56,8 @@ function isSecurePassword(password: string): boolean {
   return password.length >= 12 && /[A-Z]/u.test(password) && /[a-z]/u.test(password) && /\d/u.test(password) && /[^A-Za-z0-9]/u.test(password);
 }
 
-type ClosingModal = 'messages' | 'calendar' | 'calculator' | 'profile' | 'adminConsole' | 'reportBug' | 'bugTracker';
-type FloatingAppId = 'messages' | 'calendar' | 'calculator' | 'profile' | 'adminConsole';
+type ClosingModal = 'messages' | 'calendar' | 'calculator' | 'profile' | 'reportBug' | 'bugTracker';
+type FloatingAppId = 'messages' | 'calendar' | 'calculator' | 'profile';
 type AppScale = AuthAccount['appScale'];
 
 interface MessagePreferences {
@@ -1244,10 +1244,6 @@ function getCenteredFloatingPosition(width: number, topRatio = 0.08) {
 
 function getInitialProfileSettingsPosition() {
   return getCenteredFloatingPosition(Math.min(window.innerWidth - 16, 900), 0.07);
-}
-
-function getInitialAdminConsolePosition() {
-  return getCenteredFloatingPosition(Math.min(window.innerWidth - 16, 1240), 0.035);
 }
 
 function isEditableKeyboardTarget(target: EventTarget | null): boolean {
@@ -2860,22 +2856,6 @@ function MessagesRouteRedirect({ onOpenMessages }: { onOpenMessages: () => void 
   return <Navigate to="/" replace />;
 }
 
-function CreateUserRouteRedirect({ onOpenCreateUser }: { onOpenCreateUser: () => void }) {
-  useEffect(() => {
-    onOpenCreateUser();
-  }, [onOpenCreateUser]);
-
-  return <Navigate to="/" replace />;
-}
-
-function AdminRouteRedirect({ onOpenAdmin }: { onOpenAdmin: () => void }) {
-  useEffect(() => {
-    onOpenAdmin();
-  }, [onOpenAdmin]);
-
-  return <Navigate to="/" replace />;
-}
-
 interface CommandPaletteItem {
   id: string;
   label: string;
@@ -2897,7 +2877,6 @@ function GlobalCommandPalette({
   onOpenCalendar,
   onOpenCalculator,
   onOpenProfile,
-  onOpenAdminConsole,
   onReportBug,
 }: {
   isOpen: boolean;
@@ -2911,7 +2890,6 @@ function GlobalCommandPalette({
   onOpenCalendar: () => void;
   onOpenCalculator: () => void;
   onOpenProfile: () => void;
-  onOpenAdminConsole: (tab?: AdminConsoleTab) => void;
   onReportBug: () => void;
 }) {
   const navigate = useNavigate();
@@ -3041,7 +3019,7 @@ function GlobalCommandPalette({
           detail: 'Open Shield administration.',
           keywords: ['settings', 'manage', 'administrator'],
           icon: Shield,
-          action: () => onOpenAdminConsole(defaultAdminConsoleTab),
+          action: () => navigate(`/admin/${defaultAdminConsoleTab}`),
         },
       );
     }
@@ -3053,7 +3031,7 @@ function GlobalCommandPalette({
           detail: 'Add a new account.',
           keywords: ['account', 'new', 'person'],
           icon: UserPlus,
-          action: () => onOpenAdminConsole('create-user'),
+          action: () => navigate('/admin/create-user'),
         });
     }
 
@@ -3078,7 +3056,7 @@ function GlobalCommandPalette({
           detail: 'Review system activity.',
           keywords: ['activity', 'history', 'xlsx', 'export'],
           icon: ClipboardList,
-          action: () => onOpenAdminConsole('audit'),
+          action: () => navigate('/admin/audit'),
         },
       );
     }
@@ -3091,13 +3069,13 @@ function GlobalCommandPalette({
           detail: 'Manage roles and access.',
           keywords: ['roles', 'access', 'security'],
           icon: LockKeyhole,
-          action: () => onOpenAdminConsole('permissions'),
+          action: () => navigate('/admin/permissions'),
         },
       );
     }
 
     return items;
-  }, [canOpenAdminConsole, canUsePermission, defaultAdminConsoleTab, navigate, onOpenAdminConsole, onOpenCalendar, onOpenCalculator, onOpenMessages, onOpenProfile, onReportBug, showCalendar]);
+  }, [canOpenAdminConsole, canUsePermission, defaultAdminConsoleTab, navigate, onOpenCalendar, onOpenCalculator, onOpenMessages, onOpenProfile, onReportBug, showCalendar]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -3239,7 +3217,6 @@ function GlobalKeyboardShortcuts({
   onOpenCalendar,
   onOpenCalculator,
   onOpenCommandPalette,
-  onOpenAdminConsole,
   onLock,
 }: {
   canOpenAdminConsole: boolean;
@@ -3251,7 +3228,6 @@ function GlobalKeyboardShortcuts({
   onOpenCalendar: () => void;
   onOpenCalculator: () => void;
   onOpenCommandPalette: () => void;
-  onOpenAdminConsole: (tab?: AdminConsoleTab) => void;
   onLock: () => void;
 }) {
   const navigate = useNavigate();
@@ -3323,13 +3299,13 @@ function GlobalKeyboardShortcuts({
 
       if (key === 'a' && canOpenAdminConsole) {
         event.preventDefault();
-        onOpenAdminConsole(defaultAdminConsoleTab);
+        navigate(`/admin/${defaultAdminConsoleTab}`);
         return;
       }
 
       if (key === 'u' && canCreateUsers) {
         event.preventDefault();
-        onOpenAdminConsole('create-user');
+        navigate('/admin/create-user');
         return;
       }
 
@@ -3342,7 +3318,7 @@ function GlobalKeyboardShortcuts({
     document.addEventListener('keydown', handleShortcut);
 
     return () => document.removeEventListener('keydown', handleShortcut);
-  }, [canCreateUsers, canOpenAdminConsole, defaultAdminConsoleTab, isLocked, navigate, onLock, onOpenAdminConsole, onOpenCalendar, onOpenCalculator, onOpenCommandPalette, onOpenMessages, showCalendar]);
+  }, [canCreateUsers, canOpenAdminConsole, defaultAdminConsoleTab, isLocked, navigate, onLock, onOpenCalendar, onOpenCalculator, onOpenCommandPalette, onOpenMessages, showCalendar]);
 
   return null;
 }
@@ -4737,8 +4713,6 @@ function App() {
   const [activeFloatingApp, setActiveFloatingApp] = useState<FloatingAppId>('messages');
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [messageTargetUser, setMessageTargetUser] = useState<User | null>(null);
-  const [isAdminConsoleOpen, setIsAdminConsoleOpen] = useState(false);
-  const [adminConsoleTab, setAdminConsoleTab] = useState<AdminConsoleTab>('general');
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
   const [isBugTrackerOpen, setIsBugTrackerOpen] = useState(false);
   const [isFirstLoginGuideOpen, setIsFirstLoginGuideOpen] = useState(false);
@@ -5847,12 +5821,6 @@ function App() {
     currentUser?.mustChangePassword && !isWelcomeSplashOpen && !isFirstLoginGuideOpen,
   );
 
-  useEffect(() => {
-    if (!canOpenAdminConsole && isAdminConsoleOpen) {
-      setIsAdminConsoleOpen(false);
-    }
-  }, [canOpenAdminConsole, isAdminConsoleOpen]);
-
   const loadBugReports = useCallback(async () => {
     if (!isAdministrator) return;
     try {
@@ -5971,7 +5939,6 @@ function App() {
       if (modal === 'calendar') setIsCalendarModalOpen(false);
       if (modal === 'calculator') setIsCalculatorOpen(false);
       if (modal === 'profile') setIsProfileModalOpen(false);
-      if (modal === 'adminConsole') setIsAdminConsoleOpen(false);
       if (modal === 'reportBug') setIsReportBugOpen(false);
       if (modal === 'bugTracker') setIsBugTrackerOpen(false);
       setClosingModal(null);
@@ -6052,12 +6019,12 @@ function App() {
     setIsProfileModalOpen(true);
   };
 
-  useEffect(() => {
-    const openAppPath = (path: string) => {
-      window.history.pushState({}, document.title, withAppBase(path));
-      window.dispatchEvent(new PopStateEvent('popstate'));
-    };
+  const openAppPath = (path: string) => {
+    window.history.pushState({}, document.title, withAppBase(path));
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
 
+  useEffect(() => {
     const handleInternalLink = (event: Event) => {
       const target = ((event as CustomEvent<{ target?: string }>).detail?.target || '').toLowerCase();
       if (!target) {
@@ -6117,11 +6084,6 @@ function App() {
       return true;
     }
 
-    if (activeFloatingApp === 'adminConsole' && isAdminConsoleOpen) {
-      closeModal('adminConsole');
-      return true;
-    }
-
     if (isCalculatorOpen) {
       closeModal('calculator');
       return true;
@@ -6142,11 +6104,6 @@ function App() {
       return true;
     }
 
-    if (isAdminConsoleOpen) {
-      closeModal('adminConsole');
-      return true;
-    }
-
     return false;
   };
 
@@ -6155,13 +6112,7 @@ function App() {
       return;
     }
 
-    if (isAdminConsoleOpen && adminConsoleTab === 'create-user') {
-      closeModal('adminConsole');
-      return;
-    }
-
-    setAdminConsoleTab('create-user');
-    setIsAdminConsoleOpen(true);
+    openAppPath('/admin/create-user');
   };
 
   const openAdminConsole = (tab: AdminConsoleTab = 'general') => {
@@ -6169,11 +6120,8 @@ function App() {
       return;
     }
 
-    announceFloatingFocus('adminConsole');
-    setActiveFloatingApp('adminConsole');
-    setAdminConsoleTab(tab);
     setIsAccountMenuOpen(false);
-    setIsAdminConsoleOpen(true);
+    openAppPath(`/admin/${tab}`);
   };
 
   const handleReceiveMessagesChange = async (receiveMessages: boolean) => {
@@ -6379,11 +6327,6 @@ function App() {
         return;
       }
 
-      if (isAdminConsoleOpen) {
-        consumeEscape();
-        closeModal('adminConsole');
-        return;
-      }
       if (isProfileModalOpen) {
         consumeEscape();
         closeModal('profile');
@@ -6393,7 +6336,7 @@ function App() {
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [activeFloatingApp, isAccountMenuOpen, isAdminConsoleOpen, isBugTrackerOpen, isCalculatorOpen, isCalendarModalOpen, isCommandPaletteOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isProfileModalOpen, isReportBugOpen]);
+  }, [activeFloatingApp, isAccountMenuOpen, isBugTrackerOpen, isCalculatorOpen, isCalendarModalOpen, isCommandPaletteOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isProfileModalOpen, isReportBugOpen]);
 
   useEffect(() => {
     const blockContextMenu = (event: MouseEvent) => {
@@ -6781,17 +6724,89 @@ function App() {
                       )}
                       <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
                       {currentUser && canOpenAdminConsole && (
-                        <Route path="/admin" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole(getDefaultAdminConsoleTab())} />} />
+                        <Route
+                          path="/admin"
+                          element={
+                            <AdminConsolePage
+                              account={currentUser}
+                              initialTab={getDefaultAdminConsoleTab()}
+                              onAccountUpdate={handleAccountUpdate}
+                              onToast={showToast}
+                              getErrorMessage={getErrorMessage}
+                              onUserCreated={() => openAppPath('/admin/permissions')}
+                              bugReports={bugReports}
+                              onBugStatusChange={updateBugStatus}
+                            />
+                          }
+                        />
+                      )}
+                      {currentUser && canOpenAdminConsole && (
+                        <Route
+                          path="/admin/:tab"
+                          element={
+                            <AdminConsolePage
+                              account={currentUser}
+                              onAccountUpdate={handleAccountUpdate}
+                              onToast={showToast}
+                              getErrorMessage={getErrorMessage}
+                              onUserCreated={() => openAppPath('/admin/permissions')}
+                              bugReports={bugReports}
+                              onBugStatusChange={updateBugStatus}
+                            />
+                          }
+                        />
                       )}
                       {currentUser && canOpenAdminConsole && hasPermission('admin:create-user') && hasPermission('users:create') && (
-                        <Route path="/users/create" element={<CreateUserRouteRedirect onOpenCreateUser={() => openAdminConsole('create-user')} />} />
+                        <Route
+                          path="/users/create"
+                          element={
+                            <AdminConsolePage
+                              account={currentUser}
+                              initialTab="create-user"
+                              onAccountUpdate={handleAccountUpdate}
+                              onToast={showToast}
+                              getErrorMessage={getErrorMessage}
+                              onUserCreated={() => openAppPath('/admin/permissions')}
+                              bugReports={bugReports}
+                              onBugStatusChange={updateBugStatus}
+                            />
+                          }
+                        />
                       )}
                       <Route path="/reports" element={<ReportsPage currentUser={currentUser} onToast={showToast} getErrorMessage={getErrorMessage} />} />
                       {currentUser && canOpenAdminConsole && hasPermission('admin:audit') && hasPermission('audit:view') && (
-                        <Route path="/audit" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('audit')} />} />
+                        <Route
+                          path="/audit"
+                          element={
+                            <AdminConsolePage
+                              account={currentUser}
+                              initialTab="audit"
+                              onAccountUpdate={handleAccountUpdate}
+                              onToast={showToast}
+                              getErrorMessage={getErrorMessage}
+                              onUserCreated={() => openAppPath('/admin/permissions')}
+                              bugReports={bugReports}
+                              onBugStatusChange={updateBugStatus}
+                            />
+                          }
+                        />
                       )}
                       {currentUser && canOpenAdminConsole && hasPermission('admin:permissions') && hasPermission('roles:manage') && (
-                        <Route path="/permissions" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('permissions')} />} />
+                        <Route
+                          path="/permissions"
+                          element={
+                            <AdminConsolePage
+                              account={currentUser}
+                              initialTab="permissions"
+                              onAccountUpdate={handleAccountUpdate}
+                              onToast={showToast}
+                              getErrorMessage={getErrorMessage}
+                              onUserCreated={() => openAppPath('/admin/permissions')}
+                              bugReports={bugReports}
+                              onBugStatusChange={updateBugStatus}
+                            />
+                          }
+                        />
                       )}
                       <Route path="*" element={<NotFoundPage />} />
                     </Routes>
@@ -6808,7 +6823,6 @@ function App() {
                     ...(isMessagesModalOpen ? (['messages'] as const) : []),
                     ...(isCalendarModalOpen ? (['calendar'] as const) : []),
                     ...(isCalculatorOpen ? (['calculator'] as const) : []),
-                    ...(isAdminConsoleOpen && adminConsoleTab === 'create-user' ? (['create-user'] as const) : []),
                   ]}
                   storageKey={getQuickLaunchStorageKey(currentUser?.id || 'anonymous')}
                   accountId={currentUser?.id}
@@ -6840,7 +6854,6 @@ function App() {
             onOpenCalendar={openCalendarModal}
             onOpenCalculator={openCalculator}
             onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-            onOpenAdminConsole={openAdminConsole}
             onLock={lockApp}
           />
           <GlobalCommandPalette
@@ -6858,7 +6871,6 @@ function App() {
               openProfileSettings();
               setIsAccountMenuOpen(false);
             }}
-            onOpenAdminConsole={openAdminConsole}
             onReportBug={() => {
               setIsReportBugOpen(true);
               setIsAccountMenuOpen(false);
@@ -7022,57 +7034,6 @@ function App() {
                       onAccountUpdate={handleAccountUpdate}
                       onToast={showToast}
                       getErrorMessage={getErrorMessage}
-                    />
-                  </Suspense>
-                </div>
-              </>
-              )}
-            </FloatingWindow>
-          )}
-          {isAdminConsoleOpen && currentUser && canOpenAdminConsole && (
-            <FloatingWindow
-              className="pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[min(94dvh,860px)] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(520px,calc(100dvh-1rem))] md:w-[min(1240px,calc(100vw-1rem))] md:min-w-[min(460px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-5"
-              fallbackSize={{ width: Math.min(window.innerWidth - 16, 1240), height: Math.min(window.innerHeight - 16, 860) }}
-              initialPosition={getInitialAdminConsolePosition}
-              isClosing={closingModal === 'adminConsole'}
-              onFocus={() => {
-                announceFloatingFocus('adminConsole');
-                setActiveFloatingApp('adminConsole');
-              }}
-              zIndex={activeFloatingApp === 'adminConsole' ? 95 : 55}
-            >
-              {({ dragHandleProps, isDragging }) => (
-              <>
-                <div
-                  {...dragHandleProps}
-                  className={`mb-3 flex shrink-0 select-none items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800 md:cursor-grab ${isDragging ? 'md:cursor-grabbing' : ''}`}
-                >
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 sm:text-2xl">Admin Console</h2>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage settings, permissions, users, bug reports, and audit history from one place.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => closeModal('adminConsole')}
-                    className="icon-close-button"
-                    aria-label="Close admin console"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-                <div className="min-h-0 flex-1">
-                  <Suspense fallback={<PageLoader label="Loading admin console..." />}>
-                    <AdminConsolePage
-                      account={currentUser}
-                      initialTab={adminConsoleTab}
-                      onAccountUpdate={handleAccountUpdate}
-                      onToast={showToast}
-                      getErrorMessage={getErrorMessage}
-                      onUserCreated={() => {
-                        setAdminConsoleTab('permissions');
-                      }}
-                      bugReports={bugReports}
-                      onBugStatusChange={updateBugStatus}
                     />
                   </Suspense>
                 </div>
