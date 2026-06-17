@@ -351,7 +351,9 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
             {photoImportSummary.skippedFiles.length > 0 && (
               <div className="mt-2 max-h-40 overflow-auto text-gray-600 dark:text-gray-300">
                 {photoImportSummary.skippedFiles.slice(0, 20).map((file) => (
-                  <p key={`${file.fileName}-${file.reason}`}>{file.fileName}: {file.reason}</p>
+                  <p key={`${file.fileName}-${file.reason}`}>
+                    {file.fileName}{file.peNumber ? ` (PE ${file.peNumber})` : ''}: {file.reason}
+                  </p>
                 ))}
                 {photoImportSummary.skippedFiles.length > 20 && <p>{photoImportSummary.skippedFiles.length - 20} more skipped files.</p>}
               </div>

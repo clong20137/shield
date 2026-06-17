@@ -130,13 +130,21 @@ function isImportUserActive(status: string): boolean {
   return !['inactive', 'terminated', 'separated', 'retired'].includes(normalizedStatus);
 }
 
+function normalizePeLookupValue(value: string): string {
+  return value.trim().toLowerCase().replace(/^pe[\s_-]*/iu, '').replace(/[^a-z0-9]/giu, '');
+}
+
 function getPeCandidatesFromFileName(fileName: string): string[] {
   const baseName = path.parse(fileName).name.trim();
-  const compactName = baseName.replace(/[^a-z0-9]/giu, '');
-  const withoutPePrefix = compactName.replace(/^pe/iu, '');
+  const compactName = normalizePeLookupValue(baseName);
+  const peLabelMatches = Array.from(baseName.matchAll(/\bpe\s*[-_#:]?\s*([a-z0-9]{2,12})\b/giu), (match) => match[1] || '');
+  const numericMatches = Array.from(baseName.matchAll(/\b\d{3,12}\b/gu), (match) => match[0] || '');
+  const tokenMatches = baseName
+    .split(/[^a-z0-9]+/giu)
+    .filter((token) => /^(?:pe)?[a-z0-9]{3,12}$/iu.test(token));
 
   return Array.from(
-    new Set([baseName, compactName, withoutPePrefix].map((value) => value.trim()).filter(Boolean)),
+    new Set([baseName, compactName, ...peLabelMatches, ...numericMatches, ...tokenMatches].map(normalizePeLookupValue).filter(Boolean)),
   );
 }
 

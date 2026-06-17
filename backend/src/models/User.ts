@@ -334,6 +334,7 @@ export class UserModel {
 
   static async getUserByPeNumber(peNumber: string): Promise<User | null> {
     const normalizedPeNumber = peNumber.trim().toLowerCase();
+    const compactPeNumber = normalizedPeNumber.replace(/^pe[\s_-]*/iu, '').replace(/[^a-z0-9]/giu, '');
     if (!normalizedPeNumber) {
       return null;
     }
@@ -341,8 +342,11 @@ export class UserModel {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query(
-        'SELECT * FROM users WHERE LOWER(COALESCE(`peNumber`, \'\')) = ? LIMIT 1',
-        [normalizedPeNumber]
+        `SELECT * FROM users
+         WHERE LOWER(COALESCE(\`peNumber\`, '')) = ?
+            OR REPLACE(REPLACE(REPLACE(REPLACE(LOWER(COALESCE(\`peNumber\`, '')), ' ', ''), '-', ''), '_', ''), 'pe', '') = ?
+         LIMIT 1`,
+        [normalizedPeNumber, compactPeNumber]
       );
       const users = rows as User[];
       return users.length > 0 ? users[0] : null;
