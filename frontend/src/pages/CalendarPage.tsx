@@ -17,7 +17,9 @@ type StoredTrooperDailyDraft = {
   savedAt: number;
 };
 
-const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training'];
+const dayOffStatus = 'Day Off';
+const dayOffColor = '#64748B';
+const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training', dayOffStatus];
 const narrativeCharacterLimit = 1000;
 const dailyInputCharacterLimit = 5;
 const trooperDailyDraftStoragePrefix = 'shield_trooper_daily_draft';
@@ -1615,6 +1617,59 @@ function CalendarPage({
     lastAutoDutyHoursRef.current = '';
   };
 
+  const markDailyAsDayOff = async (dateKey: string) => {
+    const existingEntry = entries.find((entry) => entry.date === dateKey && !entry.id.startsWith('local-draft-'));
+    const localEntry = selectedDate === dateKey
+      ? entryForm
+      : existingEntry
+        ? createEntryFormFromEntry(existingEntry)
+        : createDefaultEntryForm(dateKey, currentUser);
+    const dayOffForm: CalendarEntryForm = {
+      ...localEntry,
+      category: 'Trooper Daily',
+      date: dateKey,
+      dutyHours: '0',
+      districtWorked: localEntry.districtWorked || getDefaultDistrict(currentUser),
+      specialStatus: dayOffStatus,
+      color: dayOffColor,
+      submissionStatus: 'Draft',
+      details: {
+        ...(localEntry.details || {}),
+        regularDaysOff: '1',
+      },
+    };
+    const payload = {
+      ...dayOffForm,
+      accountId: currentUser.id,
+      ...actor,
+    };
+
+    setCalendarError(null);
+    try {
+      const response = existingEntry
+        ? await calendarService.update(existingEntry.id, payload)
+        : await calendarService.create(payload);
+
+      setEntries((currentEntries) => [
+        response.data,
+        ...currentEntries.filter((entry) => entry.date !== response.data.date),
+      ]);
+      removeTrooperDailyDraft(currentUser.id, dateKey);
+      skipNextDailyDraftWriteRef.current = true;
+      setCalendarFocusDate(new Date(`${dateKey}T00:00:00`));
+      setSelectedDate(dateKey);
+      setEditingEntryId(response.data.id);
+      setEntryForm(createEntryFormFromEntry(response.data));
+      setIsDutyHoursManual(true);
+      setDailySaveStatus('saved');
+      setDailySaveStatusAt(Date.now());
+      lastAutoDutyHoursRef.current = '';
+    } catch (err) {
+      console.error('Failed to mark daily as day off:', err);
+      setCalendarError(getApiErrorMessage(err, 'Failed to mark day off.'));
+    }
+  };
+
   useEffect(() => {
     if (!dailyStripContextMenu) {
       return undefined;
@@ -1649,6 +1704,12 @@ function CalendarPage({
       if (key === 'p') {
         consume();
         copyPreviousDailyToDate(dailyStripContextMenu.dateKey);
+        return;
+      }
+
+      if (key === 'd') {
+        consume();
+        void markDailyAsDayOff(dailyStripContextMenu.dateKey);
         return;
       }
 
@@ -2229,10 +2290,11 @@ function CalendarPage({
                           {dailyShortcutDays.map(({ day, dateKey, entry }) => {
                             const isSelectedShortcutDay = selectedDate === dateKey;
                             const isTodayShortcutDay = dateKey === todayKey;
+                            const isDayOffShortcutDay = entry?.specialStatus === dayOffStatus;
                             const dailyStripStyle: DailyStripStyle | undefined = entry || isSelectedShortcutDay
                               ? {
-                                  ...(entry ? { backgroundColor: entry.color } : {}),
-                                  '--trooper-daily-strip-rgb': getHexColorRgb(entry?.color || entryForm.color),
+                                  ...(entry ? { backgroundColor: isDayOffShortcutDay ? dayOffColor : entry.color } : {}),
+                                  '--trooper-daily-strip-rgb': getHexColorRgb(isDayOffShortcutDay ? dayOffColor : entry?.color || entryForm.color),
                                 }
                               : undefined;
                             return (
@@ -2250,12 +2312,12 @@ function CalendarPage({
                                 onContextMenu={(event) => openDailyStripContextMenu(event, dateKey, entry)}
                                 className={`relative flex h-8 min-w-0 items-center justify-center rounded-md border text-xs font-black transition duration-300 hover:-translate-y-0.5 hover:shadow-sm ${
                                   entry
-                                    ? 'trooper-daily-strip-filled border-transparent text-white'
+                                    ? `trooper-daily-strip-filled border-transparent text-white ${isDayOffShortcutDay ? 'trooper-daily-strip-day-off' : ''}`
                                     : 'border-gray-300 bg-white text-gray-700 hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
                                 } ${isSelectedShortcutDay ? 'trooper-daily-strip-selected border-accent' : ''}`}
                                 style={dailyStripStyle}
-                                aria-label={`${entry ? 'Open' : 'Create'} daily report for ${dateKey}`}
-                              title={`${entry ? 'Open' : 'Create'} ${dateKey}`}
+                                aria-label={`${isDayOffShortcutDay ? 'Open day off' : entry ? 'Open' : 'Create'} daily report for ${dateKey}`}
+                              title={`${isDayOffShortcutDay ? 'Day Off' : entry ? 'Open' : 'Create'} ${dateKey}`}
                             >
                               {day}
                               {isTodayShortcutDay && (
@@ -2767,6 +2829,17 @@ function CalendarPage({
           >
             <span>Copy Previous Daily</span>
             <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">P</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void markDailyAsDayOff(dailyStripContextMenu.dateKey);
+              setDailyStripContextMenu(null);
+            }}
+            className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
+          >
+            <span>Mark Day Off</span>
+            <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">D</span>
           </button>
           {dailyStripContextMenu.entry && (
             <button

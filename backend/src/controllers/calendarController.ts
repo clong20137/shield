@@ -39,7 +39,7 @@ const districtOptions = [
   'CSI Section',
   'Digital Forensics Unit',
 ] as const;
-const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training'] as const;
+const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training', 'Day Off'] as const;
 const submissionStatusOptions = ['Draft', 'Submitted'] as const;
 
 function getAuditActor(account: { id: string; displayName: string; email: string } | null) {
