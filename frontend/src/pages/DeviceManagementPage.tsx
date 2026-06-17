@@ -6,6 +6,7 @@ import { FloatingWindow } from '../components/FloatingWindow';
 
 type DeviceType = DeviceRecord['type'];
 type DeviceStatus = DeviceRecord['status'];
+type DeviceStatusFilter = DeviceStatus | 'All' | 'Unassigned';
 type DeviceForm = Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'>;
 type DeviceConditionalField = 'phoneNumber' | 'imei' | 'simNumber' | 'radioId' | 'hostname' | 'routerId';
 type SortKey = keyof Pick<DeviceRecord, 'type' | 'assetTag' | 'makeModel' | 'assignedTo' | 'status' | 'location' | 'maintenanceDueDate' | 'replacementDueDate' | 'updatedAt'>;
@@ -262,7 +263,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isDeviceFormOpen, setIsDeviceFormOpen] = useState(false);
   const [filter, setFilter] = useState<DeviceType | 'All'>('All');
-  const [statusFilter, setStatusFilter] = useState<DeviceStatus | 'All'>('All');
+  const [statusFilter, setStatusFilter] = useState<DeviceStatusFilter>('All');
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt');
   const [page, setPage] = useState(1);
@@ -393,7 +394,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     return devices
       .filter((device) => {
         const matchesType = filter === 'All' || device.type === filter;
-        const matchesStatus = statusFilter === 'All' || device.status === statusFilter;
+        const matchesStatus = statusFilter === 'All'
+          || (statusFilter === 'Unassigned' ? !device.assignedTo : device.status === statusFilter);
         const searchableText = [
           device.assetTag,
           device.makeModel,
@@ -427,14 +429,18 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const pageStart = filteredDevices.length === 0 ? 0 : pageStartIndex + 1;
   const pageEnd = Math.min(filteredDevices.length, pageStartIndex + pageSize);
 
-  const statusCounts = useMemo(
-    () =>
-      deviceStatuses.map((status) => ({
-        status,
-        count: devices.filter((device) => device.status === status).length,
-      })),
-    [devices],
-  );
+  const statusCounts = useMemo(() => {
+    const orderedFilters: DeviceStatusFilter[] = ['All', 'Assigned', 'Unassigned', 'Available', 'Maintenance', 'Damaged', 'Lost', 'Retired'];
+
+    return orderedFilters.map((status) => ({
+      status,
+      count: status === 'All'
+        ? devices.length
+        : status === 'Unassigned'
+          ? devices.filter((device) => !device.assignedTo).length
+          : devices.filter((device) => device.status === status).length,
+    }));
+  }, [devices]);
 
   const commandCenterStats = useMemo(() => {
     const maintenanceAttention = devices.filter((device) => isDueSoon(device.maintenanceDueDate)).length;
@@ -811,41 +817,13 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         )}
       </section>
 
-      <div className="mb-8 grid grid-cols-1 gap-3 md:grid-cols-4">
-        {commandCenterStats.map((item) => (
-          <div key={item.label} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-            <p className="text-xs font-bold uppercase tracking-wide text-gray-400">{item.label}</p>
-            <div className="mt-2 flex items-end justify-between gap-3">
-              <p className="text-3xl font-bold text-primary-500 dark:text-blue-100">{item.value}</p>
-              <p className="text-right text-xs font-semibold text-gray-500 dark:text-gray-400">{item.detail}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-        {statusCounts.map((item) => {
-          const StatusIcon = deviceStatusMeta[item.status].icon;
-          return (
-            <button
-              key={item.status}
-              type="button"
-              onClick={() => setStatusFilter(item.status)}
-              className={`rounded-lg bg-white p-4 text-left shadow transition hover:-translate-y-0.5 hover:shadow-md dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 ${statusFilter === item.status ? 'ring-2 ring-accent' : ''}`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className={`flex h-10 w-10 items-center justify-center rounded ${deviceStatusMeta[item.status].cardTone}`}>
-                  <StatusIcon size={20} />
-                </span>
-                <p className="text-3xl font-bold text-primary-500 dark:text-blue-100">{item.count}</p>
-              </div>
-              <p className="mt-3 text-sm font-semibold text-gray-500 dark:text-gray-400">{item.status}</p>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[280px_minmax(0,1fr)_420px]">
+      <DeviceStatusRail
+        commandCenterStats={commandCenterStats}
+        statusCounts={statusCounts}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+      />
       <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <h2>Inventory</h2>
@@ -854,8 +832,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               <option>All</option>
               {deviceTypes.map((type) => <option key={type}>{type}</option>)}
             </select>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as DeviceStatus | 'All')} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as DeviceStatusFilter)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
               <option>All</option>
+              <option>Unassigned</option>
               {deviceStatuses.map((status) => <option key={status}>{status}</option>)}
             </select>
             <select value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
@@ -1123,6 +1102,84 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">{label}</span>
       {children}
     </label>
+  );
+}
+
+function DeviceStatusRail({
+  commandCenterStats,
+  statusCounts,
+  statusFilter,
+  setStatusFilter,
+}: {
+  commandCenterStats: Array<{ label: string; value: number; detail: string }>;
+  statusCounts: Array<{ status: DeviceStatusFilter; count: number }>;
+  statusFilter: DeviceStatusFilter;
+  setStatusFilter: (status: DeviceStatusFilter) => void;
+}) {
+  const getRailIcon = (status: DeviceStatusFilter) => {
+    if (status === 'All') return Laptop;
+    if (status === 'Unassigned') return PackageCheck;
+    return deviceStatusMeta[status].icon;
+  };
+
+  const getRailTone = (status: DeviceStatusFilter) => {
+    if (status === 'All') return 'bg-primary-50 text-primary-500 dark:bg-blue-950/40 dark:text-blue-100';
+    if (status === 'Unassigned') return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
+    return deviceStatusMeta[status].cardTone;
+  };
+
+  return (
+    <aside className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 xl:sticky xl:top-5 xl:max-h-[calc(100vh-2.5rem)] xl:overflow-y-auto">
+      <div className="border-b border-gray-200 px-1 pb-3 dark:border-gray-800">
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Device Views</p>
+        <h2 className="mt-1 text-lg font-bold text-gray-900 dark:text-gray-100">Inventory Status</h2>
+      </div>
+
+      <div className="mt-3 space-y-1">
+        {statusCounts.map((item) => {
+          const RailIcon = getRailIcon(item.status);
+          const isActive = statusFilter === item.status;
+
+          return (
+            <button
+              key={item.status}
+              type="button"
+              onClick={() => setStatusFilter(item.status)}
+              className={`flex w-full items-center gap-3 rounded border px-3 py-2.5 text-left transition hover:border-accent hover:bg-accent/10 ${
+                isActive
+                  ? 'border-accent bg-accent/10 text-accent shadow-sm'
+                  : 'border-transparent text-gray-600 dark:text-gray-300'
+              }`}
+            >
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded ${getRailTone(item.status)}`}>
+                <RailIcon size={18} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-bold">{item.status}</span>
+                <span className="block text-xs font-semibold text-gray-400 dark:text-gray-500">
+                  {item.count} device{item.count === 1 ? '' : 's'}
+                </span>
+              </span>
+              <span className="rounded bg-gray-100 px-2 py-1 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">
+                {item.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 border-t border-gray-200 pt-3 dark:border-gray-800">
+        <p className="px-1 text-xs font-black uppercase tracking-[0.14em] text-gray-400">Command Snapshot</p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {commandCenterStats.map((item) => (
+            <div key={item.label} className="rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-950">
+              <p className="text-xl font-black text-primary-500 dark:text-blue-100">{item.value}</p>
+              <p className="mt-0.5 truncate text-[11px] font-bold uppercase text-gray-500 dark:text-gray-400" title={item.label}>{item.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </aside>
   );
 }
 
