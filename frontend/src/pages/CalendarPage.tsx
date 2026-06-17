@@ -616,7 +616,7 @@ function TimeDetailInput({
   return (
     <div className={`grid gap-2 ${useMilitaryTime ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_auto]'}`}>
       <div className="relative min-w-0">
-        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400 dark:text-gray-500">
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
           <Icon size={15} />
         </span>
         <input
@@ -639,7 +639,7 @@ function TimeDetailInput({
           inputMode="numeric"
           maxLength={5}
           data-daily-field={fieldId}
-          className={`w-full rounded border bg-white px-3 py-2 pr-14 text-sm transition dark:bg-gray-900 ${
+          className={`w-full rounded border bg-white py-2 pl-9 pr-8 text-sm transition dark:bg-gray-900 ${
             isComplete
               ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
               : 'border-gray-300 dark:border-gray-700'
@@ -647,7 +647,7 @@ function TimeDetailInput({
           aria-label="Time"
         />
         {isComplete && (
-          <span className="pointer-events-none absolute inset-y-0 right-8 flex items-center text-green-600 dark:text-green-300">
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-green-600 dark:text-green-300">
             <CheckCircle2 className="trooper-daily-check" size={16} />
           </span>
         )}
@@ -2352,7 +2352,7 @@ function CalendarPage({
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Date</span>
                           <div className="relative">
-                            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400 dark:text-gray-500">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
                               <CalendarDays size={16} />
                             </span>
                             <input
@@ -2363,7 +2363,7 @@ function CalendarPage({
                                 setEntryForm((currentForm) => ({ ...currentForm, date: event.target.value }));
                               }}
                               data-daily-field="entryDate"
-                              className={`w-full rounded border bg-white px-3 py-2 pr-9 dark:bg-gray-950 ${
+                              className={`w-full rounded border bg-white py-2 pl-10 pr-3 dark:bg-gray-950 ${
                                 invalidDailyField === 'entryDate'
                                   ? 'trooper-daily-field-guard border-danger ring-2 ring-danger/30'
                                   : 'border-gray-300 dark:border-gray-700'
@@ -2376,7 +2376,7 @@ function CalendarPage({
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Duty Hours</span>
                           <div className="relative">
-                            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400 dark:text-gray-500">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
                               <Timer size={16} />
                             </span>
                             <input
@@ -2387,7 +2387,7 @@ function CalendarPage({
                               value={entryForm.dutyHours}
                               onChange={(event) => updateDutyHours(event.target.value)}
                               data-daily-field="dutyHours"
-                              className={`w-full rounded border bg-white px-3 py-2 pr-14 transition dark:bg-gray-950 ${
+                              className={`w-full rounded border bg-white py-2 pl-10 pr-9 transition dark:bg-gray-950 ${
                                 invalidDailyField === 'dutyHours'
                                   ? 'trooper-daily-field-guard border-danger ring-2 ring-danger/30'
                                   : entryForm.dutyHours
@@ -2397,7 +2397,7 @@ function CalendarPage({
                               required
                             />
                             {entryForm.dutyHours && (
-                              <span className="pointer-events-none absolute inset-y-0 right-8 flex items-center text-green-600 dark:text-green-300">
+                              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-green-600 dark:text-green-300">
                                 <CheckCircle2 className="trooper-daily-check" size={17} />
                               </span>
                             )}
@@ -2412,7 +2412,7 @@ function CalendarPage({
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">District Worked</span>
                           <div className="relative">
-                            <span className="pointer-events-none absolute inset-y-0 right-8 flex items-center text-gray-400 dark:text-gray-500">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
                               <MapPin size={16} />
                             </span>
                             <select
@@ -2421,19 +2421,22 @@ function CalendarPage({
                                 setEntryForm((currentForm) => ({ ...currentForm, districtWorked: event.target.value }))
                               }
                               data-daily-field="districtWorked"
-                              className="w-full rounded border border-gray-300 bg-white px-3 py-2 pr-12 dark:border-gray-700 dark:bg-gray-950"
+                              className="w-full appearance-none rounded border border-gray-300 bg-white py-2 pl-10 pr-10 dark:border-gray-700 dark:bg-gray-950"
                             >
                               {districtOptions.map((district) => (
                                 <option key={district}>{district}</option>
                               ))}
                             </select>
+                            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-300 dark:text-gray-200">
+                              <ChevronRight className="rotate-90" size={17} />
+                            </span>
                           </div>
                         </label>
 
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Special Status</span>
                           <div className="relative">
-                            <span className="pointer-events-none absolute inset-y-0 right-8 flex items-center text-gray-400 dark:text-gray-500">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
                               <BadgeCheck size={16} />
                             </span>
                             <select
@@ -2442,31 +2445,37 @@ function CalendarPage({
                                 setEntryForm((currentForm) => ({ ...currentForm, specialStatus: event.target.value }))
                               }
                               data-daily-field="specialStatus"
-                              className="w-full rounded border border-gray-300 bg-white px-3 py-2 pr-12 dark:border-gray-700 dark:bg-gray-950"
+                              className="w-full appearance-none rounded border border-gray-300 bg-white py-2 pl-10 pr-10 dark:border-gray-700 dark:bg-gray-950"
                             >
                               {specialStatusOptions.map((status) => (
                                 <option key={status}>{status}</option>
                               ))}
                             </select>
+                            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-300 dark:text-gray-200">
+                              <ChevronRight className="rotate-90" size={17} />
+                            </span>
                           </div>
                         </label>
 
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Color Code</span>
                           <div className="relative">
-                            <span className="pointer-events-none absolute inset-y-0 right-8 flex items-center text-gray-400 dark:text-gray-500">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
                               <Palette size={16} />
                             </span>
                             <select
                               value={entryForm.color}
                               onChange={(event) => setEntryForm((currentForm) => ({ ...currentForm, color: event.target.value }))}
                               data-daily-field="color"
-                              className="w-full rounded border border-gray-300 bg-white px-3 py-2 pr-12 dark:border-gray-700 dark:bg-gray-950"
+                              className="w-full appearance-none rounded border border-gray-300 bg-white py-2 pl-10 pr-10 dark:border-gray-700 dark:bg-gray-950"
                             >
                               {entryColors.map((color) => (
                                 <option key={color.value} value={color.value}>{color.label}</option>
                               ))}
                             </select>
+                            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-300 dark:text-gray-200">
+                              <ChevronRight className="rotate-90" size={17} />
+                            </span>
                           </div>
                         </label>
                       </div>
@@ -2555,7 +2564,7 @@ function CalendarPage({
                                 />
                               ) : (
                                 <div className="relative">
-                                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400 dark:text-gray-500">
+                                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
                                     <FieldIcon size={15} />
                                   </span>
                                   <input
@@ -2565,14 +2574,14 @@ function CalendarPage({
                                     value={entryForm.details?.[key] || ''}
                                     onChange={(event) => updateDailyDetail(key, event.target.value)}
                                     data-daily-field={key}
-                                    className={`w-full rounded border bg-white px-3 py-2 pr-14 text-sm transition dark:bg-gray-900 ${
+                                    className={`w-full rounded border bg-white py-2 pl-9 pr-8 text-sm transition dark:bg-gray-900 ${
                                       isComplete
                                         ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
                                         : 'border-gray-300 dark:border-gray-700'
                                     }`}
                                   />
                                   {isComplete && (
-                                    <span className="pointer-events-none absolute inset-y-0 right-8 flex items-center text-green-600 dark:text-green-300">
+                                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-green-600 dark:text-green-300">
                                       <CheckCircle2 className="trooper-daily-check" size={16} />
                                     </span>
                                   )}
@@ -2597,7 +2606,7 @@ function CalendarPage({
                         </span>
                       </div>
                       <div className="relative">
-                        <span className="pointer-events-none absolute right-3 top-3 text-gray-400 dark:text-gray-500">
+                        <span className="pointer-events-none absolute left-3 top-3 text-gray-400 dark:text-gray-500">
                           <FileText size={16} />
                         </span>
                         <textarea
@@ -2606,7 +2615,7 @@ function CalendarPage({
                           placeholder="Type a narrative here"
                           maxLength={narrativeCharacterLimit}
                           data-daily-field="narrative"
-                          className="min-h-72 w-full rounded border border-gray-300 bg-white px-3 py-2 pr-9 text-sm dark:border-gray-700 dark:bg-gray-900"
+                          className="min-h-72 w-full rounded border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm dark:border-gray-700 dark:bg-gray-900"
                         />
                       </div>
                     </div>
