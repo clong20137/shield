@@ -44,12 +44,14 @@ Implemented in this pass:
 - Added keyed blind indexes for personal phone and emergency contact phone lookups.
 - Added startup protection for existing plaintext sensitive profile values when `DATA_ENCRYPTION_KEY` is configured.
 - Added production warnings for missing data encryption and blind-index keys.
+- Moved uploaded media delivery behind authenticated `/api/uploads` and `/uploads` session checks.
+- Disabled public long-lived caching for uploaded media responses.
 
 - Expand field-level encryption to additional identifiers only after search/import behavior is redesigned to avoid breaking PE, badge, PeopleSoft, and public-safety ID workflows.
 - Store encryption keys outside the database using a vault or cloud KMS.
 - Add key rotation procedures and emergency key revocation procedures.
 - Encrypt uploaded media storage and backups.
-- Replace direct static access to private uploads with permission-checked, expiring media access routes.
+- Add expiring media access links for high-sensitivity file sharing if agencies need link-based access outside the authenticated app.
 - Add malware scanning for uploaded profile images, media-library assets, documents, and imports.
 
 ## Phase 3 - Agency Isolation and Access Reviews

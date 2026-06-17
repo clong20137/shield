@@ -28,6 +28,7 @@ import quickNoteRoutes from './routes/quickNoteRoutes';
 import urgentAlertRoutes from './routes/urgentAlertRoutes';
 import mediaRoutes from './routes/mediaRoutes';
 import { startSecurityCleanupJob } from './services/securityCleanup';
+import { requireAuthenticated } from './middleware/authSession';
 import { rateLimit } from './middleware/rateLimit';
 import { requestTimeout } from './middleware/requestTimeout';
 import { csrfProtection } from './middleware/csrfProtection';
@@ -171,16 +172,17 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use('/api', csrfProtection({ allowedOrigins }));
 const uploadsStaticMiddleware = express.static(path.join(process.cwd(), 'uploads'), {
   fallthrough: false,
-  immutable: true,
-  maxAge: '7d',
+  immutable: false,
+  maxAge: 0,
   setHeaders: (res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, no-store');
   },
 });
-app.use('/uploads', generateMissingUploadThumbnail);
-app.use('/api/uploads', generateMissingUploadThumbnail);
-app.use('/uploads', uploadsStaticMiddleware);
-app.use('/api/uploads', uploadsStaticMiddleware);
+app.use('/uploads', requireAuthenticated(), generateMissingUploadThumbnail);
+app.use('/api/uploads', requireAuthenticated(), generateMissingUploadThumbnail);
+app.use('/uploads', requireAuthenticated(), uploadsStaticMiddleware);
+app.use('/api/uploads', requireAuthenticated(), uploadsStaticMiddleware);
 
 // Routes
 app.use('/api', rateLimit({
