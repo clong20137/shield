@@ -3363,8 +3363,18 @@ function NotFoundPage() {
 
 function PageLoader({ label = 'Loading...' }: { label?: string }) {
   return (
-    <div className="flex min-h-48 items-center justify-center">
-      <div className="loading">{label}</div>
+    <div className="page-loader-enter flex min-h-48 items-center justify-center">
+      <div className="loading min-w-56">{label}</div>
+    </div>
+  );
+}
+
+function RouteTransition({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+
+  return (
+    <div key={location.pathname} className="page-route-enter">
+      {children}
     </div>
   );
 }
@@ -6716,39 +6726,41 @@ function App() {
             <main className="min-w-0 flex-1 overflow-y-auto px-3 pb-28 pt-4 dark:bg-gray-950 sm:px-6 sm:pb-48 sm:pt-5 md:pb-48">
               <div data-onboarding-target="workspace" className="min-h-[calc(100dvh-12rem)] min-w-0">
                 <Suspense fallback={<PageLoader label="Loading page..." />}>
-                  <Routes>
-                    <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
-                    {currentUser && <Route path="/updates/:postId" element={<DashboardPostPage currentUser={currentUser} onToast={showToast} />} />}
-                    {currentUser && <Route path="/messages" element={<MessagesRouteRedirect onOpenMessages={openMessagesModal} />} />}
-                    {currentUser && (
-                      <Route
-                        path="/calendar"
-                        element={<CalendarPage currentUser={currentUser} onAccountUpdate={handleAccountUpdate} useMilitaryTime={messagePreferences.useMilitaryTime} />}
-                      />
-                    )}
-                    <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
-                    {currentUser && (
-                      <Route
-                        path="/evaluations"
-                        element={<PerformanceEvaluationsPage currentUser={currentUser} onToast={showToast} getErrorMessage={getErrorMessage} />}
-                      />
-                    )}
-                    <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
-                    {currentUser && canOpenAdminConsole && (
-                      <Route path="/admin" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole(getDefaultAdminConsoleTab())} />} />
-                    )}
-                    {currentUser && canOpenAdminConsole && hasPermission('admin:create-user') && hasPermission('users:create') && (
-                      <Route path="/users/create" element={<CreateUserRouteRedirect onOpenCreateUser={() => openAdminConsole('create-user')} />} />
-                    )}
-                    <Route path="/reports" element={<ReportsPage currentUser={currentUser} onToast={showToast} getErrorMessage={getErrorMessage} />} />
-                    {currentUser && canOpenAdminConsole && hasPermission('admin:audit') && hasPermission('audit:view') && (
-                      <Route path="/audit" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('audit')} />} />
-                    )}
-                    {currentUser && canOpenAdminConsole && hasPermission('admin:permissions') && hasPermission('roles:manage') && (
-                      <Route path="/permissions" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('permissions')} />} />
-                    )}
-                    <Route path="*" element={<NotFoundPage />} />
-                  </Routes>
+                  <RouteTransition>
+                    <Routes>
+                      <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
+                      {currentUser && <Route path="/updates/:postId" element={<DashboardPostPage currentUser={currentUser} onToast={showToast} />} />}
+                      {currentUser && <Route path="/messages" element={<MessagesRouteRedirect onOpenMessages={openMessagesModal} />} />}
+                      {currentUser && (
+                        <Route
+                          path="/calendar"
+                          element={<CalendarPage currentUser={currentUser} onAccountUpdate={handleAccountUpdate} useMilitaryTime={messagePreferences.useMilitaryTime} />}
+                        />
+                      )}
+                      <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
+                      {currentUser && (
+                        <Route
+                          path="/evaluations"
+                          element={<PerformanceEvaluationsPage currentUser={currentUser} onToast={showToast} getErrorMessage={getErrorMessage} />}
+                        />
+                      )}
+                      <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
+                      {currentUser && canOpenAdminConsole && (
+                        <Route path="/admin" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole(getDefaultAdminConsoleTab())} />} />
+                      )}
+                      {currentUser && canOpenAdminConsole && hasPermission('admin:create-user') && hasPermission('users:create') && (
+                        <Route path="/users/create" element={<CreateUserRouteRedirect onOpenCreateUser={() => openAdminConsole('create-user')} />} />
+                      )}
+                      <Route path="/reports" element={<ReportsPage currentUser={currentUser} onToast={showToast} getErrorMessage={getErrorMessage} />} />
+                      {currentUser && canOpenAdminConsole && hasPermission('admin:audit') && hasPermission('audit:view') && (
+                        <Route path="/audit" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('audit')} />} />
+                      )}
+                      {currentUser && canOpenAdminConsole && hasPermission('admin:permissions') && hasPermission('roles:manage') && (
+                        <Route path="/permissions" element={<AdminRouteRedirect onOpenAdmin={() => openAdminConsole('permissions')} />} />
+                      )}
+                      <Route path="*" element={<NotFoundPage />} />
+                    </Routes>
+                  </RouteTransition>
                 </Suspense>
               </div>
               {!messagePreferences.hideQuickLaunch && (

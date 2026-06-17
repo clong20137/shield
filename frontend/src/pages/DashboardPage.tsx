@@ -1676,6 +1676,14 @@ function MyDayWidget({
   const overdueCount = activeReminders.filter((reminder) => reminder.remindOn < todayKey).length;
   const draftCount = todaysEntries.filter((entry) => entry.submissionStatus === 'Draft').length;
   const submittedCount = todaysEntries.filter((entry) => entry.submissionStatus === 'Submitted').length;
+  const completedEntryPercent = todaysEntries.length > 0 ? Math.round((submittedCount / todaysEntries.length) * 100) : 0;
+  const dayStatusLabel = overdueCount > 0
+    ? `${overdueCount} overdue`
+    : activeReminders.length > 0
+      ? `${activeReminders.length} due now`
+      : draftCount > 0
+        ? `${draftCount} draft${draftCount === 1 ? '' : 's'}`
+        : 'Clear';
 
   const completeReminder = async (reminder: Reminder) => {
     try {
@@ -1717,45 +1725,63 @@ function MyDayWidget({
   };
 
   return (
-    <section data-onboarding-target="my-day" className="flex h-full min-h-[24rem] flex-col rounded-lg border border-gray-200 bg-white p-3 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-4">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-primary-500/10 text-primary-500 dark:bg-blue-950 dark:text-blue-100">
-            <CalendarDays size={19} />
+    <section data-onboarding-target="my-day" className="relative flex h-full min-h-[24rem] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
+      <div className="border-b border-white/10 bg-primary-500 px-4 py-4 text-white dark:bg-gray-950 sm:px-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-white/12 text-white ring-1 ring-white/15">
+              <CalendarDays size={20} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-100 dark:text-gray-400">My Day</p>
+              <h2 className="mt-1 truncate text-xl font-black text-white">{getReadableDate(todayKey)}</h2>
+            </div>
           </div>
-          <div className="min-w-0">
-            <h2 className="text-xl font-bold text-primary-500 dark:text-blue-100">My Day</h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{getReadableDate(todayKey)}</p>
+          <Link to="/calendar" className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-white/20 bg-white/10 text-white transition hover:bg-white/15" aria-label="Open calendar" title="Open Calendar">
+            <CalendarDays size={17} />
+          </Link>
+        </div>
+        <div className="mt-4 rounded border border-white/15 bg-white/10 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-bold uppercase tracking-wide text-blue-100 dark:text-gray-400">Daily completion</span>
+            <span className="text-sm font-black text-white">{completedEntryPercent}%</span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/20">
+            <div
+              className="h-full rounded-full bg-accent transition-all"
+              style={{ width: `${completedEntryPercent}%` }}
+            />
           </div>
         </div>
-        <Link to="/calendar" className="btn-secondary shrink-0" aria-label="Open calendar" title="Open Calendar">
-          <CalendarDays size={16} />
-        </Link>
       </div>
 
-      <div className="mb-4 grid grid-cols-3 gap-2">
-        <div className="rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
-          <p className="text-xs font-bold uppercase text-gray-400">Items</p>
-          <p className="mt-1 text-xl font-bold text-primary-500 dark:text-blue-100">{todaysEntries.length}</p>
+      <div className="grid grid-cols-3 gap-px border-b border-gray-200 bg-gray-200 dark:border-gray-800 dark:bg-gray-800">
+        <div className="bg-gray-50 px-3 py-3 dark:bg-gray-950">
+          <p className="text-[10px] font-black uppercase tracking-wide text-gray-400">Entries</p>
+          <p className="mt-1 text-xl font-black text-primary-500 dark:text-blue-100">{todaysEntries.length}</p>
         </div>
-        <div className="rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
-          <p className="text-xs font-bold uppercase text-gray-400">Drafts</p>
-          <p className="mt-1 text-xl font-bold text-accent">{draftCount}</p>
+        <div className="bg-gray-50 px-3 py-3 dark:bg-gray-950">
+          <p className="text-[10px] font-black uppercase tracking-wide text-gray-400">Status</p>
+          <p className={`mt-1 truncate text-lg font-black ${overdueCount > 0 ? 'text-danger' : activeReminders.length > 0 ? 'text-accent' : 'text-success'}`}>{dayStatusLabel}</p>
         </div>
-        <div className="rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
-          <p className="text-xs font-bold uppercase text-gray-400">Due</p>
-          <p className="mt-1 text-xl font-bold text-primary-500 dark:text-blue-100">{openReminders.length}</p>
+        <div className="bg-gray-50 px-3 py-3 dark:bg-gray-950">
+          <p className="text-[10px] font-black uppercase tracking-wide text-gray-400">Reminders</p>
+          <p className="mt-1 text-xl font-black text-primary-500 dark:text-blue-100">{openReminders.length}</p>
         </div>
       </div>
 
-      {error && <div className="error">{error}</div>}
-      {isLoading ? (
-        <div className="loading">Loading your day...</div>
-      ) : (
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+      {error && <div className="error m-3 sm:m-4">{error}</div>}
+      <div className="min-h-0 flex-1 p-3 sm:p-4">
+        {isLoading ? (
+          <div className="loading">Loading your day...</div>
+        ) : (
+        <div className="min-h-0 h-full space-y-4 overflow-y-auto pr-1">
           <div>
             <div className="mb-2 flex items-center justify-between gap-3">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Calendar</h3>
+              <h3 className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <NotebookPen size={15} />
+                Calendar
+              </h3>
               {submittedCount > 0 && <span className="text-xs font-semibold text-success">{submittedCount} submitted</span>}
             </div>
             {todaysEntries.length === 0 ? (
@@ -1763,7 +1789,8 @@ function MyDayWidget({
             ) : (
               <div className="space-y-2">
                 {todaysEntries.slice(0, 4).map((entry) => (
-                  <Link key={entry.id} to="/calendar" className="block rounded border border-gray-200 bg-gray-50 p-3 transition hover:border-accent hover:bg-white dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900">
+                  <Link key={entry.id} to="/calendar" className="group relative block overflow-hidden rounded border border-gray-200 bg-gray-50 p-3 pl-4 transition hover:-translate-y-0.5 hover:border-accent hover:bg-white hover:shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900">
+                    <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: entry.color || entryColors[0].value }} />
                     <div className="flex items-center justify-between gap-3">
                       <span className="truncate text-sm font-bold text-gray-900 dark:text-gray-100">{entry.category}</span>
                       <span className={`rounded-full px-2 py-1 text-xs font-bold ${entry.submissionStatus === 'Submitted' ? 'bg-success/10 text-success' : 'bg-accent/10 text-accent'}`}>
@@ -1781,7 +1808,10 @@ function MyDayWidget({
 
           <div>
             <div className="mb-2 flex items-center justify-between gap-3">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Reminders</h3>
+              <h3 className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <Bell size={15} />
+                Reminders
+              </h3>
               {overdueCount > 0 && <span className="text-xs font-semibold text-danger">{overdueCount} overdue</span>}
             </div>
             {openReminders.length === 0 ? (
@@ -1789,7 +1819,7 @@ function MyDayWidget({
             ) : (
               <div className="space-y-2">
                 {activeReminders.slice(0, 5).map((reminder) => (
-                  <div key={reminder.id} className="rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                  <div key={reminder.id} className={`rounded border p-3 shadow-sm ${reminder.remindOn < todayKey ? 'border-danger/30 bg-danger/5 dark:bg-red-950/20' : 'border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950'}`}>
                     <div className="flex items-start gap-2">
                       <button
                         type="button"
@@ -1844,7 +1874,8 @@ function MyDayWidget({
             )}
           </div>
         </div>
-      )}
+        )}
+      </div>
     </section>
   );
 }
