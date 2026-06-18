@@ -17,6 +17,7 @@ type DailyValidationTarget = {
   field: string;
   message: string;
 };
+type DailyPanelCompletionState = 'complete' | 'attention' | 'warning' | 'progress' | 'empty';
 type StoredTrooperDailyDraft = {
   form: CalendarEntryForm;
   editingEntryId: string | null;
@@ -721,6 +722,12 @@ function getDailyFieldIcon(key: string): LucideIcon {
 function isSectionComplete(details: Record<string, string> | undefined, section: typeof trooperDailySections[number]): boolean {
   const visibleFields = section.fields.filter(([key]) => shouldShowDailyDetailField(details, key));
   return visibleFields.every(([key]) => isDetailComplete(details, key));
+}
+
+function isSectionTouched(details: Record<string, string> | undefined, section: typeof trooperDailySections[number]): boolean {
+  return section.fields
+    .filter(([key]) => shouldShowDailyDetailField(details, key))
+    .some(([key]) => isDetailComplete(details, key));
 }
 
 function HourMetricPill({
@@ -2373,6 +2380,71 @@ function CalendarPage({
 
     return 'Autosave issue';
   })();
+  const getPanelCompletionState = (panel: string): { state: DailyPanelCompletionState; label: string } => {
+    const panelSection = trooperDailySections.find((section) => section.title === panel);
+    const invalidField = invalidDailyField || '';
+    const invalidBelongsToPanel = panel === 'Administrative'
+      ? ['entryDate', 'dutyHours', 'districtWorked', 'specialStatus', 'color'].includes(invalidField)
+      : panel === 'T-Codes'
+        ? invalidField.startsWith('tCode-')
+        : panel === 'Narrative'
+          ? invalidField === 'narrative'
+          : Boolean(panelSection?.fields.some(([key]) => key === invalidField));
+
+    if (invalidBelongsToPanel) {
+      return { state: 'attention', label: 'Needs attention' };
+    }
+
+    if (panel === 'Administrative') {
+      const isComplete = Boolean(entryForm.date && entryForm.dutyHours && entryForm.districtWorked && entryForm.specialStatus);
+      return isComplete
+        ? { state: 'complete', label: 'Complete' }
+        : { state: 'attention', label: 'Needs setup' };
+    }
+
+    if (panel === 'T-Codes') {
+      const hasIncompleteRow = !hasNoTCodes && tCodeRows.some((row) => !row.code.trim() || !row.timeWorked.trim());
+      if (hasIncompleteRow) {
+        return { state: 'attention', label: 'Needs attention' };
+      }
+      if (isTCodeComplete) {
+        return { state: 'complete', label: 'Complete' };
+      }
+      return { state: 'empty', label: 'Not started' };
+    }
+
+    if (panel === 'Narrative') {
+      return entryForm.details?.narrative?.trim()
+        ? { state: 'complete', label: 'Complete' }
+        : { state: 'empty', label: 'Optional' };
+    }
+
+    if (!panelSection) {
+      return { state: 'empty', label: 'Not started' };
+    }
+
+    if (hasHourMismatch && panel === 'Regular Duty' && calculatedShiftHours > 0) {
+      return { state: 'warning', label: 'Hours mismatch' };
+    }
+
+    if (hasHourMismatch && panel === 'Attendance Hours' && attendanceHours > 0) {
+      return { state: 'warning', label: 'Hours mismatch' };
+    }
+
+    if (hasHourMismatch && panel === 'Duty Hours' && dutyActivityHours > 0) {
+      return { state: 'warning', label: 'Hours mismatch' };
+    }
+
+    if (isSectionComplete(entryForm.details, panelSection)) {
+      return { state: 'complete', label: 'Complete' };
+    }
+
+    if (isSectionTouched(entryForm.details, panelSection)) {
+      return { state: 'progress', label: 'In progress' };
+    }
+
+    return { state: 'empty', label: 'Not started' };
+  };
   const showDailyStripTooltip = (target: HTMLElement, dateKey: string, entry?: CalendarEntry) => {
     const tooltipPosition = getOverlayPositionForTarget(target, 208, 96, 'center');
     setDailyStripTooltip({
@@ -2686,35 +2758,60 @@ function CalendarPage({
                     className="mb-2 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-bold dark:border-gray-700 dark:bg-gray-950 xl:hidden"
                     aria-label="Trooper Daily section"
                   >
-                    {dailyPanelOptions.map((panel) => (
-                      <option key={panel} value={panel}>
-                        {hiddenDailySections.includes(panel) ? `${panel} (hidden)` : panel}
-                      </option>
-                    ))}
+                    {dailyPanelOptions.map((panel) => {
+                      const completion = getPanelCompletionState(panel);
+                      return (
+                        <option key={panel} value={panel}>
+                          {hiddenDailySections.includes(panel) ? `${panel} (hidden)` : `${panel} - ${completion.label}`}
+                        </option>
+                      );
+                    })}
                   </select>
                   <nav className="hidden gap-1 xl:grid" aria-label="Trooper Daily input sections">
                     {dailyPanelOptions.map((panel) => {
                       const panelSection = trooperDailySections.find((section) => section.title === panel);
                       const isHideablePanel = Boolean(panelSection || panel === 'T-Codes');
                       const isHidden = Boolean(isHideablePanel && hiddenDailySections.includes(panel));
-                      const isComplete = panel === 'Administrative'
-                        ? Boolean(entryForm.date && entryForm.dutyHours && entryForm.districtWorked && entryForm.specialStatus)
-                        : panel === 'T-Codes'
-                          ? isTCodeComplete
-                        : panel === 'Narrative'
-                          ? Boolean(entryForm.details?.narrative?.trim())
-                          : Boolean(panelSection && isSectionComplete(entryForm.details, panelSection));
                       const isActive = activeDailyPanel === panel;
+                      const completion = getPanelCompletionState(panel);
+                      const completionStyle = {
+                        complete: {
+                          item: 'border-green-200 bg-green-50/80 text-green-800 dark:border-green-900 dark:bg-green-950/30 dark:text-green-100',
+                          rail: 'bg-green-500',
+                          icon: <CheckCircle2 className="trooper-daily-check text-green-600 dark:text-green-300" size={16} />,
+                        },
+                        attention: {
+                          item: 'border-danger/30 bg-red-50/90 text-danger dark:border-red-900 dark:bg-red-950/40',
+                          rail: 'bg-danger',
+                          icon: <X className="text-danger" size={15} />,
+                        },
+                        warning: {
+                          item: 'border-amber-300 bg-amber-50/90 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100',
+                          rail: 'bg-amber-500',
+                          icon: <span className="h-2.5 w-2.5 rounded-full bg-amber-500 shadow-[0_0_0_3px_rgba(245,158,11,0.18)]" />,
+                        },
+                        progress: {
+                          item: 'border-blue-200 bg-blue-50/80 text-blue-800 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100',
+                          rail: 'bg-blue-500',
+                          icon: <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />,
+                        },
+                        empty: {
+                          item: '',
+                          rail: 'bg-gray-300 dark:bg-gray-700',
+                          icon: <span className={`h-2 w-2 rounded-full ${isActive ? 'bg-accent' : 'bg-gray-300 dark:bg-gray-700'}`} />,
+                        },
+                      }[completion.state];
 
                       return (
                         <div
                           key={panel}
-                          className={`group grid grid-cols-[minmax(0,1fr)_1.75rem] items-center rounded-md border transition-all duration-500 ${
+                          className={`group relative grid grid-cols-[minmax(0,1fr)_1.75rem] items-center overflow-hidden rounded-md border transition-all duration-500 ${
                             isActive
                               ? 'trooper-daily-active-pulse border-accent bg-white text-accent shadow-sm dark:bg-gray-950'
-                              : `border-transparent text-gray-600 hover:border-gray-200 hover:bg-white hover:text-primary-500 dark:text-gray-300 dark:hover:border-gray-800 dark:hover:bg-gray-950 dark:hover:text-blue-100 ${isHidden ? 'opacity-50' : ''}`
+                              : `${completion.state === 'empty' ? 'border-transparent text-gray-600 hover:border-gray-200 hover:bg-white hover:text-primary-500 dark:text-gray-300 dark:hover:border-gray-800 dark:hover:bg-gray-950 dark:hover:text-blue-100' : completionStyle.item} ${isHidden ? 'opacity-50' : ''}`
                           }`}
                         >
+                          <span className={`absolute bottom-0 left-0 top-0 w-1 ${isActive ? 'bg-accent' : completionStyle.rail}`} aria-hidden="true" />
                           <button
                             type="button"
                             onClick={() => {
@@ -2724,17 +2821,20 @@ function CalendarPage({
                               }
                               setActiveDailyPanel(panel);
                             }}
-                            className="grid min-w-0 grid-cols-[minmax(0,1fr)_1.25rem] items-center gap-2 rounded px-2.5 py-2 text-left text-[0.95rem] font-bold leading-tight"
+                            className="grid min-w-0 grid-cols-[minmax(0,1fr)_1.25rem] items-center gap-2 rounded px-3 py-2 text-left text-[0.95rem] font-bold leading-tight"
                             aria-current={isActive ? 'step' : undefined}
-                            title={panel}
+                            title={`${panel} - ${completion.label}`}
                           >
-                            <span className="min-w-0 truncate">{panel}</span>
+                            <span className="min-w-0">
+                              <span className="block truncate">{panel}</span>
+                              <span className={`mt-0.5 block truncate text-[10px] font-black uppercase tracking-wide ${
+                                completion.state === 'empty' && !isActive ? 'text-gray-400 dark:text-gray-500' : 'opacity-75'
+                              }`}>
+                                {completion.label}
+                              </span>
+                            </span>
                             <span className="flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden="true">
-                              {isComplete ? (
-                                <CheckCircle2 className="trooper-daily-check text-green-600 dark:text-green-300" size={16} />
-                              ) : (
-                                <span className={`h-2 w-2 rounded-full ${isActive ? 'bg-accent' : 'bg-gray-300 dark:bg-gray-700'}`} />
-                              )}
+                              {completionStyle.icon}
                             </span>
                           </button>
                           {isHideablePanel && (
