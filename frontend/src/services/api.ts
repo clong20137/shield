@@ -469,6 +469,14 @@ export interface RegistrationSettings {
   sessionTimeoutMinutes: number;
 }
 
+export interface NotificationSound {
+  id: string;
+  label: string;
+  url: string;
+  size: number;
+  updatedAt: string;
+}
+
 export interface MicrosoftSsoStatus {
   enabled: boolean;
 }
@@ -1366,6 +1374,18 @@ export const mediaService = {
     api.put<{ fileName: string }>(`/media/images/${encodeURIComponent(folder)}/${encodeURIComponent(fileName)}`, { name }),
   deleteImage: (folder: string, fileName: string) =>
     api.delete(`/media/images/${encodeURIComponent(folder)}/${encodeURIComponent(fileName)}`),
+};
+
+export const notificationSoundService = {
+  getAll: () =>
+    api.get<{ sounds: NotificationSound[] }>('/notification-sounds'),
+  upload: (file: File) => {
+    const formData = new FormData();
+    formData.append('sound', file);
+    return api.post<{ sound: NotificationSound }>('/notification-sounds', formData, { timeout: 60000 });
+  },
+  delete: (id: string) =>
+    api.delete('/notification-sounds/' + encodeURIComponent(id)),
 };
 
 export const bugReportService = {

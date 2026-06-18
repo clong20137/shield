@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation,
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { FloatingWindow } from './components/FloatingWindow';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, CalendarEntryPayload, calendarService, clearAuthToken, CompleteSetupPayload, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, quickLaunchService, reminderService, RegistrationSettings, Reminder, SetupEnvironmentValues, SetupStatus, urgentAlertService, UrgentAlert, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, CalendarEntryPayload, calendarService, clearAuthToken, CompleteSetupPayload, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, notificationSoundService, NotificationSound, quickLaunchService, reminderService, RegistrationSettings, Reminder, SetupEnvironmentValues, SetupStatus, urgentAlertService, UrgentAlert, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
@@ -65,15 +65,17 @@ type AppScale = AuthAccount['appScale'];
 interface MessagePreferences {
   receiveMessages: boolean;
   playMessageSound: boolean;
-  messageSound: 'classic' | 'soft' | 'chime' | 'msn';
+  messageSound: MessageSound;
   reminderAlarmSound: ReminderAlarmSound;
   useMilitaryTime: boolean;
   hideQuickLaunch: boolean;
   quickLaunchSlotCount: number;
 }
 
-type ReminderAlarmSound = 'classic' | 'soft' | 'urgent' | 'none';
-type MessageSound = MessagePreferences['messageSound'];
+type BuiltInReminderAlarmSound = 'classic' | 'soft' | 'urgent' | 'none';
+type ReminderAlarmSound = BuiltInReminderAlarmSound | `custom:${string}`;
+type BuiltInMessageSound = 'classic' | 'soft' | 'chime' | 'msn';
+type MessageSound = BuiltInMessageSound | `custom:${string}`;
 
 type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'calculator' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
 type QuickLaunchExternalSlot = ApiQuickLaunchExternalSlot;
@@ -105,7 +107,29 @@ const reminderAlarmSoundOptions: Array<{ value: ReminderAlarmSound; label: strin
   { value: 'none', label: 'No sound' },
 ];
 
+function getCustomSoundId(sound: string): string | null {
+  return sound.startsWith('custom:') ? sound.slice('custom:'.length) : null;
+}
+
+function playCustomSoundEffect(soundUrl: string | undefined) {
+  if (!soundUrl) {
+    return;
+  }
+
+  try {
+    const audio = new Audio(getAssetUrl(soundUrl));
+    audio.volume = 0.85;
+    void audio.play();
+  } catch (err) {
+    console.error('Failed to play custom sound:', err);
+  }
+}
+
 function playMessageSoundEffect(messageSound: MessageSound) {
+  if (getCustomSoundId(messageSound)) {
+    return;
+  }
+
   try {
     const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) return;
@@ -132,7 +156,7 @@ function playMessageSoundEffect(messageSound: MessageSound) {
         { type: 'triangle' as OscillatorType, frequency: 1567.98, start: 0.18, duration: 0.12, volume: 0.08 },
         { type: 'sine' as OscillatorType, frequency: 1174.66, start: 0.32, duration: 0.1, volume: 0.075 },
       ],
-    }[messageSound || 'classic'];
+    }[(messageSound || 'classic') as BuiltInMessageSound];
 
     gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
     gain.connect(audioContext.destination);
@@ -799,6 +823,7 @@ function ReminderCreateModal({
   date,
   isSaving,
   alarmSound,
+  notificationSounds,
   onClose,
   onSave,
   onAlarmSoundChange,
@@ -806,6 +831,7 @@ function ReminderCreateModal({
   date: string;
   isSaving: boolean;
   alarmSound: ReminderAlarmSound;
+  notificationSounds: NotificationSound[];
   onClose: () => void;
   onSave: (reminder: { title: string; remindOn: string; remindAt: string; priority: Reminder['priority']; notes: string; recurrenceRule: Reminder['recurrenceRule'] }) => void;
   onAlarmSoundChange: (sound: ReminderAlarmSound) => void;
@@ -906,6 +932,13 @@ function ReminderCreateModal({
               {reminderAlarmSoundOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
+              {notificationSounds.length > 0 && (
+                <optgroup label="Custom sounds">
+                  {notificationSounds.map((sound) => (
+                    <option key={sound.id} value={`custom:${sound.id}`}>{sound.label}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </label>
           <label className="block">
@@ -4938,6 +4971,7 @@ function App() {
   const apiConnectionWasLostRef = useRef(false);
   const scheduledReminderTimeoutsRef = useRef<Map<string, number>>(new Map());
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
+  const [notificationSounds, setNotificationSounds] = useState<NotificationSound[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -4969,6 +5003,28 @@ function App() {
       isMounted = false;
     };
   }, []);
+
+  const loadNotificationSounds = useCallback(() => {
+    notificationSoundService.getAll()
+      .then((response) => setNotificationSounds(response.data.sounds))
+      .catch((error) => console.error('Failed to load notification sounds:', error));
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setNotificationSounds([]);
+      return undefined;
+    }
+
+    loadNotificationSounds();
+    window.addEventListener('shield:notification-sounds-updated', loadNotificationSounds);
+    return () => window.removeEventListener('shield:notification-sounds-updated', loadNotificationSounds);
+  }, [currentUser, loadNotificationSounds]);
+
+  const getCustomNotificationSoundUrl = useCallback((sound: string) => {
+    const customSoundId = getCustomSoundId(sound);
+    return customSoundId ? notificationSounds.find((item) => item.id === customSoundId)?.url : undefined;
+  }, [notificationSounds]);
 
   useEffect(() => {
     document.title = `${appName} - ${siteName}`;
@@ -5238,6 +5294,12 @@ function App() {
       return;
     }
 
+    const customSoundUrl = getCustomNotificationSoundUrl(messagePreferences.reminderAlarmSound);
+    if (customSoundUrl) {
+      playCustomSoundEffect(customSoundUrl);
+      return;
+    }
+
     try {
       const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AudioContextClass) return;
@@ -5268,7 +5330,7 @@ function App() {
           { type: 'square' as OscillatorType, frequency: 1174.66, start: 1.62, duration: 0.28, volume: 0.1 },
         ],
         none: [],
-      }[messagePreferences.reminderAlarmSound];
+      }[messagePreferences.reminderAlarmSound as BuiltInReminderAlarmSound];
 
       gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
       gain.connect(audioContext.destination);
@@ -5289,7 +5351,7 @@ function App() {
     } catch (error) {
       console.error('Failed to play reminder alarm sound:', error);
     }
-  }, [messagePreferences.reminderAlarmSound]);
+  }, [getCustomNotificationSoundUrl, messagePreferences.reminderAlarmSound]);
 
   const showDueReminders = useCallback((reminders: Reminder[]) => {
     const dueReminders = reminders
@@ -5735,6 +5797,12 @@ function App() {
       return;
     }
 
+    const customSoundUrl = getCustomNotificationSoundUrl(messagePreferences.messageSound || 'classic');
+    if (customSoundUrl) {
+      playCustomSoundEffect(customSoundUrl);
+      return;
+    }
+
     playMessageSoundEffect(messagePreferences.messageSound || 'classic');
   };
 
@@ -5782,7 +5850,7 @@ function App() {
       window.removeEventListener('shield:messages-updated', loadUnreadCount);
       eventSource?.close();
     };
-  }, [currentUser, messagePreferences.receiveMessages, messagePreferences.playMessageSound, messagePreferences.messageSound]);
+  }, [currentUser, getCustomNotificationSoundUrl, messagePreferences.receiveMessages, messagePreferences.playMessageSound, messagePreferences.messageSound]);
 
   useEffect(() => {
     authService.getSession()
@@ -5971,6 +6039,7 @@ function App() {
     if (hasPermission('admin:create-user') && hasPermission('users:create')) return 'create-user';
     if (hasPermission('admin:media') && (hasPermission('media:view') || hasPermission('media:upload') || hasPermission('media:edit') || hasPermission('media:delete'))) return 'media';
     if (hasPermission('admin:alerts') && hasPermission('alerts:send')) return 'alerts';
+    if (hasPermission('admin:general')) return 'sounds';
     if (hasPermission('admin:bugs') && hasPermission('bugs:manage')) return 'bugs';
     if (hasPermission('admin:audit') && hasPermission('audit:view')) return 'audit';
     if (hasPermission('admin:errors') && hasPermission('audit:view')) return 'errors';
@@ -6063,6 +6132,10 @@ function App() {
     eventSource.addEventListener('media-updated', handleRealtimeAppUpdate('media-updated'));
     eventSource.addEventListener('mileage-updated', handleRealtimeAppUpdate('mileage-updated'));
     eventSource.addEventListener('performance-evaluation-updated', handleRealtimeAppUpdate('performance-evaluation-updated'));
+    eventSource.addEventListener('settings-updated', (event) => {
+      void loadNotificationSounds();
+      handleRealtimeAppUpdate('settings-updated')(event);
+    });
     eventSource.addEventListener('permission-updated', (event) => {
       void syncSessionTimeoutFromSettings();
       void syncCurrentAccount();
@@ -6095,7 +6168,7 @@ function App() {
     });
 
     return () => eventSource.close();
-  }, [currentUser, handleForcedLogout, loadBugReports, loadUrgentAlerts, loadUserNotifications, syncSessionTimeoutFromSettings]);
+  }, [currentUser, handleForcedLogout, loadBugReports, loadNotificationSounds, loadUrgentAlerts, loadUserNotifications, syncSessionTimeoutFromSettings]);
 
   const closeModal = (modal: ClosingModal) => {
     setClosingModal(modal);
@@ -7210,6 +7283,7 @@ function App() {
                     <AccountSettingsPage
                       account={currentUser}
                       messagePreferences={messagePreferences}
+                      notificationSounds={notificationSounds}
                       onReceiveMessagesChange={handleReceiveMessagesChange}
                       onMessageSoundChange={(playMessageSound) =>
                         setMessagePreferences((preferences) => ({
@@ -7220,14 +7294,21 @@ function App() {
                       onMessageSoundSelect={(messageSound) =>
                         setMessagePreferences((preferences) => ({
                           ...preferences,
-                          messageSound,
+                          messageSound: messageSound as MessageSound,
                         }))
                       }
-                      onPreviewMessageSound={(messageSound) => playMessageSoundEffect(messageSound)}
+                      onPreviewMessageSound={(messageSound) => {
+                        const customSoundUrl = getCustomNotificationSoundUrl(messageSound);
+                        if (customSoundUrl) {
+                          playCustomSoundEffect(customSoundUrl);
+                          return;
+                        }
+                        playMessageSoundEffect(messageSound as MessageSound);
+                      }}
                       onReminderAlarmSoundSelect={(reminderAlarmSound) =>
                         setMessagePreferences((preferences) => ({
                           ...preferences,
-                          reminderAlarmSound,
+                          reminderAlarmSound: reminderAlarmSound as ReminderAlarmSound,
                         }))
                       }
                       onMilitaryTimeChange={(useMilitaryTime) =>
@@ -7346,6 +7427,7 @@ function App() {
               date={reminderModalDate}
               isSaving={isReminderSaving}
               alarmSound={messagePreferences.reminderAlarmSound}
+              notificationSounds={notificationSounds}
               onClose={() => {
                 if (!isReminderSaving) {
                   setReminderModalDate(null);

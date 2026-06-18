@@ -18,6 +18,14 @@ type DailyValidationTarget = {
   message: string;
 };
 type DailyPanelCompletionState = 'complete' | 'attention' | 'warning' | 'progress' | 'empty';
+type SmartDailyCheck = {
+  id: string;
+  title: string;
+  detail: string;
+  panel: string;
+  field: string;
+  severity: 'warning' | 'attention';
+};
 type StoredTrooperDailyDraft = {
   form: CalendarEntryForm;
   editingEntryId: string | null;
@@ -1387,6 +1395,14 @@ function CalendarPage({
     window.setTimeout(() => focusDailyField(target.field), activeDailyPanel === target.panel ? 0 : 90);
   };
 
+  const openSmartDailyCheck = (check: SmartDailyCheck) => {
+    showDailyValidationTarget({
+      panel: check.panel,
+      field: check.field,
+      message: check.detail,
+    });
+  };
+
   const getVisibleDailyPanelOptions = () => dailyPanelOptions.filter((panel) => !hiddenDailySections.includes(panel));
 
   const selectDailyPanel = (panel: string, focusFirstField = false) => {
@@ -2420,6 +2436,115 @@ function CalendarPage({
     : leaveStatusHours > 0
       ? 'worked hours'
       : 'reported duty hours';
+  const getDetailNumber = (key: string) => parseNumericDetail(entryDetails, key);
+  const smartDailyChecks: SmartDailyCheck[] = [
+    getDetailNumber('pbt') > 0 && getDetailNumber('owiDefendants') > 0 && getDetailNumber('pbt') > getDetailNumber('owiDefendants')
+      ? {
+          id: 'pbt-owi-defendants',
+          title: 'PBT count is higher than OWI defendants',
+          detail: `${formatHours(getDetailNumber('pbt'))} PBT recorded for ${formatHours(getDetailNumber('owiDefendants'))} OWI defendant${getDetailNumber('owiDefendants') === 1 ? '' : 's'}.`,
+          panel: 'OWI Offense Activity',
+          field: 'pbt',
+          severity: 'attention',
+        }
+      : null,
+    getDetailNumber('owiFelonies') + getDetailNumber('owiMisdemeanors') > 0 &&
+      getDetailNumber('owiDefendants') > 0 &&
+      getDetailNumber('owiFelonies') + getDetailNumber('owiMisdemeanors') > getDetailNumber('owiDefendants')
+      ? {
+          id: 'owi-charges-defendants',
+          title: 'OWI charge totals exceed defendants',
+          detail: `${formatHours(getDetailNumber('owiFelonies') + getDetailNumber('owiMisdemeanors'))} OWI misdemeanor/felony entries for ${formatHours(getDetailNumber('owiDefendants'))} defendant${getDetailNumber('owiDefendants') === 1 ? '' : 's'}.`,
+          panel: 'OWI Offense Activity',
+          field: 'owiDefendants',
+          severity: 'warning',
+        }
+      : null,
+    getDetailNumber('totalFelonyArrests') > 0 &&
+      getDetailNumber('totalCriminalArrests') > 0 &&
+      getDetailNumber('totalFelonyArrests') > getDetailNumber('totalCriminalArrests')
+      ? {
+          id: 'felony-total-arrests',
+          title: 'Felony arrests exceed total criminal arrests',
+          detail: `${formatHours(getDetailNumber('totalFelonyArrests'))} felony arrests recorded against ${formatHours(getDetailNumber('totalCriminalArrests'))} total criminal arrests.`,
+          panel: 'Criminal Activity',
+          field: 'totalFelonyArrests',
+          severity: 'attention',
+        }
+      : null,
+    getDetailNumber('criminalDefendants') > 0 &&
+      getDetailNumber('totalCriminalArrests') > 0 &&
+      getDetailNumber('criminalDefendants') < getDetailNumber('totalCriminalArrests')
+      ? {
+          id: 'criminal-defendants-arrests',
+          title: 'Criminal defendants are lower than arrests',
+          detail: `${formatHours(getDetailNumber('criminalDefendants'))} defendant${getDetailNumber('criminalDefendants') === 1 ? '' : 's'} for ${formatHours(getDetailNumber('totalCriminalArrests'))} total criminal arrests.`,
+          panel: 'Criminal Activity',
+          field: 'criminalDefendants',
+          severity: 'warning',
+        }
+      : null,
+    getDetailNumber('regularDutyMiles') > 0 && dutyActivityHours <= 0.01 && calculatedShiftHours <= 0.01
+      ? {
+          id: 'miles-no-hours',
+          title: 'Mileage entered without worked hours',
+          detail: `${formatHours(getDetailNumber('regularDutyMiles'))} regular duty miles are recorded, but shift time and duty activity are both zero.`,
+          panel: 'Regular Duty',
+          field: 'regularDutyMiles',
+          severity: 'warning',
+        }
+      : null,
+    standardDutyActivityHours > 0 && shiftDutyTargetHours <= 0.01
+      ? {
+          id: 'activity-on-full-leave',
+          title: 'Activity entered on a full leave day',
+          detail: `${formatHours(standardDutyActivityHours)} duty activity hour${standardDutyActivityHours === 1 ? '' : 's'} recorded while no worked hours are expected.`,
+          panel: 'Duty Hours',
+          field: 'patrolHours',
+          severity: 'warning',
+        }
+      : null,
+    getDetailNumber('heroinGramsFound') > 0 && getDetailNumber('heroinArrests') <= 0
+      ? {
+          id: 'heroin-grams-no-arrests',
+          title: 'Heroin grams entered without arrests',
+          detail: `${formatHours(getDetailNumber('heroinGramsFound'))} grams found with zero heroin arrests.`,
+          panel: 'Drug Activity',
+          field: 'heroinArrests',
+          severity: 'warning',
+        }
+      : null,
+    getDetailNumber('cocaineGramsFound') > 0 && getDetailNumber('cocaineArrests') <= 0
+      ? {
+          id: 'cocaine-grams-no-arrests',
+          title: 'Cocaine grams entered without arrests',
+          detail: `${formatHours(getDetailNumber('cocaineGramsFound'))} grams found with zero cocaine arrests.`,
+          panel: 'Drug Activity',
+          field: 'cocaineArrests',
+          severity: 'warning',
+        }
+      : null,
+    getDetailNumber('marijuanaGramsFound') > 0 && getDetailNumber('marijuanaArrests') <= 0
+      ? {
+          id: 'marijuana-grams-no-arrests',
+          title: 'Marijuana grams entered without arrests',
+          detail: `${formatHours(getDetailNumber('marijuanaGramsFound'))} grams found with zero marijuana arrests.`,
+          panel: 'Drug Activity',
+          field: 'marijuanaArrests',
+          severity: 'warning',
+        }
+      : null,
+    getDetailNumber('methamphetamineGramsFound') > 0 && getDetailNumber('methamphetamineArrests') <= 0
+      ? {
+          id: 'meth-grams-no-arrests',
+          title: 'Methamphetamine grams entered without arrests',
+          detail: `${formatHours(getDetailNumber('methamphetamineGramsFound'))} grams found with zero methamphetamine arrests.`,
+          panel: 'Drug Activity',
+          field: 'methamphetamineArrests',
+          severity: 'warning',
+        }
+      : null,
+  ].filter((check): check is SmartDailyCheck => Boolean(check));
   const dailySaveStatusLabel = (() => {
     if (dailySaveStatus === 'idle') {
       return '';
@@ -3741,7 +3866,7 @@ function CalendarPage({
       )}
 
       {isSubmitReviewOpen && (
-        <div className="modal-backdrop fixed inset-0 z-[140] flex items-end justify-center bg-black/45 sm:items-center">
+        <div className="modal-backdrop fixed inset-0 z-[140] flex items-end justify-center bg-black/45 backdrop-blur-sm !p-0 sm:items-center">
           <div className="modal-window max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
@@ -3817,6 +3942,45 @@ function CalendarPage({
                 No blocking issues found.
               </div>
             )}
+
+            <div className="mt-4 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-black text-gray-900 dark:text-gray-100">Smart daily checks</p>
+                  <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Quick consistency checks before submission.</p>
+                </div>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-black ${
+                  smartDailyChecks.length > 0
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-100'
+                    : 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-100'
+                }`}>
+                  {smartDailyChecks.length > 0 ? `${smartDailyChecks.length} flag${smartDailyChecks.length === 1 ? '' : 's'}` : 'Clear'}
+                </span>
+              </div>
+              {smartDailyChecks.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {smartDailyChecks.map((check) => (
+                    <button
+                      key={check.id}
+                      type="button"
+                      onClick={() => openSmartDailyCheck(check)}
+                      className={`w-full rounded border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${
+                        check.severity === 'attention'
+                          ? 'border-danger/30 bg-red-50 text-danger dark:border-red-900 dark:bg-red-950/30'
+                          : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100'
+                      }`}
+                    >
+                      <span className="block text-sm font-black">{check.title}</span>
+                      <span className="mt-1 block text-xs font-semibold opacity-80">{check.detail}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm font-bold text-green-800 dark:border-green-900 dark:bg-green-950/30 dark:text-green-100">
+                  No unusual activity patterns found.
+                </p>
+              )}
+            </div>
 
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button type="button" onClick={() => setIsSubmitReviewOpen(false)} className="btn-secondary" aria-label="Cancel submission" title="Cancel">

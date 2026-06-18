@@ -17,6 +17,7 @@ export type AppEventType =
   | 'media-updated'
   | 'quick-launch-updated'
   | 'reminder-updated'
+  | 'settings-updated'
   | 'session-revoked'
   | 'user-updated';
 

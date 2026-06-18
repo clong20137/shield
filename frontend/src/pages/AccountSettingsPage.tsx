@@ -2,7 +2,7 @@ import QRCode from 'qrcode';
 import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Camera, Download, ExternalLink, EyeOff, Image, KeyRound, Laptop, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, Volume2, X } from 'lucide-react';
-import { AuthAccount, AuthSession, DeviceRecord, MediaLibraryItem, TwoFactorSetupResponse, authService, deviceService, getAssetUrl, handleAssetImageError, performanceEvaluationService, userService } from '../services/api';
+import { AuthAccount, AuthSession, DeviceRecord, MediaLibraryItem, NotificationSound, TwoFactorSetupResponse, authService, deviceService, getAssetUrl, handleAssetImageError, performanceEvaluationService, userService } from '../services/api';
 import { ProfilePictureMediaPicker } from '../components/ProfilePictureMediaPicker';
 import { downloadPerformanceEvaluationPdf } from '../utils/performanceEvaluationPdf';
 
@@ -11,17 +11,18 @@ interface AccountSettingsPageProps {
   messagePreferences: {
     receiveMessages: boolean;
     playMessageSound: boolean;
-    messageSound: 'classic' | 'soft' | 'chime' | 'msn';
-    reminderAlarmSound: 'classic' | 'soft' | 'urgent' | 'none';
+    messageSound: string;
+    reminderAlarmSound: string;
     useMilitaryTime: boolean;
     hideQuickLaunch: boolean;
     quickLaunchSlotCount: number;
   };
+  notificationSounds: NotificationSound[];
   onReceiveMessagesChange: (receiveMessages: boolean) => void;
   onMessageSoundChange: (playMessageSound: boolean) => void;
-  onMessageSoundSelect: (messageSound: 'classic' | 'soft' | 'chime' | 'msn') => void;
-  onPreviewMessageSound: (messageSound: 'classic' | 'soft' | 'chime' | 'msn') => void;
-  onReminderAlarmSoundSelect: (reminderAlarmSound: 'classic' | 'soft' | 'urgent' | 'none') => void;
+  onMessageSoundSelect: (messageSound: string) => void;
+  onPreviewMessageSound: (messageSound: string) => void;
+  onReminderAlarmSoundSelect: (reminderAlarmSound: string) => void;
   onMilitaryTimeChange: (useMilitaryTime: boolean) => void;
   onQuickLaunchHiddenChange: (hideQuickLaunch: boolean) => void;
   onQuickLaunchSlotCountChange: (slotCount: number) => void;
@@ -56,6 +57,7 @@ function isSecurePassword(password: string): boolean {
 export function AccountSettingsPage({
   account,
   messagePreferences,
+  notificationSounds,
   onReceiveMessagesChange,
   onMessageSoundChange,
   onMessageSoundSelect,
@@ -824,13 +826,20 @@ export function AccountSettingsPage({
                 <select
                   value={messagePreferences.messageSound}
                   disabled={!messagePreferences.receiveMessages || !messagePreferences.playMessageSound}
-                  onChange={(event) => onMessageSoundSelect(event.target.value as 'classic' | 'soft' | 'chime' | 'msn')}
+                  onChange={(event) => onMessageSoundSelect(event.target.value)}
                   className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
                 >
                   <option value="classic">Classic two-tone</option>
                   <option value="soft">Soft alert</option>
                   <option value="chime">Bright chime</option>
                   <option value="msn">MSN Messenger</option>
+                  {notificationSounds.length > 0 && (
+                    <optgroup label="Custom sounds">
+                      {notificationSounds.map((sound) => (
+                        <option key={sound.id} value={`custom:${sound.id}`}>{sound.label}</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
                 <button
                   type="button"
@@ -850,13 +859,20 @@ export function AccountSettingsPage({
               <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose the alarm used when a reminder is due.</span>
               <select
                 value={messagePreferences.reminderAlarmSound}
-                onChange={(event) => onReminderAlarmSoundSelect(event.target.value as 'classic' | 'soft' | 'urgent' | 'none')}
+                onChange={(event) => onReminderAlarmSoundSelect(event.target.value)}
                 className="mt-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
               >
                 <option value="classic">Classic alarm</option>
                 <option value="soft">Soft chime</option>
                 <option value="urgent">Urgent pulse</option>
                 <option value="none">No sound</option>
+                {notificationSounds.length > 0 && (
+                  <optgroup label="Custom sounds">
+                    {notificationSounds.map((sound) => (
+                      <option key={sound.id} value={`custom:${sound.id}`}>{sound.label}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </label>
           </PreferenceGroup>
