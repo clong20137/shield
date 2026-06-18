@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import type { EmojiClickData } from 'emoji-picker-react';
@@ -675,22 +676,24 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
           </div>
         )}
       </section>
-      {commentPendingDelete && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+      {commentPendingDelete && createPortal((
+        <div className="modal-backdrop fixed inset-0 z-[140] flex items-center justify-center bg-black/45 p-4" onClick={() => setCommentPendingDelete(null)}>
+          <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900" onClick={(event) => event.stopPropagation()}>
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Comment</h2>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Remove this comment from the update?</p>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setCommentPendingDelete(null)} className="btn-secondary" aria-label="Cancel delete comment" title="Cancel">
                 <X size={16} />
+                Cancel
               </button>
-              <button type="button" onClick={() => deleteComment(commentPendingDelete)} className="btn-danger" aria-label="Delete comment" title="Delete">
+              <button type="button" onClick={() => void deleteComment(commentPendingDelete)} className="btn-danger" aria-label="Delete comment" title="Delete">
                 <Trash2 size={16} />
+                Delete
               </button>
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
       {selectedCommentUser && (
         <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
           <div className="modal-window max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-lg">
