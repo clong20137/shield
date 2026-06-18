@@ -2,7 +2,7 @@ import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database';
 
-export type DistrictFeedPostCategory = 'Announcement' | 'Update' | 'Alert';
+export type DistrictFeedPostCategory = 'Announcement' | 'Update' | 'News' | 'Alert';
 
 export interface DistrictFeedPost {
   id: string;
@@ -84,6 +84,56 @@ export class DistrictFeedPostModel {
         createdAt: now,
         updatedAt: now,
       };
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async getById(id: string): Promise<DistrictFeedPost | null> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<DistrictFeedPostRow[]>(
+        'SELECT * FROM district_feed_posts WHERE `id` = ? LIMIT 1',
+        [id],
+      );
+
+      return rows[0] || null;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async update(id: string, district: string, input: Pick<DistrictFeedPostInput, 'category' | 'title' | 'body'>): Promise<DistrictFeedPost | null> {
+    const cleanedDistrict = district.trim();
+    const conn = await pool.getConnection();
+    try {
+      const now = new Date();
+      const [result] = await conn.query<ResultSetHeader>(
+        `UPDATE district_feed_posts
+         SET \`category\` = ?, \`title\` = ?, \`body\` = ?, \`updatedAt\` = ?
+         WHERE \`id\` = ? AND \`district\` = ?`,
+        [input.category, input.title.trim(), input.body.trim(), now, id, cleanedDistrict],
+      );
+
+      if (result.affectedRows === 0) {
+        return null;
+      }
+
+      return DistrictFeedPostModel.getById(id);
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async delete(id: string, district: string): Promise<boolean> {
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>(
+        'DELETE FROM district_feed_posts WHERE `id` = ? AND `district` = ?',
+        [id, district.trim()],
+      );
+
+      return result.affectedRows > 0;
     } finally {
       conn.release();
     }

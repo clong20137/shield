@@ -259,7 +259,7 @@ export interface QuickNote {
   updatedAt: string;
 }
 
-export type DistrictFeedPostCategory = 'Announcement' | 'Update' | 'Alert';
+export type DistrictFeedPostCategory = 'Announcement' | 'Update' | 'News' | 'Alert';
 
 export interface DistrictFeedPost {
   id: string;
@@ -1312,6 +1312,10 @@ export const dashboardSummaryService = {
 export const districtFeedService = {
   createPost: (post: { category: DistrictFeedPostCategory; title: string; body: string }) =>
     api.post<DistrictFeedPost>('/district-feed/posts', post),
+  updatePost: (id: string, post: { category: DistrictFeedPostCategory; title: string; body: string }) =>
+    api.put<DistrictFeedPost>(`/district-feed/posts/${id}`, post),
+  deletePost: (id: string) =>
+    api.delete(`/district-feed/posts/${id}`),
 };
 
 export const mediaService = {

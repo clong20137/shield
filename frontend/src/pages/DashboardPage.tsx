@@ -2516,6 +2516,8 @@ function DistrictFeedWidget({
   const [postBody, setPostBody] = useState('');
   const [isPosting, setIsPosting] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [postPendingDelete, setPostPendingDelete] = useState<DistrictFeedPost | null>(null);
 
   useEffect(() => {
     setPosts(initialPosts || []);
@@ -2523,8 +2525,26 @@ function DistrictFeedWidget({
 
   const getCategoryClass = (category: DistrictFeedPostCategory) => {
     if (category === 'Alert') return 'bg-danger text-white';
+    if (category === 'News') return 'bg-emerald-600 text-white';
     if (category === 'Update') return 'bg-primary-500 text-white';
     return 'bg-accent text-white';
+  };
+
+  const resetComposer = () => {
+    setPostTitle('');
+    setPostBody('');
+    setPostCategory('Announcement');
+    setEditingPostId(null);
+    setPostError(null);
+  };
+
+  const startEditingPost = (post: DistrictFeedPost) => {
+    setPostTitle(post.title);
+    setPostBody(post.body);
+    setPostCategory(post.category);
+    setEditingPostId(post.id);
+    setPostError(null);
+    setIsComposerOpen(true);
   };
 
   const submitDistrictPost = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -2537,22 +2557,44 @@ function DistrictFeedWidget({
     setIsPosting(true);
     setPostError(null);
     try {
-      const response = await districtFeedService.createPost({
+      const payload = {
         category: postCategory,
         title: postTitle,
         body: postBody,
-      });
-      setPosts((current) => [response.data, ...current].slice(0, 8));
-      setPostTitle('');
-      setPostBody('');
-      setPostCategory('Announcement');
+      };
+      const response = editingPostId
+        ? await districtFeedService.updatePost(editingPostId, payload)
+        : await districtFeedService.createPost(payload);
+      setPosts((current) => (
+        editingPostId
+          ? current.map((post) => (post.id === editingPostId ? response.data : post))
+          : [response.data, ...current].slice(0, 8)
+      ));
+      resetComposer();
       setIsComposerOpen(false);
       window.dispatchEvent(new Event('shield:dashboard-updated'));
     } catch (err) {
       console.error('Failed to post district feed update:', err);
-      setPostError('Could not post to the district feed.');
+      setPostError(editingPostId ? 'Could not update the district feed post.' : 'Could not post to the district feed.');
     } finally {
       setIsPosting(false);
+    }
+  };
+
+  const deleteDistrictPost = async (post: DistrictFeedPost) => {
+    setPostError(null);
+    try {
+      await districtFeedService.deletePost(post.id);
+      setPosts((current) => current.filter((item) => item.id !== post.id));
+      setPostPendingDelete(null);
+      if (editingPostId === post.id) {
+        resetComposer();
+        setIsComposerOpen(false);
+      }
+      window.dispatchEvent(new Event('shield:dashboard-updated'));
+    } catch (err) {
+      console.error('Failed to delete district feed post:', err);
+      setPostError('Could not delete the district feed post.');
     }
   };
 
@@ -2574,7 +2616,12 @@ function DistrictFeedWidget({
           {canPost && districtName && (
             <button
               type="button"
-              onClick={() => setIsComposerOpen((value) => !value)}
+              onClick={() => {
+                if (isComposerOpen) {
+                  resetComposer();
+                }
+                setIsComposerOpen((value) => !value);
+              }}
               className="btn-primary shrink-0"
               aria-label="Post to district feed"
               title="Post to District Feed"
@@ -2603,6 +2650,7 @@ function DistrictFeedWidget({
                   >
                     <option value="Announcement">Announcement</option>
                     <option value="Update">Update</option>
+                    <option value="News">News</option>
                     <option value="Alert">Alert</option>
                   </select>
                   <input
@@ -2623,13 +2671,16 @@ function DistrictFeedWidget({
                 <div className="mt-2 flex items-center justify-between gap-3">
                   <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{postBody.length}/1600</span>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => setIsComposerOpen(false)} className="btn-secondary" aria-label="Cancel district feed post" title="Cancel">
+                    <button type="button" onClick={() => {
+                      resetComposer();
+                      setIsComposerOpen(false);
+                    }} className="btn-secondary" aria-label="Cancel district feed post" title="Cancel">
                       <X size={16} />
                       Cancel
                     </button>
-                    <button type="submit" className="btn-primary" disabled={isPosting || !postTitle.trim() || !postBody.trim()} aria-label="Post district feed update" title="Post">
+                    <button type="submit" className="btn-primary" disabled={isPosting || !postTitle.trim() || !postBody.trim()} aria-label={editingPostId ? 'Save district feed post' : 'Post district feed update'} title={editingPostId ? 'Save' : 'Post'}>
                       <Send size={16} />
-                      Post
+                      {editingPostId ? 'Save' : 'Post'}
                     </button>
                   </div>
                 </div>
@@ -2649,9 +2700,21 @@ function DistrictFeedWidget({
                     </span>
                     <h3 className="mt-2 line-clamp-2 text-sm font-black text-gray-900 dark:text-gray-100">{post.title}</h3>
                   </div>
-                  <span className="shrink-0 text-xs font-semibold text-gray-400">
-                    {new Date(post.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <span className="text-xs font-semibold text-gray-400">
+                      {new Date(post.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    </span>
+                    {canPost && (
+                      <>
+                        <button type="button" onClick={() => startEditingPost(post)} className="btn-secondary px-2 py-1 text-xs" aria-label={`Edit ${post.title}`} title="Edit">
+                          <Pencil size={13} />
+                        </button>
+                        <button type="button" onClick={() => setPostPendingDelete(post)} className="btn-danger px-2 py-1 text-xs" aria-label={`Delete ${post.title}`} title="Delete">
+                          <Trash2 size={13} />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-600 dark:text-gray-300">{post.body}</p>
                 <p className="mt-3 text-xs font-semibold text-gray-400">Posted by {post.authorName}</p>
@@ -2661,6 +2724,24 @@ function DistrictFeedWidget({
           </div>
         )}
       </div>
+      {postPendingDelete && createPortal((
+        <div className="modal-backdrop fixed inset-0 z-[140] flex items-center justify-center bg-black/45 p-4" onClick={() => setPostPendingDelete(null)}>
+          <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900" onClick={(event) => event.stopPropagation()}>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete District Post</h2>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Remove "{postPendingDelete.title}" from the {postPendingDelete.district} feed?</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setPostPendingDelete(null)} className="btn-secondary" aria-label="Cancel delete district post" title="Cancel">
+                <X size={16} />
+                Cancel
+              </button>
+              <button type="button" onClick={() => void deleteDistrictPost(postPendingDelete)} className="btn-danger" aria-label="Delete district post" title="Delete">
+                <Trash2 size={16} />
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      ), document.body)}
     </section>
   );
 }
