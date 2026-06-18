@@ -70,6 +70,10 @@ export async function getSessionAccount(req: Request) {
   return AuthSessionModel.getAccountForToken(token);
 }
 
+function isSafeReadRequest(req: Request): boolean {
+  return req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS';
+}
+
 export function requireAuthenticated() {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -79,7 +83,7 @@ export function requireAuthenticated() {
         return res.status(401).json({ error: 'Sign in required' });
       }
 
-      if (account.mustChangePassword) {
+      if (account.mustChangePassword && !isSafeReadRequest(req)) {
         return res.status(403).json({ error: 'Password change required before continuing', mustChangePassword: true });
       }
 

@@ -8,6 +8,10 @@ export async function getRequestAccount(req: Request) {
 }
 
 function shouldAllowRequiredAccountSetup(req: Request, accountId: string): boolean {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    return true;
+  }
+
   if (req.method === 'POST' && req.path === '/change-password' && req.body?.accountId === accountId) {
     return true;
   }
