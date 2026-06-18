@@ -4931,6 +4931,7 @@ function App() {
   const [copiedSidebarDaily, setCopiedSidebarDaily] = useState<CalendarEntryPayload | null>(null);
   const previousMessageUnreadCount = useRef<number | null>(null);
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const rateLimitToastRef = useRef(0);
   const shownDueReminderIdsRef = useRef<Set<string>>(new Set());
   const notificationRequestRef = useRef(0);
@@ -5581,6 +5582,22 @@ function App() {
 
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [isNotificationsOpen]);
+
+  useEffect(() => {
+    if (!isAccountMenuOpen) {
+      return;
+    }
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!accountMenuRef.current?.contains(event.target as Node)) {
+        setIsAccountMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [isAccountMenuOpen]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -6833,6 +6850,7 @@ function App() {
                 >
                   {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
                 </button>
+                <div ref={accountMenuRef} className="relative">
                 <button
                   data-onboarding-control="settings"
                   type="button"
@@ -6890,8 +6908,9 @@ function App() {
                       }}
                       className="flex w-full items-center gap-2 border-t border-gray-200 px-4 py-3 text-left text-sm font-semibold text-danger hover:bg-red-50 dark:border-gray-700 dark:hover:bg-red-950"
                     >
-                      <LogOut size={16} /> Sign out
-                    </button>
+                    <LogOut size={16} /> Sign out
+                  </button>
+                </div>
                 </div>
               </div>
 

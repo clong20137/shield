@@ -12,6 +12,11 @@ type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNote
 type TimePeriod = 'AM' | 'PM';
 type CalendarView = 'day' | 'week' | 'month';
 type DailySaveStatus = 'idle' | 'local' | 'saving' | 'saved' | 'error';
+type DailyValidationTarget = {
+  panel: string;
+  field: string;
+  message: string;
+};
 type StoredTrooperDailyDraft = {
   form: CalendarEntryForm;
   editingEntryId: string | null;
@@ -754,6 +759,7 @@ function TimeDetailInput({
   value,
   onChange,
   isComplete = false,
+  isInvalid = false,
   useMilitaryTime = false,
   fieldId,
   icon: Icon = Clock3,
@@ -761,6 +767,7 @@ function TimeDetailInput({
   value: string;
   onChange: (value: string) => void;
   isComplete?: boolean;
+  isInvalid?: boolean;
   useMilitaryTime?: boolean;
   fieldId?: string;
   icon?: LucideIcon;
@@ -813,7 +820,9 @@ function TimeDetailInput({
           maxLength={5}
           data-daily-field={fieldId}
           className={`trooper-daily-field-with-icon w-full rounded border bg-white py-2 pl-9 pr-8 text-sm transition dark:bg-gray-900 ${
-            isComplete
+            isInvalid
+              ? 'trooper-daily-field-guard border-danger ring-2 ring-danger/30'
+              : isComplete
               ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
               : 'border-gray-300 dark:border-gray-700'
           }`}
@@ -1325,8 +1334,24 @@ function CalendarPage({
 
   const focusDailyField = (fieldName: string) => {
     window.setTimeout(() => {
-      dailyFormRef.current?.querySelector<HTMLElement>(`[data-daily-field="${fieldName}"]`)?.focus();
+      const target = dailyFormRef.current?.querySelector<HTMLElement>(`[data-daily-field="${fieldName}"]`);
+      if (!target) {
+        return;
+      }
+
+      target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+      target.focus({ preventScroll: true });
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+        target.select();
+      }
     }, 0);
+  };
+
+  const showDailyValidationTarget = (target: DailyValidationTarget) => {
+    setActiveDailyPanel(target.panel);
+    setInvalidDailyField(target.field);
+    setCalendarError(target.message);
+    window.setTimeout(() => focusDailyField(target.field), activeDailyPanel === target.panel ? 0 : 90);
   };
 
   const getVisibleDailyPanelOptions = () => dailyPanelOptions.filter((panel) => !hiddenDailySections.includes(panel));
@@ -1475,18 +1500,68 @@ function CalendarPage({
     const hours = Number(entryForm.dutyHours);
 
     if (!entryForm.date) {
-      setActiveDailyPanel('Administrative');
-      setInvalidDailyField('entryDate');
-      setCalendarError('Date is required.');
-      focusDailyField('entryDate');
+      showDailyValidationTarget({
+        panel: 'Administrative',
+        field: 'entryDate',
+        message: 'Date is required.',
+      });
       return;
     }
 
     if (!entryForm.dutyHours.trim() || Number.isNaN(hours) || hours < 0) {
-      setActiveDailyPanel('Administrative');
-      setInvalidDailyField('dutyHours');
-      setCalendarError('Duty hours are required before saving or submitting.');
-      focusDailyField('dutyHours');
+      showDailyValidationTarget({
+        panel: 'Administrative',
+        field: 'dutyHours',
+        message: 'Duty hours are required before saving or submitting.',
+      });
+      return;
+    }
+
+    if (!entryForm.districtWorked.trim()) {
+      showDailyValidationTarget({
+        panel: 'Administrative',
+        field: 'districtWorked',
+        message: 'District worked is required before saving or submitting.',
+      });
+      return;
+    }
+
+    if (!entryForm.specialStatus.trim()) {
+      showDailyValidationTarget({
+        panel: 'Administrative',
+        field: 'specialStatus',
+        message: 'Special status is required before saving or submitting.',
+      });
+      return;
+    }
+
+    if (!hasNoTCodeSelection(entryForm.details)) {
+      const incompleteTCode = parseTCodeDetails(entryForm.details).find((row) => !row.code.trim() || !row.timeWorked.trim());
+      if (incompleteTCode) {
+        showDailyValidationTarget({
+          panel: 'T-Codes',
+          field: !incompleteTCode.code.trim() ? `tCode-${incompleteTCode.id}-code` : `tCode-${incompleteTCode.id}-time`,
+          message: 'Complete the T-Code row or delete it before saving or submitting.',
+        });
+        return;
+      }
+    }
+
+    if (submissionStatus === 'Submitted' && hasHourMismatch) {
+      const mismatchPanel = attendanceHours > 0 && Math.abs(attendanceHours - hours) > 0.01
+        ? 'Attendance Hours'
+        : dutyActivityHours > 0 && Math.abs(dutyActivityHours - hours) > 0.01
+          ? 'Duty Hours'
+          : 'Regular Duty';
+      showDailyValidationTarget({
+        panel: mismatchPanel,
+        field: mismatchPanel === 'Attendance Hours'
+          ? 'regularDutyHours'
+          : mismatchPanel === 'Duty Hours'
+            ? 'patrolHours'
+            : 'regularDutyStartTime',
+        message: 'Hours do not match the reported duty hours. Update the highlighted section before submitting.',
+      });
       return;
     }
 
@@ -1628,6 +1703,7 @@ function CalendarPage({
   };
 
   const updateDailyDetail = (key: string, value: string) => {
+    setInvalidDailyField((field) => (field === key ? null : field));
     setEntryForm((currentForm) => {
       const nextValue = wholeNumberDetailFields.has(key)
         ? sanitizeWholeNumberInput(value)
@@ -1697,6 +1773,9 @@ function CalendarPage({
   };
 
   const updateTCodeRow = (rowId: string, updates: Partial<Omit<TrooperDailyTCode, 'id'>>) => {
+    setInvalidDailyField((field) => (
+      field === `tCode-${rowId}-code` || field === `tCode-${rowId}-time` ? null : field
+    ));
     updateTCodeRows(parseTCodeDetails(entryForm.details).map((row) => row.id === rowId ? { ...row, ...updates } : row));
   };
 
@@ -2940,11 +3019,16 @@ function CalendarPage({
                             </span>
                             <select
                               value={entryForm.districtWorked}
-                              onChange={(event) =>
-                                setEntryForm((currentForm) => ({ ...currentForm, districtWorked: event.target.value }))
-                              }
+                              onChange={(event) => {
+                                setInvalidDailyField((field) => (field === 'districtWorked' ? null : field));
+                                setEntryForm((currentForm) => ({ ...currentForm, districtWorked: event.target.value }));
+                              }}
                               data-daily-field="districtWorked"
-                              className="trooper-daily-field-with-icon w-full appearance-none rounded border border-gray-300 bg-white py-2 pl-10 pr-10 dark:border-gray-700 dark:bg-gray-950"
+                              className={`trooper-daily-field-with-icon w-full appearance-none rounded border bg-white py-2 pl-10 pr-10 dark:bg-gray-950 ${
+                                invalidDailyField === 'districtWorked'
+                                  ? 'trooper-daily-field-guard border-danger ring-2 ring-danger/30'
+                                  : 'border-gray-300 dark:border-gray-700'
+                              }`}
                             >
                               {districtOptions.map((district) => (
                                 <option key={district}>{district}</option>
@@ -2964,11 +3048,16 @@ function CalendarPage({
                             </span>
                             <select
                               value={entryForm.specialStatus}
-                              onChange={(event) =>
-                                setEntryForm((currentForm) => ({ ...currentForm, specialStatus: event.target.value }))
-                              }
+                              onChange={(event) => {
+                                setInvalidDailyField((field) => (field === 'specialStatus' ? null : field));
+                                setEntryForm((currentForm) => ({ ...currentForm, specialStatus: event.target.value }));
+                              }}
                               data-daily-field="specialStatus"
-                              className="trooper-daily-field-with-icon w-full appearance-none rounded border border-gray-300 bg-white py-2 pl-10 pr-10 dark:border-gray-700 dark:bg-gray-950"
+                              className={`trooper-daily-field-with-icon w-full appearance-none rounded border bg-white py-2 pl-10 pr-10 dark:bg-gray-950 ${
+                                invalidDailyField === 'specialStatus'
+                                  ? 'trooper-daily-field-guard border-danger ring-2 ring-danger/30'
+                                  : 'border-gray-300 dark:border-gray-700'
+                              }`}
                             >
                               {specialStatusOptions.map((status) => (
                                 <option key={status}>{status}</option>
@@ -3072,6 +3161,7 @@ function CalendarPage({
                         {activeDailySection.fields.filter(([key]) => shouldShowDailyDetailField(entryForm.details, key)).map(([key, label]) => {
                           const isTimeField = timeDetailFields.has(key);
                           const isComplete = isDetailComplete(entryForm.details, key);
+                          const isInvalid = invalidDailyField === key;
                           const FieldIcon = getDailyFieldIcon(key);
                           return (
                             <label key={key} className="block">
@@ -3081,6 +3171,7 @@ function CalendarPage({
                                   value={entryForm.details?.[key] || ''}
                                   onChange={(value) => updateDailyDetail(key, value)}
                                   isComplete={isComplete}
+                                  isInvalid={isInvalid}
                                   useMilitaryTime={dailyUseMilitaryTime}
                                   fieldId={key}
                                   icon={FieldIcon}
@@ -3098,7 +3189,9 @@ function CalendarPage({
                                     onChange={(event) => updateDailyDetail(key, event.target.value)}
                                     data-daily-field={key}
                                     className={`trooper-daily-field-with-icon w-full rounded border bg-white py-2 pl-9 pr-8 text-sm transition dark:bg-gray-900 ${
-                                      isComplete
+                                      isInvalid
+                                        ? 'trooper-daily-field-guard border-danger ring-2 ring-danger/30'
+                                        : isComplete
                                         ? 'trooper-daily-match border-green-300 text-green-800 dark:border-green-800 dark:text-green-100'
                                         : 'border-gray-300 dark:border-gray-700'
                                     }`}
@@ -3177,7 +3270,12 @@ function CalendarPage({
                                   <select
                                     value={row.code}
                                     onChange={(event) => updateTCodeRow(row.id, { code: event.target.value })}
-                                    className="w-full appearance-none rounded border border-gray-300 bg-white px-3 py-2 pr-9 text-sm dark:border-gray-700 dark:bg-gray-950"
+                                    data-daily-field={`tCode-${row.id}-code`}
+                                    className={`w-full appearance-none rounded border bg-white px-3 py-2 pr-9 text-sm dark:bg-gray-950 ${
+                                      invalidDailyField === `tCode-${row.id}-code`
+                                        ? 'trooper-daily-field-guard border-danger ring-2 ring-danger/30'
+                                        : 'border-gray-300 dark:border-gray-700'
+                                    }`}
                                     aria-label="T-Code option"
                                   >
                                     {tCodeOptions.map((option) => (
@@ -3200,7 +3298,12 @@ function CalendarPage({
                                     inputMode="decimal"
                                     value={row.timeWorked}
                                     onChange={(event) => updateTCodeRow(row.id, { timeWorked: sanitizeDecimalInput(event.target.value, 5) })}
-                                    className="trooper-daily-field-with-icon w-full rounded border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-gray-700 dark:bg-gray-950"
+                                    data-daily-field={`tCode-${row.id}-time`}
+                                    className={`trooper-daily-field-with-icon w-full rounded border bg-white py-2 pl-9 pr-3 text-sm dark:bg-gray-950 ${
+                                      invalidDailyField === `tCode-${row.id}-time`
+                                        ? 'trooper-daily-field-guard border-danger ring-2 ring-danger/30'
+                                        : 'border-gray-300 dark:border-gray-700'
+                                    }`}
                                     aria-label="T-Code time worked"
                                   />
                                 </div>
