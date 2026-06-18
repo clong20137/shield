@@ -1,8 +1,8 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import type { EmojiClickData } from 'emoji-picker-react';
-import { Check, ChevronDown, ChevronRight, Edit3, Flag, Heart, LucideIcon, Megaphone, MessageSquare, PartyPopper, Pin, PinOff, Reply, Send, ShieldCheck, Smile, ThumbsUp, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Edit3, Flag, Heart, LucideIcon, Megaphone, MessageSquare, PartyPopper, Pin, PinOff, Reply, Send, ShieldCheck, Smile, ThumbsUp, Trash2, X } from 'lucide-react';
 import { UserDetail } from '../components/UserDetail';
 import { FormattedText } from '../components/FormattedText';
 import { MentionTextarea } from '../components/MentionTextarea';
@@ -43,6 +43,7 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentBody, setEditingCommentBody] = useState('');
   const [collapsedThreadIds, setCollapsedThreadIds] = useState<Set<string>>(() => new Set());
+  const [commentPage, setCommentPage] = useState(1);
   const [commentPendingDelete, setCommentPendingDelete] = useState<DashboardPostComment | null>(null);
   const [selectedCommentUser, setSelectedCommentUser] = useState<User | null>(null);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
@@ -70,7 +71,14 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
         dashboardPostService.getComments(postId),
       ]);
       setPost(postResponse.data);
-      setComments(sortComments(commentsResponse.data));
+      const sortedComments = sortComments(commentsResponse.data);
+      setComments(sortedComments);
+      const parentsWithReplies = new Set(
+        sortedComments
+          .filter((comment) => sortedComments.some((reply) => reply.parentCommentId === comment.id))
+          .map((comment) => comment.id),
+      );
+      setCollapsedThreadIds(parentsWithReplies);
     } catch (err) {
       console.error('Failed to load update:', err);
       setError('Failed to load this update.');
@@ -112,6 +120,7 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
     try {
       const response = await dashboardPostService.addComment(post.id, commentBody);
       setComments((items) => sortComments([...items, response.data]));
+      setCommentPage(Math.max(1, Math.ceil((rootComments.length + 1) / commentsPerPage)));
       setCommentBody('');
       setIsEmojiPickerOpen(false);
     } catch (err) {
@@ -130,6 +139,7 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
     try {
       const response = await dashboardPostService.addComment(post.id, replyBody, parentComment.id);
       setComments((items) => sortComments([...items, response.data]));
+      setCollapsedThreadIds((current) => new Set([...current, parentComment.id]));
       setReplyBody('');
       setReplyParentId(null);
     } catch (err) {
@@ -327,6 +337,17 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
   }, {});
 
   const rootComments = sortComments(comments.filter((comment) => !comment.parentCommentId));
+  const commentsPerPage = 5;
+  const commentPageCount = Math.max(1, Math.ceil(rootComments.length / commentsPerPage));
+  const currentCommentPage = Math.min(commentPage, commentPageCount);
+  const visibleRootComments = useMemo(
+    () => rootComments.slice((currentCommentPage - 1) * commentsPerPage, currentCommentPage * commentsPerPage),
+    [rootComments, currentCommentPage],
+  );
+
+  useEffect(() => {
+    setCommentPage((page) => Math.min(page, commentPageCount));
+  }, [commentPageCount]);
 
   const renderComment = (comment: DashboardPostComment, isReply = false) => {
     const replies = repliesByParent[comment.id] || [];
@@ -622,8 +643,37 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
         <div className="mt-5 space-y-4">
           {comments.length === 0 ? (
             <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No comments yet.</div>
-          ) : rootComments.map((comment) => renderComment(comment))}
+          ) : visibleRootComments.map((comment) => renderComment(comment))}
         </div>
+        {rootComments.length > commentsPerPage && (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-4 dark:border-gray-800">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-gray-400">
+              Page {currentCommentPage} of {commentPageCount}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCommentPage((page) => Math.max(1, page - 1))}
+                className="btn-secondary"
+                disabled={currentCommentPage === 1}
+                aria-label="Previous comments"
+                title="Previous Comments"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCommentPage((page) => Math.min(commentPageCount, page + 1))}
+                className="btn-secondary"
+                disabled={currentCommentPage === commentPageCount}
+                aria-label="Next comments"
+                title="Next Comments"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </section>
       {commentPendingDelete && (
         <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">

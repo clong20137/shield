@@ -217,7 +217,6 @@ function PermissionsPage({
   const [isSavingRegistration, setIsSavingRegistration] = useState(false);
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [accessReview, setAccessReview] = useState<AccessReviewResponse | null>(null);
-  const [isLoadingAccessReview, setIsLoadingAccessReview] = useState(false);
   const [reviewPage, setReviewPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -260,6 +259,25 @@ function PermissionsPage({
       window.removeEventListener('shield:user-updated', handlePermissionsUpdate);
     };
   }, [account.id]);
+
+  useEffect(() => {
+    if (section === 'settings') return undefined;
+
+    const syncWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void syncAccessReview();
+      }
+    };
+    const intervalId = window.setInterval(syncWhenVisible, 60000);
+
+    window.addEventListener('focus', syncWhenVisible);
+    document.addEventListener('visibilitychange', syncWhenVisible);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', syncWhenVisible);
+      document.removeEventListener('visibilitychange', syncWhenVisible);
+    };
+  }, [section]);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -382,21 +400,14 @@ function PermissionsPage({
     }
   };
 
-  const refreshAccessReview = async () => {
-    setIsLoadingAccessReview(true);
-    setError(null);
+  async function syncAccessReview() {
     try {
       const response = await reportService.getAccessReview();
       setAccessReview(response.data);
-      onToast('success', 'Access review refreshed.');
     } catch (err) {
-      const message = getErrorMessage(err, 'Failed to refresh access review.');
-      setError(message);
-      onToast('error', message);
-    } finally {
-      setIsLoadingAccessReview(false);
+      console.error('Failed to live sync access review:', err);
     }
-  };
+  }
 
   const flaggedAccounts = accessReview?.accounts.filter((item) => item.reviewFlags.length > 0) || [];
   const reviewPageSize = 6;
@@ -442,10 +453,10 @@ function PermissionsPage({
             </h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Review privileged access, MFA enrollment, stale accounts, and active sessions.</p>
           </div>
-          <button type="button" onClick={refreshAccessReview} className="btn-secondary" disabled={isLoadingAccessReview} aria-label="Refresh access review" title="Refresh">
-            <ShieldCheck size={16} />
-            {isLoadingAccessReview ? 'Refreshing' : 'Refresh'}
-          </button>
+          <span className="inline-flex items-center gap-2 rounded bg-emerald-50 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-emerald-800 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-100 dark:ring-emerald-900">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.14)]" />
+            Live synced
+          </span>
         </div>
 
         {loading ? (
