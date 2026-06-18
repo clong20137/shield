@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Mail, Pencil, Plus, Save, Search, ShieldCheck, ShieldAlert, X } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Mail, Pencil, Plus, Save, Search, ShieldCheck, ShieldAlert, X } from 'lucide-react';
 import { AccessReviewResponse, AuthAccount, AuthInvite, AuthRole, RegistrationSettings, authService, reportService } from '../services/api';
 
 const APP_BASE_PATH = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
@@ -218,6 +218,7 @@ function PermissionsPage({
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [accessReview, setAccessReview] = useState<AccessReviewResponse | null>(null);
   const [isLoadingAccessReview, setIsLoadingAccessReview] = useState(false);
+  const [isReviewListExpanded, setIsReviewListExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -397,7 +398,8 @@ function PermissionsPage({
     }
   };
 
-  const flaggedAccounts = accessReview?.accounts.filter((item) => item.reviewFlags.length > 0).slice(0, 8) || [];
+  const flaggedAccounts = accessReview?.accounts.filter((item) => item.reviewFlags.length > 0) || [];
+  const visibleFlaggedAccounts = isReviewListExpanded ? flaggedAccounts : flaggedAccounts.slice(0, 4);
   const formatDate = (value?: string | null) => {
     if (!value) return 'Never';
     const date = new Date(value);
@@ -459,32 +461,60 @@ function PermissionsPage({
             </div>
 
             {flaggedAccounts.length > 0 ? (
-              <div className="overflow-hidden rounded border border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/20">
-                <div className="flex items-center gap-2 border-b border-amber-200 px-3 py-2 text-sm font-bold text-amber-900 dark:border-amber-900/60 dark:text-amber-100">
-                  <AlertTriangle size={16} />
-                  Accounts Needing Review
+              <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-900/60 dark:bg-amber-950/20">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-amber-200 pb-3 dark:border-amber-900/60">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950 dark:text-amber-200 dark:ring-amber-900">
+                      <AlertTriangle size={17} />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-base font-black text-amber-950 dark:text-amber-100">Accounts Needing Review</h3>
+                      <p className="mt-1 text-sm text-amber-800/80 dark:text-amber-100/70">
+                        Focus on the accounts with missing MFA, stale activity, or elevated access.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="rounded bg-white px-2.5 py-1 text-xs font-black uppercase tracking-[0.12em] text-amber-800 ring-1 ring-amber-200 dark:bg-gray-950 dark:text-amber-100 dark:ring-amber-900">
+                    {flaggedAccounts.length} flagged
+                  </span>
                 </div>
-                <div className="divide-y divide-amber-200 dark:divide-amber-900/60">
-                  {flaggedAccounts.map((reviewAccount) => (
-                    <div key={reviewAccount.id} className="grid gap-2 px-3 py-2 text-sm md:grid-cols-[minmax(0,1.2fr)_0.8fr_1fr]">
-                      <div className="min-w-0">
-                        <span className="block truncate font-bold text-gray-900 dark:text-gray-100">{reviewAccount.displayName}</span>
-                        <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{reviewAccount.email}</span>
+                <div className="mt-3 grid gap-3 xl:grid-cols-2">
+                  {visibleFlaggedAccounts.map((reviewAccount) => (
+                    <article key={reviewAccount.id} className="rounded border border-amber-200 bg-white p-3 shadow-sm dark:border-amber-900/60 dark:bg-gray-950">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <span className="block truncate text-sm font-black text-gray-900 dark:text-gray-100">{reviewAccount.displayName}</span>
+                          <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">{reviewAccount.email}</span>
+                        </div>
+                        <span className="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-600 dark:bg-gray-900 dark:text-gray-300">
+                          {reviewAccount.role}
+                        </span>
                       </div>
-                      <div className="text-xs text-gray-600 dark:text-gray-300">
-                        <span className="block font-semibold">{reviewAccount.role}</span>
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
                         <span>Last seen {formatDate(reviewAccount.lastSeenAt)}</span>
+                        <span className="h-1 w-1 rounded-full bg-gray-300 dark:bg-gray-700" />
+                        <span>{reviewAccount.reviewFlags.length} review flag{reviewAccount.reviewFlags.length === 1 ? '' : 's'}</span>
                       </div>
-                      <div className="flex flex-wrap gap-1">
+                      <div className="mt-3 flex flex-wrap gap-1.5">
                         {reviewAccount.reviewFlags.map((flag) => (
-                          <span key={flag} className="rounded bg-white px-2 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-amber-800 ring-1 ring-amber-200 dark:bg-gray-950 dark:text-amber-100 dark:ring-amber-900">
+                          <span key={flag} className="rounded bg-amber-50 px-2 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-amber-800 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-900">
                             {flag.replace(/_/gu, ' ')}
                           </span>
                         ))}
                       </div>
-                    </div>
+                    </article>
                   ))}
                 </div>
+                {flaggedAccounts.length > 4 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsReviewListExpanded((value) => !value)}
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded border border-dashed border-amber-300 bg-white/70 px-3 py-2 text-xs font-black uppercase tracking-[0.1em] text-amber-800 transition hover:border-amber-400 hover:bg-white dark:border-amber-900 dark:bg-gray-950/70 dark:text-amber-100 dark:hover:bg-gray-950"
+                  >
+                    {isReviewListExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                    {isReviewListExpanded ? 'Show fewer accounts' : `Show ${flaggedAccounts.length - 4} more`}
+                  </button>
+                )}
               </div>
             ) : (
               <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm font-semibold text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-100">
