@@ -232,6 +232,18 @@ const attendanceHourFields = [
   'injuryIllnessHours',
 ];
 
+const fullLeaveWaivedDailySections = new Set<string>([
+  'Regular Duty',
+  'Duty Hours',
+  'Traffic Activity',
+  'OWI Offense Activity',
+  '10K Truck Activity',
+  'Level 1-3 Regular Duty Inspections',
+  'Criminal Activity',
+  'Drug Activity',
+  'T-Codes',
+]);
+
 const dutyActivityHourFields = [
   'patrolHours',
   'crashInvestHours',
@@ -1943,6 +1955,11 @@ function CalendarPage({
   const fillBlankNumericDetailsWithZero = () => {
     setEntryForm((currentForm) => {
       const details = { ...(currentForm.details || {}) };
+      timeDetailFields.forEach((key) => {
+        if (!details[key]) {
+          details[key] = '00:00';
+        }
+      });
       numericDetailFields.forEach((key) => {
         if (!details[key]) {
           details[key] = '0';
@@ -2062,6 +2079,9 @@ function CalendarPage({
       return;
     }
 
+    const defaultWorkdayHours = Number(getDefaultDutyHours(currentUser)) || numericHours;
+    const isFullWorkdayLeave = Math.abs(numericHours - defaultWorkdayHours) <= 0.01;
+    const reportedHours = numericHours < defaultWorkdayHours ? defaultWorkdayHours : numericHours;
     const existingEntry = getCalendarEntryForDate(entries, dateKey);
     const savedExistingEntry = existingEntry && !existingEntry.id.startsWith('local-draft-') ? existingEntry : null;
     const localEntry = selectedDate === dateKey
@@ -2075,14 +2095,14 @@ function CalendarPage({
       ...localEntry,
       category: 'Trooper Daily',
       date: dateKey,
-      dutyHours: formatHours(numericHours),
+      dutyHours: formatHours(reportedHours),
       districtWorked: localEntry.districtWorked || getDefaultDistrict(currentUser),
       specialStatus: status,
       color: status === vacationStatus ? vacationColor : sickColor,
       submissionStatus: 'Draft',
       details: {
         ...(localEntry.details || {}),
-        regularDaysOff: '0',
+        regularDaysOff: isFullWorkdayLeave ? '1' : '0',
         [otherLeaveHoursKey]: '0',
         [leaveHoursKey]: formatHours(numericHours),
       },
@@ -2293,6 +2313,8 @@ function CalendarPage({
     : entryForm.specialStatus === sickStatus
       ? parseNumericDetail(entryDetails, 'injuryIllnessHours')
       : 0;
+  const defaultWorkdayHours = Number(getDefaultDutyHours(currentUser)) || reportedDutyHours;
+  const isFullLeaveDay = leaveStatusHours > 0 && defaultWorkdayHours > 0 && Math.abs(leaveStatusHours - defaultWorkdayHours) <= 0.01;
   const workedDutyHoursTarget = Math.max(reportedDutyHours - leaveStatusHours, 0);
   const shiftDutyTargetHours = leaveStatusHours > 0 ? workedDutyHoursTarget : reportedDutyHours;
   const standardDutyActivityHours = dutyActivityHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
@@ -2422,6 +2444,10 @@ function CalendarPage({
 
     if (invalidBelongsToPanel) {
       return { state: 'attention', label: 'Needs attention' };
+    }
+
+    if (isFullLeaveDay && fullLeaveWaivedDailySections.has(panel)) {
+      return { state: 'complete', label: 'Leave day' };
     }
 
     if (panel === 'Administrative') {
