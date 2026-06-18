@@ -35,6 +35,7 @@ const sickColor = '#DC2626';
 const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training', vacationStatus, sickStatus];
 const narrativeCharacterLimit = 1000;
 const dailyInputCharacterLimit = 5;
+const tCodeHourInputCharacterLimit = 6;
 const trooperDailyDraftStoragePrefix = 'shield_trooper_daily_draft';
 const tCodeDetailsKey = 'tCodes';
 const noTCodeDetailsKey = 'noTCodes';
@@ -249,7 +250,7 @@ const wholeNumberDetailFields = new Set<string>(
   trooperDailySections
     .filter((section) => !['Regular Duty', 'Attendance Hours', 'Duty Hours'].includes(section.title))
     .flatMap((section) => section.fields.map(([key]) => key))
-    .filter((key) => !key.toLowerCase().includes('grams')),
+    .filter((key) => !key.toLowerCase().includes('grams') && key !== 'pbt'),
 );
 
 const getDefaultDistrict = (currentUser?: AuthAccount) =>
@@ -656,7 +657,7 @@ function parseTCodeDetails(details: Record<string, string> | undefined): Trooper
       .map((row) => ({
         id: row.id || createTCodeId(),
         code: String(row.code || '').slice(0, 80),
-        timeWorked: sanitizeDecimalInput(String(row.timeWorked || ''), 5),
+        timeWorked: sanitizeDecimalInput(String(row.timeWorked || ''), 3, tCodeHourInputCharacterLimit),
       }))
       .filter((row) => row.code || row.timeWorked)
       .slice(0, 25);
@@ -670,7 +671,7 @@ function serializeTCodeDetails(rows: TrooperDailyTCode[]): string {
     .map((row) => ({
       id: row.id,
       code: row.code.trim(),
-      timeWorked: sanitizeDecimalInput(row.timeWorked, 5),
+      timeWorked: sanitizeDecimalInput(row.timeWorked, 3, tCodeHourInputCharacterLimit),
     }))
     .filter((row) => row.code || row.timeWorked)
     .slice(0, 25));
@@ -3397,7 +3398,8 @@ function CalendarPage({
                                     type="text"
                                     inputMode="decimal"
                                     value={row.timeWorked}
-                                    onChange={(event) => updateTCodeRow(row.id, { timeWorked: sanitizeDecimalInput(event.target.value, 5) })}
+                                    maxLength={tCodeHourInputCharacterLimit}
+                                    onChange={(event) => updateTCodeRow(row.id, { timeWorked: sanitizeDecimalInput(event.target.value, 3, tCodeHourInputCharacterLimit) })}
                                     data-daily-field={`tCode-${row.id}-time`}
                                     className={`trooper-daily-field-with-icon w-full rounded border bg-white py-2 pl-9 pr-3 text-sm dark:bg-gray-950 ${
                                       invalidDailyField === `tCode-${row.id}-time`
