@@ -437,6 +437,7 @@ export async function initializeDatabase() {
   await ensureColumn('user_messages', 'threadTitle', '`threadTitle` VARCHAR(200)');
   await ensureColumn('user_messages', 'threadParticipantIds', '`threadParticipantIds` TEXT');
   await ensureColumn('user_messages', 'threadParticipantNames', '`threadParticipantNames` TEXT');
+  await ensureColumn('user_messages', 'threadImageUrl', '`threadImageUrl` VARCHAR(500)');
   await ensureColumn('user_messages', 'groupMessageId', '`groupMessageId` VARCHAR(36)');
   await ensureIndex('user_messages', 'idx_messages_recipient_visible_created', '`recipientUserId`, `recipientDeleted`, `isArchived`, `createdAt`');
   await ensureIndex('user_messages', 'idx_messages_sender_visible_created', '`senderAccountId`, `senderDeleted`, `createdAt`');

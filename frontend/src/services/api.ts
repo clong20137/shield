@@ -751,6 +751,7 @@ export interface UserMessage {
   threadTitle?: string | null;
   threadParticipantIds?: string | null;
   threadParticipantNames?: string | null;
+  threadImageUrl?: string | null;
   groupMessageId?: string | null;
   createdAt: string;
   senderName?: string;
@@ -1228,6 +1229,18 @@ export const messageService = {
     threadId?: string;
     threadTitle?: string;
   }) => api.post<{ threadId: string; groupMessageId: string; messages: UserMessage[] }>('/messages/group', message),
+
+  uploadImage: (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    return api.post<{ imageUrl: string }>('/messages/images', formData);
+  },
+
+  updateThreadImage: (threadId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    return api.put<{ threadId: string; imageUrl: string }>(`/messages/thread/${threadId}/image`, formData);
+  },
 
   getForUser: (userId: string) =>
     api.get<UserMessage[]>(`/messages/user/${userId}`),

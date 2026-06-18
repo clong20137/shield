@@ -19,6 +19,7 @@ export interface UserMessage {
   threadTitle?: string | null;
   threadParticipantIds?: string | null;
   threadParticipantNames?: string | null;
+  threadImageUrl?: string | null;
   groupMessageId?: string | null;
   createdAt: Date;
   senderName?: string;
@@ -52,6 +53,7 @@ interface UserMessageRow extends RowDataPacket {
   threadTitle?: string | null;
   threadParticipantIds?: string | null;
   threadParticipantNames?: string | null;
+  threadImageUrl?: string | null;
   groupMessageId?: string | null;
   createdAt: Date;
   senderName?: string;
@@ -86,6 +88,7 @@ function toUserMessage(row: UserMessageRow): UserMessage {
     threadTitle: row.threadTitle || null,
     threadParticipantIds: row.threadParticipantIds || null,
     threadParticipantNames: row.threadParticipantNames || null,
+    threadImageUrl: row.threadImageUrl || null,
     groupMessageId: row.groupMessageId || row.id,
     createdAt: row.createdAt,
     senderName: row.senderName,
@@ -112,8 +115,8 @@ export class UserMessageModel {
 
       await conn.query<ResultSetHeader>(
         `INSERT INTO user_messages (
-          \`id\`, \`senderAccountId\`, \`recipientUserId\`, \`subject\`, \`body\`, \`isRead\`, \`threadId\`, \`threadType\`, \`threadTitle\`, \`threadParticipantIds\`, \`threadParticipantNames\`, \`groupMessageId\`, \`createdAt\`
-        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`,
+          \`id\`, \`senderAccountId\`, \`recipientUserId\`, \`subject\`, \`body\`, \`isRead\`, \`threadId\`, \`threadType\`, \`threadTitle\`, \`threadParticipantIds\`, \`threadParticipantNames\`, \`threadImageUrl\`, \`groupMessageId\`, \`createdAt\`
+        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           message.senderAccountId,
@@ -125,6 +128,7 @@ export class UserMessageModel {
           message.threadTitle || null,
           message.threadParticipantIds || null,
           message.threadParticipantNames || null,
+          message.threadImageUrl || null,
           message.groupMessageId || id,
           now,
         ]
@@ -142,6 +146,7 @@ export class UserMessageModel {
         threadTitle: message.threadTitle || null,
         threadParticipantIds: message.threadParticipantIds || null,
         threadParticipantNames: message.threadParticipantNames || null,
+        threadImageUrl: message.threadImageUrl || null,
         groupMessageId: message.groupMessageId || id,
         createdAt: now,
       };
@@ -336,6 +341,50 @@ export class UserMessageModel {
           \`senderDeleted\` = CASE WHEN \`senderAccountId\` = ? THEN 1 ELSE \`senderDeleted\` END
         WHERE \`threadId\` = ? AND (\`recipientUserId\` = ? OR \`senderAccountId\` = ?)`,
         [accountId, accountId, threadId, accountId, accountId]
+      );
+
+      return result.affectedRows > 0;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async isThreadParticipant(threadId: string, accountId: string): Promise<boolean> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<Array<RowDataPacket & { count: number }>>(
+        `SELECT COUNT(*) as count
+        FROM user_messages
+        WHERE \`threadId\` = ?
+          AND (\`senderAccountId\` = ? OR \`recipientUserId\` = ?)
+        LIMIT 1`,
+        [threadId, accountId, accountId],
+      );
+
+      return Number(rows[0]?.count || 0) > 0;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async updateThreadImage(threadId: string, accountId: string, threadImageUrl: string): Promise<boolean> {
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>(
+        `UPDATE user_messages
+        SET \`threadImageUrl\` = ?
+        WHERE \`threadId\` = ?
+          AND \`threadType\` IN ('group', 'district')
+          AND EXISTS (
+            SELECT 1 FROM (
+              SELECT \`id\`
+              FROM user_messages
+              WHERE \`threadId\` = ?
+                AND (\`senderAccountId\` = ? OR \`recipientUserId\` = ?)
+              LIMIT 1
+            ) participant
+          )`,
+        [threadImageUrl, threadId, threadId, accountId, accountId],
       );
 
       return result.affectedRows > 0;

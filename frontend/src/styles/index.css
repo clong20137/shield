@@ -1810,6 +1810,12 @@ input.pinned-profile-search-input.pinned-profile-search-input {
   padding-right: 0.75rem !important;
 }
 
+.EmojiPickerReact input.epr-search,
+.epr-main input.epr-search {
+  padding-left: 2.75rem !important;
+  padding-right: 0.75rem !important;
+}
+
 select {
   min-height: 2.75rem;
   padding-left: 1rem !important;

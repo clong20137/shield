@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { MessageController } from '../controllers/messageController';
 import { requirePermission, requireSelfOrPermission } from '../middleware/permissions';
 import { rateLimit } from '../middleware/rateLimit';
+import { requireAuthenticated } from '../middleware/authSession';
+import { messageImageUpload } from '../middleware/messageUpload';
 
 const router = Router();
 const messageSendLimiter = rateLimit({ keyPrefix: 'messages-send', windowMs: 60 * 1000, max: 60, message: 'Too many messages sent. Try again shortly.' });
@@ -12,6 +14,8 @@ const messageMutationLimiter = rateLimit({ keyPrefix: 'messages-mutate', windowM
 router.get('/events', MessageController.streamEvents);
 router.post('/', messageSendLimiter, requirePermission('messages:send'), requireSelfOrPermission((req) => req.body?.senderAccountId, 'roles:manage'), MessageController.createMessage);
 router.post('/group', messageSendLimiter, requirePermission('messages:send'), requireSelfOrPermission((req) => req.body?.senderAccountId, 'roles:manage'), MessageController.createGroupMessage);
+router.post('/images', messageMutationLimiter, requirePermission('messages:send'), messageImageUpload.single('image'), MessageController.uploadImage);
+router.put('/thread/:threadId/image', messageMutationLimiter, requireAuthenticated(), messageImageUpload.single('image'), MessageController.updateThreadImage);
 router.get('/inbox/:accountId', messageReadLimiter, requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), MessageController.listInbox);
 router.get('/sent/:accountId', messageReadLimiter, requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), MessageController.listSent);
 router.get('/user/:userId', messageReadLimiter, requireSelfOrPermission((req) => req.params.userId, 'roles:manage'), MessageController.listMessagesForUser);

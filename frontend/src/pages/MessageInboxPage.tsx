@@ -1,8 +1,8 @@
-import { FormEvent, KeyboardEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { ClipboardEvent, FormEvent, KeyboardEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Building2, Check, CheckCheck, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Send, Trash2, Users, X } from 'lucide-react';
+import { Building2, Check, CheckCheck, Image as ImageIcon, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Send, Trash2, Users, X } from 'lucide-react';
 import type { EmojiClickData } from 'emoji-picker-react';
-import { AuthAccount, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, userService, User, UserMessage } from '../services/api';
+import { AuthAccount, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, handleAssetThumbnailError, messageService, userService, User, UserMessage } from '../services/api';
 import { RankBadge } from '../components/RankBadge';
 import { MentionText } from '../components/MentionText';
 import { MentionTextarea } from '../components/MentionTextarea';
@@ -23,6 +23,7 @@ interface MessageThread {
   contactEmail: string;
   contactRank: string;
   contactProfilePictureUrl: string;
+  threadImageUrl: string;
   contactLastSeenAt: string | null;
   contactReceivesMessages: boolean;
   participantIds: string[];
@@ -171,6 +172,10 @@ function getContactRank(message: UserMessage, currentUserId: string): string {
 }
 
 function getContactProfilePicture(message: UserMessage, currentUserId: string): string {
+  if (getThreadType(message) !== 'direct') {
+    return message.threadImageUrl || '';
+  }
+
   return message.senderAccountId === currentUserId
     ? message.recipientProfilePictureUrl || ''
     : message.senderProfilePictureUrl || '';
@@ -243,6 +248,10 @@ function getDraftGroupThreadId(recipients: Pick<User, 'id'>[]): string {
   return `draft-group:${recipients.map((user) => user.id).sort().join(',')}`;
 }
 
+function isMessageImageUrl(value: string): boolean {
+  return /^\/uploads\/messages\/[^\s]+?\.(?:jpe?g|jfif|png|gif|webp)$/iu.test(value.trim());
+}
+
 function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRecipient = null }: MessageInboxPageProps) {
   const [inboxMessages, setInboxMessages] = useState<UserMessage[]>([]);
   const [sentMessages, setSentMessages] = useState<UserMessage[]>([]);
@@ -281,6 +290,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
   const composeButtonRef = useRef<HTMLButtonElement | null>(null);
   const replyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const groupImageInputRef = useRef<HTMLInputElement | null>(null);
+  const messageImageInputRef = useRef<HTMLInputElement | null>(null);
   const focusReplyComposer = () => {
     window.setTimeout(() => replyTextareaRef.current?.focus(), 0);
   };
@@ -520,6 +531,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           contactEmail: getContactEmail(message, currentUser.id),
           contactRank: getContactRank(message, currentUser.id),
           contactProfilePictureUrl: getContactProfilePicture(message, currentUser.id),
+          threadImageUrl: message.threadImageUrl || '',
           contactLastSeenAt: getContactLastSeenAt(message, currentUser.id),
           contactReceivesMessages: getContactReceivesMessages(message, currentUser.id),
           participantIds: getParticipantIds(message),
@@ -538,6 +550,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       }
       existingThread.latestMessage = message;
       existingThread.contactLastSeenAt = getContactLastSeenAt(message, currentUser.id);
+      existingThread.threadImageUrl = message.threadImageUrl || existingThread.threadImageUrl;
+      existingThread.contactProfilePictureUrl = getThreadType(message) !== 'direct' && message.threadImageUrl
+        ? message.threadImageUrl
+        : existingThread.contactProfilePictureUrl;
       existingThread.participantIds = Array.from(new Set([...existingThread.participantIds, ...getParticipantIds(message)]));
       existingThread.participantNames = Array.from(new Set([...existingThread.participantNames, ...getParticipantNames(message, currentUser.id)]));
       existingThread.subject = existingThread.subject || subject;
@@ -567,6 +583,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           contactEmail: draftRecipient.email || '',
           contactRank: draftRecipient.rank || '',
           contactProfilePictureUrl: draftRecipient.profilePictureUrl || '',
+          threadImageUrl: '',
           contactLastSeenAt: draftRecipient.lastSeenAt || null,
           contactReceivesMessages: draftRecipient.receivesMessages !== false,
           participantIds: [currentUser.id, draftRecipient.id],
@@ -584,6 +601,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           contactEmail: '',
           contactRank: `${draftGroupRecipients.length} recipients`,
           contactProfilePictureUrl: '',
+          threadImageUrl: '',
           contactLastSeenAt: null,
           contactReceivesMessages: true,
           participantIds: [currentUser.id, ...draftGroupRecipients.map((user) => user.id)],
@@ -745,6 +763,56 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     }
 
     return `${body.trim()}\n\nAttachments: ${files.map((file) => file.name).join(', ')}`;
+  };
+
+  const appendMessageImage = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      return;
+    }
+
+    try {
+      const response = await messageService.uploadImage(file);
+      setReplyBody((body) => `${body}${body.trim() ? '\n' : ''}${response.data.imageUrl}`);
+      focusReplyComposer();
+    } catch (err) {
+      console.error('Failed to upload message image:', err);
+      onToast('error', 'Failed to upload image.');
+    }
+  };
+
+  const handleMessagePaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const imageFiles = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith('image/'));
+    if (imageFiles.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    void imageFiles.reduce<Promise<void>>(
+      (promise, file) => promise.then(() => appendMessageImage(file)),
+      Promise.resolve(),
+    );
+  };
+
+  const changeGroupImage = async (file?: File | null) => {
+    if (!file || !selectedThread || selectedThread.threadType === 'direct' || selectedThread.id.startsWith('draft-group:')) {
+      return;
+    }
+
+    try {
+      const response = await messageService.updateThreadImage(selectedThread.id, file);
+      const imageUrl = response.data.imageUrl;
+      setInboxMessages((messages) => messages.map((message) => (
+        message.threadId === selectedThread.id ? { ...message, threadImageUrl: imageUrl } : message
+      )));
+      setSentMessages((messages) => messages.map((message) => (
+        message.threadId === selectedThread.id ? { ...message, threadImageUrl: imageUrl } : message
+      )));
+      onToast('success', 'Group image updated.');
+      await loadMessages(false);
+    } catch (err) {
+      console.error('Failed to update group image:', err);
+      onToast('error', getApiErrorMessage(err, 'Failed to update group image.'));
+    }
   };
 
   const addEmojiToReply = (emojiData: EmojiClickData) => {
@@ -1066,7 +1134,14 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                       className="relative shrink-0"
                       aria-label={`Open ${thread.contactName}`}
                     >
-                      {thread.threadType !== 'direct' ? (
+                      {thread.threadType !== 'direct' && thread.threadImageUrl ? (
+                        <img
+                          src={getAssetThumbnailUrl(thread.threadImageUrl, 96)}
+                          alt={thread.contactName}
+                          onError={(event) => handleAssetThumbnailError(event, thread.threadImageUrl)}
+                          className="h-10 w-10 rounded-full border border-gray-200 object-cover dark:border-gray-700"
+                        />
+                      ) : thread.threadType !== 'direct' ? (
                         <span className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-primary-500/10 text-primary-500 dark:border-gray-700 dark:text-blue-100">
                           {thread.threadType === 'district' ? <Building2 size={17} /> : <Users size={17} />}
                         </span>
@@ -1331,9 +1406,33 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   <div className="flex min-w-0 items-center gap-3">
                   <div className="relative shrink-0">
                     {selectedThread.threadType !== 'direct' ? (
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-primary-500/10 text-primary-500 shadow-sm dark:border-gray-700 dark:text-blue-100">
-                        {selectedThread.threadType === 'district' ? <Building2 size={20} /> : <Users size={20} />}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!selectedThread.id.startsWith('draft-group:')) {
+                            groupImageInputRef.current?.click();
+                          }
+                        }}
+                        className="group relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-primary-500/10 text-primary-500 shadow-sm dark:border-gray-700 dark:text-blue-100"
+                        aria-label="Change group image"
+                        title={selectedThread.id.startsWith('draft-group:') ? 'Send a message before changing group image' : 'Change group image'}
+                      >
+                        {selectedThread.threadImageUrl ? (
+                          <img
+                            src={getAssetThumbnailUrl(selectedThread.threadImageUrl, 96)}
+                            alt={selectedThread.contactName}
+                            onError={(event) => handleAssetThumbnailError(event, selectedThread.threadImageUrl)}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          selectedThread.threadType === 'district' ? <Building2 size={20} /> : <Users size={20} />
+                        )}
+                        {!selectedThread.id.startsWith('draft-group:') && (
+                          <span className="absolute inset-0 hidden items-center justify-center bg-black/45 text-white group-hover:flex">
+                            <ImageIcon size={15} />
+                          </span>
+                        )}
+                      </button>
                     ) : selectedThread.contactProfilePictureUrl ? (
                       <img
                         src={getAssetThumbnailUrl(selectedThread.contactProfilePictureUrl, 96)}
@@ -1346,6 +1445,16 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                         {getInitials(selectedThread.contactName)}
                       </div>
                     )}
+                    <input
+                      ref={groupImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(event) => {
+                        void changeGroupImage(event.target.files?.[0]);
+                        event.currentTarget.value = '';
+                      }}
+                    />
                   </div>
                   <div className="min-w-0 text-left">
                     <div className="flex min-w-0 items-center gap-2">
@@ -1430,13 +1539,27 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                               ? 'rounded-br-md bg-[#007AFF] text-white'
                               : 'rounded-bl-md border border-gray-200 bg-white text-gray-900 dark:border-gray-800 dark:bg-white dark:text-gray-900'
                           }`}>
-                            <p className="whitespace-pre-wrap text-left text-sm leading-6">
-                              <MentionText
-                                text={message.body}
-                                mentionClassName={isMine ? 'font-bold text-white underline decoration-white/80 underline-offset-2' : 'font-bold text-blue-700 underline underline-offset-2'}
-                                onMentionClick={openMentionProfile}
-                              />
-                            </p>
+                            <div className="space-y-2 text-left text-sm leading-6">
+                              {message.body.split(/\n/gu).map((line, lineIndex) => (
+                                isMessageImageUrl(line) ? (
+                                  <img
+                                    key={`${message.id}-image-${lineIndex}`}
+                                    src={getAssetUrl(line)}
+                                    alt="Message upload"
+                                    onError={handleAssetImageError}
+                                    className="max-h-72 max-w-full rounded-lg object-contain"
+                                  />
+                                ) : (
+                                  <p key={`${message.id}-text-${lineIndex}`} className="whitespace-pre-wrap">
+                                    <MentionText
+                                      text={line || ' '}
+                                      mentionClassName={isMine ? 'font-bold text-white underline decoration-white/80 underline-offset-2' : 'font-bold text-blue-700 underline underline-offset-2'}
+                                      onMentionClick={openMentionProfile}
+                                    />
+                                  </p>
+                                )
+                              ))}
+                            </div>
                           </div>
                           <div className={`mt-1 flex items-center gap-1.5 px-1 text-[11px] font-semibold text-gray-400 ${isMine ? 'justify-end' : 'justify-start'}`}>
                             <span>{formatMessageTime(message.createdAt)}</span>
@@ -1540,12 +1663,35 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                       onChange={(event) => setReplyAttachments(Array.from(event.target.files || []))}
                     />
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => messageImageInputRef.current?.click()}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800 sm:h-8 sm:w-8"
+                    aria-label="Upload image"
+                    title="Upload image"
+                  >
+                    <ImageIcon size={18} />
+                  </button>
+                  <input
+                    ref={messageImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) {
+                        void appendMessageImage(file);
+                      }
+                      event.currentTarget.value = '';
+                    }}
+                  />
                   <MentionTextarea
                     ref={replyTextareaRef}
                     value={replyBody}
                     onChange={updateReplyBody}
                     wrapperClassName="min-w-0 flex-1"
                     onKeyDown={handleReplyKeyDown}
+                    onPaste={handleMessagePaste}
                     placeholder={selectedThreadAcceptsMessages ? 'Message. Use @name to mention someone.' : 'Messages are disabled for this user'}
                     disabled={!selectedThreadAcceptsMessages}
                     rows={1}

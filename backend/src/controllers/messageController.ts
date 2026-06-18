@@ -1,12 +1,15 @@
 import { Request, Response } from 'express';
+import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { UserMessageModel } from '../models/UserMessage';
-import { addMessageEventClient, broadcastMessageEvent } from '../services/messageEvents';
+import { addMessageEventClient, broadcastMessageEvent, broadcastMessageEventToAll } from '../services/messageEvents';
 import { notifyMentions } from '../services/mentionService';
 import { cleanMultiline, cleanString } from '../utils/validation';
 import { getSessionAccount } from '../middleware/authSession';
 import { parsePagination } from '../utils/pagination';
+import { isSafeMessageImage } from '../middleware/messageUpload';
+import { createImageThumbnails } from '../services/imageThumbnails';
 
 export class MessageController {
   static async streamEvents(req: Request, res: Response) {
@@ -187,6 +190,65 @@ export class MessageController {
     } catch (error) {
       console.error('Create group message error:', error);
       res.status(500).json({ error: 'Failed to send group message' });
+    }
+  }
+
+  static async uploadImage(req: Request, res: Response) {
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ error: 'Image file is required' });
+      }
+
+      if (!isSafeMessageImage(file.path)) {
+        fs.rmSync(file.path, { force: true });
+        return res.status(400).json({ error: 'Only valid image uploads are allowed' });
+      }
+
+      await createImageThumbnails(file.path, [240, 640]);
+      res.status(201).json({ imageUrl: `/uploads/messages/${file.filename}` });
+    } catch (error) {
+      console.error('Message image upload error:', error);
+      res.status(500).json({ error: 'Failed to upload image' });
+    }
+  }
+
+  static async updateThreadImage(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      const threadId = cleanString(req.params.threadId, 36);
+      const file = req.file;
+
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      if (!threadId) {
+        return res.status(400).json({ error: 'Thread is required' });
+      }
+
+      if (!file) {
+        return res.status(400).json({ error: 'Image file is required' });
+      }
+
+      if (!isSafeMessageImage(file.path)) {
+        fs.rmSync(file.path, { force: true });
+        return res.status(400).json({ error: 'Only valid image uploads are allowed' });
+      }
+
+      const imageUrl = `/uploads/messages/${file.filename}`;
+      const updated = await UserMessageModel.updateThreadImage(threadId, account.id, imageUrl);
+      if (!updated) {
+        fs.rmSync(file.path, { force: true });
+        return res.status(404).json({ error: 'Group thread not found' });
+      }
+
+      await createImageThumbnails(file.path, [96, 240]);
+      broadcastMessageEventToAll({ type: 'message-created', actorAccountId: account.id });
+      res.json({ threadId, imageUrl });
+    } catch (error) {
+      console.error('Update thread image error:', error);
+      res.status(500).json({ error: 'Failed to update group image' });
     }
   }
 
