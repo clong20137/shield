@@ -442,6 +442,7 @@ export interface AuthAccount {
   presenceHidden: boolean;
   calendarHidden: boolean;
   appScale: 'compact' | 'comfortable' | 'large';
+  defaultDutyHours: string;
   hasCompletedOnboarding: boolean;
   trooperDailyHiddenSections: string[];
   twoFactorEnabled: boolean;
@@ -1052,6 +1053,9 @@ export const authService = {
 
   updateAppScalePreference: (accountId: string, appScale: AuthAccount['appScale']) =>
     api.put<AuthResponse>(`/auth/accounts/${accountId}/app-scale-preference`, { appScale }),
+
+  updateDefaultDutyHoursPreference: (accountId: string, defaultDutyHours: string | number) =>
+    api.put<AuthResponse>(`/auth/accounts/${accountId}/default-duty-hours-preference`, { defaultDutyHours }),
 
   updateTrooperDailyPreferences: (accountId: string, hiddenSections: string[]) =>
     api.put<AuthResponse>(`/auth/accounts/${accountId}/trooper-daily-preferences`, { hiddenSections }),

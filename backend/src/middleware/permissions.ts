@@ -24,6 +24,10 @@ function shouldAllowRequiredAccountSetup(req: Request, accountId: string): boole
     return true;
   }
 
+  if (req.method === 'PUT' && req.path === `/accounts/${accountId}/default-duty-hours-preference`) {
+    return true;
+  }
+
   return false;
 }
 

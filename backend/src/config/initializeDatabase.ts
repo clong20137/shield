@@ -87,6 +87,7 @@ export async function initializeDatabase() {
       \`lastSsoLoginAt\` DATETIME,
       \`receivesMessages\` BOOLEAN DEFAULT 1,
       \`presenceHidden\` BOOLEAN DEFAULT 0,
+      \`defaultDutyHours\` DECIMAL(5,2) NOT NULL DEFAULT 8.00,
       \`isHidden\` BOOLEAN DEFAULT 0,
       \`hasCompletedOnboarding\` BOOLEAN DEFAULT 0,
       \`twoFactorSecret\` VARCHAR(64),
@@ -145,6 +146,7 @@ export async function initializeDatabase() {
   await ensureColumn('users', 'presenceHidden', '`presenceHidden` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'calendarHidden', '`calendarHidden` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'appScale', "`appScale` VARCHAR(20) NOT NULL DEFAULT 'comfortable'");
+  await ensureColumn('users', 'defaultDutyHours', '`defaultDutyHours` DECIMAL(5,2) NOT NULL DEFAULT 8.00');
   await ensureColumn('users', 'isHidden', '`isHidden` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'hasCompletedOnboarding', '`hasCompletedOnboarding` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'trooperDailyHiddenSections', '`trooperDailyHiddenSections` TEXT');

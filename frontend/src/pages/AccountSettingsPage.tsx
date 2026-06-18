@@ -28,6 +28,7 @@ interface AccountSettingsPageProps {
   onPresenceHiddenChange: (presenceHidden: boolean) => void;
   onCalendarHiddenChange: (calendarHidden: boolean) => void;
   onAppScaleChange: (appScale: AuthAccount['appScale']) => void;
+  onDefaultDutyHoursChange: (defaultDutyHours: string) => void;
   onOpenEvaluations?: () => void;
   onReplayGuide?: () => void;
   onAccountUpdate: (account: AuthAccount) => void;
@@ -66,6 +67,7 @@ export function AccountSettingsPage({
   onPresenceHiddenChange,
   onCalendarHiddenChange,
   onAppScaleChange,
+  onDefaultDutyHoursChange,
   onOpenEvaluations,
   onReplayGuide,
   onAccountUpdate,
@@ -92,6 +94,7 @@ export function AccountSettingsPage({
   const [isProfileMediaPickerOpen, setIsProfileMediaPickerOpen] = useState(false);
   const [evaluationCount, setEvaluationCount] = useState<number | null>(null);
   const [isEvaluationsLoading, setIsEvaluationsLoading] = useState(false);
+  const [defaultDutyHoursInput, setDefaultDutyHoursInput] = useState(account.defaultDutyHours || '8');
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
   const isAssignedDevicesLoadingRef = useRef(false);
   const assignedDevicesRefreshTimerRef = useRef<number | null>(null);
@@ -104,6 +107,10 @@ export function AccountSettingsPage({
     onToastRef.current = onToast;
     getErrorMessageRef.current = getErrorMessage;
   }, [getErrorMessage, onToast]);
+
+  useEffect(() => {
+    setDefaultDutyHoursInput(account.defaultDutyHours || '8');
+  }, [account.defaultDutyHours]);
 
   useEffect(() => {
     let isMounted = true;
@@ -889,6 +896,46 @@ export function AccountSettingsPage({
                   aria-label="Quick launcher slot count"
                 />
               </div>
+            </label>
+            <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
+              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Default duty hours</span>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Used as the default hours for Trooper Daily shortcuts like Vacation Day and Sick Day.</span>
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                {['8', '8.5', '9.5', '10.5'].map((hours) => (
+                  <button
+                    key={hours}
+                    type="button"
+                    onClick={() => {
+                      setDefaultDutyHoursInput(hours);
+                      onDefaultDutyHoursChange(hours);
+                    }}
+                    className={`rounded border px-3 py-2 text-sm font-black transition ${
+                      account.defaultDutyHours === hours
+                        ? 'border-accent bg-accent/10 text-accent'
+                        : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-accent dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200'
+                    }`}
+                  >
+                    {hours}h
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                min={0}
+                max={24}
+                step={0.25}
+                value={defaultDutyHoursInput}
+                onChange={(event) => setDefaultDutyHoursInput(event.target.value)}
+                onBlur={() => onDefaultDutyHoursChange(defaultDutyHoursInput)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    onDefaultDutyHoursChange(defaultDutyHoursInput);
+                  }
+                }}
+                className="mt-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                aria-label="Default duty hours"
+              />
             </label>
             <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
               <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">App scale</span>

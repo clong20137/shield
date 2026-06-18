@@ -49,6 +49,7 @@ router.put('/accounts/:accountId/message-preferences', requireSelfOrPermission((
 router.put('/accounts/:accountId/presence-preference', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), AuthController.updatePresencePreference);
 router.put('/accounts/:accountId/calendar-preferences', requireSelfOrPermission((req) => req.params.accountId, 'calendar:manage'), AuthController.updateCalendarPreferences);
 router.put('/accounts/:accountId/app-scale-preference', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), AuthController.updateAppScalePreference);
+router.put('/accounts/:accountId/default-duty-hours-preference', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), AuthController.updateDefaultDutyHoursPreference);
 router.put('/accounts/:accountId/trooper-daily-preferences', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), AuthController.updateTrooperDailyPreferences);
 router.put('/accounts/:accountId/onboarding-complete', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), AuthController.completeOnboarding);
 router.get('/roles', requirePermission('roles:manage'), AuthController.listRoles);

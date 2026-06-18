@@ -22,6 +22,7 @@ export interface AuthAccount {
   presenceHidden: boolean;
   calendarHidden: boolean;
   appScale: 'compact' | 'comfortable' | 'large';
+  defaultDutyHours: string;
   hasCompletedOnboarding: boolean;
   trooperDailyHiddenSections: string[];
   twoFactorEnabled: boolean;
@@ -55,6 +56,7 @@ interface AuthAccountRow extends RowDataPacket {
   presenceHidden: boolean | number;
   calendarHidden: boolean | number;
   appScale: string | null;
+  defaultDutyHours: number | string | null;
   hasCompletedOnboarding: boolean | number;
   trooperDailyHiddenSections: string | null;
   passwordHash: string | null;
@@ -215,6 +217,8 @@ function toPublicAccount(account: AuthAccountRow): AuthAccount {
     trooperDailyHiddenSections = [];
   }
 
+  const defaultDutyHours = Number(account.defaultDutyHours);
+
   return {
     id: account.id,
     email: account.email,
@@ -233,6 +237,7 @@ function toPublicAccount(account: AuthAccountRow): AuthAccount {
     presenceHidden: Boolean(account.presenceHidden),
     calendarHidden: Boolean(account.calendarHidden),
     appScale: account.appScale === 'compact' || account.appScale === 'large' ? account.appScale : 'comfortable',
+    defaultDutyHours: Number.isFinite(defaultDutyHours) && defaultDutyHours >= 0 ? String(defaultDutyHours).replace(/\.?0+$/u, '') : '8',
     hasCompletedOnboarding: Boolean(account.hasCompletedOnboarding),
     trooperDailyHiddenSections,
     twoFactorEnabled: Boolean(account.twoFactorEnabled),
@@ -317,6 +322,7 @@ export class AuthAccountModel {
           presenceHidden: Boolean(existingUser.presenceHidden),
           calendarHidden: Boolean(existingUser.calendarHidden),
           appScale: existingUser.appScale === 'compact' || existingUser.appScale === 'large' ? existingUser.appScale : 'comfortable',
+          defaultDutyHours: String(Number(existingUser.defaultDutyHours) || 8).replace(/\.?0+$/u, ''),
           hasCompletedOnboarding: Boolean(existingUser.hasCompletedOnboarding),
           trooperDailyHiddenSections: [],
           twoFactorEnabled: Boolean(existingUser.twoFactorEnabled),
@@ -351,6 +357,7 @@ export class AuthAccountModel {
         presenceHidden: false,
         calendarHidden: false,
         appScale: 'comfortable',
+        defaultDutyHours: '8',
         hasCompletedOnboarding: false,
         trooperDailyHiddenSections: [],
         twoFactorEnabled: false,
@@ -905,6 +912,26 @@ export class AuthAccountModel {
       await conn.query<ResultSetHeader>(
         'UPDATE users SET `appScale` = ?, `updatedAt` = ? WHERE `id` = ? AND `passwordHash` IS NOT NULL',
         [appScale, new Date(), accountId]
+      );
+
+      const [rows] = await conn.query<AuthAccountRow[]>(
+        'SELECT * FROM users WHERE `id` = ? AND `passwordHash` IS NOT NULL LIMIT 1',
+        [accountId]
+      );
+      const account = rows[0];
+
+      return account ? toPublicAccount(account) : null;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async updateDefaultDutyHoursPreference(accountId: string, defaultDutyHours: number): Promise<AuthAccount | null> {
+    const conn = await pool.getConnection();
+    try {
+      await conn.query<ResultSetHeader>(
+        'UPDATE users SET `defaultDutyHours` = ?, `updatedAt` = ? WHERE `id` = ? AND `passwordHash` IS NOT NULL',
+        [defaultDutyHours, new Date(), accountId]
       );
 
       const [rows] = await conn.query<AuthAccountRow[]>(

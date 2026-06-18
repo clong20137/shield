@@ -1899,6 +1899,35 @@ export class AuthController {
     }
   }
 
+  static async updateDefaultDutyHoursPreference(req: Request, res: Response) {
+    try {
+      const { defaultDutyHours } = req.body as { defaultDutyHours?: unknown };
+      const { accountId } = req.params;
+      const sessionAccount = await getSessionAccount(req);
+
+      if (!sessionAccount || sessionAccount.id !== accountId) {
+        return res.status(403).json({ error: 'You can only update your own default duty hours preference' });
+      }
+
+      const hours = Number(defaultDutyHours);
+      if (!Number.isFinite(hours) || hours < 0 || hours > 24) {
+        return res.status(400).json({ error: 'Default duty hours must be between 0 and 24' });
+      }
+
+      const account = await AuthAccountModel.updateDefaultDutyHoursPreference(accountId, Math.round(hours * 100) / 100);
+
+      if (!account) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+
+      broadcastAppEvent({ type: 'user-updated', entityId: accountId });
+      res.json({ account: await withPermissions(account) });
+    } catch (error) {
+      console.error('Update default duty hours preference error:', error);
+      res.status(500).json({ error: 'Failed to update default duty hours preference' });
+    }
+  }
+
   static async updateTrooperDailyPreferences(req: Request, res: Response) {
     try {
       const { hiddenSections } = req.body as { hiddenSections?: unknown };

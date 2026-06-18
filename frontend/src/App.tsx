@@ -202,6 +202,15 @@ function normalizeAppScale(value?: string | null): AppScale {
   return value === 'compact' || value === 'large' ? value : 'comfortable';
 }
 
+function normalizeDefaultDutyHours(value: unknown): string {
+  const hours = Number(value);
+  if (!Number.isFinite(hours)) {
+    return '8';
+  }
+
+  return (Math.min(24, Math.max(0, Math.round(hours * 100) / 100))).toString().replace(/\.?0+$/u, '');
+}
+
 function normalizeQuickLaunchSlotCount(value: unknown): number {
   const count = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(count)) {
@@ -3655,6 +3664,7 @@ interface OnboardingStep {
   body: string;
   placement?: 'right' | 'below';
   showAppScalePicker?: boolean;
+  showDutyHoursPicker?: boolean;
 }
 
 const onboardingSteps: OnboardingStep[] = [
@@ -3670,6 +3680,13 @@ const onboardingSteps: OnboardingStep[] = [
     title: 'Choose your workspace size',
     body: 'Pick the scale that feels best for your screen. You can change it later from Account Settings.',
     showAppScalePicker: true,
+  },
+  {
+    target: 'my-day',
+    eyebrow: 'Daily Hours',
+    title: 'Set your usual shift length',
+    body: 'Choose the duty hours you usually work. Trooper Daily shortcuts like Vacation Day and Sick Day will use this as their default.',
+    showDutyHoursPicker: true,
   },
   {
     target: 'pinned-profiles',
@@ -3777,23 +3794,30 @@ const findOnboardingElement = (target: string) => {
 function FirstLoginGuide({
   account,
   onAppScaleChange,
+  onDefaultDutyHoursChange,
   onFinish,
   onLater,
 }: {
   account: AuthAccount;
   onAppScaleChange: (appScale: AppScale) => void;
+  onDefaultDutyHoursChange: (defaultDutyHours: string) => void;
   onFinish: () => void;
   onLater: () => void;
 }) {
   const [stepIndex, setStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [animationKey, setAnimationKey] = useState(0);
+  const [dutyHoursInput, setDutyHoursInput] = useState(normalizeDefaultDutyHours(account.defaultDutyHours));
   const step = onboardingSteps[stepIndex];
 
   const goToStep = (nextIndex: number) => {
     setAnimationKey((key) => key + 1);
     setStepIndex(nextIndex);
   };
+
+  useEffect(() => {
+    setDutyHoursInput(normalizeDefaultDutyHours(account.defaultDutyHours));
+  }, [account.defaultDutyHours]);
 
   useEffect(() => {
     let frame = 0;
@@ -3942,6 +3966,53 @@ function FirstLoginGuide({
                 </button>
               );
             })}
+          </div>
+        )}
+        {step.showDutyHoursPicker && (
+          <div className="mt-4">
+            <label className="block text-xs font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
+              Usual duty hours
+            </label>
+            <div className="mt-2 grid grid-cols-4 gap-2">
+              {['8', '8.5', '9.5', '10.5'].map((hours) => {
+                const isSelected = normalizeDefaultDutyHours(account.defaultDutyHours) === hours;
+
+                return (
+                  <button
+                    key={hours}
+                    type="button"
+                    onClick={() => {
+                      setDutyHoursInput(hours);
+                      onDefaultDutyHoursChange(hours);
+                    }}
+                    className={`rounded border px-3 py-2 text-sm font-black transition ${
+                      isSelected
+                        ? 'onboarding-scale-choice-selected border-accent bg-accent/10 text-accent shadow-sm'
+                        : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-accent hover:bg-white dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-900'
+                    }`}
+                  >
+                    {hours}h
+                  </button>
+                );
+              })}
+            </div>
+            <input
+              type="number"
+              min={0}
+              max={24}
+              step={0.25}
+              value={dutyHoursInput}
+              onChange={(event) => setDutyHoursInput(event.target.value)}
+              onBlur={() => onDefaultDutyHoursChange(dutyHoursInput)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  onDefaultDutyHoursChange(dutyHoursInput);
+                }
+              }}
+              className="mt-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+              aria-label="Usual duty hours"
+            />
           </div>
         )}
         <p className="mt-3 text-xs text-gray-500 dark:text-gray-500">
@@ -6289,6 +6360,28 @@ function App() {
     }
   };
 
+  const handleDefaultDutyHoursChange = async (value: string) => {
+    if (!currentUser) {
+      return;
+    }
+
+    const defaultDutyHours = normalizeDefaultDutyHours(value);
+    const previousUser = currentUser;
+    handleAccountUpdate({ ...currentUser, defaultDutyHours });
+
+    try {
+      const response = await authService.updateDefaultDutyHoursPreference(currentUser.id, defaultDutyHours);
+      if (response.data.account) {
+        handleAccountUpdate(response.data.account);
+      }
+      showToast('success', `Default duty hours set to ${defaultDutyHours}.`);
+    } catch (err) {
+      console.error(err);
+      handleAccountUpdate(previousUser);
+      showToast('error', getErrorMessage(err, 'Failed to update default duty hours.'));
+    }
+  };
+
   const handleQuickLaunchSlotCountChange = (slotCount: number) => {
     const quickLaunchSlotCount = normalizeQuickLaunchSlotCount(slotCount);
     setMessagePreferences((preferences) => ({
@@ -7139,6 +7232,7 @@ function App() {
                       onPresenceHiddenChange={handlePresenceHiddenChange}
                       onCalendarHiddenChange={handleCalendarHiddenChange}
                       onAppScaleChange={handleAppScaleChange}
+                      onDefaultDutyHoursChange={handleDefaultDutyHoursChange}
                       onReplayGuide={replayGuide}
                       onOpenEvaluations={() => closeModal('profile')}
                       onAccountUpdate={handleAccountUpdate}
@@ -7228,6 +7322,7 @@ function App() {
             <FirstLoginGuide
               account={currentUser}
               onAppScaleChange={handleAppScaleChange}
+              onDefaultDutyHoursChange={handleDefaultDutyHoursChange}
               onFinish={finishFirstLoginGuide}
               onLater={() => setIsFirstLoginGuideOpen(false)}
             />

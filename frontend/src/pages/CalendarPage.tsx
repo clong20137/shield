@@ -529,6 +529,11 @@ function formatHours(value: number): string {
   return value.toFixed(2).replace(/\.?0+$/u, '');
 }
 
+function getDefaultDutyHours(currentUser?: AuthAccount): string {
+  const hours = Number(currentUser?.defaultDutyHours);
+  return Number.isFinite(hours) && hours >= 0 ? formatHours(hours) : '8';
+}
+
 function sanitizeDecimalInput(value: string, maxIntegerDigits?: number, maxLength = dailyInputCharacterLimit): string {
   const cleanedValue = value.replace(/[^\d.]/gu, '');
   const [rawInteger = '', ...decimalParts] = cleanedValue.split('.');
@@ -903,7 +908,10 @@ function CalendarPage({
   const [invalidDailyField, setInvalidDailyField] = useState<string | null>(null);
   const [dailyStripTooltip, setDailyStripTooltip] = useState<(OverlayPosition & { dateKey: string; entry: CalendarEntry | null }) | null>(null);
   const [dailyStripContextMenu, setDailyStripContextMenu] = useState<(OverlayPosition & { dateKey: string; entry: CalendarEntry | null }) | null>(null);
-  const [dailyStatusHours, setDailyStatusHours] = useState({ vacation: '8', sick: '8' });
+  const [dailyStatusHours, setDailyStatusHours] = useState(() => {
+    const defaultHours = getDefaultDutyHours(currentUser);
+    return { vacation: defaultHours, sick: defaultHours };
+  });
   const [copiedDailyForm, setCopiedDailyForm] = useState<CalendarEntryForm | null>(null);
   const lastAutoDutyHoursRef = useRef('');
   const dailyFormRef = useRef<HTMLFormElement | null>(null);
@@ -922,6 +930,11 @@ function CalendarPage({
     actorId: currentUser.id,
     actorName: currentUser.displayName || currentUser.email,
   };
+
+  useEffect(() => {
+    const defaultHours = getDefaultDutyHours(currentUser);
+    setDailyStatusHours({ vacation: defaultHours, sick: defaultHours });
+  }, [currentUser.defaultDutyHours]);
 
   useEffect(() => {
     entriesRef.current = entries;
@@ -3350,7 +3363,14 @@ function CalendarPage({
               value={dailyStatusHours.vacation}
               onChange={(event) => setDailyStatusHours((current) => ({ ...current, vacation: sanitizeDecimalInput(event.target.value) }))}
               onClick={(event) => event.stopPropagation()}
-              onKeyDown={(event) => event.stopPropagation()}
+              onKeyDown={(event) => {
+                event.stopPropagation();
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  void markDailyLeaveStatus(dailyStripContextMenu.dateKey, vacationStatus, dailyStatusHours.vacation);
+                  setDailyStripContextMenu(null);
+                }
+              }}
               className="h-8 w-16 shrink-0 rounded border border-gray-300 bg-white px-2 text-right text-xs font-bold text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
               aria-label="Vacation day hours"
               title="Vacation Hours"
@@ -3374,7 +3394,14 @@ function CalendarPage({
               value={dailyStatusHours.sick}
               onChange={(event) => setDailyStatusHours((current) => ({ ...current, sick: sanitizeDecimalInput(event.target.value) }))}
               onClick={(event) => event.stopPropagation()}
-              onKeyDown={(event) => event.stopPropagation()}
+              onKeyDown={(event) => {
+                event.stopPropagation();
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  void markDailyLeaveStatus(dailyStripContextMenu.dateKey, sickStatus, dailyStatusHours.sick);
+                  setDailyStripContextMenu(null);
+                }
+              }}
               className="h-8 w-16 shrink-0 rounded border border-gray-300 bg-white px-2 text-right text-xs font-bold text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
               aria-label="Sick day hours"
               title="Sick Hours"
