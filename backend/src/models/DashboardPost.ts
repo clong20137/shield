@@ -38,6 +38,7 @@ export interface DashboardPostComment {
   authorRank?: string | null;
   authorDistrict?: string | null;
   authorProfilePictureUrl?: string | null;
+  parentCommentId: string | null;
   body: string;
   isFlagged: boolean | number;
   flaggedBy: string | null;
@@ -46,6 +47,9 @@ export interface DashboardPostComment {
   isPinned: boolean | number;
   pinnedBy: string | null;
   pinnedAt: Date | null;
+  isAdminHighlighted: boolean | number;
+  adminHighlightedBy: string | null;
+  adminHighlightedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -278,7 +282,7 @@ export class DashboardPostModel {
         FROM dashboard_post_comments c
         LEFT JOIN users u ON u.\`id\` = c.\`authorId\`
         WHERE c.\`postId\` = ?
-        ORDER BY c.\`isPinned\` DESC, c.\`pinnedAt\` DESC, c.\`createdAt\` ASC
+        ORDER BY c.\`isPinned\` DESC, c.\`pinnedAt\` DESC, c.\`parentCommentId\` ASC, c.\`createdAt\` ASC
         LIMIT ? OFFSET ?`,
         [postId, limit, offset],
       );
@@ -287,13 +291,14 @@ export class DashboardPostModel {
         ...row,
         isFlagged: row.isFlagged !== false && row.isFlagged !== 0,
         isPinned: row.isPinned !== false && row.isPinned !== 0,
+        isAdminHighlighted: row.isAdminHighlighted !== false && row.isAdminHighlighted !== 0,
       }));
     } finally {
       conn.release();
     }
   }
 
-  static async createComment(postId: string, authorId: string, authorName: string, body: string): Promise<DashboardPostComment | null> {
+  static async createComment(postId: string, authorId: string, authorName: string, body: string, parentCommentId: string | null = null): Promise<DashboardPostComment | null> {
     const conn = await pool.getConnection();
     try {
       const [postRows] = await conn.query<RowDataPacket[]>(
@@ -305,13 +310,24 @@ export class DashboardPostModel {
         return null;
       }
 
+      if (parentCommentId) {
+        const [parentRows] = await conn.query<RowDataPacket[]>(
+          'SELECT `id`, `parentCommentId` FROM dashboard_post_comments WHERE `id` = ? AND `postId` = ? LIMIT 1',
+          [parentCommentId, postId],
+        );
+
+        if (parentRows.length === 0 || parentRows[0].parentCommentId) {
+          return null;
+        }
+      }
+
       const id = uuidv4();
       const now = new Date();
       await conn.query<ResultSetHeader>(
         `INSERT INTO dashboard_post_comments (
-          \`id\`, \`postId\`, \`authorId\`, \`authorName\`, \`body\`, \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [id, postId, authorId, authorName, body.trim(), now, now],
+          \`id\`, \`postId\`, \`authorId\`, \`authorName\`, \`parentCommentId\`, \`body\`, \`createdAt\`, \`updatedAt\`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, postId, authorId, authorName, parentCommentId, body.trim(), now, now],
       );
 
       return {
@@ -319,6 +335,7 @@ export class DashboardPostModel {
         postId,
         authorId,
         authorName,
+        parentCommentId,
         authorEmail: null,
         authorRank: null,
         authorDistrict: null,
@@ -331,6 +348,9 @@ export class DashboardPostModel {
         isPinned: false,
         pinnedBy: null,
         pinnedAt: null,
+        isAdminHighlighted: false,
+        adminHighlightedBy: null,
+        adminHighlightedAt: null,
         createdAt: now,
         updatedAt: now,
       };
@@ -339,17 +359,92 @@ export class DashboardPostModel {
     }
   }
 
+  static async updateComment(postId: string, commentId: string, body: string): Promise<DashboardPostComment | null> {
+    const conn = await pool.getConnection();
+    try {
+      const now = new Date();
+      const [result] = await conn.query<ResultSetHeader>(
+        `UPDATE dashboard_post_comments
+         SET \`body\` = ?, \`updatedAt\` = ?
+         WHERE \`id\` = ? AND \`postId\` = ?`,
+        [body.trim(), now, commentId, postId],
+      );
+
+      if (result.affectedRows === 0) {
+        return null;
+      }
+    } finally {
+      conn.release();
+    }
+
+    const comments = await DashboardPostModel.listComments(postId);
+    return comments.find((comment) => comment.id === commentId) || null;
+  }
+
+  static async getComment(postId: string, commentId: string): Promise<DashboardPostComment | null> {
+    const comments = await DashboardPostModel.listComments(postId, 500);
+    return comments.find((comment) => comment.id === commentId) || null;
+  }
+
   static async deleteComment(postId: string, commentId: string): Promise<boolean> {
     const conn = await pool.getConnection();
     try {
       const [result] = await conn.query<ResultSetHeader>(
-        'DELETE FROM dashboard_post_comments WHERE `id` = ? AND `postId` = ?',
-        [commentId, postId],
+        'DELETE FROM dashboard_post_comments WHERE (`id` = ? OR `parentCommentId` = ?) AND `postId` = ?',
+        [commentId, commentId, postId],
       );
       return result.affectedRows > 0;
     } finally {
       conn.release();
     }
+  }
+
+  static async deleteCommentIfAuthorized(postId: string, commentId: string, requesterId: string, canManage: boolean): Promise<boolean | null> {
+    const conn = await pool.getConnection();
+    try {
+      const [commentRows] = await conn.query<RowDataPacket[]>(
+        'SELECT `id`, `authorId` FROM dashboard_post_comments WHERE `id` = ? AND `postId` = ? LIMIT 1',
+        [commentId, postId],
+      );
+
+      if (commentRows.length === 0) {
+        return null;
+      }
+
+      if (!canManage && commentRows[0].authorId !== requesterId) {
+        return false;
+      }
+
+      const [result] = await conn.query<ResultSetHeader>(
+        'DELETE FROM dashboard_post_comments WHERE (`id` = ? OR `parentCommentId` = ?) AND `postId` = ?',
+        [commentId, commentId, postId],
+      );
+      return result.affectedRows > 0;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async setCommentAdminHighlighted(postId: string, commentId: string, highlightedBy: string, isAdminHighlighted: boolean): Promise<DashboardPostComment | null> {
+    const conn = await pool.getConnection();
+    try {
+      const now = new Date();
+      const [result] = await conn.query<ResultSetHeader>(
+        `UPDATE dashboard_post_comments
+         SET \`isAdminHighlighted\` = ?, \`adminHighlightedBy\` = ?, \`adminHighlightedAt\` = ?, \`updatedAt\` = ?
+         WHERE \`id\` = ? AND \`postId\` = ?`,
+        [isAdminHighlighted ? 1 : 0, isAdminHighlighted ? highlightedBy : null, isAdminHighlighted ? now : null, now, commentId, postId],
+      );
+
+      if (result.affectedRows === 0) {
+        return null;
+      }
+    } finally {
+      conn.release();
+    }
+
+    const comments = await DashboardPostModel.listComments(postId);
+    return comments.find((comment) => comment.id === commentId) || null;
   }
 
   static async flagComment(postId: string, commentId: string, flaggedBy: string, reason: string): Promise<DashboardPostComment | null> {

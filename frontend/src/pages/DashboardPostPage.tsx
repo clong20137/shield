@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import type { EmojiClickData } from 'emoji-picker-react';
-import { Flag, Heart, LucideIcon, Megaphone, MessageSquare, PartyPopper, Pin, PinOff, Send, Smile, ThumbsUp, Trash2, X } from 'lucide-react';
+import { Check, Edit3, Flag, Heart, LucideIcon, Megaphone, MessageSquare, PartyPopper, Pin, PinOff, Reply, Send, ShieldCheck, Smile, ThumbsUp, Trash2, X } from 'lucide-react';
 import { UserDetail } from '../components/UserDetail';
 import { FormattedText } from '../components/FormattedText';
 import { MentionTextarea } from '../components/MentionTextarea';
@@ -38,15 +38,26 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
   const [post, setPost] = useState<DashboardPost | null>(null);
   const [comments, setComments] = useState<DashboardPostComment[]>([]);
   const [commentBody, setCommentBody] = useState('');
+  const [replyParentId, setReplyParentId] = useState<string | null>(null);
+  const [replyBody, setReplyBody] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentBody, setEditingCommentBody] = useState('');
   const [commentPendingDelete, setCommentPendingDelete] = useState<DashboardPostComment | null>(null);
   const [selectedCommentUser, setSelectedCommentUser] = useState<User | null>(null);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingComment, setIsSavingComment] = useState(false);
+  const [savingReplyParentId, setSavingReplyParentId] = useState<string | null>(null);
+  const [savingEditCommentId, setSavingEditCommentId] = useState<string | null>(null);
   const [moderatingCommentId, setModeratingCommentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reactionPulseMap, setReactionPulseMap] = useState<Record<string, number>>({});
   const isAdministrator = currentUser?.role === 'administrator';
+  const canManageComments = Boolean(
+    isAdministrator ||
+    currentUser?.permissions?.includes('dashboard:manage') ||
+    currentUser?.permissions?.includes('dashboard:delete'),
+  );
 
   const loadPost = async () => {
     if (!postId) return;
@@ -110,6 +121,49 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
     }
   };
 
+  const submitReply = async (parentComment: DashboardPostComment) => {
+    if (!post || !replyBody.trim()) return;
+
+    setSavingReplyParentId(parentComment.id);
+    setError(null);
+    try {
+      const response = await dashboardPostService.addComment(post.id, replyBody, parentComment.id);
+      setComments((items) => sortComments([...items, response.data]));
+      setReplyBody('');
+      setReplyParentId(null);
+    } catch (err) {
+      console.error('Failed to add reply:', err);
+      setError('Failed to add reply.');
+    } finally {
+      setSavingReplyParentId(null);
+    }
+  };
+
+  const startEditingComment = (comment: DashboardPostComment) => {
+    setEditingCommentId(comment.id);
+    setEditingCommentBody(comment.body);
+    setReplyParentId(null);
+    setReplyBody('');
+  };
+
+  const saveCommentEdit = async (comment: DashboardPostComment) => {
+    if (!post || !editingCommentBody.trim()) return;
+
+    setSavingEditCommentId(comment.id);
+    setError(null);
+    try {
+      const response = await dashboardPostService.updateComment(post.id, comment.id, editingCommentBody);
+      setComments((items) => sortComments(items.map((item) => (item.id === comment.id ? response.data : item))));
+      setEditingCommentId(null);
+      setEditingCommentBody('');
+    } catch (err) {
+      console.error('Failed to update comment:', err);
+      setError('Failed to update comment.');
+    } finally {
+      setSavingEditCommentId(null);
+    }
+  };
+
   const flagComment = async (comment: DashboardPostComment) => {
     if (!post) return;
     setModeratingCommentId(comment.id);
@@ -146,11 +200,26 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
     setError(null);
     try {
       await dashboardPostService.deleteComment(post.id, comment.id);
-      setComments((items) => items.filter((item) => item.id !== comment.id));
+      setComments((items) => items.filter((item) => item.id !== comment.id && item.parentCommentId !== comment.id));
       setCommentPendingDelete(null);
     } catch (err) {
       console.error('Failed to delete comment:', err);
       setError('Failed to delete comment.');
+    } finally {
+      setModeratingCommentId(null);
+    }
+  };
+
+  const highlightComment = async (comment: DashboardPostComment) => {
+    if (!post) return;
+    setModeratingCommentId(comment.id);
+    setError(null);
+    try {
+      const response = await dashboardPostService.highlightComment(post.id, comment.id, !comment.isAdminHighlighted);
+      setComments((items) => sortComments(items.map((item) => (item.id === comment.id ? response.data : item))));
+    } catch (err) {
+      console.error('Failed to highlight comment:', err);
+      setError('Failed to update highlighted comment.');
     } finally {
       setModeratingCommentId(null);
     }
@@ -244,6 +313,167 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
       .join('')
       .slice(0, 2)
       .toUpperCase();
+
+  const canEditComment = (comment: DashboardPostComment) =>
+    Boolean(currentUser && (canManageComments || comment.authorId === currentUser.id));
+
+  const canDeleteComment = canEditComment;
+
+  const repliesByParent = comments.reduce<Record<string, DashboardPostComment[]>>((map, comment) => {
+    if (comment.parentCommentId) {
+      map[comment.parentCommentId] = [...(map[comment.parentCommentId] || []), comment].sort((a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
+    }
+    return map;
+  }, {});
+
+  const rootComments = sortComments(comments.filter((comment) => !comment.parentCommentId));
+
+  const renderComment = (comment: DashboardPostComment, isReply = false) => {
+    const replies = repliesByParent[comment.id] || [];
+    const isEditing = editingCommentId === comment.id;
+    const isReplying = replyParentId === comment.id;
+    const wasEdited = new Date(comment.updatedAt).getTime() > new Date(comment.createdAt).getTime() + 1000;
+
+    return (
+      <div key={comment.id} className={isReply ? 'ml-4 border-l-2 border-accent/20 pl-4 sm:ml-8 sm:pl-5' : ''}>
+        <div className={`grid grid-cols-1 overflow-hidden rounded border dark:border-gray-800 md:grid-cols-[210px_minmax(0,1fr)] ${comment.isAdminHighlighted ? 'border-primary-500 bg-primary-50 shadow-sm dark:border-blue-500 dark:bg-blue-950/30' : comment.isPinned ? 'border-accent bg-accent/5 shadow-sm' : comment.isFlagged ? 'border-amber-300 dark:border-amber-800' : 'border-gray-200'}`}>
+          <aside className={`flex flex-col items-center justify-center border-b p-5 text-center text-white md:border-b-0 md:border-r ${comment.isAdminHighlighted ? 'border-primary-700 bg-primary-600 dark:border-blue-700 dark:bg-blue-950' : 'border-primary-600 bg-primary-500 dark:border-gray-800 dark:bg-gray-900'}`}>
+            <div className="flex w-full flex-col items-center justify-center gap-3">
+              <button type="button" onClick={() => openCommentAuthor(comment)} className="rounded-full focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-primary-500" aria-label={`Open ${comment.authorName || 'comment author'} profile`} title="Open Profile">
+                {comment.authorProfilePictureUrl ? (
+                  <img src={getAssetUrl(comment.authorProfilePictureUrl)} alt={comment.authorName || 'Comment author'} onError={handleAssetImageError} className="h-20 w-20 rounded-full border-2 border-white object-cover shadow transition hover:scale-105" />
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-white bg-white text-xl font-bold text-primary-500 shadow transition hover:scale-105">
+                    {getCommentInitials(comment)}
+                  </div>
+                )}
+              </button>
+              <div className="w-full min-w-0">
+                <p className="truncate text-base font-bold text-white">{comment.authorName || 'User'}</p>
+                <p className="mt-1 truncate text-xs font-semibold uppercase text-blue-100">{comment.authorRank || 'No rank listed'}</p>
+                <p className="mt-1 truncate text-xs text-blue-100">{comment.authorDistrict || 'No district listed'}</p>
+              </div>
+            </div>
+          </aside>
+          <div className="p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase text-gray-400">
+                  {new Date(comment.createdAt).toLocaleString()}{wasEdited ? ' - Edited' : ''}
+                </p>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {comment.isAdminHighlighted && <p className="inline-flex items-center gap-1 rounded bg-primary-500 px-2 py-1 text-xs font-bold uppercase text-white"><ShieldCheck size={12} /> Admin Highlight</p>}
+                  {comment.isPinned && <p className="inline-flex items-center gap-1 rounded bg-accent/10 px-2 py-1 text-xs font-bold uppercase text-accent"><Pin size={12} /> Pinned Comment</p>}
+                  {comment.isFlagged && <p className="inline-flex items-center rounded bg-amber-100 px-2 py-1 text-xs font-bold uppercase text-amber-700 dark:bg-amber-950 dark:text-amber-300">Flagged for review</p>}
+                </div>
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                {!isReply && (
+                  <button type="button" onClick={() => {
+                    setReplyParentId(isReplying ? null : comment.id);
+                    setReplyBody('');
+                    setEditingCommentId(null);
+                  }} disabled={!currentUser} className="btn-secondary" aria-label="Reply to comment" title="Reply">
+                    <Reply size={16} />
+                  </button>
+                )}
+                {canEditComment(comment) && (
+                  <button type="button" onClick={() => startEditingComment(comment)} disabled={moderatingCommentId === comment.id || savingEditCommentId === comment.id} className="btn-secondary" aria-label="Edit comment" title="Edit Comment">
+                    <Edit3 size={16} />
+                  </button>
+                )}
+                {comment.isFlagged && isAdministrator ? (
+                  <button type="button" onClick={() => unflagComment(comment)} disabled={moderatingCommentId === comment.id} className="btn-secondary" aria-label="Unflag comment" title="Unflag Comment">
+                    <Flag size={16} />
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => flagComment(comment)} disabled={moderatingCommentId === comment.id || comment.isFlagged} className="btn-secondary" aria-label="Flag comment" title={comment.isFlagged ? 'Already Flagged' : 'Flag Comment'}>
+                    <Flag size={16} />
+                  </button>
+                )}
+                {isAdministrator && (
+                  <>
+                    <button type="button" onClick={() => pinComment(comment)} disabled={moderatingCommentId === comment.id} className="btn-secondary" aria-label={comment.isPinned ? 'Unpin comment' : 'Pin comment'} title={comment.isPinned ? 'Unpin Comment' : 'Pin Comment'}>
+                      {comment.isPinned ? <PinOff size={16} /> : <Pin size={16} />}
+                    </button>
+                    <button type="button" onClick={() => highlightComment(comment)} disabled={moderatingCommentId === comment.id} className="btn-secondary" aria-label={comment.isAdminHighlighted ? 'Remove admin highlight' : 'Admin highlight'} title={comment.isAdminHighlighted ? 'Remove Admin Highlight' : 'Admin Highlight'}>
+                      <ShieldCheck size={16} />
+                    </button>
+                  </>
+                )}
+                {canDeleteComment(comment) && (
+                  <button type="button" onClick={() => setCommentPendingDelete(comment)} disabled={moderatingCommentId === comment.id} className="btn-danger" aria-label="Delete comment" title="Delete Comment">
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {isEditing ? (
+              <div className="mt-3 rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                <MentionTextarea
+                  value={editingCommentBody}
+                  onChange={setEditingCommentBody}
+                  wrapperClassName="w-full"
+                  className="min-h-20 w-full resize-y rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900"
+                  maxLength={1200}
+                />
+                <div className="mt-3 flex justify-end gap-2">
+                  <button type="button" onClick={() => {
+                    setEditingCommentId(null);
+                    setEditingCommentBody('');
+                  }} className="btn-secondary" aria-label="Cancel edit" title="Cancel">
+                    <X size={16} />
+                  </button>
+                  <button type="button" onClick={() => void saveCommentEdit(comment)} disabled={savingEditCommentId === comment.id || !editingCommentBody.trim()} className="btn-primary" aria-label="Save comment" title="Save Comment">
+                    <Check size={16} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <MentionText
+                text={comment.body}
+                onMentionClick={openMentionProfile}
+                className="mt-3 block whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300"
+                mentionClassName="font-bold text-primary-500 underline underline-offset-2 dark:text-blue-200"
+              />
+            )}
+
+            {isReplying && (
+              <div className="mt-4 rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                <MentionTextarea
+                  value={replyBody}
+                  onChange={setReplyBody}
+                  wrapperClassName="w-full"
+                  className="min-h-20 w-full resize-y rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900"
+                  placeholder="Write a reply..."
+                  maxLength={1200}
+                />
+                <div className="mt-3 flex justify-end gap-2">
+                  <button type="button" onClick={() => {
+                    setReplyParentId(null);
+                    setReplyBody('');
+                  }} className="btn-secondary" aria-label="Cancel reply" title="Cancel">
+                    <X size={16} />
+                  </button>
+                  <button type="button" onClick={() => void submitReply(comment)} disabled={savingReplyParentId === comment.id || !replyBody.trim()} className="btn-primary" aria-label="Post reply" title="Post Reply">
+                    <Send size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        {replies.length > 0 && (
+          <div className="mt-3 space-y-3">
+            {replies.map((reply) => renderComment(reply, true))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -374,64 +604,7 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
         <div className="mt-5 space-y-4">
           {comments.length === 0 ? (
             <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No comments yet.</div>
-          ) : comments.map((comment) => (
-            <div key={comment.id} className={`grid grid-cols-1 overflow-hidden rounded border dark:border-gray-800 md:grid-cols-[210px_minmax(0,1fr)] ${comment.isPinned ? 'border-accent bg-accent/5 shadow-sm' : comment.isFlagged ? 'border-amber-300 dark:border-amber-800' : 'border-gray-200'}`}>
-              <aside className="flex flex-col items-center justify-center border-b border-primary-600 bg-primary-500 p-5 text-center text-white dark:border-gray-800 dark:bg-gray-900 md:border-b-0 md:border-r">
-                <div className="flex w-full flex-col items-center justify-center gap-3">
-                  <button type="button" onClick={() => openCommentAuthor(comment)} className="rounded-full focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-primary-500" aria-label={`Open ${comment.authorName || 'comment author'} profile`} title="Open Profile">
-                    {comment.authorProfilePictureUrl ? (
-                      <img src={getAssetUrl(comment.authorProfilePictureUrl)} alt={comment.authorName || 'Comment author'} onError={handleAssetImageError} className="h-20 w-20 rounded-full border-2 border-white object-cover shadow transition hover:scale-105" />
-                    ) : (
-                      <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-white bg-white text-xl font-bold text-primary-500 shadow transition hover:scale-105">
-                        {getCommentInitials(comment)}
-                      </div>
-                    )}
-                  </button>
-                  <div className="w-full min-w-0">
-                    <p className="truncate text-base font-bold text-white">{comment.authorName || 'User'}</p>
-                    <p className="mt-1 truncate text-xs font-semibold uppercase text-blue-100">{comment.authorRank || 'No rank listed'}</p>
-                    <p className="mt-1 truncate text-xs text-blue-100">{comment.authorDistrict || 'No district listed'}</p>
-                  </div>
-                </div>
-              </aside>
-              <div className="p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-bold uppercase text-gray-400">{new Date(comment.createdAt).toLocaleString()}</p>
-                    {comment.isPinned && <p className="mt-1 inline-flex items-center gap-1 rounded bg-accent/10 px-2 py-1 text-xs font-bold uppercase text-accent"><Pin size={12} /> Pinned Comment</p>}
-                    {comment.isFlagged && <p className="mt-1 text-xs font-bold uppercase text-amber-600">Flagged for review</p>}
-                  </div>
-                  <div className="flex gap-2">
-                    {comment.isFlagged && isAdministrator ? (
-                      <button type="button" onClick={() => unflagComment(comment)} disabled={moderatingCommentId === comment.id} className="btn-secondary" aria-label="Unflag comment" title="Unflag Comment">
-                        <Flag size={16} />
-                      </button>
-                    ) : (
-                      <button type="button" onClick={() => flagComment(comment)} disabled={moderatingCommentId === comment.id || comment.isFlagged} className="btn-secondary" aria-label="Flag comment" title={comment.isFlagged ? 'Already Flagged' : 'Flag Comment'}>
-                        <Flag size={16} />
-                      </button>
-                    )}
-                    {isAdministrator && (
-                      <>
-                        <button type="button" onClick={() => pinComment(comment)} disabled={moderatingCommentId === comment.id} className="btn-secondary" aria-label={comment.isPinned ? 'Unpin comment' : 'Pin comment'} title={comment.isPinned ? 'Unpin Comment' : 'Pin Comment'}>
-                          {comment.isPinned ? <PinOff size={16} /> : <Pin size={16} />}
-                        </button>
-                        <button type="button" onClick={() => setCommentPendingDelete(comment)} disabled={moderatingCommentId === comment.id} className="btn-danger" aria-label="Delete comment" title="Delete Comment">
-                          <Trash2 size={16} />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <MentionText
-                  text={comment.body}
-                  onMentionClick={openMentionProfile}
-                  className="mt-3 block whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300"
-                  mentionClassName="font-bold text-primary-500 underline underline-offset-2 dark:text-blue-200"
-                />
-              </div>
-            </div>
-          ))}
+          ) : rootComments.map((comment) => renderComment(comment))}
         </div>
       </section>
       {commentPendingDelete && (

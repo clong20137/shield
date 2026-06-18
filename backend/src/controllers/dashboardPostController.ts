@@ -15,6 +15,14 @@ const dashboardCategories = ['Update', 'News', 'Alert'] as const;
 const dashboardReactions = ['like', 'celebrate', 'important', 'thanks'] as const;
 const commentFlagNotificationCooldownMs = 15 * 60 * 1000;
 
+function canManageDashboardComments(account: { role?: string; permissions?: string[] } | null): boolean {
+  return Boolean(
+    account?.role === 'administrator' ||
+    account?.permissions?.includes('dashboard:manage') ||
+    account?.permissions?.includes('dashboard:delete'),
+  );
+}
+
 function cleanDashboardPostImageUrl(value: unknown): string {
   const imageUrl = cleanString(value, 500);
   return imageUrl.startsWith('/uploads/dashboard-posts/') ? imageUrl : '';
@@ -184,6 +192,7 @@ export class DashboardPostController {
       }
 
       const body = cleanMultiline(req.body?.body, 1200);
+      const parentCommentId = cleanString(req.body?.parentCommentId, 36) || null;
       if (!body) {
         return res.status(400).json({ error: 'Comment is required' });
       }
@@ -193,6 +202,7 @@ export class DashboardPostController {
         account.id,
         account.displayName || account.email,
         body,
+        parentCommentId,
       );
 
       if (!comment) {
@@ -217,11 +227,60 @@ export class DashboardPostController {
     }
   }
 
+  static async updateComment(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const body = cleanMultiline(req.body?.body, 1200);
+      if (!body) {
+        return res.status(400).json({ error: 'Comment is required' });
+      }
+
+      const existing = await DashboardPostModel.getComment(req.params.id, req.params.commentId);
+      if (!existing) {
+        return res.status(404).json({ error: 'Comment not found' });
+      }
+
+      if (!canManageDashboardComments(account) && existing.authorId !== account.id) {
+        return res.status(403).json({ error: 'You can only edit your own comments' });
+      }
+
+      const comment = await DashboardPostModel.updateComment(req.params.id, req.params.commentId, body);
+      if (!comment) {
+        return res.status(404).json({ error: 'Comment not found' });
+      }
+
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: req.params.id });
+      res.json(comment);
+    } catch (error) {
+      console.error('Dashboard post comment update error:', error);
+      res.status(500).json({ error: 'Failed to update comment' });
+    }
+  }
+
   static async deleteComment(req: Request, res: Response) {
     try {
-      const deleted = await DashboardPostModel.deleteComment(req.params.id, req.params.commentId);
-      if (!deleted) {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const deleted = await DashboardPostModel.deleteCommentIfAuthorized(
+        req.params.id,
+        req.params.commentId,
+        account.id,
+        canManageDashboardComments(account),
+      );
+
+      if (deleted === null) {
         return res.status(404).json({ error: 'Comment not found' });
+      }
+
+      if (!deleted) {
+        return res.status(403).json({ error: 'You can only delete your own comments' });
       }
 
       broadcastAppEvent({ type: 'dashboard-updated', entityId: req.params.id });
@@ -305,6 +364,27 @@ export class DashboardPostController {
     } catch (error) {
       console.error('Dashboard post comment pin error:', error);
       res.status(500).json({ error: 'Failed to update pinned comment' });
+    }
+  }
+
+  static async setCommentAdminHighlighted(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const isAdminHighlighted = req.body?.isAdminHighlighted !== false;
+      const comment = await DashboardPostModel.setCommentAdminHighlighted(req.params.id, req.params.commentId, account.id, isAdminHighlighted);
+      if (!comment) {
+        return res.status(404).json({ error: 'Comment not found' });
+      }
+
+      broadcastAppEvent({ type: 'dashboard-updated', entityId: req.params.id });
+      res.json(comment);
+    } catch (error) {
+      console.error('Dashboard post comment highlight error:', error);
+      res.status(500).json({ error: 'Failed to update highlighted comment' });
     }
   }
 

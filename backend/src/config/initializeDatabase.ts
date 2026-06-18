@@ -359,6 +359,7 @@ export async function initializeDatabase() {
       \`postId\` VARCHAR(36) NOT NULL,
       \`authorId\` VARCHAR(36) NOT NULL,
       \`authorName\` VARCHAR(150),
+      \`parentCommentId\` VARCHAR(36),
       \`body\` TEXT NOT NULL,
       \`isFlagged\` BOOLEAN DEFAULT 0,
       \`flaggedBy\` VARCHAR(36),
@@ -367,13 +368,18 @@ export async function initializeDatabase() {
       \`isPinned\` BOOLEAN DEFAULT 0,
       \`pinnedBy\` VARCHAR(36),
       \`pinnedAt\` DATETIME,
+      \`isAdminHighlighted\` BOOLEAN DEFAULT 0,
+      \`adminHighlightedBy\` VARCHAR(36),
+      \`adminHighlightedAt\` DATETIME,
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX \`idx_dashboard_post_comments_post\` (\`postId\`),
+      INDEX \`idx_dashboard_post_comments_parent\` (\`parentCommentId\`),
       INDEX \`idx_dashboard_post_comments_created\` (\`createdAt\`)
     )
   `);
 
+  await ensureColumn('dashboard_post_comments', 'parentCommentId', '`parentCommentId` VARCHAR(36)');
   await ensureColumn('dashboard_post_comments', 'isFlagged', '`isFlagged` BOOLEAN DEFAULT 0');
   await ensureColumn('dashboard_post_comments', 'flaggedBy', '`flaggedBy` VARCHAR(36)');
   await ensureColumn('dashboard_post_comments', 'flaggedAt', '`flaggedAt` DATETIME');
@@ -381,7 +387,11 @@ export async function initializeDatabase() {
   await ensureColumn('dashboard_post_comments', 'isPinned', '`isPinned` BOOLEAN DEFAULT 0');
   await ensureColumn('dashboard_post_comments', 'pinnedBy', '`pinnedBy` VARCHAR(36)');
   await ensureColumn('dashboard_post_comments', 'pinnedAt', '`pinnedAt` DATETIME');
+  await ensureColumn('dashboard_post_comments', 'isAdminHighlighted', '`isAdminHighlighted` BOOLEAN DEFAULT 0');
+  await ensureColumn('dashboard_post_comments', 'adminHighlightedBy', '`adminHighlightedBy` VARCHAR(36)');
+  await ensureColumn('dashboard_post_comments', 'adminHighlightedAt', '`adminHighlightedAt` DATETIME');
   await ensureIndex('dashboard_post_comments', 'idx_dashboard_comments_post_pinned_created', '`postId`, `isPinned`, `pinnedAt`, `createdAt`');
+  await ensureIndex('dashboard_post_comments', 'idx_dashboard_comments_post_parent_created', '`postId`, `parentCommentId`, `createdAt`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_messages (
