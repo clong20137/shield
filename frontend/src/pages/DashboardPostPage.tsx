@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import type { EmojiClickData } from 'emoji-picker-react';
-import { Check, Edit3, Flag, Heart, LucideIcon, Megaphone, MessageSquare, PartyPopper, Pin, PinOff, Reply, Send, ShieldCheck, Smile, ThumbsUp, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Edit3, Flag, Heart, LucideIcon, Megaphone, MessageSquare, PartyPopper, Pin, PinOff, Reply, Send, ShieldCheck, Smile, ThumbsUp, Trash2, X } from 'lucide-react';
 import { UserDetail } from '../components/UserDetail';
 import { FormattedText } from '../components/FormattedText';
 import { MentionTextarea } from '../components/MentionTextarea';
@@ -42,6 +42,7 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
   const [replyBody, setReplyBody] = useState('');
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentBody, setEditingCommentBody] = useState('');
+  const [collapsedThreadIds, setCollapsedThreadIds] = useState<Set<string>>(() => new Set());
   const [commentPendingDelete, setCommentPendingDelete] = useState<DashboardPostComment | null>(null);
   const [selectedCommentUser, setSelectedCommentUser] = useState<User | null>(null);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
@@ -210,21 +211,6 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
     }
   };
 
-  const highlightComment = async (comment: DashboardPostComment) => {
-    if (!post) return;
-    setModeratingCommentId(comment.id);
-    setError(null);
-    try {
-      const response = await dashboardPostService.highlightComment(post.id, comment.id, !comment.isAdminHighlighted);
-      setComments((items) => sortComments(items.map((item) => (item.id === comment.id ? response.data : item))));
-    } catch (err) {
-      console.error('Failed to highlight comment:', err);
-      setError('Failed to update highlighted comment.');
-    } finally {
-      setModeratingCommentId(null);
-    }
-  };
-
   const pinComment = async (comment: DashboardPostComment) => {
     if (!post) return;
     setModeratingCommentId(comment.id);
@@ -319,6 +305,18 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
 
   const canDeleteComment = canEditComment;
 
+  const toggleThreadCollapsed = (commentId: string) => {
+    setCollapsedThreadIds((current) => {
+      const next = new Set(current);
+      if (next.has(commentId)) {
+        next.delete(commentId);
+      } else {
+        next.add(commentId);
+      }
+      return next;
+    });
+  };
+
   const repliesByParent = comments.reduce<Record<string, DashboardPostComment[]>>((map, comment) => {
     if (comment.parentCommentId) {
       map[comment.parentCommentId] = [...(map[comment.parentCommentId] || []), comment].sort((a, b) =>
@@ -334,6 +332,7 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
     const replies = repliesByParent[comment.id] || [];
     const isEditing = editingCommentId === comment.id;
     const isReplying = replyParentId === comment.id;
+    const isThreadCollapsed = collapsedThreadIds.has(comment.id);
     const wasEdited = new Date(comment.updatedAt).getTime() > new Date(comment.createdAt).getTime() + 1000;
 
     return (
@@ -364,12 +363,18 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
                   {new Date(comment.createdAt).toLocaleString()}{wasEdited ? ' - Edited' : ''}
                 </p>
                 <div className="mt-1 flex flex-wrap gap-1.5">
-                  {comment.isAdminHighlighted && <p className="inline-flex items-center gap-1 rounded bg-primary-500 px-2 py-1 text-xs font-bold uppercase text-white"><ShieldCheck size={12} /> Admin Highlight</p>}
+                  {comment.isAdminHighlighted && <p className="inline-flex items-center gap-1 rounded bg-primary-500 px-2 py-1 text-xs font-bold uppercase text-white"><ShieldCheck size={12} /> Admin</p>}
                   {comment.isPinned && <p className="inline-flex items-center gap-1 rounded bg-accent/10 px-2 py-1 text-xs font-bold uppercase text-accent"><Pin size={12} /> Pinned Comment</p>}
                   {comment.isFlagged && <p className="inline-flex items-center rounded bg-amber-100 px-2 py-1 text-xs font-bold uppercase text-amber-700 dark:bg-amber-950 dark:text-amber-300">Flagged for review</p>}
                 </div>
               </div>
               <div className="flex flex-wrap justify-end gap-2">
+                {!isReply && replies.length > 0 && (
+                  <button type="button" onClick={() => toggleThreadCollapsed(comment.id)} className="btn-secondary" aria-label={isThreadCollapsed ? 'Expand replies' : 'Collapse replies'} title={isThreadCollapsed ? 'Expand Replies' : 'Collapse Replies'}>
+                    {isThreadCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                    <span className="ml-1 text-xs font-bold">{replies.length}</span>
+                  </button>
+                )}
                 {!isReply && (
                   <button type="button" onClick={() => {
                     setReplyParentId(isReplying ? null : comment.id);
@@ -397,9 +402,6 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
                   <>
                     <button type="button" onClick={() => pinComment(comment)} disabled={moderatingCommentId === comment.id} className="btn-secondary" aria-label={comment.isPinned ? 'Unpin comment' : 'Pin comment'} title={comment.isPinned ? 'Unpin Comment' : 'Pin Comment'}>
                       {comment.isPinned ? <PinOff size={16} /> : <Pin size={16} />}
-                    </button>
-                    <button type="button" onClick={() => highlightComment(comment)} disabled={moderatingCommentId === comment.id} className="btn-secondary" aria-label={comment.isAdminHighlighted ? 'Remove admin highlight' : 'Admin highlight'} title={comment.isAdminHighlighted ? 'Remove Admin Highlight' : 'Admin Highlight'}>
-                      <ShieldCheck size={16} />
                     </button>
                   </>
                 )}
@@ -466,7 +468,7 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
             )}
           </div>
         </div>
-        {replies.length > 0 && (
+        {replies.length > 0 && !isThreadCollapsed && (
           <div className="mt-3 space-y-3">
             {replies.map((reply) => renderComment(reply, true))}
           </div>

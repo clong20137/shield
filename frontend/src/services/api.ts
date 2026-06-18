@@ -778,6 +778,7 @@ export interface DashboardPostComment {
   authorRank?: string | null;
   authorDistrict?: string | null;
   authorProfilePictureUrl?: string | null;
+  authorRole?: string | null;
   parentCommentId: string | null;
   body: string;
   isFlagged: boolean;
@@ -1283,9 +1284,6 @@ export const dashboardPostService = {
 
   pinComment: (id: string, commentId: string, isPinned: boolean) =>
     api.put<DashboardPostComment>(`/dashboard-posts/${id}/comments/${commentId}/pin`, { isPinned }),
-
-  highlightComment: (id: string, commentId: string, isAdminHighlighted: boolean) =>
-    api.put<DashboardPostComment>(`/dashboard-posts/${id}/comments/${commentId}/highlight`, { isAdminHighlighted }),
 
   deleteComment: (id: string, commentId: string) =>
     api.delete(`/dashboard-posts/${id}/comments/${commentId}`),

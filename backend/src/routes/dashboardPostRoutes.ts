@@ -15,7 +15,6 @@ router.post('/:id/comments', requireAuthenticated(), DashboardPostController.cre
 router.post('/:id/comments/:commentId/flag', requireAuthenticated(), DashboardPostController.flagComment);
 router.delete('/:id/comments/:commentId/flag', requirePermission('dashboard:manage'), DashboardPostController.unflagComment);
 router.put('/:id/comments/:commentId/pin', requirePermission('dashboard:manage'), DashboardPostController.setCommentPinned);
-router.put('/:id/comments/:commentId/highlight', requirePermission('dashboard:manage'), DashboardPostController.setCommentAdminHighlighted);
 router.put('/:id/comments/:commentId', requireAuthenticated(), DashboardPostController.updateComment);
 router.delete('/:id/comments/:commentId', requireAuthenticated(), DashboardPostController.deleteComment);
 router.put('/:id', requireAnyPermission(['dashboard:edit', 'dashboard:manage']), DashboardPostController.updatePost);

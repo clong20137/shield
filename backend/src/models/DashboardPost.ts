@@ -38,6 +38,7 @@ export interface DashboardPostComment {
   authorRank?: string | null;
   authorDistrict?: string | null;
   authorProfilePictureUrl?: string | null;
+  authorRole?: string | null;
   parentCommentId: string | null;
   body: string;
   isFlagged: boolean | number;
@@ -278,7 +279,8 @@ export class DashboardPostModel {
           u.\`email\` as authorEmail,
           u.\`rank\` as authorRank,
           u.\`district\` as authorDistrict,
-          u.\`profilePictureUrl\` as authorProfilePictureUrl
+          u.\`profilePictureUrl\` as authorProfilePictureUrl,
+          u.\`role\` as authorRole
         FROM dashboard_post_comments c
         LEFT JOIN users u ON u.\`id\` = c.\`authorId\`
         WHERE c.\`postId\` = ?
@@ -291,14 +293,14 @@ export class DashboardPostModel {
         ...row,
         isFlagged: row.isFlagged !== false && row.isFlagged !== 0,
         isPinned: row.isPinned !== false && row.isPinned !== 0,
-        isAdminHighlighted: row.isAdminHighlighted !== false && row.isAdminHighlighted !== 0,
+        isAdminHighlighted: row.authorRole === 'administrator' || (row.isAdminHighlighted !== false && row.isAdminHighlighted !== 0),
       }));
     } finally {
       conn.release();
     }
   }
 
-  static async createComment(postId: string, authorId: string, authorName: string, body: string, parentCommentId: string | null = null): Promise<DashboardPostComment | null> {
+  static async createComment(postId: string, authorId: string, authorName: string, body: string, parentCommentId: string | null = null, authorRole = 'user'): Promise<DashboardPostComment | null> {
     const conn = await pool.getConnection();
     try {
       const [postRows] = await conn.query<RowDataPacket[]>(
@@ -340,6 +342,7 @@ export class DashboardPostModel {
         authorRank: null,
         authorDistrict: null,
         authorProfilePictureUrl: null,
+        authorRole,
         body: body.trim(),
         isFlagged: false,
         flaggedBy: null,
@@ -348,7 +351,7 @@ export class DashboardPostModel {
         isPinned: false,
         pinnedBy: null,
         pinnedAt: null,
-        isAdminHighlighted: false,
+        isAdminHighlighted: authorRole === 'administrator',
         adminHighlightedBy: null,
         adminHighlightedAt: null,
         createdAt: now,
@@ -423,28 +426,6 @@ export class DashboardPostModel {
     } finally {
       conn.release();
     }
-  }
-
-  static async setCommentAdminHighlighted(postId: string, commentId: string, highlightedBy: string, isAdminHighlighted: boolean): Promise<DashboardPostComment | null> {
-    const conn = await pool.getConnection();
-    try {
-      const now = new Date();
-      const [result] = await conn.query<ResultSetHeader>(
-        `UPDATE dashboard_post_comments
-         SET \`isAdminHighlighted\` = ?, \`adminHighlightedBy\` = ?, \`adminHighlightedAt\` = ?, \`updatedAt\` = ?
-         WHERE \`id\` = ? AND \`postId\` = ?`,
-        [isAdminHighlighted ? 1 : 0, isAdminHighlighted ? highlightedBy : null, isAdminHighlighted ? now : null, now, commentId, postId],
-      );
-
-      if (result.affectedRows === 0) {
-        return null;
-      }
-    } finally {
-      conn.release();
-    }
-
-    const comments = await DashboardPostModel.listComments(postId);
-    return comments.find((comment) => comment.id === commentId) || null;
   }
 
   static async flagComment(postId: string, commentId: string, flaggedBy: string, reason: string): Promise<DashboardPostComment | null> {

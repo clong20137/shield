@@ -203,6 +203,7 @@ export class DashboardPostController {
         account.displayName || account.email,
         body,
         parentCommentId,
+        account.role,
       );
 
       if (!comment) {
@@ -364,27 +365,6 @@ export class DashboardPostController {
     } catch (error) {
       console.error('Dashboard post comment pin error:', error);
       res.status(500).json({ error: 'Failed to update pinned comment' });
-    }
-  }
-
-  static async setCommentAdminHighlighted(req: Request, res: Response) {
-    try {
-      const account = await getSessionAccount(req);
-      if (!account) {
-        return res.status(401).json({ error: 'Sign in required' });
-      }
-
-      const isAdminHighlighted = req.body?.isAdminHighlighted !== false;
-      const comment = await DashboardPostModel.setCommentAdminHighlighted(req.params.id, req.params.commentId, account.id, isAdminHighlighted);
-      if (!comment) {
-        return res.status(404).json({ error: 'Comment not found' });
-      }
-
-      broadcastAppEvent({ type: 'dashboard-updated', entityId: req.params.id });
-      res.json(comment);
-    } catch (error) {
-      console.error('Dashboard post comment highlight error:', error);
-      res.status(500).json({ error: 'Failed to update highlighted comment' });
     }
   }
 
