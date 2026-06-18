@@ -627,8 +627,17 @@ function getDifferenceLabel(firstValue: number, secondValue: number): string {
   return difference <= 0.01 ? 'Matches' : `${formatHours(difference)} hr off`;
 }
 
+function getHourTargetLabel(targetHours: number, actualHours: number, label = 'Matches'): string {
+  const difference = Math.abs(targetHours - actualHours);
+  return difference <= 0.01 ? label : `${formatHours(difference)} hr off`;
+}
+
 function isHourMatch(reportedHours: number, comparisonHours: number): boolean {
   return reportedHours > 0 && comparisonHours > 0 && Math.abs(reportedHours - comparisonHours) <= 0.01;
+}
+
+function isHourTargetMatch(targetHours: number, comparisonHours: number): boolean {
+  return targetHours > 0 && comparisonHours > 0 && Math.abs(targetHours - comparisonHours) <= 0.01;
 }
 
 function areEntryFormsEqual(firstForm: CalendarEntryForm, secondForm: CalendarEntryForm): boolean {
@@ -1560,7 +1569,7 @@ function CalendarPage({
     if (submissionStatus === 'Submitted' && hasHourMismatch) {
       const mismatchPanel = attendanceHours > 0 && Math.abs(attendanceHours - hours) > 0.01
         ? 'Attendance Hours'
-        : dutyActivityHours > 0 && Math.abs(dutyActivityHours - hours) > 0.01
+        : dutyActivityHours > 0 && Math.abs(dutyActivityHours - shiftDutyTargetHours) > 0.01
           ? 'Duty Hours'
           : 'Regular Duty';
       showDailyValidationTarget({
@@ -1570,7 +1579,7 @@ function CalendarPage({
           : mismatchPanel === 'Duty Hours'
             ? 'patrolHours'
             : 'regularDutyStartTime',
-        message: 'Hours do not match the reported duty hours. Update the highlighted section before submitting.',
+        message: 'Hours do not match. Update the highlighted section before submitting.',
       });
       return;
     }
@@ -2279,18 +2288,26 @@ function CalendarPage({
   const tCodeHours = calculateTCodeHours(entryDetails);
   const calculatedShiftHours = calculateShiftHours(entryDetails);
   const attendanceHours = attendanceHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
+  const leaveStatusHours = entryForm.specialStatus === vacationStatus
+    ? parseNumericDetail(entryDetails, 'vacationHours')
+    : entryForm.specialStatus === sickStatus
+      ? parseNumericDetail(entryDetails, 'injuryIllnessHours')
+      : 0;
+  const workedDutyHoursTarget = Math.max(reportedDutyHours - leaveStatusHours, 0);
+  const shiftDutyTargetHours = leaveStatusHours > 0 ? workedDutyHoursTarget : reportedDutyHours;
   const standardDutyActivityHours = dutyActivityHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
   const dutyActivityHours = standardDutyActivityHours + tCodeHours;
   const hasShiftTime = calculatedShiftHours > 0;
+  const hasShiftDutyTarget = shiftDutyTargetHours > 0;
   const hasReportedHours = reportedDutyHours > 0;
-  const shiftHoursMatch = isHourMatch(reportedDutyHours, calculatedShiftHours);
+  const shiftHoursMatch = isHourTargetMatch(shiftDutyTargetHours, calculatedShiftHours);
   const attendanceHoursMatch = isHourMatch(reportedDutyHours, attendanceHours);
-  const dutyActivityHoursMatch = isHourMatch(reportedDutyHours, dutyActivityHours);
+  const dutyActivityHoursMatch = isHourTargetMatch(shiftDutyTargetHours, dutyActivityHours);
   const hasHourMismatch =
     hasReportedHours &&
-    ((hasShiftTime && Math.abs(calculatedShiftHours - reportedDutyHours) > 0.01) ||
+    ((hasShiftTime && Math.abs(calculatedShiftHours - shiftDutyTargetHours) > 0.01) ||
       (attendanceHours > 0 && Math.abs(attendanceHours - reportedDutyHours) > 0.01) ||
-      (dutyActivityHours > 0 && Math.abs(dutyActivityHours - reportedDutyHours) > 0.01));
+      (dutyActivityHours > 0 && Math.abs(dutyActivityHours - shiftDutyTargetHours) > 0.01));
   const visibleDailySections = useMemo(
     () => trooperDailySections.filter((section) => !hiddenDailySections.includes(section.title)),
     [hiddenDailySections],
@@ -2322,9 +2339,9 @@ function CalendarPage({
   });
   const hourMetrics = [
     { label: 'Reported', value: reportedDutyHours, helper: '', isMatch: false },
-    { label: 'Shift', value: calculatedShiftHours, helper: getDifferenceLabel(reportedDutyHours, calculatedShiftHours), isMatch: shiftHoursMatch },
+    { label: 'Shift', value: calculatedShiftHours, helper: getHourTargetLabel(shiftDutyTargetHours, calculatedShiftHours, hasShiftDutyTarget ? 'Matches worked hours' : 'No worked hours'), isMatch: shiftHoursMatch || (!hasShiftDutyTarget && calculatedShiftHours <= 0.01) },
     { label: 'Attendance', value: attendanceHours, helper: getDifferenceLabel(reportedDutyHours, attendanceHours), isMatch: attendanceHoursMatch },
-    { label: 'Duty Activity', value: dutyActivityHours, helper: tCodeHours > 0 ? `Includes ${formatHours(tCodeHours)}h T-Codes` : getDifferenceLabel(reportedDutyHours, dutyActivityHours), isMatch: dutyActivityHoursMatch },
+    { label: 'Duty Activity', value: dutyActivityHours, helper: tCodeHours > 0 ? `Includes ${formatHours(tCodeHours)}h T-Codes` : getHourTargetLabel(shiftDutyTargetHours, dutyActivityHours, hasShiftDutyTarget ? 'Matches worked hours' : 'No worked hours'), isMatch: dutyActivityHoursMatch || (!hasShiftDutyTarget && dutyActivityHours <= 0.01) },
   ];
   const activeHourGuidance = (() => {
     if (!hasReportedHours) {
@@ -2332,13 +2349,13 @@ function CalendarPage({
     }
 
     if (activeDailyPanel === 'T-Codes' && tCodeHours > 0) {
-      const difference = Math.abs(dutyActivityHours - reportedDutyHours);
+      const difference = Math.abs(dutyActivityHours - shiftDutyTargetHours);
       return {
         label: 'Duty activity hours',
         value: dutyActivityHours,
         isMatch: dutyActivityHoursMatch,
         difference,
-        direction: dutyActivityHours > reportedDutyHours ? 'over' : 'under',
+        direction: dutyActivityHours > shiftDutyTargetHours ? 'over' : 'under',
       };
     }
 
@@ -2356,13 +2373,19 @@ function CalendarPage({
       return null;
     }
 
-    const difference = Math.abs(comparison.value - reportedDutyHours);
+    const targetHours = activeDailySection.title === 'Attendance Hours' ? reportedDutyHours : shiftDutyTargetHours;
+    const difference = Math.abs(comparison.value - targetHours);
     return {
       ...comparison,
       difference,
-      direction: comparison.value > reportedDutyHours ? 'over' : 'under',
+      direction: comparison.value > targetHours ? 'over' : 'under',
     };
   })();
+  const activeHourGuidanceTargetLabel = activeDailySection?.title === 'Attendance Hours'
+    ? 'reported duty hours'
+    : leaveStatusHours > 0
+      ? 'worked hours'
+      : 'reported duty hours';
   const dailySaveStatusLabel = (() => {
     if (dailySaveStatus === 'idle') {
       return '';
@@ -3201,7 +3224,7 @@ function CalendarPage({
 
                       {hasHourMismatch && (
                         <p className="rounded-lg border border-danger/30 bg-red-50 px-3 py-2 text-sm font-semibold text-danger dark:bg-red-950/30">
-                          Hours do not match the reported duty hours. Review shift times, attendance hours, and duty activity hours before submitting.
+                          Hours do not match. Attendance should match reported duty hours; shift times and duty activity should match worked hours after Vacation/Sick hours.
                         </p>
                       )}
                     </div>
@@ -3233,8 +3256,8 @@ function CalendarPage({
                                 <X size={14} className="text-danger" />
                               )}
                               {activeHourGuidance.isMatch
-                                ? `${activeHourGuidance.label} matches reported duty hours.`
-                                : `${activeHourGuidance.label} is ${formatHours(activeHourGuidance.difference)} hr ${activeHourGuidance.direction} reported duty hours.`}
+                                ? `${activeHourGuidance.label} matches ${activeHourGuidanceTargetLabel}.`
+                                : `${activeHourGuidance.label} is ${formatHours(activeHourGuidance.difference)} hr ${activeHourGuidance.direction} ${activeHourGuidanceTargetLabel}.`}
                             </p>
                           )}
                         </div>
