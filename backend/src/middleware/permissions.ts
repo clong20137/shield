@@ -20,6 +20,10 @@ function shouldAllowRequiredAccountSetup(req: Request, accountId: string): boole
     return true;
   }
 
+  if (req.method === 'PUT' && req.path === `/accounts/${accountId}/app-scale-preference`) {
+    return true;
+  }
+
   return false;
 }
 

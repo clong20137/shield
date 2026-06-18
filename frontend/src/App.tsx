@@ -22,7 +22,9 @@ const THEME_KEY = 'shield_theme';
 const MESSAGE_PREFERENCES_KEY = 'shield_message_preferences';
 const SESSION_TIMEOUT_KEY = 'shield_session_timeout_minutes';
 const QUICK_LAUNCH_KEY = 'shield_quick_launch';
-const QUICK_LAUNCH_SLOT_COUNT = 8;
+const QUICK_LAUNCH_MIN_SLOT_COUNT = 4;
+const QUICK_LAUNCH_MAX_SLOT_COUNT = 10;
+const QUICK_LAUNCH_DEFAULT_SLOT_COUNT = 8;
 const QUICK_LAUNCH_PICKER_WIDTH = 320;
 const QUICK_LAUNCH_PICKER_GUTTER = 12;
 const QUICK_LAUNCH_PICKER_CLOSE_MS = 500;
@@ -67,6 +69,7 @@ interface MessagePreferences {
   reminderAlarmSound: ReminderAlarmSound;
   useMilitaryTime: boolean;
   hideQuickLaunch: boolean;
+  quickLaunchSlotCount: number;
 }
 
 type ReminderAlarmSound = 'classic' | 'soft' | 'urgent' | 'none';
@@ -91,6 +94,7 @@ const defaultMessagePreferences: MessagePreferences = {
   reminderAlarmSound: 'classic',
   useMilitaryTime: false,
   hideQuickLaunch: false,
+  quickLaunchSlotCount: QUICK_LAUNCH_DEFAULT_SLOT_COUNT,
 };
 
 const reminderAlarmSoundOptions: Array<{ value: ReminderAlarmSound; label: string }> = [
@@ -116,7 +120,12 @@ const quickLaunchApps: QuickLaunchApp[] = [
 function loadMessagePreferences(): MessagePreferences {
   try {
     const storedPreferences = window.localStorage.getItem(MESSAGE_PREFERENCES_KEY);
-    return storedPreferences ? { ...defaultMessagePreferences, ...JSON.parse(storedPreferences) } : defaultMessagePreferences;
+    const parsedPreferences = storedPreferences ? JSON.parse(storedPreferences) : {};
+    return {
+      ...defaultMessagePreferences,
+      ...parsedPreferences,
+      quickLaunchSlotCount: normalizeQuickLaunchSlotCount(parsedPreferences.quickLaunchSlotCount),
+    };
   } catch {
     return defaultMessagePreferences;
   }
@@ -142,6 +151,15 @@ function normalizeAppScale(value?: string | null): AppScale {
   return value === 'compact' || value === 'large' ? value : 'comfortable';
 }
 
+function normalizeQuickLaunchSlotCount(value: unknown): number {
+  const count = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(count)) {
+    return QUICK_LAUNCH_DEFAULT_SLOT_COUNT;
+  }
+
+  return Math.min(QUICK_LAUNCH_MAX_SLOT_COUNT, Math.max(QUICK_LAUNCH_MIN_SLOT_COUNT, Math.round(count)));
+}
+
 const appScaleOptions: Array<{ value: AppScale; label: string; description: string }> = [
   { value: 'compact', label: 'Compact', description: 'Fits more on screen.' },
   { value: 'comfortable', label: 'Comfortable', description: 'Balanced default.' },
@@ -152,14 +170,15 @@ function getQuickLaunchStorageKey(accountId: string): string {
   return `${QUICK_LAUNCH_KEY}_${accountId}`;
 }
 
-function getEmptyQuickLaunchSlots(): QuickLaunchSlot[] {
-  return Array.from({ length: QUICK_LAUNCH_SLOT_COUNT }, () => null);
+function getEmptyQuickLaunchSlots(slotCount = QUICK_LAUNCH_DEFAULT_SLOT_COUNT): QuickLaunchSlot[] {
+  return Array.from({ length: normalizeQuickLaunchSlotCount(slotCount) }, () => null);
 }
 
-function normalizeQuickLaunchSlots(rawSlots: unknown): QuickLaunchSlot[] {
+function normalizeQuickLaunchSlots(rawSlots: unknown, slotCount = QUICK_LAUNCH_DEFAULT_SLOT_COUNT): QuickLaunchSlot[] {
   const parsedSlots = Array.isArray(rawSlots) ? rawSlots : [];
+  const normalizedSlotCount = normalizeQuickLaunchSlotCount(slotCount);
 
-  return Array.from({ length: QUICK_LAUNCH_SLOT_COUNT }, (_, index) => {
+  return Array.from({ length: normalizedSlotCount }, (_, index) => {
     const slot = parsedSlots[index];
 
     if (quickLaunchApps.some((app) => app.id === slot)) {
@@ -184,18 +203,18 @@ function normalizeQuickLaunchSlots(rawSlots: unknown): QuickLaunchSlot[] {
   });
 }
 
-function loadLegacyQuickLaunchSlots(storageKey: string): QuickLaunchSlot[] {
+function loadLegacyQuickLaunchSlots(storageKey: string, slotCount = QUICK_LAUNCH_DEFAULT_SLOT_COUNT): QuickLaunchSlot[] {
   try {
     const storedSlots = window.localStorage.getItem(storageKey);
-    return normalizeQuickLaunchSlots(storedSlots ? JSON.parse(storedSlots) : []);
+    return normalizeQuickLaunchSlots(storedSlots ? JSON.parse(storedSlots) : [], slotCount);
   } catch {
-    return getEmptyQuickLaunchSlots();
+    return getEmptyQuickLaunchSlots(slotCount);
   }
 }
 
-function saveLegacyQuickLaunchSlots(storageKey: string, slots: QuickLaunchSlot[]) {
+function saveLegacyQuickLaunchSlots(storageKey: string, slots: QuickLaunchSlot[], slotCount = QUICK_LAUNCH_DEFAULT_SLOT_COUNT) {
   try {
-    window.localStorage.setItem(storageKey, JSON.stringify(normalizeQuickLaunchSlots(slots)));
+    window.localStorage.setItem(storageKey, JSON.stringify(normalizeQuickLaunchSlots(slots, slotCount)));
   } catch {
     // Local storage is only a fallback for quick launch preferences.
   }
@@ -2091,6 +2110,7 @@ function QuickLaunchTray({
   storageKey,
   accountId,
   showCalendar,
+  slotCount,
   onOpenMessages,
   onOpenCalendar,
   onOpenCalculator,
@@ -2104,14 +2124,16 @@ function QuickLaunchTray({
   storageKey: string;
   accountId?: string;
   showCalendar: boolean;
+  slotCount: number;
   onOpenMessages: () => void;
   onOpenCalendar: () => void;
   onOpenCalculator: () => void;
   onOpenCreateUser: () => void;
 }) {
+  const normalizedSlotCount = normalizeQuickLaunchSlotCount(slotCount);
   const navigate = useNavigate();
   const location = useLocation();
-  const [slots, setSlots] = useState<QuickLaunchSlot[]>(getEmptyQuickLaunchSlots);
+  const [slots, setSlots] = useState<QuickLaunchSlot[]>(() => getEmptyQuickLaunchSlots(normalizedSlotCount));
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
   const [contextMenu, setContextMenu] = useState<{ index: number; x: number; y: number } | null>(null);
   const [draggingSlot, setDraggingSlot] = useState<number | null>(null);
@@ -2175,6 +2197,35 @@ function QuickLaunchTray({
     setExternalUrl('');
   }, [editingExternalSlot]);
 
+  useEffect(() => {
+    if (editingSlot !== null && editingSlot >= normalizedSlotCount) {
+      setEditingSlot(null);
+      setIsPickerClosing(false);
+      setExternalLabel('');
+      setExternalUrl('');
+    }
+
+    if (contextMenu && contextMenu.index >= normalizedSlotCount) {
+      setContextMenu(null);
+    }
+
+    if (draggingSlot !== null && draggingSlot >= normalizedSlotCount) {
+      setDraggingSlot(null);
+    }
+
+    if (dragOverSlot !== null && dragOverSlot >= normalizedSlotCount) {
+      setDragOverSlot(null);
+    }
+
+    if (launchingSlot !== null && launchingSlot >= normalizedSlotCount) {
+      setLaunchingSlot(null);
+    }
+
+    if (failedLaunchSlot !== null && failedLaunchSlot >= normalizedSlotCount) {
+      setFailedLaunchSlot(null);
+    }
+  }, [contextMenu, dragOverSlot, draggingSlot, editingSlot, failedLaunchSlot, launchingSlot, normalizedSlotCount]);
+
   const isAppActive = (app: QuickLaunchApp) => {
     if (activeModalAppSet.has(app.id)) {
       return true;
@@ -2218,33 +2269,33 @@ function QuickLaunchTray({
   }, []);
 
   const saveQuickLaunchSlots = useCallback(async (nextSlots: QuickLaunchSlot[]) => {
-    const normalizedSlots = normalizeQuickLaunchSlots(nextSlots);
+    const normalizedSlots = normalizeQuickLaunchSlots(nextSlots, normalizedSlotCount);
     setSlots(normalizedSlots);
-    saveLegacyQuickLaunchSlots(storageKey, normalizedSlots);
+    saveLegacyQuickLaunchSlots(storageKey, normalizedSlots, normalizedSlotCount);
 
     try {
       const response = await quickLaunchService.save(normalizedSlots as ApiQuickLaunchSlot[]);
-      const savedSlots = normalizeQuickLaunchSlots(response.data.slots);
+      const savedSlots = normalizeQuickLaunchSlots(response.data.slots, normalizedSlotCount);
       setSlots(savedSlots);
-      saveLegacyQuickLaunchSlots(storageKey, savedSlots);
+      saveLegacyQuickLaunchSlots(storageKey, savedSlots, normalizedSlotCount);
     } catch (err) {
       console.error('Failed to save quick launch:', err);
     }
-  }, [storageKey]);
+  }, [normalizedSlotCount, storageKey]);
 
   const loadQuickLaunchFromDatabase = useCallback(async () => {
     if (!accountId) {
-      setSlots(getEmptyQuickLaunchSlots());
+      setSlots(getEmptyQuickLaunchSlots(normalizedSlotCount));
       return;
     }
 
     try {
       const response = await quickLaunchService.get();
-      const databaseSlots = normalizeQuickLaunchSlots(response.data.slots);
+      const databaseSlots = normalizeQuickLaunchSlots(response.data.slots, normalizedSlotCount);
       const hasDatabaseSlots = databaseSlots.some(Boolean);
 
       if (!hasDatabaseSlots) {
-        const legacySlots = loadLegacyQuickLaunchSlots(storageKey);
+        const legacySlots = loadLegacyQuickLaunchSlots(storageKey, normalizedSlotCount);
         if (legacySlots.some(Boolean)) {
           setSlots(legacySlots);
           try {
@@ -2257,12 +2308,12 @@ function QuickLaunchTray({
       }
 
       setSlots(databaseSlots);
-      saveLegacyQuickLaunchSlots(storageKey, databaseSlots);
+      saveLegacyQuickLaunchSlots(storageKey, databaseSlots, normalizedSlotCount);
     } catch (err) {
       console.error('Failed to load quick launch:', err);
-      setSlots(loadLegacyQuickLaunchSlots(storageKey));
+      setSlots(loadLegacyQuickLaunchSlots(storageKey, normalizedSlotCount));
     }
-  }, [accountId, storageKey]);
+  }, [accountId, normalizedSlotCount, storageKey]);
 
   useEffect(() => {
     loadQuickLaunchFromDatabase();
@@ -2420,7 +2471,7 @@ function QuickLaunchTray({
   };
 
   const removeAllSlots = () => {
-    void saveQuickLaunchSlots(getEmptyQuickLaunchSlots());
+    void saveQuickLaunchSlots(getEmptyQuickLaunchSlots(normalizedSlotCount));
     setContextMenu(null);
     closeQuickLaunchPicker();
   };
@@ -6201,6 +6252,14 @@ function App() {
     }
   };
 
+  const handleQuickLaunchSlotCountChange = (slotCount: number) => {
+    const quickLaunchSlotCount = normalizeQuickLaunchSlotCount(slotCount);
+    setMessagePreferences((preferences) => ({
+      ...preferences,
+      quickLaunchSlotCount,
+    }));
+  };
+
   const openBugTrackerFromNotification = () => {
     setIsNotificationsOpen(false);
     openAdminConsole('bugs');
@@ -6837,6 +6896,7 @@ function App() {
                   storageKey={getQuickLaunchStorageKey(currentUser?.id || 'anonymous')}
                   accountId={currentUser?.id}
                   showCalendar={showCalendar}
+                  slotCount={messagePreferences.quickLaunchSlotCount}
                   onOpenMessages={toggleMessagesModal}
                   onOpenCalendar={toggleCalendarModal}
                   onOpenCalculator={toggleCalculator}
@@ -7037,6 +7097,7 @@ function App() {
                           hideQuickLaunch,
                         }))
                       }
+                      onQuickLaunchSlotCountChange={handleQuickLaunchSlotCountChange}
                       onCalendarHiddenChange={handleCalendarHiddenChange}
                       onAppScaleChange={handleAppScaleChange}
                       onReplayGuide={replayGuide}

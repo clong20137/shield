@@ -15,6 +15,7 @@ interface AccountSettingsPageProps {
     reminderAlarmSound: 'classic' | 'soft' | 'urgent' | 'none';
     useMilitaryTime: boolean;
     hideQuickLaunch: boolean;
+    quickLaunchSlotCount: number;
   };
   onReceiveMessagesChange: (receiveMessages: boolean) => void;
   onMessageSoundChange: (playMessageSound: boolean) => void;
@@ -22,6 +23,7 @@ interface AccountSettingsPageProps {
   onReminderAlarmSoundSelect: (reminderAlarmSound: 'classic' | 'soft' | 'urgent' | 'none') => void;
   onMilitaryTimeChange: (useMilitaryTime: boolean) => void;
   onQuickLaunchHiddenChange: (hideQuickLaunch: boolean) => void;
+  onQuickLaunchSlotCountChange: (slotCount: number) => void;
   onCalendarHiddenChange: (calendarHidden: boolean) => void;
   onAppScaleChange: (appScale: AuthAccount['appScale']) => void;
   onOpenEvaluations?: () => void;
@@ -57,6 +59,7 @@ export function AccountSettingsPage({
   onReminderAlarmSoundSelect,
   onMilitaryTimeChange,
   onQuickLaunchHiddenChange,
+  onQuickLaunchSlotCountChange,
   onCalendarHiddenChange,
   onAppScaleChange,
   onOpenEvaluations,
@@ -862,6 +865,30 @@ export function AccountSettingsPage({
               checked={messagePreferences.hideQuickLaunch}
               onChange={(event) => onQuickLaunchHiddenChange(event.target.checked)}
             />
+          </label>
+
+          <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
+            <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Quick launcher slots</span>
+            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose how many quick launch positions are available in your dock.</span>
+            <div className="mt-3 flex items-center gap-3">
+              <input
+                type="range"
+                min={4}
+                max={10}
+                value={messagePreferences.quickLaunchSlotCount}
+                onChange={(event) => onQuickLaunchSlotCountChange(Number(event.target.value))}
+                className="min-w-0 flex-1"
+              />
+              <input
+                type="number"
+                min={4}
+                max={10}
+                value={messagePreferences.quickLaunchSlotCount}
+                onChange={(event) => onQuickLaunchSlotCountChange(Number(event.target.value))}
+                className="w-20 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                aria-label="Quick launcher slot count"
+              />
+            </div>
           </label>
 
           <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
