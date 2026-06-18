@@ -923,6 +923,7 @@ function CalendarPage({
   const [dailySaveStatus, setDailySaveStatus] = useState<DailySaveStatus>('idle');
   const [dailySaveStatusAt, setDailySaveStatusAt] = useState<number | null>(null);
   const [invalidDailyField, setInvalidDailyField] = useState<string | null>(null);
+  const [invalidDailyPanel, setInvalidDailyPanel] = useState<string | null>(null);
   const [dailyStripTooltip, setDailyStripTooltip] = useState<(OverlayPosition & { dateKey: string; entry: CalendarEntry | null }) | null>(null);
   const [dailyStripContextMenu, setDailyStripContextMenu] = useState<(OverlayPosition & { dateKey: string; entry: CalendarEntry | null }) | null>(null);
   const [dailyStatusHours, setDailyStatusHours] = useState(() => {
@@ -1357,6 +1358,7 @@ function CalendarPage({
 
   const showDailyValidationTarget = (target: DailyValidationTarget) => {
     setActiveDailyPanel(target.panel);
+    setInvalidDailyPanel(target.panel);
     setInvalidDailyField(target.field);
     setCalendarError(target.message);
     window.setTimeout(() => focusDailyField(target.field), activeDailyPanel === target.panel ? 0 : 90);
@@ -1574,6 +1576,7 @@ function CalendarPage({
     }
 
     setInvalidDailyField(null);
+    setInvalidDailyPanel(null);
     setCalendarError(null);
     setIsSavingDaily(true);
     setDailySaveStatus('saving');
@@ -1588,7 +1591,9 @@ function CalendarPage({
       };
 
       const existingEntryForDate = entries.find((entry) => entry.date === entryForm.date && !entry.id.startsWith('local-draft-'));
-      const targetEntryId = editingEntryId || existingEntryForDate?.id || null;
+      const targetEntryId = editingEntryId && !editingEntryId.startsWith('local-draft-')
+        ? editingEntryId
+        : existingEntryForDate?.id || null;
 
       if (targetEntryId) {
         const response = await calendarService.update(targetEntryId, payload);
@@ -2384,13 +2389,13 @@ function CalendarPage({
   const getPanelCompletionState = (panel: string): { state: DailyPanelCompletionState; label: string } => {
     const panelSection = trooperDailySections.find((section) => section.title === panel);
     const invalidField = invalidDailyField || '';
-    const invalidBelongsToPanel = panel === 'Administrative'
+    const invalidBelongsToPanel = invalidDailyField && (invalidDailyPanel === panel || (panel === 'Administrative'
       ? ['entryDate', 'dutyHours', 'districtWorked', 'specialStatus', 'color'].includes(invalidField)
       : panel === 'T-Codes'
         ? invalidField.startsWith('tCode-')
         : panel === 'Narrative'
           ? invalidField === 'narrative'
-          : Boolean(panelSection?.fields.some(([key]) => key === invalidField));
+          : Boolean(panelSection?.fields.some(([key]) => key === invalidField))));
 
     if (invalidBelongsToPanel) {
       return { state: 'attention', label: 'Needs attention' };
@@ -2446,6 +2451,7 @@ function CalendarPage({
 
     return { state: 'empty', label: 'Not started' };
   };
+  const activeDailyCompletion = getPanelCompletionState(activeDailyPanel);
   const showDailyStripTooltip = (target: HTMLElement, dateKey: string, entry?: CalendarEntry) => {
     const tooltipPosition = getOverlayPositionForTarget(target, 208, 96, 'center');
     setDailyStripTooltip({
@@ -3207,7 +3213,8 @@ function CalendarPage({
                         <div>
                           <h3 className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-gray-100">
                             {activeDailySection.title}
-                            {isSectionComplete(entryForm.details, activeDailySection) && <CheckCircle2 className="trooper-daily-check text-green-600 dark:text-green-300" size={18} />}
+                            {activeDailyCompletion.state === 'attention' && <X className="text-danger" size={18} />}
+                            {activeDailyCompletion.state === 'complete' && <CheckCircle2 className="trooper-daily-check text-green-600 dark:text-green-300" size={18} />}
                           </h3>
                           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                             {activeDailySection.fields.filter(([key]) => shouldShowDailyDetailField(entryForm.details, key) && isDetailComplete(entryForm.details, key)).length} of {activeDailySection.fields.filter(([key]) => shouldShowDailyDetailField(entryForm.details, key)).length} fields complete.
