@@ -369,12 +369,6 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
                 </div>
               </div>
               <div className="flex flex-wrap justify-end gap-2">
-                {!isReply && replies.length > 0 && (
-                  <button type="button" onClick={() => toggleThreadCollapsed(comment.id)} className="btn-secondary" aria-label={isThreadCollapsed ? 'Expand replies' : 'Collapse replies'} title={isThreadCollapsed ? 'Expand Replies' : 'Collapse Replies'}>
-                    {isThreadCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                    <span className="ml-1 text-xs font-bold">{replies.length}</span>
-                  </button>
-                )}
                 {!isReply && (
                   <button type="button" onClick={() => {
                     setReplyParentId(isReplying ? null : comment.id);
@@ -441,6 +435,19 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
                 className="mt-3 block whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300"
                 mentionClassName="font-bold text-primary-500 underline underline-offset-2 dark:text-blue-200"
               />
+            )}
+
+            {!isReply && replies.length > 0 && (
+              <button
+                type="button"
+                onClick={() => toggleThreadCollapsed(comment.id)}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-xs font-bold uppercase text-gray-600 transition hover:border-accent hover:bg-accent/10 hover:text-accent dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300"
+                aria-label={isThreadCollapsed ? 'Expand replies' : 'Collapse replies'}
+                title={isThreadCollapsed ? 'Expand Replies' : 'Collapse Replies'}
+              >
+                {isThreadCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+                {isThreadCollapsed ? 'View' : 'Hide'} {replies.length} repl{replies.length === 1 ? 'y' : 'ies'}
+              </button>
             )}
 
             {isReplying && (
