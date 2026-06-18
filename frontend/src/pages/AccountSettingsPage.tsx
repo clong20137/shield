@@ -399,6 +399,13 @@ export function AccountSettingsPage({
     };
   }, [account.id, activeTab]);
 
+  const messageSoundSelection = notificationSounds.some((sound) => `custom:${sound.id}` === messagePreferences.messageSound)
+    ? messagePreferences.messageSound
+    : '';
+  const reminderAlarmSoundSelection = notificationSounds.some((sound) => `custom:${sound.id}` === messagePreferences.reminderAlarmSound)
+    ? messagePreferences.reminderAlarmSound
+    : '';
+
   return (
     <div className="space-y-3 pb-1">
       <div className="-mx-3 flex gap-2 overflow-x-auto border-b border-gray-200 px-3 pb-3 dark:border-gray-800 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
@@ -824,27 +831,20 @@ export function AccountSettingsPage({
               <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose and preview the ping used when new unread messages arrive.</span>
               <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                 <select
-                  value={messagePreferences.messageSound}
-                  disabled={!messagePreferences.receiveMessages || !messagePreferences.playMessageSound}
+                  value={messageSoundSelection}
+                  disabled={!messagePreferences.receiveMessages || !messagePreferences.playMessageSound || notificationSounds.length === 0}
                   onChange={(event) => onMessageSoundSelect(event.target.value)}
                   className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
                 >
-                  <option value="classic">Classic two-tone</option>
-                  <option value="soft">Soft alert</option>
-                  <option value="chime">Bright chime</option>
-                  <option value="msn">MSN Messenger</option>
-                  {notificationSounds.length > 0 && (
-                    <optgroup label="Custom sounds">
-                      {notificationSounds.map((sound) => (
-                        <option key={sound.id} value={`custom:${sound.id}`}>{sound.label}</option>
-                      ))}
-                    </optgroup>
-                  )}
+                  <option value="">{notificationSounds.length > 0 ? 'Choose sound' : 'No sounds uploaded'}</option>
+                  {notificationSounds.map((sound) => (
+                    <option key={sound.id} value={`custom:${sound.id}`}>{sound.label}</option>
+                  ))}
                 </select>
                 <button
                   type="button"
-                  onClick={() => onPreviewMessageSound(messagePreferences.messageSound)}
-                  disabled={!messagePreferences.receiveMessages || !messagePreferences.playMessageSound}
+                  onClick={() => onPreviewMessageSound(messageSoundSelection)}
+                  disabled={!messagePreferences.receiveMessages || !messagePreferences.playMessageSound || !messageSoundSelection}
                   className="btn-secondary justify-center"
                   aria-label="Preview message sound"
                   title="Preview Sound"
@@ -858,21 +858,15 @@ export function AccountSettingsPage({
               <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Reminder alarm sound</span>
               <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose the alarm used when a reminder is due.</span>
               <select
-                value={messagePreferences.reminderAlarmSound}
+                value={reminderAlarmSoundSelection}
                 onChange={(event) => onReminderAlarmSoundSelect(event.target.value)}
+                disabled={notificationSounds.length === 0}
                 className="mt-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
               >
-                <option value="classic">Classic alarm</option>
-                <option value="soft">Soft chime</option>
-                <option value="urgent">Urgent pulse</option>
-                <option value="none">No sound</option>
-                {notificationSounds.length > 0 && (
-                  <optgroup label="Custom sounds">
-                    {notificationSounds.map((sound) => (
-                      <option key={sound.id} value={`custom:${sound.id}`}>{sound.label}</option>
-                    ))}
-                  </optgroup>
-                )}
+                <option value="">{notificationSounds.length > 0 ? 'Choose sound' : 'No sounds uploaded'}</option>
+                {notificationSounds.map((sound) => (
+                  <option key={sound.id} value={`custom:${sound.id}`}>{sound.label}</option>
+                ))}
               </select>
             </label>
           </PreferenceGroup>

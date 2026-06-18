@@ -72,10 +72,8 @@ interface MessagePreferences {
   quickLaunchSlotCount: number;
 }
 
-type BuiltInReminderAlarmSound = 'classic' | 'soft' | 'urgent' | 'none';
-type ReminderAlarmSound = BuiltInReminderAlarmSound | `custom:${string}`;
-type BuiltInMessageSound = 'classic' | 'soft' | 'chime' | 'msn';
-type MessageSound = BuiltInMessageSound | `custom:${string}`;
+type ReminderAlarmSound = '' | `custom:${string}`;
+type MessageSound = '' | `custom:${string}`;
 
 type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'calculator' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
 type QuickLaunchExternalSlot = ApiQuickLaunchExternalSlot;
@@ -93,19 +91,12 @@ interface QuickLaunchApp {
 const defaultMessagePreferences: MessagePreferences = {
   receiveMessages: true,
   playMessageSound: true,
-  messageSound: 'classic',
-  reminderAlarmSound: 'classic',
+  messageSound: '',
+  reminderAlarmSound: '',
   useMilitaryTime: false,
   hideQuickLaunch: false,
   quickLaunchSlotCount: QUICK_LAUNCH_DEFAULT_SLOT_COUNT,
 };
-
-const reminderAlarmSoundOptions: Array<{ value: ReminderAlarmSound; label: string }> = [
-  { value: 'classic', label: 'Classic alarm' },
-  { value: 'soft', label: 'Soft chime' },
-  { value: 'urgent', label: 'Urgent pulse' },
-  { value: 'none', label: 'No sound' },
-];
 
 function getCustomSoundId(sound: string): string | null {
   return sound.startsWith('custom:') ? sound.slice('custom:'.length) : null;
@@ -122,60 +113,6 @@ function playCustomSoundEffect(soundUrl: string | undefined) {
     void audio.play();
   } catch (err) {
     console.error('Failed to play custom sound:', err);
-  }
-}
-
-function playMessageSoundEffect(messageSound: MessageSound) {
-  if (getCustomSoundId(messageSound)) {
-    return;
-  }
-
-  try {
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) return;
-
-    const audioContext = new AudioContextClass();
-    const gain = audioContext.createGain();
-    const tones = {
-      classic: [
-        { type: 'triangle' as OscillatorType, frequency: 659.25, start: 0, duration: 0.14, volume: 0.12 },
-        { type: 'sine' as OscillatorType, frequency: 987.77, start: 0.16, duration: 0.2, volume: 0.1 },
-      ],
-      soft: [
-        { type: 'sine' as OscillatorType, frequency: 523.25, start: 0, duration: 0.18, volume: 0.08 },
-        { type: 'sine' as OscillatorType, frequency: 659.25, start: 0.14, duration: 0.22, volume: 0.07 },
-      ],
-      chime: [
-        { type: 'triangle' as OscillatorType, frequency: 784, start: 0, duration: 0.12, volume: 0.1 },
-        { type: 'triangle' as OscillatorType, frequency: 1046.5, start: 0.11, duration: 0.16, volume: 0.09 },
-        { type: 'sine' as OscillatorType, frequency: 1318.51, start: 0.24, duration: 0.18, volume: 0.07 },
-      ],
-      msn: [
-        { type: 'sine' as OscillatorType, frequency: 880, start: 0, duration: 0.09, volume: 0.1 },
-        { type: 'sine' as OscillatorType, frequency: 1174.66, start: 0.08, duration: 0.11, volume: 0.095 },
-        { type: 'triangle' as OscillatorType, frequency: 1567.98, start: 0.18, duration: 0.12, volume: 0.08 },
-        { type: 'sine' as OscillatorType, frequency: 1174.66, start: 0.32, duration: 0.1, volume: 0.075 },
-      ],
-    }[(messageSound || 'classic') as BuiltInMessageSound];
-
-    gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
-    gain.connect(audioContext.destination);
-
-    tones.forEach((tone) => {
-      const oscillator = audioContext.createOscillator();
-      oscillator.type = tone.type;
-      oscillator.frequency.value = tone.frequency;
-      oscillator.connect(gain);
-      gain.gain.setValueAtTime(0.0001, audioContext.currentTime + tone.start);
-      gain.gain.exponentialRampToValueAtTime(tone.volume, audioContext.currentTime + tone.start + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + tone.start + tone.duration);
-      oscillator.start(audioContext.currentTime + tone.start);
-      oscillator.stop(audioContext.currentTime + tone.start + tone.duration);
-    });
-
-    window.setTimeout(() => void audioContext.close().catch(() => undefined), 1200);
-  } catch (err) {
-    console.error('Failed to play message sound:', err);
   }
 }
 
@@ -925,20 +862,15 @@ function ReminderCreateModal({
           <label className="block">
             <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Alarm Sound</span>
             <select
-              value={alarmSound}
+              value={notificationSounds.some((sound) => `custom:${sound.id}` === alarmSound) ? alarmSound : ''}
               onChange={(event) => onAlarmSoundChange(event.target.value as ReminderAlarmSound)}
+              disabled={notificationSounds.length === 0}
               className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
             >
-              {reminderAlarmSoundOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
+              <option value="">{notificationSounds.length > 0 ? 'Choose sound' : 'No sounds uploaded'}</option>
+              {notificationSounds.map((sound) => (
+                <option key={sound.id} value={`custom:${sound.id}`}>{sound.label}</option>
               ))}
-              {notificationSounds.length > 0 && (
-                <optgroup label="Custom sounds">
-                  {notificationSounds.map((sound) => (
-                    <option key={sound.id} value={`custom:${sound.id}`}>{sound.label}</option>
-                  ))}
-                </optgroup>
-              )}
             </select>
           </label>
           <label className="block">
@@ -5290,66 +5222,13 @@ function App() {
   }, []);
 
   const playReminderAlarmSound = useCallback(() => {
-    if (messagePreferences.reminderAlarmSound === 'none') {
+    if (!messagePreferences.reminderAlarmSound) {
       return;
     }
 
     const customSoundUrl = getCustomNotificationSoundUrl(messagePreferences.reminderAlarmSound);
     if (customSoundUrl) {
       playCustomSoundEffect(customSoundUrl);
-      return;
-    }
-
-    try {
-      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AudioContextClass) return;
-
-      const audioContext = new AudioContextClass();
-      const gain = audioContext.createGain();
-      const tones = {
-        classic: [
-          { type: 'triangle' as OscillatorType, frequency: 740, start: 0, duration: 0.24, volume: 0.13 },
-          { type: 'sine' as OscillatorType, frequency: 988, start: 0.28, duration: 0.28, volume: 0.11 },
-          { type: 'triangle' as OscillatorType, frequency: 740, start: 0.74, duration: 0.24, volume: 0.12 },
-          { type: 'sine' as OscillatorType, frequency: 988, start: 1.02, duration: 0.32, volume: 0.1 },
-          { type: 'triangle' as OscillatorType, frequency: 587.33, start: 1.54, duration: 0.38, volume: 0.09 },
-        ],
-        soft: [
-          { type: 'sine' as OscillatorType, frequency: 523.25, start: 0, duration: 0.38, volume: 0.08 },
-          { type: 'sine' as OscillatorType, frequency: 659.25, start: 0.34, duration: 0.44, volume: 0.07 },
-          { type: 'sine' as OscillatorType, frequency: 783.99, start: 0.86, duration: 0.5, volume: 0.065 },
-          { type: 'sine' as OscillatorType, frequency: 659.25, start: 1.42, duration: 0.54, volume: 0.06 },
-        ],
-        urgent: [
-          { type: 'square' as OscillatorType, frequency: 784, start: 0, duration: 0.16, volume: 0.12 },
-          { type: 'square' as OscillatorType, frequency: 1046.5, start: 0.22, duration: 0.16, volume: 0.12 },
-          { type: 'square' as OscillatorType, frequency: 784, start: 0.48, duration: 0.16, volume: 0.12 },
-          { type: 'square' as OscillatorType, frequency: 1046.5, start: 0.7, duration: 0.18, volume: 0.11 },
-          { type: 'square' as OscillatorType, frequency: 784, start: 1.08, duration: 0.16, volume: 0.12 },
-          { type: 'square' as OscillatorType, frequency: 1046.5, start: 1.3, duration: 0.16, volume: 0.12 },
-          { type: 'square' as OscillatorType, frequency: 1174.66, start: 1.62, duration: 0.28, volume: 0.1 },
-        ],
-        none: [],
-      }[messagePreferences.reminderAlarmSound as BuiltInReminderAlarmSound];
-
-      gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
-      gain.connect(audioContext.destination);
-
-      tones.forEach((tone) => {
-        const oscillator = audioContext.createOscillator();
-        oscillator.type = tone.type;
-        oscillator.frequency.value = tone.frequency;
-        oscillator.connect(gain);
-        gain.gain.setValueAtTime(0.0001, audioContext.currentTime + tone.start);
-        gain.gain.exponentialRampToValueAtTime(tone.volume, audioContext.currentTime + tone.start + 0.015);
-        gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + tone.start + tone.duration);
-        oscillator.start(audioContext.currentTime + tone.start);
-        oscillator.stop(audioContext.currentTime + tone.start + tone.duration);
-      });
-
-      window.setTimeout(() => void audioContext.close().catch(() => undefined), 2600);
-    } catch (error) {
-      console.error('Failed to play reminder alarm sound:', error);
     }
   }, [getCustomNotificationSoundUrl, messagePreferences.reminderAlarmSound]);
 
@@ -5797,13 +5676,10 @@ function App() {
       return;
     }
 
-    const customSoundUrl = getCustomNotificationSoundUrl(messagePreferences.messageSound || 'classic');
+    const customSoundUrl = getCustomNotificationSoundUrl(messagePreferences.messageSound);
     if (customSoundUrl) {
       playCustomSoundEffect(customSoundUrl);
-      return;
     }
-
-    playMessageSoundEffect(messagePreferences.messageSound || 'classic');
   };
 
   useEffect(() => {
@@ -7301,9 +7177,7 @@ function App() {
                         const customSoundUrl = getCustomNotificationSoundUrl(messageSound);
                         if (customSoundUrl) {
                           playCustomSoundEffect(customSoundUrl);
-                          return;
                         }
-                        playMessageSoundEffect(messageSound as MessageSound);
                       }}
                       onReminderAlarmSoundSelect={(reminderAlarmSound) =>
                         setMessagePreferences((preferences) => ({
