@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ArchiveX, CheckCircle2, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, QrCode, Radio, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, deviceService, DeviceRecord } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
@@ -272,20 +272,90 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const isDeviceLoadInFlightRef = useRef(false);
+  const isUserLoadInFlightRef = useRef(false);
+  const deviceRefreshTimerRef = useRef<number | null>(null);
 
   const canManageDevices = currentUser?.role === 'administrator';
   const actor = { actorId: currentUser?.id, actorName: currentUser?.displayName || currentUser?.email };
 
+  const loadRegisteredUsers = useCallback(async () => {
+    if (!currentUser || !canManageDevices || isUserLoadInFlightRef.current) {
+      if (!currentUser || !canManageDevices) {
+        setRegisteredUsers([]);
+      }
+      return;
+    }
+
+    isUserLoadInFlightRef.current = true;
+    try {
+      const response = await authService.getAccounts(currentUser.id);
+      setRegisteredUsers(response.data);
+    } catch (err) {
+      console.error('Failed to load registered users:', err);
+      setRegisteredUsers([]);
+    } finally {
+      isUserLoadInFlightRef.current = false;
+    }
+  }, [canManageDevices, currentUser?.id]);
+
+  const loadDevices = useCallback(async (showLoading = true) => {
+    if (!currentUser) {
+      setDevices([]);
+      setLoading(false);
+      return;
+    }
+
+    if (!canManageDevices) {
+      setDevices([]);
+      setLoading(false);
+      setError('You do not have permission to manage devices.');
+      return;
+    }
+
+    if (isDeviceLoadInFlightRef.current) {
+      return;
+    }
+
+    isDeviceLoadInFlightRef.current = true;
+    if (showLoading) {
+      setLoading(true);
+    }
+    setError(null);
+    try {
+      const response = await deviceService.getAll();
+      setDevices(response.data);
+    } catch (err) {
+      console.error('Failed to load device inventory:', err);
+      setError('Failed to load device inventory. Check that the backend is running.');
+    } finally {
+      isDeviceLoadInFlightRef.current = false;
+      setLoading(false);
+    }
+  }, [canManageDevices, currentUser?.id]);
+
   useEffect(() => {
-    loadDevices(true);
-    loadRegisteredUsers();
+    void loadDevices(true);
+    void loadRegisteredUsers();
+
     const handleDeviceUpdate = () => {
-      loadDevices(false);
+      if (deviceRefreshTimerRef.current) {
+        window.clearTimeout(deviceRefreshTimerRef.current);
+      }
+
+      deviceRefreshTimerRef.current = window.setTimeout(() => {
+        void loadDevices(false);
+      }, 350);
     };
 
     window.addEventListener('shield:device-updated', handleDeviceUpdate);
-    return () => window.removeEventListener('shield:device-updated', handleDeviceUpdate);
-  }, []);
+    return () => {
+      window.removeEventListener('shield:device-updated', handleDeviceUpdate);
+      if (deviceRefreshTimerRef.current) {
+        window.clearTimeout(deviceRefreshTimerRef.current);
+      }
+    };
+  }, [loadDevices, loadRegisteredUsers]);
 
   useEffect(() => {
     const handleUserUpdate = () => {
@@ -298,38 +368,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       window.removeEventListener('shield:user-updated', handleUserUpdate);
       window.removeEventListener('shield:permission-updated', handleUserUpdate);
     };
-  }, [currentUser?.id]);
-
-  const loadRegisteredUsers = async () => {
-    if (!currentUser) {
-      setRegisteredUsers([]);
-      return;
-    }
-
-    try {
-      const response = await authService.getAccounts(currentUser.id);
-      setRegisteredUsers(response.data);
-    } catch (err) {
-      console.error('Failed to load registered users:', err);
-      setRegisteredUsers([]);
-    }
-  };
-
-  const loadDevices = async (showLoading = true) => {
-    if (showLoading) {
-      setLoading(true);
-    }
-    setError(null);
-    try {
-      const response = await deviceService.getAll();
-      setDevices(response.data);
-    } catch (err) {
-      console.error('Failed to load device inventory:', err);
-      setError('Failed to load device inventory. Check that the backend is running.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [loadRegisteredUsers]);
 
   const filteredDevices = useMemo(() => {
     const searchTerm = query.trim().toLowerCase();
