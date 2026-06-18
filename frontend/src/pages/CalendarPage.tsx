@@ -1991,8 +1991,24 @@ function CalendarPage({
       accountId: currentUser.id,
       ...actor,
     };
+    const optimisticEntry = createOptimisticEntryFromForm(leaveForm, currentUser, existingEntry || undefined);
 
     setCalendarError(null);
+    setEntries((currentEntries) => [
+      optimisticEntry,
+      ...currentEntries
+        .filter((entry) => entry.date !== dateKey)
+        .filter((entry) => entry.id !== optimisticEntry.id),
+    ]);
+    skipNextDailyDraftWriteRef.current = true;
+    setCalendarFocusDate(new Date(`${dateKey}T00:00:00`));
+    setSelectedDate(dateKey);
+    setEditingEntryId(savedExistingEntry?.id || optimisticEntry.id);
+    setEntryForm(leaveForm);
+    setIsDutyHoursManual(true);
+    setDailySaveStatus('saving');
+    lastAutoDutyHoursRef.current = '';
+
     try {
       const response = savedExistingEntry
         ? await calendarService.update(savedExistingEntry.id, payload)
