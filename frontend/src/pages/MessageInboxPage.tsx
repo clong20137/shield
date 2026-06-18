@@ -239,6 +239,10 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function getDraftGroupThreadId(recipients: Pick<User, 'id'>[]): string {
+  return `draft-group:${recipients.map((user) => user.id).sort().join(',')}`;
+}
+
 function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRecipient = null }: MessageInboxPageProps) {
   const [inboxMessages, setInboxMessages] = useState<UserMessage[]>([]);
   const [sentMessages, setSentMessages] = useState<UserMessage[]>([]);
@@ -276,6 +280,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const lastTypingSentRef = useRef(0);
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
   const composeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const replyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const focusReplyComposer = () => {
+    window.setTimeout(() => replyTextareaRef.current?.focus(), 0);
+  };
   const emojiButtonLabel = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
 
   useEffect(() => {
@@ -298,7 +306,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     setReplyBody('');
     setReplyAttachments([]);
     setSearchTerm('');
-  }, [currentUser.id, onToast, targetRecipient]);
+  }, [currentUser.id, targetRecipient?.id]);
 
   const loadMessages = async (showLoading = false) => {
     if (showLoading) {
@@ -418,7 +426,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       return;
     }
 
-    setSelectedThreadId(`draft-group:${draftGroupRecipients.map((user) => user.id).sort().join(',')}`);
+    setSelectedThreadId(getDraftGroupThreadId(draftGroupRecipients));
   }, [draftGroupRecipients]);
 
   useEffect(() => {
@@ -551,9 +559,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
   const filteredThreads = useMemo(() => {
     const existingDraftThread = draftRecipient && threads.some((thread) => thread.id === draftRecipient.id);
-    const draftGroupId = draftGroupRecipients.length > 0
-      ? `draft-group:${draftGroupRecipients.map((user) => user.id).sort().join(',')}`
-      : '';
+    const draftGroupId = draftGroupRecipients.length > 0 ? getDraftGroupThreadId(draftGroupRecipients) : '';
     const draftThread: MessageThread | null = draftRecipient && !existingDraftThread
       ? {
           id: draftRecipient.id,
@@ -806,14 +812,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     }
 
     setDraftRecipient(null);
-    setDraftGroupRecipients((recipients) => (
-      recipients.some((recipient) => recipient.id === user.id) ? recipients : [...recipients, user]
-    ));
-    setSelectedThreadId(null);
+    setDraftGroupRecipients((recipients) => {
+      const nextRecipients = recipients.some((recipient) => recipient.id === user.id) ? recipients : [...recipients, user];
+      setSelectedThreadId(getDraftGroupThreadId(nextRecipients));
+      return nextRecipients;
+    });
     setRecipientQuery('');
     setRecipientResults([]);
-    setReplyBody('');
-    setReplyAttachments([]);
   };
 
   const removeGroupRecipient = (userId: string) => {
@@ -843,8 +848,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       setDraftRecipient(null);
       setDraftGroupRecipients(users);
       setDraftThreadTitle(`${currentUser.district} District`);
-      setSelectedThreadId(null);
-      setIsComposeOpen(true);
+      setSelectedThreadId(getDraftGroupThreadId(users));
+      setIsComposeOpen(false);
+      focusReplyComposer();
       onToast('success', `Added ${users.length} ${currentUser.district} district member${users.length === 1 ? '' : 's'}.`);
     } catch (err) {
       console.error('Failed to load district recipients:', err);
@@ -1212,6 +1218,20 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                       </span>
                     ))}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedThreadId(getDraftGroupThreadId(draftGroupRecipients));
+                      setIsComposeOpen(false);
+                      setRecipientQuery('');
+                      setRecipientResults([]);
+                      focusReplyComposer();
+                    }}
+                    className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded bg-primary-500 px-3 text-sm font-bold text-white transition hover:bg-primary-600"
+                  >
+                    <Send size={15} />
+                    Start Group Chat
+                  </button>
                 </div>
               )}
 
@@ -1260,6 +1280,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                               setIsComposeOpen(false);
                               setReplyBody('');
                               setReplyAttachments([]);
+                              focusReplyComposer();
                             }}
                             className="inline-flex h-8 items-center rounded bg-primary-500 px-2.5 text-xs font-bold text-white hover:bg-primary-600"
                           >
@@ -1520,6 +1541,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                     />
                   </label>
                   <MentionTextarea
+                    ref={replyTextareaRef}
                     value={replyBody}
                     onChange={updateReplyBody}
                     wrapperClassName="min-w-0 flex-1"
