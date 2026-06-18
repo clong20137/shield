@@ -40,7 +40,7 @@ const districtOptions = [
   'CSI Section',
   'Digital Forensics Unit',
 ] as const;
-const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training', 'Day Off'] as const;
+const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training', 'Vacation Day', 'Sick Day', 'Day Off'] as const;
 const submissionStatusOptions = ['Draft', 'Submitted'] as const;
 const tCodeOptionsSettingKey = 'trooperDaily.tCodeOptions';
 const defaultTCodeOptions = ['T-1', 'T-2', 'T-3'];
