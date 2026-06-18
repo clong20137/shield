@@ -3333,17 +3333,16 @@ function CalendarPage({
             <span>Copy Previous Daily</span>
             <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">P</span>
           </button>
-          <div className="flex items-center gap-2 rounded px-3 py-2 text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800">
+          <div className="quick-launch-context-menu-item gap-3 text-gray-700 dark:text-gray-200">
             <button
               type="button"
               onClick={() => {
                 void markDailyLeaveStatus(dailyStripContextMenu.dateKey, vacationStatus, dailyStatusHours.vacation);
                 setDailyStripContextMenu(null);
               }}
-              className="flex flex-1 items-center gap-2 text-left font-semibold"
+              className="flex min-w-0 flex-1 items-center text-left font-semibold"
             >
-              <span>Vacation Day</span>
-              <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">V</span>
+              <span className="truncate">Vacation Day</span>
             </button>
             <input
               type="text"
@@ -3351,22 +3350,23 @@ function CalendarPage({
               value={dailyStatusHours.vacation}
               onChange={(event) => setDailyStatusHours((current) => ({ ...current, vacation: sanitizeDecimalInput(event.target.value) }))}
               onClick={(event) => event.stopPropagation()}
-              className="h-8 w-16 rounded border border-gray-300 bg-white px-2 text-right text-xs font-bold text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+              onKeyDown={(event) => event.stopPropagation()}
+              className="h-8 w-16 shrink-0 rounded border border-gray-300 bg-white px-2 text-right text-xs font-bold text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
               aria-label="Vacation day hours"
               title="Vacation Hours"
             />
+            <span className="w-4 shrink-0 text-right text-xs font-black text-gray-400 dark:text-gray-500">V</span>
           </div>
-          <div className="flex items-center gap-2 rounded px-3 py-2 text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800">
+          <div className="quick-launch-context-menu-item gap-3 text-gray-700 dark:text-gray-200">
             <button
               type="button"
               onClick={() => {
                 void markDailyLeaveStatus(dailyStripContextMenu.dateKey, sickStatus, dailyStatusHours.sick);
                 setDailyStripContextMenu(null);
               }}
-              className="flex flex-1 items-center gap-2 text-left font-semibold"
+              className="flex min-w-0 flex-1 items-center text-left font-semibold"
             >
-              <span>Sick Day</span>
-              <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">S</span>
+              <span className="truncate">Sick Day</span>
             </button>
             <input
               type="text"
@@ -3374,10 +3374,12 @@ function CalendarPage({
               value={dailyStatusHours.sick}
               onChange={(event) => setDailyStatusHours((current) => ({ ...current, sick: sanitizeDecimalInput(event.target.value) }))}
               onClick={(event) => event.stopPropagation()}
-              className="h-8 w-16 rounded border border-gray-300 bg-white px-2 text-right text-xs font-bold text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+              onKeyDown={(event) => event.stopPropagation()}
+              className="h-8 w-16 shrink-0 rounded border border-gray-300 bg-white px-2 text-right text-xs font-bold text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
               aria-label="Sick day hours"
               title="Sick Hours"
             />
+            <span className="w-4 shrink-0 text-right text-xs font-black text-gray-400 dark:text-gray-500">S</span>
           </div>
           {dailyStripContextMenu.entry && (
             <button
