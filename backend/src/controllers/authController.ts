@@ -1324,14 +1324,25 @@ export class AuthController {
         return res.status(404).json({ error: 'Account not found' });
       }
 
-      await AuthSessionModel.revokeAllSessions(cleanAccountId);
+      const currentToken = getSessionToken(req);
+      const isSelfReset = requester.id === cleanAccountId;
+      if (isSelfReset && currentToken) {
+        await AuthSessionModel.revokeOtherSessions(cleanAccountId, currentToken);
+      } else {
+        await AuthSessionModel.revokeAllSessions(cleanAccountId);
+      }
+      broadcastAppEvent({ type: 'user-updated', entityId: cleanAccountId });
       await AuditLogModel.create({
         actorId: requester.id,
         actorName: requester.displayName || requester.email,
         action: 'auth.password_admin_reset',
         entityType: 'user',
         entityId: cleanAccountId,
-        details: JSON.stringify({ temporaryPasswordAssigned: true, mustChangePassword: true }),
+        details: JSON.stringify({
+          temporaryPasswordAssigned: true,
+          mustChangePassword: true,
+          currentSessionPreserved: isSelfReset && Boolean(currentToken),
+        }),
         ...requestAuditFields(req),
       });
 
