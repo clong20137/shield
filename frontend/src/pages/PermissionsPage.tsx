@@ -45,6 +45,7 @@ const permissionGroups = [
       { key: 'calendar:view-profiles', label: 'View profile calendars' },
       { key: 'messages:send', label: 'Send messages' },
       { key: 'alerts:send', label: 'Send urgent alerts' },
+      { key: 'district-feed:post', label: 'Post district feed updates' },
     ],
   },
   {

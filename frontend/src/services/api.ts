@@ -271,6 +271,20 @@ export interface DashboardDistrictFeedEntry extends CalendarEntry {
   };
 }
 
+export type DistrictFeedPostCategory = 'Announcement' | 'Update' | 'Alert';
+
+export interface DistrictFeedPost {
+  id: string;
+  district: string;
+  category: DistrictFeedPostCategory;
+  title: string;
+  body: string;
+  authorId: string;
+  authorName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DashboardSummary {
   calendarEntries: CalendarEntry[];
   reminders: Reminder[];
@@ -278,6 +292,7 @@ export interface DashboardSummary {
   posts: DashboardPost[];
   quickNote: QuickNote;
   districtFeed: DashboardDistrictFeedEntry[];
+  districtFeedPosts: DistrictFeedPost[];
   dueReminderNotificationsCreated: number;
 }
 
@@ -1305,6 +1320,11 @@ export const dashboardPostService = {
 export const dashboardSummaryService = {
   get: () =>
     api.get<DashboardSummary>('/dashboard/summary'),
+};
+
+export const districtFeedService = {
+  createPost: (post: { category: DistrictFeedPostCategory; title: string; body: string }) =>
+    api.post<DistrictFeedPost>('/district-feed/posts', post),
 };
 
 export const mediaService = {

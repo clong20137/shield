@@ -260,13 +260,13 @@ export async function initializeDatabase() {
   await pool.query(`
     INSERT IGNORE INTO roles (\`id\`, \`name\`, \`permissions\`)
     VALUES
-      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","media:view","media:upload","media:edit","media:delete","devices:manage","calendar:manage","calendar:view-profiles","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","bugs:manage","admin:access","admin:general","admin:permissions","admin:achievements","admin:create-user","admin:media","admin:alerts","admin:bugs","admin:audit","admin:errors"]'),
+      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","media:view","media:upload","media:edit","media:delete","devices:manage","calendar:manage","calendar:view-profiles","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","district-feed:post","bugs:manage","admin:access","admin:general","admin:permissions","admin:achievements","admin:create-user","admin:media","admin:alerts","admin:bugs","admin:audit","admin:errors"]'),
       ('role-user', 'user', '["users:view","calendar:manage","messages:send"]')
   `);
 
   await pool.query(`
     UPDATE roles
-    SET \`permissions\` = '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","media:view","media:upload","media:edit","media:delete","devices:manage","calendar:manage","calendar:view-profiles","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","bugs:manage","admin:access","admin:general","admin:permissions","admin:achievements","admin:create-user","admin:media","admin:alerts","admin:bugs","admin:audit","admin:errors"]'
+    SET \`permissions\` = '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","media:view","media:upload","media:edit","media:delete","devices:manage","calendar:manage","calendar:view-profiles","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","district-feed:post","bugs:manage","admin:access","admin:general","admin:permissions","admin:achievements","admin:create-user","admin:media","admin:alerts","admin:bugs","admin:audit","admin:errors"]'
     WHERE \`name\` = 'administrator'
   `);
 
@@ -392,6 +392,23 @@ export async function initializeDatabase() {
   await ensureColumn('dashboard_post_comments', 'adminHighlightedAt', '`adminHighlightedAt` DATETIME');
   await ensureIndex('dashboard_post_comments', 'idx_dashboard_comments_post_pinned_created', '`postId`, `isPinned`, `pinnedAt`, `createdAt`');
   await ensureIndex('dashboard_post_comments', 'idx_dashboard_comments_post_parent_created', '`postId`, `parentCommentId`, `createdAt`');
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS district_feed_posts (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`district\` VARCHAR(100) NOT NULL,
+      \`category\` VARCHAR(40) NOT NULL DEFAULT 'Announcement',
+      \`title\` VARCHAR(140) NOT NULL,
+      \`body\` TEXT NOT NULL,
+      \`authorId\` VARCHAR(36) NOT NULL,
+      \`authorName\` VARCHAR(150) NOT NULL,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX \`idx_district_feed_district_created\` (\`district\`, \`createdAt\`),
+      INDEX \`idx_district_feed_category_created\` (\`category\`, \`createdAt\`)
+    )
+  `);
+  await ensureIndex('district_feed_posts', 'idx_district_feed_district_category_created', '`district`, `category`, `createdAt`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_messages (

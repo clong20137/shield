@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom';
 import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, Link2, List, ListOrdered, LucideIcon, MapPinned, Megaphone, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ShieldCheck, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authService, AuthAccount, calendarService, CalendarEntry, DashboardDistrictFeedEntry, DashboardReaction, dashboardPostService, DashboardPost, dashboardSummaryService, DashboardSummary, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
+import { authService, AuthAccount, calendarService, CalendarEntry, DashboardDistrictFeedEntry, DashboardReaction, dashboardPostService, DashboardPost, dashboardSummaryService, DashboardSummary, districtFeedService, DistrictFeedPost, DistrictFeedPostCategory, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { UserDetail } from '../components/UserDetail';
 
@@ -2499,16 +2499,69 @@ function QuickNotesWidget({
 function DistrictFeedWidget({
   currentUser,
   initialFeed,
+  initialPosts,
 }: {
   currentUser: AuthAccount | null;
   initialFeed?: DashboardDistrictFeedEntry[];
+  initialPosts?: DistrictFeedPost[];
 }) {
   const districtName = currentUser?.district?.trim() || '';
+  const canPost = Boolean(
+    currentUser?.role === 'administrator' ||
+    currentUser?.permissions?.includes('district-feed:post') ||
+    currentUser?.permissions?.includes('dashboard:manage'),
+  );
   const feedItems = initialFeed || [];
+  const [posts, setPosts] = useState<DistrictFeedPost[]>([]);
+  const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [postCategory, setPostCategory] = useState<DistrictFeedPostCategory>('Announcement');
+  const [postTitle, setPostTitle] = useState('');
+  const [postBody, setPostBody] = useState('');
+  const [isPosting, setIsPosting] = useState(false);
+  const [postError, setPostError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPosts(initialPosts || []);
+  }, [initialPosts]);
 
   const getOfficerName = (item: DashboardDistrictFeedEntry) => {
     const name = `${item.user.firstName || ''} ${item.user.lastName || ''}`.trim();
     return name || item.user.email || 'Officer';
+  };
+
+  const getCategoryClass = (category: DistrictFeedPostCategory) => {
+    if (category === 'Alert') return 'bg-danger text-white';
+    if (category === 'Update') return 'bg-primary-500 text-white';
+    return 'bg-accent text-white';
+  };
+
+  const submitDistrictPost = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!postTitle.trim() || !postBody.trim()) {
+      setPostError('Title and message are required.');
+      return;
+    }
+
+    setIsPosting(true);
+    setPostError(null);
+    try {
+      const response = await districtFeedService.createPost({
+        category: postCategory,
+        title: postTitle,
+        body: postBody,
+      });
+      setPosts((current) => [response.data, ...current].slice(0, 8));
+      setPostTitle('');
+      setPostBody('');
+      setPostCategory('Announcement');
+      setIsComposerOpen(false);
+      window.dispatchEvent(new Event('shield:dashboard-updated'));
+    } catch (err) {
+      console.error('Failed to post district feed update:', err);
+      setPostError('Could not post to the district feed.');
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   return (
@@ -2526,10 +2579,16 @@ function DistrictFeedWidget({
               </p>
             </div>
           </div>
-          {feedItems.length > 0 && (
-            <span className="rounded bg-accent/10 px-2.5 py-1 text-xs font-black uppercase tracking-[0.12em] text-accent">
-              {feedItems.length} latest
-            </span>
+          {canPost && districtName && (
+            <button
+              type="button"
+              onClick={() => setIsComposerOpen((value) => !value)}
+              className="btn-primary shrink-0"
+              aria-label="Post to district feed"
+              title="Post to District Feed"
+            >
+              <Plus size={16} />
+            </button>
           )}
         </div>
       </div>
@@ -2539,13 +2598,84 @@ function DistrictFeedWidget({
           <div className="flex h-full items-center justify-center rounded border border-dashed border-gray-300 px-4 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
             Assign a district to your profile to see district activity.
           </div>
-        ) : feedItems.length === 0 ? (
-          <div className="flex h-full items-center justify-center rounded border border-dashed border-gray-300 px-4 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
-            No submitted activity has been posted for {districtName} yet.
-          </div>
         ) : (
           <div className="space-y-3">
-            {feedItems.map((item) => {
+            {isComposerOpen && (
+              <form onSubmit={submitDistrictPost} className="rounded border border-accent/30 bg-accent/5 p-3 dark:bg-accent/10">
+                {postError && <div className="error mb-3">{postError}</div>}
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[150px_minmax(0,1fr)]">
+                  <select
+                    value={postCategory}
+                    onChange={(event) => setPostCategory(event.target.value as DistrictFeedPostCategory)}
+                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                  >
+                    <option value="Announcement">Announcement</option>
+                    <option value="Update">Update</option>
+                    <option value="Alert">Alert</option>
+                  </select>
+                  <input
+                    value={postTitle}
+                    onChange={(event) => setPostTitle(event.target.value)}
+                    maxLength={140}
+                    placeholder="Feed title"
+                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                  />
+                </div>
+                <textarea
+                  value={postBody}
+                  onChange={(event) => setPostBody(event.target.value)}
+                  maxLength={1600}
+                  placeholder={`Post to ${districtName}`}
+                  className="mt-2 min-h-24 w-full resize-y rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                />
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{postBody.length}/1600</span>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setIsComposerOpen(false)} className="btn-secondary" aria-label="Cancel district feed post" title="Cancel">
+                      <X size={16} />
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn-primary" disabled={isPosting || !postTitle.trim() || !postBody.trim()} aria-label="Post district feed update" title="Post">
+                      <Send size={16} />
+                      Post
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
+
+            {posts.length === 0 ? (
+              <div className="rounded border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                No command posts have been added for {districtName} yet.
+              </div>
+            ) : posts.map((post) => (
+              <article key={post.id} className="rounded border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className={`inline-flex rounded px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${getCategoryClass(post.category)}`}>
+                      {post.category}
+                    </span>
+                    <h3 className="mt-2 line-clamp-2 text-sm font-black text-gray-900 dark:text-gray-100">{post.title}</h3>
+                  </div>
+                  <span className="shrink-0 text-xs font-semibold text-gray-400">
+                    {new Date(post.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  </span>
+                </div>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-600 dark:text-gray-300">{post.body}</p>
+                <p className="mt-3 text-xs font-semibold text-gray-400">Posted by {post.authorName}</p>
+              </article>
+            ))}
+
+            <div className="border-t border-gray-200 pt-3 dark:border-gray-800">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <h3 className="text-xs font-black uppercase tracking-[0.14em] text-gray-400">Recent Activity</h3>
+                {feedItems.length > 0 && <span className="text-xs font-semibold text-gray-400">{feedItems.length} latest</span>}
+              </div>
+              {feedItems.length === 0 ? (
+                <div className="rounded border border-dashed border-gray-300 px-4 py-4 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                  No submitted activity has been posted for {districtName} yet.
+                </div>
+              ) : feedItems.map((item) => {
               const officerName = getOfficerName(item);
               const miles = Number.parseFloat(item.details?.regularDutyMiles || '0') || 0;
               const grams = ['heroinGrams', 'cocaineGrams', 'marijuanaGrams', 'methGrams']
@@ -2592,7 +2722,8 @@ function DistrictFeedWidget({
                   </div>
                 </Link>
               );
-            })}
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -2823,7 +2954,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
         </div>
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
           <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
-          <DistrictFeedWidget currentUser={currentUser} initialFeed={dashboardSummary?.districtFeed} />
+          <DistrictFeedWidget currentUser={currentUser} initialFeed={dashboardSummary?.districtFeed} initialPosts={dashboardSummary?.districtFeedPosts} />
         </div>
         {profileWindow}
       </div>
@@ -2850,7 +2981,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
         <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
-        <DistrictFeedWidget currentUser={currentUser} initialFeed={dashboardSummary?.districtFeed} />
+        <DistrictFeedWidget currentUser={currentUser} initialFeed={dashboardSummary?.districtFeed} initialPosts={dashboardSummary?.districtFeedPosts} />
       </div>
       {profileWindow}
     </div>
