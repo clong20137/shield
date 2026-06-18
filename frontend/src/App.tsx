@@ -6289,7 +6289,6 @@ function App() {
       if (response.data.account) {
         handleAccountUpdate(response.data.account);
       }
-      showToast('success', receiveMessages ? 'Messages enabled.' : 'Messages disabled.');
     } catch (err) {
       console.error(err);
       setMessagePreferences(previousPreferences);
@@ -6310,7 +6309,6 @@ function App() {
       if (response.data.account) {
         handleAccountUpdate(response.data.account);
       }
-      showToast('success', presenceHidden ? 'Incognito mode enabled.' : 'Incognito mode disabled.');
     } catch (err) {
       console.error(err);
       handleAccountUpdate(previousUser);
@@ -6331,7 +6329,6 @@ function App() {
       if (response.data.account) {
         handleAccountUpdate(response.data.account);
       }
-      showToast('success', calendarHidden ? 'Profile calendar hidden.' : 'Profile calendar shown.');
     } catch (err) {
       console.error(err);
       handleAccountUpdate(previousUser);
@@ -6352,7 +6349,6 @@ function App() {
       if (response.data.account) {
         handleAccountUpdate(response.data.account);
       }
-      showToast('success', `App scale set to ${appScale}.`);
     } catch (err) {
       console.error(err);
       handleAccountUpdate(previousUser);
@@ -6374,7 +6370,6 @@ function App() {
       if (response.data.account) {
         handleAccountUpdate(response.data.account);
       }
-      showToast('success', `Default duty hours set to ${defaultDutyHours}.`);
     } catch (err) {
       console.error(err);
       handleAccountUpdate(previousUser);
