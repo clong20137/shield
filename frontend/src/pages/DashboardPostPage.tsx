@@ -475,9 +475,18 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
             )}
           </div>
         </div>
-        {replies.length > 0 && !isThreadCollapsed && (
-          <div className="mt-3 space-y-3">
-            {replies.map((reply) => renderComment(reply, true))}
+        {replies.length > 0 && (
+          <div
+            className={`grid transition-[grid-template-rows,opacity,transform] duration-300 ease-out ${
+              isThreadCollapsed ? 'grid-rows-[0fr] opacity-0 -translate-y-1' : 'grid-rows-[1fr] opacity-100 translate-y-0'
+            }`}
+            aria-hidden={isThreadCollapsed}
+          >
+            <div className="min-h-0 overflow-hidden">
+              <div className="mt-3 space-y-3">
+                {replies.map((reply) => renderComment(reply, true))}
+              </div>
+            </div>
           </div>
         )}
       </div>

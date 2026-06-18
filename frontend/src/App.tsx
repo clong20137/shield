@@ -3353,9 +3353,10 @@ function PageLoader({ label = 'Loading...' }: { label?: string }) {
 
 function RouteTransition({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const isAdminWorkspaceRoute = /^\/(admin|audit|permissions|users\/create)(\/|$)/u.test(location.pathname);
 
   return (
-    <div key={location.pathname} className="page-route-enter">
+    <div key={isAdminWorkspaceRoute ? 'admin-workspace' : location.pathname} className={isAdminWorkspaceRoute ? undefined : 'page-route-enter'}>
       {children}
     </div>
   );
