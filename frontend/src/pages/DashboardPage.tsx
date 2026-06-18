@@ -1,8 +1,8 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, Link2, List, ListOrdered, LucideIcon, MapPinned, Megaphone, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ShieldCheck, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, Link2, List, ListOrdered, LucideIcon, MapPinned, Megaphone, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authService, AuthAccount, calendarService, CalendarEntry, DashboardDistrictFeedEntry, DashboardReaction, dashboardPostService, DashboardPost, dashboardSummaryService, DashboardSummary, districtFeedService, DistrictFeedPost, DistrictFeedPostCategory, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
+import { authService, AuthAccount, calendarService, CalendarEntry, DashboardReaction, dashboardPostService, DashboardPost, dashboardSummaryService, DashboardSummary, districtFeedService, DistrictFeedPost, DistrictFeedPostCategory, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { UserDetail } from '../components/UserDetail';
 
@@ -2498,11 +2498,9 @@ function QuickNotesWidget({
 
 function DistrictFeedWidget({
   currentUser,
-  initialFeed,
   initialPosts,
 }: {
   currentUser: AuthAccount | null;
-  initialFeed?: DashboardDistrictFeedEntry[];
   initialPosts?: DistrictFeedPost[];
 }) {
   const districtName = currentUser?.district?.trim() || '';
@@ -2511,7 +2509,6 @@ function DistrictFeedWidget({
     currentUser?.permissions?.includes('district-feed:post') ||
     currentUser?.permissions?.includes('dashboard:manage'),
   );
-  const feedItems = initialFeed || [];
   const [posts, setPosts] = useState<DistrictFeedPost[]>([]);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [postCategory, setPostCategory] = useState<DistrictFeedPostCategory>('Announcement');
@@ -2523,11 +2520,6 @@ function DistrictFeedWidget({
   useEffect(() => {
     setPosts(initialPosts || []);
   }, [initialPosts]);
-
-  const getOfficerName = (item: DashboardDistrictFeedEntry) => {
-    const name = `${item.user.firstName || ''} ${item.user.lastName || ''}`.trim();
-    return name || item.user.email || 'Officer';
-  };
 
   const getCategoryClass = (category: DistrictFeedPostCategory) => {
     if (category === 'Alert') return 'bg-danger text-white';
@@ -2575,7 +2567,7 @@ function DistrictFeedWidget({
             <div className="min-w-0">
               <h2 className="text-xl font-bold text-primary-500 dark:text-blue-100">District Feed</h2>
               <p className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">
-                {districtName ? `${districtName} activity only` : 'No assigned district'}
+                {districtName ? `${districtName} command posts only` : 'No assigned district'}
               </p>
             </div>
           </div>
@@ -2666,64 +2658,6 @@ function DistrictFeedWidget({
               </article>
             ))}
 
-            <div className="border-t border-gray-200 pt-3 dark:border-gray-800">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <h3 className="text-xs font-black uppercase tracking-[0.14em] text-gray-400">Recent Activity</h3>
-                {feedItems.length > 0 && <span className="text-xs font-semibold text-gray-400">{feedItems.length} latest</span>}
-              </div>
-              {feedItems.length === 0 ? (
-                <div className="rounded border border-dashed border-gray-300 px-4 py-4 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                  No submitted activity has been posted for {districtName} yet.
-                </div>
-              ) : feedItems.map((item) => {
-              const officerName = getOfficerName(item);
-              const miles = Number.parseFloat(item.details?.regularDutyMiles || '0') || 0;
-              const grams = ['heroinGrams', 'cocaineGrams', 'marijuanaGrams', 'methGrams']
-                .reduce((total, key) => total + (Number.parseFloat(item.details?.[key] || '0') || 0), 0);
-              const activityMeta = [
-                `${item.dutyHours || '0'} hrs`,
-                miles > 0 ? `${miles.toLocaleString(undefined, { maximumFractionDigits: 1 })} mi` : '',
-                grams > 0 ? `${grams.toLocaleString(undefined, { maximumFractionDigits: 1 })}g seized` : '',
-              ].filter(Boolean);
-
-              return (
-                <Link
-                  key={item.id}
-                  to={`/calendar?date=${encodeURIComponent(item.date)}`}
-                  className="group relative block overflow-hidden rounded border border-gray-200 bg-gray-50 p-3 pl-4 transition hover:-translate-y-0.5 hover:border-accent hover:bg-white hover:shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900"
-                >
-                  <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: item.color || entryColors[0].value }} />
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-black text-gray-900 dark:text-gray-100">{officerName}</p>
-                      <p className="mt-1 truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
-                        {item.user.rank || 'Officer'} - {getReadableDate(item.date)}
-                      </p>
-                    </div>
-                    <span className={`shrink-0 rounded px-2 py-1 text-[10px] font-black uppercase ${item.reviewStatus === 'Approved' ? 'bg-success/10 text-success' : item.reviewStatus === 'Returned' ? 'bg-danger/10 text-danger' : 'bg-accent/10 text-accent'}`}>
-                      {item.reviewStatus}
-                    </span>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {activityMeta.map((meta) => (
-                      <span key={meta} className="rounded bg-white px-2 py-1 text-xs font-bold text-gray-600 ring-1 ring-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-800">
-                        {meta}
-                      </span>
-                    ))}
-                    {item.specialStatus && item.specialStatus !== 'None' && (
-                      <span className="rounded bg-primary-500/10 px-2 py-1 text-xs font-bold text-primary-500 dark:text-blue-100">
-                        {item.specialStatus}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-gray-400 transition group-hover:text-accent">
-                    <ShieldCheck size={13} />
-                    Submitted {new Date(item.updatedAt).toLocaleDateString()}
-                  </div>
-                </Link>
-              );
-              })}
-            </div>
           </div>
         )}
       </div>
@@ -2954,7 +2888,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
         </div>
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
           <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
-          <DistrictFeedWidget currentUser={currentUser} initialFeed={dashboardSummary?.districtFeed} initialPosts={dashboardSummary?.districtFeedPosts} />
+          <DistrictFeedWidget currentUser={currentUser} initialPosts={dashboardSummary?.districtFeedPosts} />
         </div>
         {profileWindow}
       </div>
@@ -2981,7 +2915,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
         <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
-        <DistrictFeedWidget currentUser={currentUser} initialFeed={dashboardSummary?.districtFeed} initialPosts={dashboardSummary?.districtFeedPosts} />
+        <DistrictFeedWidget currentUser={currentUser} initialPosts={dashboardSummary?.districtFeedPosts} />
       </div>
       {profileWindow}
     </div>

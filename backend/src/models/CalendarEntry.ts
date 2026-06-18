@@ -22,18 +22,6 @@ export interface CalendarEntry {
   updatedAt: Date;
 }
 
-export interface DistrictFeedEntry extends CalendarEntry {
-  user: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    peNumber: string;
-    badgeNumber: string;
-    rank: string;
-    district: string;
-  };
-}
-
 interface CalendarEntryRow extends RowDataPacket {
   id: string;
   ownerAccountId: string;
@@ -52,16 +40,6 @@ interface CalendarEntryRow extends RowDataPacket {
   reviewedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
-}
-
-interface DistrictFeedEntryRow extends CalendarEntryRow {
-  userFirstName: string | null;
-  userLastName: string | null;
-  userEmail: string | null;
-  userPeNumber: string | null;
-  userBadgeNumber: string | null;
-  userRank: string | null;
-  userDistrict: string | null;
 }
 
 interface MileageTotalRow extends RowDataPacket {
@@ -106,21 +84,6 @@ function toCalendarEntry(row: CalendarEntryRow): CalendarEntry {
   };
 }
 
-function toDistrictFeedEntry(row: DistrictFeedEntryRow): DistrictFeedEntry {
-  return {
-    ...toCalendarEntry(row),
-    user: {
-      firstName: row.userFirstName || '',
-      lastName: row.userLastName || '',
-      email: row.userEmail || '',
-      peNumber: row.userPeNumber || '',
-      badgeNumber: row.userBadgeNumber || '',
-      rank: row.userRank || '',
-      district: row.userDistrict || '',
-    },
-  };
-}
-
 export class CalendarEntryModel {
   static async getMileageTotal(ownerAccountId: string): Promise<number> {
     const conn = await pool.getConnection();
@@ -147,40 +110,6 @@ export class CalendarEntryModel {
       );
 
       return rows.map(toCalendarEntry);
-    } finally {
-      conn.release();
-    }
-  }
-
-  static async listDistrictFeed(district: string, limit = 8): Promise<DistrictFeedEntry[]> {
-    const cleanedDistrict = district.trim();
-    if (!cleanedDistrict) {
-      return [];
-    }
-
-    const conn = await pool.getConnection();
-    try {
-      const [rows] = await conn.query<DistrictFeedEntryRow[]>(
-        `SELECT
-          ce.*,
-          u.\`firstName\` AS userFirstName,
-          u.\`lastName\` AS userLastName,
-          u.\`email\` AS userEmail,
-          u.\`peNumber\` AS userPeNumber,
-          u.\`badgeNumber\` AS userBadgeNumber,
-          u.\`rank\` AS userRank,
-          u.\`district\` AS userDistrict
-        FROM calendar_entries ce
-        LEFT JOIN users u ON u.\`id\` = ce.\`ownerAccountId\`
-        WHERE ce.\`category\` = 'Trooper Daily'
-          AND COALESCE(ce.\`submissionStatus\`, 'Submitted') = 'Submitted'
-          AND ce.\`districtWorked\` = ?
-        ORDER BY ce.\`entryDate\` DESC, ce.\`updatedAt\` DESC
-        LIMIT ?`,
-        [cleanedDistrict, Math.min(Math.max(limit, 1), 20)],
-      );
-
-      return rows.map(toDistrictFeedEntry);
     } finally {
       conn.release();
     }

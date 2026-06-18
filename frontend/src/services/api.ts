@@ -259,18 +259,6 @@ export interface QuickNote {
   updatedAt: string;
 }
 
-export interface DashboardDistrictFeedEntry extends CalendarEntry {
-  user: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    peNumber: string;
-    badgeNumber: string;
-    rank: string;
-    district: string;
-  };
-}
-
 export type DistrictFeedPostCategory = 'Announcement' | 'Update' | 'Alert';
 
 export interface DistrictFeedPost {
@@ -291,7 +279,6 @@ export interface DashboardSummary {
   pinnedProfiles: PinnedProfile[];
   posts: DashboardPost[];
   quickNote: QuickNote;
-  districtFeed: DashboardDistrictFeedEntry[];
   districtFeedPosts: DistrictFeedPost[];
   dueReminderNotificationsCreated: number;
 }
