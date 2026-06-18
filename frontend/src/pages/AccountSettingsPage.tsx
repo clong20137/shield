@@ -1,5 +1,5 @@
 import QRCode from 'qrcode';
-import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Camera, Download, ExternalLink, Image, KeyRound, Laptop, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, X } from 'lucide-react';
 import { AuthAccount, AuthSession, DeviceRecord, MediaLibraryItem, TwoFactorSetupResponse, authService, deviceService, getAssetUrl, handleAssetImageError, performanceEvaluationService, userService } from '../services/api';
@@ -86,7 +86,16 @@ export function AccountSettingsPage({
   const [evaluationCount, setEvaluationCount] = useState<number | null>(null);
   const [isEvaluationsLoading, setIsEvaluationsLoading] = useState(false);
   const profilePictureInputRef = useRef<HTMLInputElement | null>(null);
+  const isAssignedDevicesLoadingRef = useRef(false);
+  const assignedDevicesRefreshTimerRef = useRef<number | null>(null);
+  const onToastRef = useRef(onToast);
+  const getErrorMessageRef = useRef(getErrorMessage);
   const canChangeCalendarPreference = account.role === 'administrator' || Boolean(account.permissions?.includes('calendar:manage'));
+
+  useEffect(() => {
+    onToastRef.current = onToast;
+    getErrorMessageRef.current = getErrorMessage;
+  }, [getErrorMessage, onToast]);
 
   useEffect(() => {
     let isMounted = true;
@@ -134,24 +143,38 @@ export function AccountSettingsPage({
     loadSessions();
   }, []);
 
-  const loadAssignedDevices = () => {
-    setIsAssignedDevicesLoading(true);
+  const loadAssignedDevices = useCallback((showLoading = true) => {
+    if (isAssignedDevicesLoadingRef.current) {
+      return Promise.resolve();
+    }
+
+    isAssignedDevicesLoadingRef.current = true;
+    setIsAssignedDevicesLoading(showLoading);
     return deviceService.getAssignedToMe()
       .then((response) => setAssignedDevices(response.data))
       .catch((error) => {
         console.error('Failed to load assigned devices:', error);
-        onToast('error', getErrorMessage(error, 'Failed to load assigned devices.'));
+        onToastRef.current('error', getErrorMessageRef.current(error, 'Failed to load assigned devices.'));
       })
-      .finally(() => setIsAssignedDevicesLoading(false));
-  };
+      .finally(() => {
+        isAssignedDevicesLoadingRef.current = false;
+        setIsAssignedDevicesLoading(false);
+      });
+  }, []);
 
   useEffect(() => {
     void loadAssignedDevices();
-  }, [getErrorMessage, onToast]);
+  }, [loadAssignedDevices]);
 
   useEffect(() => {
     const handleDeviceUpdate = () => {
-      void loadAssignedDevices();
+      if (assignedDevicesRefreshTimerRef.current) {
+        window.clearTimeout(assignedDevicesRefreshTimerRef.current);
+      }
+
+      assignedDevicesRefreshTimerRef.current = window.setTimeout(() => {
+        void loadAssignedDevices(false);
+      }, 350);
     };
 
     window.addEventListener('shield:device-updated', handleDeviceUpdate);
@@ -159,8 +182,11 @@ export function AccountSettingsPage({
     return () => {
       window.removeEventListener('shield:device-updated', handleDeviceUpdate);
       window.removeEventListener('shield:user-updated', handleDeviceUpdate);
+      if (assignedDevicesRefreshTimerRef.current) {
+        window.clearTimeout(assignedDevicesRefreshTimerRef.current);
+      }
     };
-  }, [account.id]);
+  }, [account.id, loadAssignedDevices]);
 
   const revokeSession = async (sessionId: string) => {
     setIsRevokingSessions(true);

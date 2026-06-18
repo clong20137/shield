@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetUrl, handleAssetImageError, MileageSummary, mileageService, User } from '../services/api';
 import { RankBadge } from './RankBadge';
@@ -203,6 +203,9 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const [deviceError, setDeviceError] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [presenceTick, setPresenceTick] = useState(0);
+  const isDeviceLoadInFlightRef = useRef(false);
+  const deviceRefreshTimerRef = useRef<number | null>(null);
+  const deviceLoadRequestIdRef = useRef(0);
   const canBypassHiddenProfileCalendar = currentUser?.id === user.id || currentUser?.role === 'administrator';
   const canViewProfileCalendar = Boolean(
     (!user.calendarHidden || canBypassHiddenProfileCalendar) && (
@@ -299,40 +302,57 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
     };
   }, [activeTab, canViewProfileCalendar, user.id]);
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadAssignedDevices = useCallback((showLoading = true) => {
+    if (isDeviceLoadInFlightRef.current) {
+      return;
+    }
 
-    const loadAssignedDevices = () => {
-      setIsDevicesLoading(true);
-      setDeviceError(null);
-      deviceService.getAssignedToUser(user.id)
-        .then((response) => {
-          if (isMounted) {
-            setAssignedDevices(response.data);
-          }
-        })
-        .catch((error) => {
-          console.error('Failed to load assigned profile devices:', error);
-          if (isMounted) {
-            setAssignedDevices([]);
-            setDeviceError('Failed to load assigned devices.');
-          }
-        })
-        .finally(() => {
-          if (isMounted) {
-            setIsDevicesLoading(false);
-          }
-        });
+    isDeviceLoadInFlightRef.current = true;
+    const requestId = deviceLoadRequestIdRef.current + 1;
+    deviceLoadRequestIdRef.current = requestId;
+    setIsDevicesLoading(showLoading);
+    setDeviceError(null);
+    deviceService.getAssignedToUser(user.id)
+      .then((response) => {
+        if (requestId === deviceLoadRequestIdRef.current) {
+          setAssignedDevices(response.data);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load assigned profile devices:', error);
+        if (requestId === deviceLoadRequestIdRef.current) {
+          setDeviceError('Failed to load assigned devices.');
+        }
+      })
+      .finally(() => {
+        if (requestId === deviceLoadRequestIdRef.current) {
+          isDeviceLoadInFlightRef.current = false;
+          setIsDevicesLoading(false);
+        }
+      });
+  }, [user.id]);
+
+  useEffect(() => {
+    deviceLoadRequestIdRef.current += 1;
+    isDeviceLoadInFlightRef.current = false;
+    loadAssignedDevices();
+    const handleDeviceUpdate = () => {
+      if (deviceRefreshTimerRef.current) {
+        window.clearTimeout(deviceRefreshTimerRef.current);
+      }
+
+      deviceRefreshTimerRef.current = window.setTimeout(() => loadAssignedDevices(false), 350);
     };
 
-    loadAssignedDevices();
-    window.addEventListener('shield:device-updated', loadAssignedDevices);
+    window.addEventListener('shield:device-updated', handleDeviceUpdate);
 
     return () => {
-      isMounted = false;
-      window.removeEventListener('shield:device-updated', loadAssignedDevices);
+      window.removeEventListener('shield:device-updated', handleDeviceUpdate);
+      if (deviceRefreshTimerRef.current) {
+        window.clearTimeout(deviceRefreshTimerRef.current);
+      }
     };
-  }, [user.id]);
+  }, [loadAssignedDevices]);
 
   const openDeviceEdit = (device: DeviceRecord) => {
     setEditingDevice(device);
