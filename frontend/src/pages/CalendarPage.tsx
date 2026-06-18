@@ -22,9 +22,11 @@ type DeletedDailyUndo = {
   wasSelected: boolean;
 };
 
-const dayOffStatus = 'Day Off';
-const dayOffColor = '#64748B';
-const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training', dayOffStatus];
+const vacationStatus = 'Vacation Day';
+const sickStatus = 'Sick Day';
+const vacationColor = '#2563EB';
+const sickColor = '#DC2626';
+const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training', vacationStatus, sickStatus];
 const narrativeCharacterLimit = 1000;
 const dailyInputCharacterLimit = 5;
 const trooperDailyDraftStoragePrefix = 'shield_trooper_daily_draft';
@@ -672,6 +674,13 @@ function isTCodeSectionComplete(details: Record<string, string> | undefined): bo
   return hasNoTCodeSelection(details) || (rows.length > 0 && rows.every((row) => row.code.trim() && row.timeWorked.trim()));
 }
 
+function calculateTCodeHours(details: Record<string, string> | undefined): number {
+  return parseTCodeDetails(details).reduce((total, row) => {
+    const value = Number(row.timeWorked);
+    return Number.isFinite(value) && value > 0 ? total + value : total;
+  }, 0);
+}
+
 function isDetailComplete(details: Record<string, string> | undefined, key: string): boolean {
   return Boolean(details?.[key]?.trim());
 }
@@ -894,6 +903,7 @@ function CalendarPage({
   const [invalidDailyField, setInvalidDailyField] = useState<string | null>(null);
   const [dailyStripTooltip, setDailyStripTooltip] = useState<(OverlayPosition & { dateKey: string; entry: CalendarEntry | null }) | null>(null);
   const [dailyStripContextMenu, setDailyStripContextMenu] = useState<(OverlayPosition & { dateKey: string; entry: CalendarEntry | null }) | null>(null);
+  const [dailyStatusHours, setDailyStatusHours] = useState({ vacation: '8', sick: '8' });
   const [copiedDailyForm, setCopiedDailyForm] = useState<CalendarEntryForm | null>(null);
   const lastAutoDutyHoursRef = useRef('');
   const dailyFormRef = useRef<HTMLFormElement | null>(null);
@@ -1646,10 +1656,19 @@ function CalendarPage({
         delete nextDetails[noTCodeDetailsKey];
       }
 
-      return {
+      const nextForm = {
         ...currentForm,
         details: nextDetails,
       };
+
+      const tCodeHours = calculateTCodeHours(nextDetails);
+      if (tCodeHours > 0 && !isDutyHoursManual && calculateShiftHours(nextDetails) <= 0) {
+        const formattedHours = formatHours(tCodeHours);
+        nextForm.dutyHours = formattedHours;
+        lastAutoDutyHoursRef.current = formattedHours;
+      }
+
+      return nextForm;
     });
   };
 
@@ -1921,7 +1940,14 @@ function CalendarPage({
     lastAutoDutyHoursRef.current = '';
   };
 
-  const markDailyAsDayOff = async (dateKey: string) => {
+  const markDailyLeaveStatus = async (dateKey: string, status: typeof vacationStatus | typeof sickStatus, rawHours: string) => {
+    const sanitizedHours = sanitizeDecimalInput(rawHours);
+    const numericHours = Number(sanitizedHours);
+    if (!sanitizedHours || !Number.isFinite(numericHours) || numericHours < 0 || numericHours > 24) {
+      setCalendarError(`Enter valid ${status.toLowerCase()} hours between 0 and 24.`);
+      return;
+    }
+
     const existingEntry = getCalendarEntryForDate(entries, dateKey);
     const savedExistingEntry = existingEntry && !existingEntry.id.startsWith('local-draft-') ? existingEntry : null;
     const localEntry = selectedDate === dateKey
@@ -1929,22 +1955,26 @@ function CalendarPage({
       : existingEntry
         ? createEntryFormFromEntry(existingEntry)
         : createDefaultEntryForm(dateKey, currentUser);
-    const dayOffForm: CalendarEntryForm = {
+    const leaveHoursKey = status === vacationStatus ? 'vacationHours' : 'injuryIllnessHours';
+    const otherLeaveHoursKey = status === vacationStatus ? 'injuryIllnessHours' : 'vacationHours';
+    const leaveForm: CalendarEntryForm = {
       ...localEntry,
       category: 'Trooper Daily',
       date: dateKey,
-      dutyHours: '0',
+      dutyHours: formatHours(numericHours),
       districtWorked: localEntry.districtWorked || getDefaultDistrict(currentUser),
-      specialStatus: dayOffStatus,
-      color: dayOffColor,
+      specialStatus: status,
+      color: status === vacationStatus ? vacationColor : sickColor,
       submissionStatus: 'Draft',
       details: {
         ...(localEntry.details || {}),
-        regularDaysOff: '1',
+        regularDaysOff: '0',
+        [otherLeaveHoursKey]: '0',
+        [leaveHoursKey]: formatHours(numericHours),
       },
     };
     const payload = {
-      ...dayOffForm,
+      ...leaveForm,
       accountId: currentUser.id,
       ...actor,
     };
@@ -1967,8 +1997,8 @@ function CalendarPage({
       setDailySaveStatusAt(Date.now());
       lastAutoDutyHoursRef.current = '';
     } catch (err) {
-      console.error('Failed to mark daily as day off:', err);
-      setCalendarError(getApiErrorMessage(err, 'Failed to mark day off.'));
+      console.error('Failed to mark daily leave status:', err);
+      setCalendarError(getApiErrorMessage(err, `Failed to mark ${status.toLowerCase()}.`));
     }
   };
 
@@ -1985,19 +2015,28 @@ function CalendarPage({
         setDailyStripContextMenu(null);
       };
 
+      if (isEditableShortcutTarget(event.target)) {
+        if (key === 'escape') {
+          consume();
+        }
+        return;
+      }
+
       if (key === 'enter' || key === 'o') {
         consume();
         openDay(dailyStripContextMenu.dateKey);
         return;
       }
 
-      if (key === 'c' && (dailyStripContextMenu.entry || selectedDate === dailyStripContextMenu.dateKey)) {
+      const isCommandKey = event.ctrlKey || event.metaKey;
+
+      if (isCommandKey && key === 'c' && (dailyStripContextMenu.entry || selectedDate === dailyStripContextMenu.dateKey)) {
         consume();
         copyDailyToClipboard(dailyStripContextMenu.dateKey, dailyStripContextMenu.entry);
         return;
       }
 
-      if (key === 'v' && copiedDailyForm) {
+      if (isCommandKey && key === 'v' && copiedDailyForm) {
         consume();
         pasteCopiedDailyToDate(dailyStripContextMenu.dateKey);
         return;
@@ -2009,9 +2048,15 @@ function CalendarPage({
         return;
       }
 
-      if (key === 'd') {
+      if (key === 'v') {
         consume();
-        void markDailyAsDayOff(dailyStripContextMenu.dateKey);
+        void markDailyLeaveStatus(dailyStripContextMenu.dateKey, vacationStatus, dailyStatusHours.vacation);
+        return;
+      }
+
+      if (key === 's') {
+        consume();
+        void markDailyLeaveStatus(dailyStripContextMenu.dateKey, sickStatus, dailyStatusHours.sick);
         return;
       }
 
@@ -2024,7 +2069,7 @@ function CalendarPage({
     window.addEventListener('keydown', handleContextMenuKeyDown);
 
     return () => window.removeEventListener('keydown', handleContextMenuKeyDown);
-  }, [copiedDailyForm, currentUser, dailyStripContextMenu, editingEntryId, entries, entryForm, selectedDate]);
+  }, [copiedDailyForm, currentUser, dailyStatusHours, dailyStripContextMenu, editingEntryId, entries, entryForm, selectedDate]);
 
   useEffect(() => {
     const handleDailyClipboardShortcut = (event: KeyboardEvent) => {
@@ -2110,9 +2155,11 @@ function CalendarPage({
   const tCodeRows = parseTCodeDetails(entryDetails);
   const hasNoTCodes = hasNoTCodeSelection(entryDetails);
   const isTCodeComplete = isTCodeSectionComplete(entryDetails);
+  const tCodeHours = calculateTCodeHours(entryDetails);
   const calculatedShiftHours = calculateShiftHours(entryDetails);
   const attendanceHours = attendanceHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
-  const dutyActivityHours = dutyActivityHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
+  const standardDutyActivityHours = dutyActivityHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
+  const dutyActivityHours = standardDutyActivityHours + tCodeHours;
   const hasShiftTime = calculatedShiftHours > 0;
   const hasReportedHours = reportedDutyHours > 0;
   const shiftHoursMatch = isHourMatch(reportedDutyHours, calculatedShiftHours);
@@ -2156,10 +2203,25 @@ function CalendarPage({
     { label: 'Reported', value: reportedDutyHours, helper: '', isMatch: false },
     { label: 'Shift', value: calculatedShiftHours, helper: getDifferenceLabel(reportedDutyHours, calculatedShiftHours), isMatch: shiftHoursMatch },
     { label: 'Attendance', value: attendanceHours, helper: getDifferenceLabel(reportedDutyHours, attendanceHours), isMatch: attendanceHoursMatch },
-    { label: 'Duty Activity', value: dutyActivityHours, helper: getDifferenceLabel(reportedDutyHours, dutyActivityHours), isMatch: dutyActivityHoursMatch },
+    { label: 'Duty Activity', value: dutyActivityHours, helper: tCodeHours > 0 ? `Includes ${formatHours(tCodeHours)}h T-Codes` : getDifferenceLabel(reportedDutyHours, dutyActivityHours), isMatch: dutyActivityHoursMatch },
   ];
   const activeHourGuidance = (() => {
-    if (!activeDailySection || !hasReportedHours) {
+    if (!hasReportedHours) {
+      return null;
+    }
+
+    if (activeDailyPanel === 'T-Codes' && tCodeHours > 0) {
+      const difference = Math.abs(dutyActivityHours - reportedDutyHours);
+      return {
+        label: 'Duty activity hours',
+        value: dutyActivityHours,
+        isMatch: dutyActivityHoursMatch,
+        difference,
+        direction: dutyActivityHours > reportedDutyHours ? 'over' : 'under',
+      };
+    }
+
+    if (!activeDailySection) {
       return null;
     }
 
@@ -2215,7 +2277,7 @@ function CalendarPage({
   const openDailyStripContextMenu = (event: React.MouseEvent<HTMLElement>, dateKey: string, entry?: CalendarEntry) => {
     event.preventDefault();
     setDailyStripTooltip(null);
-    const menuPosition = getOverlayPositionForTarget(event.currentTarget, 260, entry ? 236 : 196, 'left');
+    const menuPosition = getOverlayPositionForTarget(event.currentTarget, 300, entry ? 316 : 276, 'left');
     setDailyStripContextMenu({
       ...menuPosition,
       dateKey,
@@ -2622,11 +2684,12 @@ function CalendarPage({
                           {dailyShortcutDays.map(({ day, dateKey, entry }) => {
                             const isSelectedShortcutDay = selectedDate === dateKey;
                             const isTodayShortcutDay = dateKey === todayKey;
-                            const isDayOffShortcutDay = entry?.specialStatus === dayOffStatus;
+                            const isLeaveShortcutDay = entry?.specialStatus === vacationStatus || entry?.specialStatus === sickStatus;
+                            const leaveShortcutColor = entry?.specialStatus === sickStatus ? sickColor : vacationColor;
                             const dailyStripStyle: DailyStripStyle | undefined = entry || isSelectedShortcutDay
                               ? {
-                                  ...(entry ? { backgroundColor: isDayOffShortcutDay ? dayOffColor : entry.color } : {}),
-                                  '--trooper-daily-strip-rgb': getHexColorRgb(isDayOffShortcutDay ? dayOffColor : entry?.color || entryForm.color),
+                                  ...(entry ? { backgroundColor: isLeaveShortcutDay ? leaveShortcutColor : entry.color } : {}),
+                                  '--trooper-daily-strip-rgb': getHexColorRgb(isLeaveShortcutDay ? leaveShortcutColor : entry?.color || entryForm.color),
                                 }
                               : undefined;
                             return (
@@ -2644,12 +2707,12 @@ function CalendarPage({
                                 onContextMenu={(event) => openDailyStripContextMenu(event, dateKey, entry)}
                                 className={`relative flex h-8 min-w-0 items-center justify-center rounded-md border text-xs font-black transition duration-300 hover:-translate-y-0.5 hover:shadow-sm ${
                                   entry
-                                    ? `trooper-daily-strip-filled border-transparent text-white ${isDayOffShortcutDay ? 'trooper-daily-strip-day-off' : ''}`
+                                    ? `trooper-daily-strip-filled border-transparent text-white ${isLeaveShortcutDay ? 'trooper-daily-strip-day-off' : ''}`
                                     : 'border-gray-300 bg-white text-gray-700 hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
                                 } ${isSelectedShortcutDay ? 'trooper-daily-strip-selected border-accent' : ''}`}
                                 style={dailyStripStyle}
-                                aria-label={`${isDayOffShortcutDay ? 'Open day off' : entry ? 'Open' : 'Create'} daily report for ${dateKey}`}
-                              title={`${isDayOffShortcutDay ? 'Day Off' : entry ? 'Open' : 'Create'} ${dateKey}`}
+                                aria-label={`${isLeaveShortcutDay ? `Open ${entry?.specialStatus.toLowerCase()}` : entry ? 'Open' : 'Create'} daily report for ${dateKey}`}
+                              title={`${isLeaveShortcutDay ? entry?.specialStatus : entry ? 'Open' : 'Create'} ${dateKey}`}
                             >
                               {day}
                               {isTodayShortcutDay && (
@@ -3270,17 +3333,52 @@ function CalendarPage({
             <span>Copy Previous Daily</span>
             <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">P</span>
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              void markDailyAsDayOff(dailyStripContextMenu.dateKey);
-              setDailyStripContextMenu(null);
-            }}
-            className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
-          >
-            <span>Mark Day Off</span>
-            <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">D</span>
-          </button>
+          <div className="flex items-center gap-2 rounded px-3 py-2 text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800">
+            <button
+              type="button"
+              onClick={() => {
+                void markDailyLeaveStatus(dailyStripContextMenu.dateKey, vacationStatus, dailyStatusHours.vacation);
+                setDailyStripContextMenu(null);
+              }}
+              className="flex flex-1 items-center gap-2 text-left font-semibold"
+            >
+              <span>Vacation Day</span>
+              <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">V</span>
+            </button>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={dailyStatusHours.vacation}
+              onChange={(event) => setDailyStatusHours((current) => ({ ...current, vacation: sanitizeDecimalInput(event.target.value) }))}
+              onClick={(event) => event.stopPropagation()}
+              className="h-8 w-16 rounded border border-gray-300 bg-white px-2 text-right text-xs font-bold text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+              aria-label="Vacation day hours"
+              title="Vacation Hours"
+            />
+          </div>
+          <div className="flex items-center gap-2 rounded px-3 py-2 text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800">
+            <button
+              type="button"
+              onClick={() => {
+                void markDailyLeaveStatus(dailyStripContextMenu.dateKey, sickStatus, dailyStatusHours.sick);
+                setDailyStripContextMenu(null);
+              }}
+              className="flex flex-1 items-center gap-2 text-left font-semibold"
+            >
+              <span>Sick Day</span>
+              <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">S</span>
+            </button>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={dailyStatusHours.sick}
+              onChange={(event) => setDailyStatusHours((current) => ({ ...current, sick: sanitizeDecimalInput(event.target.value) }))}
+              onClick={(event) => event.stopPropagation()}
+              className="h-8 w-16 rounded border border-gray-300 bg-white px-2 text-right text-xs font-bold text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+              aria-label="Sick day hours"
+              title="Sick Hours"
+            />
+          </div>
           {dailyStripContextMenu.entry && (
             <button
               type="button"

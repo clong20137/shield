@@ -31,6 +31,10 @@ const QUICK_LAUNCH_PICKER_CLOSE_MS = 500;
 const QUICK_LAUNCH_CONTEXT_MENU_WIDTH = 190;
 const QUICK_LAUNCH_CONTEXT_MENU_HEIGHT = 150;
 const QUICK_LAUNCH_CONTEXT_MENU_GUTTER = 12;
+const vacationStatus = 'Vacation Day';
+const sickStatus = 'Sick Day';
+const vacationColor = '#2563EB';
+const sickColor = '#DC2626';
 const MODAL_CLOSE_MS = 220;
 const PASSWORD_REQUIREMENTS_MESSAGE = 'Password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.';
 const APP_BASE_PATH = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
@@ -1454,6 +1458,19 @@ function formatSidebarCalendarDate(value: string): string {
   return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+function formatLeaveHours(value: number): string {
+  return value.toFixed(2).replace(/\.?0+$/u, '');
+}
+
+function sanitizeSidebarDecimalInput(value: string, maxLength = 5): string {
+  const cleanedValue = value.replace(/[^\d.]/gu, '');
+  const [rawInteger = '', ...decimalParts] = cleanedValue.split('.');
+  const integerPart = rawInteger || (cleanedValue.startsWith('.') ? '0' : '');
+  const hasDecimal = cleanedValue.includes('.');
+  const decimalPart = decimalParts.join('').slice(0, 2);
+  return (hasDecimal ? `${integerPart}.${decimalPart}` : integerPart).slice(0, maxLength);
+}
+
 function getSidebarCalendarDays(monthDate: Date) {
   const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const lastDay = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
@@ -1501,7 +1518,7 @@ function SidebarCalendarWidget({
   onPasteDaily,
   onCopyPreviousDaily,
   onAddReminder,
-  onMarkDayOff,
+  onMarkLeaveStatus,
   onDeleteDaily,
 }: {
   compact: boolean;
@@ -1513,13 +1530,14 @@ function SidebarCalendarWidget({
   onPasteDaily: (dateKey: string) => void;
   onCopyPreviousDaily: (dateKey: string) => void;
   onAddReminder: (dateKey: string) => void;
-  onMarkDayOff: (dateKey: string) => void;
+  onMarkLeaveStatus: (dateKey: string, status: typeof vacationStatus | typeof sickStatus, hours: string) => void;
   onDeleteDaily: (dateKey: string) => void;
 }) {
   const todayKey = getLocalDateKey();
   const [visibleMonth, setVisibleMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [hoveredDate, setHoveredDate] = useState<{ x: number; y: number; dateKey: string; entries: CalendarEntry[]; reminders: Reminder[] } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; dateKey: string; entries: CalendarEntry[] } | null>(null);
+  const [leaveHours, setLeaveHours] = useState({ vacation: '8', sick: '8' });
   const calendarDays = useMemo(() => getSidebarCalendarDays(visibleMonth), [visibleMonth]);
   const entriesByDate = useMemo(() => entries.reduce<Record<string, CalendarEntry[]>>((groups, entry) => {
     const dateKey = getEntryDateKey(entry);
@@ -1556,7 +1574,7 @@ function SidebarCalendarWidget({
   const openContextMenu = (event: React.MouseEvent<HTMLElement>, dateKey: string, dayEntries: CalendarEntry[]) => {
     event.preventDefault();
     setHoveredDate(null);
-    const menuPosition = getViewportMenuPosition(event.clientX, event.clientY, 224, dayEntries[0] ? 308 : 268);
+    const menuPosition = getViewportMenuPosition(event.clientX, event.clientY, 256, dayEntries[0] ? 360 : 320);
     setContextMenu({
       x: menuPosition.x,
       y: menuPosition.y,
@@ -1579,19 +1597,28 @@ function SidebarCalendarWidget({
         setContextMenu(null);
       };
 
+      if ((event.target instanceof HTMLElement) && Boolean(event.target.closest('input, textarea, select, [contenteditable="true"]'))) {
+        if (key === 'escape') {
+          consume();
+        }
+        return;
+      }
+
       if (key === 'enter' || key === 'o') {
         consume();
         onOpenCalendar(contextMenu.dateKey);
         return;
       }
 
-      if (key === 'c' && contextMenu.entries[0]) {
+      const isCommandKey = event.ctrlKey || event.metaKey;
+
+      if (isCommandKey && key === 'c' && contextMenu.entries[0]) {
         consume();
         onCopyDaily(contextMenu.dateKey);
         return;
       }
 
-      if (key === 'v' && copiedDaily) {
+      if (isCommandKey && key === 'v' && copiedDaily) {
         consume();
         onPasteDaily(contextMenu.dateKey);
         return;
@@ -1603,9 +1630,15 @@ function SidebarCalendarWidget({
         return;
       }
 
-      if (key === 'd') {
+      if (key === 'v') {
         consume();
-        onMarkDayOff(contextMenu.dateKey);
+        onMarkLeaveStatus(contextMenu.dateKey, vacationStatus, leaveHours.vacation);
+        return;
+      }
+
+      if (key === 's') {
+        consume();
+        onMarkLeaveStatus(contextMenu.dateKey, sickStatus, leaveHours.sick);
         return;
       }
 
@@ -1630,7 +1663,7 @@ function SidebarCalendarWidget({
       window.removeEventListener('scroll', closeContextMenu, true);
       window.removeEventListener('keydown', handleContextMenuKeyDown);
     };
-  }, [contextMenu, copiedDaily, onAddReminder, onCopyDaily, onCopyPreviousDaily, onDeleteDaily, onMarkDayOff, onOpenCalendar, onPasteDaily]);
+  }, [contextMenu, copiedDaily, leaveHours, onAddReminder, onCopyDaily, onCopyPreviousDaily, onDeleteDaily, onMarkLeaveStatus, onOpenCalendar, onPasteDaily]);
 
   if (compact) {
     return (
@@ -1810,17 +1843,52 @@ function SidebarCalendarWidget({
             <span>Copy Previous Daily</span>
             <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">P</span>
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              onMarkDayOff(contextMenu.dateKey);
-              setContextMenu(null);
-            }}
-            className="flex w-full items-center gap-2 rounded px-3 py-2 text-left font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
-          >
-            <span>Mark Day Off</span>
-            <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">D</span>
-          </button>
+          <div className="flex items-center gap-2 rounded px-3 py-2 text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800">
+            <button
+              type="button"
+              onClick={() => {
+                onMarkLeaveStatus(contextMenu.dateKey, vacationStatus, leaveHours.vacation);
+                setContextMenu(null);
+              }}
+              className="flex flex-1 items-center gap-2 text-left font-semibold"
+            >
+              <span>Vacation Day</span>
+              <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">V</span>
+            </button>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={leaveHours.vacation}
+              onChange={(event) => setLeaveHours((current) => ({ ...current, vacation: sanitizeSidebarDecimalInput(event.target.value) }))}
+              onClick={(event) => event.stopPropagation()}
+              className="h-8 w-14 rounded border border-gray-300 bg-white px-2 text-right text-xs font-bold text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+              aria-label="Vacation day hours"
+              title="Vacation Hours"
+            />
+          </div>
+          <div className="flex items-center gap-2 rounded px-3 py-2 text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800">
+            <button
+              type="button"
+              onClick={() => {
+                onMarkLeaveStatus(contextMenu.dateKey, sickStatus, leaveHours.sick);
+                setContextMenu(null);
+              }}
+              className="flex flex-1 items-center gap-2 text-left font-semibold"
+            >
+              <span>Sick Day</span>
+              <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">S</span>
+            </button>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={leaveHours.sick}
+              onChange={(event) => setLeaveHours((current) => ({ ...current, sick: sanitizeSidebarDecimalInput(event.target.value) }))}
+              onClick={(event) => event.stopPropagation()}
+              className="h-8 w-14 rounded border border-gray-300 bg-white px-2 text-right text-xs font-bold text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+              aria-label="Sick day hours"
+              title="Sick Hours"
+            />
+          </div>
           <button
             type="button"
             onClick={() => {
@@ -5081,28 +5149,40 @@ function App() {
     await saveSidebarDailyPayload(dateKey, createSidebarDailyPayload(previousEntry, dateKey), 'Copied previous daily');
   };
 
-  const markSidebarDailyDayOff = async (dateKey: string) => {
+  const markSidebarDailyLeaveStatus = async (dateKey: string, status: typeof vacationStatus | typeof sickStatus, rawHours: string) => {
     if (!currentUser) {
       return;
     }
 
+    const sanitizedHours = sanitizeSidebarDecimalInput(rawHours);
+    const numericHours = Number(sanitizedHours);
+    if (!sanitizedHours || !Number.isFinite(numericHours) || numericHours < 0 || numericHours > 24) {
+      showToast('error', `Enter valid ${status.toLowerCase()} hours between 0 and 24.`, { saveToNotifications: false });
+      return;
+    }
+
     const existingEntry = sidebarCalendarEntries.find((entry) => getEntryDateKey(entry) === dateKey);
-    const dayOffPayload: CalendarEntryPayload = {
+    const leaveHours = formatLeaveHours(numericHours);
+    const leaveHoursKey = status === vacationStatus ? 'vacationHours' : 'injuryIllnessHours';
+    const otherLeaveHoursKey = status === vacationStatus ? 'injuryIllnessHours' : 'vacationHours';
+    const leavePayload: CalendarEntryPayload = {
       category: 'Trooper Daily',
       date: dateKey,
-      dutyHours: '0',
+      dutyHours: leaveHours,
       districtWorked: existingEntry?.districtWorked || currentUser.district || 'Indianapolis',
-      specialStatus: 'Day Off',
-      color: '#64748B',
+      specialStatus: status,
+      color: status === vacationStatus ? vacationColor : sickColor,
       details: {
         ...(existingEntry?.details || {}),
-        regularDaysOff: '1',
+        regularDaysOff: '0',
+        [otherLeaveHoursKey]: '0',
+        [leaveHoursKey]: leaveHours,
       },
       submissionStatus: 'Draft',
       ownerAccountId: existingEntry?.ownerAccountId,
     };
 
-    await saveSidebarDailyPayload(dateKey, dayOffPayload, 'Marked day off');
+    await saveSidebarDailyPayload(dateKey, leavePayload, `Marked ${status.toLowerCase()}`);
   };
 
   const deleteSidebarDaily = async (dateKey: string) => {
@@ -6565,7 +6645,7 @@ function App() {
                     onPasteDaily={(dateKey) => void pasteSidebarDaily(dateKey)}
                     onCopyPreviousDaily={copyPreviousSidebarDaily}
                     onAddReminder={(dateKey) => void addSidebarReminder(dateKey)}
-                    onMarkDayOff={(dateKey) => void markSidebarDailyDayOff(dateKey)}
+                    onMarkLeaveStatus={(dateKey, status, hours) => void markSidebarDailyLeaveStatus(dateKey, status, hours)}
                     onDeleteDaily={(dateKey) => void deleteSidebarDaily(dateKey)}
                   />
                 </div>
