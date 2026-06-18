@@ -14,6 +14,49 @@ import { parsePagination } from '../utils/pagination';
 const dashboardCategories = ['Update', 'News', 'Alert'] as const;
 const dashboardReactions = ['like', 'celebrate', 'important', 'thanks'] as const;
 const commentFlagNotificationCooldownMs = 15 * 60 * 1000;
+const dashboardPostHtmlPattern = /<\/?[a-z][\s\S]*>/iu;
+
+function decodeHtmlEntities(value: string): string {
+  const namedEntities: Record<string, string> = {
+    amp: '&',
+    apos: "'",
+    gt: '>',
+    lt: '<',
+    nbsp: ' ',
+    quot: '"',
+  };
+
+  return value.replace(/&(#x[\da-f]+|#\d+|[a-z]+);/giu, (match, entity: string) => {
+    const normalizedEntity = entity.toLowerCase();
+    if (normalizedEntity.startsWith('#x')) {
+      return String.fromCodePoint(Number.parseInt(normalizedEntity.slice(2), 16));
+    }
+
+    if (normalizedEntity.startsWith('#')) {
+      return String.fromCodePoint(Number.parseInt(normalizedEntity.slice(1), 10));
+    }
+
+    return namedEntities[normalizedEntity] ?? match;
+  });
+}
+
+function getDashboardPostPlainText(value: string): string {
+  if (!dashboardPostHtmlPattern.test(value)) {
+    return value.trim().replace(/\s+/gu, ' ');
+  }
+
+  return decodeHtmlEntities(value)
+    .replace(/<(script|style)\b[\s\S]*?<\/\1>/giu, ' ')
+    .replace(/<(br|\/p|\/div|\/li|\/h[1-6])\b[^>]*>/giu, ' ')
+    .replace(/<[^>]+>/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+}
+
+function getDashboardPostNotificationMessage(body: string): string {
+  const plainText = getDashboardPostPlainText(body);
+  return plainText.length > 140 ? `${plainText.slice(0, 137).trimEnd()}...` : plainText;
+}
 
 function canManageDashboardComments(account: { role?: string; permissions?: string[] } | null): boolean {
   return Boolean(
@@ -74,12 +117,13 @@ export class DashboardPostController {
       });
 
       const accounts = await AuthAccountModel.listAccounts();
+      const notificationMessage = getDashboardPostNotificationMessage(body);
       await Promise.all(accounts.filter((item) => item.id !== account.id).map(async (recipient) => {
         await UserNotificationModel.create({
           userId: recipient.id,
           type: 'dashboard_post',
           title: `${category}: ${title}`,
-          message: body.length > 140 ? `${body.slice(0, 137)}...` : body,
+          message: notificationMessage,
           entityType: 'dashboard_post',
           entityId: post.id,
         });

@@ -278,6 +278,16 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function getPlainNotificationMessage(value: string): string {
+  if (!/<\/?[a-z][\s\S]*>/iu.test(value)) {
+    return value;
+  }
+
+  const container = document.createElement('div');
+  container.innerHTML = value;
+  return (container.textContent || value).trim();
+}
+
 function isNetworkConnectionError(error: unknown): boolean {
   return Boolean(
     typeof error === 'object' &&
@@ -6588,7 +6598,7 @@ function App() {
                                     <span className="truncate font-bold text-gray-800 dark:text-gray-100">{notification.title}</span>
                                     {!notification.isRead && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" aria-label="New notification" />}
                                   </span>
-                                  <span className="mt-1 block line-clamp-2 text-sm text-gray-500 dark:text-gray-400">{notification.message}</span>
+                                  <span className="mt-1 block line-clamp-2 text-sm text-gray-500 dark:text-gray-400">{getPlainNotificationMessage(notification.message)}</span>
                                   <span className="mt-2 block text-xs font-bold uppercase tracking-wide text-accent">
                                     {notification.isRead ? 'Seen' : 'New'} - {new Date(notification.createdAt).toLocaleString()}
                                   </span>
@@ -6615,7 +6625,7 @@ function App() {
                                     <p className="truncate font-bold text-gray-800 dark:text-gray-100">{title}</p>
                                     <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" aria-label="New notification" />
                                   </div>
-                                  <p className="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">{notification.message}</p>
+                                  <p className="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">{getPlainNotificationMessage(notification.message)}</p>
                                   <p className="mt-2 text-xs font-bold uppercase tracking-wide text-accent">Just now</p>
                                 </div>
                               </div>
