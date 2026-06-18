@@ -997,7 +997,7 @@ export const authService = {
     api.post<{ revokedCount: number }>('/auth/sessions/revoke-others'),
 
   changePassword: (accountId: string, currentPassword: string, newPassword: string) =>
-    api.post('/auth/change-password', { accountId, currentPassword, newPassword }),
+    api.post<AuthResponse & { message?: string }>('/auth/change-password', { accountId, currentPassword, newPassword }),
 
   adminResetPassword: (accountId: string) =>
     api.post<{ account: AuthAccount; temporaryPassword: string; message: string }>(`/auth/accounts/${accountId}/reset-password`),

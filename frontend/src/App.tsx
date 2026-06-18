@@ -1073,8 +1073,7 @@ function ForcePasswordChange({
     setError(null);
 
     try {
-      await authService.changePassword(account.id, currentPassword, newPassword);
-      const response = await authService.getSession();
+      const response = await authService.changePassword(account.id, currentPassword, newPassword);
       if (response.data.account) {
         onChanged(response.data.account);
       }
