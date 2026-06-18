@@ -46,6 +46,7 @@ router.post('/2fa/disable', mfaLimiter, requireSelfOrPermission((req) => req.bod
 router.get('/accounts', requireAnyPermission(['roles:manage', 'devices:manage', 'reports:cpar']), AuthController.listAccounts);
 router.put('/accounts/:accountId/role', roleManagementLimiter, requirePermission('roles:manage'), AuthController.updateRole);
 router.put('/accounts/:accountId/message-preferences', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), AuthController.updateMessagePreferences);
+router.put('/accounts/:accountId/presence-preference', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), AuthController.updatePresencePreference);
 router.put('/accounts/:accountId/calendar-preferences', requireSelfOrPermission((req) => req.params.accountId, 'calendar:manage'), AuthController.updateCalendarPreferences);
 router.put('/accounts/:accountId/app-scale-preference', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), AuthController.updateAppScalePreference);
 router.put('/accounts/:accountId/trooper-daily-preferences', requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), AuthController.updateTrooperDailyPreferences);

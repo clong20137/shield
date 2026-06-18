@@ -178,13 +178,13 @@ export class UserMessageModel {
           s.email as senderEmail,
           s.rank as senderRank,
           s.profilePictureUrl as senderProfilePictureUrl,
-          s.lastSeenAt as senderLastSeenAt,
+          CASE WHEN COALESCE(s.presenceHidden, 0) = 1 THEN NULL ELSE s.lastSeenAt END as senderLastSeenAt,
           s.receivesMessages as senderReceivesMessages,
           COALESCE(r.displayName, CONCAT(r.firstName, ' ', r.lastName), r.email) as recipientName,
           r.email as recipientEmail,
           r.rank as recipientRank,
           r.profilePictureUrl as recipientProfilePictureUrl,
-          r.lastSeenAt as recipientLastSeenAt,
+          CASE WHEN COALESCE(r.presenceHidden, 0) = 1 THEN NULL ELSE r.lastSeenAt END as recipientLastSeenAt,
           r.receivesMessages as recipientReceivesMessages
         FROM user_messages m
         LEFT JOIN users s ON s.id = m.senderAccountId
@@ -212,13 +212,13 @@ export class UserMessageModel {
           s.email as senderEmail,
           s.rank as senderRank,
           s.profilePictureUrl as senderProfilePictureUrl,
-          s.lastSeenAt as senderLastSeenAt,
+          CASE WHEN COALESCE(s.presenceHidden, 0) = 1 THEN NULL ELSE s.lastSeenAt END as senderLastSeenAt,
           s.receivesMessages as senderReceivesMessages,
           COALESCE(r.displayName, CONCAT(r.firstName, ' ', r.lastName), r.email) as recipientName,
           r.email as recipientEmail,
           r.rank as recipientRank,
           r.profilePictureUrl as recipientProfilePictureUrl,
-          r.lastSeenAt as recipientLastSeenAt,
+          CASE WHEN COALESCE(r.presenceHidden, 0) = 1 THEN NULL ELSE r.lastSeenAt END as recipientLastSeenAt,
           r.receivesMessages as recipientReceivesMessages
         FROM user_messages m
         LEFT JOIN users s ON s.id = m.senderAccountId
@@ -245,13 +245,13 @@ export class UserMessageModel {
           s.email as senderEmail,
           s.rank as senderRank,
           s.profilePictureUrl as senderProfilePictureUrl,
-          s.lastSeenAt as senderLastSeenAt,
+          CASE WHEN COALESCE(s.presenceHidden, 0) = 1 THEN NULL ELSE s.lastSeenAt END as senderLastSeenAt,
           s.receivesMessages as senderReceivesMessages,
           COALESCE(r.displayName, CONCAT(r.firstName, ' ', r.lastName), r.email) as recipientName,
           r.email as recipientEmail,
           r.rank as recipientRank,
           r.profilePictureUrl as recipientProfilePictureUrl,
-          r.lastSeenAt as recipientLastSeenAt,
+          CASE WHEN COALESCE(r.presenceHidden, 0) = 1 THEN NULL ELSE r.lastSeenAt END as recipientLastSeenAt,
           r.receivesMessages as recipientReceivesMessages
         FROM user_messages m
         LEFT JOIN users s ON s.id = m.senderAccountId

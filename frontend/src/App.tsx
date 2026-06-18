@@ -73,6 +73,7 @@ interface MessagePreferences {
 }
 
 type ReminderAlarmSound = 'classic' | 'soft' | 'urgent' | 'none';
+type MessageSound = MessagePreferences['messageSound'];
 
 type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'calculator' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
 type QuickLaunchExternalSlot = ApiQuickLaunchExternalSlot;
@@ -103,6 +104,56 @@ const reminderAlarmSoundOptions: Array<{ value: ReminderAlarmSound; label: strin
   { value: 'urgent', label: 'Urgent pulse' },
   { value: 'none', label: 'No sound' },
 ];
+
+function playMessageSoundEffect(messageSound: MessageSound) {
+  try {
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    const audioContext = new AudioContextClass();
+    const gain = audioContext.createGain();
+    const tones = {
+      classic: [
+        { type: 'triangle' as OscillatorType, frequency: 659.25, start: 0, duration: 0.14, volume: 0.12 },
+        { type: 'sine' as OscillatorType, frequency: 987.77, start: 0.16, duration: 0.2, volume: 0.1 },
+      ],
+      soft: [
+        { type: 'sine' as OscillatorType, frequency: 523.25, start: 0, duration: 0.18, volume: 0.08 },
+        { type: 'sine' as OscillatorType, frequency: 659.25, start: 0.14, duration: 0.22, volume: 0.07 },
+      ],
+      chime: [
+        { type: 'triangle' as OscillatorType, frequency: 784, start: 0, duration: 0.12, volume: 0.1 },
+        { type: 'triangle' as OscillatorType, frequency: 1046.5, start: 0.11, duration: 0.16, volume: 0.09 },
+        { type: 'sine' as OscillatorType, frequency: 1318.51, start: 0.24, duration: 0.18, volume: 0.07 },
+      ],
+      msn: [
+        { type: 'sine' as OscillatorType, frequency: 880, start: 0, duration: 0.09, volume: 0.1 },
+        { type: 'sine' as OscillatorType, frequency: 1174.66, start: 0.08, duration: 0.11, volume: 0.095 },
+        { type: 'triangle' as OscillatorType, frequency: 1567.98, start: 0.18, duration: 0.12, volume: 0.08 },
+        { type: 'sine' as OscillatorType, frequency: 1174.66, start: 0.32, duration: 0.1, volume: 0.075 },
+      ],
+    }[messageSound || 'classic'];
+
+    gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+    gain.connect(audioContext.destination);
+
+    tones.forEach((tone) => {
+      const oscillator = audioContext.createOscillator();
+      oscillator.type = tone.type;
+      oscillator.frequency.value = tone.frequency;
+      oscillator.connect(gain);
+      gain.gain.setValueAtTime(0.0001, audioContext.currentTime + tone.start);
+      gain.gain.exponentialRampToValueAtTime(tone.volume, audioContext.currentTime + tone.start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + tone.start + tone.duration);
+      oscillator.start(audioContext.currentTime + tone.start);
+      oscillator.stop(audioContext.currentTime + tone.start + tone.duration);
+    });
+
+    window.setTimeout(() => void audioContext.close().catch(() => undefined), 1200);
+  } catch (err) {
+    console.error('Failed to play message sound:', err);
+  }
+}
 
 const quickLaunchApps: QuickLaunchApp[] = [
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -5587,51 +5638,7 @@ function App() {
       return;
     }
 
-    try {
-      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AudioContextClass) return;
-
-      const audioContext = new AudioContextClass();
-      const gain = audioContext.createGain();
-      const tones = {
-        classic: [
-          { type: 'triangle' as OscillatorType, frequency: 659.25, start: 0, duration: 0.14, volume: 0.12 },
-          { type: 'sine' as OscillatorType, frequency: 987.77, start: 0.16, duration: 0.2, volume: 0.1 },
-        ],
-        soft: [
-          { type: 'sine' as OscillatorType, frequency: 523.25, start: 0, duration: 0.18, volume: 0.08 },
-          { type: 'sine' as OscillatorType, frequency: 659.25, start: 0.14, duration: 0.22, volume: 0.07 },
-        ],
-        chime: [
-          { type: 'triangle' as OscillatorType, frequency: 784, start: 0, duration: 0.12, volume: 0.1 },
-          { type: 'triangle' as OscillatorType, frequency: 1046.5, start: 0.11, duration: 0.16, volume: 0.09 },
-          { type: 'sine' as OscillatorType, frequency: 1318.51, start: 0.24, duration: 0.18, volume: 0.07 },
-        ],
-        msn: [
-          { type: 'sine' as OscillatorType, frequency: 880, start: 0, duration: 0.09, volume: 0.1 },
-          { type: 'sine' as OscillatorType, frequency: 1174.66, start: 0.08, duration: 0.11, volume: 0.095 },
-          { type: 'triangle' as OscillatorType, frequency: 1567.98, start: 0.18, duration: 0.12, volume: 0.08 },
-          { type: 'sine' as OscillatorType, frequency: 1174.66, start: 0.32, duration: 0.1, volume: 0.075 },
-        ],
-      }[messagePreferences.messageSound || 'classic'];
-
-      gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
-      gain.connect(audioContext.destination);
-
-      tones.forEach((tone) => {
-        const oscillator = audioContext.createOscillator();
-        oscillator.type = tone.type;
-        oscillator.frequency.value = tone.frequency;
-        oscillator.connect(gain);
-        gain.gain.setValueAtTime(0.0001, audioContext.currentTime + tone.start);
-        gain.gain.exponentialRampToValueAtTime(tone.volume, audioContext.currentTime + tone.start + 0.015);
-        gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + tone.start + tone.duration);
-        oscillator.start(audioContext.currentTime + tone.start);
-        oscillator.stop(audioContext.currentTime + tone.start + tone.duration);
-      });
-    } catch (err) {
-      console.error('Failed to play message ping:', err);
-    }
+    playMessageSoundEffect(messagePreferences.messageSound || 'classic');
   };
 
   useEffect(() => {
@@ -6207,6 +6214,27 @@ function App() {
       console.error(err);
       setMessagePreferences(previousPreferences);
       showToast('error', 'Failed to update message preferences.');
+    }
+  };
+
+  const handlePresenceHiddenChange = async (presenceHidden: boolean) => {
+    if (!currentUser) {
+      return;
+    }
+
+    const previousUser = currentUser;
+    handleAccountUpdate({ ...currentUser, presenceHidden });
+
+    try {
+      const response = await authService.updatePresencePreference(currentUser.id, presenceHidden);
+      if (response.data.account) {
+        handleAccountUpdate(response.data.account);
+      }
+      showToast('success', presenceHidden ? 'Incognito mode enabled.' : 'Incognito mode disabled.');
+    } catch (err) {
+      console.error(err);
+      handleAccountUpdate(previousUser);
+      showToast('error', getErrorMessage(err, 'Failed to update incognito mode.'));
     }
   };
 
@@ -7079,6 +7107,7 @@ function App() {
                           messageSound,
                         }))
                       }
+                      onPreviewMessageSound={(messageSound) => playMessageSoundEffect(messageSound)}
                       onReminderAlarmSoundSelect={(reminderAlarmSound) =>
                         setMessagePreferences((preferences) => ({
                           ...preferences,
@@ -7098,6 +7127,7 @@ function App() {
                         }))
                       }
                       onQuickLaunchSlotCountChange={handleQuickLaunchSlotCountChange}
+                      onPresenceHiddenChange={handlePresenceHiddenChange}
                       onCalendarHiddenChange={handleCalendarHiddenChange}
                       onAppScaleChange={handleAppScaleChange}
                       onReplayGuide={replayGuide}

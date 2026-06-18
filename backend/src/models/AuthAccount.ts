@@ -19,6 +19,7 @@ export interface AuthAccount {
   microsoftUserId: string | null;
   lastSsoLoginAt: Date | null;
   receivesMessages: boolean;
+  presenceHidden: boolean;
   calendarHidden: boolean;
   appScale: 'compact' | 'comfortable' | 'large';
   hasCompletedOnboarding: boolean;
@@ -51,6 +52,7 @@ interface AuthAccountRow extends RowDataPacket {
   microsoftUserId: string | null;
   lastSsoLoginAt: Date | null;
   receivesMessages: boolean | number;
+  presenceHidden: boolean | number;
   calendarHidden: boolean | number;
   appScale: string | null;
   hasCompletedOnboarding: boolean | number;
@@ -228,6 +230,7 @@ function toPublicAccount(account: AuthAccountRow): AuthAccount {
     microsoftUserId: account.microsoftUserId || null,
     lastSsoLoginAt: account.lastSsoLoginAt || null,
     receivesMessages: account.receivesMessages !== false && account.receivesMessages !== 0,
+    presenceHidden: Boolean(account.presenceHidden),
     calendarHidden: Boolean(account.calendarHidden),
     appScale: account.appScale === 'compact' || account.appScale === 'large' ? account.appScale : 'comfortable',
     hasCompletedOnboarding: Boolean(account.hasCompletedOnboarding),
@@ -311,6 +314,7 @@ export class AuthAccountModel {
           microsoftUserId: existingUser.microsoftUserId || null,
           lastSsoLoginAt: existingUser.lastSsoLoginAt || null,
           receivesMessages: existingUser.receivesMessages !== false && existingUser.receivesMessages !== 0,
+          presenceHidden: Boolean(existingUser.presenceHidden),
           calendarHidden: Boolean(existingUser.calendarHidden),
           appScale: existingUser.appScale === 'compact' || existingUser.appScale === 'large' ? existingUser.appScale : 'comfortable',
           hasCompletedOnboarding: Boolean(existingUser.hasCompletedOnboarding),
@@ -344,6 +348,7 @@ export class AuthAccountModel {
         microsoftUserId: null,
         lastSsoLoginAt: null,
         receivesMessages: true,
+        presenceHidden: false,
         calendarHidden: false,
         appScale: 'comfortable',
         hasCompletedOnboarding: false,
@@ -664,7 +669,7 @@ export class AuthAccountModel {
       }
 
       await conn.query<ResultSetHeader>(
-        'UPDATE users SET `ssoProvider` = ?, `microsoftUserId` = ?, `lastSsoLoginAt` = ?, `lastSeenAt` = ?, `updatedAt` = ? WHERE `id` = ?',
+        'UPDATE users SET `ssoProvider` = ?, `microsoftUserId` = ?, `lastSsoLoginAt` = ?, `lastSeenAt` = CASE WHEN COALESCE(`presenceHidden`, 0) = 1 THEN NULL ELSE ? END, `updatedAt` = ? WHERE `id` = ?',
         ['microsoft', profile.id, now, now, now, account.id],
       );
 
@@ -806,7 +811,7 @@ export class AuthAccountModel {
     const conn = await pool.getConnection();
     try {
       await conn.query<ResultSetHeader>(
-        'UPDATE users SET `lastSeenAt` = ? WHERE `id` = ?',
+        'UPDATE users SET `lastSeenAt` = ? WHERE `id` = ? AND COALESCE(`presenceHidden`, 0) = 0',
         [new Date(), accountId],
       );
     } finally {
@@ -860,6 +865,26 @@ export class AuthAccountModel {
       await conn.query<ResultSetHeader>(
         'UPDATE users SET `calendarHidden` = ?, `updatedAt` = ? WHERE `id` = ? AND `passwordHash` IS NOT NULL',
         [calendarHidden ? 1 : 0, new Date(), accountId]
+      );
+
+      const [rows] = await conn.query<AuthAccountRow[]>(
+        'SELECT * FROM users WHERE `id` = ? AND `passwordHash` IS NOT NULL LIMIT 1',
+        [accountId]
+      );
+      const account = rows[0];
+
+      return account ? toPublicAccount(account) : null;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async updatePresencePreference(accountId: string, presenceHidden: boolean): Promise<AuthAccount | null> {
+    const conn = await pool.getConnection();
+    try {
+      await conn.query<ResultSetHeader>(
+        'UPDATE users SET `presenceHidden` = ?, `lastSeenAt` = CASE WHEN ? = 1 THEN NULL ELSE `lastSeenAt` END, `updatedAt` = ? WHERE `id` = ? AND `passwordHash` IS NOT NULL',
+        [presenceHidden ? 1 : 0, presenceHidden ? 1 : 0, new Date(), accountId]
       );
 
       const [rows] = await conn.query<AuthAccountRow[]>(

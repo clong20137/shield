@@ -243,6 +243,7 @@ export interface User {
   emergencyContactPhone: string;
   role: string;
   receivesMessages: boolean;
+  presenceHidden?: boolean;
   calendarHidden?: boolean;
   lastSeenAt?: string | null;
   createdAt: string;
@@ -438,6 +439,7 @@ export interface AuthAccount {
   microsoftUserId?: string | null;
   lastSsoLoginAt?: string | null;
   receivesMessages: boolean;
+  presenceHidden: boolean;
   calendarHidden: boolean;
   appScale: 'compact' | 'comfortable' | 'large';
   hasCompletedOnboarding: boolean;
@@ -1041,6 +1043,9 @@ export const authService = {
 
   updateMessagePreferences: (accountId: string, receiveMessages: boolean) =>
     api.put<AuthResponse>(`/auth/accounts/${accountId}/message-preferences`, { receiveMessages }),
+
+  updatePresencePreference: (accountId: string, presenceHidden: boolean) =>
+    api.put<AuthResponse>(`/auth/accounts/${accountId}/presence-preference`, { presenceHidden }),
 
   updateCalendarPreferences: (accountId: string, calendarHidden: boolean) =>
     api.put<AuthResponse>(`/auth/accounts/${accountId}/calendar-preferences`, { calendarHidden }),

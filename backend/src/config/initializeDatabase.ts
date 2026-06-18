@@ -86,6 +86,7 @@ export async function initializeDatabase() {
       \`microsoftUserId\` VARCHAR(100),
       \`lastSsoLoginAt\` DATETIME,
       \`receivesMessages\` BOOLEAN DEFAULT 1,
+      \`presenceHidden\` BOOLEAN DEFAULT 0,
       \`isHidden\` BOOLEAN DEFAULT 0,
       \`hasCompletedOnboarding\` BOOLEAN DEFAULT 0,
       \`twoFactorSecret\` VARCHAR(64),
@@ -141,6 +142,7 @@ export async function initializeDatabase() {
   await ensureColumn('users', 'microsoftUserId', '`microsoftUserId` VARCHAR(100)');
   await ensureColumn('users', 'lastSsoLoginAt', '`lastSsoLoginAt` DATETIME');
   await ensureColumn('users', 'receivesMessages', '`receivesMessages` BOOLEAN DEFAULT 1');
+  await ensureColumn('users', 'presenceHidden', '`presenceHidden` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'calendarHidden', '`calendarHidden` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'appScale', "`appScale` VARCHAR(20) NOT NULL DEFAULT 'comfortable'");
   await ensureColumn('users', 'isHidden', '`isHidden` BOOLEAN DEFAULT 0');
@@ -260,13 +262,13 @@ export async function initializeDatabase() {
   await pool.query(`
     INSERT IGNORE INTO roles (\`id\`, \`name\`, \`permissions\`)
     VALUES
-      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","media:view","media:upload","media:edit","media:delete","devices:manage","calendar:manage","calendar:view-profiles","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","district-feed:post","bugs:manage","admin:access","admin:general","admin:permissions","admin:achievements","admin:create-user","admin:media","admin:alerts","admin:bugs","admin:audit","admin:errors"]'),
+      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","presence:incognito","media:view","media:upload","media:edit","media:delete","devices:manage","calendar:manage","calendar:view-profiles","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","district-feed:post","bugs:manage","admin:access","admin:general","admin:permissions","admin:achievements","admin:create-user","admin:media","admin:alerts","admin:bugs","admin:audit","admin:errors"]'),
       ('role-user', 'user', '["users:view","calendar:manage","messages:send"]')
   `);
 
   await pool.query(`
     UPDATE roles
-    SET \`permissions\` = '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","media:view","media:upload","media:edit","media:delete","devices:manage","calendar:manage","calendar:view-profiles","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","district-feed:post","bugs:manage","admin:access","admin:general","admin:permissions","admin:achievements","admin:create-user","admin:media","admin:alerts","admin:bugs","admin:audit","admin:errors"]'
+    SET \`permissions\` = '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","presence:incognito","media:view","media:upload","media:edit","media:delete","devices:manage","calendar:manage","calendar:view-profiles","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:send","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","district-feed:post","bugs:manage","admin:access","admin:general","admin:permissions","admin:achievements","admin:create-user","admin:media","admin:alerts","admin:bugs","admin:audit","admin:errors"]'
     WHERE \`name\` = 'administrator'
   `);
 

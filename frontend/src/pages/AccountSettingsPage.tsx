@@ -1,7 +1,7 @@
 import QRCode from 'qrcode';
-import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Camera, Download, ExternalLink, Image, KeyRound, Laptop, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, X } from 'lucide-react';
+import { Camera, Download, ExternalLink, EyeOff, Image, KeyRound, Laptop, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, Volume2, X } from 'lucide-react';
 import { AuthAccount, AuthSession, DeviceRecord, MediaLibraryItem, TwoFactorSetupResponse, authService, deviceService, getAssetUrl, handleAssetImageError, performanceEvaluationService, userService } from '../services/api';
 import { ProfilePictureMediaPicker } from '../components/ProfilePictureMediaPicker';
 import { downloadPerformanceEvaluationPdf } from '../utils/performanceEvaluationPdf';
@@ -20,10 +20,12 @@ interface AccountSettingsPageProps {
   onReceiveMessagesChange: (receiveMessages: boolean) => void;
   onMessageSoundChange: (playMessageSound: boolean) => void;
   onMessageSoundSelect: (messageSound: 'classic' | 'soft' | 'chime' | 'msn') => void;
+  onPreviewMessageSound: (messageSound: 'classic' | 'soft' | 'chime' | 'msn') => void;
   onReminderAlarmSoundSelect: (reminderAlarmSound: 'classic' | 'soft' | 'urgent' | 'none') => void;
   onMilitaryTimeChange: (useMilitaryTime: boolean) => void;
   onQuickLaunchHiddenChange: (hideQuickLaunch: boolean) => void;
   onQuickLaunchSlotCountChange: (slotCount: number) => void;
+  onPresenceHiddenChange: (presenceHidden: boolean) => void;
   onCalendarHiddenChange: (calendarHidden: boolean) => void;
   onAppScaleChange: (appScale: AuthAccount['appScale']) => void;
   onOpenEvaluations?: () => void;
@@ -56,10 +58,12 @@ export function AccountSettingsPage({
   onReceiveMessagesChange,
   onMessageSoundChange,
   onMessageSoundSelect,
+  onPreviewMessageSound,
   onReminderAlarmSoundSelect,
   onMilitaryTimeChange,
   onQuickLaunchHiddenChange,
   onQuickLaunchSlotCountChange,
+  onPresenceHiddenChange,
   onCalendarHiddenChange,
   onAppScaleChange,
   onOpenEvaluations,
@@ -94,6 +98,7 @@ export function AccountSettingsPage({
   const onToastRef = useRef(onToast);
   const getErrorMessageRef = useRef(getErrorMessage);
   const canChangeCalendarPreference = account.role === 'administrator' || Boolean(account.permissions?.includes('calendar:manage'));
+  const canUseIncognitoMode = account.role === 'administrator' || Boolean(account.permissions?.includes('presence:incognito'));
 
   useEffect(() => {
     onToastRef.current = onToast;
@@ -785,153 +790,204 @@ export function AccountSettingsPage({
       )}
 
       {activeTab === 'preferences' && (
-        <section className="space-y-3 rounded-lg border border-gray-200 p-4 dark:border-gray-800">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Preferences</h3>
-          <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
-            <span>
-              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Receive messages</span>
-              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Show message badges and message notifications.</span>
-            </span>
-            <input
-              type="checkbox"
+        <section className="space-y-4">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Preferences</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Tune messaging, workspace layout, privacy, and guide options.</p>
+          </div>
+
+          <PreferenceGroup title="Messaging" description="Control message availability, alerts, and sounds.">
+            <PreferenceToggle
+              title="Receive messages"
+              description="Show message badges and message notifications."
               checked={messagePreferences.receiveMessages}
-              onChange={(event) => onReceiveMessagesChange(event.target.checked)}
+              onChange={onReceiveMessagesChange}
             />
-          </label>
-
-          <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
-            <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Message sound</span>
-            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose the ping used when new unread messages arrive.</span>
-            <select
-              value={messagePreferences.messageSound}
-              disabled={!messagePreferences.receiveMessages || !messagePreferences.playMessageSound}
-              onChange={(event) => onMessageSoundSelect(event.target.value as 'classic' | 'soft' | 'chime' | 'msn')}
-              className="mt-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-            >
-              <option value="classic">Classic two-tone</option>
-              <option value="soft">Soft alert</option>
-              <option value="chime">Bright chime</option>
-              <option value="msn">MSN Messenger</option>
-            </select>
-          </label>
-
-          <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
-            <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Reminder alarm sound</span>
-            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose the alarm used when a reminder is due.</span>
-            <select
-              value={messagePreferences.reminderAlarmSound}
-              onChange={(event) => onReminderAlarmSoundSelect(event.target.value as 'classic' | 'soft' | 'urgent' | 'none')}
-              className="mt-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-            >
-              <option value="classic">Classic alarm</option>
-              <option value="soft">Soft chime</option>
-              <option value="urgent">Urgent pulse</option>
-              <option value="none">No sound</option>
-            </select>
-          </label>
-
-          <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
-            <span>
-              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Message ping sound</span>
-              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Play a short sound when new unread messages arrive.</span>
-            </span>
-            <input
-              type="checkbox"
+            <PreferenceToggle
+              title="Message ping sound"
+              description="Play a short sound when new unread messages arrive."
               checked={messagePreferences.playMessageSound}
               disabled={!messagePreferences.receiveMessages}
-              onChange={(event) => onMessageSoundChange(event.target.checked)}
+              onChange={onMessageSoundChange}
             />
-          </label>
-
-          <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
-            <span>
-              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Military time for Trooper Dailies</span>
-              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Use 24-hour time inputs instead of AM/PM toggles.</span>
-            </span>
-            <input
-              type="checkbox"
-              checked={messagePreferences.useMilitaryTime}
-              onChange={(event) => onMilitaryTimeChange(event.target.checked)}
-            />
-          </label>
-
-          <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
-            <span>
-              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Hide quick launcher</span>
-              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Remove the quick launch dock from your workspace.</span>
-            </span>
-            <input
-              type="checkbox"
-              checked={messagePreferences.hideQuickLaunch}
-              onChange={(event) => onQuickLaunchHiddenChange(event.target.checked)}
-            />
-          </label>
-
-          <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
-            <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Quick launcher slots</span>
-            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose how many quick launch positions are available in your dock.</span>
-            <div className="mt-3 flex items-center gap-3">
-              <input
-                type="range"
-                min={4}
-                max={10}
-                value={messagePreferences.quickLaunchSlotCount}
-                onChange={(event) => onQuickLaunchSlotCountChange(Number(event.target.value))}
-                className="min-w-0 flex-1"
-              />
-              <input
-                type="number"
-                min={4}
-                max={10}
-                value={messagePreferences.quickLaunchSlotCount}
-                onChange={(event) => onQuickLaunchSlotCountChange(Number(event.target.value))}
-                className="w-20 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-                aria-label="Quick launcher slot count"
-              />
-            </div>
-          </label>
-
-          <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
-            <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">App scale</span>
-            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Adjust the overall size of text, controls, and spacing.</span>
-            <select
-              value={account.appScale || 'comfortable'}
-              onChange={(event) => onAppScaleChange(event.target.value as AuthAccount['appScale'])}
-              className="mt-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-            >
-              <option value="compact">Compact</option>
-              <option value="comfortable">Comfortable</option>
-              <option value="large">Large</option>
-            </select>
-          </label>
-
-          {canChangeCalendarPreference && (
-            <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
-              <span>
-                <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Hide profile calendar</span>
-                <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Hide the Calendar tab when others view your user profile.</span>
-              </span>
-              <input
-                type="checkbox"
-                checked={Boolean(account.calendarHidden)}
-                onChange={(event) => onCalendarHiddenChange(event.target.checked)}
-              />
+            <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
+              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Message sound</span>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose and preview the ping used when new unread messages arrive.</span>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <select
+                  value={messagePreferences.messageSound}
+                  disabled={!messagePreferences.receiveMessages || !messagePreferences.playMessageSound}
+                  onChange={(event) => onMessageSoundSelect(event.target.value as 'classic' | 'soft' | 'chime' | 'msn')}
+                  className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                >
+                  <option value="classic">Classic two-tone</option>
+                  <option value="soft">Soft alert</option>
+                  <option value="chime">Bright chime</option>
+                  <option value="msn">MSN Messenger</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => onPreviewMessageSound(messagePreferences.messageSound)}
+                  disabled={!messagePreferences.receiveMessages || !messagePreferences.playMessageSound}
+                  className="btn-secondary justify-center"
+                  aria-label="Preview message sound"
+                  title="Preview Sound"
+                >
+                  <Volume2 size={16} />
+                  <span>Preview</span>
+                </button>
+              </div>
             </label>
+            <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
+              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Reminder alarm sound</span>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose the alarm used when a reminder is due.</span>
+              <select
+                value={messagePreferences.reminderAlarmSound}
+                onChange={(event) => onReminderAlarmSoundSelect(event.target.value as 'classic' | 'soft' | 'urgent' | 'none')}
+                className="mt-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+              >
+                <option value="classic">Classic alarm</option>
+                <option value="soft">Soft chime</option>
+                <option value="urgent">Urgent pulse</option>
+                <option value="none">No sound</option>
+              </select>
+            </label>
+          </PreferenceGroup>
+
+          <PreferenceGroup title="Workspace" description="Adjust daily-entry inputs and quick launcher layout.">
+            <PreferenceToggle
+              title="Military time for Trooper Dailies"
+              description="Use 24-hour time inputs instead of AM/PM toggles."
+              checked={messagePreferences.useMilitaryTime}
+              onChange={onMilitaryTimeChange}
+            />
+            <PreferenceToggle
+              title="Hide quick launcher"
+              description="Remove the quick launch dock from your workspace."
+              checked={messagePreferences.hideQuickLaunch}
+              onChange={onQuickLaunchHiddenChange}
+            />
+            <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
+              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Quick launcher slots</span>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose how many quick launch positions are available in your dock.</span>
+              <div className="mt-3 flex items-center gap-3">
+                <input
+                  type="range"
+                  min={4}
+                  max={10}
+                  value={messagePreferences.quickLaunchSlotCount}
+                  onChange={(event) => onQuickLaunchSlotCountChange(Number(event.target.value))}
+                  className="min-w-0 flex-1"
+                />
+                <input
+                  type="number"
+                  min={4}
+                  max={10}
+                  value={messagePreferences.quickLaunchSlotCount}
+                  onChange={(event) => onQuickLaunchSlotCountChange(Number(event.target.value))}
+                  className="w-20 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                  aria-label="Quick launcher slot count"
+                />
+              </div>
+            </label>
+            <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
+              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">App scale</span>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Adjust the overall size of text, controls, and spacing.</span>
+              <select
+                value={account.appScale || 'comfortable'}
+                onChange={(event) => onAppScaleChange(event.target.value as AuthAccount['appScale'])}
+                className="mt-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+              >
+                <option value="compact">Compact</option>
+                <option value="comfortable">Comfortable</option>
+                <option value="large">Large</option>
+              </select>
+            </label>
+          </PreferenceGroup>
+
+          {(canUseIncognitoMode || canChangeCalendarPreference) && (
+            <PreferenceGroup title="Privacy" description="Control what others can see from your profile and presence.">
+              {canUseIncognitoMode && (
+                <PreferenceToggle
+                  title="Incognito mode"
+                  description="Hide your online indicator and last-online timestamp from other users."
+                  checked={Boolean(account.presenceHidden)}
+                  onChange={onPresenceHiddenChange}
+                  icon={<EyeOff size={16} />}
+                />
+              )}
+              {canChangeCalendarPreference && (
+                <PreferenceToggle
+                  title="Hide profile calendar"
+                  description="Hide the Calendar tab when others view your user profile."
+                  checked={Boolean(account.calendarHidden)}
+                  onChange={onCalendarHiddenChange}
+                />
+              )}
+            </PreferenceGroup>
           )}
 
           {onReplayGuide && (
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
-              <span>
-                <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Guided tour</span>
-                <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Replay the spotlight guide for navigation, alerts, messages, settings, and quick launch.</span>
-              </span>
-              <button type="button" onClick={onReplayGuide} className="btn-primary" aria-label="Replay guided tour" title="Replay Guide">
-                <ShieldCheck size={16} />
-              </button>
-            </div>
+            <PreferenceGroup title="Guide" description="Replay onboarding when you want a refresher.">
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
+                <span>
+                  <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Guided tour</span>
+                  <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Replay the spotlight guide for navigation, alerts, messages, settings, and quick launch.</span>
+                </span>
+                <button type="button" onClick={onReplayGuide} className="btn-primary" aria-label="Replay guided tour" title="Replay Guide">
+                  <ShieldCheck size={16} />
+                </button>
+              </div>
+            </PreferenceGroup>
           )}
         </section>
       )}
     </div>
+  );
+}
+
+function PreferenceGroup({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+  return (
+    <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+      <div className="mb-3">
+        <h4 className="text-sm font-black uppercase tracking-[0.14em] text-accent">{title}</h4>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{description}</p>
+      </div>
+      <div className="space-y-3">{children}</div>
+    </section>
+  );
+}
+
+function PreferenceToggle({
+  title,
+  description,
+  checked,
+  disabled = false,
+  icon,
+  onChange,
+}: {
+  title: string;
+  description: string;
+  checked: boolean;
+  disabled?: boolean;
+  icon?: ReactNode;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
+      <span className="flex min-w-0 items-start gap-3">
+        {icon && <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">{icon}</span>}
+        <span className="min-w-0">
+          <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">{title}</span>
+          <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">{description}</span>
+        </span>
+      </span>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+    </label>
   );
 }

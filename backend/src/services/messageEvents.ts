@@ -13,10 +13,11 @@ interface MessageEventPayload {
   typingName?: string;
   typingIsActive?: boolean;
   actorOnline?: boolean;
-  actorLastSeenAt?: string;
+  actorLastSeenAt?: string | null;
 }
 
 const clients = new Map<string, Set<Response>>();
+const hiddenPresenceAccounts = new Set<string>();
 
 function sendEvent(response: Response, payload: MessageEventPayload) {
   response.write(`event: ${payload.type}\n`);
@@ -36,15 +37,38 @@ export function addMessageEventClient(accountId: string, response: Response) {
   });
   response.write(': connected\n\n');
   clients.forEach((_accountClients, onlineAccountId) => {
-    sendEvent(response, {
-      type: 'presence-updated',
-      actorAccountId: onlineAccountId,
-      actorOnline: true,
-      actorLastSeenAt: new Date().toISOString(),
+    void AuthAccountModel.getAccountById(onlineAccountId).then((account) => {
+      if (!account || account.presenceHidden) {
+        hiddenPresenceAccounts.add(onlineAccountId);
+        return;
+      }
+
+      hiddenPresenceAccounts.delete(onlineAccountId);
+      sendEvent(response, {
+        type: 'presence-updated',
+        actorAccountId: onlineAccountId,
+        actorOnline: true,
+        actorLastSeenAt: new Date().toISOString(),
+      });
+    }).catch((error) => {
+      console.error('Failed to load message presence:', error);
     });
   });
 
-  const announceOnline = () => {
+  const announceOnline = async () => {
+    const account = await AuthAccountModel.getAccountById(accountId);
+    if (!account || account.presenceHidden) {
+      hiddenPresenceAccounts.add(accountId);
+      broadcastMessageEventToAll({
+        type: 'presence-updated',
+        actorAccountId: accountId,
+        actorOnline: false,
+        actorLastSeenAt: null,
+      });
+      return;
+    }
+
+    hiddenPresenceAccounts.delete(accountId);
     const lastSeenAt = new Date().toISOString();
     void AuthAccountModel.updateLastSeen(accountId).catch((error) => {
       console.error('Failed to update message presence:', error);
@@ -57,11 +81,15 @@ export function addMessageEventClient(accountId: string, response: Response) {
     });
   };
 
-  announceOnline();
+  void announceOnline().catch((error) => {
+    console.error('Failed to announce message presence:', error);
+  });
 
   const keepAlive = windowlessInterval(() => {
     response.write(': keep-alive\n\n');
-    announceOnline();
+    void announceOnline().catch((error) => {
+      console.error('Failed to announce message presence:', error);
+    });
   }, 25000);
 
   response.on('close', () => {
@@ -69,6 +97,11 @@ export function addMessageEventClient(accountId: string, response: Response) {
     accountClients.delete(response);
     if (accountClients.size === 0) {
       clients.delete(accountId);
+      if (hiddenPresenceAccounts.has(accountId)) {
+        hiddenPresenceAccounts.delete(accountId);
+        return;
+      }
+
       broadcastMessageEventToAll({
         type: 'presence-updated',
         actorAccountId: accountId,

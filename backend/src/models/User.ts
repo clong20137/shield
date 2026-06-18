@@ -40,6 +40,8 @@ export interface User {
   mustChangePassword?: boolean;
   receivesMessages: boolean;
   calendarHidden?: boolean;
+  presenceHidden?: boolean;
+  lastSeenAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -165,8 +167,11 @@ export class UserModel {
   }
 
   private static toPublicUser(row: User): User {
+    const presenceHidden = Boolean(row.presenceHidden);
     return {
       ...row,
+      presenceHidden,
+      lastSeenAt: presenceHidden ? null : row.lastSeenAt,
       personalPhoneNumber: decryptFieldValue(row.personalPhoneNumber),
       residentialAddress: decryptFieldValue(row.residentialAddress),
       mailingAddress: decryptFieldValue(row.mailingAddress),

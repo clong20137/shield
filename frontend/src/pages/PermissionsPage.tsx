@@ -24,6 +24,7 @@ const permissionGroups = [
       { key: 'users:edit', label: 'Edit users' },
       { key: 'users:view-hidden', label: 'View hidden users' },
       { key: 'users:profile-picture', label: 'Edit profile photos' },
+      { key: 'presence:incognito', label: 'Use incognito mode' },
     ],
   },
   {

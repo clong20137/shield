@@ -11,6 +11,7 @@ import { AuditLogModel } from '../models/AuditLog';
 import { SystemSettingModel } from '../models/SystemSetting';
 import { AUTH_SESSION_COOKIE_NAME, getSessionAccount, getSessionToken } from '../middleware/authSession';
 import { broadcastAppEvent } from '../services/appEvents';
+import { broadcastMessageEventToAll } from '../services/messageEvents';
 import { sendEmail } from '../services/emailService';
 import { cleanMultiline, cleanString, isOneOf, isStrongPassword, isValidEmail, normalizeEmail, strongPasswordMessage } from '../utils/validation';
 
@@ -24,6 +25,7 @@ const allowedPermissions = [
   'users:edit',
   'users:view-hidden',
   'users:profile-picture',
+  'presence:incognito',
   'media:view',
   'media:upload',
   'media:edit',
@@ -41,6 +43,7 @@ const allowedPermissions = [
   'dashboard:create',
   'dashboard:edit',
   'dashboard:delete',
+  'district-feed:post',
   'bugs:manage',
   'admin:access',
   'admin:general',
@@ -1824,6 +1827,47 @@ export class AuthController {
     } catch (error) {
       console.error('Update calendar preferences error:', error);
       res.status(500).json({ error: 'Failed to update calendar preferences' });
+    }
+  }
+
+  static async updatePresencePreference(req: Request, res: Response) {
+    try {
+      const { presenceHidden } = req.body as { presenceHidden?: boolean };
+      const { accountId } = req.params;
+      const sessionAccount = await getSessionAccount(req);
+
+      if (!sessionAccount || sessionAccount.id !== accountId) {
+        return res.status(403).json({ error: 'You can only update your own presence preference' });
+      }
+
+      if (typeof presenceHidden !== 'boolean') {
+        return res.status(400).json({ error: 'Presence preference is required' });
+      }
+
+      if (presenceHidden && sessionAccount.role !== 'administrator') {
+        const permissions = await AuthAccountModel.getPermissionsForAccount(sessionAccount.id);
+        if (!permissions.includes('presence:incognito')) {
+          return res.status(403).json({ error: 'Incognito mode permission required' });
+        }
+      }
+
+      const account = await AuthAccountModel.updatePresencePreference(accountId, presenceHidden);
+
+      if (!account) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+
+      broadcastAppEvent({ type: 'user-updated', entityId: accountId });
+      broadcastMessageEventToAll({
+        type: 'presence-updated',
+        actorAccountId: accountId,
+        actorOnline: !presenceHidden,
+        actorLastSeenAt: presenceHidden ? null : new Date().toISOString(),
+      });
+      res.json({ account: await withPermissions(account) });
+    } catch (error) {
+      console.error('Update presence preference error:', error);
+      res.status(500).json({ error: 'Failed to update presence preference' });
     }
   }
 
