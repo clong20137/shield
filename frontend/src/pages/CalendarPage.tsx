@@ -941,6 +941,7 @@ function CalendarPage({
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [isDutyHoursManual, setIsDutyHoursManual] = useState(false);
   const [isSavingDaily, setIsSavingDaily] = useState(false);
+  const [isSubmitReviewOpen, setIsSubmitReviewOpen] = useState(false);
   const [dailySaveStatus, setDailySaveStatus] = useState<DailySaveStatus>('idle');
   const [dailySaveStatusAt, setDailySaveStatusAt] = useState<number | null>(null);
   const [invalidDailyField, setInvalidDailyField] = useState<string | null>(null);
@@ -1378,6 +1379,7 @@ function CalendarPage({
   };
 
   const showDailyValidationTarget = (target: DailyValidationTarget) => {
+    setIsSubmitReviewOpen(false);
     setActiveDailyPanel(target.panel);
     setInvalidDailyPanel(target.panel);
     setInvalidDailyField(target.field);
@@ -1521,8 +1523,12 @@ function CalendarPage({
     setCalendarFocusDate(today);
   };
 
-  const saveEntry = async (event: React.SyntheticEvent, submissionStatus: CalendarEntry['submissionStatus'] = 'Draft') => {
-    event.preventDefault();
+  const saveEntry = async (
+    event?: Pick<React.SyntheticEvent, 'preventDefault'>,
+    submissionStatus: CalendarEntry['submissionStatus'] = 'Draft',
+    skipSubmitReview = false,
+  ) => {
+    event?.preventDefault();
 
     if (isSavingDaily) {
       return;
@@ -1596,9 +1602,15 @@ function CalendarPage({
       return;
     }
 
+    if (submissionStatus === 'Submitted' && !skipSubmitReview) {
+      setIsSubmitReviewOpen(true);
+      return;
+    }
+
     setInvalidDailyField(null);
     setInvalidDailyPanel(null);
     setCalendarError(null);
+    setIsSubmitReviewOpen(false);
     setIsSavingDaily(true);
     setDailySaveStatus('saving');
     backendAutosaveRequestRef.current += 1;
@@ -2501,6 +2513,12 @@ function CalendarPage({
     return { state: 'empty', label: 'Not started' };
   };
   const activeDailyCompletion = getPanelCompletionState(activeDailyPanel);
+  const submitReviewSections = dailyPanelOptions.map((panel) => ({
+    panel,
+    ...getPanelCompletionState(panel),
+  }));
+  const submitReviewAttentionSections = submitReviewSections.filter((section) => section.state === 'attention' || section.state === 'warning');
+  const submitReviewCompletedSections = submitReviewSections.filter((section) => section.state === 'complete').length;
   const showDailyStripTooltip = (target: HTMLElement, dateKey: string, entry?: CalendarEntry) => {
     const tooltipPosition = getOverlayPositionForTarget(target, 208, 96, 'center');
     setDailyStripTooltip({
@@ -3716,6 +3734,104 @@ function CalendarPage({
               </button>
               <button type="button" onClick={() => deleteEntry(entryPendingDelete)} className="btn-danger" disabled={deletingEntryId === entryPendingDelete.id} aria-label="Delete entry" title={deletingEntryId === entryPendingDelete.id ? 'Deleting' : 'Delete'}>
                 {deletingEntryId === entryPendingDelete.id ? 'Deleting' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isSubmitReviewOpen && (
+        <div className="modal-backdrop fixed inset-0 z-[140] flex items-end justify-center bg-black/45 sm:items-center">
+          <div className="modal-window max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-wide text-accent">Trooper Daily Review</p>
+                <h2 className="mt-1 text-xl font-bold text-gray-900 dark:text-gray-100">Confirm Submission</h2>
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  Review the daily details before sending this report for submission.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSubmitReviewOpen(false)}
+                className="rounded p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                aria-label="Close submit review"
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                <span className="text-xs font-black uppercase text-gray-500 dark:text-gray-400">Date</span>
+                <p className="mt-1 font-bold text-gray-900 dark:text-gray-100">{getReadableDate(entryForm.date)}</p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                <span className="text-xs font-black uppercase text-gray-500 dark:text-gray-400">Status</span>
+                <p className="mt-1 font-bold text-gray-900 dark:text-gray-100">{entryForm.specialStatus || 'None'}</p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                <span className="text-xs font-black uppercase text-gray-500 dark:text-gray-400">District</span>
+                <p className="mt-1 font-bold text-gray-900 dark:text-gray-100">{entryForm.districtWorked}</p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                <span className="text-xs font-black uppercase text-gray-500 dark:text-gray-400">Sections</span>
+                <p className="mt-1 font-bold text-gray-900 dark:text-gray-100">{submitReviewCompletedSections} of {submitReviewSections.length} complete</p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-2 sm:grid-cols-4">
+              {hourMetrics.map((metric) => (
+                <div key={metric.label} className={`rounded-lg border p-3 ${
+                  metric.isMatch
+                    ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950/30 dark:text-green-100'
+                    : 'border-gray-200 bg-white text-gray-800 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100'
+                }`}>
+                  <span className="text-[10px] font-black uppercase opacity-70">{metric.label}</span>
+                  <p className="mt-1 text-lg font-black">{formatHours(metric.value || 0)}h</p>
+                  {metric.helper && <p className="mt-1 text-[11px] font-bold opacity-75">{metric.helper}</p>}
+                </div>
+              ))}
+            </div>
+
+            {leaveStatusHours > 0 && (
+              <div className="mt-4 rounded-lg border border-accent/25 bg-accent/5 p-3 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                {formatHours(leaveStatusHours)}h {entryForm.specialStatus.toLowerCase()} recorded. Worked-hour sections are checked against {formatHours(shiftDutyTargetHours)}h.
+              </div>
+            )}
+
+            {submitReviewAttentionSections.length > 0 ? (
+              <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
+                <p className="text-sm font-black text-amber-800 dark:text-amber-100">Needs attention</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {submitReviewAttentionSections.map((section) => (
+                    <span key={section.panel} className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-200 dark:bg-gray-950 dark:text-amber-100 dark:ring-amber-900">
+                      {section.panel}: {section.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm font-bold text-green-800 dark:border-green-900 dark:bg-green-950/30 dark:text-green-100">
+                No blocking issues found.
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button type="button" onClick={() => setIsSubmitReviewOpen(false)} className="btn-secondary" aria-label="Cancel submission" title="Cancel">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveEntry(undefined, 'Submitted', true)}
+                className="btn-success"
+                disabled={isSavingDaily}
+                aria-label="Confirm daily submission"
+                title={isSavingDaily ? 'Submitting Report' : 'Submit Report'}
+              >
+                <CheckCircle2 size={16} />
+                <span>{isSavingDaily ? 'Submitting' : 'Submit Daily'}</span>
               </button>
             </div>
           </div>
