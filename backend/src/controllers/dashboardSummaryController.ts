@@ -32,12 +32,13 @@ export class DashboardSummaryController {
       }
 
       const includeHiddenProfiles = await canViewHiddenUsers(account);
-      const [calendarEntries, reminders, pinnedProfiles, posts, quickNote] = await Promise.all([
+      const [calendarEntries, reminders, pinnedProfiles, posts, quickNote, districtFeed] = await Promise.all([
         CalendarEntryModel.listEntries(account.id, 1000, 0),
         ReminderModel.list(account.id),
         PinnedProfileModel.list(account.id, includeHiddenProfiles),
         DashboardPostModel.listPosts(8, account.id),
         QuickNoteModel.get(account.id),
+        CalendarEntryModel.listDistrictFeed(account.district || '', 8),
       ]);
 
       res.json({
@@ -46,6 +47,7 @@ export class DashboardSummaryController {
         pinnedProfiles,
         posts,
         quickNote,
+        districtFeed,
         dueReminderNotificationsCreated: dueCount,
       });
     } catch (error) {

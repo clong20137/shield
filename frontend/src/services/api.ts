@@ -259,12 +259,25 @@ export interface QuickNote {
   updatedAt: string;
 }
 
+export interface DashboardDistrictFeedEntry extends CalendarEntry {
+  user: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    peNumber: string;
+    badgeNumber: string;
+    rank: string;
+    district: string;
+  };
+}
+
 export interface DashboardSummary {
   calendarEntries: CalendarEntry[];
   reminders: Reminder[];
   pinnedProfiles: PinnedProfile[];
   posts: DashboardPost[];
   quickNote: QuickNote;
+  districtFeed: DashboardDistrictFeedEntry[];
   dueReminderNotificationsCreated: number;
 }
 
