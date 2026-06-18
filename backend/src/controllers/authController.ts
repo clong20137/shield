@@ -1245,10 +1245,6 @@ export class AuthController {
   static async changePassword(req: Request, res: Response) {
     try {
       const requester = await getSessionAccount(req);
-      if (!requester) {
-        return res.status(401).json({ error: 'Sign in required' });
-      }
-
       const { accountId, currentPassword, newPassword } = req.body as {
         accountId?: string;
         currentPassword?: string;
@@ -1256,17 +1252,26 @@ export class AuthController {
       };
 
       const submittedAccountId = cleanString(accountId, 36);
-      const cleanAccountId = submittedAccountId || requester.id;
+      const cleanAccountId = submittedAccountId || requester?.id || '';
 
       if (!currentPassword || !newPassword) {
         return res.status(400).json({ error: 'Current password and new password are required' });
       }
 
-      if (requester.id !== cleanAccountId && !(await canManageRoles(requester))) {
+      if (!cleanAccountId) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      if (!requester) {
+        const targetAccount = await AuthAccountModel.getAccountById(cleanAccountId);
+        if (!targetAccount?.mustChangePassword) {
+          return res.status(401).json({ error: 'Sign in required' });
+        }
+      } else if (requester.id !== cleanAccountId && !(await canManageRoles(requester))) {
         return res.status(403).json({ error: 'Permission denied' });
       }
 
-      if (requester.mustChangePassword && requester.id !== cleanAccountId) {
+      if (requester?.mustChangePassword && requester.id !== cleanAccountId) {
         return res.status(403).json({ error: 'Password change required before continuing', mustChangePassword: true });
       }
 
@@ -1285,16 +1290,20 @@ export class AuthController {
       }
 
       await AuditLogModel.create({
-        actorId: requester.id,
-        actorName: requester.displayName || requester.email,
+        actorId: requester?.id || cleanAccountId,
+        actorName: requester?.displayName || requester?.email || cleanAccountId,
         action: 'auth.password_changed',
         entityType: 'user',
         entityId: cleanAccountId,
-        details: JSON.stringify({ selfService: requester.id === cleanAccountId }),
+        details: JSON.stringify({ selfService: !requester || requester.id === cleanAccountId }),
         ...requestAuditFields(req),
       });
       const updatedAccount = await AuthAccountModel.getAccountById(cleanAccountId);
       if (updatedAccount) {
+        if (!requester) {
+          const token = await AuthSessionModel.createSession(cleanAccountId);
+          setSessionCookie(req, res, token);
+        }
         broadcastAppEvent({ type: 'user-updated', entityId: cleanAccountId });
       }
       res.json({
