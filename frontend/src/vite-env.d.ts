@@ -34,17 +34,17 @@ interface Window {
   shieldDesktop?: {
     platform: string;
     shell: 'electron';
-    notify: (payload: ShieldDesktopNotificationPayload) => Promise<boolean>;
-    setUnreadCount: (count: number) => Promise<boolean>;
-    flashAttention: () => Promise<boolean>;
-    clearAttention: () => Promise<boolean>;
-    checkForUpdates: () => Promise<{ ok: boolean; message?: string }>;
-    installUpdate: () => Promise<void>;
-    getDesktopPreferences: () => Promise<ShieldDesktopPreferences>;
-    setStartWithWindows: (startWithWindows: boolean) => Promise<ShieldDesktopPreferences>;
-    setTrayMode: (trayMode: boolean) => Promise<ShieldDesktopPreferences>;
-    navigate: (appPath: string) => Promise<boolean>;
-    onNotificationClick: (callback: (payload: { appPath?: string }) => void) => () => void;
-    onUpdateStatus: (callback: (payload: ShieldDesktopUpdateStatus) => void) => () => void;
+    notify?: (payload: ShieldDesktopNotificationPayload) => Promise<boolean>;
+    setUnreadCount?: (count: number) => Promise<boolean>;
+    flashAttention?: () => Promise<boolean>;
+    clearAttention?: () => Promise<boolean>;
+    checkForUpdates?: () => Promise<{ ok: boolean; message?: string }>;
+    installUpdate?: () => Promise<void>;
+    getDesktopPreferences?: () => Promise<ShieldDesktopPreferences>;
+    setStartWithWindows?: (startWithWindows: boolean) => Promise<ShieldDesktopPreferences>;
+    setTrayMode?: (trayMode: boolean) => Promise<ShieldDesktopPreferences>;
+    navigate?: (appPath: string) => Promise<boolean>;
+    onNotificationClick?: (callback: (payload: { appPath?: string }) => void) => () => void;
+    onUpdateStatus?: (callback: (payload: ShieldDesktopUpdateStatus) => void) => () => void;
   };
 }

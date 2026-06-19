@@ -126,12 +126,16 @@ function isShieldDesktopApp(): boolean {
   return typeof window !== 'undefined' && window.shieldDesktop?.shell === 'electron';
 }
 
+function hasShieldDesktopFeature<K extends keyof NonNullable<Window['shieldDesktop']>>(feature: K): boolean {
+  return isShieldDesktopApp() && typeof window.shieldDesktop?.[feature] === 'function';
+}
+
 function showDesktopNotification(title: string, options?: { body?: string; tag?: string; appPath?: string; silent?: boolean }): boolean {
-  if (!isShieldDesktopApp()) {
+  if (!hasShieldDesktopFeature('notify')) {
     return false;
   }
 
-  window.shieldDesktop?.notify({
+  window.shieldDesktop?.notify?.({
     title,
     body: options?.body,
     appPath: options?.appPath,
@@ -5141,22 +5145,22 @@ function App() {
   };
 
   useEffect(() => {
-    if (!isShieldDesktopApp()) {
+    if (!hasShieldDesktopFeature('getDesktopPreferences')) {
       setDesktopPreferences(null);
       return;
     }
 
-    window.shieldDesktop?.getDesktopPreferences()
+    window.shieldDesktop?.getDesktopPreferences?.()
       .then(setDesktopPreferences)
       .catch((error) => console.error('Failed to load desktop preferences:', error));
   }, []);
 
   useEffect(() => {
-    if (!isShieldDesktopApp()) {
+    if (!hasShieldDesktopFeature('onUpdateStatus')) {
       return;
     }
 
-    return window.shieldDesktop?.onUpdateStatus((status) => {
+    return window.shieldDesktop?.onUpdateStatus?.((status) => {
       if (status.type === 'available') {
         setDesktopPreferences((preferences) => preferences ? { ...preferences, updateDownloaded: false } : preferences);
         showToast('info', status.version ? `Shield desktop update ${status.version} is downloading.` : 'A Shield desktop update is downloading.', { saveToNotifications: false });
@@ -5174,12 +5178,12 @@ function App() {
   }, []);
 
   const handleStartWithWindowsChange = async (startWithWindows: boolean) => {
-    if (!isShieldDesktopApp()) {
+    if (!hasShieldDesktopFeature('setStartWithWindows')) {
       return;
     }
 
     try {
-      const preferences = await window.shieldDesktop?.setStartWithWindows(startWithWindows);
+      const preferences = await window.shieldDesktop?.setStartWithWindows?.(startWithWindows);
       if (preferences) {
         setDesktopPreferences(preferences);
       }
@@ -5191,12 +5195,12 @@ function App() {
   };
 
   const handleTrayModeChange = async (trayMode: boolean) => {
-    if (!isShieldDesktopApp()) {
+    if (!hasShieldDesktopFeature('setTrayMode')) {
       return;
     }
 
     try {
-      const preferences = await window.shieldDesktop?.setTrayMode(trayMode);
+      const preferences = await window.shieldDesktop?.setTrayMode?.(trayMode);
       if (preferences) {
         setDesktopPreferences(preferences);
       }
@@ -5208,12 +5212,12 @@ function App() {
   };
 
   const handleInstallDesktopUpdate = async () => {
-    if (!isShieldDesktopApp()) {
+    if (!hasShieldDesktopFeature('installUpdate')) {
       return;
     }
 
     try {
-      await window.shieldDesktop?.installUpdate();
+      await window.shieldDesktop?.installUpdate?.();
     } catch (error) {
       console.error('Failed to restart and install update:', error);
       showToast('error', 'Failed to restart and install the desktop update.', { saveToNotifications: false });
@@ -5851,8 +5855,8 @@ function App() {
               tag: 'shield-new-message',
               appPath: '/messages',
             });
-            if (isShieldDesktopApp()) {
-              window.shieldDesktop?.flashAttention().catch((error) => console.error('Failed to flash desktop window:', error));
+            if (hasShieldDesktopFeature('flashAttention')) {
+              window.shieldDesktop?.flashAttention?.().catch((error) => console.error('Failed to flash desktop window:', error));
             }
           }
         }
@@ -5885,27 +5889,27 @@ function App() {
   }, [currentUser, getCustomNotificationSoundUrl, messagePreferences.receiveMessages, messagePreferences.playMessageSound, messagePreferences.messageSound, messagePreferences.browserNotifications]);
 
   useEffect(() => {
-    if (!isShieldDesktopApp()) {
+    if (!hasShieldDesktopFeature('setUnreadCount')) {
       return;
     }
 
-    window.shieldDesktop?.setUnreadCount(messageUnreadCount).catch((error) => {
+    window.shieldDesktop?.setUnreadCount?.(messageUnreadCount).catch((error) => {
       console.error('Failed to update desktop unread badge:', error);
     });
 
-    if (messageUnreadCount === 0) {
-      window.shieldDesktop?.clearAttention().catch((error) => {
+    if (messageUnreadCount === 0 && hasShieldDesktopFeature('clearAttention')) {
+      window.shieldDesktop?.clearAttention?.().catch((error) => {
         console.error('Failed to clear desktop attention state:', error);
       });
     }
   }, [messageUnreadCount]);
 
   useEffect(() => {
-    if (!isShieldDesktopApp()) {
+    if (!hasShieldDesktopFeature('onNotificationClick')) {
       return;
     }
 
-    return window.shieldDesktop?.onNotificationClick((payload) => {
+    return window.shieldDesktop?.onNotificationClick?.((payload) => {
       if (payload.appPath) {
         window.location.assign(withAppBase(payload.appPath));
       }
