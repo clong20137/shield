@@ -1319,7 +1319,7 @@ function ShieldLoading({
     <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
       <div className="text-center">
         <div className="shield-app-icon-loader mx-auto mb-4">
-          <img src={withAppBase('/shield-splash-icon.svg')} alt="SHIELD" />
+          <img src={withAppBase('/shield-splash-logo.png')} alt="SHIELD" />
         </div>
         <p className="text-sm font-bold uppercase tracking-[0.24em] text-accent">{title}</p>
         <div className="shield-loading-bar mx-auto mt-4" aria-hidden="true">
