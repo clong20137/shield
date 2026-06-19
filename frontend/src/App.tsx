@@ -4895,6 +4895,7 @@ function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [notifications, setNotifications] = useState<ToastMessage[]>([]);
   const [desktopPreferences, setDesktopPreferences] = useState<ShieldDesktopPreferences | null>(null);
+  const [desktopUpdateStatus, setDesktopUpdateStatus] = useState<ShieldDesktopUpdateStatus | null>(null);
   const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState<number>(() => {
     try {
       const raw = window.localStorage.getItem(SESSION_TIMEOUT_KEY);
@@ -5161,6 +5162,8 @@ function App() {
     }
 
     return window.shieldDesktop?.onUpdateStatus?.((status) => {
+      setDesktopUpdateStatus(status);
+
       if (status.type === 'available') {
         setDesktopPreferences((preferences) => preferences ? { ...preferences, updateDownloaded: false } : preferences);
         showToast('info', status.version ? `Shield desktop update ${status.version} is downloading.` : 'A Shield desktop update is downloading.', { saveToNotifications: false });
@@ -5168,11 +5171,20 @@ function App() {
 
       if (status.type === 'downloaded') {
         setDesktopPreferences((preferences) => preferences ? { ...preferences, updateDownloaded: true } : preferences);
-        showToast('success', 'Shield desktop update downloaded. Restart the app to install it.', { saveToNotifications: false });
+        showToast('success', 'Shield desktop update downloaded. Shield will restart automatically.', { saveToNotifications: false });
+      }
+
+      if (status.type === 'restarting') {
+        showToast('info', 'Restarting Shield to install the desktop update...', { saveToNotifications: false });
+      }
+
+      if (status.type === 'not-available') {
+        showToast('success', 'Shield desktop is up to date.', { saveToNotifications: false });
       }
 
       if (status.type === 'error') {
         console.error('Desktop update error:', status.message);
+        showToast('error', 'Failed to check for Shield desktop updates.', { saveToNotifications: false });
       }
     });
   }, []);
@@ -7412,6 +7424,7 @@ function App() {
                       messagePreferences={messagePreferences}
                       isDesktopApp={isShieldDesktopApp()}
                       desktopPreferences={desktopPreferences}
+                      desktopUpdateStatus={desktopUpdateStatus}
                       notificationSounds={notificationSounds}
                       onReceiveMessagesChange={handleReceiveMessagesChange}
                       onBrowserNotificationsChange={handleBrowserNotificationsChange}

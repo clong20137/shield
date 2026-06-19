@@ -14,6 +14,7 @@ let desktopConfig = null;
 let tray = null;
 let isQuitting = false;
 let isUpdateDownloaded = false;
+let pendingUpdateRestartTimer = null;
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -312,7 +313,7 @@ function rebuildTrayMenu() {
     {
       label: 'Restart to update',
       enabled: isUpdateDownloaded,
-      click: () => autoUpdater.quitAndInstall(false, true)
+      click: installDownloadedUpdate
     },
     { type: 'separator' },
     {
@@ -423,6 +424,17 @@ function sendUpdaterStatus(type, payload = {}) {
   }
 }
 
+function installDownloadedUpdate() {
+  if (pendingUpdateRestartTimer) {
+    clearTimeout(pendingUpdateRestartTimer);
+    pendingUpdateRestartTimer = null;
+  }
+
+  sendUpdaterStatus('restarting');
+  isQuitting = true;
+  autoUpdater.quitAndInstall(false, true);
+}
+
 function configureAutoUpdates(config) {
   if (!config.updateUrl) {
     return;
@@ -444,9 +456,10 @@ function configureAutoUpdates(config) {
     rebuildTrayMenu();
     sendUpdaterStatus('downloaded', { version: info.version });
     showDesktopNotification({
-      title: 'Shield update ready',
-      body: 'Restart Shield to finish installing the desktop update.'
+      title: 'Shield update downloaded',
+      body: 'Shield will restart automatically to finish installing the desktop update.'
     });
+    pendingUpdateRestartTimer = setTimeout(installDownloadedUpdate, 5000);
   });
   autoUpdater.on('error', (error) => sendUpdaterStatus('error', { message: error.message }));
 
@@ -603,7 +616,7 @@ ipcMain.handle('shield:check-for-updates', async () => {
   return { ok: true };
 });
 ipcMain.handle('shield:install-update', () => {
-  autoUpdater.quitAndInstall(false, true);
+  installDownloadedUpdate();
 });
 ipcMain.handle('shield:get-clipboard-files', () => readClipboardPayload());
 ipcMain.handle('shield:get-desktop-preferences', () => ({

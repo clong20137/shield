@@ -17,7 +17,7 @@ interface ShieldDesktopNotificationPayload {
 }
 
 interface ShieldDesktopUpdateStatus {
-  type: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+  type: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'restarting' | 'error';
   version?: string;
   percent?: number;
   message?: string;

@@ -23,6 +23,7 @@ interface AccountSettingsPageProps {
   };
   isDesktopApp: boolean;
   desktopPreferences: ShieldDesktopPreferences | null;
+  desktopUpdateStatus: ShieldDesktopUpdateStatus | null;
   notificationSounds: NotificationSound[];
   onReceiveMessagesChange: (receiveMessages: boolean) => void;
   onBrowserNotificationsChange: (browserNotifications: boolean) => void;
@@ -70,6 +71,7 @@ export function AccountSettingsPage({
   messagePreferences,
   isDesktopApp,
   desktopPreferences,
+  desktopUpdateStatus,
   notificationSounds,
   onReceiveMessagesChange,
   onBrowserNotificationsChange,
@@ -423,6 +425,47 @@ export function AccountSettingsPage({
   const reminderAlarmSoundSelection = notificationSounds.some((sound) => `custom:${sound.id}` === messagePreferences.reminderAlarmSound)
     ? messagePreferences.reminderAlarmSound
     : '';
+  const desktopUpdateProgress = desktopUpdateStatus?.type === 'downloaded' || desktopUpdateStatus?.type === 'restarting'
+    ? 100
+    : desktopUpdateStatus?.type === 'downloading'
+      ? Math.min(100, Math.max(0, Math.round(desktopUpdateStatus.percent || 0)))
+      : 0;
+  const showDesktopUpdateProgress = Boolean(desktopUpdateStatus && ['available', 'downloading', 'downloaded', 'restarting'].includes(desktopUpdateStatus.type));
+  const desktopUpdateMessage = (() => {
+    if (desktopUpdateStatus?.type === 'checking') {
+      return 'Checking for desktop updates...';
+    }
+
+    if (desktopUpdateStatus?.type === 'available') {
+      return desktopUpdateStatus.version
+        ? `Desktop update ${desktopUpdateStatus.version} found. Download is starting...`
+        : 'Desktop update found. Download is starting...';
+    }
+
+    if (desktopUpdateStatus?.type === 'downloading') {
+      return 'Downloading desktop update...';
+    }
+
+    if (desktopUpdateStatus?.type === 'downloaded' || desktopUpdateStatus?.type === 'restarting') {
+      return 'Update downloaded. Shield will restart automatically.';
+    }
+
+    if (desktopUpdateStatus?.type === 'not-available') {
+      return 'Shield desktop is up to date.';
+    }
+
+    if (desktopUpdateStatus?.type === 'error') {
+      return 'Desktop update check failed. Verify the update files are reachable.';
+    }
+
+    if (desktopPreferences?.updateDownloaded) {
+      return 'A desktop update is ready to install.';
+    }
+
+    return desktopPreferences?.updateConfigured
+      ? 'Shield checks for desktop updates automatically.'
+      : 'Check for updates from this app. Newer desktop controls appear after the latest desktop update is installed.';
+  })();
 
   return (
     <div className="space-y-3 pb-1">
@@ -978,15 +1021,23 @@ export function AccountSettingsPage({
                   </>
                 )}
                 <div className="flex flex-col gap-3 rounded border border-gray-200 p-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="min-w-0">
+                  <span className="min-w-0 flex-1">
                     <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Desktop updates</span>
-                    <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-                      {desktopPreferences?.updateDownloaded
-                        ? 'A desktop update is ready to install.'
-                        : desktopPreferences?.updateConfigured
-                          ? 'Shield checks for desktop updates automatically.'
-                          : 'Check for updates from this app. Newer desktop controls appear after the latest desktop update is installed.'}
-                    </span>
+                    <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">{desktopUpdateMessage}</span>
+                    {showDesktopUpdateProgress && (
+                      <span className="mt-3 block">
+                        <span className="mb-1 flex items-center justify-between text-[11px] font-black uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+                          <span>{desktopUpdateStatus?.type === 'restarting' ? 'Restarting' : 'Download'}</span>
+                          <span>{desktopUpdateProgress}%</span>
+                        </span>
+                        <span className="block h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+                          <span
+                            className="block h-full rounded-full bg-accent transition-all duration-300"
+                            style={{ width: `${desktopUpdateProgress}%` }}
+                          />
+                        </span>
+                      </span>
+                    )}
                   </span>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <button
