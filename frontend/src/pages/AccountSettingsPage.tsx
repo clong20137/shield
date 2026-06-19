@@ -11,6 +11,7 @@ interface AccountSettingsPageProps {
   messagePreferences: {
     receiveMessages: boolean;
     playMessageSound: boolean;
+    browserNotifications: boolean;
     messageSound: string;
     reminderAlarmSound: string;
     useMilitaryTime: boolean;
@@ -19,6 +20,7 @@ interface AccountSettingsPageProps {
   };
   notificationSounds: NotificationSound[];
   onReceiveMessagesChange: (receiveMessages: boolean) => void;
+  onBrowserNotificationsChange: (browserNotifications: boolean) => void;
   onMessageSoundChange: (playMessageSound: boolean) => void;
   onMessageSoundSelect: (messageSound: string) => void;
   onPreviewMessageSound: (messageSound: string) => void;
@@ -59,6 +61,7 @@ export function AccountSettingsPage({
   messagePreferences,
   notificationSounds,
   onReceiveMessagesChange,
+  onBrowserNotificationsChange,
   onMessageSoundChange,
   onMessageSoundSelect,
   onPreviewMessageSound,
@@ -818,6 +821,12 @@ export function AccountSettingsPage({
               description="Show message badges and message notifications."
               checked={messagePreferences.receiveMessages}
               onChange={onReceiveMessagesChange}
+            />
+            <PreferenceToggle
+              title="Browser notifications"
+              description="Show Windows/browser notifications for new messages and due reminders while Shield is open."
+              checked={messagePreferences.browserNotifications}
+              onChange={onBrowserNotificationsChange}
             />
             <PreferenceToggle
               title="Message ping sound"

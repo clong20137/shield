@@ -65,6 +65,7 @@ type AppScale = AuthAccount['appScale'];
 interface MessagePreferences {
   receiveMessages: boolean;
   playMessageSound: boolean;
+  browserNotifications: boolean;
   messageSound: MessageSound;
   reminderAlarmSound: ReminderAlarmSound;
   useMilitaryTime: boolean;
@@ -91,6 +92,7 @@ interface QuickLaunchApp {
 const defaultMessagePreferences: MessagePreferences = {
   receiveMessages: true,
   playMessageSound: true,
+  browserNotifications: false,
   messageSound: '',
   reminderAlarmSound: '',
   useMilitaryTime: false,
@@ -113,6 +115,27 @@ function playCustomSoundEffect(soundUrl: string | undefined) {
     void audio.play();
   } catch (err) {
     console.error('Failed to play custom sound:', err);
+  }
+}
+
+function canUseBrowserNotifications(): boolean {
+  return typeof window !== 'undefined' && 'Notification' in window;
+}
+
+function showBrowserNotification(title: string, options?: NotificationOptions) {
+  if (!canUseBrowserNotifications() || Notification.permission !== 'granted') {
+    return;
+  }
+
+  try {
+    const notification = new Notification(title, {
+      badge: withAppBase('/favicon.ico'),
+      icon: withAppBase('/favicon.ico'),
+      ...options,
+    });
+    window.setTimeout(() => notification.close(), 9000);
+  } catch (error) {
+    console.error('Failed to show browser notification:', error);
   }
 }
 
@@ -5250,9 +5273,15 @@ function App() {
       return [...currentReminders, ...dueReminders.filter((reminder) => !currentIds.has(reminder.id))];
     });
     playReminderAlarmSound();
+    if (messagePreferences.browserNotifications) {
+      showBrowserNotification(dueReminders.length === 1 ? `Reminder: ${dueReminders[0].title}` : `${dueReminders.length} reminders due`, {
+        body: dueReminders.length === 1 ? formatReminderDueAt(dueReminders[0]) : 'Open Shield to review your due reminders.',
+        tag: dueReminders.length === 1 ? `shield-reminder-${dueReminders[0].id}` : 'shield-reminders-due',
+      });
+    }
     showToast('info', dueReminders.length === 1 ? `Reminder due: ${dueReminders[0].title}` : `${dueReminders.length} reminders due`, { saveToNotifications: false });
     window.dispatchEvent(new Event('shield:notification-updated'));
-  }, [clearScheduledReminder, playReminderAlarmSound]);
+  }, [clearScheduledReminder, messagePreferences.browserNotifications, playReminderAlarmSound]);
 
   const scheduleReminder = useCallback((reminder: Reminder) => {
     clearScheduledReminder(reminder.id);
@@ -5699,6 +5728,13 @@ function App() {
         const nextUnreadCount = response.data.filter((message) => !message.isRead).length;
         if (previousMessageUnreadCount.current !== null && nextUnreadCount > previousMessageUnreadCount.current) {
           playMessagePing();
+          if (messagePreferences.browserNotifications) {
+            const newestUnread = response.data.find((message) => !message.isRead);
+            showBrowserNotification(newestUnread?.senderName ? `New message from ${newestUnread.senderName}` : 'New message', {
+              body: newestUnread?.body ? getPlainNotificationMessage(newestUnread.body).slice(0, 140) : 'Open Shield to view your message.',
+              tag: 'shield-new-message',
+            });
+          }
         }
         previousMessageUnreadCount.current = nextUnreadCount;
         setMessageUnreadCount(nextUnreadCount);
@@ -5726,7 +5762,7 @@ function App() {
       window.removeEventListener('shield:messages-updated', loadUnreadCount);
       eventSource?.close();
     };
-  }, [currentUser, getCustomNotificationSoundUrl, messagePreferences.receiveMessages, messagePreferences.playMessageSound, messagePreferences.messageSound]);
+  }, [currentUser, getCustomNotificationSoundUrl, messagePreferences.receiveMessages, messagePreferences.playMessageSound, messagePreferences.messageSound, messagePreferences.browserNotifications]);
 
   useEffect(() => {
     authService.getSession()
@@ -6260,6 +6296,39 @@ function App() {
       setMessagePreferences(previousPreferences);
       showToast('error', 'Failed to update message preferences.');
     }
+  };
+
+  const handleBrowserNotificationsChange = async (browserNotifications: boolean) => {
+    if (!browserNotifications) {
+      setMessagePreferences((preferences) => ({ ...preferences, browserNotifications: false }));
+      return;
+    }
+
+    if (!canUseBrowserNotifications()) {
+      showToast('error', 'Browser notifications are not supported in this browser.', { saveToNotifications: false });
+      return;
+    }
+
+    if (Notification.permission === 'denied') {
+      showToast('error', 'Browser notifications are blocked. Enable them in your browser site settings first.', { saveToNotifications: false });
+      return;
+    }
+
+    const permission = Notification.permission === 'granted'
+      ? 'granted'
+      : await Notification.requestPermission();
+
+    if (permission !== 'granted') {
+      setMessagePreferences((preferences) => ({ ...preferences, browserNotifications: false }));
+      showToast('info', 'Browser notifications were not enabled.', { saveToNotifications: false });
+      return;
+    }
+
+    setMessagePreferences((preferences) => ({ ...preferences, browserNotifications: true }));
+    showBrowserNotification('Shield notifications enabled', {
+      body: 'You will receive browser notifications for new messages and due reminders while Shield is open.',
+      tag: 'shield-browser-notifications-enabled',
+    });
   };
 
   const handlePresenceHiddenChange = async (presenceHidden: boolean) => {
@@ -7161,6 +7230,7 @@ function App() {
                       messagePreferences={messagePreferences}
                       notificationSounds={notificationSounds}
                       onReceiveMessagesChange={handleReceiveMessagesChange}
+                      onBrowserNotificationsChange={handleBrowserNotificationsChange}
                       onMessageSoundChange={(playMessageSound) =>
                         setMessagePreferences((preferences) => ({
                           ...preferences,
