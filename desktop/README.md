@@ -34,7 +34,13 @@ npm run dist
 
 The installer will be created in `desktop/release/`.
 
-To make it downloadable, copy `desktop/release/BlueLine-Command-Setup-1.0.0.exe` to a protected downloads folder on the agency web server, for example `/downloads/BlueLine-Command-Setup.exe`.
+To make it downloadable from Account Settings, copy `desktop/release/BlueLine-Command-Setup-1.0.0.exe` to the app downloads folder and name it `BlueLine-Command-Setup.exe`.
+
+For the IIS path discussed for Shield, that would be:
+
+```text
+C:\inetpub\wwwroot\shield\downloads\BlueLine-Command-Setup.exe
+```
 
 ## Portable Build
 

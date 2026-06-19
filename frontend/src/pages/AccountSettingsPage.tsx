@@ -6,6 +6,9 @@ import { AuthAccount, AuthSession, DeviceRecord, MediaLibraryItem, NotificationS
 import { ProfilePictureMediaPicker } from '../components/ProfilePictureMediaPicker';
 import { downloadPerformanceEvaluationPdf } from '../utils/performanceEvaluationPdf';
 
+const appBasePath = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
+const desktopInstallerUrl = `${appBasePath}/downloads/BlueLine-Command-Setup.exe`;
+
 interface AccountSettingsPageProps {
   account: AuthAccount;
   messagePreferences: {
@@ -901,6 +904,34 @@ export function AccountSettingsPage({
                 </button>
               </div>
             </label>
+          </PreferenceGroup>
+
+          <PreferenceGroup title="Desktop App" description="Install the desktop version of BlueLine Command on this workstation.">
+            <div className="rounded border border-gray-200 p-4 dark:border-gray-800">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-primary-500/10 text-primary-500 dark:bg-blue-500/10 dark:text-blue-100">
+                    <Laptop size={20} />
+                  </span>
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">BlueLine Command for Windows</h4>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Download the Windows desktop installer for faster access from this device.
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href={desktopInstallerUrl}
+                  download
+                  className="btn-secondary justify-center"
+                  aria-label="Download BlueLine Command desktop app"
+                  title="Download Desktop App"
+                >
+                  <Download size={16} />
+                  <span>Download App</span>
+                </a>
+              </div>
+            </div>
           </PreferenceGroup>
 
           <PreferenceGroup title="Workspace" description="Adjust daily-entry inputs and quick launcher layout.">
