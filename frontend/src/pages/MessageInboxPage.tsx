@@ -1865,19 +1865,19 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                       )}
                       {isSystem ? (
                         <div className="my-3 flex justify-center">
-                          <span className="max-w-[90%] rounded-full border border-gray-200 bg-white px-3 py-1.5 text-center text-xs font-bold text-gray-500 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
+                          <span className="wrap-anywhere max-w-[90%] rounded-full border border-gray-200 bg-white px-3 py-1.5 text-center text-xs font-bold text-gray-500 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
                             {getSystemMessageText(message)}
                           </span>
                         </div>
                       ) : (
                       <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`group flex max-w-[90%] flex-col sm:max-w-[78%] ${isMine ? 'items-end text-right' : 'items-start text-left'}`}>
-                          <div className={`inline-block w-fit max-w-full rounded-[1.35rem] px-4 py-2.5 shadow-sm ${
+                        <div className={`group flex min-w-0 max-w-[90%] flex-col sm:max-w-[78%] ${isMine ? 'items-end text-right' : 'items-start text-left'}`}>
+                          <div className={`wrap-anywhere inline-block w-fit max-w-full rounded-[1.35rem] px-4 py-2.5 shadow-sm ${
                             isMine
                               ? 'rounded-br-md bg-[#007AFF] text-white'
                               : 'rounded-bl-md border border-gray-200 bg-white text-gray-900 dark:border-gray-800 dark:bg-white dark:text-gray-900'
                           }`}>
-                            <div className="space-y-2 text-left text-sm leading-6">
+                            <div className="wrap-anywhere min-w-0 space-y-2 text-left text-sm leading-6">
                               {message.body.split(/\n/gu).map((line, lineIndex) => {
                                 const attachment = parseAttachmentLine(line);
                                 return attachment ? (
@@ -1887,14 +1887,14 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                                     download={attachment.fileName}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold ${
+                                    className={`flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold ${
                                       isMine
                                         ? 'border-white/25 bg-white/10 text-white hover:bg-white/20'
                                         : 'border-gray-200 bg-gray-50 text-gray-800 hover:bg-gray-100'
                                     }`}
                                   >
                                     <Download size={15} />
-                                    <span className="truncate">{attachment.fileName}</span>
+                                    <span className="wrap-anywhere min-w-0 flex-1">{attachment.fileName}</span>
                                   </a>
                                 ) : isMessageImageUrl(line) ? (
                                   <img
@@ -1905,9 +1905,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                                     className="max-h-72 max-w-full rounded-lg object-contain"
                                   />
                                 ) : (
-                                  <p key={`${message.id}-text-${lineIndex}`} className="whitespace-pre-wrap">
+                                  <p key={`${message.id}-text-${lineIndex}`} className="wrap-anywhere whitespace-pre-wrap">
                                     <MentionText
                                       text={line || ' '}
+                                      className="wrap-anywhere"
                                       mentionClassName={isMine ? 'font-bold text-white underline decoration-white/80 underline-offset-2' : 'font-bold text-blue-700 underline underline-offset-2'}
                                       onMentionClick={openMentionProfile}
                                     />
@@ -1981,7 +1982,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                 {replyAttachments.length > 0 && (
                   <div className="mb-2 flex flex-wrap gap-2">
                     {replyAttachments.map((file) => (
-                      <span key={`${file.name}-${file.size}`} className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">
+                      <span key={`${file.name}-${file.size}`} className="wrap-anywhere min-w-0 max-w-full rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">
                         {file.name}
                       </span>
                     ))}

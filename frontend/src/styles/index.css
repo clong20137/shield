@@ -684,6 +684,13 @@
     @apply font-sans text-gray-800 bg-gray-50 dark:bg-gray-950 dark:text-gray-100;
   }
 
+  html,
+  body,
+  #root {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   :focus-visible {
     @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-white dark:ring-offset-gray-950;
   }
@@ -1748,6 +1755,11 @@
     content: attr(data-placeholder);
     color: rgb(156 163 175);
     pointer-events: none;
+  }
+
+  .wrap-anywhere {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .rich-post-editor h1,
