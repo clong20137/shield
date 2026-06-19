@@ -583,7 +583,7 @@ export class MessageController {
         }
       );
 
-      res.json({ message: 'Message deleted' });
+      res.json(message || { message: 'Message deleted' });
     } catch (error) {
       console.error('Delete message error:', error);
       res.status(500).json({ error: 'Failed to delete message' });

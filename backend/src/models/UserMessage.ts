@@ -10,8 +10,11 @@ export interface UserMessage {
   body: string;
   isRead: boolean;
   isArchived: boolean;
+  isDeleted: boolean;
   senderDeleted: boolean;
   recipientDeleted: boolean;
+  deletedAt?: Date | null;
+  deletedByAccountId?: string | null;
   senderReaction?: string | null;
   recipientReaction?: string | null;
   threadId?: string | null;
@@ -53,8 +56,11 @@ interface UserMessageRow extends RowDataPacket {
   body: string;
   isRead: boolean | number;
   isArchived: boolean | number;
+  isDeleted?: boolean | number;
   senderDeleted: boolean | number;
   recipientDeleted: boolean | number;
+  deletedAt?: Date | null;
+  deletedByAccountId?: string | null;
   senderReaction?: string | null;
   recipientReaction?: string | null;
   threadId?: string | null;
@@ -88,8 +94,11 @@ function toUserMessage(row: UserMessageRow): UserMessage {
     body: row.body,
     isRead: Boolean(row.isRead),
     isArchived: Boolean(row.isArchived),
+    isDeleted: Boolean(row.isDeleted),
     senderDeleted: Boolean(row.senderDeleted),
     recipientDeleted: Boolean(row.recipientDeleted),
+    deletedAt: row.deletedAt || null,
+    deletedByAccountId: row.deletedByAccountId || null,
     senderReaction: row.senderReaction || null,
     recipientReaction: row.recipientReaction || null,
     threadId: row.threadId || null,
@@ -116,7 +125,7 @@ function toUserMessage(row: UserMessageRow): UserMessage {
 }
 
 export class UserMessageModel {
-  static async createMessage(message: Omit<UserMessage, 'id' | 'isRead' | 'isArchived' | 'senderDeleted' | 'recipientDeleted' | 'createdAt'>): Promise<UserMessage> {
+  static async createMessage(message: Omit<UserMessage, 'id' | 'isRead' | 'isArchived' | 'isDeleted' | 'senderDeleted' | 'recipientDeleted' | 'deletedAt' | 'deletedByAccountId' | 'createdAt'>): Promise<UserMessage> {
     const conn = await pool.getConnection();
     try {
       const id = uuidv4();
@@ -148,8 +157,11 @@ export class UserMessageModel {
         id,
         isRead: false,
         isArchived: false,
+        isDeleted: false,
         senderDeleted: false,
         recipientDeleted: false,
+        deletedAt: null,
+        deletedByAccountId: null,
         threadId: message.threadId || null,
         threadType: message.threadType || 'direct',
         threadTitle: message.threadTitle || null,
@@ -327,11 +339,12 @@ export class UserMessageModel {
     try {
       const [result] = await conn.query<ResultSetHeader>(
         `UPDATE user_messages
-        SET
-          \`recipientDeleted\` = CASE WHEN \`recipientUserId\` = ? THEN 1 ELSE \`recipientDeleted\` END,
-          \`senderDeleted\` = CASE WHEN \`senderAccountId\` = ? THEN 1 ELSE \`senderDeleted\` END
+        SET \`isDeleted\` = 1,
+          \`isRead\` = 1,
+          \`deletedAt\` = COALESCE(\`deletedAt\`, ?),
+          \`deletedByAccountId\` = COALESCE(\`deletedByAccountId\`, ?)
         WHERE \`id\` = ? AND (\`recipientUserId\` = ? OR \`senderAccountId\` = ?)`,
-        [accountId, accountId, messageId, accountId, accountId]
+        [new Date(), accountId, messageId, accountId, accountId]
       );
 
       return result.affectedRows > 0;
@@ -348,8 +361,17 @@ export class UserMessageModel {
         SET
           \`recipientDeleted\` = CASE WHEN \`recipientUserId\` = ? THEN 1 ELSE \`recipientDeleted\` END,
           \`senderDeleted\` = CASE WHEN \`senderAccountId\` = ? THEN 1 ELSE \`senderDeleted\` END
-        WHERE \`threadId\` = ? AND (\`recipientUserId\` = ? OR \`senderAccountId\` = ?)`,
-        [accountId, accountId, threadId, accountId, accountId]
+        WHERE (
+          (\`threadId\` = ? AND (\`recipientUserId\` = ? OR \`senderAccountId\` = ?))
+          OR (
+            COALESCE(\`threadType\`, 'direct') = 'direct'
+            AND (
+              (\`senderAccountId\` = ? AND \`recipientUserId\` = ?)
+              OR (\`senderAccountId\` = ? AND \`recipientUserId\` = ?)
+            )
+          )
+        )`,
+        [accountId, accountId, threadId, accountId, accountId, accountId, threadId, threadId, accountId]
       );
 
       return result.affectedRows > 0;

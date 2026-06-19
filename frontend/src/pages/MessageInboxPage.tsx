@@ -240,6 +240,29 @@ function getReactionIcon(reaction?: string | null): string {
   return messageReactionOptions.find((option) => option.key === reaction)?.icon || '';
 }
 
+function getMessageReactionIcons(message: UserMessage, accountId: string): string[] {
+  return [
+    getReactionIcon(getMessageReactionForOtherUser(message, accountId)),
+    getReactionIcon(getMessageReactionForUser(message, accountId)),
+  ].filter(Boolean);
+}
+
+function isDeletedMessage(message: UserMessage): boolean {
+  return message.isDeleted === true;
+}
+
+function getMessagePreviewText(message: UserMessage): string {
+  if (isDeletedMessage(message)) {
+    return 'Message deleted';
+  }
+
+  if (isSystemMessage(message)) {
+    return getSystemMessageText(message);
+  }
+
+  return message.body;
+}
+
 function normalizeSubject(subject: string): string {
   return subject.replace(/^(re:\s*)+/iu, '').trim() || 'Message';
 }
@@ -1228,11 +1251,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
   const deleteMessage = async (message: UserMessage) => {
     try {
-      await messageService.delete(message.id, currentUser.id);
-      setInboxMessages((messages) => messages.filter((item) => item.id !== message.id));
-      setSentMessages((messages) => messages.filter((item) => item.id !== message.id));
+      const response = await messageService.delete(message.id, currentUser.id);
+      const updatedMessage = response.data;
+      setInboxMessages((messages) => messages.map((item) => (item.id === updatedMessage.id ? updatedMessage : item)));
+      setSentMessages((messages) => messages.map((item) => (item.id === updatedMessage.id ? updatedMessage : item)));
       setMessagePendingDelete(null);
-      await loadMessages(false);
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
       onToast('success', 'Message deleted.');
     } catch (err) {
@@ -1244,7 +1267,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const deleteThread = async (thread: MessageThread) => {
     try {
       const deletedMessageIds = new Set(thread.messages.map((message) => message.id));
-      if (thread.threadType !== 'direct' && !thread.id.startsWith('draft-group:')) {
+      if (!thread.id.startsWith('draft-group:')) {
         await messageService.deleteThread(thread.id, currentUser.id);
       } else {
         await Promise.all(thread.messages.map((message) => messageService.delete(message.id, currentUser.id)));
@@ -1420,7 +1443,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <p className="line-clamp-1 min-w-0 text-sm text-gray-500 dark:text-gray-400">
-                          {thread.latestMessage ? `${thread.latestMessage.senderAccountId === currentUser.id ? 'You: ' : ''}${thread.latestMessage.body}` : 'Start typing on the right'}
+                          {thread.latestMessage ? `${thread.latestMessage.senderAccountId === currentUser.id ? 'You: ' : ''}${getMessagePreviewText(thread.latestMessage)}` : 'Start typing on the right'}
                         </p>
                         {thread.unreadCount > 0 && (
                           <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
@@ -1837,11 +1860,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   const isMine = message.senderAccountId === currentUser.id;
                   const previousMessage = displayedMessages[index - 1];
                   const myReaction = getMessageReactionForUser(message, currentUser.id);
-                  const otherReaction = getMessageReactionForOtherUser(message, currentUser.id);
+                  const reactionIcons = getMessageReactionIcons(message, currentUser.id);
                   const showTimestamp =
                     !previousMessage ||
                     new Date(message.createdAt).getTime() - new Date(previousMessage.createdAt).getTime() > 10 * 60 * 1000;
                   const isSystem = isSystemMessage(message);
+                  const isDeleted = isDeletedMessage(message);
 
                   return (
                     <div key={message.id} ref={index === displayedMessages.length - 1 ? latestMessageRef : undefined}>
@@ -1872,13 +1896,27 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                       ) : (
                       <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                         <div className={`group flex min-w-0 max-w-[90%] flex-col sm:max-w-[78%] ${isMine ? 'items-end text-right' : 'items-start text-left'}`}>
-                          <div className={`wrap-anywhere inline-block w-fit max-w-full rounded-[1.35rem] px-4 py-2.5 shadow-sm ${
-                            isMine
-                              ? 'rounded-br-md bg-[#007AFF] text-white'
-                              : 'rounded-bl-md border border-gray-200 bg-white text-gray-900 dark:border-gray-800 dark:bg-white dark:text-gray-900'
+                          <div className={`wrap-anywhere relative inline-block w-fit max-w-full rounded-[1.35rem] px-4 py-2.5 shadow-sm ${
+                            isDeleted
+                              ? 'border border-dashed border-gray-300 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                              : isMine
+                                ? 'rounded-br-md bg-[#007AFF] text-white'
+                                : 'rounded-bl-md border border-gray-200 bg-white text-gray-900 dark:border-gray-800 dark:bg-white dark:text-gray-900'
                           }`}>
+                            {!isDeleted && reactionIcons.length > 0 && (
+                              <span
+                                key={`${message.id}-${reactionIcons.join('-')}`}
+                                className="message-tapback absolute -left-2 -top-3 inline-flex min-h-7 min-w-8 items-center justify-center gap-0.5 rounded-full border border-white bg-white px-1.5 text-sm shadow-lg ring-1 ring-black/5 dark:border-gray-800 dark:bg-gray-900 dark:ring-white/10"
+                              >
+                                {reactionIcons.map((icon, reactionIndex) => (
+                                  <span key={`${icon}-${reactionIndex}`} className="leading-none">{icon}</span>
+                                ))}
+                              </span>
+                            )}
                             <div className="wrap-anywhere min-w-0 space-y-2 text-left text-sm leading-6">
-                              {message.body.split(/\n/gu).map((line, lineIndex) => {
+                              {isDeleted ? (
+                                <p className="text-sm font-semibold italic">Message deleted</p>
+                              ) : message.body.split(/\n/gu).map((line, lineIndex) => {
                                 const attachment = parseAttachmentLine(line);
                                 return attachment ? (
                                   <a
@@ -1926,37 +1964,35 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                               </span>
                             )}
                           </div>
-                          {(myReaction || otherReaction) && (
-                            <div className={`mt-1 flex gap-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
-                              {otherReaction && <span className="rounded-full bg-white px-2 py-0.5 text-xs shadow dark:bg-gray-900">{getReactionIcon(otherReaction)}</span>}
-                              {myReaction && <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs text-accent shadow">{getReactionIcon(myReaction)}</span>}
-                            </div>
-                          )}
                           <div className={`mt-1 flex flex-wrap items-center gap-1.5 text-xs font-semibold text-gray-400 ${isMine ? 'justify-end' : 'justify-start'}`}>
-                            <button
-                              type="button"
-                              onClick={() => setMessagePendingDelete(message)}
-                              className="flex h-7 w-7 items-center justify-center rounded-full bg-danger text-white opacity-100 shadow-sm transition hover:bg-red-800 sm:opacity-0 sm:group-hover:opacity-100"
-                              aria-label="Delete message"
-                              title="Delete"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                            <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
-                              <SmilePlus size={13} />
-                              {messageReactionOptions.map((reaction) => (
+                            {!isDeleted && (
+                              <>
                                 <button
-                                  key={reaction.key}
                                   type="button"
-                                  onClick={() => void reactToMessage(message, reaction.key)}
-                                  className={`rounded-full px-1.5 py-0.5 hover:bg-accent/10 ${myReaction === reaction.key ? 'bg-accent/10 text-accent' : ''}`}
-                                  aria-label={reaction.label}
-                                  title={reaction.label}
+                                  onClick={() => setMessagePendingDelete(message)}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full bg-danger text-white opacity-100 shadow-sm transition hover:bg-red-800 sm:opacity-0 sm:group-hover:opacity-100"
+                                  aria-label="Delete message"
+                                  title="Delete"
                                 >
-                                  {reaction.icon}
+                                  <Trash2 size={13} />
                                 </button>
-                              ))}
-                            </div>
+                                <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+                                  <SmilePlus size={13} />
+                                  {messageReactionOptions.map((reaction) => (
+                                    <button
+                                      key={reaction.key}
+                                      type="button"
+                                      onClick={() => void reactToMessage(message, reaction.key)}
+                                      className={`rounded-full px-1.5 py-0.5 hover:bg-accent/10 ${myReaction === reaction.key ? 'bg-accent/10 text-accent' : ''}`}
+                                      aria-label={reaction.label}
+                                      title={reaction.label}
+                                    >
+                                      {reaction.icon}
+                                    </button>
+                                  ))}
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>

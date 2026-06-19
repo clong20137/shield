@@ -423,8 +423,11 @@ export async function initializeDatabase() {
       \`body\` TEXT NOT NULL,
       \`isRead\` BOOLEAN DEFAULT 0,
       \`isArchived\` BOOLEAN DEFAULT 0,
+      \`isDeleted\` BOOLEAN DEFAULT 0,
       \`senderDeleted\` BOOLEAN DEFAULT 0,
       \`recipientDeleted\` BOOLEAN DEFAULT 0,
+      \`deletedAt\` TIMESTAMP NULL,
+      \`deletedByAccountId\` VARCHAR(36),
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       INDEX \`idx_messages_sender\` (\`senderAccountId\`),
       INDEX \`idx_messages_recipient\` (\`recipientUserId\`)
@@ -432,8 +435,11 @@ export async function initializeDatabase() {
   `);
 
   await ensureColumn('user_messages', 'isArchived', '`isArchived` BOOLEAN DEFAULT 0');
+  await ensureColumn('user_messages', 'isDeleted', '`isDeleted` BOOLEAN DEFAULT 0');
   await ensureColumn('user_messages', 'senderDeleted', '`senderDeleted` BOOLEAN DEFAULT 0');
   await ensureColumn('user_messages', 'recipientDeleted', '`recipientDeleted` BOOLEAN DEFAULT 0');
+  await ensureColumn('user_messages', 'deletedAt', '`deletedAt` TIMESTAMP NULL');
+  await ensureColumn('user_messages', 'deletedByAccountId', '`deletedByAccountId` VARCHAR(36)');
   await ensureColumn('user_messages', 'senderReaction', '`senderReaction` VARCHAR(30)');
   await ensureColumn('user_messages', 'recipientReaction', '`recipientReaction` VARCHAR(30)');
   await ensureColumn('user_messages', 'threadId', '`threadId` VARCHAR(36)');

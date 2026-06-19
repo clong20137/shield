@@ -755,6 +755,11 @@ export interface UserMessage {
   subject: string;
   body: string;
   isRead: boolean;
+  isDeleted?: boolean;
+  deletedAt?: string | null;
+  deletedByAccountId?: string | null;
+  senderDeleted?: boolean;
+  recipientDeleted?: boolean;
   senderReaction?: string | null;
   recipientReaction?: string | null;
   threadId?: string | null;
@@ -1293,7 +1298,7 @@ export const messageService = {
     api.put(`/messages/${messageId}/archive`, { recipientUserId }),
 
   delete: (messageId: string, accountId: string) =>
-    api.delete(`/messages/${messageId}`, { data: { accountId } }),
+    api.delete<UserMessage>(`/messages/${messageId}`, { data: { accountId } }),
 
   deleteThread: (threadId: string, accountId: string) =>
     api.delete(`/messages/thread/${threadId}`, { data: { accountId } }),
