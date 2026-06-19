@@ -243,8 +243,8 @@ function getDesktopConfig() {
 }
 
 function createShieldTrayIcon() {
-  const iconPath = path.join(__dirname, 'build', 'icon.png');
-  if (fs.existsSync(iconPath)) {
+  const iconPath = getShieldIconPath();
+  if (iconPath) {
     return nativeImage.createFromPath(iconPath);
   }
 
@@ -376,6 +376,22 @@ function createBadgeOverlay(count) {
   return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
 }
 
+function getShieldIconPath() {
+  const iconCandidates = process.platform === 'win32'
+    ? ['icon.ico', 'icon.png']
+    : ['icon.png', 'icon.ico'];
+
+  const buildPath = path.join(__dirname, 'build');
+  for (const iconName of iconCandidates) {
+    const iconPath = path.join(buildPath, iconName);
+    if (fs.existsSync(iconPath)) {
+      return iconPath;
+    }
+  }
+
+  return null;
+}
+
 function updateUnreadBadge(count) {
   if (!mainWindow) {
     return;
@@ -481,6 +497,7 @@ function createMainWindow() {
     allowedOrigins.add(appOrigin);
   }
 
+  const iconPath = getShieldIconPath();
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 960,
@@ -488,7 +505,7 @@ function createMainWindow() {
     minHeight: 720,
     title: 'Shield',
     backgroundColor: '#0f172a',
-    icon: path.join(__dirname, 'build', 'icon.png'),
+    icon: iconPath,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -500,6 +517,10 @@ function createMainWindow() {
   });
 
   mainWindow.once('ready-to-show', () => {
+    if (iconPath) {
+      mainWindow.setIcon(iconPath);
+    }
+
     if (!process.argv.includes('--hidden')) {
       mainWindow.show();
     }
