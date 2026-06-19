@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, clipboard, shell, ipcMain, Notification, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, Tray, clipboard, shell, ipcMain, Notification, nativeImage, powerMonitor } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const fs = require('fs');
 const path = require('path');
@@ -16,6 +16,10 @@ let tray = null;
 let isQuitting = false;
 let isUpdateDownloaded = false;
 let pendingUpdateRestartTimer = null;
+let desktopUnreadCount = 0;
+let desktopIdleCheckTimer = null;
+let desktopIdleStatus = 'active';
+let desktopUpdateCheckTimer = null;
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -29,8 +33,11 @@ const desktopPreferencesDefault = {
 };
 
 const clipboardFileSizeLimit = 25 * 1024 * 1024;
-const webAppUpdateCheckIntervalMs = 60 * 1000;
+const webAppUpdateCheckIntervalMs = 30 * 1000;
 const webAppReloadCooldownMs = 15 * 1000;
+const desktopUpdateCheckIntervalMs = 15 * 60 * 1000;
+const desktopIdleThresholdSeconds = 5 * 60;
+const desktopIdleCheckIntervalMs = 15 * 1000;
 let webAppUpdateCheckTimer = null;
 let webAppSignature = null;
 let isWebAppUpdateCheckRunning = false;
@@ -296,13 +303,14 @@ function rebuildTrayMenu() {
   }
 
   const preferences = getDesktopPreferences();
+  const unreadLabel = desktopUnreadCount > 0 ? `Messages (${desktopUnreadCount > 99 ? '99+' : desktopUnreadCount})` : 'Messages';
   tray.setContextMenu(Menu.buildFromTemplate([
     {
       label: 'Open Shield',
       click: showMainWindow
     },
     {
-      label: 'Messages',
+      label: unreadLabel,
       click: () => {
         showMainWindow();
         if (mainWindow) {
@@ -357,6 +365,16 @@ function createTray() {
   tray = new Tray(createShieldTrayIcon());
   tray.setToolTip('Shield');
   tray.on('double-click', showMainWindow);
+  rebuildTrayMenu();
+}
+
+function updateTrayBadge(count) {
+  if (!tray) {
+    return;
+  }
+
+  const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0;
+  tray.setToolTip(safeCount > 0 ? `Shield - ${safeCount} unread message${safeCount === 1 ? '' : 's'}` : 'Shield');
   rebuildTrayMenu();
 }
 
@@ -428,6 +446,9 @@ async function checkForWebAppUpdate({ initial = false } = {}) {
     if (nextSignature !== webAppSignature && Date.now() - lastWebAppReloadAt > webAppReloadCooldownMs) {
       webAppSignature = nextSignature;
       lastWebAppReloadAt = Date.now();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('shield:web-app-update-status', { type: 'reloading' });
+      }
       mainWindow.webContents.reloadIgnoringCache();
     }
   } catch (error) {
@@ -435,6 +456,52 @@ async function checkForWebAppUpdate({ initial = false } = {}) {
   } finally {
     isWebAppUpdateCheckRunning = false;
   }
+}
+
+function sendDesktopIdleStatus(status, idleSeconds) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('shield:desktop-idle-status', { status, idleSeconds });
+  }
+}
+
+function checkDesktopIdleStatus({ force = false } = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  const idleState = powerMonitor.getSystemIdleState(desktopIdleThresholdSeconds);
+  const idleSeconds = powerMonitor.getSystemIdleTime();
+  const nextStatus = idleState === 'active' ? 'active' : 'away';
+
+  if (force || nextStatus !== desktopIdleStatus) {
+    desktopIdleStatus = nextStatus;
+    sendDesktopIdleStatus(nextStatus, idleSeconds);
+  }
+}
+
+function startDesktopIdleChecks() {
+  if (desktopIdleCheckTimer) {
+    clearInterval(desktopIdleCheckTimer);
+  }
+
+  checkDesktopIdleStatus({ force: true });
+  desktopIdleCheckTimer = setInterval(() => checkDesktopIdleStatus(), desktopIdleCheckIntervalMs);
+}
+
+function stopDesktopIdleChecks() {
+  if (desktopIdleCheckTimer) {
+    clearInterval(desktopIdleCheckTimer);
+    desktopIdleCheckTimer = null;
+  }
+}
+
+function registerPowerMonitorEvents() {
+  powerMonitor.on('resume', () => checkDesktopIdleStatus({ force: true }));
+  powerMonitor.on('unlock-screen', () => checkDesktopIdleStatus({ force: true }));
+  powerMonitor.on('lock-screen', () => {
+    desktopIdleStatus = 'away';
+    sendDesktopIdleStatus('away', powerMonitor.getSystemIdleTime());
+  });
 }
 
 function startWebAppUpdateChecks() {
@@ -493,7 +560,9 @@ function updateUnreadBadge(count) {
   }
 
   const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0;
+  desktopUnreadCount = safeCount;
   app.setBadgeCount(safeCount);
+  updateTrayBadge(safeCount);
 
   if (process.platform === 'win32') {
     const overlay = createBadgeOverlay(safeCount);
@@ -579,9 +648,19 @@ function configureAutoUpdates(config) {
   });
   autoUpdater.on('error', (error) => sendUpdaterStatus('error', { message: error.message }));
 
-  setTimeout(() => {
+  const checkForDesktopUpdates = () => {
+    if (isUpdateDownloaded) {
+      return;
+    }
+
     autoUpdater.checkForUpdates().catch((error) => sendUpdaterStatus('error', { message: error.message }));
-  }, 15000);
+  };
+
+  setTimeout(checkForDesktopUpdates, 15000);
+  if (desktopUpdateCheckTimer) {
+    clearInterval(desktopUpdateCheckTimer);
+  }
+  desktopUpdateCheckTimer = setInterval(checkForDesktopUpdates, desktopUpdateCheckIntervalMs);
 }
 
 function createMainWindow() {
@@ -621,6 +700,10 @@ function createMainWindow() {
     }
   });
 
+  mainWindow.webContents.on('did-finish-load', () => {
+    checkDesktopIdleStatus({ force: true });
+  });
+
   mainWindow.on('close', (event) => {
     const preferences = getDesktopPreferences();
     if (!isQuitting && preferences.trayMode) {
@@ -631,6 +714,7 @@ function createMainWindow() {
 
   mainWindow.on('closed', () => {
     stopWebAppUpdateChecks();
+    stopDesktopIdleChecks();
     mainWindow = null;
   });
 
@@ -687,6 +771,7 @@ function createMainWindow() {
     }))}`);
   });
   startWebAppUpdateChecks();
+  startDesktopIdleChecks();
 }
 
 app.setAppUserModelId('com.shield.desktop');
@@ -699,6 +784,7 @@ if (hasSingleInstanceLock) {
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
     ensureDefaultDesktopPreferences();
+    registerPowerMonitorEvents();
     createTray();
     createMainWindow();
     configureAutoUpdates(desktopConfig);
@@ -713,6 +799,16 @@ if (hasSingleInstanceLock) {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  stopWebAppUpdateChecks();
+  stopDesktopIdleChecks();
+  if (desktopUpdateCheckTimer) {
+    clearInterval(desktopUpdateCheckTimer);
+    desktopUpdateCheckTimer = null;
+  }
+  app.setBadgeCount(0);
+  if (mainWindow && !mainWindow.isDestroyed() && process.platform === 'win32') {
+    mainWindow.setOverlayIcon(null, '');
+  }
 });
 
 ipcMain.handle('shield:desktop-notification', (_event, payload) => showDesktopNotification(payload));

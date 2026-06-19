@@ -31,6 +31,15 @@ interface ShieldDesktopPreferences {
   updateConfigured: boolean;
 }
 
+interface ShieldDesktopIdleStatus {
+  status: 'active' | 'away';
+  idleSeconds?: number;
+}
+
+interface ShieldDesktopWebAppUpdateStatus {
+  type: 'reloading';
+}
+
 interface ShieldDesktopClipboardFile {
   name: string;
   type: string;
@@ -55,5 +64,7 @@ interface Window {
     navigate?: (appPath: string) => Promise<boolean>;
     onNotificationClick?: (callback: (payload: { appPath?: string }) => void) => () => void;
     onUpdateStatus?: (callback: (payload: ShieldDesktopUpdateStatus) => void) => () => void;
+    onIdleStatus?: (callback: (payload: ShieldDesktopIdleStatus) => void) => () => void;
+    onWebAppUpdateStatus?: (callback: (payload: ShieldDesktopWebAppUpdateStatus) => void) => () => void;
   };
 }

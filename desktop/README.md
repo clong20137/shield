@@ -4,7 +4,14 @@ This folder packages the hosted Shield web app as a Windows desktop application.
 
 The desktop app does not run its own database or backend. It opens the agency-hosted HTTPS Shield URL in a locked-down Electron window.
 
-The desktop shell also checks the hosted web app once per minute. When the hosted frontend changes, the window reloads while bypassing cache so users do not have to hard refresh to pick up new web deployments.
+The desktop shell also checks the hosted web app every 30 seconds. When the hosted frontend changes, the window reloads while bypassing cache so users do not have to hard refresh to pick up new web deployments.
+
+The desktop shell also provides native desktop behavior:
+
+- It checks for desktop installer updates shortly after launch and every 15 minutes after that. Updates download automatically from `updateUrl`; once downloaded, Shield restarts to install them.
+- It checks the hosted web app every 30 seconds and reloads with cache bypass when the hosted frontend changes.
+- It uses OS idle/lock state to mark the signed-in user away after 5 minutes of desktop inactivity, then active again when the workstation is used.
+- It mirrors unread message counts onto the taskbar/dock badge, Windows overlay icon, and tray tooltip/menu.
 
 ## Configure the App URL
 

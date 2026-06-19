@@ -5238,6 +5238,21 @@ function App() {
       markActive(true);
     };
 
+    const removeDesktopIdleStatusListener = hasShieldDesktopFeature('onIdleStatus')
+      ? window.shieldDesktop?.onIdleStatus?.((payload) => {
+        if (payload.status === 'away') {
+          if (awayPresenceTimerRef.current) {
+            window.clearTimeout(awayPresenceTimerRef.current);
+            awayPresenceTimerRef.current = null;
+          }
+          setPresenceStatus('away');
+          return;
+        }
+
+        markActive(true);
+      })
+      : undefined;
+
     markActive(true);
     const activeHeartbeat = window.setInterval(() => {
       if (awayPresenceStateRef.current === 'active') {
@@ -5267,6 +5282,7 @@ function App() {
       window.removeEventListener('touchstart', markActive);
       window.removeEventListener('focus', markActive);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      removeDesktopIdleStatusListener?.();
     };
   }, [currentUser, isAuthenticated]);
 
@@ -5443,6 +5459,18 @@ function App() {
 
       if (status.type === 'not-available' || status.type === 'error') {
         desktopUpdateCheckIsManualRef.current = false;
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!hasShieldDesktopFeature('onWebAppUpdateStatus')) {
+      return;
+    }
+
+    return window.shieldDesktop?.onWebAppUpdateStatus?.((status) => {
+      if (status.type === 'reloading') {
+        showToast('info', 'Shield web updates were found. Refreshing desktop view...', { saveToNotifications: false });
       }
     });
   }, []);

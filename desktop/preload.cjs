@@ -23,5 +23,15 @@ contextBridge.exposeInMainWorld('shieldDesktop', {
     const handler = (_event, payload) => callback(payload);
     ipcRenderer.on('shield:update-status', handler);
     return () => ipcRenderer.removeListener('shield:update-status', handler);
+  },
+  onIdleStatus: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on('shield:desktop-idle-status', handler);
+    return () => ipcRenderer.removeListener('shield:desktop-idle-status', handler);
+  },
+  onWebAppUpdateStatus: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on('shield:web-app-update-status', handler);
+    return () => ipcRenderer.removeListener('shield:web-app-update-status', handler);
   }
 });
