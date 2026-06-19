@@ -1253,11 +1253,20 @@ export const messageService = {
     return api.post<{ imageUrl: string }>('/messages/images', formData);
   },
 
+  uploadAttachment: (file: File) => {
+    const formData = new FormData();
+    formData.append('attachment', file);
+    return api.post<{ fileUrl: string; fileName: string }>('/messages/attachments', formData);
+  },
+
   updateThreadImage: (threadId: string, file: File) => {
     const formData = new FormData();
     formData.append('image', file);
     return api.put<{ threadId: string; imageUrl: string }>(`/messages/thread/${threadId}/image`, formData);
   },
+
+  updateThreadTitle: (threadId: string, threadTitle: string) =>
+    api.put<{ threadId: string; threadTitle: string }>(`/messages/thread/${threadId}/title`, { threadTitle }),
 
   getForUser: (userId: string) =>
     api.get<UserMessage[]>(`/messages/user/${userId}`),

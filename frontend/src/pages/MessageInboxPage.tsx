@@ -1,6 +1,6 @@
 import { ClipboardEvent, FormEvent, KeyboardEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Building2, Check, CheckCheck, Image as ImageIcon, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Send, Trash2, Users, X } from 'lucide-react';
+import { Building2, Check, CheckCheck, Download, Image as ImageIcon, Pencil, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Save, Send, Trash2, Users, X } from 'lucide-react';
 import type { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, handleAssetThumbnailError, messageService, userService, User, UserMessage } from '../services/api';
 import { RankBadge } from '../components/RankBadge';
@@ -252,6 +252,51 @@ function isMessageImageUrl(value: string): boolean {
   return /^\/uploads\/messages\/[^\s]+?\.(?:jpe?g|jfif|png|gif|webp)$/iu.test(value.trim());
 }
 
+const systemMessagePrefix = '::system::';
+const attachmentMessagePrefix = '::attachment::';
+
+function isSystemMessage(message: UserMessage): boolean {
+  return message.body.startsWith(systemMessagePrefix);
+}
+
+function getSystemMessageText(message: UserMessage): string {
+  return message.body.slice(systemMessagePrefix.length).trim();
+}
+
+function formatAttachmentLine(fileName: string, fileUrl: string): string {
+  return `${attachmentMessagePrefix}${encodeURIComponent(fileName)}::${fileUrl}`;
+}
+
+function parseAttachmentLine(value: string): { fileName: string; fileUrl: string } | null {
+  if (!value.startsWith(attachmentMessagePrefix)) {
+    return null;
+  }
+
+  const body = value.slice(attachmentMessagePrefix.length);
+  const separatorIndex = body.indexOf('::');
+  if (separatorIndex <= 0) {
+    return null;
+  }
+
+  const rawName = body.slice(0, separatorIndex);
+  const fileUrl = body.slice(separatorIndex + 2).trim();
+  if (!fileUrl.startsWith('/uploads/messages/')) {
+    return null;
+  }
+
+  try {
+    return {
+      fileName: decodeURIComponent(rawName),
+      fileUrl,
+    };
+  } catch {
+    return {
+      fileName: rawName,
+      fileUrl,
+    };
+  }
+}
+
 function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRecipient = null }: MessageInboxPageProps) {
   const [inboxMessages, setInboxMessages] = useState<UserMessage[]>([]);
   const [sentMessages, setSentMessages] = useState<UserMessage[]>([]);
@@ -278,6 +323,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const [draftRecipient, setDraftRecipient] = useState<User | null>(null);
   const [draftGroupRecipients, setDraftGroupRecipients] = useState<User[]>([]);
   const [draftThreadTitle, setDraftThreadTitle] = useState('');
+  const [editingThreadTitle, setEditingThreadTitle] = useState('');
+  const [isEditingThreadTitle, setIsEditingThreadTitle] = useState(false);
+  const [isSavingThreadTitle, setIsSavingThreadTitle] = useState(false);
   const [isLoadingDistrictRecipients, setIsLoadingDistrictRecipients] = useState(false);
   const [isRecipientSearching, setIsRecipientSearching] = useState(false);
   const [messagePendingDelete, setMessagePendingDelete] = useState<UserMessage | null>(null);
@@ -630,6 +678,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const selectedThread = filteredThreads.find((thread) => thread.id === selectedThreadId) || null;
   const selectedThreadAcceptsMessages = selectedThread?.contactReceivesMessages !== false;
   const selectedTyping = selectedThreadId ? typingByThread[selectedThreadId] : null;
+
+  useEffect(() => {
+    setIsEditingThreadTitle(false);
+    setEditingThreadTitle(selectedThread?.contactName || '');
+  }, [selectedThread?.id, selectedThread?.contactName]);
+
   const displayedMessages = useMemo(() => {
     if (!selectedThread) {
       return [];
@@ -757,12 +811,31 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isComposeOpen, isEmojiPickerOpen, messagePendingDelete, threadPendingDelete]);
 
-  const withAttachmentSummary = (body: string, files: File[]) => {
-    if (files.length === 0) {
+  const withAttachmentSummary = (body: string, attachments: Array<{ fileName: string; fileUrl: string }>) => {
+    if (attachments.length === 0) {
       return body;
     }
 
-    return `${body.trim()}\n\nAttachments: ${files.map((file) => file.name).join(', ')}`;
+    return [
+      body.trim(),
+      ...attachments.map((attachment) => formatAttachmentLine(attachment.fileName, attachment.fileUrl)),
+    ].filter(Boolean).join('\n');
+  };
+
+  const uploadReplyAttachments = async () => {
+    if (replyAttachments.length === 0) {
+      return [];
+    }
+
+    const uploaded = await Promise.all(replyAttachments.map(async (file) => {
+      const response = await messageService.uploadAttachment(file);
+      return {
+        fileName: response.data.fileName || file.name,
+        fileUrl: response.data.fileUrl,
+      };
+    }));
+
+    return uploaded;
   };
 
   const appendMessageImage = async (file: File) => {
@@ -812,6 +885,43 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     } catch (err) {
       console.error('Failed to update group image:', err);
       onToast('error', getApiErrorMessage(err, 'Failed to update group image.'));
+    }
+  };
+
+  const saveGroupTitle = async () => {
+    if (!selectedThread || selectedThread.threadType === 'direct' || selectedThread.id.startsWith('draft-group:')) {
+      return;
+    }
+
+    const nextTitle = editingThreadTitle.trim();
+    if (!nextTitle) {
+      onToast('error', 'Enter a group name.');
+      return;
+    }
+
+    if (nextTitle === selectedThread.contactName) {
+      setIsEditingThreadTitle(false);
+      return;
+    }
+
+    setIsSavingThreadTitle(true);
+    try {
+      const response = await messageService.updateThreadTitle(selectedThread.id, nextTitle);
+      const threadTitle = response.data.threadTitle;
+      setInboxMessages((messages) => messages.map((message) => (
+        message.threadId === selectedThread.id ? { ...message, threadTitle } : message
+      )));
+      setSentMessages((messages) => messages.map((message) => (
+        message.threadId === selectedThread.id ? { ...message, threadTitle } : message
+      )));
+      setIsEditingThreadTitle(false);
+      onToast('success', 'Group name updated.');
+      await loadMessages(false);
+    } catch (err) {
+      console.error('Failed to update group name:', err);
+      onToast('error', getApiErrorMessage(err, 'Failed to update group name.'));
+    } finally {
+      setIsSavingThreadTitle(false);
     }
   };
 
@@ -931,7 +1041,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const sendReply = async (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
 
-    if (!selectedThread || !replyBody.trim()) {
+    if (!selectedThread || (!replyBody.trim() && replyAttachments.length === 0)) {
       onToast('error', 'Enter a message.');
       return;
     }
@@ -943,13 +1053,15 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
     setIsSending(true);
     try {
+      const uploadedAttachments = await uploadReplyAttachments();
+      const messageBody = withAttachmentSummary(replyBody, uploadedAttachments);
       if (selectedThread.threadType !== 'direct') {
         const recipientIds = selectedThread.participantIds.filter((id) => id !== currentUser.id);
         const response = await messageService.sendGroup({
           senderAccountId: currentUser.id,
           recipientUserIds: recipientIds,
           subject: selectedThread.subject || selectedThread.contactName,
-          body: withAttachmentSummary(replyBody, replyAttachments),
+          body: messageBody,
           audienceType: selectedThread.threadType === 'district' ? 'district' : 'group',
           threadId: selectedThread.id.startsWith('draft-group:') ? undefined : selectedThread.id,
           threadTitle: selectedThread.contactName,
@@ -960,7 +1072,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           senderAccountId: currentUser.id,
           recipientUserId: selectedThread.id,
           subject: selectedThread.subject,
-          body: withAttachmentSummary(replyBody, replyAttachments),
+          body: messageBody,
         });
       }
       setReplyBody('');
@@ -1458,8 +1570,64 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   </div>
                   <div className="min-w-0 text-left">
                     <div className="flex min-w-0 items-center gap-2">
-                      <h2 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">{selectedThread.contactName}</h2>
-                      {selectedThread.threadType === 'direct' && <PresenceDot isOnline={selectedPresence?.online === true} />}
+                      {isEditingThreadTitle && selectedThread.threadType !== 'direct' ? (
+                        <form
+                          className="flex min-w-0 items-center gap-1.5"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            void saveGroupTitle();
+                          }}
+                        >
+                          <input
+                            value={editingThreadTitle}
+                            onChange={(event) => setEditingThreadTitle(event.target.value)}
+                            className="min-w-0 rounded border border-gray-300 bg-white px-2 py-1 text-sm font-bold text-gray-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                            aria-label="Group name"
+                            maxLength={180}
+                            autoFocus
+                          />
+                          <button
+                            type="submit"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
+                            disabled={isSavingThreadTitle}
+                            aria-label="Save group name"
+                            title="Save"
+                          >
+                            <Save size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsEditingThreadTitle(false);
+                              setEditingThreadTitle(selectedThread.contactName);
+                            }}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800"
+                            aria-label="Cancel group name edit"
+                            title="Cancel"
+                          >
+                            <X size={14} />
+                          </button>
+                        </form>
+                      ) : (
+                        <>
+                          <h2 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">{selectedThread.contactName}</h2>
+                          {selectedThread.threadType !== 'direct' && !selectedThread.id.startsWith('draft-group:') && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingThreadTitle(selectedThread.contactName);
+                                setIsEditingThreadTitle(true);
+                              }}
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-primary-500 dark:hover:bg-gray-800"
+                              aria-label="Edit group name"
+                              title="Edit group name"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                          )}
+                          {selectedThread.threadType === 'direct' && <PresenceDot isOnline={selectedPresence?.online === true} />}
+                        </>
+                      )}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <RankBadge rank={selectedThread.contactRank} compact subtle />
@@ -1511,6 +1679,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   const showTimestamp =
                     !previousMessage ||
                     new Date(message.createdAt).getTime() - new Date(previousMessage.createdAt).getTime() > 10 * 60 * 1000;
+                  const isSystem = isSystemMessage(message);
 
                   return (
                     <div key={message.id} ref={index === displayedMessages.length - 1 ? latestMessageRef : undefined}>
@@ -1532,6 +1701,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                           })}
                         </div>
                       )}
+                      {isSystem ? (
+                        <div className="my-3 flex justify-center">
+                          <span className="max-w-[90%] rounded-full border border-gray-200 bg-white px-3 py-1.5 text-center text-xs font-bold text-gray-500 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
+                            {getSystemMessageText(message)}
+                          </span>
+                        </div>
+                      ) : (
                       <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                         <div className={`group flex max-w-[90%] flex-col sm:max-w-[78%] ${isMine ? 'items-end text-right' : 'items-start text-left'}`}>
                           <div className={`inline-block w-fit max-w-full rounded-[1.35rem] px-4 py-2.5 shadow-sm ${
@@ -1540,8 +1716,25 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                               : 'rounded-bl-md border border-gray-200 bg-white text-gray-900 dark:border-gray-800 dark:bg-white dark:text-gray-900'
                           }`}>
                             <div className="space-y-2 text-left text-sm leading-6">
-                              {message.body.split(/\n/gu).map((line, lineIndex) => (
-                                isMessageImageUrl(line) ? (
+                              {message.body.split(/\n/gu).map((line, lineIndex) => {
+                                const attachment = parseAttachmentLine(line);
+                                return attachment ? (
+                                  <a
+                                    key={`${message.id}-attachment-${lineIndex}`}
+                                    href={getAssetUrl(attachment.fileUrl)}
+                                    download={attachment.fileName}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold ${
+                                      isMine
+                                        ? 'border-white/25 bg-white/10 text-white hover:bg-white/20'
+                                        : 'border-gray-200 bg-gray-50 text-gray-800 hover:bg-gray-100'
+                                    }`}
+                                  >
+                                    <Download size={15} />
+                                    <span className="truncate">{attachment.fileName}</span>
+                                  </a>
+                                ) : isMessageImageUrl(line) ? (
                                   <img
                                     key={`${message.id}-image-${lineIndex}`}
                                     src={getAssetUrl(line)}
@@ -1557,8 +1750,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                                       onMentionClick={openMentionProfile}
                                     />
                                   </p>
-                                )
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                           <div className={`mt-1 flex items-center gap-1.5 px-1 text-[11px] font-semibold text-gray-400 ${isMine ? 'justify-end' : 'justify-start'}`}>
@@ -1604,6 +1797,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                           </div>
                         </div>
                       </div>
+                      )}
                     </div>
                   );
                 })}

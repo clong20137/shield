@@ -36,6 +36,15 @@ export interface UserMessage {
   recipientReceivesMessages?: boolean;
 }
 
+export interface MessageThreadInfo {
+  threadId: string;
+  threadType: string;
+  threadTitle: string | null;
+  threadParticipantIds: string[];
+  threadParticipantNames: string[];
+  threadImageUrl: string | null;
+}
+
 interface UserMessageRow extends RowDataPacket {
   id: string;
   senderAccountId: string;
@@ -385,6 +394,92 @@ export class UserMessageModel {
             ) participant
           )`,
         [threadImageUrl, threadId, threadId, accountId, accountId],
+      );
+
+      return result.affectedRows > 0;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async getThreadInfo(threadId: string, accountId: string): Promise<MessageThreadInfo | null> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<Array<RowDataPacket & {
+        threadId: string;
+        threadType: string;
+        threadTitle: string | null;
+        threadParticipantIds: string | null;
+        threadParticipantNames: string | null;
+        threadImageUrl: string | null;
+      }>>(
+        `SELECT \`threadId\`, \`threadType\`, \`threadTitle\`, \`threadParticipantIds\`, \`threadParticipantNames\`, \`threadImageUrl\`
+        FROM user_messages
+        WHERE \`threadId\` = ?
+          AND \`threadType\` IN ('group', 'district')
+          AND EXISTS (
+            SELECT 1 FROM (
+              SELECT \`id\`
+              FROM user_messages
+              WHERE \`threadId\` = ?
+                AND (\`senderAccountId\` = ? OR \`recipientUserId\` = ?)
+              LIMIT 1
+            ) participant
+          )
+        ORDER BY \`createdAt\` DESC
+        LIMIT 1`,
+        [threadId, threadId, accountId, accountId],
+      );
+
+      const row = rows[0];
+      if (!row) {
+        return null;
+      }
+
+      const parseList = (value: string | null): string[] => {
+        if (!value) {
+          return [];
+        }
+
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+        } catch {
+          return [];
+        }
+      };
+
+      return {
+        threadId: row.threadId,
+        threadType: row.threadType || 'group',
+        threadTitle: row.threadTitle || null,
+        threadParticipantIds: parseList(row.threadParticipantIds),
+        threadParticipantNames: parseList(row.threadParticipantNames),
+        threadImageUrl: row.threadImageUrl || null,
+      };
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async updateThreadTitle(threadId: string, accountId: string, threadTitle: string): Promise<boolean> {
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>(
+        `UPDATE user_messages
+        SET \`threadTitle\` = ?
+        WHERE \`threadId\` = ?
+          AND \`threadType\` IN ('group', 'district')
+          AND EXISTS (
+            SELECT 1 FROM (
+              SELECT \`id\`
+              FROM user_messages
+              WHERE \`threadId\` = ?
+                AND (\`senderAccountId\` = ? OR \`recipientUserId\` = ?)
+              LIMIT 1
+            ) participant
+          )`,
+        [threadTitle, threadId, threadId, accountId, accountId],
       );
 
       return result.affectedRows > 0;

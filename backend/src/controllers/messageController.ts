@@ -3,13 +3,23 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { UserMessageModel } from '../models/UserMessage';
-import { addMessageEventClient, broadcastMessageEvent, broadcastMessageEventToAll } from '../services/messageEvents';
+import { addMessageEventClient, broadcastMessageEvent } from '../services/messageEvents';
 import { notifyMentions } from '../services/mentionService';
 import { cleanMultiline, cleanString } from '../utils/validation';
 import { getSessionAccount } from '../middleware/authSession';
 import { parsePagination } from '../utils/pagination';
 import { isSafeMessageImage } from '../middleware/messageUpload';
 import { createImageThumbnails } from '../services/imageThumbnails';
+
+const systemMessagePrefix = '::system::';
+
+function getSystemMessageBody(message: string): string {
+  return `${systemMessagePrefix}${message}`;
+}
+
+function getMessageAttachmentUrl(filename: string): string {
+  return `/uploads/messages/${filename}`;
+}
 
 export class MessageController {
   static async streamEvents(req: Request, res: Response) {
@@ -213,6 +223,85 @@ export class MessageController {
     }
   }
 
+  static async uploadAttachment(req: Request, res: Response) {
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ error: 'Attachment file is required' });
+      }
+
+      res.status(201).json({
+        fileUrl: getMessageAttachmentUrl(file.filename),
+        fileName: file.originalname,
+      });
+    } catch (error) {
+      console.error('Message attachment upload error:', error);
+      res.status(500).json({ error: 'Failed to upload attachment' });
+    }
+  }
+
+  static async updateThreadTitle(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      const threadId = cleanString(req.params.threadId, 36);
+      const threadTitle = cleanString(req.body?.threadTitle, 180);
+
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      if (!threadId) {
+        return res.status(400).json({ error: 'Thread is required' });
+      }
+
+      if (!threadTitle) {
+        return res.status(400).json({ error: 'Group name is required' });
+      }
+
+      const threadInfo = await UserMessageModel.getThreadInfo(threadId, account.id);
+      if (!threadInfo) {
+        return res.status(404).json({ error: 'Group thread not found' });
+      }
+
+      const updated = await UserMessageModel.updateThreadTitle(threadId, account.id, threadTitle);
+      if (!updated) {
+        return res.status(404).json({ error: 'Group thread not found' });
+      }
+
+      const participantIds = threadInfo.threadParticipantIds.filter(Boolean);
+      const recipients = participantIds.filter((id) => id !== account.id);
+      const groupMessageId = uuidv4();
+      const actorName = account.displayName || account.email || 'Someone';
+      const body = getSystemMessageBody(`${actorName} changed the group name to ${threadTitle}.`);
+
+      await Promise.all(recipients.map((recipientUserId) =>
+        UserMessageModel.createMessage({
+          senderAccountId: account.id,
+          recipientUserId,
+          subject: threadTitle,
+          body,
+          threadId,
+          threadType: threadInfo.threadType,
+          threadTitle,
+          threadParticipantIds: JSON.stringify(participantIds),
+          threadParticipantNames: JSON.stringify(threadInfo.threadParticipantNames),
+          threadImageUrl: threadInfo.threadImageUrl,
+          groupMessageId,
+        }),
+      ));
+
+      broadcastMessageEvent(participantIds, {
+        type: 'message-created',
+        actorAccountId: account.id,
+      });
+
+      res.json({ threadId, threadTitle });
+    } catch (error) {
+      console.error('Update thread title error:', error);
+      res.status(500).json({ error: 'Failed to update group name' });
+    }
+  }
+
   static async updateThreadImage(req: Request, res: Response) {
     try {
       const account = await getSessionAccount(req);
@@ -236,6 +325,12 @@ export class MessageController {
         return res.status(400).json({ error: 'Only valid image uploads are allowed' });
       }
 
+      const threadInfo = await UserMessageModel.getThreadInfo(threadId, account.id);
+      if (!threadInfo) {
+        fs.rmSync(file.path, { force: true });
+        return res.status(404).json({ error: 'Group thread not found' });
+      }
+
       const imageUrl = `/uploads/messages/${file.filename}`;
       const updated = await UserMessageModel.updateThreadImage(threadId, account.id, imageUrl);
       if (!updated) {
@@ -244,7 +339,29 @@ export class MessageController {
       }
 
       await createImageThumbnails(file.path, [96, 240]);
-      broadcastMessageEventToAll({ type: 'message-created', actorAccountId: account.id });
+      const participantIds = threadInfo.threadParticipantIds.filter(Boolean);
+      const recipients = participantIds.filter((id) => id !== account.id);
+      const groupMessageId = uuidv4();
+      const actorName = account.displayName || account.email || 'Someone';
+      const body = getSystemMessageBody(`${actorName} changed the group photo.`);
+
+      await Promise.all(recipients.map((recipientUserId) =>
+        UserMessageModel.createMessage({
+          senderAccountId: account.id,
+          recipientUserId,
+          subject: threadInfo.threadTitle || 'Group Message',
+          body,
+          threadId,
+          threadType: threadInfo.threadType,
+          threadTitle: threadInfo.threadTitle,
+          threadParticipantIds: JSON.stringify(participantIds),
+          threadParticipantNames: JSON.stringify(threadInfo.threadParticipantNames),
+          threadImageUrl: imageUrl,
+          groupMessageId,
+        }),
+      ));
+
+      broadcastMessageEvent(participantIds, { type: 'message-created', actorAccountId: account.id });
       res.json({ threadId, imageUrl });
     } catch (error) {
       console.error('Update thread image error:', error);
