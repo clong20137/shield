@@ -973,20 +973,14 @@ export function AccountSettingsPage({
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       {isDesktopApp ? 'You are using the installed Shield desktop app.' : 'Download the Windows desktop installer for faster access from this device.'}
                     </p>
+                    {isDesktopApp && desktopPreferences?.appVersion && (
+                      <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-gray-400 dark:text-gray-500">
+                        Version {desktopPreferences.appVersion}
+                      </p>
+                    )}
                   </div>
                 </div>
-                {isDesktopApp ? (
-                  <button
-                    type="button"
-                    onClick={onCheckForDesktopUpdates}
-                    className="btn-secondary justify-center"
-                    aria-label="Check for Shield desktop updates"
-                    title="Check for Updates"
-                  >
-                    <RefreshCw size={16} />
-                    <span>Check for Updates</span>
-                  </button>
-                ) : (
+                {!isDesktopApp && (
                   <a
                     href={desktopInstallerUrl}
                     download

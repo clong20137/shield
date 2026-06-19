@@ -621,6 +621,7 @@ ipcMain.handle('shield:install-update', () => {
 ipcMain.handle('shield:get-clipboard-files', () => readClipboardPayload());
 ipcMain.handle('shield:get-desktop-preferences', () => ({
   ...getDesktopPreferences(),
+  appVersion: app.getVersion(),
   updateDownloaded: isUpdateDownloaded,
   updateConfigured: Boolean(desktopConfig?.updateUrl)
 }));
@@ -629,6 +630,7 @@ ipcMain.handle('shield:set-start-with-windows', (_event, startWithWindows) => {
   rebuildTrayMenu();
   return {
     ...preferences,
+    appVersion: app.getVersion(),
     updateDownloaded: isUpdateDownloaded,
     updateConfigured: Boolean(desktopConfig?.updateUrl)
   };
@@ -638,6 +640,7 @@ ipcMain.handle('shield:set-tray-mode', (_event, trayMode) => {
   rebuildTrayMenu();
   return {
     ...preferences,
+    appVersion: app.getVersion(),
     updateDownloaded: isUpdateDownloaded,
     updateConfigured: Boolean(desktopConfig?.updateUrl)
   };

@@ -26,6 +26,7 @@ interface ShieldDesktopUpdateStatus {
 interface ShieldDesktopPreferences {
   startWithWindows: boolean;
   trayMode: boolean;
+  appVersion?: string;
   updateDownloaded: boolean;
   updateConfigured: boolean;
 }

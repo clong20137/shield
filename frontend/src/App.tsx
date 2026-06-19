@@ -1,5 +1,5 @@
 import { CSSProperties, FormEvent, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Command, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Command, Download, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, RefreshCw, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
@@ -3541,6 +3541,86 @@ function getModalWindowClass(isClosing: boolean, className: string) {
   return `${isClosing ? 'modal-window-exit' : 'modal-window'} ${className}`;
 }
 
+function DesktopUpdatePrompt({
+  status,
+  installedVersion,
+  onClose,
+  onInstall,
+}: {
+  status: ShieldDesktopUpdateStatus | null;
+  installedVersion?: string;
+  onClose: () => void;
+  onInstall: () => void;
+}) {
+  const progress = status?.type === 'downloaded' || status?.type === 'restarting'
+    ? 100
+    : status?.type === 'downloading'
+      ? Math.min(100, Math.max(0, Math.round(status.percent || 0)))
+      : 0;
+  const isDownloaded = status?.type === 'downloaded';
+  const isRestarting = status?.type === 'restarting';
+  const targetVersionLabel = status?.version ? `version ${status.version}` : 'the latest release';
+
+  return (
+    <div className={getModalBackdropClass(false, 'bg-black/55 backdrop-blur-sm')}>
+      <div className={getModalWindowClass(false, 'w-full max-w-lg rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900 sm:p-6')}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">
+              <Download size={22} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-accent">Desktop Update</p>
+              <h2 className="mt-1 text-xl font-black text-gray-900 dark:text-gray-100">Shield needs an update</h2>
+              <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                This workstation is running {installedVersion ? `version ${installedVersion}` : 'an older desktop version'}.
+                Shield is preparing {targetVersionLabel} and will restart automatically when it is ready.
+              </p>
+            </div>
+          </div>
+          {!isRestarting && (
+            <button type="button" onClick={onClose} className="icon-close-button" aria-label="Close update prompt">
+              <X size={18} />
+            </button>
+          )}
+        </div>
+
+        <div className="mt-5 rounded border border-gray-200 p-4 dark:border-gray-800">
+          <div className="flex items-center justify-between gap-3 text-xs font-black uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+            <span>{isRestarting ? 'Restarting' : isDownloaded ? 'Ready' : 'Downloading'}</span>
+            <span>{progress}%</span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+            <div className="h-full rounded-full bg-accent transition-all duration-300" style={{ width: `${progress}%` }} />
+          </div>
+          <p className="mt-3 flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0 text-accent" />
+            <span>{isDownloaded || isRestarting ? 'Save any in-progress work now. Shield is ready to finish installing.' : 'You can keep working while the update downloads.'}</span>
+          </p>
+        </div>
+
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          {!isRestarting && (
+            <button type="button" onClick={onClose} className="btn-secondary justify-center">
+              <X size={16} />
+              <span>{isDownloaded ? 'Wait for Auto Restart' : 'Continue Working'}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onInstall}
+            disabled={!isDownloaded || isRestarting}
+            className="btn-primary justify-center disabled:pointer-events-none disabled:opacity-50"
+          >
+            <RefreshCw size={16} />
+            <span>{isRestarting ? 'Restarting...' : 'Restart Now'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ReportBugModal({
   onClose,
   onToast,
@@ -4896,6 +4976,7 @@ function App() {
   const [notifications, setNotifications] = useState<ToastMessage[]>([]);
   const [desktopPreferences, setDesktopPreferences] = useState<ShieldDesktopPreferences | null>(null);
   const [desktopUpdateStatus, setDesktopUpdateStatus] = useState<ShieldDesktopUpdateStatus | null>(null);
+  const [isDesktopUpdatePromptOpen, setIsDesktopUpdatePromptOpen] = useState(false);
   const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState<number>(() => {
     try {
       const raw = window.localStorage.getItem(SESSION_TIMEOUT_KEY);
@@ -4961,6 +5042,8 @@ function App() {
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const rateLimitToastRef = useRef(0);
+  const desktopUpdateCheckIsManualRef = useRef(false);
+  const desktopUpdateCheckedAccountRef = useRef<string | null>(null);
   const shownDueReminderIdsRef = useRef<Set<string>>(new Set());
   const notificationRequestRef = useRef(0);
   const apiConnectionWasLostRef = useRef(false);
@@ -5166,25 +5249,38 @@ function App() {
 
       if (status.type === 'available') {
         setDesktopPreferences((preferences) => preferences ? { ...preferences, updateDownloaded: false } : preferences);
+        setIsDesktopUpdatePromptOpen(true);
         showToast('info', status.version ? `Shield desktop update ${status.version} is downloading.` : 'A Shield desktop update is downloading.', { saveToNotifications: false });
+        desktopUpdateCheckIsManualRef.current = false;
       }
 
       if (status.type === 'downloaded') {
         setDesktopPreferences((preferences) => preferences ? { ...preferences, updateDownloaded: true } : preferences);
+        setIsDesktopUpdatePromptOpen(true);
         showToast('success', 'Shield desktop update downloaded. Shield will restart automatically.', { saveToNotifications: false });
+        desktopUpdateCheckIsManualRef.current = false;
       }
 
       if (status.type === 'restarting') {
+        setIsDesktopUpdatePromptOpen(true);
         showToast('info', 'Restarting Shield to install the desktop update...', { saveToNotifications: false });
       }
 
       if (status.type === 'not-available') {
-        showToast('success', 'Shield desktop is up to date.', { saveToNotifications: false });
+        if (desktopUpdateCheckIsManualRef.current) {
+          showToast('success', 'Shield desktop is up to date.', { saveToNotifications: false });
+        }
       }
 
       if (status.type === 'error') {
         console.error('Desktop update error:', status.message);
-        showToast('error', 'Failed to check for Shield desktop updates.', { saveToNotifications: false });
+        if (desktopUpdateCheckIsManualRef.current) {
+          showToast('error', 'Failed to check for Shield desktop updates.', { saveToNotifications: false });
+        }
+      }
+
+      if (status.type === 'not-available' || status.type === 'error') {
+        desktopUpdateCheckIsManualRef.current = false;
       }
     });
   }, []);
@@ -5243,17 +5339,37 @@ function App() {
     }
 
     try {
+      desktopUpdateCheckIsManualRef.current = true;
       const result = await window.shieldDesktop?.checkForUpdates?.();
       if (result && !result.ok) {
+        desktopUpdateCheckIsManualRef.current = false;
         showToast('error', result.message || 'Desktop update check is not available.', { saveToNotifications: false });
         return;
       }
       showToast('info', 'Checking for Shield desktop updates...', { saveToNotifications: false });
     } catch (error) {
+      desktopUpdateCheckIsManualRef.current = false;
       console.error('Failed to check for desktop updates:', error);
       showToast('error', 'Failed to check for desktop updates.', { saveToNotifications: false });
     }
   };
+
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser || !hasShieldDesktopFeature('checkForUpdates')) {
+      return;
+    }
+
+    if (desktopUpdateCheckedAccountRef.current === currentUser.id) {
+      return;
+    }
+
+    desktopUpdateCheckedAccountRef.current = currentUser.id;
+    desktopUpdateCheckIsManualRef.current = false;
+    window.shieldDesktop?.checkForUpdates?.().catch((error) => {
+      desktopUpdateCheckIsManualRef.current = false;
+      console.error('Failed to run login desktop update check:', error);
+    });
+  }, [currentUser, isAuthenticated]);
 
   const copySidebarDaily = (dateKey: string) => {
     const entry = sidebarCalendarEntries.find((item) => getEntryDateKey(item) === dateKey);
@@ -6774,6 +6890,14 @@ function App() {
     <Router basename={ROUTER_BASENAME}>
       <ToastHost toasts={toasts} />
       {showConfetti && <ConfettiOverlay />}
+      {isDesktopUpdatePromptOpen && (
+        <DesktopUpdatePrompt
+          status={desktopUpdateStatus}
+          installedVersion={desktopPreferences?.appVersion}
+          onClose={() => setIsDesktopUpdatePromptOpen(false)}
+          onInstall={handleInstallDesktopUpdate}
+        />
+      )}
       {isSetupLoading || isSessionLoading ? (
         <ShieldLoading
           title={isApiConnectionLost ? 'Connection Lost' : 'Loading SHIELD'}
