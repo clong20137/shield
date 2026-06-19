@@ -19,6 +19,7 @@ interface AccountSettingsPageProps {
     reminderAlarmSound: string;
     useMilitaryTime: boolean;
     hideQuickLaunch: boolean;
+    quickLaunchPlacement: 'dock' | 'sidebar';
     quickLaunchSlotCount: number;
   };
   isDesktopApp: boolean;
@@ -33,6 +34,7 @@ interface AccountSettingsPageProps {
   onReminderAlarmSoundSelect: (reminderAlarmSound: string) => void;
   onMilitaryTimeChange: (useMilitaryTime: boolean) => void;
   onQuickLaunchHiddenChange: (hideQuickLaunch: boolean) => void;
+  onQuickLaunchPlacementChange: (placement: 'dock' | 'sidebar') => void;
   onQuickLaunchSlotCountChange: (slotCount: number) => void;
   onPresenceHiddenChange: (presenceHidden: boolean) => void;
   onCalendarHiddenChange: (calendarHidden: boolean) => void;
@@ -81,6 +83,7 @@ export function AccountSettingsPage({
   onReminderAlarmSoundSelect,
   onMilitaryTimeChange,
   onQuickLaunchHiddenChange,
+  onQuickLaunchPlacementChange,
   onQuickLaunchSlotCountChange,
   onPresenceHiddenChange,
   onCalendarHiddenChange,
@@ -1074,6 +1077,29 @@ export function AccountSettingsPage({
               checked={messagePreferences.hideQuickLaunch}
               onChange={onQuickLaunchHiddenChange}
             />
+            <div className="rounded border border-gray-200 p-4 dark:border-gray-800">
+              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Quick launcher location</span>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Place quick launch at the bottom of the workspace or as a grid under the sidebar calendar.</span>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {[
+                  ['dock', 'Bottom dock'],
+                  ['sidebar', 'Left panel grid'],
+                ].map(([placement, label]) => (
+                  <button
+                    key={placement}
+                    type="button"
+                    onClick={() => onQuickLaunchPlacementChange(placement as 'dock' | 'sidebar')}
+                    className={`rounded border px-3 py-2 text-sm font-black transition ${
+                      messagePreferences.quickLaunchPlacement === placement
+                        ? 'border-accent bg-accent/10 text-accent'
+                        : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-accent dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
               <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Quick launcher slots</span>
               <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose how many quick launch positions are available in your dock.</span>

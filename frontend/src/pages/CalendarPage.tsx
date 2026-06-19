@@ -2346,18 +2346,20 @@ function CalendarPage({
   const workedDutyHoursTarget = Math.max(reportedDutyHours - leaveStatusHours, 0);
   const shiftDutyTargetHours = leaveStatusHours > 0 ? workedDutyHoursTarget : reportedDutyHours;
   const standardDutyActivityHours = dutyActivityHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
-  const dutyActivityHours = standardDutyActivityHours + tCodeHours;
+  const dutyActivityHours = standardDutyActivityHours;
   const hasShiftTime = calculatedShiftHours > 0;
   const hasShiftDutyTarget = shiftDutyTargetHours > 0;
   const hasReportedHours = reportedDutyHours > 0;
   const shiftHoursMatch = isHourTargetMatch(shiftDutyTargetHours, calculatedShiftHours);
   const attendanceHoursMatch = isHourMatch(reportedDutyHours, attendanceHours);
   const dutyActivityHoursMatch = isHourTargetMatch(shiftDutyTargetHours, dutyActivityHours);
+  const tCodeHoursMatch = isHourTargetMatch(shiftDutyTargetHours, tCodeHours);
   const hasHourMismatch =
     hasReportedHours &&
     ((hasShiftTime && Math.abs(calculatedShiftHours - shiftDutyTargetHours) > 0.01) ||
       (attendanceHours > 0 && Math.abs(attendanceHours - reportedDutyHours) > 0.01) ||
-      (dutyActivityHours > 0 && Math.abs(dutyActivityHours - shiftDutyTargetHours) > 0.01));
+      (dutyActivityHours > 0 && Math.abs(dutyActivityHours - shiftDutyTargetHours) > 0.01) ||
+      (tCodeHours > 0 && Math.abs(tCodeHours - shiftDutyTargetHours) > 0.01));
   const visibleDailySections = useMemo(
     () => trooperDailySections.filter((section) => !hiddenDailySections.includes(section.title)),
     [hiddenDailySections],
@@ -2391,7 +2393,8 @@ function CalendarPage({
     { label: 'Reported', value: reportedDutyHours, helper: '', isMatch: false },
     { label: 'Shift', value: calculatedShiftHours, helper: getHourTargetLabel(shiftDutyTargetHours, calculatedShiftHours, hasShiftDutyTarget ? 'Matches worked hours' : 'No worked hours'), isMatch: shiftHoursMatch || (!hasShiftDutyTarget && calculatedShiftHours <= 0.01) },
     { label: 'Attendance', value: attendanceHours, helper: getDifferenceLabel(reportedDutyHours, attendanceHours), isMatch: attendanceHoursMatch },
-    { label: 'Duty Activity', value: dutyActivityHours, helper: tCodeHours > 0 ? `Includes ${formatHours(tCodeHours)}h T-Codes` : getHourTargetLabel(shiftDutyTargetHours, dutyActivityHours, hasShiftDutyTarget ? 'Matches worked hours' : 'No worked hours'), isMatch: dutyActivityHoursMatch || (!hasShiftDutyTarget && dutyActivityHours <= 0.01) },
+    { label: 'Duty Activity', value: dutyActivityHours, helper: getHourTargetLabel(shiftDutyTargetHours, dutyActivityHours, hasShiftDutyTarget ? 'Matches worked hours' : 'No worked hours'), isMatch: dutyActivityHoursMatch || (!hasShiftDutyTarget && dutyActivityHours <= 0.01) },
+    { label: 'T-Codes', value: tCodeHours, helper: getHourTargetLabel(shiftDutyTargetHours, tCodeHours, hasShiftDutyTarget ? 'Matches worked hours' : 'No worked hours'), isMatch: tCodeHoursMatch || (!hasShiftDutyTarget && tCodeHours <= 0.01) },
   ];
   const activeHourGuidance = (() => {
     if (!hasReportedHours) {
@@ -2399,13 +2402,13 @@ function CalendarPage({
     }
 
     if (activeDailyPanel === 'T-Codes' && tCodeHours > 0) {
-      const difference = Math.abs(dutyActivityHours - shiftDutyTargetHours);
+      const difference = Math.abs(tCodeHours - shiftDutyTargetHours);
       return {
-        label: 'Duty activity hours',
-        value: dutyActivityHours,
-        isMatch: dutyActivityHoursMatch,
+        label: 'T-Code hours',
+        value: tCodeHours,
+        isMatch: tCodeHoursMatch,
         difference,
-        direction: dutyActivityHours > shiftDutyTargetHours ? 'over' : 'under',
+        direction: tCodeHours > shiftDutyTargetHours ? 'over' : 'under',
       };
     }
 
@@ -2598,6 +2601,9 @@ function CalendarPage({
       const hasIncompleteRow = !hasNoTCodes && tCodeRows.some((row) => !row.code.trim() || !row.timeWorked.trim());
       if (hasIncompleteRow) {
         return { state: 'attention', label: 'Needs attention' };
+      }
+      if (hasHourMismatch && tCodeHours > 0) {
+        return { state: 'warning', label: 'Hours mismatch' };
       }
       if (isTCodeComplete) {
         return { state: 'complete', label: 'Complete' };
@@ -3393,7 +3399,7 @@ function CalendarPage({
 
                       {hasHourMismatch && (
                         <p className="rounded-lg border border-danger/30 bg-red-50 px-3 py-2 text-sm font-semibold text-danger dark:bg-red-950/30">
-                          Hours do not match. Attendance should match reported duty hours; shift times and duty activity should match worked hours after Vacation/Sick hours.
+                          Hours do not match. Attendance should match reported duty hours; shift times, duty activity, and T-Codes should each match worked hours after Vacation/Sick hours.
                         </p>
                       )}
                     </div>

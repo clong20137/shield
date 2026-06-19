@@ -28,8 +28,8 @@ const QUICK_LAUNCH_DEFAULT_SLOT_COUNT = 8;
 const QUICK_LAUNCH_PICKER_WIDTH = 320;
 const QUICK_LAUNCH_PICKER_GUTTER = 12;
 const QUICK_LAUNCH_PICKER_CLOSE_MS = 500;
-const QUICK_LAUNCH_CONTEXT_MENU_WIDTH = 190;
-const QUICK_LAUNCH_CONTEXT_MENU_HEIGHT = 150;
+const QUICK_LAUNCH_CONTEXT_MENU_WIDTH = 256;
+const QUICK_LAUNCH_CONTEXT_MENU_HEIGHT = 330;
 const QUICK_LAUNCH_CONTEXT_MENU_GUTTER = 12;
 const MODAL_CLOSE_MS = 220;
 const PASSWORD_REQUIREMENTS_MESSAGE = 'Password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.';
@@ -70,11 +70,13 @@ interface MessagePreferences {
   reminderAlarmSound: ReminderAlarmSound;
   useMilitaryTime: boolean;
   hideQuickLaunch: boolean;
+  quickLaunchPlacement: QuickLaunchPlacement;
   quickLaunchSlotCount: number;
 }
 
 type ReminderAlarmSound = '' | `custom:${string}`;
 type MessageSound = '' | `custom:${string}`;
+type QuickLaunchPlacement = 'dock' | 'sidebar';
 
 type QuickLaunchAppId = 'dashboard' | 'messages' | 'calendar' | 'devices' | 'calculator' | 'search' | 'reports' | 'create-user' | 'audit' | 'permissions';
 type QuickLaunchExternalSlot = ApiQuickLaunchExternalSlot;
@@ -97,6 +99,7 @@ const defaultMessagePreferences: MessagePreferences = {
   reminderAlarmSound: '',
   useMilitaryTime: false,
   hideQuickLaunch: false,
+  quickLaunchPlacement: 'dock',
   quickLaunchSlotCount: QUICK_LAUNCH_DEFAULT_SLOT_COUNT,
 };
 
@@ -197,6 +200,7 @@ function loadMessagePreferences(): MessagePreferences {
     return {
       ...defaultMessagePreferences,
       ...parsedPreferences,
+      quickLaunchPlacement: parsedPreferences.quickLaunchPlacement === 'sidebar' ? 'sidebar' : 'dock',
       quickLaunchSlotCount: normalizeQuickLaunchSlotCount(parsedPreferences.quickLaunchSlotCount),
     };
   } catch {
@@ -2206,10 +2210,14 @@ function QuickLaunchTray({
   accountId,
   showCalendar,
   slotCount,
+  placement,
   onOpenMessages,
   onOpenCalendar,
   onOpenCalculator,
   onOpenCreateUser,
+  onQuickLaunchHiddenChange,
+  onQuickLaunchPlacementChange,
+  onQuickLaunchSlotCountChange,
 }: {
   isAdministrator: boolean;
   permissions: string[];
@@ -2220,12 +2228,17 @@ function QuickLaunchTray({
   accountId?: string;
   showCalendar: boolean;
   slotCount: number;
+  placement: QuickLaunchPlacement;
   onOpenMessages: () => void;
   onOpenCalendar: () => void;
   onOpenCalculator: () => void;
   onOpenCreateUser: () => void;
+  onQuickLaunchHiddenChange: (hideQuickLaunch: boolean) => void;
+  onQuickLaunchPlacementChange: (placement: QuickLaunchPlacement) => void;
+  onQuickLaunchSlotCountChange: (slotCount: number) => void;
 }) {
   const normalizedSlotCount = normalizeQuickLaunchSlotCount(slotCount);
+  const isSidebarPlacement = placement === 'sidebar';
   const navigate = useNavigate();
   const location = useLocation();
   const [slots, setSlots] = useState<QuickLaunchSlot[]>(() => getEmptyQuickLaunchSlots(normalizedSlotCount));
@@ -2709,9 +2722,23 @@ function QuickLaunchTray({
   }, [activeQuickLaunchTargets, isSidebarCollapsed]);
 
   return (
-    <section className={`pointer-events-none fixed bottom-3 left-3 right-3 z-30 hidden select-none transition-all duration-200 sm:bottom-5 sm:right-6 md:block ${isSidebarCollapsed ? 'sm:left-24' : 'sm:left-[19.5rem]'}`}>
-      <div ref={trayRef} data-onboarding-target="quick-launch" className="quick-launch-gold-frame quick-launch-tray-enter pointer-events-auto relative mx-auto w-fit max-w-full rounded-2xl border border-transparent bg-white/85 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:bg-gray-950/80 sm:p-3">
-        <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 sm:gap-2">
+    <section className={isSidebarPlacement
+      ? 'pointer-events-none relative hidden select-none md:block'
+      : `pointer-events-none fixed bottom-3 left-3 right-3 z-30 hidden select-none transition-all duration-200 sm:bottom-5 sm:right-6 md:block ${isSidebarCollapsed ? 'sm:left-24' : 'sm:left-[19.5rem]'}`
+    }>
+      <div
+        ref={trayRef}
+        data-onboarding-target="quick-launch"
+        className={`quick-launch-gold-frame quick-launch-tray-enter pointer-events-auto relative max-w-full border border-transparent bg-white/85 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:bg-gray-950/80 ${
+          isSidebarPlacement
+            ? 'w-full rounded-lg sm:p-2'
+            : 'mx-auto w-fit rounded-2xl sm:p-3'
+        }`}
+      >
+        <div className={isSidebarPlacement
+          ? `grid max-w-full gap-1.5 ${isSidebarCollapsed ? 'grid-cols-1 justify-items-center' : 'grid-cols-3'}`
+          : 'flex max-w-full flex-wrap items-center justify-center gap-1.5 sm:gap-2'
+        }>
         {slots.map((slot, index) => {
           const slotRenderKey = getQuickLaunchSlotRenderKey(slot, index);
           const app = typeof slot === 'string' ? availableApps.find((item) => item.id === slot) || null : null;
@@ -2860,7 +2887,7 @@ function QuickLaunchTray({
 
       {contextMenu && (
         <div
-          className="quick-launch-context-menu pointer-events-auto fixed z-[70] min-w-40 overflow-hidden rounded border border-gray-200 bg-white p-1 text-sm shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+          className="quick-launch-context-menu pointer-events-auto fixed z-[70] w-64 overflow-hidden rounded border border-gray-200 bg-white p-1 text-sm shadow-2xl dark:border-gray-700 dark:bg-gray-900"
           style={{
             left: Math.max(
               QUICK_LAUNCH_CONTEXT_MENU_GUTTER,
@@ -2886,6 +2913,48 @@ function QuickLaunchTray({
             className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
           >
             <Trash2 size={15} /> Remove
+          </button>
+          <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+          <div className="px-3 py-2">
+            <div className="mb-2 flex items-center justify-between gap-3 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              <span>Slots</span>
+              <span>{normalizedSlotCount}</span>
+            </div>
+            <input
+              type="range"
+              min={QUICK_LAUNCH_MIN_SLOT_COUNT}
+              max={QUICK_LAUNCH_MAX_SLOT_COUNT}
+              value={normalizedSlotCount}
+              onChange={(event) => onQuickLaunchSlotCountChange(Number(event.target.value))}
+              className="w-full"
+              aria-label="Quick launcher slot count"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-1 px-1 pb-1">
+            <button
+              type="button"
+              onClick={() => onQuickLaunchPlacementChange('dock')}
+              className={`quick-launch-context-menu-item justify-center text-gray-700 dark:text-gray-200 ${placement === 'dock' ? 'bg-accent/10 text-accent' : ''}`}
+            >
+              Dock
+            </button>
+            <button
+              type="button"
+              onClick={() => onQuickLaunchPlacementChange('sidebar')}
+              className={`quick-launch-context-menu-item justify-center text-gray-700 dark:text-gray-200 ${placement === 'sidebar' ? 'bg-accent/10 text-accent' : ''}`}
+            >
+              Left Grid
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onQuickLaunchHiddenChange(true);
+              setContextMenu(null);
+            }}
+            className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
+          >
+            <X size={15} /> Hide launcher
           </button>
           <button
             type="button"
@@ -7020,6 +7089,49 @@ function App() {
                   />
                 </div>
               )}
+              {!messagePreferences.hideQuickLaunch && messagePreferences.quickLaunchPlacement === 'sidebar' && (
+                <div className={showCalendar ? 'mt-3' : ''}>
+                  {!isSidebarCollapsed && (
+                    <div className="mb-2 flex items-center justify-between gap-2 text-blue-100">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.16em]">Quick Launch</span>
+                      <span className="text-[10px] font-black">{messagePreferences.quickLaunchSlotCount}</span>
+                    </div>
+                  )}
+                  <QuickLaunchTray
+                    isAdministrator={isAdministrator}
+                    permissions={currentUser?.permissions || []}
+                    isSidebarCollapsed={isSidebarCollapsed}
+                    badgeCounts={{ messages: messageUnreadCount }}
+                    activeModalApps={[
+                      ...(isMessagesModalOpen ? (['messages'] as const) : []),
+                      ...(isCalendarModalOpen ? (['calendar'] as const) : []),
+                      ...(isCalculatorOpen ? (['calculator'] as const) : []),
+                    ]}
+                    storageKey={getQuickLaunchStorageKey(currentUser?.id || 'anonymous')}
+                    accountId={currentUser?.id}
+                    showCalendar={showCalendar}
+                    slotCount={messagePreferences.quickLaunchSlotCount}
+                    placement={messagePreferences.quickLaunchPlacement}
+                    onOpenMessages={toggleMessagesModal}
+                    onOpenCalendar={toggleCalendarModal}
+                    onOpenCalculator={toggleCalculator}
+                    onOpenCreateUser={toggleCreateUserModal}
+                    onQuickLaunchHiddenChange={(hideQuickLaunch) =>
+                      setMessagePreferences((preferences) => ({
+                        ...preferences,
+                        hideQuickLaunch,
+                      }))
+                    }
+                    onQuickLaunchPlacementChange={(quickLaunchPlacement) =>
+                      setMessagePreferences((preferences) => ({
+                        ...preferences,
+                        quickLaunchPlacement,
+                      }))
+                    }
+                    onQuickLaunchSlotCountChange={handleQuickLaunchSlotCountChange}
+                  />
+                </div>
+              )}
             </div>
             </div>
           </aside>
@@ -7362,7 +7474,7 @@ function App() {
                   </RouteTransition>
                 </Suspense>
               </div>
-              {!messagePreferences.hideQuickLaunch && (
+              {!messagePreferences.hideQuickLaunch && messagePreferences.quickLaunchPlacement === 'dock' && (
                 <QuickLaunchTray
                   isAdministrator={isAdministrator}
                   permissions={currentUser?.permissions || []}
@@ -7377,10 +7489,24 @@ function App() {
                   accountId={currentUser?.id}
                   showCalendar={showCalendar}
                   slotCount={messagePreferences.quickLaunchSlotCount}
+                  placement={messagePreferences.quickLaunchPlacement}
                   onOpenMessages={toggleMessagesModal}
                   onOpenCalendar={toggleCalendarModal}
                   onOpenCalculator={toggleCalculator}
                   onOpenCreateUser={toggleCreateUserModal}
+                  onQuickLaunchHiddenChange={(hideQuickLaunch) =>
+                    setMessagePreferences((preferences) => ({
+                      ...preferences,
+                      hideQuickLaunch,
+                    }))
+                  }
+                  onQuickLaunchPlacementChange={(quickLaunchPlacement) =>
+                    setMessagePreferences((preferences) => ({
+                      ...preferences,
+                      quickLaunchPlacement,
+                    }))
+                  }
+                  onQuickLaunchSlotCountChange={handleQuickLaunchSlotCountChange}
                 />
               )}
             </main>
@@ -7586,6 +7712,12 @@ function App() {
                         setMessagePreferences((preferences) => ({
                           ...preferences,
                           hideQuickLaunch,
+                        }))
+                      }
+                      onQuickLaunchPlacementChange={(quickLaunchPlacement) =>
+                        setMessagePreferences((preferences) => ({
+                          ...preferences,
+                          quickLaunchPlacement,
                         }))
                       }
                       onQuickLaunchSlotCountChange={handleQuickLaunchSlotCountChange}
