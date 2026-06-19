@@ -1,6 +1,6 @@
 {
   "name": "shield-desktop",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Desktop shell for Shield",
   "main": "main.cjs",
   "private": true,

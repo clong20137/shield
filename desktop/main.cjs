@@ -15,6 +15,12 @@ let tray = null;
 let isQuitting = false;
 let isUpdateDownloaded = false;
 
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
+
 const desktopPreferencesDefault = {
   startWithWindows: false,
   trayMode: true
@@ -548,18 +554,24 @@ function createMainWindow() {
 
 app.setAppUserModelId('com.shield.desktop');
 
-app.whenReady().then(() => {
-  Menu.setApplicationMenu(null);
-  createTray();
-  createMainWindow();
-  configureAutoUpdates(desktopConfig);
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow();
-    }
+if (hasSingleInstanceLock) {
+  app.on('second-instance', () => {
+    showMainWindow();
   });
-});
+
+  app.whenReady().then(() => {
+    Menu.setApplicationMenu(null);
+    createTray();
+    createMainWindow();
+    configureAutoUpdates(desktopConfig);
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createMainWindow();
+      }
+    });
+  });
+}
 
 app.on('before-quit', () => {
   isQuitting = true;
