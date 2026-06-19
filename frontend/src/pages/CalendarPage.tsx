@@ -760,38 +760,6 @@ function isSectionTouched(details: Record<string, string> | undefined, section: 
     .some(([key]) => isDetailComplete(details, key));
 }
 
-function HourMetricPill({
-  label,
-  value,
-  helper,
-  isMatch = false,
-}: {
-  label: string;
-  value: string;
-  helper?: string;
-  isMatch?: boolean;
-}) {
-  return (
-    <div
-      className={`flex min-w-0 items-center justify-between gap-2 rounded border px-2.5 py-1.5 transition-all duration-300 ${
-        isMatch
-          ? 'trooper-daily-match border-green-300 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-100'
-          : 'border-gray-200 bg-white text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200'
-      }`}
-    >
-      <div className="min-w-0">
-        <p className={`truncate text-[10px] font-bold uppercase tracking-wide ${isMatch ? 'text-green-700 dark:text-green-200' : 'text-gray-500 dark:text-gray-400'}`}>{label}</p>
-        {helper && (
-          <p className={`truncate text-[10px] font-semibold ${isMatch ? 'text-green-700 dark:text-green-300' : 'text-gray-500 dark:text-gray-400'}`}>{helper}</p>
-        )}
-      </div>
-      <p className={`shrink-0 text-sm font-black ${isMatch ? 'text-green-700 dark:text-green-200' : 'text-primary-500 dark:text-blue-100'}`}>
-        {value}
-      </p>
-    </div>
-  );
-}
-
 function TimeDetailInput({
   value,
   onChange,
@@ -2346,20 +2314,19 @@ function CalendarPage({
   const workedDutyHoursTarget = Math.max(reportedDutyHours - leaveStatusHours, 0);
   const shiftDutyTargetHours = leaveStatusHours > 0 ? workedDutyHoursTarget : reportedDutyHours;
   const standardDutyActivityHours = dutyActivityHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
-  const dutyActivityHours = standardDutyActivityHours;
+  const dutyActivityHours = standardDutyActivityHours + tCodeHours;
+  const remainingDutyActivityHours = Math.max(shiftDutyTargetHours - dutyActivityHours, 0);
   const hasShiftTime = calculatedShiftHours > 0;
   const hasShiftDutyTarget = shiftDutyTargetHours > 0;
   const hasReportedHours = reportedDutyHours > 0;
   const shiftHoursMatch = isHourTargetMatch(shiftDutyTargetHours, calculatedShiftHours);
   const attendanceHoursMatch = isHourMatch(reportedDutyHours, attendanceHours);
   const dutyActivityHoursMatch = isHourTargetMatch(shiftDutyTargetHours, dutyActivityHours);
-  const tCodeHoursMatch = isHourTargetMatch(shiftDutyTargetHours, tCodeHours);
   const hasHourMismatch =
     hasReportedHours &&
     ((hasShiftTime && Math.abs(calculatedShiftHours - shiftDutyTargetHours) > 0.01) ||
       (attendanceHours > 0 && Math.abs(attendanceHours - reportedDutyHours) > 0.01) ||
-      (dutyActivityHours > 0 && Math.abs(dutyActivityHours - shiftDutyTargetHours) > 0.01) ||
-      (tCodeHours > 0 && Math.abs(tCodeHours - shiftDutyTargetHours) > 0.01));
+      (dutyActivityHours > 0 && Math.abs(dutyActivityHours - shiftDutyTargetHours) > 0.01));
   const visibleDailySections = useMemo(
     () => trooperDailySections.filter((section) => !hiddenDailySections.includes(section.title)),
     [hiddenDailySections],
@@ -2393,23 +2360,11 @@ function CalendarPage({
     { label: 'Reported', value: reportedDutyHours, helper: '', isMatch: false },
     { label: 'Shift', value: calculatedShiftHours, helper: getHourTargetLabel(shiftDutyTargetHours, calculatedShiftHours, hasShiftDutyTarget ? 'Matches worked hours' : 'No worked hours'), isMatch: shiftHoursMatch || (!hasShiftDutyTarget && calculatedShiftHours <= 0.01) },
     { label: 'Attendance', value: attendanceHours, helper: getDifferenceLabel(reportedDutyHours, attendanceHours), isMatch: attendanceHoursMatch },
-    { label: 'Duty Activity', value: dutyActivityHours, helper: getHourTargetLabel(shiftDutyTargetHours, dutyActivityHours, hasShiftDutyTarget ? 'Matches worked hours' : 'No worked hours'), isMatch: dutyActivityHoursMatch || (!hasShiftDutyTarget && dutyActivityHours <= 0.01) },
-    { label: 'T-Codes', value: tCodeHours, helper: getHourTargetLabel(shiftDutyTargetHours, tCodeHours, hasShiftDutyTarget ? 'Matches worked hours' : 'No worked hours'), isMatch: tCodeHoursMatch || (!hasShiftDutyTarget && tCodeHours <= 0.01) },
+    { label: 'Duty Activity', value: dutyActivityHours, helper: tCodeHours > 0 ? `Includes ${formatHours(tCodeHours)}h T-Code` : getHourTargetLabel(shiftDutyTargetHours, dutyActivityHours, hasShiftDutyTarget ? 'Matches worked hours' : 'No worked hours'), isMatch: dutyActivityHoursMatch || (!hasShiftDutyTarget && dutyActivityHours <= 0.01) },
   ];
   const activeHourGuidance = (() => {
     if (!hasReportedHours) {
       return null;
-    }
-
-    if (activeDailyPanel === 'T-Codes' && tCodeHours > 0) {
-      const difference = Math.abs(tCodeHours - shiftDutyTargetHours);
-      return {
-        label: 'T-Code hours',
-        value: tCodeHours,
-        isMatch: tCodeHoursMatch,
-        difference,
-        direction: tCodeHours > shiftDutyTargetHours ? 'over' : 'under',
-      };
     }
 
     if (!activeDailySection) {
@@ -2419,7 +2374,7 @@ function CalendarPage({
     const sectionComparisons: Record<string, { label: string; value: number; isMatch: boolean }> = {
       'Regular Duty': { label: 'Shift time', value: calculatedShiftHours, isMatch: shiftHoursMatch },
       'Attendance Hours': { label: 'Attendance hours', value: attendanceHours, isMatch: attendanceHoursMatch },
-      'Duty Hours': { label: 'Duty activity hours', value: dutyActivityHours, isMatch: dutyActivityHoursMatch },
+      'Duty Hours': { label: 'Duty activity + T-Code hours', value: dutyActivityHours, isMatch: dutyActivityHoursMatch },
     };
     const comparison = sectionComparisons[activeDailySection.title];
     if (!comparison || comparison.value <= 0) {
@@ -2601,9 +2556,6 @@ function CalendarPage({
       const hasIncompleteRow = !hasNoTCodes && tCodeRows.some((row) => !row.code.trim() || !row.timeWorked.trim());
       if (hasIncompleteRow) {
         return { state: 'attention', label: 'Needs attention' };
-      }
-      if (hasHourMismatch && tCodeHours > 0) {
-        return { state: 'warning', label: 'Hours mismatch' };
       }
       if (isTCodeComplete) {
         return { state: 'complete', label: 'Complete' };
@@ -3232,22 +3184,6 @@ function CalendarPage({
                     </div>
                   </div>
 
-                  <div className={`sticky top-0 z-20 grid grid-cols-2 gap-2 border-b p-2 shadow-[0_10px_24px_rgba(15,23,42,0.08)] backdrop-blur lg:grid-cols-4 ${
-                    hasHourMismatch
-                      ? 'border-danger/30 bg-red-50/95 dark:bg-red-950/80'
-                      : 'border-accent/30 bg-white/95 dark:bg-gray-950/95'
-                  }`}>
-                    {hourMetrics.map((metric) => (
-                      <HourMetricPill
-                        key={metric.label}
-                        label={metric.label}
-                        value={`${formatHours(metric.value || 0)}h`}
-                        helper={metric.helper}
-                        isMatch={metric.isMatch}
-                      />
-                    ))}
-                  </div>
-
                 <section className="min-w-0 p-4">
                   {activeDailyPanel === 'Administrative' && (
                     <div className="space-y-4">
@@ -3399,7 +3335,7 @@ function CalendarPage({
 
                       {hasHourMismatch && (
                         <p className="rounded-lg border border-danger/30 bg-red-50 px-3 py-2 text-sm font-semibold text-danger dark:bg-red-950/30">
-                          Hours do not match. Attendance should match reported duty hours; shift times, duty activity, and T-Codes should each match worked hours after Vacation/Sick hours.
+                          Hours do not match. Attendance should match reported duty hours; shift times should match worked hours; Duty Hours activity plus T-Codes should add up to worked hours after Vacation/Sick hours.
                         </p>
                       )}
                     </div>
@@ -3530,6 +3466,13 @@ function CalendarPage({
                           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                             Add each T-Code worked and the time spent on it.
                           </p>
+                          {tCodeHours > 0 && (
+                            <p className="mt-2 rounded-lg border border-accent/20 bg-accent/5 px-3 py-2 text-sm font-semibold text-gray-700 dark:border-accent/30 dark:bg-accent/10 dark:text-gray-200">
+                              {formatHours(tCodeHours)}h T-Code counts toward Duty Hours. {remainingDutyActivityHours > 0.01
+                                ? `Report ${formatHours(remainingDutyActivityHours)}h more in Duty Hours to reach ${formatHours(shiftDutyTargetHours)}h.`
+                                : `Duty Hours target of ${formatHours(shiftDutyTargetHours)}h is covered.`}
+                            </p>
+                          )}
                         </div>
                         <button
                           type="button"
@@ -3910,7 +3853,7 @@ function CalendarPage({
               </div>
             </div>
 
-            <div className="mt-4 grid gap-2 sm:grid-cols-4">
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
               {hourMetrics.map((metric) => (
                 <div key={metric.label} className={`rounded-lg border p-3 ${
                   metric.isMatch
