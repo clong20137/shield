@@ -1,7 +1,7 @@
 import QRCode from 'qrcode';
 import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Camera, ChevronDown, Download, ExternalLink, EyeOff, Image, KeyRound, Laptop, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, Volume2, X } from 'lucide-react';
+import { Camera, ChevronDown, Download, ExternalLink, EyeOff, Image, KeyRound, Laptop, LogOut, Power, QrCode, RefreshCw, Save, ShieldCheck, Smartphone, UserCircle, Volume2, X } from 'lucide-react';
 import { AuthAccount, AuthSession, DeviceRecord, MediaLibraryItem, NotificationSound, TwoFactorSetupResponse, authService, deviceService, getAssetUrl, handleAssetImageError, performanceEvaluationService, userService } from '../services/api';
 import { ProfilePictureMediaPicker } from '../components/ProfilePictureMediaPicker';
 import { downloadPerformanceEvaluationPdf } from '../utils/performanceEvaluationPdf';
@@ -21,6 +21,7 @@ interface AccountSettingsPageProps {
     hideQuickLaunch: boolean;
     quickLaunchSlotCount: number;
   };
+  desktopPreferences: ShieldDesktopPreferences | null;
   notificationSounds: NotificationSound[];
   onReceiveMessagesChange: (receiveMessages: boolean) => void;
   onBrowserNotificationsChange: (browserNotifications: boolean) => void;
@@ -35,6 +36,9 @@ interface AccountSettingsPageProps {
   onCalendarHiddenChange: (calendarHidden: boolean) => void;
   onAppScaleChange: (appScale: AuthAccount['appScale']) => void;
   onDefaultDutyHoursChange: (defaultDutyHours: string) => void;
+  onStartWithWindowsChange: (startWithWindows: boolean) => void;
+  onTrayModeChange: (trayMode: boolean) => void;
+  onInstallDesktopUpdate: () => void;
   onOpenEvaluations?: () => void;
   onReplayGuide?: () => void;
   onAccountUpdate: (account: AuthAccount) => void;
@@ -62,6 +66,7 @@ function isSecurePassword(password: string): boolean {
 export function AccountSettingsPage({
   account,
   messagePreferences,
+  desktopPreferences,
   notificationSounds,
   onReceiveMessagesChange,
   onBrowserNotificationsChange,
@@ -76,6 +81,9 @@ export function AccountSettingsPage({
   onCalendarHiddenChange,
   onAppScaleChange,
   onDefaultDutyHoursChange,
+  onStartWithWindowsChange,
+  onTrayModeChange,
+  onInstallDesktopUpdate,
   onOpenEvaluations,
   onReplayGuide,
   onAccountUpdate,
@@ -932,6 +940,47 @@ export function AccountSettingsPage({
                 </a>
               </div>
             </div>
+            {desktopPreferences && (
+              <>
+                <PreferenceToggle
+                  title="Start with Windows"
+                  description="Launch Shield automatically when you sign in to this workstation."
+                  checked={desktopPreferences.startWithWindows}
+                  onChange={onStartWithWindowsChange}
+                  icon={<Power size={16} />}
+                />
+                <PreferenceToggle
+                  title="Minimize to system tray"
+                  description="Keep Shield running in the tray when the desktop window is closed."
+                  checked={desktopPreferences.trayMode}
+                  onChange={onTrayModeChange}
+                  icon={<Laptop size={16} />}
+                />
+                <div className="flex flex-col gap-3 rounded border border-gray-200 p-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Desktop updates</span>
+                    <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                      {desktopPreferences.updateDownloaded
+                        ? 'A desktop update is ready to install.'
+                        : desktopPreferences.updateConfigured
+                          ? 'Shield checks for desktop updates automatically.'
+                          : 'Desktop update URL is not configured for this installer.'}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onInstallDesktopUpdate}
+                    disabled={!desktopPreferences.updateDownloaded}
+                    className="btn-secondary justify-center disabled:pointer-events-none disabled:opacity-50"
+                    aria-label="Restart Shield to install desktop update"
+                    title={desktopPreferences.updateDownloaded ? 'Restart To Update' : 'No Update Ready'}
+                  >
+                    <RefreshCw size={16} />
+                    <span>Restart to Update</span>
+                  </button>
+                </div>
+              </>
+            )}
           </PreferenceGroup>
 
           <PreferenceGroup title="Workspace" description="Adjust daily-entry inputs and quick launcher layout.">

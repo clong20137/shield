@@ -4890,6 +4890,7 @@ function App() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [notifications, setNotifications] = useState<ToastMessage[]>([]);
+  const [desktopPreferences, setDesktopPreferences] = useState<ShieldDesktopPreferences | null>(null);
   const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState<number>(() => {
     try {
       const raw = window.localStorage.getItem(SESSION_TIMEOUT_KEY);
@@ -5141,15 +5142,28 @@ function App() {
 
   useEffect(() => {
     if (!isShieldDesktopApp()) {
+      setDesktopPreferences(null);
+      return;
+    }
+
+    window.shieldDesktop?.getDesktopPreferences()
+      .then(setDesktopPreferences)
+      .catch((error) => console.error('Failed to load desktop preferences:', error));
+  }, []);
+
+  useEffect(() => {
+    if (!isShieldDesktopApp()) {
       return;
     }
 
     return window.shieldDesktop?.onUpdateStatus((status) => {
       if (status.type === 'available') {
+        setDesktopPreferences((preferences) => preferences ? { ...preferences, updateDownloaded: false } : preferences);
         showToast('info', status.version ? `Shield desktop update ${status.version} is downloading.` : 'A Shield desktop update is downloading.', { saveToNotifications: false });
       }
 
       if (status.type === 'downloaded') {
+        setDesktopPreferences((preferences) => preferences ? { ...preferences, updateDownloaded: true } : preferences);
         showToast('success', 'Shield desktop update downloaded. Restart the app to install it.', { saveToNotifications: false });
       }
 
@@ -5158,6 +5172,53 @@ function App() {
       }
     });
   }, []);
+
+  const handleStartWithWindowsChange = async (startWithWindows: boolean) => {
+    if (!isShieldDesktopApp()) {
+      return;
+    }
+
+    try {
+      const preferences = await window.shieldDesktop?.setStartWithWindows(startWithWindows);
+      if (preferences) {
+        setDesktopPreferences(preferences);
+      }
+      showToast('success', startWithWindows ? 'Shield will start with Windows.' : 'Shield will not start with Windows.', { saveToNotifications: false });
+    } catch (error) {
+      console.error('Failed to update startup preference:', error);
+      showToast('error', 'Failed to update startup preference.', { saveToNotifications: false });
+    }
+  };
+
+  const handleTrayModeChange = async (trayMode: boolean) => {
+    if (!isShieldDesktopApp()) {
+      return;
+    }
+
+    try {
+      const preferences = await window.shieldDesktop?.setTrayMode(trayMode);
+      if (preferences) {
+        setDesktopPreferences(preferences);
+      }
+      showToast('success', trayMode ? 'Shield will minimize to the system tray.' : 'Shield will close normally.', { saveToNotifications: false });
+    } catch (error) {
+      console.error('Failed to update tray preference:', error);
+      showToast('error', 'Failed to update tray preference.', { saveToNotifications: false });
+    }
+  };
+
+  const handleInstallDesktopUpdate = async () => {
+    if (!isShieldDesktopApp()) {
+      return;
+    }
+
+    try {
+      await window.shieldDesktop?.installUpdate();
+    } catch (error) {
+      console.error('Failed to restart and install update:', error);
+      showToast('error', 'Failed to restart and install the desktop update.', { saveToNotifications: false });
+    }
+  };
 
   const copySidebarDaily = (dateKey: string) => {
     const entry = sidebarCalendarEntries.find((item) => getEntryDateKey(item) === dateKey);
@@ -7326,6 +7387,7 @@ function App() {
                     <AccountSettingsPage
                       account={currentUser}
                       messagePreferences={messagePreferences}
+                      desktopPreferences={desktopPreferences}
                       notificationSounds={notificationSounds}
                       onReceiveMessagesChange={handleReceiveMessagesChange}
                       onBrowserNotificationsChange={handleBrowserNotificationsChange}
@@ -7370,6 +7432,9 @@ function App() {
                       onCalendarHiddenChange={handleCalendarHiddenChange}
                       onAppScaleChange={handleAppScaleChange}
                       onDefaultDutyHoursChange={handleDefaultDutyHoursChange}
+                      onStartWithWindowsChange={handleStartWithWindowsChange}
+                      onTrayModeChange={handleTrayModeChange}
+                      onInstallDesktopUpdate={handleInstallDesktopUpdate}
                       onReplayGuide={replayGuide}
                       onOpenEvaluations={() => closeModal('profile')}
                       onAccountUpdate={handleAccountUpdate}

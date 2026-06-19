@@ -23,6 +23,13 @@ interface ShieldDesktopUpdateStatus {
   message?: string;
 }
 
+interface ShieldDesktopPreferences {
+  startWithWindows: boolean;
+  trayMode: boolean;
+  updateDownloaded: boolean;
+  updateConfigured: boolean;
+}
+
 interface Window {
   shieldDesktop?: {
     platform: string;
@@ -33,6 +40,9 @@ interface Window {
     clearAttention: () => Promise<boolean>;
     checkForUpdates: () => Promise<{ ok: boolean; message?: string }>;
     installUpdate: () => Promise<void>;
+    getDesktopPreferences: () => Promise<ShieldDesktopPreferences>;
+    setStartWithWindows: (startWithWindows: boolean) => Promise<ShieldDesktopPreferences>;
+    setTrayMode: (trayMode: boolean) => Promise<ShieldDesktopPreferences>;
     navigate: (appPath: string) => Promise<boolean>;
     onNotificationClick: (callback: (payload: { appPath?: string }) => void) => () => void;
     onUpdateStatus: (callback: (payload: ShieldDesktopUpdateStatus) => void) => () => void;

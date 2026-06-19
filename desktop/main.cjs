@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, shell, ipcMain, Notification, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, Tray, shell, ipcMain, Notification, nativeImage } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const fs = require('fs');
 const path = require('path');
@@ -11,6 +11,14 @@ const defaultConfig = {
 
 let mainWindow = null;
 let desktopConfig = null;
+let tray = null;
+let isQuitting = false;
+let isUpdateDownloaded = false;
+
+const desktopPreferencesDefault = {
+  startWithWindows: false,
+  trayMode: true
+};
 
 function escapeHtml(value) {
   return String(value)
@@ -98,6 +106,44 @@ function readJsonIfExists(filePath) {
   }
 }
 
+function getDesktopPreferencesPath() {
+  return path.join(app.getPath('userData'), 'desktop-preferences.json');
+}
+
+function getDesktopPreferences() {
+  const preferences = readJsonIfExists(getDesktopPreferencesPath()) || {};
+  const loginItemSettings = app.getLoginItemSettings();
+
+  return {
+    ...desktopPreferencesDefault,
+    ...preferences,
+    startWithWindows: Boolean(loginItemSettings.openAtLogin || preferences.startWithWindows)
+  };
+}
+
+function saveDesktopPreferences(preferences) {
+  const nextPreferences = {
+    ...getDesktopPreferences(),
+    ...preferences
+  };
+
+  fs.mkdirSync(app.getPath('userData'), { recursive: true });
+  fs.writeFileSync(getDesktopPreferencesPath(), JSON.stringify(nextPreferences, null, 2));
+  return nextPreferences;
+}
+
+function setStartWithWindows(startWithWindows) {
+  const enabled = Boolean(startWithWindows);
+  app.setLoginItemSettings({
+    openAtLogin: enabled,
+    openAsHidden: true,
+    path: process.execPath,
+    args: ['--hidden']
+  });
+
+  return saveDesktopPreferences({ startWithWindows: enabled });
+}
+
 function getDesktopConfig() {
   const packagedConfigPath = path.join(process.resourcesPath || __dirname, 'config.json');
   const localConfigPath = path.join(__dirname, 'config.json');
@@ -114,6 +160,101 @@ function getDesktopConfig() {
     allowedOrigins,
     updateUrl
   };
+}
+
+function createShieldTrayIcon() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+    <rect width="32" height="32" rx="7" fill="#0f172a"/>
+    <path d="M16 4.2 25 7.4v6.8c0 5.8-3.7 10.9-9 13.6-5.3-2.7-9-7.8-9-13.6V7.4l9-3.2Z" fill="#2563eb"/>
+    <path d="M16 7.1 22.2 9.3v4.6c0 4-2.5 7.6-6.2 9.7-3.7-2.1-6.2-5.7-6.2-9.7V9.3L16 7.1Z" fill="#e5e7eb"/>
+    <path d="M16 9.2 20.1 10.7v3.1c0 2.7-1.6 5.1-4.1 6.8-2.5-1.7-4.1-4.1-4.1-6.8v-3.1L16 9.2Z" fill="#dc2626"/>
+  </svg>`;
+
+  return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+}
+
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createMainWindow();
+    return;
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function rebuildTrayMenu() {
+  if (!tray) {
+    return;
+  }
+
+  const preferences = getDesktopPreferences();
+  tray.setContextMenu(Menu.buildFromTemplate([
+    {
+      label: 'Open Shield',
+      click: showMainWindow
+    },
+    {
+      label: 'Messages',
+      click: () => {
+        showMainWindow();
+        if (mainWindow) {
+          mainWindow.webContents.send('shield:desktop-notification-click', { appPath: '/messages' });
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Start with Windows',
+      type: 'checkbox',
+      checked: preferences.startWithWindows,
+      click: (menuItem) => setStartWithWindows(menuItem.checked)
+    },
+    {
+      label: 'Minimize to tray',
+      type: 'checkbox',
+      checked: preferences.trayMode,
+      click: (menuItem) => {
+        saveDesktopPreferences({ trayMode: menuItem.checked });
+        rebuildTrayMenu();
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Check for updates',
+      click: () => {
+        autoUpdater.checkForUpdates().catch((error) => sendUpdaterStatus('error', { message: error.message }));
+      }
+    },
+    {
+      label: 'Restart to update',
+      enabled: isUpdateDownloaded,
+      click: () => autoUpdater.quitAndInstall(false, true)
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit Shield',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      }
+    }
+  ]));
+}
+
+function createTray() {
+  if (tray) {
+    return;
+  }
+
+  tray = new Tray(createShieldTrayIcon());
+  tray.setToolTip('Shield');
+  tray.on('double-click', showMainWindow);
+  rebuildTrayMenu();
 }
 
 function getOrigin(value) {
@@ -220,6 +361,8 @@ function configureAutoUpdates(config) {
   autoUpdater.on('update-not-available', (info) => sendUpdaterStatus('not-available', { version: info.version }));
   autoUpdater.on('download-progress', (progress) => sendUpdaterStatus('downloading', { percent: Math.round(progress.percent || 0) }));
   autoUpdater.on('update-downloaded', (info) => {
+    isUpdateDownloaded = true;
+    rebuildTrayMenu();
     sendUpdaterStatus('downloaded', { version: info.version });
     showDesktopNotification({
       title: 'Shield update ready',
@@ -259,7 +402,21 @@ function createMainWindow() {
   });
 
   mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
+    if (!process.argv.includes('--hidden')) {
+      mainWindow.show();
+    }
+  });
+
+  mainWindow.on('close', (event) => {
+    const preferences = getDesktopPreferences();
+    if (!isQuitting && preferences.trayMode) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
   });
 
   mainWindow.webContents.on('before-input-event', (event, input) => {
@@ -320,6 +477,7 @@ app.setAppUserModelId('com.shield.desktop');
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
+  createTray();
   createMainWindow();
   configureAutoUpdates(desktopConfig);
 
@@ -328,6 +486,10 @@ app.whenReady().then(() => {
       createMainWindow();
     }
   });
+});
+
+app.on('before-quit', () => {
+  isQuitting = true;
 });
 
 ipcMain.handle('shield:desktop-notification', (_event, payload) => showDesktopNotification(payload));
@@ -357,6 +519,29 @@ ipcMain.handle('shield:check-for-updates', async () => {
 });
 ipcMain.handle('shield:install-update', () => {
   autoUpdater.quitAndInstall(false, true);
+});
+ipcMain.handle('shield:get-desktop-preferences', () => ({
+  ...getDesktopPreferences(),
+  updateDownloaded: isUpdateDownloaded,
+  updateConfigured: Boolean(desktopConfig?.updateUrl)
+}));
+ipcMain.handle('shield:set-start-with-windows', (_event, startWithWindows) => {
+  const preferences = setStartWithWindows(startWithWindows);
+  rebuildTrayMenu();
+  return {
+    ...preferences,
+    updateDownloaded: isUpdateDownloaded,
+    updateConfigured: Boolean(desktopConfig?.updateUrl)
+  };
+});
+ipcMain.handle('shield:set-tray-mode', (_event, trayMode) => {
+  const preferences = saveDesktopPreferences({ trayMode: Boolean(trayMode) });
+  rebuildTrayMenu();
+  return {
+    ...preferences,
+    updateDownloaded: isUpdateDownloaded,
+    updateConfigured: Boolean(desktopConfig?.updateUrl)
+  };
 });
 ipcMain.handle('shield:navigate', (_event, appPath) => {
   if (!mainWindow || !desktopConfig) {
