@@ -2000,13 +2000,6 @@
     @apply relative flex h-32 w-32 items-center justify-center overflow-visible;
   }
 
-  .shield-app-icon-loader::before {
-    content: '';
-    @apply absolute inset-0 z-30 rounded-full border-2 border-accent/25;
-    border-top-color: rgb(156, 134, 92);
-    animation: shield-loader-spin 1.25s linear infinite;
-  }
-
   .shield-app-icon-loader::after {
     content: '';
     @apply pointer-events-none absolute z-40;
@@ -2167,7 +2160,6 @@ select.trooper-daily-field-with-icon {
   .trooper-daily-check,
   .toast-notification,
   .shield-loader::after,
-  .shield-app-icon-loader::before,
   .shield-app-icon-loader::after,
   .shield-app-icon-loader img,
   .shield-loading-bar span,

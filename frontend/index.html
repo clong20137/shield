@@ -47,17 +47,6 @@
         overflow: visible;
       }
 
-      .initial-splash-mark::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        z-index: 3;
-        border: 2px solid rgba(156, 134, 92, 0.28);
-        border-top-color: #9c865c;
-        border-radius: 999px;
-        animation: splash-ring 1.25s linear infinite;
-      }
-
       .initial-splash-mark::after {
         content: '';
         position: absolute;
@@ -200,7 +189,6 @@
       }
 
       @media (prefers-reduced-motion: reduce) {
-        .initial-splash-mark::before,
         .initial-splash-mark::after,
         .initial-splash-mark img,
         .initial-splash-progress span,
