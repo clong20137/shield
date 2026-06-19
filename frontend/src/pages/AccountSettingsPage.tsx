@@ -1,7 +1,7 @@
 import QRCode from 'qrcode';
 import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Camera, Download, ExternalLink, EyeOff, Image, KeyRound, Laptop, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, Volume2, X } from 'lucide-react';
+import { Camera, ChevronDown, Download, ExternalLink, EyeOff, Image, KeyRound, Laptop, LogOut, QrCode, Save, ShieldCheck, Smartphone, UserCircle, Volume2, X } from 'lucide-react';
 import { AuthAccount, AuthSession, DeviceRecord, MediaLibraryItem, NotificationSound, TwoFactorSetupResponse, authService, deviceService, getAssetUrl, handleAssetImageError, performanceEvaluationService, userService } from '../services/api';
 import { ProfilePictureMediaPicker } from '../components/ProfilePictureMediaPicker';
 import { downloadPerformanceEvaluationPdf } from '../utils/performanceEvaluationPdf';
@@ -830,17 +830,22 @@ export function AccountSettingsPage({
               <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Message sound</span>
               <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose and preview the ping used when new unread messages arrive.</span>
               <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                <select
-                  value={messageSoundSelection}
-                  disabled={!messagePreferences.receiveMessages || !messagePreferences.playMessageSound || notificationSounds.length === 0}
-                  onChange={(event) => onMessageSoundSelect(event.target.value)}
-                  className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-                >
-                  <option value="">{notificationSounds.length > 0 ? 'Choose sound' : 'No sounds uploaded'}</option>
-                  {notificationSounds.map((sound) => (
-                    <option key={sound.id} value={`custom:${sound.id}`}>{sound.label}</option>
-                  ))}
-                </select>
+                <div className="relative min-w-0 flex-1">
+                  <select
+                    value={messageSoundSelection}
+                    disabled={!messagePreferences.receiveMessages || !messagePreferences.playMessageSound || notificationSounds.length === 0}
+                    onChange={(event) => onMessageSoundSelect(event.target.value)}
+                    className="w-full appearance-none rounded border border-gray-300 bg-white py-2 pl-3 pr-10 text-sm dark:border-gray-700 dark:bg-gray-950"
+                  >
+                    <option value="">{notificationSounds.length > 0 ? 'Choose sound' : 'No sounds uploaded'}</option>
+                    {notificationSounds.map((sound) => (
+                      <option key={sound.id} value={`custom:${sound.id}`}>{sound.label}</option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400 dark:text-gray-500">
+                    <ChevronDown size={16} />
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => onPreviewMessageSound(messageSoundSelection)}
@@ -857,17 +862,35 @@ export function AccountSettingsPage({
             <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
               <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Reminder alarm sound</span>
               <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose the alarm used when a reminder is due.</span>
-              <select
-                value={reminderAlarmSoundSelection}
-                onChange={(event) => onReminderAlarmSoundSelect(event.target.value)}
-                disabled={notificationSounds.length === 0}
-                className="mt-3 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-              >
-                <option value="">{notificationSounds.length > 0 ? 'Choose sound' : 'No sounds uploaded'}</option>
-                {notificationSounds.map((sound) => (
-                  <option key={sound.id} value={`custom:${sound.id}`}>{sound.label}</option>
-                ))}
-              </select>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <div className="relative min-w-0 flex-1">
+                  <select
+                    value={reminderAlarmSoundSelection}
+                    onChange={(event) => onReminderAlarmSoundSelect(event.target.value)}
+                    disabled={notificationSounds.length === 0}
+                    className="w-full appearance-none rounded border border-gray-300 bg-white py-2 pl-3 pr-10 text-sm dark:border-gray-700 dark:bg-gray-950"
+                  >
+                    <option value="">{notificationSounds.length > 0 ? 'Choose sound' : 'No sounds uploaded'}</option>
+                    {notificationSounds.map((sound) => (
+                      <option key={sound.id} value={`custom:${sound.id}`}>{sound.label}</option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400 dark:text-gray-500">
+                    <ChevronDown size={16} />
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onPreviewMessageSound(reminderAlarmSoundSelection)}
+                  disabled={!reminderAlarmSoundSelection}
+                  className="btn-secondary justify-center"
+                  aria-label="Preview reminder alarm sound"
+                  title="Preview Sound"
+                >
+                  <Volume2 size={16} />
+                  <span>Preview</span>
+                </button>
+              </div>
             </label>
           </PreferenceGroup>
 
