@@ -25,7 +25,7 @@
     "files": [
       "main.cjs",
       "preload.cjs",
-      "config.example.json",
+      "config*.json",
       "README.md"
     ],
     "win": {

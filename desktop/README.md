@@ -17,6 +17,8 @@ For development, copy `config.example.json` to `config.json` and set the interna
 }
 ```
 
+Before building an agency installer, create `desktop/config.json` with the production Shield URL. The installer will include it when `npm run dist` is run.
+
 You can also launch with:
 
 ```powershell
@@ -33,6 +35,8 @@ npm run dist
 ```
 
 The installer will be created in `desktop/release/`.
+
+If the desktop app opens to a blank navy screen or an error screen, press `Ctrl+Shift+I` inside the desktop window to open diagnostics. Most load issues mean `config.json` is still pointing to the example URL or the installed computer cannot reach the configured Shield URL.
 
 To make it downloadable from Account Settings, copy `desktop/release/Shield-Setup-1.0.0.exe` to the app downloads folder and name it `Shield-Setup.exe`.
 
