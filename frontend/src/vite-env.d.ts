@@ -49,6 +49,17 @@ interface ShieldDesktopClipboardFile {
   base64: string;
 }
 
+interface ShieldDesktopCrashReport {
+  id: string;
+  source: string;
+  message: string;
+  stack?: string;
+  extra?: Record<string, unknown>;
+  appVersion?: string;
+  platform?: string;
+  createdAt: string;
+}
+
 interface Window {
   shieldDesktop?: {
     platform: string;
@@ -58,6 +69,8 @@ interface Window {
     flashAttention?: () => Promise<boolean>;
     clearAttention?: () => Promise<boolean>;
     getClipboardFiles?: () => Promise<{ files: ShieldDesktopClipboardFile[] }>;
+    getCrashReports?: () => Promise<{ reports: ShieldDesktopCrashReport[] }>;
+    clearCrashReports?: (ids: string[]) => Promise<{ cleared: number }>;
     checkForUpdates?: () => Promise<{ ok: boolean; message?: string }>;
     installUpdate?: () => Promise<void>;
     getDesktopPreferences?: () => Promise<ShieldDesktopPreferences>;

@@ -1309,10 +1309,12 @@ async function checkApiHealth(signal?: AbortSignal): Promise<boolean> {
 function ShieldLoading({
   title = 'Loading SHIELD',
   detail,
+  steps = [],
   lastConnectedAt,
 }: {
   title?: string;
   detail?: string;
+  steps?: Array<{ label: string; status: 'active' | 'complete' | 'warning' | 'waiting'; detail?: string }>;
   lastConnectedAt?: number | null;
 }) {
   return (
@@ -1326,6 +1328,29 @@ function ShieldLoading({
           <span />
         </div>
         {detail && <p className="mt-3 text-sm font-semibold text-gray-500 dark:text-gray-400">{detail}</p>}
+        {steps.length > 0 && (
+          <div className="mx-auto mt-5 w-80 max-w-[82vw] rounded-lg border border-gray-200 bg-white/80 p-3 text-left shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
+            {steps.map((step) => (
+              <div key={step.label} className="flex items-start gap-3 py-1.5">
+                <span
+                  className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
+                    step.status === 'complete'
+                      ? 'bg-green-500'
+                      : step.status === 'warning'
+                        ? 'bg-amber-500'
+                        : step.status === 'active'
+                          ? 'animate-pulse bg-accent'
+                          : 'bg-gray-300 dark:bg-gray-700'
+                  }`}
+                />
+                <span className="min-w-0">
+                  <span className="block text-xs font-black uppercase tracking-[0.12em] text-gray-600 dark:text-gray-300">{step.label}</span>
+                  {step.detail && <span className="mt-0.5 block wrap-anywhere text-xs text-gray-500 dark:text-gray-400">{step.detail}</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
         {lastConnectedAt && (
           <p className="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-gray-400">
             Last connected {formatConnectionTime(lastConnectedAt)}
@@ -5120,6 +5145,7 @@ function App() {
   const desktopUpdateCheckIsManualRef = useRef(false);
   const desktopUpdateCheckedAccountRef = useRef<string | null>(null);
   const initialLoadingRef = useRef(true);
+  const desktopCrashReportSubmittedRef = useRef<Set<string>>(new Set());
   const shownDueReminderIdsRef = useRef<Set<string>>(new Set());
   const notificationRequestRef = useRef(0);
   const apiConnectionWasLostRef = useRef(false);
@@ -6540,6 +6566,67 @@ function App() {
   }, [isAdministrator, loadBugReports, notificationCenterTab]);
 
   useEffect(() => {
+    if (!isAuthenticated || !currentUser || !hasShieldDesktopFeature('getCrashReports')) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const submitPendingCrashReports = async () => {
+      try {
+        const payload = await window.shieldDesktop?.getCrashReports?.();
+        const reports = payload?.reports || [];
+        if (reports.length === 0 || isCancelled) {
+          return;
+        }
+
+        const submittedIds: string[] = [];
+        for (const report of reports) {
+          if (isCancelled || desktopCrashReportSubmittedRef.current.has(report.id)) {
+            continue;
+          }
+
+          desktopCrashReportSubmittedRef.current.add(report.id);
+          const description = [
+            `Source: ${report.source}`,
+            `Message: ${report.message}`,
+            `Version: ${report.appVersion || 'Unknown'}`,
+            `Platform: ${report.platform || 'Unknown'}`,
+            `Captured: ${report.createdAt}`,
+            report.stack ? `Stack:\n${report.stack}` : '',
+            report.extra ? `Details:\n${JSON.stringify(report.extra, null, 2)}` : '',
+          ].filter(Boolean).join('\n\n');
+
+          await bugReportService.create({
+            title: `Desktop crash: ${report.source}`,
+            description,
+            location: 'Electron desktop app',
+            priority: report.source.includes('renderer') ? 'High' : 'Critical',
+          });
+          submittedIds.push(report.id);
+        }
+
+        if (submittedIds.length > 0 && !isCancelled) {
+          await window.shieldDesktop?.clearCrashReports?.(submittedIds);
+          window.dispatchEvent(new CustomEvent('shield:bug-updated'));
+          if (isAdministrator) {
+            void loadBugReports();
+          }
+          showToast('info', `${submittedIds.length} desktop crash report${submittedIds.length === 1 ? '' : 's'} sent to Bug Tracker.`, { saveToNotifications: false });
+        }
+      } catch (error) {
+        console.error('Failed to submit desktop crash reports:', error);
+      }
+    };
+
+    void submitPendingCrashReports();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentUser, isAdministrator, isAuthenticated, loadBugReports]);
+
+  useEffect(() => {
     if (!currentUser) {
       return;
     }
@@ -7169,6 +7256,53 @@ function App() {
     return 'Connecting to API...';
   })();
 
+  const loadingSteps = (() => {
+    const steps: Array<{ label: string; status: 'active' | 'complete' | 'warning' | 'waiting'; detail?: string }> = [];
+
+    if (isShieldDesktopApp()) {
+      const updateStatus = desktopUpdateStatus?.type;
+      steps.push({
+        label: 'Desktop update',
+        status: updateStatus === 'error'
+          ? 'warning'
+          : updateStatus === 'not-available'
+            ? 'complete'
+            : isDesktopStartupUpdateBlocking
+              ? 'active'
+              : 'waiting',
+        detail: desktopUpdateStatus?.type === 'downloading' && typeof desktopUpdateStatus.percent === 'number'
+          ? `${desktopUpdateStatus.percent}% downloaded`
+          : desktopUpdateStatus?.type === 'available'
+            ? desktopUpdateStatus.version ? `Version ${desktopUpdateStatus.version} found` : 'Update found'
+            : desktopUpdateStatus?.type === 'downloaded'
+              ? 'Downloaded, restart pending'
+              : desktopUpdateStatus?.type === 'restarting'
+                ? 'Restarting installer'
+                : desktopUpdateStatus?.type === 'not-available'
+                  ? 'Up to date'
+                  : desktopUpdateStatus?.type === 'error'
+                    ? desktopUpdateStatus.message || 'Update check failed'
+                    : desktopPreferences?.updateConfigured
+                      ? 'Checking on launch'
+                      : 'Not configured',
+      });
+    }
+
+    steps.push({
+      label: 'API connection',
+      status: isSetupLoading ? isApiConnectionLost ? 'warning' : 'active' : 'complete',
+      detail: isSetupLoading ? isApiConnectionLost ? 'Waiting for API response' : 'Connecting to API' : 'Connected',
+    });
+
+    steps.push({
+      label: 'Account session',
+      status: isSessionLoading ? 'active' : 'complete',
+      detail: isSessionLoading ? 'Loading saved session' : 'Session ready',
+    });
+
+    return steps;
+  })();
+
   return (
     <Router basename={ROUTER_BASENAME}>
       <ToastHost toasts={toasts} />
@@ -7185,6 +7319,7 @@ function App() {
         <ShieldLoading
           title="Loading SHIELD"
           detail={loadingDetail}
+          steps={loadingSteps}
         />
       ) : setupStatus?.setupRequired ? (
         <SetupWizard

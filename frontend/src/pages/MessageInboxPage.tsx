@@ -1,4 +1,4 @@
-import { ClipboardEvent, FormEvent, KeyboardEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { ClipboardEvent, DragEvent, FormEvent, KeyboardEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Building2, Check, CheckCheck, Download, Image as ImageIcon, Pencil, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Save, Send, Trash2, Users, X } from 'lucide-react';
 import type { EmojiClickData } from 'emoji-picker-react';
@@ -354,6 +354,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState('');
   const [replyAttachments, setReplyAttachments] = useState<File[]>([]);
+  const [isReplyDragOver, setIsReplyDragOver] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -969,6 +970,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   };
 
   const addFilesToReply = (files: File[]) => {
+    if (files.length === 0) {
+      return;
+    }
+
     const imageFiles = files.filter((file) => file.type.startsWith('image/'));
     const attachmentFiles = files.filter((file) => !file.type.startsWith('image/'));
 
@@ -1012,6 +1017,38 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
     event.preventDefault();
     addFilesToReply(pastedFiles);
+  };
+
+  const handleReplyDragOver = (event: DragEvent<HTMLFormElement>) => {
+    if (!selectedThreadAcceptsMessages) {
+      return;
+    }
+
+    if (Array.from(event.dataTransfer.types).includes('Files')) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+      setIsReplyDragOver(true);
+    }
+  };
+
+  const handleReplyDragLeave = (event: DragEvent<HTMLFormElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsReplyDragOver(false);
+    }
+  };
+
+  const handleReplyDrop = (event: DragEvent<HTMLFormElement>) => {
+    const droppedFiles = Array.from(event.dataTransfer.files || []);
+    if (droppedFiles.length === 0 || !selectedThreadAcceptsMessages) {
+      setIsReplyDragOver(false);
+      return;
+    }
+
+    event.preventDefault();
+    setIsReplyDragOver(false);
+    addFilesToReply(droppedFiles);
+    onToast('info', `Added ${droppedFiles.length} dropped file${droppedFiles.length === 1 ? '' : 's'} to this message.`);
+    focusReplyComposer();
   };
 
   const changeGroupImage = async (file?: File | null) => {
@@ -2009,7 +2046,18 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                 )}
               </div>
 
-              <form onSubmit={sendReply} className="border-t border-gray-200 p-3 dark:border-gray-800 sm:p-4">
+              <form
+                onSubmit={sendReply}
+                onDragOver={handleReplyDragOver}
+                onDragLeave={handleReplyDragLeave}
+                onDrop={handleReplyDrop}
+                className={`relative border-t border-gray-200 p-3 transition dark:border-gray-800 sm:p-4 ${isReplyDragOver ? 'bg-accent/5' : ''}`}
+              >
+                {isReplyDragOver && (
+                  <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-2xl border-2 border-dashed border-accent bg-white/85 text-sm font-black uppercase tracking-[0.14em] text-accent shadow-lg backdrop-blur dark:bg-gray-950/85">
+                    Drop files to attach
+                  </div>
+                )}
                 {!selectedThreadAcceptsMessages && (
                   <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-danger dark:border-red-900 dark:bg-red-950 dark:text-red-200">
                     {selectedThread.contactName} is not accepting messages right now.
@@ -2053,7 +2101,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                       type="file"
                       multiple
                       className="hidden"
-                      onChange={(event) => setReplyAttachments(Array.from(event.target.files || []))}
+                      onChange={(event) => {
+                        addFilesToReply(Array.from(event.target.files || []));
+                        event.currentTarget.value = '';
+                      }}
                     />
                   </label>
                   <button

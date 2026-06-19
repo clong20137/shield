@@ -24,6 +24,9 @@ let lastDesktopUpdateStatus = null;
 let isDesktopUpdateCheckRunning = false;
 let isStartupDesktopUpdateInProgress = false;
 let startupDesktopUpdateFallbackTimer = null;
+let rendererCrashReloadCount = 0;
+let rendererCrashResetTimer = null;
+const pendingCrashReports = [];
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -41,6 +44,9 @@ const webAppUpdateCheckIntervalMs = 30 * 1000;
 const webAppReloadCooldownMs = 15 * 1000;
 const desktopUpdateCheckIntervalMs = 15 * 60 * 1000;
 const desktopStartupUpdateFallbackMs = 2 * 60 * 1000;
+const maxPendingCrashReports = 10;
+const maxRendererCrashReloads = 2;
+const rendererCrashStableResetMs = 30 * 1000;
 const desktopIdleThresholdSeconds = 5 * 60;
 const desktopIdleCheckIntervalMs = 15 * 1000;
 let webAppUpdateCheckTimer = null;
@@ -135,6 +141,52 @@ function renderErrorPage({ title, message, detail, appUrl }) {
     </main>
   </body>
 </html>`;
+}
+
+function normalizeCrashDetail(value) {
+  if (value instanceof Error) {
+    return {
+      message: value.message,
+      stack: value.stack || ''
+    };
+  }
+
+  if (typeof value === 'object' && value !== null) {
+    let fallbackMessage = 'Desktop error object';
+    try {
+      fallbackMessage = JSON.stringify(value);
+    } catch {
+      fallbackMessage = Object.prototype.toString.call(value);
+    }
+
+    return {
+      message: value.message || fallbackMessage,
+      stack: value.stack || ''
+    };
+  }
+
+  return {
+    message: String(value || 'Unknown desktop error'),
+    stack: ''
+  };
+}
+
+function recordDesktopCrash(source, error, extra = {}) {
+  const detail = normalizeCrashDetail(error);
+  pendingCrashReports.unshift({
+    id: crypto.randomUUID(),
+    source,
+    message: detail.message,
+    stack: detail.stack,
+    extra,
+    appVersion: app.getVersion(),
+    platform: process.platform,
+    createdAt: new Date().toISOString()
+  });
+
+  if (pendingCrashReports.length > maxPendingCrashReports) {
+    pendingCrashReports.length = maxPendingCrashReports;
+  }
 }
 
 function readJsonIfExists(filePath) {
@@ -746,6 +798,13 @@ function createMainWindow() {
   });
 
   mainWindow.webContents.on('did-finish-load', () => {
+    if (rendererCrashResetTimer) {
+      clearTimeout(rendererCrashResetTimer);
+    }
+    rendererCrashResetTimer = setTimeout(() => {
+      rendererCrashReloadCount = 0;
+      rendererCrashResetTimer = null;
+    }, rendererCrashStableResetMs);
     checkDesktopIdleStatus({ force: true });
   });
 
@@ -781,6 +840,20 @@ function createMainWindow() {
   });
 
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    if (rendererCrashResetTimer) {
+      clearTimeout(rendererCrashResetTimer);
+      rendererCrashResetTimer = null;
+    }
+    recordDesktopCrash('renderer-process-gone', details.reason || 'Renderer process stopped', details);
+    rendererCrashReloadCount += 1;
+
+    if (rendererCrashReloadCount <= maxRendererCrashReloads) {
+      mainWindow.loadURL(desktopConfig.appUrl).catch((error) => {
+        recordDesktopCrash('renderer-reload-failed', error);
+      });
+      return;
+    }
+
     mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(renderErrorPage({
       title: 'Shield desktop renderer stopped',
       message: 'The desktop window process stopped unexpectedly.',
@@ -857,6 +930,16 @@ app.on('before-quit', () => {
   }
 });
 
+process.on('uncaughtException', (error) => {
+  recordDesktopCrash('main-uncaught-exception', error);
+  console.error('Unhandled Shield desktop exception:', error);
+});
+
+process.on('unhandledRejection', (reason) => {
+  recordDesktopCrash('main-unhandled-rejection', reason);
+  console.error('Unhandled Shield desktop rejection:', reason);
+});
+
 ipcMain.handle('shield:desktop-notification', (_event, payload) => showDesktopNotification(payload));
 ipcMain.handle('shield:set-unread-count', (_event, count) => {
   updateUnreadBadge(count);
@@ -886,6 +969,23 @@ ipcMain.handle('shield:install-update', () => {
   installDownloadedUpdate();
 });
 ipcMain.handle('shield:get-clipboard-files', () => readClipboardPayload());
+ipcMain.handle('shield:get-crash-reports', () => ({ reports: [...pendingCrashReports] }));
+ipcMain.handle('shield:clear-crash-reports', (_event, ids) => {
+  const idSet = new Set(Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : []);
+  if (idSet.size === 0) {
+    return { cleared: 0 };
+  }
+
+  let cleared = 0;
+  for (let index = pendingCrashReports.length - 1; index >= 0; index -= 1) {
+    if (idSet.has(pendingCrashReports[index].id)) {
+      pendingCrashReports.splice(index, 1);
+      cleared += 1;
+    }
+  }
+
+  return { cleared };
+});
 ipcMain.handle('shield:get-desktop-preferences', () => ({
   ...getDesktopPreferences(),
   appVersion: app.getVersion(),
