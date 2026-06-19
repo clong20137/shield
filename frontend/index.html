@@ -38,6 +38,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        overflow: hidden;
       }
 
       .initial-splash-mark::before {
@@ -50,8 +51,21 @@
         animation: splash-ring 1.25s linear infinite;
       }
 
+      .initial-splash-mark::after {
+        content: '';
+        position: absolute;
+        inset: 1.2rem;
+        z-index: 2;
+        background: linear-gradient(115deg, transparent 18%, rgba(255, 255, 255, 0.72) 46%, transparent 72%);
+        opacity: 0.68;
+        transform: translateX(-150%) rotate(10deg);
+        animation: splash-logo-shine 2.4s ease-in-out infinite;
+        pointer-events: none;
+      }
+
       .initial-splash-mark img {
         position: relative;
+        z-index: 1;
         width: 5.75rem;
         height: 5.75rem;
         object-fit: contain;
@@ -87,6 +101,27 @@
         animation: splash-fallback 0.35s ease-out 7s forwards;
       }
 
+      .initial-splash-progress {
+        width: min(18rem, 72vw);
+        height: 0.5rem;
+        margin-top: 0.35rem;
+        overflow: hidden;
+        border: 1px solid rgba(156, 134, 92, 0.28);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.72);
+        box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08), 0 12px 24px rgba(15, 23, 42, 0.08);
+      }
+
+      .initial-splash-progress span {
+        display: block;
+        width: 44%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #6f623f, #c3ad78, #9c865c);
+        box-shadow: 0 0 18px rgba(156, 134, 92, 0.38);
+        animation: splash-progress 1.65s ease-in-out infinite;
+      }
+
       @keyframes splash-ring {
         to {
           transform: rotate(360deg);
@@ -101,6 +136,32 @@
 
         50% {
           transform: scale(1.045);
+        }
+      }
+
+      @keyframes splash-logo-shine {
+        0%,
+        24% {
+          transform: translateX(-150%) rotate(10deg);
+        }
+
+        58%,
+        100% {
+          transform: translateX(150%) rotate(10deg);
+        }
+      }
+
+      @keyframes splash-progress {
+        0% {
+          transform: translateX(-105%);
+        }
+
+        55% {
+          transform: translateX(88%);
+        }
+
+        100% {
+          transform: translateX(232%);
         }
       }
 
@@ -122,6 +183,11 @@
           color: #f9fafb;
         }
 
+        .initial-splash-progress {
+          background: rgba(17, 24, 39, 0.82);
+          box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.34), 0 16px 32px rgba(0, 0, 0, 0.28);
+        }
+
         .initial-splash-copy,
         .initial-splash-fallback {
           color: #9ca3af;
@@ -130,9 +196,15 @@
 
       @media (prefers-reduced-motion: reduce) {
         .initial-splash-mark::before,
+        .initial-splash-mark::after,
         .initial-splash-mark img,
+        .initial-splash-progress span,
         .initial-splash-fallback {
           animation: none;
+        }
+
+        .initial-splash-progress span {
+          width: 72%;
         }
 
         .initial-splash-fallback {
@@ -150,6 +222,7 @@
         <p class="initial-splash-kicker">SHIELD</p>
         <h1>Loading SHIELD</h1>
         <p class="initial-splash-copy">Preparing your workspace...</p>
+        <div class="initial-splash-progress" aria-hidden="true"><span></span></div>
         <p class="initial-splash-fallback">If this stays on screen, the frontend JavaScript did not load.</p>
       </div>
     </div>

@@ -68,6 +68,32 @@
   }
 }
 
+@keyframes shield-logo-shine {
+  0%,
+  24% {
+    transform: translateX(-150%) rotate(10deg);
+  }
+
+  58%,
+  100% {
+    transform: translateX(150%) rotate(10deg);
+  }
+}
+
+@keyframes shield-loading-progress {
+  0% {
+    transform: translateX(-105%);
+  }
+
+  55% {
+    transform: translateX(88%);
+  }
+
+  100% {
+    transform: translateX(232%);
+  }
+}
+
 @keyframes shimmer {
   100% {
     transform: translateX(100%);
@@ -1971,7 +1997,7 @@
   }
 
   .shield-app-icon-loader {
-    @apply relative flex h-28 w-28 items-center justify-center;
+    @apply relative flex h-28 w-28 items-center justify-center overflow-hidden;
   }
 
   .shield-app-icon-loader::before {
@@ -1981,9 +2007,31 @@
     animation: shield-loader-spin 1.25s linear infinite;
   }
 
+  .shield-app-icon-loader::after {
+    content: '';
+    @apply pointer-events-none absolute z-20;
+    inset: 1.2rem;
+    background: linear-gradient(115deg, transparent 18%, rgba(255, 255, 255, 0.72) 46%, transparent 72%);
+    opacity: 0.68;
+    transform: translateX(-150%) rotate(10deg);
+    animation: shield-logo-shine 2.4s ease-in-out infinite;
+  }
+
   .shield-app-icon-loader img {
     @apply relative z-10 h-24 w-24 object-contain drop-shadow-xl;
     animation: shield-icon-pulse 1.8s ease-in-out infinite;
+  }
+
+  .shield-loading-bar {
+    @apply h-2 w-72 max-w-[72vw] overflow-hidden rounded-full border border-accent/30 bg-white/80 shadow-lg shadow-gray-900/10 dark:bg-gray-900/80 dark:shadow-black/30;
+  }
+
+  .shield-loading-bar span {
+    @apply block h-full rounded-full;
+    width: 44%;
+    background: linear-gradient(90deg, #6f623f, #c3ad78, #9c865c);
+    box-shadow: 0 0 18px rgba(156, 134, 92, 0.38);
+    animation: shield-loading-progress 1.65s ease-in-out infinite;
   }
 
   .shield-sidebar {
@@ -2120,10 +2168,16 @@ select.trooper-daily-field-with-icon {
   .toast-notification,
   .shield-loader::after,
   .shield-app-icon-loader::before,
+  .shield-app-icon-loader::after,
   .shield-app-icon-loader img,
+  .shield-loading-bar span,
   .loading::after {
     animation: none !important;
     filter: none !important;
     transform: none !important;
+  }
+
+  .shield-loading-bar span {
+    width: 72%;
   }
 }

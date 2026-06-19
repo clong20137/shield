@@ -1322,6 +1322,9 @@ function ShieldLoading({
           <img src={withAppBase('/shield-icon.png')} alt="SHIELD" />
         </div>
         <p className="text-sm font-bold uppercase tracking-[0.24em] text-accent">{title}</p>
+        <div className="shield-loading-bar mx-auto mt-4" aria-hidden="true">
+          <span />
+        </div>
         {detail && <p className="mt-3 text-sm font-semibold text-gray-500 dark:text-gray-400">{detail}</p>}
         {lastConnectedAt && (
           <p className="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-gray-400">
