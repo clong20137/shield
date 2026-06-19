@@ -1286,6 +1286,9 @@ export const messageService = {
   sendTyping: (senderAccountId: string, recipientUserId: string, typingName: string, isTyping = true) =>
     api.post('/messages/typing', { senderAccountId, recipientUserId, typingName, isTyping }),
 
+  updatePresence: (status: 'active' | 'away') =>
+    api.post<{ ok: boolean; away: boolean }>('/messages/presence', { status }),
+
   archive: (messageId: string, recipientUserId: string) =>
     api.put(`/messages/${messageId}/archive`, { recipientUserId }),
 

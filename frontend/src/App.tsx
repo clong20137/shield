@@ -20,6 +20,7 @@ const PerformanceEvaluationsPage = lazy(() => import('./pages/PerformanceEvaluat
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
 const MESSAGE_PREFERENCES_KEY = 'shield_message_preferences';
+const MILITARY_TIME_DEFAULT_APPLIED_KEY = 'shield_military_time_default_applied';
 const SESSION_TIMEOUT_KEY = 'shield_session_timeout_minutes';
 const QUICK_LAUNCH_KEY = 'shield_quick_launch';
 const QUICK_LAUNCH_MIN_SLOT_COUNT = 4;
@@ -31,6 +32,7 @@ const QUICK_LAUNCH_PICKER_CLOSE_MS = 500;
 const QUICK_LAUNCH_CONTEXT_MENU_WIDTH = 256;
 const QUICK_LAUNCH_CONTEXT_MENU_HEIGHT = 300;
 const QUICK_LAUNCH_CONTEXT_MENU_GUTTER = 12;
+const AWAY_PRESENCE_IDLE_MS = 5 * 60 * 1000;
 const MODAL_CLOSE_MS = 220;
 const PASSWORD_REQUIREMENTS_MESSAGE = 'Password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.';
 const APP_BASE_PATH = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
@@ -97,7 +99,7 @@ const defaultMessagePreferences: MessagePreferences = {
   browserNotifications: false,
   messageSound: '',
   reminderAlarmSound: '',
-  useMilitaryTime: false,
+  useMilitaryTime: true,
   hideQuickLaunch: false,
   quickLaunchPlacement: 'dock',
   quickLaunchSlotCount: QUICK_LAUNCH_DEFAULT_SLOT_COUNT,
@@ -197,9 +199,15 @@ function loadMessagePreferences(): MessagePreferences {
   try {
     const storedPreferences = window.localStorage.getItem(MESSAGE_PREFERENCES_KEY);
     const parsedPreferences = storedPreferences ? JSON.parse(storedPreferences) : {};
+    const shouldApplyMilitaryTimeDefault = window.localStorage.getItem(MILITARY_TIME_DEFAULT_APPLIED_KEY) !== 'true';
+    if (shouldApplyMilitaryTimeDefault) {
+      window.localStorage.setItem(MILITARY_TIME_DEFAULT_APPLIED_KEY, 'true');
+    }
+
     return {
       ...defaultMessagePreferences,
       ...parsedPreferences,
+      useMilitaryTime: shouldApplyMilitaryTimeDefault ? true : parsedPreferences.useMilitaryTime ?? defaultMessagePreferences.useMilitaryTime,
       quickLaunchPlacement: parsedPreferences.quickLaunchPlacement === 'sidebar' ? 'sidebar' : 'dock',
       quickLaunchSlotCount: normalizeQuickLaunchSlotCount(parsedPreferences.quickLaunchSlotCount),
     };
@@ -5111,6 +5119,9 @@ function App() {
   const notificationRequestRef = useRef(0);
   const apiConnectionWasLostRef = useRef(false);
   const scheduledReminderTimeoutsRef = useRef<Map<string, number>>(new Map());
+  const awayPresenceTimerRef = useRef<number | null>(null);
+  const awayPresenceStateRef = useRef<'active' | 'away'>('active');
+  const awayPresenceRequestRef = useRef(0);
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
   const [notificationSounds, setNotificationSounds] = useState<NotificationSound[]>([]);
 
@@ -5170,6 +5181,91 @@ function App() {
   useEffect(() => {
     document.title = `${appName} - ${siteName}`;
   }, [appName, siteName]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser || currentUser.presenceHidden) {
+      if (awayPresenceTimerRef.current) {
+        window.clearTimeout(awayPresenceTimerRef.current);
+        awayPresenceTimerRef.current = null;
+      }
+      awayPresenceStateRef.current = 'active';
+      return undefined;
+    }
+
+    const setPresenceStatus = (status: 'active' | 'away', force = false) => {
+      if (!force && awayPresenceStateRef.current === status) {
+        return;
+      }
+
+      awayPresenceStateRef.current = status;
+      const requestId = awayPresenceRequestRef.current + 1;
+      awayPresenceRequestRef.current = requestId;
+      messageService.updatePresence(status).catch((error) => {
+        if (awayPresenceRequestRef.current === requestId) {
+          console.error('Failed to update presence status:', error);
+        }
+      });
+    };
+
+    const scheduleAway = () => {
+      if (awayPresenceTimerRef.current) {
+        window.clearTimeout(awayPresenceTimerRef.current);
+      }
+
+      awayPresenceTimerRef.current = window.setTimeout(() => {
+        setPresenceStatus('away');
+      }, AWAY_PRESENCE_IDLE_MS);
+    };
+
+    const markActive = (forceOrEvent: boolean | Event = false) => {
+      setPresenceStatus('active', forceOrEvent === true);
+      scheduleAway();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (awayPresenceTimerRef.current) {
+          window.clearTimeout(awayPresenceTimerRef.current);
+          awayPresenceTimerRef.current = null;
+        }
+        setPresenceStatus('away');
+        return;
+      }
+
+      markActive(true);
+    };
+
+    markActive(true);
+    const activeHeartbeat = window.setInterval(() => {
+      if (awayPresenceStateRef.current === 'active') {
+        messageService.updatePresence('active').catch((error) => {
+          console.error('Failed to refresh active presence:', error);
+        });
+      }
+    }, 60 * 1000);
+    window.addEventListener('keydown', markActive);
+    window.addEventListener('pointerdown', markActive);
+    window.addEventListener('mousemove', markActive);
+    window.addEventListener('scroll', markActive, true);
+    window.addEventListener('touchstart', markActive);
+    window.addEventListener('focus', markActive);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (awayPresenceTimerRef.current) {
+        window.clearTimeout(awayPresenceTimerRef.current);
+        awayPresenceTimerRef.current = null;
+      }
+      window.clearInterval(activeHeartbeat);
+      window.removeEventListener('keydown', markActive);
+      window.removeEventListener('pointerdown', markActive);
+      window.removeEventListener('mousemove', markActive);
+      window.removeEventListener('scroll', markActive, true);
+      window.removeEventListener('touchstart', markActive);
+      window.removeEventListener('focus', markActive);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentUser, isAuthenticated]);
 
   useEffect(() => {
     if (isSetupLoading || !setupStatus) {

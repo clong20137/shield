@@ -1517,6 +1517,20 @@ function isProfileOnline(lastSeenAt?: string | null): boolean {
   return !Number.isNaN(value) && Date.now() - value < 2 * 60 * 1000;
 }
 
+function isProfileAway(lastSeenAt?: string | null): boolean {
+  if (!lastSeenAt) {
+    return false;
+  }
+
+  const value = new Date(lastSeenAt).getTime();
+  if (Number.isNaN(value)) {
+    return false;
+  }
+
+  const diff = Date.now() - value;
+  return diff >= 2 * 60 * 1000 && diff < 5 * 60 * 1000;
+}
+
 function isMobileViewport() {
   return window.innerWidth < 768;
 }
@@ -1719,6 +1733,9 @@ function PinnedProfilesWidget({
                   <span className="relative mx-auto block h-16 w-16 rounded-full sm:h-[4.5rem] sm:w-[4.5rem]">
                     {isProfileOnline(profile.lastSeenAt) && (
                       <span className="pointer-events-none absolute -inset-1 rounded-full border border-green-400/45 shadow-[0_0_0_1px_rgba(34,197,94,0.12)] shield-online-pulse" />
+                    )}
+                    {isProfileAway(profile.lastSeenAt) && (
+                      <span className="pointer-events-none absolute -inset-1 rounded-full border border-amber-300/70 shadow-[0_0_0_1px_rgba(251,191,36,0.2)] shield-online-pulse" />
                     )}
                     <span className="relative block h-full w-full overflow-hidden rounded-full border-2 border-white bg-primary-500 shadow group-hover:ring-4 group-hover:ring-accent/20">
                       {profile.profilePictureUrl ? (

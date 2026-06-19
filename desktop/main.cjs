@@ -24,7 +24,7 @@ if (!hasSingleInstanceLock) {
 }
 
 const desktopPreferencesDefault = {
-  startWithWindows: false,
+  startWithWindows: true,
   trayMode: true
 };
 
@@ -206,6 +206,17 @@ function getDesktopPreferences() {
     ...preferences,
     startWithWindows: Boolean(loginItemSettings.openAtLogin || preferences.startWithWindows)
   };
+}
+
+function ensureDefaultDesktopPreferences() {
+  const preferences = readJsonIfExists(getDesktopPreferencesPath()) || {};
+  if (!Object.prototype.hasOwnProperty.call(preferences, 'startWithWindows')) {
+    setStartWithWindows(desktopPreferencesDefault.startWithWindows);
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(preferences, 'trayMode')) {
+    saveDesktopPreferences({ trayMode: desktopPreferencesDefault.trayMode });
+  }
 }
 
 function saveDesktopPreferences(preferences) {
@@ -687,6 +698,7 @@ if (hasSingleInstanceLock) {
 
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
+    ensureDefaultDesktopPreferences();
     createTray();
     createMainWindow();
     configureAutoUpdates(desktopConfig);

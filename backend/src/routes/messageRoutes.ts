@@ -9,9 +9,11 @@ const router = Router();
 const messageSendLimiter = rateLimit({ keyPrefix: 'messages-send', windowMs: 60 * 1000, max: 60, message: 'Too many messages sent. Try again shortly.' });
 const messageReadLimiter = rateLimit({ keyPrefix: 'messages-read', windowMs: 60 * 1000, max: 180, message: 'Too many message requests. Try again shortly.' });
 const messageTypingLimiter = rateLimit({ keyPrefix: 'messages-typing', windowMs: 60 * 1000, max: 180, message: 'Too many typing updates. Try again shortly.' });
+const messagePresenceLimiter = rateLimit({ keyPrefix: 'messages-presence', windowMs: 60 * 1000, max: 90, message: 'Too many presence updates. Try again shortly.' });
 const messageMutationLimiter = rateLimit({ keyPrefix: 'messages-mutate', windowMs: 60 * 1000, max: 120, message: 'Too many message updates. Try again shortly.' });
 
 router.get('/events', MessageController.streamEvents);
+router.post('/presence', messagePresenceLimiter, requireAuthenticated(), MessageController.updatePresence);
 router.post('/', messageSendLimiter, requirePermission('messages:send'), requireSelfOrPermission((req) => req.body?.senderAccountId, 'roles:manage'), MessageController.createMessage);
 router.post('/group', messageSendLimiter, requirePermission('messages:send'), requireSelfOrPermission((req) => req.body?.senderAccountId, 'roles:manage'), MessageController.createGroupMessage);
 router.post('/images', messageMutationLimiter, requirePermission('messages:send'), messageImageUpload.single('image'), MessageController.uploadImage);

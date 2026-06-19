@@ -80,6 +80,20 @@ function isUserOnline(lastSeenAt?: string | null): boolean {
   return Date.now() - value < 2 * 60 * 1000;
 }
 
+function isUserAway(lastSeenAt?: string | null): boolean {
+  if (!lastSeenAt) {
+    return false;
+  }
+
+  const value = new Date(lastSeenAt).getTime();
+  if (Number.isNaN(value)) {
+    return false;
+  }
+
+  const diffMs = Date.now() - value;
+  return diffMs >= 2 * 60 * 1000 && diffMs < 5 * 60 * 1000;
+}
+
 function getLastOnlineLabel(lastSeenAt?: string | null): string {
   if (!lastSeenAt) {
     return 'Last online: Never';
@@ -93,6 +107,10 @@ function getLastOnlineLabel(lastSeenAt?: string | null): string {
   const diffMs = Date.now() - value;
   if (diffMs < 2 * 60 * 1000) {
     return 'Online now';
+  }
+
+  if (diffMs < 5 * 60 * 1000) {
+    return 'Away';
   }
 
   const minutes = Math.floor(diffMs / 60000);
@@ -416,9 +434,12 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const nextAchievement = mileageSummary?.nextAchievement || null;
   const mileagePercent = milestone > 0 ? Math.min(100, Math.round((mileage / milestone) * 100)) : 0;
   const isOnline = isUserOnline(user.lastSeenAt);
+  const isAway = !isOnline && isUserAway(user.lastSeenAt);
   const lastOnlineLabel = useMemo(() => getLastOnlineLabel(user.lastSeenAt), [presenceTick, user.lastSeenAt]);
   const profileRingClass = isOnline
     ? 'border-green-300/80 shadow-[0_0_0_2px_rgba(34,197,94,0.14)]'
+    : isAway
+      ? 'border-amber-300/90 shadow-[0_0_0_2px_rgba(251,191,36,0.18)]'
     : 'border-white';
 
   return (
@@ -431,6 +452,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           <div className="flex min-w-0 flex-col items-center gap-3 text-center sm:flex-row sm:items-center sm:gap-4 sm:text-left">
           <div className="relative shrink-0">
             {isOnline && <span className="pointer-events-none absolute -inset-1 rounded-full border border-green-300/45 shield-online-pulse" />}
+            {isAway && <span className="pointer-events-none absolute -inset-1 rounded-full border border-amber-300/70 shield-online-pulse" />}
           {user.profilePictureUrl ? (
             <img
               src={getAssetUrl(user.profilePictureUrl)}

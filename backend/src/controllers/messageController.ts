@@ -3,7 +3,7 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { UserMessageModel } from '../models/UserMessage';
-import { addMessageEventClient, broadcastMessageEvent } from '../services/messageEvents';
+import { addMessageEventClient, broadcastMessageEvent, updateMessagePresence } from '../services/messageEvents';
 import { notifyMentions } from '../services/mentionService';
 import { cleanMultiline, cleanString } from '../utils/validation';
 import { getSessionAccount } from '../middleware/authSession';
@@ -34,6 +34,23 @@ export class MessageController {
     } catch (error) {
       console.error('Message events error:', error);
       res.status(500).json({ error: 'Failed to start message updates' });
+    }
+  }
+
+  static async updatePresence(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+
+      if (!account) {
+        return res.status(401).json({ error: 'Session expired or invalid' });
+      }
+
+      const isAway = req.body?.status === 'away' || req.body?.away === true;
+      await updateMessagePresence(account.id, isAway);
+      res.json({ ok: true, away: isAway });
+    } catch (error) {
+      console.error('Message presence update error:', error);
+      res.status(500).json({ error: 'Failed to update presence' });
     }
   }
 

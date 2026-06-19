@@ -13,11 +13,13 @@ interface MessageEventPayload {
   typingName?: string;
   typingIsActive?: boolean;
   actorOnline?: boolean;
+  actorAway?: boolean;
   actorLastSeenAt?: string | null;
 }
 
 const clients = new Map<string, Set<Response>>();
 const hiddenPresenceAccounts = new Set<string>();
+const awayPresenceAccounts = new Set<string>();
 
 function sendEvent(response: Response, payload: MessageEventPayload) {
   response.write(`event: ${payload.type}\n`);
@@ -48,6 +50,7 @@ export function addMessageEventClient(accountId: string, response: Response) {
         type: 'presence-updated',
         actorAccountId: onlineAccountId,
         actorOnline: true,
+        actorAway: awayPresenceAccounts.has(onlineAccountId),
         actorLastSeenAt: new Date().toISOString(),
       });
     }).catch((error) => {
@@ -63,6 +66,7 @@ export function addMessageEventClient(accountId: string, response: Response) {
         type: 'presence-updated',
         actorAccountId: accountId,
         actorOnline: false,
+        actorAway: false,
         actorLastSeenAt: null,
       });
       return;
@@ -77,6 +81,7 @@ export function addMessageEventClient(accountId: string, response: Response) {
       type: 'presence-updated',
       actorAccountId: accountId,
       actorOnline: true,
+      actorAway: awayPresenceAccounts.has(accountId),
       actorLastSeenAt: lastSeenAt,
     });
   };
@@ -106,9 +111,49 @@ export function addMessageEventClient(accountId: string, response: Response) {
         type: 'presence-updated',
         actorAccountId: accountId,
         actorOnline: false,
+        actorAway: false,
         actorLastSeenAt: new Date().toISOString(),
       });
+      awayPresenceAccounts.delete(accountId);
     }
+  });
+}
+
+export async function updateMessagePresence(accountId: string, isAway: boolean) {
+  const account = await AuthAccountModel.getAccountById(accountId);
+  if (!account || account.presenceHidden) {
+    hiddenPresenceAccounts.add(accountId);
+    awayPresenceAccounts.delete(accountId);
+    broadcastMessageEventToAll({
+      type: 'presence-updated',
+      actorAccountId: accountId,
+      actorOnline: false,
+      actorAway: false,
+      actorLastSeenAt: null,
+    });
+    return;
+  }
+
+  hiddenPresenceAccounts.delete(accountId);
+  if (isAway) {
+    awayPresenceAccounts.add(accountId);
+  } else {
+    awayPresenceAccounts.delete(accountId);
+  }
+
+  const lastSeenAt = new Date().toISOString();
+  if (!isAway) {
+    void AuthAccountModel.updateLastSeen(accountId).catch((error) => {
+      console.error('Failed to update message presence:', error);
+    });
+  }
+
+  broadcastMessageEventToAll({
+    type: 'presence-updated',
+    actorAccountId: accountId,
+    actorOnline: true,
+    actorAway: isAway,
+    actorLastSeenAt: lastSeenAt,
   });
 }
 
