@@ -1997,20 +1997,20 @@
   }
 
   .shield-app-icon-loader {
-    @apply relative flex h-28 w-28 items-center justify-center overflow-hidden;
+    @apply relative flex h-32 w-32 items-center justify-center overflow-visible;
   }
 
   .shield-app-icon-loader::before {
     content: '';
-    @apply absolute inset-1 rounded-full border-2 border-accent/25;
+    @apply absolute inset-0 z-30 rounded-full border-2 border-accent/25;
     border-top-color: rgb(156, 134, 92);
     animation: shield-loader-spin 1.25s linear infinite;
   }
 
   .shield-app-icon-loader::after {
     content: '';
-    @apply pointer-events-none absolute z-20;
-    inset: 1.2rem;
+    @apply pointer-events-none absolute z-40;
+    inset: 1.25rem;
     background: linear-gradient(115deg, transparent 18%, rgba(255, 255, 255, 0.72) 46%, transparent 72%);
     opacity: 0.68;
     transform: translateX(-150%) rotate(10deg);
@@ -2018,7 +2018,7 @@
   }
 
   .shield-app-icon-loader img {
-    @apply relative z-10 h-24 w-24 object-contain drop-shadow-xl;
+    @apply relative z-20 h-24 w-24 object-contain drop-shadow-xl;
     animation: shield-icon-pulse 1.8s ease-in-out infinite;
   }
 

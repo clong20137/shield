@@ -39,18 +39,19 @@
 
       .initial-splash-mark {
         position: relative;
-        width: 7.5rem;
-        height: 7.5rem;
+        width: 8.25rem;
+        height: 8.25rem;
         display: flex;
         align-items: center;
         justify-content: center;
-        overflow: hidden;
+        overflow: visible;
       }
 
       .initial-splash-mark::before {
         content: '';
         position: absolute;
-        inset: 0.25rem;
+        inset: 0;
+        z-index: 3;
         border: 2px solid rgba(156, 134, 92, 0.28);
         border-top-color: #9c865c;
         border-radius: 999px;
@@ -60,8 +61,8 @@
       .initial-splash-mark::after {
         content: '';
         position: absolute;
-        inset: 1.2rem;
-        z-index: 2;
+        inset: 1.25rem;
+        z-index: 4;
         background: linear-gradient(115deg, transparent 18%, rgba(255, 255, 255, 0.72) 46%, transparent 72%);
         opacity: 0.68;
         transform: translateX(-150%) rotate(10deg);
@@ -71,9 +72,9 @@
 
       .initial-splash-mark img {
         position: relative;
-        z-index: 1;
-        width: 5.75rem;
-        height: 5.75rem;
+        z-index: 2;
+        width: 5.65rem;
+        height: 5.65rem;
         object-fit: contain;
         filter: drop-shadow(0 18px 28px rgba(15, 23, 42, 0.2));
         animation: splash-icon-pulse 1.8s ease-in-out infinite;
@@ -221,11 +222,11 @@
     <div id="root">
       <div class="initial-splash" role="status" aria-live="polite">
         <div class="initial-splash-mark">
-          <img src="%BASE_URL%shield-icon.png" alt="SHIELD" />
+          <img src="%BASE_URL%shield-splash-icon.svg" alt="SHIELD" />
         </div>
         <p class="initial-splash-kicker">SHIELD</p>
         <h1>Loading SHIELD</h1>
-        <p class="initial-splash-copy">Preparing your workspace...</p>
+        <p class="initial-splash-copy">Connecting to API...</p>
         <div class="initial-splash-progress" aria-hidden="true"><span></span></div>
         <p class="initial-splash-fallback">If this stays on screen, the frontend JavaScript did not load.</p>
       </div>

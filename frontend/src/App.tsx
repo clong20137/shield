@@ -1319,7 +1319,7 @@ function ShieldLoading({
     <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
       <div className="text-center">
         <div className="shield-app-icon-loader mx-auto mb-4">
-          <img src={withAppBase('/shield-icon.png')} alt="SHIELD" />
+          <img src={withAppBase('/shield-splash-icon.svg')} alt="SHIELD" />
         </div>
         <p className="text-sm font-bold uppercase tracking-[0.24em] text-accent">{title}</p>
         <div className="shield-loading-bar mx-auto mt-4" aria-hidden="true">
@@ -5130,32 +5130,59 @@ function App() {
 
   useEffect(() => {
     let isMounted = true;
-    authService.getSetupStatus()
-      .then((response) => {
+    let retryTimer: number | null = null;
+
+    const loadSetupStatus = async () => {
+      const isHealthy = await checkApiHealth();
+      if (!isMounted) {
+        return;
+      }
+
+      if (!isHealthy) {
+        setIsApiConnectionLost(true);
+        retryTimer = window.setTimeout(loadSetupStatus, 3500);
+        return;
+      }
+
+      setLastApiConnectedAt(Date.now());
+      setIsApiConnectionLost(false);
+
+      try {
+        const response = await authService.getSetupStatus();
         if (isMounted) {
           setSetupStatus(response.data);
-        }
-      })
-      .catch((error) => {
-        console.error('Failed to load setup status:', error);
-        if (isMounted) {
-          setSetupStatus({
-            setupRequired: false,
-            setupCompleted: false,
-            accountCount: 0,
-            database: { connected: false, initialized: false },
-            error: 'Failed to load setup status.',
-          });
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
           setIsSetupLoading(false);
         }
-      });
+      } catch (error) {
+        console.error('Failed to load setup status:', error);
+        if (!isMounted) {
+          return;
+        }
+
+        if (isNetworkConnectionError(error)) {
+          setIsApiConnectionLost(true);
+          retryTimer = window.setTimeout(loadSetupStatus, 3500);
+          return;
+        }
+
+        setIsSetupLoading(false);
+        setSetupStatus({
+          setupRequired: false,
+          setupCompleted: false,
+          accountCount: 0,
+          database: { connected: false, initialized: false },
+          error: 'Failed to load setup status.',
+        });
+      }
+    };
+
+    void loadSetupStatus();
 
     return () => {
       isMounted = false;
+      if (retryTimer) {
+        window.clearTimeout(retryTimer);
+      }
     };
   }, []);
 
@@ -5995,6 +6022,58 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (isSetupLoading) {
+      return undefined;
+    }
+
+    let isMounted = true;
+    authService.getSession()
+      .then((response) => {
+        if (response.data.account) {
+          setCurrentUser(response.data.account);
+          setIsAuthenticated(true);
+          clearAuthToken();
+          window.localStorage.setItem(SESSION_KEY, JSON.stringify(response.data.account));
+          void syncSessionTimeoutFromSettings();
+
+          if (!response.data.account.hasCompletedOnboarding) {
+            if (!hasSeenWelcomeSplash(response.data.account.id)) {
+              setIsWelcomeSplashOpen(true);
+            }
+            setShouldLaunchGuideAfterWelcome(true);
+          }
+        }
+      })
+      .catch((error) => {
+        if (isNetworkConnectionError(error)) {
+          try {
+            const cachedSession = window.localStorage.getItem(SESSION_KEY);
+            if (cachedSession) {
+              const cachedAccount = JSON.parse(cachedSession) as AuthAccount;
+              setCurrentUser(cachedAccount);
+              setIsAuthenticated(true);
+            }
+          } catch {
+            window.localStorage.removeItem(SESSION_KEY);
+          }
+          return;
+        }
+
+        clearAuthToken();
+        window.localStorage.removeItem(SESSION_KEY);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsSessionLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isSetupLoading, syncSessionTimeoutFromSettings]);
+
+  useEffect(() => {
     if (!isNotificationsOpen) {
       return;
     }
@@ -6252,45 +6331,6 @@ function App() {
       }
     });
   }, []);
-
-  useEffect(() => {
-    authService.getSession()
-      .then((response) => {
-        if (response.data.account) {
-          setCurrentUser(response.data.account);
-          setIsAuthenticated(true);
-          clearAuthToken();
-          window.localStorage.setItem(SESSION_KEY, JSON.stringify(response.data.account));
-          void syncSessionTimeoutFromSettings();
-
-          if (!response.data.account.hasCompletedOnboarding) {
-            if (!hasSeenWelcomeSplash(response.data.account.id)) {
-              setIsWelcomeSplashOpen(true);
-            }
-            setShouldLaunchGuideAfterWelcome(true);
-          }
-        }
-      })
-      .catch((error) => {
-        if (isNetworkConnectionError(error)) {
-          try {
-            const cachedSession = window.localStorage.getItem(SESSION_KEY);
-            if (cachedSession) {
-              const cachedAccount = JSON.parse(cachedSession) as AuthAccount;
-              setCurrentUser(cachedAccount);
-              setIsAuthenticated(true);
-            }
-          } catch {
-            window.localStorage.removeItem(SESSION_KEY);
-          }
-          return;
-        }
-
-        clearAuthToken();
-        window.localStorage.removeItem(SESSION_KEY);
-      })
-      .finally(() => setIsSessionLoading(false));
-  }, [syncSessionTimeoutFromSettings]);
 
   const handleLogin = (account: AuthAccount) => {
     clearAuthToken();
@@ -7090,9 +7130,8 @@ function App() {
       )}
       {isSetupLoading || isSessionLoading ? (
         <ShieldLoading
-          title={isApiConnectionLost ? 'Connection Lost' : 'Loading SHIELD'}
-          detail={isApiConnectionLost ? 'Reconnecting...' : undefined}
-          lastConnectedAt={isApiConnectionLost ? lastApiConnectedAt : undefined}
+          title="Loading SHIELD"
+          detail="Connecting to API..."
         />
       ) : setupStatus?.setupRequired ? (
         <SetupWizard
