@@ -432,7 +432,7 @@ function installDownloadedUpdate() {
 
   sendUpdaterStatus('restarting');
   isQuitting = true;
-  autoUpdater.quitAndInstall(false, true);
+  autoUpdater.quitAndInstall(true, true);
 }
 
 function configureAutoUpdates(config) {
