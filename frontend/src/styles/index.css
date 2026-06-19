@@ -1372,6 +1372,60 @@
     will-change: opacity, transform, filter;
   }
 
+  .message-member-stack {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.75rem;
+  }
+
+  .message-member-avatar {
+    position: relative;
+    display: inline-flex;
+    height: 1.75rem;
+    width: 1.75rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 9999px;
+    border: 2px solid rgb(255, 255, 255);
+    background: rgb(229, 231, 235);
+    color: rgb(75, 85, 99);
+    font-size: 0.625rem;
+    font-weight: 900;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.18);
+    transition: margin-left var(--shield-motion-duration) var(--shield-motion-ease), transform var(--shield-motion-duration) var(--shield-motion-ease), box-shadow var(--shield-motion-duration) var(--shield-motion-ease);
+  }
+
+  .message-member-avatar + .message-member-avatar {
+    margin-left: 0.25rem;
+  }
+
+  .message-member-stack-collapsed .message-member-avatar + .message-member-avatar {
+    margin-left: -0.75rem;
+  }
+
+  .message-member-stack-collapsed:hover .message-member-avatar + .message-member-avatar,
+  .message-member-stack-collapsed:focus-within .message-member-avatar + .message-member-avatar {
+    margin-left: 0.125rem;
+  }
+
+  .message-member-stack:hover .message-member-avatar,
+  .message-member-stack:focus-within .message-member-avatar {
+    transform: translateY(-0.125rem);
+  }
+
+  .message-member-avatar:hover {
+    z-index: 50 !important;
+    transform: translateY(-0.25rem) scale(1.08);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.28);
+  }
+
+  .message-member-overflow {
+    background: rgb(17, 24, 39);
+    color: rgb(255, 255, 255);
+  }
+
   .quick-launch-context-menu-item {
     display: flex;
     width: 100%;
@@ -1516,6 +1570,17 @@
   .dark .quick-launch-context-menu-item:focus-visible {
     background: rgba(30, 41, 59, 0.92);
     color: rgb(219, 234, 254);
+  }
+
+  .dark .message-member-avatar {
+    border-color: rgb(15, 23, 42);
+    background: rgb(51, 65, 85);
+    color: rgb(226, 232, 240);
+  }
+
+  .dark .message-member-overflow {
+    background: rgb(226, 232, 240);
+    color: rgb(15, 23, 42);
   }
 
   .dark .daily-strip-leave-menu-item:hover,

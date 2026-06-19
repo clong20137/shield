@@ -35,6 +35,12 @@ interface MessageThread {
   unreadCount: number;
 }
 
+interface ThreadMemberPreview {
+  id: string;
+  name: string;
+  profilePictureUrl: string;
+}
+
 const PINNED_THREADS_KEY_PREFIX = 'shield_pinned_message_threads';
 const messageReactionOptions = [
   { key: 'thumbsUp', label: 'Thumbs up', icon: '👍' },
@@ -332,6 +338,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const [threadPendingDelete, setThreadPendingDelete] = useState<MessageThread | null>(null);
   const [selectedMentionUser, setSelectedMentionUser] = useState<User | null>(null);
   const [presenceByAccount, setPresenceByAccount] = useState<Record<string, { online: boolean; lastSeenAt: string | null }>>({});
+  const [memberDirectory, setMemberDirectory] = useState<Record<string, ThreadMemberPreview>>({});
   const [composePopoverPosition, setComposePopoverPosition] = useState({ right: 16, bottom: 88 });
   const typingStopTimerRef = useRef<number | null>(null);
   const lastTypingSentRef = useRef(0);
@@ -475,6 +482,50 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       window.removeEventListener('shield:api-reconnected', handleRealtimeMessageUpdate);
     };
   }, [currentUser.id]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadMemberDirectory = async () => {
+      try {
+        const pageSize = 250;
+        const directory: Record<string, ThreadMemberPreview> = {
+          [currentUser.id]: {
+            id: currentUser.id,
+            name: currentUser.displayName || `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email || 'You',
+            profilePictureUrl: currentUser.profilePictureUrl || '',
+          },
+        };
+
+        for (let page = 1; page <= 4; page += 1) {
+          const response = await userService.getAll(page, pageSize);
+          response.data.data.forEach((user: User) => {
+            directory[user.id] = {
+              id: user.id,
+              name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Member',
+              profilePictureUrl: user.profilePictureUrl || '',
+            };
+          });
+
+          if (response.data.count < pageSize) {
+            break;
+          }
+        }
+
+        if (isMounted) {
+          setMemberDirectory(directory);
+        }
+      } catch (err) {
+        console.error('Failed to load message member directory:', err);
+      }
+    };
+
+    void loadMemberDirectory();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser.id, currentUser.displayName, currentUser.email, currentUser.firstName, currentUser.lastName, currentUser.profilePictureUrl]);
 
   useEffect(() => {
     window.localStorage.setItem(`${PINNED_THREADS_KEY_PREFIX}_${currentUser.id}`, JSON.stringify(pinnedThreadIds));
@@ -723,6 +774,20 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     };
   };
   const selectedPresence = selectedThread ? getThreadPresence(selectedThread) : null;
+  const selectedThreadMemberPreviews = useMemo<ThreadMemberPreview[]>(() => {
+    if (!selectedThread || selectedThread.threadType === 'direct') {
+      return [];
+    }
+
+    return selectedThread.participantIds.map((id, index) => {
+      const directoryMember = memberDirectory[id];
+      return {
+        id,
+        name: directoryMember?.name || selectedThread.participantNames[index] || 'Member',
+        profilePictureUrl: directoryMember?.profilePictureUrl || '',
+      };
+    });
+  }, [memberDirectory, selectedThread]);
 
   useEffect(() => {
     if (!selectedThreadId && threads.length > 0) {
@@ -1634,6 +1699,37 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                       <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
                         {selectedPresence?.label || getPresenceLabel(selectedThread.contactLastSeenAt)}
                       </span>
+                      {selectedThreadMemberPreviews.length > 0 && (
+                        <div
+                          className={`message-member-stack ${selectedThreadMemberPreviews.length > 6 ? 'message-member-stack-collapsed' : ''}`}
+                          aria-label={`${selectedThreadMemberPreviews.length} group members`}
+                        >
+                          {selectedThreadMemberPreviews.slice(0, 6).map((member, index) => (
+                            <span
+                              key={member.id}
+                              className="message-member-avatar"
+                              style={{ zIndex: selectedThreadMemberPreviews.length - index }}
+                              title={member.name}
+                            >
+                              {member.profilePictureUrl ? (
+                                <img
+                                  src={getAssetThumbnailUrl(member.profilePictureUrl, 96)}
+                                  alt={member.name}
+                                  onError={(event) => handleAssetThumbnailError(event, member.profilePictureUrl)}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <span>{getInitials(member.name)}</span>
+                              )}
+                            </span>
+                          ))}
+                          {selectedThreadMemberPreviews.length > 6 && (
+                            <span className="message-member-avatar message-member-overflow" title={`${selectedThreadMemberPreviews.length - 6} more members`}>
+                              +{selectedThreadMemberPreviews.length - 6}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     {!selectedThreadAcceptsMessages && (
                       <p className="mt-1 text-xs font-bold text-danger">
