@@ -5051,6 +5051,7 @@ function App() {
   const [desktopPreferences, setDesktopPreferences] = useState<ShieldDesktopPreferences | null>(null);
   const [desktopUpdateStatus, setDesktopUpdateStatus] = useState<ShieldDesktopUpdateStatus | null>(null);
   const [isDesktopUpdatePromptOpen, setIsDesktopUpdatePromptOpen] = useState(false);
+  const [isDesktopStartupUpdateBlocking, setIsDesktopStartupUpdateBlocking] = useState(false);
   const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState<number>(() => {
     try {
       const raw = window.localStorage.getItem(SESSION_TIMEOUT_KEY);
@@ -5118,6 +5119,7 @@ function App() {
   const rateLimitToastRef = useRef(0);
   const desktopUpdateCheckIsManualRef = useRef(false);
   const desktopUpdateCheckedAccountRef = useRef<string | null>(null);
+  const initialLoadingRef = useRef(true);
   const shownDueReminderIdsRef = useRef<Set<string>>(new Set());
   const notificationRequestRef = useRef(0);
   const apiConnectionWasLostRef = useRef(false);
@@ -5434,13 +5436,23 @@ function App() {
   };
 
   useEffect(() => {
+    initialLoadingRef.current = isSetupLoading || isSessionLoading;
+  }, [isSessionLoading, isSetupLoading]);
+
+  useEffect(() => {
     if (!hasShieldDesktopFeature('getDesktopPreferences')) {
       setDesktopPreferences(null);
       return;
     }
 
     window.shieldDesktop?.getDesktopPreferences?.()
-      .then(setDesktopPreferences)
+      .then((preferences) => {
+        setDesktopPreferences(preferences);
+        if (preferences.updateStatus) {
+          setDesktopUpdateStatus(preferences.updateStatus);
+        }
+        setIsDesktopStartupUpdateBlocking(Boolean(preferences.startupUpdateInProgress));
+      })
       .catch((error) => console.error('Failed to load desktop preferences:', error));
   }, []);
 
@@ -5451,6 +5463,14 @@ function App() {
 
     return window.shieldDesktop?.onUpdateStatus?.((status) => {
       setDesktopUpdateStatus(status);
+
+      if (['checking', 'available', 'downloading', 'downloaded', 'restarting'].includes(status.type)) {
+        setIsDesktopStartupUpdateBlocking((isBlocking) => isBlocking || initialLoadingRef.current);
+      }
+
+      if (status.type === 'not-available' || status.type === 'error') {
+        setIsDesktopStartupUpdateBlocking(false);
+      }
 
       if (status.type === 'available') {
         setDesktopPreferences((preferences) => preferences ? { ...preferences, updateDownloaded: false } : preferences);
@@ -5467,6 +5487,7 @@ function App() {
       }
 
       if (status.type === 'restarting') {
+        setIsDesktopStartupUpdateBlocking(true);
         setIsDesktopUpdatePromptOpen(true);
         showToast('info', 'Restarting Shield to install the desktop update...', { saveToNotifications: false });
       }
@@ -7116,6 +7137,38 @@ function App() {
     return () => document.removeEventListener('contextmenu', blockContextMenu);
   }, []);
 
+  const loadingDetail = (() => {
+    if (isDesktopStartupUpdateBlocking) {
+      if (desktopUpdateStatus?.type === 'available') {
+        return desktopUpdateStatus.version
+          ? `Desktop update ${desktopUpdateStatus.version} found. Starting download...`
+          : 'Desktop update found. Starting download...';
+      }
+
+      if (desktopUpdateStatus?.type === 'downloading') {
+        return typeof desktopUpdateStatus.percent === 'number'
+          ? `Downloading desktop update... ${desktopUpdateStatus.percent}%`
+          : 'Downloading desktop update...';
+      }
+
+      if (desktopUpdateStatus?.type === 'downloaded') {
+        return 'Desktop update downloaded. Restarting SHIELD...';
+      }
+
+      if (desktopUpdateStatus?.type === 'restarting') {
+        return 'Restarting SHIELD to install the update...';
+      }
+
+      return 'Checking for desktop updates...';
+    }
+
+    if (isSessionLoading && !isSetupLoading) {
+      return 'Loading account session...';
+    }
+
+    return 'Connecting to API...';
+  })();
+
   return (
     <Router basename={ROUTER_BASENAME}>
       <ToastHost toasts={toasts} />
@@ -7128,10 +7181,10 @@ function App() {
           onInstall={handleInstallDesktopUpdate}
         />
       )}
-      {isSetupLoading || isSessionLoading ? (
+      {isDesktopStartupUpdateBlocking || isSetupLoading || isSessionLoading ? (
         <ShieldLoading
           title="Loading SHIELD"
-          detail="Connecting to API..."
+          detail={loadingDetail}
         />
       ) : setupStatus?.setupRequired ? (
         <SetupWizard

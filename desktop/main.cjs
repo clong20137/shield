@@ -20,6 +20,10 @@ let desktopUnreadCount = 0;
 let desktopIdleCheckTimer = null;
 let desktopIdleStatus = 'active';
 let desktopUpdateCheckTimer = null;
+let lastDesktopUpdateStatus = null;
+let isDesktopUpdateCheckRunning = false;
+let isStartupDesktopUpdateInProgress = false;
+let startupDesktopUpdateFallbackTimer = null;
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -36,6 +40,7 @@ const clipboardFileSizeLimit = 25 * 1024 * 1024;
 const webAppUpdateCheckIntervalMs = 30 * 1000;
 const webAppReloadCooldownMs = 15 * 1000;
 const desktopUpdateCheckIntervalMs = 15 * 60 * 1000;
+const desktopStartupUpdateFallbackMs = 2 * 60 * 1000;
 const desktopIdleThresholdSeconds = 5 * 60;
 const desktopIdleCheckIntervalMs = 15 * 1000;
 let webAppUpdateCheckTimer = null;
@@ -604,9 +609,18 @@ function showDesktopNotification(payload) {
 }
 
 function sendUpdaterStatus(type, payload = {}) {
+  lastDesktopUpdateStatus = { type, ...payload };
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('shield:update-status', { type, ...payload });
+    mainWindow.webContents.send('shield:update-status', lastDesktopUpdateStatus);
   }
+}
+
+function finishStartupDesktopUpdateCheck() {
+  if (startupDesktopUpdateFallbackTimer) {
+    clearTimeout(startupDesktopUpdateFallbackTimer);
+    startupDesktopUpdateFallbackTimer = null;
+  }
+  isStartupDesktopUpdateInProgress = false;
 }
 
 function installDownloadedUpdate() {
@@ -618,6 +632,37 @@ function installDownloadedUpdate() {
   sendUpdaterStatus('restarting');
   isQuitting = true;
   autoUpdater.quitAndInstall(true, true);
+}
+
+function checkForDesktopUpdates({ startup = false } = {}) {
+  if (!desktopConfig?.updateUrl || isUpdateDownloaded || isDesktopUpdateCheckRunning) {
+    return Promise.resolve(false);
+  }
+
+  if (startup) {
+    isStartupDesktopUpdateInProgress = true;
+    if (startupDesktopUpdateFallbackTimer) {
+      clearTimeout(startupDesktopUpdateFallbackTimer);
+    }
+    startupDesktopUpdateFallbackTimer = setTimeout(() => {
+      if (isStartupDesktopUpdateInProgress && lastDesktopUpdateStatus?.type === 'checking') {
+        finishStartupDesktopUpdateCheck();
+        sendUpdaterStatus('error', { message: 'Desktop update check timed out. Continuing startup.' });
+      }
+    }, desktopStartupUpdateFallbackMs);
+  }
+
+  isDesktopUpdateCheckRunning = true;
+
+  return autoUpdater.checkForUpdates()
+    .then(() => true)
+    .catch((error) => {
+      sendUpdaterStatus('error', { message: error.message });
+      return false;
+    })
+    .finally(() => {
+      isDesktopUpdateCheckRunning = false;
+    });
 }
 
 function configureAutoUpdates(config) {
@@ -634,7 +679,10 @@ function configureAutoUpdates(config) {
 
   autoUpdater.on('checking-for-update', () => sendUpdaterStatus('checking'));
   autoUpdater.on('update-available', (info) => sendUpdaterStatus('available', { version: info.version }));
-  autoUpdater.on('update-not-available', (info) => sendUpdaterStatus('not-available', { version: info.version }));
+  autoUpdater.on('update-not-available', (info) => {
+    finishStartupDesktopUpdateCheck();
+    sendUpdaterStatus('not-available', { version: info.version });
+  });
   autoUpdater.on('download-progress', (progress) => sendUpdaterStatus('downloading', { percent: Math.round(progress.percent || 0) }));
   autoUpdater.on('update-downloaded', (info) => {
     isUpdateDownloaded = true;
@@ -646,25 +694,22 @@ function configureAutoUpdates(config) {
     });
     pendingUpdateRestartTimer = setTimeout(installDownloadedUpdate, 5000);
   });
-  autoUpdater.on('error', (error) => sendUpdaterStatus('error', { message: error.message }));
+  autoUpdater.on('error', (error) => {
+    finishStartupDesktopUpdateCheck();
+    sendUpdaterStatus('error', { message: error.message });
+  });
 
-  const checkForDesktopUpdates = () => {
-    if (isUpdateDownloaded) {
-      return;
-    }
-
-    autoUpdater.checkForUpdates().catch((error) => sendUpdaterStatus('error', { message: error.message }));
-  };
-
-  setTimeout(checkForDesktopUpdates, 15000);
+  void checkForDesktopUpdates({ startup: true });
   if (desktopUpdateCheckTimer) {
     clearInterval(desktopUpdateCheckTimer);
   }
-  desktopUpdateCheckTimer = setInterval(checkForDesktopUpdates, desktopUpdateCheckIntervalMs);
+  desktopUpdateCheckTimer = setInterval(() => {
+    void checkForDesktopUpdates();
+  }, desktopUpdateCheckIntervalMs);
 }
 
 function createMainWindow() {
-  desktopConfig = getDesktopConfig();
+  desktopConfig = desktopConfig || getDesktopConfig();
   const allowedOrigins = new Set(desktopConfig.allowedOrigins.map(getOrigin).filter(Boolean));
   const appOrigin = getOrigin(desktopConfig.appUrl);
   if (appOrigin) {
@@ -784,10 +829,11 @@ if (hasSingleInstanceLock) {
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
     ensureDefaultDesktopPreferences();
+    desktopConfig = getDesktopConfig();
+    configureAutoUpdates(desktopConfig);
     registerPowerMonitorEvents();
     createTray();
     createMainWindow();
-    configureAutoUpdates(desktopConfig);
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -833,7 +879,7 @@ ipcMain.handle('shield:check-for-updates', async () => {
     return { ok: false, message: 'Desktop update URL is not configured.' };
   }
 
-  await autoUpdater.checkForUpdates();
+  await checkForDesktopUpdates();
   return { ok: true };
 });
 ipcMain.handle('shield:install-update', () => {
@@ -844,7 +890,9 @@ ipcMain.handle('shield:get-desktop-preferences', () => ({
   ...getDesktopPreferences(),
   appVersion: app.getVersion(),
   updateDownloaded: isUpdateDownloaded,
-  updateConfigured: Boolean(desktopConfig?.updateUrl)
+  updateConfigured: Boolean(desktopConfig?.updateUrl),
+  updateStatus: lastDesktopUpdateStatus,
+  startupUpdateInProgress: isStartupDesktopUpdateInProgress
 }));
 ipcMain.handle('shield:set-start-with-windows', (_event, startWithWindows) => {
   const preferences = setStartWithWindows(startWithWindows);
@@ -853,7 +901,9 @@ ipcMain.handle('shield:set-start-with-windows', (_event, startWithWindows) => {
     ...preferences,
     appVersion: app.getVersion(),
     updateDownloaded: isUpdateDownloaded,
-    updateConfigured: Boolean(desktopConfig?.updateUrl)
+    updateConfigured: Boolean(desktopConfig?.updateUrl),
+    updateStatus: lastDesktopUpdateStatus,
+    startupUpdateInProgress: isStartupDesktopUpdateInProgress
   };
 });
 ipcMain.handle('shield:set-tray-mode', (_event, trayMode) => {
@@ -863,7 +913,9 @@ ipcMain.handle('shield:set-tray-mode', (_event, trayMode) => {
     ...preferences,
     appVersion: app.getVersion(),
     updateDownloaded: isUpdateDownloaded,
-    updateConfigured: Boolean(desktopConfig?.updateUrl)
+    updateConfigured: Boolean(desktopConfig?.updateUrl),
+    updateStatus: lastDesktopUpdateStatus,
+    startupUpdateInProgress: isStartupDesktopUpdateInProgress
   };
 });
 ipcMain.handle('shield:navigate', (_event, appPath) => {

@@ -29,6 +29,8 @@ interface ShieldDesktopPreferences {
   appVersion?: string;
   updateDownloaded: boolean;
   updateConfigured: boolean;
+  updateStatus?: ShieldDesktopUpdateStatus | null;
+  startupUpdateInProgress?: boolean;
 }
 
 interface ShieldDesktopIdleStatus {
