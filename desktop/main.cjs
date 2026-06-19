@@ -243,6 +243,11 @@ function getDesktopConfig() {
 }
 
 function createShieldTrayIcon() {
+  const iconPath = path.join(__dirname, 'build', 'icon.png');
+  if (fs.existsSync(iconPath)) {
+    return nativeImage.createFromPath(iconPath);
+  }
+
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
     <rect width="32" height="32" rx="7" fill="#0f172a"/>
     <path d="M16 4.2 25 7.4v6.8c0 5.8-3.7 10.9-9 13.6-5.3-2.7-9-7.8-9-13.6V7.4l9-3.2Z" fill="#2563eb"/>
@@ -483,6 +488,7 @@ function createMainWindow() {
     minHeight: 720,
     title: 'Shield',
     backgroundColor: '#0f172a',
+    icon: path.join(__dirname, 'build', 'icon.png'),
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),

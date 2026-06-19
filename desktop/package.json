@@ -1,6 +1,6 @@
 {
   "name": "shield-desktop",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Desktop shell for Shield",
   "main": "main.cjs",
   "private": true,
@@ -25,6 +25,8 @@
     "files": [
       "main.cjs",
       "preload.cjs",
+      "build/icon.png",
+      "build/icon.ico",
       "config*.json",
       "README.md"
     ],
@@ -36,6 +38,7 @@
     ],
     "win": {
       "signAndEditExecutable": false,
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",
