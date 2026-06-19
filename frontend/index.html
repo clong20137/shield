@@ -29,6 +29,12 @@
         font-family: Arial, sans-serif;
         padding: 2rem;
         text-align: center;
+        transition: opacity 180ms ease, transform 180ms ease;
+      }
+
+      .initial-splash-exiting {
+        opacity: 0;
+        transform: scale(0.992);
       }
 
       .initial-splash-mark {
@@ -114,12 +120,14 @@
 
       .initial-splash-progress span {
         display: block;
-        width: 44%;
+        width: 100%;
         height: 100%;
         border-radius: inherit;
         background: linear-gradient(90deg, #6f623f, #c3ad78, #9c865c);
         box-shadow: 0 0 18px rgba(156, 134, 92, 0.38);
-        animation: splash-progress 1.65s ease-in-out infinite;
+        transform: scaleX(0);
+        transform-origin: left center;
+        animation: splash-progress 1.05s cubic-bezier(0.16, 1, 0.3, 1) forwards;
       }
 
       @keyframes splash-ring {
@@ -153,15 +161,11 @@
 
       @keyframes splash-progress {
         0% {
-          transform: translateX(-105%);
-        }
-
-        55% {
-          transform: translateX(88%);
+          transform: scaleX(0);
         }
 
         100% {
-          transform: translateX(232%);
+          transform: scaleX(1);
         }
       }
 
@@ -204,7 +208,7 @@
         }
 
         .initial-splash-progress span {
-          width: 72%;
+          transform: scaleX(1);
         }
 
         .initial-splash-fallback {
