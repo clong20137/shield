@@ -63,6 +63,8 @@ function getAccountInitials(account: AuthAccount): string {
 }
 
 const PASSWORD_REQUIREMENTS_MESSAGE = 'New password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.';
+const PASSWORD_INPUT_CLASS =
+  'w-full rounded border-2 border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500';
 
 function isSecurePassword(password: string): boolean {
   return password.length >= 12 && /[A-Z]/u.test(password) && /[a-z]/u.test(password) && /\d/u.test(password) && /[^A-Za-z0-9]/u.test(password);
@@ -592,7 +594,7 @@ export function AccountSettingsPage({
                 type="password"
                 value={currentPassword}
                 onChange={(event) => setCurrentPassword(event.target.value)}
-                className="w-full rounded border-2 border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+                className={PASSWORD_INPUT_CLASS}
                 autoComplete="current-password"
               />
             </label>
@@ -603,7 +605,7 @@ export function AccountSettingsPage({
                 type="password"
                 value={newPassword}
                 onChange={(event) => setNewPassword(event.target.value)}
-                className="w-full rounded border-2 border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+                className={PASSWORD_INPUT_CLASS}
                 autoComplete="new-password"
               />
             </label>
@@ -614,7 +616,7 @@ export function AccountSettingsPage({
                 type="password"
                 value={confirmNewPassword}
                 onChange={(event) => setConfirmNewPassword(event.target.value)}
-                className="w-full rounded border-2 border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+                className={PASSWORD_INPUT_CLASS}
                 autoComplete="new-password"
               />
             </label>
