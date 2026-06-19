@@ -11,13 +11,14 @@ For development, copy `config.example.json` to `config.json` and set the interna
 ```json
 {
   "appUrl": "https://your-shield-server.example.gov",
+  "updateUrl": "https://your-shield-server.example.gov/downloads/",
   "allowedOrigins": [
     "https://your-shield-server.example.gov"
   ]
 }
 ```
 
-Before building an agency installer, create `desktop/config.json` with the production Shield URL. The installer will include it when `npm run dist` is run.
+Before building an agency installer, create `desktop/config.json` with the production Shield URL. The installer will include it when `npm run dist` is run. Set `updateUrl` to the IIS folder that will host `Shield-Setup.exe`, `Shield-Setup.exe.blockmap`, and `latest.yml`.
 
 You can also launch with:
 
@@ -38,7 +39,13 @@ The installer will be created in `desktop/release/`.
 
 If the desktop app opens to a blank navy screen or an error screen, press `Ctrl+Shift+I` inside the desktop window to open diagnostics. Most load issues mean `config.json` is still pointing to the example URL or the installed computer cannot reach the configured Shield URL.
 
-To make it downloadable from Account Settings, copy `desktop/release/Shield-Setup-1.0.0.exe` to the app downloads folder and name it `Shield-Setup.exe`.
+To make it downloadable from Account Settings and available for automatic updates, copy these generated files from `desktop/release/` to the app downloads folder:
+
+```text
+Shield-Setup.exe
+Shield-Setup.exe.blockmap
+latest.yml
+```
 
 For the IIS path discussed for Shield, that would be:
 

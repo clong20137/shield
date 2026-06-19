@@ -1,11 +1,16 @@
-const { app, BrowserWindow, Menu, shell } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, Notification, nativeImage } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const fs = require('fs');
 const path = require('path');
 
 const defaultConfig = {
   appUrl: 'https://shield.example.gov',
-  allowedOrigins: ['https://shield.example.gov']
+  allowedOrigins: ['https://shield.example.gov'],
+  updateUrl: ''
 };
+
+let mainWindow = null;
+let desktopConfig = null;
 
 function escapeHtml(value) {
   return String(value)
@@ -102,10 +107,12 @@ function getDesktopConfig() {
   const allowedOrigins = Array.isArray(fileConfig.allowedOrigins) && fileConfig.allowedOrigins.length > 0
     ? fileConfig.allowedOrigins
     : [appUrl];
+  const updateUrl = process.env.SHIELD_UPDATE_URL || fileConfig.updateUrl || defaultConfig.updateUrl;
 
   return {
     appUrl,
-    allowedOrigins
+    allowedOrigins,
+    updateUrl
   };
 }
 
@@ -117,15 +124,124 @@ function getOrigin(value) {
   }
 }
 
+function getUrlForAppPath(appUrl, appPath) {
+  try {
+    if (!appPath || typeof appPath !== 'string') {
+      return appUrl;
+    }
+
+    return new URL(appPath.replace(/^\/+/u, ''), appUrl.endsWith('/') ? appUrl : `${appUrl}/`).toString();
+  } catch {
+    return appUrl;
+  }
+}
+
+function createBadgeOverlay(count) {
+  if (!count || count <= 0) {
+    return null;
+  }
+
+  const label = count > 99 ? '99+' : String(count);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+    <circle cx="16" cy="16" r="15" fill="#dc2626"/>
+    <text x="16" y="21" text-anchor="middle" font-family="Arial, sans-serif" font-size="${label.length > 2 ? 11 : 15}" font-weight="700" fill="#ffffff">${label}</text>
+  </svg>`;
+
+  return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+}
+
+function updateUnreadBadge(count) {
+  if (!mainWindow) {
+    return;
+  }
+
+  const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0;
+  app.setBadgeCount(safeCount);
+
+  if (process.platform === 'win32') {
+    const overlay = createBadgeOverlay(safeCount);
+    mainWindow.setOverlayIcon(overlay, safeCount > 0 ? `${safeCount} unread item${safeCount === 1 ? '' : 's'}` : '');
+  }
+}
+
+function showDesktopNotification(payload) {
+  if (!Notification.isSupported()) {
+    return false;
+  }
+
+  const title = typeof payload?.title === 'string' && payload.title.trim() ? payload.title.trim() : 'Shield';
+  const body = typeof payload?.body === 'string' ? payload.body : '';
+  const appPath = typeof payload?.appPath === 'string' ? payload.appPath : '';
+  const notification = new Notification({
+    title,
+    body,
+    silent: Boolean(payload?.silent),
+  });
+
+  notification.on('click', () => {
+    if (!mainWindow) {
+      createMainWindow();
+    }
+
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send('shield:desktop-notification-click', { appPath });
+    }
+  });
+
+  notification.show();
+  return true;
+}
+
+function sendUpdaterStatus(type, payload = {}) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('shield:update-status', { type, ...payload });
+  }
+}
+
+function configureAutoUpdates(config) {
+  if (!config.updateUrl) {
+    return;
+  }
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.setFeedURL({
+    provider: 'generic',
+    url: config.updateUrl
+  });
+
+  autoUpdater.on('checking-for-update', () => sendUpdaterStatus('checking'));
+  autoUpdater.on('update-available', (info) => sendUpdaterStatus('available', { version: info.version }));
+  autoUpdater.on('update-not-available', (info) => sendUpdaterStatus('not-available', { version: info.version }));
+  autoUpdater.on('download-progress', (progress) => sendUpdaterStatus('downloading', { percent: Math.round(progress.percent || 0) }));
+  autoUpdater.on('update-downloaded', (info) => {
+    sendUpdaterStatus('downloaded', { version: info.version });
+    showDesktopNotification({
+      title: 'Shield update ready',
+      body: 'Restart Shield to finish installing the desktop update.'
+    });
+  });
+  autoUpdater.on('error', (error) => sendUpdaterStatus('error', { message: error.message }));
+
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch((error) => sendUpdaterStatus('error', { message: error.message }));
+  }, 15000);
+}
+
 function createMainWindow() {
-  const desktopConfig = getDesktopConfig();
+  desktopConfig = getDesktopConfig();
   const allowedOrigins = new Set(desktopConfig.allowedOrigins.map(getOrigin).filter(Boolean));
   const appOrigin = getOrigin(desktopConfig.appUrl);
   if (appOrigin) {
     allowedOrigins.add(appOrigin);
   }
 
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1440,
     height: 960,
     minWidth: 1100,
@@ -205,12 +321,50 @@ app.setAppUserModelId('com.shield.desktop');
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   createMainWindow();
+  configureAutoUpdates(desktopConfig);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
     }
   });
+});
+
+ipcMain.handle('shield:desktop-notification', (_event, payload) => showDesktopNotification(payload));
+ipcMain.handle('shield:set-unread-count', (_event, count) => {
+  updateUnreadBadge(count);
+  return true;
+});
+ipcMain.handle('shield:flash-attention', () => {
+  if (mainWindow) {
+    mainWindow.flashFrame(true);
+  }
+  return true;
+});
+ipcMain.handle('shield:clear-attention', () => {
+  if (mainWindow) {
+    mainWindow.flashFrame(false);
+  }
+  return true;
+});
+ipcMain.handle('shield:check-for-updates', async () => {
+  if (!desktopConfig?.updateUrl) {
+    return { ok: false, message: 'Desktop update URL is not configured.' };
+  }
+
+  await autoUpdater.checkForUpdates();
+  return { ok: true };
+});
+ipcMain.handle('shield:install-update', () => {
+  autoUpdater.quitAndInstall(false, true);
+});
+ipcMain.handle('shield:navigate', (_event, appPath) => {
+  if (!mainWindow || !desktopConfig) {
+    return false;
+  }
+
+  mainWindow.loadURL(getUrlForAppPath(desktopConfig.appUrl, appPath));
+  return true;
 });
 
 app.on('window-all-closed', () => {

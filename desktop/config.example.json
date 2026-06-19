@@ -1,5 +1,6 @@
 {
   "appUrl": "https://shield.example.gov",
+  "updateUrl": "https://shield.example.gov/downloads/",
   "allowedOrigins": [
     "https://shield.example.gov"
   ]

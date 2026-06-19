@@ -122,6 +122,40 @@ function canUseBrowserNotifications(): boolean {
   return typeof window !== 'undefined' && 'Notification' in window;
 }
 
+function isShieldDesktopApp(): boolean {
+  return typeof window !== 'undefined' && window.shieldDesktop?.shell === 'electron';
+}
+
+function showDesktopNotification(title: string, options?: { body?: string; tag?: string; appPath?: string; silent?: boolean }): boolean {
+  if (!isShieldDesktopApp()) {
+    return false;
+  }
+
+  window.shieldDesktop?.notify({
+    title,
+    body: options?.body,
+    appPath: options?.appPath,
+    silent: options?.silent,
+  }).catch((error) => {
+    console.error('Failed to show desktop notification:', error);
+  });
+
+  return true;
+}
+
+function showSystemNotification(title: string, options?: NotificationOptions & { appPath?: string }) {
+  if (showDesktopNotification(title, {
+    body: options?.body,
+    tag: options?.tag,
+    appPath: options?.appPath,
+    silent: Boolean(options?.silent),
+  })) {
+    return;
+  }
+
+  showBrowserNotification(title, options);
+}
+
 function showBrowserNotification(title: string, options?: NotificationOptions) {
   if (!canUseBrowserNotifications() || Notification.permission !== 'granted') {
     return;
@@ -5105,6 +5139,26 @@ function App() {
     }, 4500);
   };
 
+  useEffect(() => {
+    if (!isShieldDesktopApp()) {
+      return;
+    }
+
+    return window.shieldDesktop?.onUpdateStatus((status) => {
+      if (status.type === 'available') {
+        showToast('info', status.version ? `Shield desktop update ${status.version} is downloading.` : 'A Shield desktop update is downloading.', { saveToNotifications: false });
+      }
+
+      if (status.type === 'downloaded') {
+        showToast('success', 'Shield desktop update downloaded. Restart the app to install it.', { saveToNotifications: false });
+      }
+
+      if (status.type === 'error') {
+        console.error('Desktop update error:', status.message);
+      }
+    });
+  }, []);
+
   const copySidebarDaily = (dateKey: string) => {
     const entry = sidebarCalendarEntries.find((item) => getEntryDateKey(item) === dateKey);
     if (!entry) {
@@ -5274,9 +5328,10 @@ function App() {
     });
     playReminderAlarmSound();
     if (messagePreferences.browserNotifications) {
-      showBrowserNotification(dueReminders.length === 1 ? `Reminder: ${dueReminders[0].title}` : `${dueReminders.length} reminders due`, {
+      showSystemNotification(dueReminders.length === 1 ? `Reminder: ${dueReminders[0].title}` : `${dueReminders.length} reminders due`, {
         body: dueReminders.length === 1 ? formatReminderDueAt(dueReminders[0]) : 'Open Shield to review your due reminders.',
         tag: dueReminders.length === 1 ? `shield-reminder-${dueReminders[0].id}` : 'shield-reminders-due',
+        appPath: '/',
       });
     }
     showToast('info', dueReminders.length === 1 ? `Reminder due: ${dueReminders[0].title}` : `${dueReminders.length} reminders due`, { saveToNotifications: false });
@@ -5730,10 +5785,14 @@ function App() {
           playMessagePing();
           if (messagePreferences.browserNotifications) {
             const newestUnread = response.data.find((message) => !message.isRead);
-            showBrowserNotification(newestUnread?.senderName ? `New message from ${newestUnread.senderName}` : 'New message', {
+            showSystemNotification(newestUnread?.senderName ? `New message from ${newestUnread.senderName}` : 'New message', {
               body: newestUnread?.body ? getPlainNotificationMessage(newestUnread.body).slice(0, 140) : 'Open Shield to view your message.',
               tag: 'shield-new-message',
+              appPath: '/messages',
             });
+            if (isShieldDesktopApp()) {
+              window.shieldDesktop?.flashAttention().catch((error) => console.error('Failed to flash desktop window:', error));
+            }
           }
         }
         previousMessageUnreadCount.current = nextUnreadCount;
@@ -5763,6 +5822,34 @@ function App() {
       eventSource?.close();
     };
   }, [currentUser, getCustomNotificationSoundUrl, messagePreferences.receiveMessages, messagePreferences.playMessageSound, messagePreferences.messageSound, messagePreferences.browserNotifications]);
+
+  useEffect(() => {
+    if (!isShieldDesktopApp()) {
+      return;
+    }
+
+    window.shieldDesktop?.setUnreadCount(messageUnreadCount).catch((error) => {
+      console.error('Failed to update desktop unread badge:', error);
+    });
+
+    if (messageUnreadCount === 0) {
+      window.shieldDesktop?.clearAttention().catch((error) => {
+        console.error('Failed to clear desktop attention state:', error);
+      });
+    }
+  }, [messageUnreadCount]);
+
+  useEffect(() => {
+    if (!isShieldDesktopApp()) {
+      return;
+    }
+
+    return window.shieldDesktop?.onNotificationClick((payload) => {
+      if (payload.appPath) {
+        window.location.assign(withAppBase(payload.appPath));
+      }
+    });
+  }, []);
 
   useEffect(() => {
     authService.getSession()
@@ -6304,6 +6391,15 @@ function App() {
       return;
     }
 
+    if (isShieldDesktopApp()) {
+      setMessagePreferences((preferences) => ({ ...preferences, browserNotifications: true }));
+      showSystemNotification('Shield notifications enabled', {
+        body: 'You will receive Windows notifications for new messages and due reminders while Shield is open.',
+        tag: 'shield-desktop-notifications-enabled',
+      });
+      return;
+    }
+
     if (!canUseBrowserNotifications()) {
       showToast('error', 'Browser notifications are not supported in this browser.', { saveToNotifications: false });
       return;
@@ -6325,8 +6421,10 @@ function App() {
     }
 
     setMessagePreferences((preferences) => ({ ...preferences, browserNotifications: true }));
-    showBrowserNotification('Shield notifications enabled', {
-      body: 'You will receive browser notifications for new messages and due reminders while Shield is open.',
+    showSystemNotification('Shield notifications enabled', {
+      body: isShieldDesktopApp()
+        ? 'You will receive Windows notifications for new messages and due reminders while Shield is open.'
+        : 'You will receive browser notifications for new messages and due reminders while Shield is open.',
       tag: 'shield-browser-notifications-enabled',
     });
   };

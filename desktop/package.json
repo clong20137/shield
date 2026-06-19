@@ -28,6 +28,12 @@
       "config*.json",
       "README.md"
     ],
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://shield.example.gov/downloads/"
+      }
+    ],
     "win": {
       "signAndEditExecutable": false,
       "target": [
@@ -38,7 +44,7 @@
           ]
         }
       ],
-      "artifactName": "Shield-Setup-${version}.${ext}"
+      "artifactName": "Shield-Setup.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -47,5 +53,8 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Shield"
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }
