@@ -26,6 +26,7 @@ const allowedPermissions = [
   'users:view-hidden',
   'users:profile-picture',
   'presence:incognito',
+  'presence:view-incognito',
   'media:view',
   'media:upload',
   'media:edit',
@@ -1861,8 +1862,9 @@ export class AuthController {
       broadcastMessageEventToAll({
         type: 'presence-updated',
         actorAccountId: accountId,
-        actorOnline: !presenceHidden,
-        actorLastSeenAt: presenceHidden ? null : new Date().toISOString(),
+        actorOnline: true,
+        actorAway: false,
+        actorLastSeenAt: new Date().toISOString(),
       });
       res.json({ account: await withPermissions(account) });
     } catch (error) {

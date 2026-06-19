@@ -124,6 +124,12 @@ function toUserMessage(row: UserMessageRow): UserMessage {
   };
 }
 
+function visibleLastSeenExpression(alias: string, canViewIncognitoPresence: boolean): string {
+  return canViewIncognitoPresence
+    ? `${alias}.lastSeenAt`
+    : `CASE WHEN COALESCE(${alias}.presenceHidden, 0) = 1 THEN NULL ELSE ${alias}.lastSeenAt END`;
+}
+
 export class UserMessageModel {
   static async createMessage(message: Omit<UserMessage, 'id' | 'isRead' | 'isArchived' | 'isDeleted' | 'senderDeleted' | 'recipientDeleted' | 'deletedAt' | 'deletedByAccountId' | 'createdAt'>): Promise<UserMessage> {
     const conn = await pool.getConnection();
@@ -190,22 +196,24 @@ export class UserMessageModel {
     }
   }
 
-  static async listInbox(accountId: string, limit = 250, offset = 0): Promise<UserMessage[]> {
+  static async listInbox(accountId: string, limit = 250, offset = 0, options: { canViewIncognitoPresence?: boolean } = {}): Promise<UserMessage[]> {
     const conn = await pool.getConnection();
     try {
+      const senderLastSeenSql = visibleLastSeenExpression('s', Boolean(options.canViewIncognitoPresence));
+      const recipientLastSeenSql = visibleLastSeenExpression('r', Boolean(options.canViewIncognitoPresence));
       const [rows] = await conn.query<UserMessageRow[]>(
         `SELECT m.*,
           COALESCE(s.displayName, CONCAT(s.firstName, ' ', s.lastName), s.email) as senderName,
           s.email as senderEmail,
           s.rank as senderRank,
           s.profilePictureUrl as senderProfilePictureUrl,
-          CASE WHEN COALESCE(s.presenceHidden, 0) = 1 THEN NULL ELSE s.lastSeenAt END as senderLastSeenAt,
+          ${senderLastSeenSql} as senderLastSeenAt,
           s.receivesMessages as senderReceivesMessages,
           COALESCE(r.displayName, CONCAT(r.firstName, ' ', r.lastName), r.email) as recipientName,
           r.email as recipientEmail,
           r.rank as recipientRank,
           r.profilePictureUrl as recipientProfilePictureUrl,
-          CASE WHEN COALESCE(r.presenceHidden, 0) = 1 THEN NULL ELSE r.lastSeenAt END as recipientLastSeenAt,
+          ${recipientLastSeenSql} as recipientLastSeenAt,
           r.receivesMessages as recipientReceivesMessages
         FROM user_messages m
         LEFT JOIN users s ON s.id = m.senderAccountId
@@ -224,22 +232,24 @@ export class UserMessageModel {
     }
   }
 
-  static async listSent(accountId: string, limit = 250, offset = 0): Promise<UserMessage[]> {
+  static async listSent(accountId: string, limit = 250, offset = 0, options: { canViewIncognitoPresence?: boolean } = {}): Promise<UserMessage[]> {
     const conn = await pool.getConnection();
     try {
+      const senderLastSeenSql = visibleLastSeenExpression('s', Boolean(options.canViewIncognitoPresence));
+      const recipientLastSeenSql = visibleLastSeenExpression('r', Boolean(options.canViewIncognitoPresence));
       const [rows] = await conn.query<UserMessageRow[]>(
         `SELECT m.*,
           COALESCE(s.displayName, CONCAT(s.firstName, ' ', s.lastName), s.email) as senderName,
           s.email as senderEmail,
           s.rank as senderRank,
           s.profilePictureUrl as senderProfilePictureUrl,
-          CASE WHEN COALESCE(s.presenceHidden, 0) = 1 THEN NULL ELSE s.lastSeenAt END as senderLastSeenAt,
+          ${senderLastSeenSql} as senderLastSeenAt,
           s.receivesMessages as senderReceivesMessages,
           COALESCE(r.displayName, CONCAT(r.firstName, ' ', r.lastName), r.email) as recipientName,
           r.email as recipientEmail,
           r.rank as recipientRank,
           r.profilePictureUrl as recipientProfilePictureUrl,
-          CASE WHEN COALESCE(r.presenceHidden, 0) = 1 THEN NULL ELSE r.lastSeenAt END as recipientLastSeenAt,
+          ${recipientLastSeenSql} as recipientLastSeenAt,
           r.receivesMessages as recipientReceivesMessages
         FROM user_messages m
         LEFT JOIN users s ON s.id = m.senderAccountId
@@ -257,22 +267,24 @@ export class UserMessageModel {
     }
   }
 
-  static async getById(messageId: string): Promise<UserMessage | null> {
+  static async getById(messageId: string, options: { canViewIncognitoPresence?: boolean } = {}): Promise<UserMessage | null> {
     const conn = await pool.getConnection();
     try {
+      const senderLastSeenSql = visibleLastSeenExpression('s', Boolean(options.canViewIncognitoPresence));
+      const recipientLastSeenSql = visibleLastSeenExpression('r', Boolean(options.canViewIncognitoPresence));
       const [rows] = await conn.query<UserMessageRow[]>(
         `SELECT m.*,
           COALESCE(s.displayName, CONCAT(s.firstName, ' ', s.lastName), s.email) as senderName,
           s.email as senderEmail,
           s.rank as senderRank,
           s.profilePictureUrl as senderProfilePictureUrl,
-          CASE WHEN COALESCE(s.presenceHidden, 0) = 1 THEN NULL ELSE s.lastSeenAt END as senderLastSeenAt,
+          ${senderLastSeenSql} as senderLastSeenAt,
           s.receivesMessages as senderReceivesMessages,
           COALESCE(r.displayName, CONCAT(r.firstName, ' ', r.lastName), r.email) as recipientName,
           r.email as recipientEmail,
           r.rank as recipientRank,
           r.profilePictureUrl as recipientProfilePictureUrl,
-          CASE WHEN COALESCE(r.presenceHidden, 0) = 1 THEN NULL ELSE r.lastSeenAt END as recipientLastSeenAt,
+          ${recipientLastSeenSql} as recipientLastSeenAt,
           r.receivesMessages as recipientReceivesMessages
         FROM user_messages m
         LEFT JOIN users s ON s.id = m.senderAccountId

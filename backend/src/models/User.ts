@@ -166,12 +166,12 @@ export class UserModel {
     return value as string | boolean | Date | null;
   }
 
-  private static toPublicUser(row: User): User {
+  private static toPublicUser(row: User, options: { canViewIncognitoPresence?: boolean } = {}): User {
     const presenceHidden = Boolean(row.presenceHidden);
     return {
       ...row,
       presenceHidden,
-      lastSeenAt: presenceHidden ? null : row.lastSeenAt,
+      lastSeenAt: presenceHidden && !options.canViewIncognitoPresence ? null : row.lastSeenAt,
       personalPhoneNumber: decryptFieldValue(row.personalPhoneNumber),
       residentialAddress: decryptFieldValue(row.residentialAddress),
       mailingAddress: decryptFieldValue(row.mailingAddress),
@@ -181,14 +181,14 @@ export class UserModel {
     };
   }
 
-  private static toPublicUsers(rows: User[]): User[] {
-    return rows.map((row) => UserModel.toPublicUser(row));
+  private static toPublicUsers(rows: User[], options: { canViewIncognitoPresence?: boolean } = {}): User[] {
+    return rows.map((row) => UserModel.toPublicUser(row, options));
   }
 
   static async searchUsers(
     searchTerm: string,
     filters?: Partial<User>,
-    options: { includeHidden?: boolean; limit?: number; offset?: number } = {}
+    options: { includeHidden?: boolean; limit?: number; offset?: number; canViewIncognitoPresence?: boolean } = {}
   ): Promise<User[]> {
     const conn = await pool.getConnection();
     try {
@@ -352,24 +352,24 @@ export class UserModel {
         : ' ORDER BY `lastName`, `firstName` LIMIT ? OFFSET ?';
 
       const [rows] = await conn.query(query, [...params, ...orderParams, options.limit ?? 100, options.offset ?? 0]);
-      return UserModel.toPublicUsers(rows as User[]);
+      return UserModel.toPublicUsers(rows as User[], options);
     } finally {
       conn.release();
     }
   }
 
-  static async getUserById(id: string): Promise<User | null> {
+  static async getUserById(id: string, options: { canViewIncognitoPresence?: boolean } = {}): Promise<User | null> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query('SELECT * FROM users WHERE `id` = ?', [id]);
       const users = rows as User[];
-      return users.length > 0 ? UserModel.toPublicUser(users[0]) : null;
+      return users.length > 0 ? UserModel.toPublicUser(users[0], options) : null;
     } finally {
       conn.release();
     }
   }
 
-  static async getUserByPeNumber(peNumber: string): Promise<User | null> {
+  static async getUserByPeNumber(peNumber: string, options: { canViewIncognitoPresence?: boolean } = {}): Promise<User | null> {
     const normalizedPeNumber = peNumber.trim().toLowerCase();
     const compactPeNumber = normalizedPeNumber.replace(/^pe[\s_-]*/iu, '').replace(/[^a-z0-9]/giu, '');
     const compactPeNumberWithoutLeadingZeros = compactPeNumber.replace(/^0+(?=\d)/u, '');
@@ -388,20 +388,20 @@ export class UserModel {
         [normalizedPeNumber, compactPeNumber, compactPeNumberWithoutLeadingZeros]
       );
       const users = rows as User[];
-      return users.length > 0 ? UserModel.toPublicUser(users[0]) : null;
+      return users.length > 0 ? UserModel.toPublicUser(users[0], options) : null;
     } finally {
       conn.release();
     }
   }
 
-  static async getAllUsers(limit: number = 100, offset: number = 0, includeHidden = false): Promise<User[]> {
+  static async getAllUsers(limit: number = 100, offset: number = 0, includeHidden = false, options: { canViewIncognitoPresence?: boolean } = {}): Promise<User[]> {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query(
         `SELECT * FROM users ${includeHidden ? '' : 'WHERE COALESCE(`isHidden`, 0) = 0'} ORDER BY \`lastName\`, \`firstName\` LIMIT ? OFFSET ?`,
         [limit, offset]
       );
-      return UserModel.toPublicUsers(rows as User[]);
+      return UserModel.toPublicUsers(rows as User[], options);
     } finally {
       conn.release();
     }

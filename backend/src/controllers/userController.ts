@@ -326,6 +326,15 @@ async function canViewHiddenUsers(req: Request): Promise<boolean> {
   return permissions.includes('users:view-hidden');
 }
 
+async function canViewIncognitoPresence(req: Request): Promise<boolean> {
+  const account = await getSessionAccount(req);
+  if (!account) return false;
+  if (account.role === 'administrator') return true;
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
+  return permissions.includes('presence:view-incognito');
+}
+
 function isHiddenFromRequester(user: User, requesterId: string | undefined, canViewHidden: boolean): boolean {
   return Boolean(user.isHidden) && user.id !== requesterId && !canViewHidden;
 }
@@ -405,10 +414,11 @@ export class UserController {
 
       const isPagedRequest = req.query.page !== undefined || req.query.pageSize !== undefined || req.query.limit !== undefined;
       const includeHidden = await canViewHiddenUsers(req);
+      const canViewPresence = await canViewIncognitoPresence(req);
 
       if (isPagedRequest) {
         const { page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 50, maxPageSize: 250 });
-        const rows = await UserModel.searchUsers(q ?? '', filters, { includeHidden, limit: pageSize + 1, offset });
+        const rows = await UserModel.searchUsers(q ?? '', filters, { includeHidden, limit: pageSize + 1, offset, canViewIncognitoPresence: canViewPresence });
         const hasMore = rows.length > pageSize;
         const users = hasMore ? rows.slice(0, pageSize) : rows;
         return res.json({
@@ -420,7 +430,7 @@ export class UserController {
         });
       }
 
-      const users = await UserModel.searchUsers(q ?? '', filters, { includeHidden });
+      const users = await UserModel.searchUsers(q ?? '', filters, { includeHidden, canViewIncognitoPresence: canViewPresence });
       res.json(users);
     } catch (error) {
       console.error('Search error:', error);
@@ -432,7 +442,7 @@ export class UserController {
     try {
       const { page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 50, maxPageSize: 250 });
 
-      const users = await UserModel.getAllUsers(pageSize, offset, await canViewHiddenUsers(req));
+      const users = await UserModel.getAllUsers(pageSize, offset, await canViewHiddenUsers(req), { canViewIncognitoPresence: await canViewIncognitoPresence(req) });
       res.json({
         data: users,
         page,
@@ -448,7 +458,7 @@ export class UserController {
   static async getUserById(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const user = await UserModel.getUserById(id);
+      const user = await UserModel.getUserById(id, { canViewIncognitoPresence: await canViewIncognitoPresence(req) });
       const sessionAccount = await getSessionAccount(req);
 
       if (!user || isHiddenFromRequester(user, sessionAccount?.id, await canViewHiddenUsers(req))) {

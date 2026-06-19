@@ -26,6 +26,60 @@ function sendEvent(response: Response, payload: MessageEventPayload) {
   response.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
+async function canViewIncognitoPresence(viewerAccountId: string, actorAccountId?: string): Promise<boolean> {
+  if (viewerAccountId === actorAccountId) {
+    return true;
+  }
+
+  const viewer = await AuthAccountModel.getAccountById(viewerAccountId);
+  if (!viewer) {
+    return false;
+  }
+
+  if (viewer.role === 'administrator') {
+    return true;
+  }
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(viewerAccountId);
+  return permissions.includes('presence:view-incognito');
+}
+
+async function getPayloadForViewer(viewerAccountId: string, payload: MessageEventPayload): Promise<MessageEventPayload> {
+  if (payload.type !== 'presence-updated' || !payload.actorAccountId) {
+    return payload;
+  }
+
+  const actor = await AuthAccountModel.getAccountById(payload.actorAccountId);
+  if (!actor?.presenceHidden) {
+    return payload;
+  }
+
+  if (await canViewIncognitoPresence(viewerAccountId, payload.actorAccountId)) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    actorOnline: false,
+    actorAway: false,
+    actorLastSeenAt: null,
+  };
+}
+
+function sendEventForViewer(viewerAccountId: string, response: Response, payload: MessageEventPayload) {
+  void getPayloadForViewer(viewerAccountId, payload)
+    .then((viewerPayload) => sendEvent(response, viewerPayload))
+    .catch((error) => {
+      console.error('Failed to filter message event for viewer:', error);
+      sendEvent(response, {
+        ...payload,
+        actorOnline: payload.type === 'presence-updated' ? false : payload.actorOnline,
+        actorAway: payload.type === 'presence-updated' ? false : payload.actorAway,
+        actorLastSeenAt: payload.type === 'presence-updated' ? null : payload.actorLastSeenAt,
+      });
+    });
+}
+
 export function addMessageEventClient(accountId: string, response: Response) {
   const accountClients = clients.get(accountId) || new Set<Response>();
   accountClients.add(response);
@@ -40,13 +94,18 @@ export function addMessageEventClient(accountId: string, response: Response) {
   response.write(': connected\n\n');
   clients.forEach((_accountClients, onlineAccountId) => {
     void AuthAccountModel.getAccountById(onlineAccountId).then((account) => {
-      if (!account || account.presenceHidden) {
+      if (!account) {
         hiddenPresenceAccounts.add(onlineAccountId);
         return;
       }
 
-      hiddenPresenceAccounts.delete(onlineAccountId);
-      sendEvent(response, {
+      if (account.presenceHidden) {
+        hiddenPresenceAccounts.add(onlineAccountId);
+      } else {
+        hiddenPresenceAccounts.delete(onlineAccountId);
+      }
+
+      sendEventForViewer(accountId, response, {
         type: 'presence-updated',
         actorAccountId: onlineAccountId,
         actorOnline: true,
@@ -60,7 +119,7 @@ export function addMessageEventClient(accountId: string, response: Response) {
 
   const announceOnline = async () => {
     const account = await AuthAccountModel.getAccountById(accountId);
-    if (!account || account.presenceHidden) {
+    if (!account) {
       hiddenPresenceAccounts.add(accountId);
       broadcastMessageEventToAll({
         type: 'presence-updated',
@@ -72,11 +131,18 @@ export function addMessageEventClient(accountId: string, response: Response) {
       return;
     }
 
-    hiddenPresenceAccounts.delete(accountId);
+    if (account.presenceHidden) {
+      hiddenPresenceAccounts.add(accountId);
+    } else {
+      hiddenPresenceAccounts.delete(accountId);
+    }
+
     const lastSeenAt = new Date().toISOString();
-    void AuthAccountModel.updateLastSeen(accountId).catch((error) => {
-      console.error('Failed to update message presence:', error);
-    });
+    if (!account.presenceHidden) {
+      void AuthAccountModel.updateLastSeen(accountId).catch((error) => {
+        console.error('Failed to update message presence:', error);
+      });
+    }
     broadcastMessageEventToAll({
       type: 'presence-updated',
       actorAccountId: accountId,
@@ -102,10 +168,7 @@ export function addMessageEventClient(accountId: string, response: Response) {
     accountClients.delete(response);
     if (accountClients.size === 0) {
       clients.delete(accountId);
-      if (hiddenPresenceAccounts.has(accountId)) {
-        hiddenPresenceAccounts.delete(accountId);
-        return;
-      }
+      hiddenPresenceAccounts.delete(accountId);
 
       broadcastMessageEventToAll({
         type: 'presence-updated',
@@ -121,7 +184,7 @@ export function addMessageEventClient(accountId: string, response: Response) {
 
 export async function updateMessagePresence(accountId: string, isAway: boolean) {
   const account = await AuthAccountModel.getAccountById(accountId);
-  if (!account || account.presenceHidden) {
+  if (!account) {
     hiddenPresenceAccounts.add(accountId);
     awayPresenceAccounts.delete(accountId);
     broadcastMessageEventToAll({
@@ -134,7 +197,12 @@ export async function updateMessagePresence(accountId: string, isAway: boolean) 
     return;
   }
 
-  hiddenPresenceAccounts.delete(accountId);
+  if (account.presenceHidden) {
+    hiddenPresenceAccounts.add(accountId);
+  } else {
+    hiddenPresenceAccounts.delete(accountId);
+  }
+
   if (isAway) {
     awayPresenceAccounts.add(accountId);
   } else {
@@ -142,7 +210,7 @@ export async function updateMessagePresence(accountId: string, isAway: boolean) 
   }
 
   const lastSeenAt = new Date().toISOString();
-  if (!isAway) {
+  if (!isAway && !account.presenceHidden) {
     void AuthAccountModel.updateLastSeen(accountId).catch((error) => {
       console.error('Failed to update message presence:', error);
     });
@@ -171,8 +239,8 @@ export function broadcastMessageEvent(accountIds: string[], payload: MessageEven
 }
 
 export function broadcastMessageEventToAll(payload: MessageEventPayload) {
-  clients.forEach((accountClients) => {
-    accountClients.forEach((client) => sendEvent(client, payload));
+  clients.forEach((accountClients, accountId) => {
+    accountClients.forEach((client) => sendEventForViewer(accountId, client, payload));
   });
 }
 

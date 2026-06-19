@@ -13,6 +13,19 @@ import { createImageThumbnails } from '../services/imageThumbnails';
 
 const systemMessagePrefix = '::system::';
 
+async function canViewIncognitoPresence(account: { id: string; role: string } | null): Promise<boolean> {
+  if (!account) {
+    return false;
+  }
+
+  if (account.role === 'administrator') {
+    return true;
+  }
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
+  return permissions.includes('presence:view-incognito');
+}
+
 function getSystemMessageBody(message: string): string {
   return `${systemMessagePrefix}${message}`;
 }
@@ -410,7 +423,10 @@ export class MessageController {
       }
 
       const pagination = parsePagination(req.query, { defaultPageSize: 250, maxPageSize: 500 });
-      const messages = await UserMessageModel.listInbox(accountId, pagination.pageSize, pagination.offset);
+      const sessionAccount = await getSessionAccount(req);
+      const messages = await UserMessageModel.listInbox(accountId, pagination.pageSize, pagination.offset, {
+        canViewIncognitoPresence: await canViewIncognitoPresence(sessionAccount),
+      });
       res.json(messages);
     } catch (error) {
       console.error('List inbox error:', error);
@@ -426,7 +442,10 @@ export class MessageController {
       }
 
       const pagination = parsePagination(req.query, { defaultPageSize: 250, maxPageSize: 500 });
-      const messages = await UserMessageModel.listSent(accountId, pagination.pageSize, pagination.offset);
+      const sessionAccount = await getSessionAccount(req);
+      const messages = await UserMessageModel.listSent(accountId, pagination.pageSize, pagination.offset, {
+        canViewIncognitoPresence: await canViewIncognitoPresence(sessionAccount),
+      });
       res.json(messages);
     } catch (error) {
       console.error('List sent messages error:', error);
