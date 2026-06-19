@@ -1,6 +1,6 @@
-# BlueLine Command Desktop App
+# Shield Desktop App
 
-This folder packages the hosted Shield/BlueLine Command web app as a Windows desktop application.
+This folder packages the hosted Shield web app as a Windows desktop application.
 
 The desktop app does not run its own database or backend. It opens the agency-hosted HTTPS Shield URL in a locked-down Electron window.
 
@@ -20,7 +20,7 @@ For development, copy `config.example.json` to `config.json` and set the interna
 You can also launch with:
 
 ```powershell
-$env:BLUELINE_COMMAND_URL="https://your-shield-server.example.gov"
+$env:SHIELD_DESKTOP_URL="https://your-shield-server.example.gov"
 npm start
 ```
 
@@ -34,12 +34,12 @@ npm run dist
 
 The installer will be created in `desktop/release/`.
 
-To make it downloadable from Account Settings, copy `desktop/release/BlueLine-Command-Setup-1.0.0.exe` to the app downloads folder and name it `BlueLine-Command-Setup.exe`.
+To make it downloadable from Account Settings, copy `desktop/release/Shield-Setup-1.0.0.exe` to the app downloads folder and name it `Shield-Setup.exe`.
 
 For the IIS path discussed for Shield, that would be:
 
 ```text
-C:\inetpub\wwwroot\shield\downloads\BlueLine-Command-Setup.exe
+C:\inetpub\wwwroot\shield\downloads\Shield-Setup.exe
 ```
 
 ## Portable Build

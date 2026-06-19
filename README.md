@@ -162,7 +162,7 @@ cd frontend
 
 ### Optional Desktop App
 
-The `desktop/` package creates a Windows installer that opens the hosted Shield/BlueLine Command web app in a locked-down Electron window.
+The `desktop/` package creates a Windows installer that opens the hosted Shield web app in a locked-down Electron window.
 
 1. Configure the agency URL:
 ```bash

@@ -1,7 +1,7 @@
 {
-  "name": "blueline-command-desktop",
+  "name": "shield-desktop",
   "version": "1.0.0",
-  "description": "Desktop shell for BlueLine Command / Shield",
+  "description": "Desktop shell for Shield",
   "main": "main.cjs",
   "private": true,
   "author": "",
@@ -17,8 +17,8 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "com.bluelinecommand.desktop",
-    "productName": "BlueLine Command",
+    "appId": "com.shield.desktop",
+    "productName": "Shield",
     "directories": {
       "output": "release"
     },
@@ -38,14 +38,14 @@
           ]
         }
       ],
-      "artifactName": "BlueLine-Command-Setup-${version}.${ext}"
+      "artifactName": "Shield-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "BlueLine Command"
+      "shortcutName": "Shield"
     }
   }
 }

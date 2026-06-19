@@ -7,7 +7,7 @@ import { ProfilePictureMediaPicker } from '../components/ProfilePictureMediaPick
 import { downloadPerformanceEvaluationPdf } from '../utils/performanceEvaluationPdf';
 
 const appBasePath = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
-const desktopInstallerUrl = `${appBasePath}/downloads/BlueLine-Command-Setup.exe`;
+const desktopInstallerUrl = `${appBasePath}/downloads/Shield-Setup.exe`;
 
 interface AccountSettingsPageProps {
   account: AuthAccount;
@@ -906,7 +906,7 @@ export function AccountSettingsPage({
             </label>
           </PreferenceGroup>
 
-          <PreferenceGroup title="Desktop App" description="Install the desktop version of BlueLine Command on this workstation.">
+          <PreferenceGroup title="Desktop App" description="Install the desktop version of Shield on this workstation.">
             <div className="rounded border border-gray-200 p-4 dark:border-gray-800">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-start gap-3">
@@ -914,7 +914,7 @@ export function AccountSettingsPage({
                     <Laptop size={20} />
                   </span>
                   <div className="min-w-0">
-                    <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">BlueLine Command for Windows</h4>
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">Shield for Windows</h4>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       Download the Windows desktop installer for faster access from this device.
                     </p>
@@ -924,7 +924,7 @@ export function AccountSettingsPage({
                   href={desktopInstallerUrl}
                   download
                   className="btn-secondary justify-center"
-                  aria-label="Download BlueLine Command desktop app"
+                  aria-label="Download Shield desktop app"
                   title="Download Desktop App"
                 >
                   <Download size={16} />

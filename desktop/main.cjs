@@ -25,7 +25,7 @@ function getDesktopConfig() {
   const localConfigPath = path.join(__dirname, 'config.json');
   const userConfigPath = path.join(app.getPath('userData'), 'config.json');
   const fileConfig = readJsonIfExists(userConfigPath) || readJsonIfExists(packagedConfigPath) || readJsonIfExists(localConfigPath) || {};
-  const appUrl = process.env.BLUELINE_COMMAND_URL || fileConfig.appUrl || defaultConfig.appUrl;
+  const appUrl = process.env.SHIELD_DESKTOP_URL || fileConfig.appUrl || defaultConfig.appUrl;
   const allowedOrigins = Array.isArray(fileConfig.allowedOrigins) && fileConfig.allowedOrigins.length > 0
     ? fileConfig.allowedOrigins
     : [appUrl];
@@ -57,7 +57,7 @@ function createMainWindow() {
     height: 960,
     minWidth: 1100,
     minHeight: 720,
-    title: 'BlueLine Command',
+    title: 'Shield',
     backgroundColor: '#0f172a',
     show: false,
     webPreferences: {
@@ -94,7 +94,7 @@ function createMainWindow() {
   mainWindow.loadURL(desktopConfig.appUrl);
 }
 
-app.setAppUserModelId('com.bluelinecommand.desktop');
+app.setAppUserModelId('com.shield.desktop');
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
