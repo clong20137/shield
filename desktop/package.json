@@ -1,6 +1,6 @@
 {
   "name": "shield-desktop",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Desktop shell for Shield",
   "main": "main.cjs",
   "private": true,
@@ -17,6 +17,7 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
+    "icon": "build/icon.ico",
     "appId": "com.shield.desktop",
     "productName": "Shield",
     "directories": {
@@ -54,7 +55,9 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Shield"
+      "shortcutName": "Shield",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
     }
   },
   "dependencies": {
