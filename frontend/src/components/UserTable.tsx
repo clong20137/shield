@@ -91,14 +91,14 @@ export const UserTable: React.FC<UserTableProps> = ({
             <tr className="bg-primary-500 text-white">
               {canSelectUsers && (
                 <th className="w-12 px-4 py-3 text-left font-semibold border-b-2 border-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={allVisibleSelected}
-                    onChange={(event) => toggleVisibleUsers(event.target.checked)}
-                    className="h-4 w-4 rounded border-white/70 text-accent focus:ring-accent"
-                    aria-label={allVisibleSelected ? 'Clear visible selected users' : 'Select visible users'}
-                  />
-                </th>
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  onChange={(event) => toggleVisibleUsers(event.target.checked)}
+                  className="h-4 w-4 rounded border-white/70 bg-white text-accent accent-accent focus:ring-accent"
+                  aria-label={allVisibleSelected ? 'Clear visible selected users' : 'Select visible users'}
+                />
+              </th>
               )}
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Last Name</th>
               <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">First Name</th>
@@ -129,15 +129,15 @@ export const UserTable: React.FC<UserTableProps> = ({
               >
                 {canSelectUsers && (
                   <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedUserIdSet.has(user.id)}
-                      onChange={(event) => toggleUser(user.id, event.target.checked)}
-                      onClick={(event) => event.stopPropagation()}
-                      className="h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent dark:border-gray-700"
-                      aria-label={`Select ${user.firstName} ${user.lastName}`}
-                    />
-                  </td>
+                  <input
+                    type="checkbox"
+                    checked={selectedUserIdSet.has(user.id)}
+                    onChange={(event) => toggleUser(user.id, event.target.checked)}
+                    onClick={(event) => event.stopPropagation()}
+                    className="h-4 w-4 rounded border-gray-300 bg-white text-accent accent-accent focus:ring-accent dark:border-gray-700 dark:bg-gray-900"
+                    aria-label={`Select ${user.firstName} ${user.lastName}`}
+                  />
+                </td>
                 )}
                 <td className="px-4 py-3">
                   <div className="flex min-w-0 items-center gap-3">

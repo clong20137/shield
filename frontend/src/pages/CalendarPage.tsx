@@ -210,6 +210,37 @@ const trooperDailySections = [
   },
 ] as const;
 
+const regularDutySplitTimeFields = [
+  ['splitStartTime', 'Split Start Time'],
+  ['splitEndTime', 'Split End Time'],
+  ['secondSplitStartTime', '2nd Split Start Time'],
+  ['secondSplitEndTime', '2nd Split End Time'],
+  ['thirdSplitStartTime', '3rd Split Start Time'],
+  ['thirdSplitEndTime', '3rd Split End Time'],
+] as const;
+
+const getRegularDutySplitPairCountFromDetails = (details?: Record<string, string>): number => {
+  if (details?.thirdSplitStartTime?.trim() || details?.thirdSplitEndTime?.trim()) {
+    return 3;
+  }
+
+  if (details?.secondSplitStartTime?.trim() || details?.secondSplitEndTime?.trim()) {
+    return 2;
+  }
+
+  return 1;
+};
+
+const getRegularDutySectionFields = (splitPairCount = 1): typeof trooperDailySections[number]['fields'] => {
+  const safeSplitPairCount = Math.min(3, Math.max(1, splitPairCount));
+  return [
+    ['regularDutyStartTime', 'Start Time'],
+    ['regularDutyEndTime', 'End Time'],
+    ...regularDutySplitTimeFields.slice(0, safeSplitPairCount * 2),
+    ['regularDutyMiles', 'Regular Duty Miles'],
+  ];
+};
+
 const timeDetailFields = new Set<string>([
   'regularDutyStartTime',
   'regularDutyEndTime',
@@ -929,6 +960,7 @@ function CalendarPage({
     return { vacation: defaultHours, sick: defaultHours };
   });
   const [copiedDailyForm, setCopiedDailyForm] = useState<CalendarEntryForm | null>(null);
+  const [regularDutySplitPairCount, setRegularDutySplitPairCount] = useState(1);
   const lastAutoDutyHoursRef = useRef('');
   const dailyFormRef = useRef<HTMLFormElement | null>(null);
   const skipNextDailyDraftWriteRef = useRef(false);
@@ -1092,7 +1124,7 @@ function CalendarPage({
     pendingDailyFocusRef.current = null;
     setCalendarFocusDate(new Date(year, month - 1, day));
     setSelectedDate(dateKey);
-    setEntryForm(nextForm);
+    setEntryFormAndSyncSplitPairs(nextForm);
     setIsDutyHoursManual(Boolean(existingEntry));
     lastAutoDutyHoursRef.current = '';
     setEditingEntryId(shouldRestoreLocalDraft && localDraft ? localDraft.editingEntryId || existingEntry?.id || null : existingEntry?.id || null);
@@ -1306,7 +1338,7 @@ function CalendarPage({
 
     dailyRedoStackRef.current.push(entryForm);
     isRestoringDailyHistoryRef.current = true;
-    setEntryForm(previousForm);
+    setEntryFormAndSyncSplitPairs(previousForm);
   };
 
   const redoDailyChange = () => {
@@ -1317,7 +1349,7 @@ function CalendarPage({
 
     dailyUndoStackRef.current.push(entryForm);
     isRestoringDailyHistoryRef.current = true;
-    setEntryForm(nextForm);
+    setEntryFormAndSyncSplitPairs(nextForm);
   };
 
   const advanceDailyPanel = () => {
@@ -1621,7 +1653,7 @@ function CalendarPage({
         skipNextDailyDraftWriteRef.current = true;
         setSelectedDate(response.data.date);
         setEditingEntryId(response.data.id);
-        setEntryForm(createEntryFormFromEntry(response.data));
+        setEntryFormAndSyncSplitPairs(createEntryFormFromEntry(response.data));
       } else {
         const response = await calendarService.create(payload);
         setEntries((currentEntries) => mergeSavedCalendarEntry(currentEntries, response.data));
@@ -1629,7 +1661,7 @@ function CalendarPage({
         skipNextDailyDraftWriteRef.current = true;
         setSelectedDate(response.data.date);
         setEditingEntryId(response.data.id);
-        setEntryForm(createEntryFormFromEntry(response.data));
+        setEntryFormAndSyncSplitPairs(createEntryFormFromEntry(response.data));
       }
       setDailySaveStatus('saved');
       setDailySaveStatusAt(Date.now());
@@ -1666,7 +1698,7 @@ function CalendarPage({
       if (editingEntryId === entry.id) {
         setEditingEntryId(null);
         skipNextDailyDraftWriteRef.current = true;
-        setEntryForm(createDefaultEntryForm(selectedDate || entry.date, currentUser));
+        setEntryFormAndSyncSplitPairs(createDefaultEntryForm(selectedDate || entry.date, currentUser));
         setIsDutyHoursManual(false);
         lastAutoDutyHoursRef.current = '';
       }
@@ -1716,7 +1748,7 @@ function CalendarPage({
         setSelectedDate(restoredEntry.date);
         setCalendarFocusDate(new Date(`${restoredEntry.date}T00:00:00`));
         setEditingEntryId(restoredEntry.id);
-        setEntryForm(createEntryFormFromEntry(restoredEntry));
+        setEntryFormAndSyncSplitPairs(createEntryFormFromEntry(restoredEntry));
         setIsDutyHoursManual(true);
         setDailySaveStatus('saved');
         setDailySaveStatusAt(Date.now());
@@ -1762,6 +1794,19 @@ function CalendarPage({
 
       return nextForm;
     });
+  };
+
+  const setRegularDutyPairCountFromDetails = (details: CalendarEntryForm['details']) => {
+    setRegularDutySplitPairCount(getRegularDutySplitPairCountFromDetails(details || {}));
+  };
+
+  const setEntryFormAndSyncSplitPairs = (nextForm: CalendarEntryForm) => {
+    setEntryForm(nextForm);
+    setRegularDutyPairCountFromDetails(nextForm.details);
+  };
+
+  const addRegularDutySplitPair = () => {
+    setRegularDutySplitPairCount((currentPairCount) => Math.min(3, currentPairCount + 1));
   };
 
   const updateTCodeRows = (rows: TrooperDailyTCode[]) => {
@@ -1838,17 +1883,18 @@ function CalendarPage({
   };
 
   const applyShortcut = (shortcut: CalendarShortcut) => {
-    setEntryForm((currentForm) => ({
-      ...currentForm,
+    const nextForm = {
+      ...entryForm,
       dutyHours: shortcut.dutyHours,
-      districtWorked: shortcut.districtWorked || currentForm.districtWorked,
+      districtWorked: shortcut.districtWorked || entryForm.districtWorked,
       specialStatus: shortcut.specialStatus,
       color: shortcut.color,
       details: {
-        ...(currentForm.details || {}),
+        ...(entryForm.details || {}),
         ...(shortcut.details || {}),
       },
-    }));
+    };
+    setEntryFormAndSyncSplitPairs(nextForm);
     setIsDutyHoursManual(true);
     lastAutoDutyHoursRef.current = '';
   };
@@ -1984,7 +2030,7 @@ function CalendarPage({
     }
 
     setCalendarError(null);
-    setEntryForm({
+    const nextForm = {
       category: 'Trooper Daily',
       date: selectedDate,
       dutyHours: previousEntry.dutyHours,
@@ -1993,7 +2039,8 @@ function CalendarPage({
       color: previousEntry.color,
       submissionStatus: 'Draft',
       details: { ...(previousEntry.details || {}) },
-    });
+    };
+    setEntryFormAndSyncSplitPairs(nextForm);
     setIsDutyHoursManual(true);
     lastAutoDutyHoursRef.current = '';
   };
@@ -2011,7 +2058,7 @@ function CalendarPage({
     setCalendarError(null);
     setSelectedDate(dateKey);
     setCalendarFocusDate(new Date(`${dateKey}T00:00:00`));
-    setEntryForm({
+    const nextForm = {
       category: 'Trooper Daily',
       date: dateKey,
       dutyHours: previousEntry.dutyHours,
@@ -2020,7 +2067,8 @@ function CalendarPage({
       color: previousEntry.color,
       submissionStatus: 'Draft',
       details: { ...(previousEntry.details || {}) },
-    });
+    };
+    setEntryFormAndSyncSplitPairs(nextForm);
     setEditingEntryId(null);
     setIsDutyHoursManual(true);
     lastAutoDutyHoursRef.current = '';
@@ -2056,12 +2104,13 @@ function CalendarPage({
     setCalendarError(null);
     setSelectedDate(dateKey);
     setCalendarFocusDate(new Date(`${dateKey}T00:00:00`));
-    setEntryForm({
+    const nextForm = {
       ...copiedDailyForm,
       date: dateKey,
       submissionStatus: 'Draft',
       details: { ...(copiedDailyForm.details || {}) },
-    });
+    };
+    setEntryFormAndSyncSplitPairs(nextForm);
     setEditingEntryId(existingEntry?.id || null);
     setIsDutyHoursManual(true);
     lastAutoDutyHoursRef.current = '';
@@ -2121,7 +2170,7 @@ function CalendarPage({
     setCalendarFocusDate(new Date(`${dateKey}T00:00:00`));
     setSelectedDate(dateKey);
     setEditingEntryId(savedExistingEntry?.id || optimisticEntry.id);
-    setEntryForm(leaveForm);
+    setEntryFormAndSyncSplitPairs(leaveForm);
     setIsDutyHoursManual(true);
     setDailySaveStatus('saving');
     lastAutoDutyHoursRef.current = '';
@@ -2137,7 +2186,7 @@ function CalendarPage({
       setCalendarFocusDate(new Date(`${dateKey}T00:00:00`));
       setSelectedDate(dateKey);
       setEditingEntryId(response.data.id);
-      setEntryForm(createEntryFormFromEntry(response.data));
+      setEntryFormAndSyncSplitPairs(createEntryFormFromEntry(response.data));
       setIsDutyHoursManual(true);
       setDailySaveStatus('saved');
       setDailySaveStatusAt(Date.now());
@@ -2328,8 +2377,14 @@ function CalendarPage({
       (attendanceHours > 0 && Math.abs(attendanceHours - reportedDutyHours) > 0.01) ||
       (dutyActivityHours > 0 && Math.abs(dutyActivityHours - shiftDutyTargetHours) > 0.01));
   const visibleDailySections = useMemo(
-    () => trooperDailySections.filter((section) => !hiddenDailySections.includes(section.title)),
-    [hiddenDailySections],
+    () => trooperDailySections
+      .filter((section) => !hiddenDailySections.includes(section.title))
+      .map((section) => (
+        section.title === 'Regular Duty'
+          ? ({ ...section, fields: getRegularDutySectionFields(regularDutySplitPairCount) })
+          : section
+      )),
+    [hiddenDailySections, regularDutySplitPairCount],
   );
   const dailyPanelOptions = useMemo(
     () => [
@@ -2527,7 +2582,7 @@ function CalendarPage({
     return 'Autosave issue';
   })();
   const getPanelCompletionState = (panel: string): { state: DailyPanelCompletionState; label: string } => {
-    const panelSection = trooperDailySections.find((section) => section.title === panel);
+    const panelSection = visibleDailySections.find((section) => section.title === panel);
     const invalidField = invalidDailyField || '';
     const invalidBelongsToPanel = invalidDailyField && (invalidDailyPanel === panel || (panel === 'Administrative'
       ? ['entryDate', 'dutyHours', 'districtWorked', 'specialStatus', 'color'].includes(invalidField)
@@ -3373,29 +3428,42 @@ function CalendarPage({
                           )}
                         </div>
                         {activeDailySection.title === 'Regular Duty' && (
-                          <div className="inline-flex rounded border border-gray-300 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-900" aria-label="Time input format">
+                          <div className="flex flex-wrap gap-2">
                             <button
                               type="button"
-                              onClick={() => setDailyUseMilitaryTime(false)}
-                              className={`rounded px-2.5 py-1.5 text-xs font-bold transition ${
-                                !dailyUseMilitaryTime
-                                  ? 'bg-primary-500 text-white'
-                                  : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
-                              }`}
+                              onClick={addRegularDutySplitPair}
+                              disabled={regularDutySplitPairCount >= 3}
+                              className="btn-secondary"
+                              title="Add another split interval"
+                              aria-label="Add split interval"
                             >
-                              Standard
+                              <Plus size={16} />
+                              <span>Add Split</span>
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => setDailyUseMilitaryTime(true)}
-                              className={`rounded px-2.5 py-1.5 text-xs font-bold transition ${
-                                dailyUseMilitaryTime
-                                  ? 'bg-primary-500 text-white'
-                                  : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
-                              }`}
-                            >
-                              Military
-                            </button>
+                            <div className="inline-flex rounded border border-gray-300 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-900" aria-label="Time input format">
+                              <button
+                                type="button"
+                                onClick={() => setDailyUseMilitaryTime(false)}
+                                className={`rounded px-2.5 py-1.5 text-xs font-bold transition ${
+                                  !dailyUseMilitaryTime
+                                    ? 'bg-primary-500 text-white'
+                                    : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                                }`}
+                              >
+                                Standard
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDailyUseMilitaryTime(true)}
+                                className={`rounded px-2.5 py-1.5 text-xs font-bold transition ${
+                                  dailyUseMilitaryTime
+                                    ? 'bg-primary-500 text-white'
+                                    : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                                }`}
+                              >
+                                Military
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>

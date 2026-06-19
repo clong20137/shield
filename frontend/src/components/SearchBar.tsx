@@ -34,6 +34,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     radioNumber: '',
     peNumber: '',
   });
+  const inputClassName = 'text-gray-900 placeholder:text-gray-500 dark:text-gray-100 dark:placeholder:text-gray-400';
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,7 +83,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
-          className="flex-1 px-4 py-3 border-2 border-gray-300 rounded focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 text-sm dark:border-gray-700 dark:bg-gray-950"
+          className={`flex-1 px-4 py-3 border-2 border-gray-300 rounded text-sm focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950 ${inputClassName}`}
         />
         <button type="submit" className="btn-primary" aria-label="Search users" title="Search">
           <Search size={16} />
@@ -103,7 +104,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <select
             value={filters.rank}
             onChange={(e) => handleFilterChange('rank', e.target.value)}
-            className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+            className={`px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950 ${inputClassName}`}
           >
             <option value="">All Ranks</option>
             {rankOptions.filter(Boolean).map((rank) => (
@@ -114,7 +115,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <select
             value={filters.district}
             onChange={(e) => handleFilterChange('district', e.target.value)}
-            className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+            className={`px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950 ${inputClassName}`}
           >
             <option value="">All Districts</option>
             {districtOptions.map((district) => (
@@ -125,7 +126,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <select
             value={filters.active}
             onChange={(e) => handleFilterChange('active', e.target.value)}
-            className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+            className={`px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950 ${inputClassName}`}
           >
             <option value="">All Status</option>
             <option value="true">Active</option>
@@ -135,7 +136,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <select
             value={filters.employmentType}
             onChange={(e) => handleFilterChange('employmentType', e.target.value)}
-            className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+            className={`px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950 ${inputClassName}`}
           >
             <option value="">All Employment Types</option>
             {employmentTypes.map((type) => (
@@ -146,7 +147,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <select
             value={filters.status}
             onChange={(e) => handleFilterChange('status', e.target.value)}
-            className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+            className={`px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950 ${inputClassName}`}
           >
             <option value="">All Special Status</option>
             {['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training', 'Administrative Duty', 'Inactive'].map((status) => (
@@ -157,7 +158,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <select
             value={filters.sex}
             onChange={(e) => handleFilterChange('sex', e.target.value)}
-            className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+            className={`px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white cursor-pointer focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950 ${inputClassName}`}
           >
             <option value="">All Sex</option>
             <option value="M">M</option>
@@ -168,28 +169,28 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             value={filters.supervisor}
             onChange={(e) => handleFilterChange('supervisor', e.target.value)}
             placeholder="Supervisor"
-            className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+            className={`px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950 ${inputClassName}`}
           />
 
           <input
             value={filters.peNumber}
             onChange={(e) => handleFilterChange('peNumber', e.target.value)}
             placeholder="PE number"
-            className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+            className={`px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950 ${inputClassName}`}
           />
 
           <input
             value={filters.badgeNumber}
             onChange={(e) => handleFilterChange('badgeNumber', e.target.value)}
             placeholder="Badge number"
-            className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+            className={`px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950 ${inputClassName}`}
           />
 
           <input
             value={filters.radioNumber}
             onChange={(e) => handleFilterChange('radioNumber', e.target.value)}
             placeholder="Radio number"
-            className="px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950"
+            className={`px-3 py-2 border-2 border-gray-300 rounded text-sm bg-white focus:outline-none focus:border-primary-500 dark:border-gray-700 dark:bg-gray-950 ${inputClassName}`}
           />
         </div>
       )}
