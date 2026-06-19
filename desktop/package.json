@@ -1,6 +1,6 @@
 {
   "name": "shield-desktop",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Desktop shell for Shield",
   "main": "main.cjs",
   "private": true,
@@ -38,7 +38,7 @@
       }
     ],
     "win": {
-      "signAndEditExecutable": false,
+      "signAndEditExecutable": true,
       "icon": "build/icon.ico",
       "target": [
         {
