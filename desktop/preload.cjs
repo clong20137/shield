@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('shieldDesktop', {
   setUnreadCount: (count) => ipcRenderer.invoke('shield:set-unread-count', count),
   flashAttention: () => ipcRenderer.invoke('shield:flash-attention'),
   clearAttention: () => ipcRenderer.invoke('shield:clear-attention'),
+  getClipboardFiles: () => ipcRenderer.invoke('shield:get-clipboard-files'),
   checkForUpdates: () => ipcRenderer.invoke('shield:check-for-updates'),
   installUpdate: () => ipcRenderer.invoke('shield:install-update'),
   getDesktopPreferences: () => ipcRenderer.invoke('shield:get-desktop-preferences'),

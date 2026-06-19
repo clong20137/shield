@@ -30,6 +30,13 @@ interface ShieldDesktopPreferences {
   updateConfigured: boolean;
 }
 
+interface ShieldDesktopClipboardFile {
+  name: string;
+  type: string;
+  size: number;
+  base64: string;
+}
+
 interface Window {
   shieldDesktop?: {
     platform: string;
@@ -38,6 +45,7 @@ interface Window {
     setUnreadCount?: (count: number) => Promise<boolean>;
     flashAttention?: () => Promise<boolean>;
     clearAttention?: () => Promise<boolean>;
+    getClipboardFiles?: () => Promise<{ files: ShieldDesktopClipboardFile[] }>;
     checkForUpdates?: () => Promise<{ ok: boolean; message?: string }>;
     installUpdate?: () => Promise<void>;
     getDesktopPreferences?: () => Promise<ShieldDesktopPreferences>;

@@ -21,6 +21,7 @@ interface AccountSettingsPageProps {
     hideQuickLaunch: boolean;
     quickLaunchSlotCount: number;
   };
+  isDesktopApp: boolean;
   desktopPreferences: ShieldDesktopPreferences | null;
   notificationSounds: NotificationSound[];
   onReceiveMessagesChange: (receiveMessages: boolean) => void;
@@ -38,6 +39,7 @@ interface AccountSettingsPageProps {
   onDefaultDutyHoursChange: (defaultDutyHours: string) => void;
   onStartWithWindowsChange: (startWithWindows: boolean) => void;
   onTrayModeChange: (trayMode: boolean) => void;
+  onCheckForDesktopUpdates: () => void;
   onInstallDesktopUpdate: () => void;
   onOpenEvaluations?: () => void;
   onReplayGuide?: () => void;
@@ -66,6 +68,7 @@ function isSecurePassword(password: string): boolean {
 export function AccountSettingsPage({
   account,
   messagePreferences,
+  isDesktopApp,
   desktopPreferences,
   notificationSounds,
   onReceiveMessagesChange,
@@ -83,6 +86,7 @@ export function AccountSettingsPage({
   onDefaultDutyHoursChange,
   onStartWithWindowsChange,
   onTrayModeChange,
+  onCheckForDesktopUpdates,
   onInstallDesktopUpdate,
   onOpenEvaluations,
   onReplayGuide,
@@ -914,7 +918,7 @@ export function AccountSettingsPage({
             </label>
           </PreferenceGroup>
 
-          <PreferenceGroup title="Desktop App" description="Install the desktop version of Shield on this workstation.">
+          <PreferenceGroup title="Desktop App" description={isDesktopApp ? 'Manage the Shield desktop app on this workstation.' : 'Install the desktop version of Shield on this workstation.'}>
             <div className="rounded border border-gray-200 p-4 dark:border-gray-800">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-start gap-3">
@@ -924,60 +928,89 @@ export function AccountSettingsPage({
                   <div className="min-w-0">
                     <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">Shield for Windows</h4>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Download the Windows desktop installer for faster access from this device.
+                      {isDesktopApp ? 'You are using the installed Shield desktop app.' : 'Download the Windows desktop installer for faster access from this device.'}
                     </p>
                   </div>
                 </div>
-                <a
-                  href={desktopInstallerUrl}
-                  download
-                  className="btn-secondary justify-center"
-                  aria-label="Download Shield desktop app"
-                  title="Download Desktop App"
-                >
-                  <Download size={16} />
-                  <span>Download App</span>
-                </a>
+                {isDesktopApp ? (
+                  <button
+                    type="button"
+                    onClick={onCheckForDesktopUpdates}
+                    className="btn-secondary justify-center"
+                    aria-label="Check for Shield desktop updates"
+                    title="Check for Updates"
+                  >
+                    <RefreshCw size={16} />
+                    <span>Check for Updates</span>
+                  </button>
+                ) : (
+                  <a
+                    href={desktopInstallerUrl}
+                    download
+                    className="btn-secondary justify-center"
+                    aria-label="Download Shield desktop app"
+                    title="Download Desktop App"
+                  >
+                    <Download size={16} />
+                    <span>Download App</span>
+                  </a>
+                )}
               </div>
             </div>
-            {desktopPreferences && (
+            {isDesktopApp && (
               <>
-                <PreferenceToggle
-                  title="Start with Windows"
-                  description="Launch Shield automatically when you sign in to this workstation."
-                  checked={desktopPreferences.startWithWindows}
-                  onChange={onStartWithWindowsChange}
-                  icon={<Power size={16} />}
-                />
-                <PreferenceToggle
-                  title="Minimize to system tray"
-                  description="Keep Shield running in the tray when the desktop window is closed."
-                  checked={desktopPreferences.trayMode}
-                  onChange={onTrayModeChange}
-                  icon={<Laptop size={16} />}
-                />
+                {desktopPreferences && (
+                  <>
+                    <PreferenceToggle
+                      title="Start with Windows"
+                      description="Launch Shield automatically when you sign in to this workstation."
+                      checked={desktopPreferences.startWithWindows}
+                      onChange={onStartWithWindowsChange}
+                      icon={<Power size={16} />}
+                    />
+                    <PreferenceToggle
+                      title="Minimize to system tray"
+                      description="Keep Shield running in the tray when the desktop window is closed."
+                      checked={desktopPreferences.trayMode}
+                      onChange={onTrayModeChange}
+                      icon={<Laptop size={16} />}
+                    />
+                  </>
+                )}
                 <div className="flex flex-col gap-3 rounded border border-gray-200 p-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
                   <span className="min-w-0">
                     <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Desktop updates</span>
                     <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-                      {desktopPreferences.updateDownloaded
+                      {desktopPreferences?.updateDownloaded
                         ? 'A desktop update is ready to install.'
-                        : desktopPreferences.updateConfigured
+                        : desktopPreferences?.updateConfigured
                           ? 'Shield checks for desktop updates automatically.'
-                          : 'Desktop update URL is not configured for this installer.'}
+                          : 'Check for updates from this app. Newer desktop controls appear after the latest desktop update is installed.'}
                     </span>
                   </span>
-                  <button
-                    type="button"
-                    onClick={onInstallDesktopUpdate}
-                    disabled={!desktopPreferences.updateDownloaded}
-                    className="btn-secondary justify-center disabled:pointer-events-none disabled:opacity-50"
-                    aria-label="Restart Shield to install desktop update"
-                    title={desktopPreferences.updateDownloaded ? 'Restart To Update' : 'No Update Ready'}
-                  >
-                    <RefreshCw size={16} />
-                    <span>Restart to Update</span>
-                  </button>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={onCheckForDesktopUpdates}
+                      className="btn-secondary justify-center"
+                      aria-label="Check for Shield desktop updates"
+                      title="Check for Updates"
+                    >
+                      <RefreshCw size={16} />
+                      <span>Check</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onInstallDesktopUpdate}
+                      disabled={!desktopPreferences?.updateDownloaded}
+                      className="btn-secondary justify-center disabled:pointer-events-none disabled:opacity-50"
+                      aria-label="Restart Shield to install desktop update"
+                      title={desktopPreferences?.updateDownloaded ? 'Restart To Update' : 'No Update Ready'}
+                    >
+                      <RefreshCw size={16} />
+                      <span>Restart to Update</span>
+                    </button>
+                  </div>
                 </div>
               </>
             )}

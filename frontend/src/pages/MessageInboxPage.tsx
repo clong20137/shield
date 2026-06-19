@@ -254,6 +254,21 @@ function getDraftGroupThreadId(recipients: Pick<User, 'id'>[]): string {
   return `draft-group:${recipients.map((user) => user.id).sort().join(',')}`;
 }
 
+function fileFromDesktopClipboardPayload(file: ShieldDesktopClipboardFile): File | null {
+  try {
+    const binary = window.atob(file.base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+
+    return new File([bytes], file.name, { type: file.type || 'application/octet-stream' });
+  } catch (error) {
+    console.error('Failed to read desktop clipboard file:', error);
+    return null;
+  }
+}
+
 function isMessageImageUrl(value: string): boolean {
   return /^\/uploads\/messages\/[^\s]+?\.(?:jpe?g|jfif|png|gif|webp)$/iu.test(value.trim());
 }
@@ -918,17 +933,50 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     }
   };
 
+  const addFilesToReply = (files: File[]) => {
+    const imageFiles = files.filter((file) => file.type.startsWith('image/'));
+    const attachmentFiles = files.filter((file) => !file.type.startsWith('image/'));
+
+    if (attachmentFiles.length > 0) {
+      setReplyAttachments((attachments) => [...attachments, ...attachmentFiles]);
+    }
+
+    if (imageFiles.length > 0) {
+      void imageFiles.reduce<Promise<void>>(
+        (promise, file) => promise.then(() => appendMessageImage(file)),
+        Promise.resolve(),
+      );
+    }
+  };
+
+  const readDesktopClipboardFiles = async () => {
+    if (typeof window.shieldDesktop?.getClipboardFiles !== 'function') {
+      return;
+    }
+
+    try {
+      const clipboardPayload = await window.shieldDesktop.getClipboardFiles();
+      const files = clipboardPayload.files
+        .map(fileFromDesktopClipboardPayload)
+        .filter((file): file is File => Boolean(file));
+      if (files.length > 0) {
+        addFilesToReply(files);
+        onToast('info', `Added ${files.length} clipboard file${files.length === 1 ? '' : 's'} to this message.`);
+      }
+    } catch (error) {
+      console.error('Failed to read desktop clipboard files:', error);
+    }
+  };
+
   const handleMessagePaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
-    const imageFiles = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith('image/'));
-    if (imageFiles.length === 0) {
+    const pastedFiles = Array.from(event.clipboardData.files);
+    if (pastedFiles.length === 0) {
+      void readDesktopClipboardFiles();
       return;
     }
 
     event.preventDefault();
-    void imageFiles.reduce<Promise<void>>(
-      (promise, file) => promise.then(() => appendMessageImage(file)),
-      Promise.resolve(),
-    );
+    addFilesToReply(pastedFiles);
   };
 
   const changeGroupImage = async (file?: File | null) => {

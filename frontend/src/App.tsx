@@ -5224,6 +5224,25 @@ function App() {
     }
   };
 
+  const handleCheckForDesktopUpdates = async () => {
+    if (!hasShieldDesktopFeature('checkForUpdates')) {
+      showToast('info', 'Install the latest Shield desktop app to use in-app update checks.', { saveToNotifications: false });
+      return;
+    }
+
+    try {
+      const result = await window.shieldDesktop?.checkForUpdates?.();
+      if (result && !result.ok) {
+        showToast('error', result.message || 'Desktop update check is not available.', { saveToNotifications: false });
+        return;
+      }
+      showToast('info', 'Checking for Shield desktop updates...', { saveToNotifications: false });
+    } catch (error) {
+      console.error('Failed to check for desktop updates:', error);
+      showToast('error', 'Failed to check for desktop updates.', { saveToNotifications: false });
+    }
+  };
+
   const copySidebarDaily = (dateKey: string) => {
     const entry = sidebarCalendarEntries.find((item) => getEntryDateKey(item) === dateKey);
     if (!entry) {
@@ -7391,6 +7410,7 @@ function App() {
                     <AccountSettingsPage
                       account={currentUser}
                       messagePreferences={messagePreferences}
+                      isDesktopApp={isShieldDesktopApp()}
                       desktopPreferences={desktopPreferences}
                       notificationSounds={notificationSounds}
                       onReceiveMessagesChange={handleReceiveMessagesChange}
@@ -7438,6 +7458,7 @@ function App() {
                       onDefaultDutyHoursChange={handleDefaultDutyHoursChange}
                       onStartWithWindowsChange={handleStartWithWindowsChange}
                       onTrayModeChange={handleTrayModeChange}
+                      onCheckForDesktopUpdates={handleCheckForDesktopUpdates}
                       onInstallDesktopUpdate={handleInstallDesktopUpdate}
                       onReplayGuide={replayGuide}
                       onOpenEvaluations={() => closeModal('profile')}

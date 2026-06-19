@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, shell, ipcMain, Notification, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, Tray, clipboard, shell, ipcMain, Notification, nativeImage } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const fs = require('fs');
 const path = require('path');
@@ -18,6 +18,24 @@ let isUpdateDownloaded = false;
 const desktopPreferencesDefault = {
   startWithWindows: false,
   trayMode: true
+};
+
+const clipboardFileSizeLimit = 25 * 1024 * 1024;
+
+const mimeTypesByExtension = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.jfif': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.pdf': 'application/pdf',
+  '.txt': 'text/plain',
+  '.csv': 'text/csv',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 };
 
 function escapeHtml(value) {
@@ -104,6 +122,61 @@ function readJsonIfExists(filePath) {
     console.error(`Failed to read desktop config at ${filePath}:`, error);
     return null;
   }
+}
+
+function getMimeTypeForFile(filePath) {
+  return mimeTypesByExtension[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
+}
+
+function readClipboardFilePaths() {
+  const formats = clipboard.availableFormats();
+  const rawFileNameBuffer = formats.includes('FileNameW') ? clipboard.readBuffer('FileNameW') : null;
+  if (!rawFileNameBuffer || rawFileNameBuffer.length === 0) {
+    return [];
+  }
+
+  return rawFileNameBuffer
+    .toString('utf16le')
+    .split('\u0000')
+    .map((filePath) => filePath.trim())
+    .filter(Boolean);
+}
+
+function readClipboardPayload() {
+  const files = [];
+
+  readClipboardFilePaths().forEach((filePath) => {
+    try {
+      const stats = fs.statSync(filePath);
+      if (!stats.isFile() || stats.size > clipboardFileSizeLimit) {
+        return;
+      }
+
+      files.push({
+        name: path.basename(filePath),
+        type: getMimeTypeForFile(filePath),
+        size: stats.size,
+        base64: fs.readFileSync(filePath).toString('base64')
+      });
+    } catch (error) {
+      console.error(`Failed to read clipboard file at ${filePath}:`, error);
+    }
+  });
+
+  const clipboardImage = clipboard.readImage();
+  if (!clipboardImage.isEmpty() && files.length === 0) {
+    const imageBuffer = clipboardImage.toPNG();
+    if (imageBuffer.length <= clipboardFileSizeLimit) {
+      files.push({
+        name: `clipboard-image-${Date.now()}.png`,
+        type: 'image/png',
+        size: imageBuffer.length,
+        base64: imageBuffer.toString('base64')
+      });
+    }
+  }
+
+  return { files };
 }
 
 function getDesktopPreferencesPath() {
@@ -520,6 +593,7 @@ ipcMain.handle('shield:check-for-updates', async () => {
 ipcMain.handle('shield:install-update', () => {
   autoUpdater.quitAndInstall(false, true);
 });
+ipcMain.handle('shield:get-clipboard-files', () => readClipboardPayload());
 ipcMain.handle('shield:get-desktop-preferences', () => ({
   ...getDesktopPreferences(),
   updateDownloaded: isUpdateDownloaded,
