@@ -1,0 +1,6 @@
+{
+  "appUrl": "https://shield.example.gov",
+  "allowedOrigins": [
+    "https://shield.example.gov"
+  ]
+}

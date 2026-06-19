@@ -25,6 +25,10 @@ A comprehensive internal application for searching users throughout an agency an
 - **Tailwind CSS** - Utility-first CSS framework
 - **Axios** - HTTP client
 
+### Desktop App
+- **Electron** - Optional Windows desktop shell for agencies that want an installable app
+- **electron-builder** - Windows installer and portable executable packaging
+
 ## Project Structure
 
 ```text
@@ -73,6 +77,13 @@ SHIELD/
     |-- package.json
     |-- tsconfig.json
     `-- vite.config.ts
+|
+`-- desktop/
+    |-- main.cjs                   # Electron main process
+    |-- preload.cjs                # Hardened preload bridge
+    |-- config.example.json        # Agency URL template
+    |-- package.json               # Desktop packaging scripts
+    `-- README.md                  # Desktop build instructions
 ```
 
 ## Installation
@@ -148,6 +159,26 @@ If the database is not connected yet, the backend still starts enough API for th
 ```bash
 cd frontend
 ```
+
+### Optional Desktop App
+
+The `desktop/` package creates a Windows installer that opens the hosted Shield/BlueLine Command web app in a locked-down Electron window.
+
+1. Configure the agency URL:
+```bash
+cd desktop
+copy config.example.json config.json
+```
+
+2. Edit `config.json` so `appUrl` and `allowedOrigins` point to the agency-hosted HTTPS Shield site.
+
+3. Build the Windows installer:
+```bash
+npm install
+npm run dist
+```
+
+The installer is created under `desktop/release/`.
 
 2. Install dependencies:
 ```bash
