@@ -3712,7 +3712,7 @@ function CalendarPage({
 
       {dailyStripContextMenu && (
         <div
-          className="quick-launch-context-menu z-[100] min-w-64 overflow-hidden rounded border border-gray-200 bg-white p-1 text-sm shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+          className="quick-launch-context-menu z-[100] min-w-56 overflow-hidden rounded border border-gray-200 bg-white p-1 text-sm shadow-2xl dark:border-gray-700 dark:bg-gray-900"
           style={{
             position: dailyStripContextMenu.strategy,
             left: dailyStripContextMenu.x,
@@ -3766,7 +3766,7 @@ function CalendarPage({
             <span>Copy Previous Daily</span>
             <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">P</span>
           </button>
-          <div className="quick-launch-context-menu-item gap-3 text-gray-700 dark:text-gray-200">
+          <div className="quick-launch-context-menu-item gap-2 text-gray-700 dark:text-gray-200">
             <button
               type="button"
               onClick={() => {
@@ -3791,13 +3791,13 @@ function CalendarPage({
                   setDailyStripContextMenu(null);
                 }
               }}
-              className="h-8 w-16 shrink-0 rounded border border-gray-300 bg-white px-2 text-right text-xs font-bold text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+              className="h-7 w-12 shrink-0 rounded border border-gray-300 bg-white px-1.5 text-right text-xs font-bold text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
               aria-label="Vacation day hours"
               title="Vacation Hours"
             />
             <span className="w-4 shrink-0 text-right text-xs font-black text-gray-400 dark:text-gray-500">V</span>
           </div>
-          <div className="quick-launch-context-menu-item gap-3 text-gray-700 dark:text-gray-200">
+          <div className="quick-launch-context-menu-item gap-2 text-gray-700 dark:text-gray-200">
             <button
               type="button"
               onClick={() => {
@@ -3822,7 +3822,7 @@ function CalendarPage({
                   setDailyStripContextMenu(null);
                 }
               }}
-              className="h-8 w-16 shrink-0 rounded border border-gray-300 bg-white px-2 text-right text-xs font-bold text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+              className="h-7 w-12 shrink-0 rounded border border-gray-300 bg-white px-1.5 text-right text-xs font-bold text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
               aria-label="Sick day hours"
               title="Sick Hours"
             />
