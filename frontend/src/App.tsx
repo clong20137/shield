@@ -1318,8 +1318,8 @@ function ShieldLoading({
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
       <div className="text-center">
-        <div className="shield-loader mx-auto mb-4">
-          <Shield size={76} />
+        <div className="shield-app-icon-loader mx-auto mb-4">
+          <img src={withAppBase('/shield-icon.png')} alt="SHIELD" />
         </div>
         <p className="text-sm font-bold uppercase tracking-[0.24em] text-accent">{title}</p>
         {detail && <p className="mt-3 text-sm font-semibold text-gray-500 dark:text-gray-400">{detail}</p>}

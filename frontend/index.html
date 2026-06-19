@@ -5,14 +5,152 @@
     <link rel="icon" type="image/png" href="%BASE_URL%shield-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SHIELD - Agency User Search & Reporting System</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+
+      body {
+        margin: 0;
+        background: #f9fafb;
+      }
+
+      .initial-splash {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.65rem;
+        background:
+          radial-gradient(circle at center, rgba(156, 134, 92, 0.14), transparent 19rem),
+          #f9fafb;
+        color: #111827;
+        font-family: Arial, sans-serif;
+        padding: 2rem;
+        text-align: center;
+      }
+
+      .initial-splash-mark {
+        position: relative;
+        width: 7.5rem;
+        height: 7.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .initial-splash-mark::before {
+        content: '';
+        position: absolute;
+        inset: 0.25rem;
+        border: 2px solid rgba(156, 134, 92, 0.28);
+        border-top-color: #9c865c;
+        border-radius: 999px;
+        animation: splash-ring 1.25s linear infinite;
+      }
+
+      .initial-splash-mark img {
+        position: relative;
+        width: 5.75rem;
+        height: 5.75rem;
+        object-fit: contain;
+        filter: drop-shadow(0 18px 28px rgba(15, 23, 42, 0.2));
+        animation: splash-icon-pulse 1.8s ease-in-out infinite;
+      }
+
+      .initial-splash-kicker {
+        margin: 0;
+        color: #9c865c;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.22em;
+      }
+
+      .initial-splash h1 {
+        margin: 0;
+        font-size: clamp(1.65rem, 4vw, 2.35rem);
+        line-height: 1.1;
+      }
+
+      .initial-splash-copy,
+      .initial-splash-fallback {
+        margin: 0;
+        color: #4b5563;
+        font-size: 0.95rem;
+        line-height: 1.5;
+      }
+
+      .initial-splash-fallback {
+        max-width: 32rem;
+        opacity: 0;
+        animation: splash-fallback 0.35s ease-out 7s forwards;
+      }
+
+      @keyframes splash-ring {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @keyframes splash-icon-pulse {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+
+        50% {
+          transform: scale(1.045);
+        }
+      }
+
+      @keyframes splash-fallback {
+        to {
+          opacity: 1;
+        }
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #030712;
+        }
+
+        .initial-splash {
+          background:
+            radial-gradient(circle at center, rgba(156, 134, 92, 0.16), transparent 20rem),
+            #030712;
+          color: #f9fafb;
+        }
+
+        .initial-splash-copy,
+        .initial-splash-fallback {
+          color: #9ca3af;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .initial-splash-mark::before,
+        .initial-splash-mark img,
+        .initial-splash-fallback {
+          animation: none;
+        }
+
+        .initial-splash-fallback {
+          opacity: 1;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root">
-      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f9fafb;color:#1f2937;font-family:Arial,sans-serif;">
-        <div style="max-width:520px;padding:24px;border:1px solid #d1d5db;background:#fff;box-shadow:0 8px 24px rgba(0,0,0,.08);">
-          <h1 style="margin:0 0 8px;font-size:24px;">Loading SHIELD</h1>
-          <p style="margin:0;line-height:1.5;">If this message stays on screen, the frontend JavaScript did not load. Check that the built assets are deployed with this page.</p>
+      <div class="initial-splash" role="status" aria-live="polite">
+        <div class="initial-splash-mark">
+          <img src="%BASE_URL%shield-icon.png" alt="SHIELD" />
         </div>
+        <p class="initial-splash-kicker">SHIELD</p>
+        <h1>Loading SHIELD</h1>
+        <p class="initial-splash-copy">Preparing your workspace...</p>
+        <p class="initial-splash-fallback">If this stays on screen, the frontend JavaScript did not load.</p>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
