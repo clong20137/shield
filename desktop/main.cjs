@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, Tray, clipboard, shell, ipcMain, Notification,
 const { autoUpdater } = require('electron-updater');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const defaultConfig = {
   appUrl: 'https://shield.example.gov',
@@ -28,6 +29,12 @@ const desktopPreferencesDefault = {
 };
 
 const clipboardFileSizeLimit = 25 * 1024 * 1024;
+const webAppUpdateCheckIntervalMs = 60 * 1000;
+const webAppReloadCooldownMs = 15 * 1000;
+let webAppUpdateCheckTimer = null;
+let webAppSignature = null;
+let isWebAppUpdateCheckRunning = false;
+let lastWebAppReloadAt = 0;
 
 const mimeTypesByExtension = {
   '.jpg': 'image/jpeg',
@@ -362,6 +369,83 @@ function getUrlForAppPath(appUrl, appPath) {
   }
 }
 
+function getWebAppUpdateCheckUrl(appUrl) {
+  const url = new URL(appUrl);
+  url.searchParams.set('shieldDesktopUpdateCheck', String(Date.now()));
+  return url.toString();
+}
+
+async function fetchWebAppSignature(appUrl) {
+  const response = await fetch(getWebAppUpdateCheckUrl(appUrl), {
+    cache: 'no-store',
+    headers: {
+      Accept: 'text/html,*/*',
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Web app update check failed with HTTP ${response.status}`);
+  }
+
+  const body = await response.text();
+  return crypto
+    .createHash('sha256')
+    .update(body)
+    .digest('hex');
+}
+
+async function checkForWebAppUpdate({ initial = false } = {}) {
+  if (!desktopConfig?.appUrl || !/^https?:\/\//iu.test(desktopConfig.appUrl) || !mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  if (isWebAppUpdateCheckRunning) {
+    return;
+  }
+
+  isWebAppUpdateCheckRunning = true;
+
+  try {
+    const nextSignature = await fetchWebAppSignature(desktopConfig.appUrl);
+    if (initial || !webAppSignature) {
+      webAppSignature = nextSignature;
+      return;
+    }
+
+    if (nextSignature !== webAppSignature && Date.now() - lastWebAppReloadAt > webAppReloadCooldownMs) {
+      webAppSignature = nextSignature;
+      lastWebAppReloadAt = Date.now();
+      mainWindow.webContents.reloadIgnoringCache();
+    }
+  } catch (error) {
+    console.error('Failed to check hosted Shield web app version:', error);
+  } finally {
+    isWebAppUpdateCheckRunning = false;
+  }
+}
+
+function startWebAppUpdateChecks() {
+  if (webAppUpdateCheckTimer) {
+    clearInterval(webAppUpdateCheckTimer);
+    webAppUpdateCheckTimer = null;
+  }
+
+  webAppSignature = null;
+  void checkForWebAppUpdate({ initial: true });
+  webAppUpdateCheckTimer = setInterval(() => {
+    void checkForWebAppUpdate();
+  }, webAppUpdateCheckIntervalMs);
+}
+
+function stopWebAppUpdateChecks() {
+  if (webAppUpdateCheckTimer) {
+    clearInterval(webAppUpdateCheckTimer);
+    webAppUpdateCheckTimer = null;
+  }
+}
+
 function createBadgeOverlay(count) {
   if (!count || count <= 0) {
     return null;
@@ -535,6 +619,7 @@ function createMainWindow() {
   });
 
   mainWindow.on('closed', () => {
+    stopWebAppUpdateChecks();
     mainWindow = null;
   });
 
@@ -590,6 +675,7 @@ function createMainWindow() {
       appUrl: desktopConfig.appUrl
     }))}`);
   });
+  startWebAppUpdateChecks();
 }
 
 app.setAppUserModelId('com.shield.desktop');

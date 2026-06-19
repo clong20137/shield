@@ -4,6 +4,8 @@ This folder packages the hosted Shield web app as a Windows desktop application.
 
 The desktop app does not run its own database or backend. It opens the agency-hosted HTTPS Shield URL in a locked-down Electron window.
 
+The desktop shell also checks the hosted web app once per minute. When the hosted frontend changes, the window reloads while bypassing cache so users do not have to hard refresh to pick up new web deployments.
+
 ## Configure the App URL
 
 For development, copy `config.example.json` to `config.json` and set the internal agency URL:

@@ -29,7 +29,7 @@ const QUICK_LAUNCH_PICKER_WIDTH = 320;
 const QUICK_LAUNCH_PICKER_GUTTER = 12;
 const QUICK_LAUNCH_PICKER_CLOSE_MS = 500;
 const QUICK_LAUNCH_CONTEXT_MENU_WIDTH = 256;
-const QUICK_LAUNCH_CONTEXT_MENU_HEIGHT = 330;
+const QUICK_LAUNCH_CONTEXT_MENU_HEIGHT = 300;
 const QUICK_LAUNCH_CONTEXT_MENU_GUTTER = 12;
 const MODAL_CLOSE_MS = 220;
 const PASSWORD_REQUIREMENTS_MESSAGE = 'Password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.';
@@ -2723,7 +2723,7 @@ function QuickLaunchTray({
 
   return (
     <section className={isSidebarPlacement
-      ? 'pointer-events-none relative hidden select-none md:block'
+      ? 'quick-launch-sidebar-placement pointer-events-none relative hidden select-none md:block'
       : `pointer-events-none fixed bottom-3 left-3 right-3 z-30 hidden select-none transition-all duration-200 sm:bottom-5 sm:right-6 md:block ${isSidebarCollapsed ? 'sm:left-24' : 'sm:left-[19.5rem]'}`
     }>
       <div
@@ -2731,12 +2731,12 @@ function QuickLaunchTray({
         data-onboarding-target="quick-launch"
         className={`quick-launch-gold-frame quick-launch-tray-enter pointer-events-auto relative max-w-full border border-transparent bg-white/85 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:bg-gray-950/80 ${
           isSidebarPlacement
-            ? 'w-full rounded-lg sm:p-2'
+            ? 'quick-launch-sidebar-frame w-full rounded-lg'
             : 'mx-auto w-fit rounded-2xl sm:p-3'
         }`}
       >
         <div className={isSidebarPlacement
-          ? `grid max-w-full gap-1.5 ${isSidebarCollapsed ? 'grid-cols-1 justify-items-center' : 'grid-cols-3'}`
+          ? `quick-launch-sidebar-grid grid max-w-full ${isSidebarCollapsed ? 'grid-cols-1 justify-items-center' : 'grid-cols-4'}`
           : 'flex max-w-full flex-wrap items-center justify-center gap-1.5 sm:gap-2'
         }>
         {slots.map((slot, index) => {
@@ -2930,22 +2930,16 @@ function QuickLaunchTray({
               aria-label="Quick launcher slot count"
             />
           </div>
-          <div className="grid grid-cols-2 gap-1 px-1 pb-1">
-            <button
-              type="button"
-              onClick={() => onQuickLaunchPlacementChange('dock')}
-              className={`quick-launch-context-menu-item justify-center text-gray-700 dark:text-gray-200 ${placement === 'dock' ? 'bg-accent/10 text-accent' : ''}`}
-            >
-              Dock
-            </button>
-            <button
-              type="button"
-              onClick={() => onQuickLaunchPlacementChange('sidebar')}
-              className={`quick-launch-context-menu-item justify-center text-gray-700 dark:text-gray-200 ${placement === 'sidebar' ? 'bg-accent/10 text-accent' : ''}`}
-            >
-              Left Grid
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onQuickLaunchPlacementChange(placement === 'sidebar' ? 'dock' : 'sidebar');
+              setContextMenu(null);
+            }}
+            className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
+          >
+            <LayoutDashboard size={15} /> {placement === 'sidebar' ? 'Move to screen' : 'Move to left grid'}
+          </button>
           <button
             type="button"
             onClick={() => {
