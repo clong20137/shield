@@ -3,7 +3,7 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { UserMessageModel } from '../models/UserMessage';
-import { addMessageEventClient, broadcastMessageEvent, updateMessagePresence } from '../services/messageEvents';
+import { addMessageEventClient, broadcastMessageEvent, MessagePresenceStatus, updateMessagePresence } from '../services/messageEvents';
 import { notifyMentions } from '../services/mentionService';
 import { cleanMultiline, cleanString } from '../utils/validation';
 import { getSessionAccount } from '../middleware/authSession';
@@ -12,6 +12,10 @@ import { isSafeMessageImage } from '../middleware/messageUpload';
 import { createImageThumbnails } from '../services/imageThumbnails';
 
 const systemMessagePrefix = '::system::';
+
+function normalizePresenceStatus(status?: MessagePresenceStatus): MessagePresenceStatus {
+  return status === 'active' || status === 'away' || status === 'busy' ? status : 'active';
+}
 
 async function canViewIncognitoPresence(account: { id: string; role: string } | null): Promise<boolean> {
   if (!account) {
@@ -58,9 +62,12 @@ export class MessageController {
         return res.status(401).json({ error: 'Session expired or invalid' });
       }
 
-      const isAway = req.body?.status === 'away' || req.body?.away === true;
-      await updateMessagePresence(account.id, isAway);
-      res.json({ ok: true, away: isAway });
+      const isAwayLegacy = req.body?.away === true;
+      const status = normalizePresenceStatus(
+        (req.body?.status as MessagePresenceStatus | undefined) || (isAwayLegacy ? 'away' : undefined)
+      );
+      await updateMessagePresence(account.id, status);
+      res.json({ ok: true, status });
     } catch (error) {
       console.error('Message presence update error:', error);
       res.status(500).json({ error: 'Failed to update presence' });

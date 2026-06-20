@@ -34,7 +34,7 @@ interface ShieldDesktopPreferences {
 }
 
 interface ShieldDesktopIdleStatus {
-  status: 'active' | 'away';
+  status: 'active' | 'away' | 'busy';
   idleSeconds?: number;
 }
 

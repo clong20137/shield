@@ -441,6 +441,7 @@ function LoginSplash({
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const [isLoginWarningOpen, setIsLoginWarningOpen] = useState(false);
   const [hasAcknowledgedLoginWarning, setHasAcknowledgedLoginWarning] = useState(false);
+  const loginInputClass = 'w-full rounded border-2 border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400';
   const loginFormRef = useRef<HTMLFormElement | null>(null);
   const lastAutoSubmittedTwoFactorCodeRef = useRef('');
 
@@ -690,7 +691,7 @@ function LoginSplash({
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+                  className={loginInputClass}
                   autoComplete="email"
                   autoFocus
                 />
@@ -704,7 +705,7 @@ function LoginSplash({
                   <input
                     value={firstName}
                     onChange={(event) => setFirstName(event.target.value)}
-                    className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+                    className={loginInputClass}
                     autoComplete="given-name"
                   />
                 </label>
@@ -713,7 +714,7 @@ function LoginSplash({
                   <input
                     value={lastName}
                     onChange={(event) => setLastName(event.target.value)}
-                    className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+                    className={loginInputClass}
                     autoComplete="family-name"
                   />
                 </label>
@@ -727,7 +728,7 @@ function LoginSplash({
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+                className={loginInputClass}
                 autoComplete={mode === 'reset' || mode === 'register' ? 'new-password' : 'current-password'}
               />
             </label>
@@ -740,7 +741,7 @@ function LoginSplash({
                   type="password"
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
-                  className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+                  className={loginInputClass}
                   autoComplete="new-password"
                 />
               </label>
@@ -752,7 +753,7 @@ function LoginSplash({
                 <input
                   value={twoFactorCode}
                   onChange={(event) => setTwoFactorCode(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/gu, '').slice(0, 12))}
-                  className="w-full rounded border-2 border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950"
+                  className={loginInputClass}
                   autoComplete="one-time-code"
                   inputMode="text"
                   maxLength={12}
@@ -5151,7 +5152,7 @@ function App() {
   const apiConnectionWasLostRef = useRef(false);
   const scheduledReminderTimeoutsRef = useRef<Map<string, number>>(new Map());
   const awayPresenceTimerRef = useRef<number | null>(null);
-  const awayPresenceStateRef = useRef<'active' | 'away'>('active');
+  const awayPresenceStateRef = useRef<'active' | 'away' | 'busy'>('active');
   const awayPresenceRequestRef = useRef(0);
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
   const [notificationSounds, setNotificationSounds] = useState<NotificationSound[]>([]);
@@ -5250,7 +5251,7 @@ function App() {
       return undefined;
     }
 
-    const setPresenceStatus = (status: 'active' | 'away', force = false) => {
+    const setPresenceStatus = (status: 'active' | 'away' | 'busy', force = false) => {
       if (!force && awayPresenceStateRef.current === status) {
         return;
       }
@@ -5275,6 +5276,22 @@ function App() {
       }, AWAY_PRESENCE_IDLE_MS);
     };
 
+    const markBusy = (forceOrEvent: boolean | Event = false) => {
+      if (awayPresenceTimerRef.current) {
+        window.clearTimeout(awayPresenceTimerRef.current);
+        awayPresenceTimerRef.current = null;
+      }
+      setPresenceStatus('busy', forceOrEvent === true);
+    };
+
+    const markAway = () => {
+      if (awayPresenceTimerRef.current) {
+        window.clearTimeout(awayPresenceTimerRef.current);
+        awayPresenceTimerRef.current = null;
+      }
+      setPresenceStatus('away');
+    };
+
     const markActive = (forceOrEvent: boolean | Event = false) => {
       setPresenceStatus('active', forceOrEvent === true);
       scheduleAway();
@@ -5282,11 +5299,7 @@ function App() {
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        if (awayPresenceTimerRef.current) {
-          window.clearTimeout(awayPresenceTimerRef.current);
-          awayPresenceTimerRef.current = null;
-        }
-        setPresenceStatus('away');
+        markBusy(true);
         return;
       }
 
@@ -5296,11 +5309,12 @@ function App() {
     const removeDesktopIdleStatusListener = hasShieldDesktopFeature('onIdleStatus')
       ? window.shieldDesktop?.onIdleStatus?.((payload) => {
         if (payload.status === 'away') {
-          if (awayPresenceTimerRef.current) {
-            window.clearTimeout(awayPresenceTimerRef.current);
-            awayPresenceTimerRef.current = null;
-          }
-          setPresenceStatus('away');
+          markAway();
+          return;
+        }
+
+        if (payload.status === 'busy') {
+          markBusy();
           return;
         }
 
@@ -5322,6 +5336,7 @@ function App() {
     window.addEventListener('scroll', markActive, true);
     window.addEventListener('touchstart', markActive);
     window.addEventListener('focus', markActive);
+    window.addEventListener('blur', markBusy);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
@@ -5336,6 +5351,7 @@ function App() {
       window.removeEventListener('scroll', markActive, true);
       window.removeEventListener('touchstart', markActive);
       window.removeEventListener('focus', markActive);
+      window.removeEventListener('blur', markBusy);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       removeDesktopIdleStatusListener?.();
     };

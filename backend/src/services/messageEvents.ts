@@ -3,6 +3,7 @@ import { AuthAccountModel } from '../models/AuthAccount';
 import { UserMessage } from '../models/UserMessage';
 
 export type MessageEventType = 'message-created' | 'message-read' | 'message-archived' | 'message-deleted' | 'message-reaction' | 'message-typing' | 'presence-updated';
+export type MessagePresenceStatus = 'active' | 'away' | 'busy';
 
 interface MessageEventPayload {
   type: MessageEventType;
@@ -14,12 +15,24 @@ interface MessageEventPayload {
   typingIsActive?: boolean;
   actorOnline?: boolean;
   actorAway?: boolean;
+  actorStatus?: MessagePresenceStatus;
   actorLastSeenAt?: string | null;
 }
 
 const clients = new Map<string, Set<Response>>();
 const hiddenPresenceAccounts = new Set<string>();
 const awayPresenceAccounts = new Set<string>();
+const presenceStatuses = new Map<string, MessagePresenceStatus>();
+
+function normalizePresenceStatus(status?: string): MessagePresenceStatus {
+  return status === 'away' || status === 'busy' || status === 'active'
+    ? status
+    : 'active';
+}
+
+function getPresenceStatus(actorAccountId: string): MessagePresenceStatus {
+  return presenceStatuses.get(actorAccountId) || 'active';
+}
 
 function sendEvent(response: Response, payload: MessageEventPayload) {
   response.write(`event: ${payload.type}\n`);
@@ -62,6 +75,7 @@ async function getPayloadForViewer(viewerAccountId: string, payload: MessageEven
     ...payload,
     actorOnline: false,
     actorAway: false,
+    actorStatus: 'away',
     actorLastSeenAt: null,
   };
 }
@@ -75,6 +89,7 @@ function sendEventForViewer(viewerAccountId: string, response: Response, payload
         ...payload,
         actorOnline: payload.type === 'presence-updated' ? false : payload.actorOnline,
         actorAway: payload.type === 'presence-updated' ? false : payload.actorAway,
+        actorStatus: payload.type === 'presence-updated' ? 'away' : payload.actorStatus,
         actorLastSeenAt: payload.type === 'presence-updated' ? null : payload.actorLastSeenAt,
       });
     });
@@ -94,10 +109,11 @@ export function addMessageEventClient(accountId: string, response: Response) {
   response.write(': connected\n\n');
   clients.forEach((_accountClients, onlineAccountId) => {
     void AuthAccountModel.getAccountById(onlineAccountId).then((account) => {
-      if (!account) {
-        hiddenPresenceAccounts.add(onlineAccountId);
-        return;
-      }
+    if (!account) {
+      hiddenPresenceAccounts.add(onlineAccountId);
+      presenceStatuses.delete(onlineAccountId);
+      return;
+    }
 
       if (account.presenceHidden) {
         hiddenPresenceAccounts.add(onlineAccountId);
@@ -110,6 +126,7 @@ export function addMessageEventClient(accountId: string, response: Response) {
         actorAccountId: onlineAccountId,
         actorOnline: true,
         actorAway: awayPresenceAccounts.has(onlineAccountId),
+        actorStatus: getPresenceStatus(onlineAccountId),
         actorLastSeenAt: new Date().toISOString(),
       });
     }).catch((error) => {
@@ -126,6 +143,7 @@ export function addMessageEventClient(accountId: string, response: Response) {
         actorAccountId: accountId,
         actorOnline: false,
         actorAway: false,
+        actorStatus: 'away',
         actorLastSeenAt: null,
       });
       return;
@@ -148,6 +166,7 @@ export function addMessageEventClient(accountId: string, response: Response) {
       actorAccountId: accountId,
       actorOnline: true,
       actorAway: awayPresenceAccounts.has(accountId),
+      actorStatus: getPresenceStatus(accountId),
       actorLastSeenAt: lastSeenAt,
     });
   };
@@ -169,29 +188,34 @@ export function addMessageEventClient(accountId: string, response: Response) {
     if (accountClients.size === 0) {
       clients.delete(accountId);
       hiddenPresenceAccounts.delete(accountId);
+      presenceStatuses.delete(accountId);
+      awayPresenceAccounts.delete(accountId);
 
       broadcastMessageEventToAll({
         type: 'presence-updated',
         actorAccountId: accountId,
         actorOnline: false,
         actorAway: false,
+        actorStatus: 'away',
         actorLastSeenAt: new Date().toISOString(),
       });
-      awayPresenceAccounts.delete(accountId);
     }
   });
 }
 
-export async function updateMessagePresence(accountId: string, isAway: boolean) {
+export async function updateMessagePresence(accountId: string, status: MessagePresenceStatus) {
   const account = await AuthAccountModel.getAccountById(accountId);
+  const normalizedStatus = normalizePresenceStatus(status);
   if (!account) {
     hiddenPresenceAccounts.add(accountId);
     awayPresenceAccounts.delete(accountId);
+    presenceStatuses.delete(accountId);
     broadcastMessageEventToAll({
       type: 'presence-updated',
       actorAccountId: accountId,
       actorOnline: false,
       actorAway: false,
+      actorStatus: 'away',
       actorLastSeenAt: null,
     });
     return;
@@ -203,14 +227,15 @@ export async function updateMessagePresence(accountId: string, isAway: boolean) 
     hiddenPresenceAccounts.delete(accountId);
   }
 
-  if (isAway) {
+  if (normalizedStatus === 'away') {
     awayPresenceAccounts.add(accountId);
   } else {
     awayPresenceAccounts.delete(accountId);
   }
+  presenceStatuses.set(accountId, normalizedStatus);
 
   const lastSeenAt = new Date().toISOString();
-  if (!isAway && !account.presenceHidden) {
+  if (normalizedStatus === 'active' && !account.presenceHidden) {
     void AuthAccountModel.updateLastSeen(accountId).catch((error) => {
       console.error('Failed to update message presence:', error);
     });
@@ -220,7 +245,8 @@ export async function updateMessagePresence(accountId: string, isAway: boolean) 
     type: 'presence-updated',
     actorAccountId: accountId,
     actorOnline: true,
-    actorAway: isAway,
+    actorAway: normalizedStatus === 'away',
+    actorStatus: normalizedStatus,
     actorLastSeenAt: lastSeenAt,
   });
 }

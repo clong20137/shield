@@ -84,7 +84,11 @@ function isOnlineFromLastSeen(value?: string | null, now = Date.now()): boolean 
   return now - lastActivityTime <= 5 * 60 * 1000;
 }
 
-function getPresenceDisplay(value: string | null | undefined, isOnline: boolean, isAway = false): string {
+function getPresenceDisplay(
+  value: string | null | undefined,
+  isOnline: boolean,
+  status: 'active' | 'away' | 'busy' = 'active',
+): string {
   if (!value) {
     return 'Never';
   }
@@ -98,13 +102,25 @@ function getPresenceDisplay(value: string | null | undefined, isOnline: boolean,
     return `Last online ${formatMessageTime(value)}`;
   }
 
-  return isAway ? 'Away' : 'Active';
+  if (status === 'busy') {
+    return 'Busy';
+  }
+
+  if (status === 'away') {
+    return 'Away';
+  }
+
+  return 'Active';
 }
 
-function PresenceDot({ isOnline, isAway = false, className = '' }: { isOnline: boolean; isAway?: boolean; className?: string }) {
-  const toneClass = isAway ? 'bg-amber-400' : isOnline ? 'bg-green-500' : 'bg-red-500';
-  const pulseClass = isAway ? 'bg-amber-300' : 'bg-green-400';
-  const label = isAway ? 'Away' : isOnline ? 'Online' : 'Offline';
+function PresenceDot({
+  isOnline,
+  status = 'active',
+  className = '',
+}: { isOnline: boolean; status?: 'active' | 'away' | 'busy'; className?: string }) {
+  const toneClass = status === 'busy' ? 'bg-red-500' : status === 'away' ? 'bg-amber-400' : isOnline ? 'bg-green-500' : 'bg-red-500';
+  const pulseClass = status === 'busy' ? 'bg-red-300' : status === 'away' ? 'bg-amber-300' : 'bg-green-400';
+  const label = status === 'busy' ? 'Busy' : status === 'away' ? 'Away' : isOnline ? 'Online' : 'Offline';
   return (
     <span
       className={`relative inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${toneClass} ${className}`}
@@ -383,7 +399,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const [messagePendingDelete, setMessagePendingDelete] = useState<UserMessage | null>(null);
   const [threadPendingDelete, setThreadPendingDelete] = useState<MessageThread | null>(null);
   const [selectedMentionUser, setSelectedMentionUser] = useState<User | null>(null);
-  const [presenceByAccount, setPresenceByAccount] = useState<Record<string, { online: boolean; away: boolean; lastSeenAt: string | null }>>({});
+  const [presenceByAccount, setPresenceByAccount] = useState<Record<string, { online: boolean; away: boolean; status?: 'active' | 'away' | 'busy'; lastSeenAt: string | null }>>({});
   const [memberDirectory, setMemberDirectory] = useState<Record<string, ThreadMemberPreview>>({});
   const [composePopoverPosition, setComposePopoverPosition] = useState({ right: 16, bottom: 88 });
   const typingStopTimerRef = useRef<number | null>(null);
@@ -493,6 +509,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           actorAccountId?: string;
           actorOnline?: boolean;
           actorAway?: boolean;
+          actorStatus?: 'active' | 'away' | 'busy';
           actorLastSeenAt?: string;
         };
         if (!payload.actorAccountId) {
@@ -505,6 +522,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           [payload.actorAccountId as string]: {
             online: payload.actorOnline === true,
             away: payload.actorAway === true,
+            status: payload.actorStatus,
             lastSeenAt: payload.actorLastSeenAt || null,
           },
         }));
@@ -808,6 +826,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       return {
         online: false,
         away: false,
+        status: 'active' as const,
         lastSeenAt: null,
         label: `${Math.max(thread.participantIds.length - 1, 0)} members`,
       };
@@ -817,11 +836,15 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     const lastSeenAt = realtimePresence?.lastSeenAt || thread.contactLastSeenAt;
     const online = realtimePresence?.online === true;
     const away = online && realtimePresence?.away === true;
+    const status = realtimePresence?.status === 'busy' || realtimePresence?.status === 'away' || realtimePresence?.status === 'active'
+      ? realtimePresence.status
+      : away ? 'away' : 'active';
     return {
       online,
       away,
+      status,
       lastSeenAt,
-      label: getPresenceDisplay(lastSeenAt, online, away),
+      label: getPresenceDisplay(lastSeenAt, online, status),
     };
   };
   const selectedPresence = selectedThread ? getThreadPresence(selectedThread) : null;
@@ -1457,7 +1480,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                       {thread.threadType === 'direct' && (
                         <span
                           className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-gray-900 ${
-                            presence.away ? 'animate-pulse bg-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.22)]' : presence.online ? 'bg-green-500' : 'bg-gray-400'
+                            presence.status === 'busy'
+                              ? 'animate-pulse bg-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.22)]'
+                              : presence.status === 'away'
+                                ? 'animate-pulse bg-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.22)]'
+                                : presence.online
+                                  ? 'bg-green-500'
+                                  : 'bg-gray-400'
                           }`}
                         />
                       )}
@@ -1816,7 +1845,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                               <Pencil size={14} />
                             </button>
                           )}
-                          {selectedThread.threadType === 'direct' && <PresenceDot isOnline={selectedPresence?.online === true} isAway={selectedPresence?.away === true} />}
+                          {selectedThread.threadType === 'direct' && (
+                            <PresenceDot isOnline={selectedPresence?.online === true} status={selectedPresence?.status || 'active'} />
+                          )}
                         </>
                       )}
                     </div>

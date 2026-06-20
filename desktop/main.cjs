@@ -18,7 +18,7 @@ let isUpdateDownloaded = false;
 let pendingUpdateRestartTimer = null;
 let desktopUnreadCount = 0;
 let desktopIdleCheckTimer = null;
-let desktopIdleStatus = 'active';
+let desktopPresenceStatus = 'active';
 let desktopUpdateCheckTimer = null;
 let lastDesktopUpdateStatus = null;
 let isDesktopUpdateCheckRunning = false;
@@ -528,11 +528,13 @@ function checkDesktopIdleStatus({ force = false } = {}) {
 
   const idleState = powerMonitor.getSystemIdleState(desktopIdleThresholdSeconds);
   const idleSeconds = powerMonitor.getSystemIdleTime();
-  const nextStatus = idleState === 'active' ? 'active' : 'away';
+  const isWindowActive = mainWindow.isVisible() && !mainWindow.isMinimized() && mainWindow.isFocused();
+  const nextStatus = isWindowActive ? (idleState === 'active' ? 'active' : 'away') : 'busy';
 
-  if (force || nextStatus !== desktopIdleStatus) {
-    desktopIdleStatus = nextStatus;
+  if (force || nextStatus !== desktopPresenceStatus) {
+    desktopPresenceStatus = nextStatus;
     sendDesktopIdleStatus(nextStatus, idleSeconds);
+    updateUnreadBadge(desktopUnreadCount);
   }
 }
 
@@ -556,9 +558,35 @@ function registerPowerMonitorEvents() {
   powerMonitor.on('resume', () => checkDesktopIdleStatus({ force: true }));
   powerMonitor.on('unlock-screen', () => checkDesktopIdleStatus({ force: true }));
   powerMonitor.on('lock-screen', () => {
-    desktopIdleStatus = 'away';
-    sendDesktopIdleStatus('away', powerMonitor.getSystemIdleTime());
+    desktopPresenceStatus = 'busy';
+    sendDesktopIdleStatus('busy', powerMonitor.getSystemIdleTime());
   });
+}
+
+function getPresenceRingColor(status) {
+  switch (status) {
+    case 'active':
+      return '#16a34a';
+    case 'away':
+      return '#f59e0b';
+    case 'busy':
+      return '#dc2626';
+    default:
+      return '#16a34a';
+  }
+}
+
+function getPresenceStatusLabel(status) {
+  switch (status) {
+    case 'active':
+      return 'Active';
+    case 'away':
+      return 'Away';
+    case 'busy':
+      return 'Busy';
+    default:
+      return 'Active';
+  }
 }
 
 function startWebAppUpdateChecks() {
@@ -581,18 +609,27 @@ function stopWebAppUpdateChecks() {
   }
 }
 
-function createBadgeOverlay(count) {
-  if (!count || count <= 0) {
-    return null;
+function createBadgeOverlay(count, status) {
+  const presenceColor = getPresenceRingColor(status || 'active');
+  const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0;
+  const label = safeCount > 99 ? '99+' : String(safeCount);
+
+  if (safeCount === 0) {
+    const statusSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+      <circle cx="16" cy="16" r="15" fill="transparent"/>
+      <circle cx="16" cy="16" r="14" fill="none" stroke="${presenceColor}" stroke-width="3"/>
+      <circle cx="16" cy="16" r="4" fill="${presenceColor}" opacity="0.85"/>
+    </svg>`;
+    return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(statusSvg)}`);
   }
 
-  const label = count > 99 ? '99+' : String(count);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-    <circle cx="16" cy="16" r="15" fill="#dc2626"/>
+  const statusWithCount = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+    <circle cx="16" cy="16" r="15" fill="transparent"/>
+    <circle cx="16" cy="16" r="14" fill="none" stroke="${presenceColor}" stroke-width="3"/>
+    <circle cx="16" cy="16" r="11" fill="#0f172a"/>
     <text x="16" y="21" text-anchor="middle" font-family="Arial, sans-serif" font-size="${label.length > 2 ? 11 : 15}" font-weight="700" fill="#ffffff">${label}</text>
   </svg>`;
-
-  return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+  return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(statusWithCount)}`);
 }
 
 function getShieldIconPath() {
@@ -622,8 +659,12 @@ function updateUnreadBadge(count) {
   updateTrayBadge(safeCount);
 
   if (process.platform === 'win32') {
-    const overlay = createBadgeOverlay(safeCount);
-    mainWindow.setOverlayIcon(overlay, safeCount > 0 ? `${safeCount} unread item${safeCount === 1 ? '' : 's'}` : '');
+    const overlay = createBadgeOverlay(safeCount, desktopPresenceStatus);
+    const statusLabel = getPresenceStatusLabel(desktopPresenceStatus);
+    const overlayToolTip = safeCount > 0
+      ? `${safeCount} unread item${safeCount === 1 ? '' : 's'} (${statusLabel})`
+      : `${statusLabel}`;
+    mainWindow.setOverlayIcon(overlay, overlayToolTip);
   }
 }
 
@@ -814,6 +855,30 @@ function createMainWindow() {
       event.preventDefault();
       mainWindow.hide();
     }
+  });
+
+  mainWindow.on('focus', () => {
+    checkDesktopIdleStatus({ force: true });
+  });
+
+  mainWindow.on('blur', () => {
+    checkDesktopIdleStatus({ force: true });
+  });
+
+  mainWindow.on('show', () => {
+    checkDesktopIdleStatus({ force: true });
+  });
+
+  mainWindow.on('hide', () => {
+    checkDesktopIdleStatus({ force: true });
+  });
+
+  mainWindow.on('minimize', () => {
+    checkDesktopIdleStatus({ force: true });
+  });
+
+  mainWindow.on('restore', () => {
+    checkDesktopIdleStatus({ force: true });
   });
 
   mainWindow.on('closed', () => {
