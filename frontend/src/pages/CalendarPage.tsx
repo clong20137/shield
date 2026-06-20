@@ -47,6 +47,11 @@ const tCodeHourInputCharacterLimit = 6;
 const trooperDailyDraftStoragePrefix = 'shield_trooper_daily_draft';
 const tCodeDetailsKey = 'tCodes';
 const noTCodeDetailsKey = 'noTCodes';
+type TrooperDailyField = readonly [string, string];
+type TrooperDailySection = {
+  title: string;
+  fields: readonly TrooperDailyField[];
+};
 type TrooperDailyTCode = {
   id: string;
   code: string;
@@ -75,7 +80,7 @@ function getHexColorRgb(value?: string): string {
   return `${red}, ${green}, ${blue}`;
 }
 
-const trooperDailySections = [
+const trooperDailySections: readonly TrooperDailySection[] = [
   {
     title: 'Regular Duty',
     fields: [
@@ -210,7 +215,7 @@ const trooperDailySections = [
   },
 ] as const;
 
-const regularDutySplitTimeFields = [
+const regularDutySplitTimeFields: readonly TrooperDailyField[] = [
   ['splitStartTime', 'Split Start Time'],
   ['splitEndTime', 'Split End Time'],
   ['secondSplitStartTime', '2nd Split Start Time'],
@@ -231,7 +236,7 @@ const getRegularDutySplitPairCountFromDetails = (details?: Record<string, string
   return 1;
 };
 
-const getRegularDutySectionFields = (splitPairCount = 1): typeof trooperDailySections[number]['fields'] => {
+const getRegularDutySectionFields = (splitPairCount = 1): readonly TrooperDailyField[] => {
   const safeSplitPairCount = Math.min(3, Math.max(1, splitPairCount));
   return [
     ['regularDutyStartTime', 'Start Time'],
@@ -780,12 +785,12 @@ function getDailyFieldIcon(key: string): LucideIcon {
   return Sparkles;
 }
 
-function isSectionComplete(details: Record<string, string> | undefined, section: typeof trooperDailySections[number]): boolean {
+function isSectionComplete(details: Record<string, string> | undefined, section: TrooperDailySection): boolean {
   const visibleFields = section.fields.filter(([key]) => shouldShowDailyDetailField(details, key));
   return visibleFields.every(([key]) => isDetailComplete(details, key));
 }
 
-function isSectionTouched(details: Record<string, string> | undefined, section: typeof trooperDailySections[number]): boolean {
+function isSectionTouched(details: Record<string, string> | undefined, section: TrooperDailySection): boolean {
   return section.fields
     .filter(([key]) => shouldShowDailyDetailField(details, key))
     .some(([key]) => isDetailComplete(details, key));
@@ -1883,7 +1888,7 @@ function CalendarPage({
   };
 
   const applyShortcut = (shortcut: CalendarShortcut) => {
-    const nextForm = {
+    const nextForm: CalendarEntryForm = {
       ...entryForm,
       dutyHours: shortcut.dutyHours,
       districtWorked: shortcut.districtWorked || entryForm.districtWorked,
@@ -2030,7 +2035,7 @@ function CalendarPage({
     }
 
     setCalendarError(null);
-    const nextForm = {
+    const nextForm: CalendarEntryForm = {
       category: 'Trooper Daily',
       date: selectedDate,
       dutyHours: previousEntry.dutyHours,
@@ -2058,7 +2063,7 @@ function CalendarPage({
     setCalendarError(null);
     setSelectedDate(dateKey);
     setCalendarFocusDate(new Date(`${dateKey}T00:00:00`));
-    const nextForm = {
+    const nextForm: CalendarEntryForm = {
       category: 'Trooper Daily',
       date: dateKey,
       dutyHours: previousEntry.dutyHours,
@@ -2090,7 +2095,7 @@ function CalendarPage({
       ...sourceForm,
       details: { ...(sourceForm.details || {}) },
       submissionStatus: 'Draft',
-    });
+    } as CalendarEntryForm);
     setCalendarError(null);
   };
 
@@ -2104,7 +2109,7 @@ function CalendarPage({
     setCalendarError(null);
     setSelectedDate(dateKey);
     setCalendarFocusDate(new Date(`${dateKey}T00:00:00`));
-    const nextForm = {
+    const nextForm: CalendarEntryForm = {
       ...copiedDailyForm,
       date: dateKey,
       submissionStatus: 'Draft',
