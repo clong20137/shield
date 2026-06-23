@@ -1,6 +1,6 @@
 import { ClipboardEvent, DragEvent, FormEvent, KeyboardEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Building2, Check, CheckCheck, Download, Image as ImageIcon, Pencil, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Save, Send, Trash2, Users, X } from 'lucide-react';
+import { ArrowLeft, Building2, Check, CheckCheck, Download, Image as ImageIcon, Pencil, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Save, Send, Trash2, Users, X } from 'lucide-react';
 import type { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, handleAssetThumbnailError, messageService, userService, User, UserMessage } from '../services/api';
 import { RankBadge } from '../components/RankBadge';
@@ -1384,6 +1384,15 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     }
   };
 
+  const listBreakpoint = isModalView ? 'md' : 'xl';
+  const threadListVisibilityClass = selectedThread
+    ? listBreakpoint === 'md' ? 'hidden md:flex' : 'hidden xl:flex'
+    : 'flex';
+  const threadViewVisibilityClass = selectedThread
+    ? 'flex'
+    : listBreakpoint === 'md' ? 'hidden md:flex' : 'hidden xl:flex';
+  const mobileBackClass = listBreakpoint === 'md' ? 'md:hidden' : 'xl:hidden';
+
   return (
     <div className={isModalView ? 'relative flex h-full min-h-0 flex-col' : 'relative'}>
       {!isModalView && (
@@ -1416,8 +1425,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
             : 'grid min-h-[70vh] grid-cols-1 gap-4 xl:h-[calc(100vh-230px)] xl:grid-cols-[minmax(260px,30%)_minmax(0,1fr)]'
         }
       >
-        <section className={`relative flex min-w-0 flex-col overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 ${
-          isModalView ? 'max-h-[34vh] min-h-[12rem] md:max-h-none md:min-h-0' : 'max-h-[34vh] min-h-[14rem] xl:max-h-none'
+        <section className={`relative min-w-0 flex-col overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 ${threadListVisibilityClass} ${
+          isModalView ? 'min-h-[min(32rem,100%)] md:max-h-none md:min-h-0' : 'min-h-[70vh] xl:min-h-0 xl:max-h-none'
         }`}>
           {isModalView && (
             <div className="border-b border-gray-200 p-3 dark:border-gray-800">
@@ -1437,15 +1446,15 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           ) : filteredThreads.length === 0 ? (
             <div className="empty-state">No conversations found.</div>
           ) : (
-            <div className="min-h-0 flex-1 divide-y divide-gray-200 overflow-y-auto pb-20 dark:divide-gray-800">
+            <div className="min-h-0 flex-1 divide-y divide-gray-100 overflow-y-auto pb-20 dark:divide-gray-800">
               {filteredThreads.map((thread) => {
                 const presence = getThreadPresence(thread);
                 const isPinned = pinnedThreadIds.includes(thread.id);
                 return (
                   <div
                     key={thread.id}
-                    className={`flex min-w-0 items-center gap-2 px-2 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 sm:gap-2.5 sm:px-3 sm:py-3 ${
-                      selectedThreadId === thread.id ? 'bg-accent/10' : ''
+                    className={`flex min-w-0 items-center gap-3 px-3 py-3 transition hover:bg-gray-50 dark:hover:bg-gray-800 sm:gap-2.5 sm:px-3 sm:py-3 ${
+                      selectedThreadId === thread.id ? 'bg-accent/10 ring-1 ring-inset ring-accent/10' : ''
                     }`}
                   >
                     <button
@@ -1459,10 +1468,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                           src={getAssetThumbnailUrl(thread.threadImageUrl, 96)}
                           alt={thread.contactName}
                           onError={(event) => handleAssetThumbnailError(event, thread.threadImageUrl)}
-                          className="h-10 w-10 rounded-full border border-gray-200 object-cover dark:border-gray-700"
+                          className="h-11 w-11 rounded-full border border-gray-200 object-cover dark:border-gray-700 sm:h-10 sm:w-10"
                         />
                       ) : thread.threadType !== 'direct' ? (
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-primary-500/10 text-primary-500 dark:border-gray-700 dark:text-blue-100">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-primary-500/10 text-primary-500 dark:border-gray-700 dark:text-blue-100 sm:h-10 sm:w-10">
                           {thread.threadType === 'district' ? <Building2 size={17} /> : <Users size={17} />}
                         </span>
                       ) : thread.contactProfilePictureUrl ? (
@@ -1470,10 +1479,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                           src={getAssetThumbnailUrl(thread.contactProfilePictureUrl, 96)}
                           alt={thread.contactName}
                           onError={(event) => handleAssetThumbnailError(event, thread.contactProfilePictureUrl)}
-                          className="h-10 w-10 rounded-full border border-gray-200 object-cover dark:border-gray-700"
+                          className="h-11 w-11 rounded-full border border-gray-200 object-cover dark:border-gray-700 sm:h-10 sm:w-10"
                         />
                       ) : (
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-accent/10 text-xs font-bold text-accent dark:border-gray-700">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-accent/10 text-xs font-bold text-accent dark:border-gray-700 sm:h-10 sm:w-10">
                           {getInitials(thread.contactName)}
                         </span>
                       )}
@@ -1494,11 +1503,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                     <button
                       type="button"
                       onClick={() => setSelectedThreadId(thread.id)}
-                      className="min-h-11 min-w-0 flex-1 text-left"
+                      className="min-h-12 min-w-0 flex-1 text-left sm:min-h-11"
                     >
                       <div className="flex min-w-0 items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className={`truncate text-sm ${thread.unreadCount > 0 ? 'font-bold text-primary-500' : 'font-semibold text-gray-800 dark:text-gray-100'}`}>
+                          <p className={`truncate text-[15px] sm:text-sm ${thread.unreadCount > 0 ? 'font-bold text-primary-500' : 'font-semibold text-gray-800 dark:text-gray-100'}`}>
                             <span className="truncate">{isPinned ? 'Pinned ' : ''}{thread.contactName}</span>
                           </p>
                           <p className="mt-0.5 truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
@@ -1508,7 +1517,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                         <span className="shrink-0 text-[11px] text-gray-400 sm:text-xs">{thread.latestMessage ? formatMessageTime(thread.latestMessage.createdAt) : 'New'}</span>
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-2">
-                        <p className="line-clamp-1 min-w-0 text-sm text-gray-500 dark:text-gray-400">
+                        <p className="line-clamp-1 min-w-0 text-[13px] text-gray-500 dark:text-gray-400 sm:text-sm">
                           {thread.latestMessage ? `${thread.latestMessage.senderAccountId === currentUser.id ? 'You: ' : ''}${getMessagePreviewText(thread.latestMessage)}` : 'Start typing on the right'}
                         </p>
                         {thread.unreadCount > 0 && (
@@ -1728,14 +1737,26 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           </button>
         </section>
 
-        <section className="flex min-h-0 min-w-0 flex-col rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+        <section className={`${threadViewVisibilityClass} min-h-0 min-w-0 flex-col rounded-lg bg-white shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800`}>
           {!selectedThread ? (
             <div className="empty-state">Select a conversation to view it.</div>
           ) : (
             <>
-              <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+              <div className="border-b border-gray-200 px-3 py-2.5 dark:border-gray-800 sm:px-4 sm:py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedThreadId(null);
+                      setThreadSearchTerm('');
+                    }}
+                    className={`${mobileBackClass} flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-200 text-primary-500 shadow-sm dark:border-gray-700 dark:text-blue-100`}
+                    aria-label="Back to conversations"
+                    title="Back"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
                   <div className="relative shrink-0">
                     {selectedThread.threadType !== 'direct' ? (
                       <button
@@ -1896,7 +1917,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   </div>
                   </div>
                 </div>
-                <div className="relative mt-3">
+                <div className="relative mt-2 sm:mt-3">
                   <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     value={threadSearchTerm}
@@ -1910,7 +1931,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                 )}
               </div>
 
-              <div className="flex-1 space-y-4 overflow-y-auto bg-gray-50 p-3 dark:bg-gray-950 sm:p-4">
+              <div className="flex-1 space-y-3 overflow-y-auto bg-gray-50 p-3 dark:bg-gray-950 sm:space-y-4 sm:p-4">
                 {selectedThread.messages.length === 0 && (
                   <div className="flex h-full min-h-48 items-center justify-center text-center">
                     <div>
@@ -1963,8 +1984,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                         </div>
                       ) : (
                       <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`group flex min-w-0 max-w-[90%] flex-col sm:max-w-[78%] ${isMine ? 'items-end text-right' : 'items-start text-left'}`}>
-                          <div className={`wrap-anywhere relative inline-block w-fit max-w-full rounded-[1.35rem] px-4 py-2.5 shadow-sm ${
+                        <div className={`group flex min-w-0 max-w-[86%] flex-col sm:max-w-[78%] ${isMine ? 'items-end text-right' : 'items-start text-left'}`}>
+                          <div className={`wrap-anywhere relative inline-block w-fit max-w-full rounded-[1.25rem] px-3.5 py-2.5 shadow-sm sm:rounded-[1.35rem] sm:px-4 ${
                             isDeleted
                               ? 'border border-dashed border-gray-300 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
                               : isMine
@@ -1981,7 +2002,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                                 ))}
                               </span>
                             )}
-                            <div className="wrap-anywhere min-w-0 space-y-2 text-left text-sm leading-6">
+                            <div className="wrap-anywhere min-w-0 space-y-2 text-left text-[15px] leading-6 sm:text-sm">
                               {isDeleted ? (
                                 <p className="text-sm font-semibold italic">Message deleted</p>
                               ) : message.body.split(/\n/gu).map((line, lineIndex) => {
@@ -2082,7 +2103,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                 onDragOver={handleReplyDragOver}
                 onDragLeave={handleReplyDragLeave}
                 onDrop={handleReplyDrop}
-                className={`relative border-t border-gray-200 p-3 transition dark:border-gray-800 sm:p-4 ${isReplyDragOver ? 'bg-accent/5' : ''}`}
+                className={`relative border-t border-gray-200 p-2.5 pb-[calc(env(safe-area-inset-bottom)+0.625rem)] transition dark:border-gray-800 sm:p-4 ${isReplyDragOver ? 'bg-accent/5' : ''}`}
               >
                 {isReplyDragOver && (
                   <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-2xl border-2 border-dashed border-accent bg-white/85 text-sm font-black uppercase tracking-[0.14em] text-accent shadow-lg backdrop-blur dark:bg-gray-950/85">
@@ -2103,11 +2124,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                     ))}
                   </div>
                 )}
-                <div className="relative flex min-h-14 items-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 sm:rounded-full sm:py-1.5">
+                <div className="relative flex min-h-14 items-end gap-1.5 rounded-2xl border border-gray-200 bg-white px-2.5 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-950 sm:items-center sm:gap-2 sm:rounded-full sm:px-3 sm:py-1.5">
                   <button
                     type="button"
                     onClick={() => setIsEmojiPickerOpen((value) => !value)}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg hover:bg-gray-100 dark:hover:bg-gray-800 sm:h-8 sm:w-8"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg hover:bg-gray-100 dark:hover:bg-gray-800 sm:h-8 sm:w-8"
                     aria-label="Add emoji"
                   >
                     {emojiButtonLabel}
@@ -2126,7 +2147,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                       </Suspense>
                     </div>
                   )}
-                  <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800 sm:h-8 sm:w-8" title="Attach files">
+                  <label className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800 sm:h-8 sm:w-8" title="Attach files">
                     <Paperclip size={18} />
                     <input
                       type="file"
@@ -2141,7 +2162,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   <button
                     type="button"
                     onClick={() => messageImageInputRef.current?.click()}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800 sm:h-8 sm:w-8"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-primary-500 hover:bg-gray-100 dark:text-blue-100 dark:hover:bg-gray-800 sm:h-8 sm:w-8"
                     aria-label="Upload image"
                     title="Upload image"
                   >
@@ -2172,7 +2193,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                     rows={1}
                     className="min-h-10 resize-none overflow-hidden border-0 bg-transparent px-1 py-2 text-sm leading-5 outline-none ring-0 focus:border-0 focus:ring-0 dark:bg-transparent sm:min-h-8 sm:py-1.5"
                   />
-                  <button type="submit" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9" disabled={isSending || !selectedThreadAcceptsMessages} aria-label="Send message">
+                  <button type="submit" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9" disabled={isSending || !selectedThreadAcceptsMessages} aria-label="Send message">
                     <Send size={17} />
                   </button>
                 </div>
