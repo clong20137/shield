@@ -19,6 +19,11 @@ let pendingUpdateRestartTimer = null;
 let desktopUnreadCount = 0;
 let desktopIdleCheckTimer = null;
 let desktopPresenceStatus = 'active';
+let desktopSessionAuthenticated = false;
+let desktopSessionLastActivityAt = Date.now();
+let desktopSessionTimeoutMinutes = 0;
+let desktopSessionTimeoutTimer = null;
+let desktopSessionTimedOut = false;
 let desktopUpdateCheckTimer = null;
 let lastDesktopUpdateStatus = null;
 let isDesktopUpdateCheckRunning = false;
@@ -49,6 +54,7 @@ const maxRendererCrashReloads = 2;
 const rendererCrashStableResetMs = 30 * 1000;
 const desktopIdleThresholdSeconds = 5 * 60;
 const desktopIdleCheckIntervalMs = 15 * 1000;
+const desktopSessionTimeoutCheckIntervalMs = 5 * 1000;
 const webAppSignatureRequestTimeoutMs = 10 * 1000;
 const webAppLoadRetryBaseMs = 2 * 1000;
 const webAppLoadRetryMaxMs = 25 * 1000;
@@ -640,6 +646,88 @@ function setWebAppLoadSuccess() {
   clearWebAppLoadRetryTimer();
 }
 
+function stopDesktopSessionTimeoutChecks() {
+  if (desktopSessionTimeoutTimer) {
+    clearInterval(desktopSessionTimeoutTimer);
+    desktopSessionTimeoutTimer = null;
+  }
+}
+
+function getNormalizedSessionTimeoutMinutes(value) {
+  const minutes = Number(value);
+  return Number.isFinite(minutes) ? Math.max(0, Math.min(1440, minutes)) : 0;
+}
+
+function checkDesktopSessionTimeout({ force = false } = {}) {
+  if (!desktopSessionAuthenticated || desktopSessionTimeoutMinutes <= 0 || desktopSessionTimedOut) {
+    return;
+  }
+
+  const timeoutMs = desktopSessionTimeoutMinutes * 60 * 1000;
+  const elapsedMs = Date.now() - desktopSessionLastActivityAt;
+  const systemIdleMs = powerMonitor.getSystemIdleTime() * 1000;
+  const inactiveMs = Math.max(elapsedMs, systemIdleMs);
+
+  if (!force && inactiveMs < timeoutMs) {
+    return;
+  }
+
+  if (inactiveMs >= timeoutMs && mainWindow && !mainWindow.isDestroyed()) {
+    desktopSessionTimedOut = true;
+    appendDesktopLog('desktop-session-timeout', {
+      timeoutMinutes: desktopSessionTimeoutMinutes,
+      inactiveSeconds: Math.floor(inactiveMs / 1000)
+    });
+    mainWindow.webContents.send('shield:session-timeout', {
+      timeoutMinutes: desktopSessionTimeoutMinutes,
+      inactiveSeconds: Math.floor(inactiveMs / 1000)
+    });
+  }
+}
+
+function startDesktopSessionTimeoutChecks() {
+  stopDesktopSessionTimeoutChecks();
+
+  if (!desktopSessionAuthenticated || desktopSessionTimeoutMinutes <= 0) {
+    return;
+  }
+
+  desktopSessionTimeoutTimer = setInterval(() => checkDesktopSessionTimeout(), desktopSessionTimeoutCheckIntervalMs);
+  checkDesktopSessionTimeout();
+}
+
+function configureDesktopSessionTimeout(options = {}) {
+  desktopSessionAuthenticated = Boolean(options.authenticated);
+  desktopSessionTimeoutMinutes = getNormalizedSessionTimeoutMinutes(options.minutes);
+  desktopSessionLastActivityAt = Date.now();
+  desktopSessionTimedOut = false;
+
+  if (!desktopSessionAuthenticated || desktopSessionTimeoutMinutes <= 0) {
+    stopDesktopSessionTimeoutChecks();
+    return {
+      authenticated: desktopSessionAuthenticated,
+      minutes: desktopSessionTimeoutMinutes,
+      enabled: false
+    };
+  }
+
+  startDesktopSessionTimeoutChecks();
+  return {
+    authenticated: desktopSessionAuthenticated,
+    minutes: desktopSessionTimeoutMinutes,
+    enabled: true
+  };
+}
+
+function reportDesktopSessionActivity() {
+  if (!desktopSessionAuthenticated || desktopSessionTimedOut) {
+    return false;
+  }
+
+  desktopSessionLastActivityAt = Date.now();
+  return true;
+}
+
 function sendDesktopIdleStatus(status, idleSeconds) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('shield:desktop-idle-status', { status, idleSeconds });
@@ -1171,6 +1259,7 @@ app.on('before-quit', () => {
     clearInterval(desktopUpdateCheckTimer);
     desktopUpdateCheckTimer = null;
   }
+  stopDesktopSessionTimeoutChecks();
   clearWebAppLoadRetryTimer();
   app.setBadgeCount(0);
   if (mainWindow && !mainWindow.isDestroyed() && process.platform === 'win32') {
@@ -1197,6 +1286,10 @@ ipcMain.handle('shield:set-presence-status', (_event, status) => {
   const nextStatus = setDesktopPresenceStatus(status);
   return { status: nextStatus };
 });
+ipcMain.handle('shield:set-session-timeout', (_event, options) => configureDesktopSessionTimeout(options));
+ipcMain.handle('shield:report-session-activity', () => ({
+  ok: reportDesktopSessionActivity()
+}));
 ipcMain.handle('shield:flash-attention', () => {
   if (mainWindow) {
     mainWindow.flashFrame(true);

@@ -42,6 +42,11 @@ interface ShieldDesktopWebAppUpdateStatus {
   type: 'reloading';
 }
 
+interface ShieldDesktopSessionTimeoutPayload {
+  timeoutMinutes: number;
+  inactiveSeconds: number;
+}
+
 interface ShieldDesktopClipboardFile {
   name: string;
   type: string;
@@ -75,6 +80,8 @@ interface Window {
     notify?: (payload: ShieldDesktopNotificationPayload) => Promise<boolean>;
     setUnreadCount?: (count: number) => Promise<boolean>;
     setPresenceStatus?: (status: ShieldDesktopIdleStatus['status']) => Promise<{ status: ShieldDesktopIdleStatus['status'] }>;
+    setSessionTimeout?: (options: { authenticated: boolean; minutes: number }) => Promise<{ authenticated: boolean; minutes: number; enabled: boolean }>;
+    reportSessionActivity?: () => Promise<{ ok: boolean }>;
     flashAttention?: () => Promise<boolean>;
     clearAttention?: () => Promise<boolean>;
     getClipboardFiles?: () => Promise<{ files: ShieldDesktopClipboardFile[] }>;
@@ -90,6 +97,7 @@ interface Window {
     onUpdateStatus?: (callback: (payload: ShieldDesktopUpdateStatus) => void) => () => void;
     onIdleStatus?: (callback: (payload: ShieldDesktopIdleStatus) => void) => () => void;
     onWebAppUpdateStatus?: (callback: (payload: ShieldDesktopWebAppUpdateStatus) => void) => () => void;
+    onSessionTimeout?: (callback: (payload: ShieldDesktopSessionTimeoutPayload) => void) => () => void;
     getDesktopLogs?: () => Promise<{
       path: string;
       entries: ShieldDesktopLog[];

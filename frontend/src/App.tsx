@@ -5089,6 +5089,7 @@ function App() {
   const inactivityTimerRef = useRef<number | null>(null);
   const loginTransitionTimerRef = useRef<number | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
+  const desktopSessionActivityReportRef = useRef<number>(0);
   const [userNotifications, setUserNotifications] = useState<UserNotification[]>([]);
   const [urgentAlerts, setUrgentAlerts] = useState<UrgentAlert[]>([]);
   const [acknowledgingUrgentAlertId, setAcknowledgingUrgentAlertId] = useState<string | null>(null);
@@ -6047,6 +6048,15 @@ function App() {
 
   const resetInactivityTimer = () => {
     lastActivityRef.current = Date.now();
+    if (hasShieldDesktopFeature('reportSessionActivity')) {
+      const now = Date.now();
+      if (now - desktopSessionActivityReportRef.current > 5000) {
+        desktopSessionActivityReportRef.current = now;
+        window.shieldDesktop?.reportSessionActivity?.().catch((error) => {
+          console.error('Failed to report desktop session activity:', error);
+        });
+      }
+    }
     if (sessionTimeoutMinutes && sessionTimeoutMinutes > 0) {
       startInactivityTimer();
     }
@@ -6483,7 +6493,36 @@ function App() {
     setMessageUnreadCount(0);
     previousMessageUnreadCount.current = null;
     clearInactivityTimer();
+    if (hasShieldDesktopFeature('setSessionTimeout')) {
+      window.shieldDesktop?.setSessionTimeout?.({ authenticated: false, minutes: 0 }).catch((error) => {
+        console.error('Failed to clear desktop session timeout:', error);
+      });
+    }
   };
+
+  useEffect(() => {
+    if (!hasShieldDesktopFeature('setSessionTimeout')) {
+      return;
+    }
+
+    window.shieldDesktop?.setSessionTimeout?.({
+      authenticated: isAuthenticated && Boolean(currentUser),
+      minutes: sessionTimeoutMinutes,
+    }).catch((error) => {
+      console.error('Failed to update desktop session timeout:', error);
+    });
+  }, [currentUser, isAuthenticated, sessionTimeoutMinutes]);
+
+  useEffect(() => {
+    if (!hasShieldDesktopFeature('onSessionTimeout')) {
+      return undefined;
+    }
+
+    return window.shieldDesktop?.onSessionTimeout?.(() => {
+      showToast('info', 'Signed out after inactivity.', { saveToNotifications: false });
+      void handleLogout();
+    });
+  }, []);
 
   const handleForcedLogout = useCallback((message: string) => {
     clearLoginTransitionTimer();
