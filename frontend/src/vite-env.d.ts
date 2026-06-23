@@ -60,6 +60,14 @@ interface ShieldDesktopCrashReport {
   createdAt: string;
 }
 
+interface ShieldDesktopLog {
+  timestamp: string;
+  event: string;
+  platform?: string;
+  version?: string;
+  details?: Record<string, unknown>;
+}
+
 interface Window {
   shieldDesktop?: {
     platform: string;
@@ -81,5 +89,11 @@ interface Window {
     onUpdateStatus?: (callback: (payload: ShieldDesktopUpdateStatus) => void) => () => void;
     onIdleStatus?: (callback: (payload: ShieldDesktopIdleStatus) => void) => () => void;
     onWebAppUpdateStatus?: (callback: (payload: ShieldDesktopWebAppUpdateStatus) => void) => () => void;
+    getDesktopLogs?: () => Promise<{
+      path: string;
+      entries: ShieldDesktopLog[];
+      maxEntries: number;
+    }>;
+    openDesktopLogs?: () => Promise<{ ok: boolean; message?: string }>;
   };
 }

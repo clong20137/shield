@@ -83,7 +83,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
-          className={`flex-1 px-4 py-3 border-2 border-gray-300 rounded text-sm focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950 ${inputClassName}`}
+          className={`flex-1 px-4 py-3 border-2 border-gray-300 bg-white rounded text-sm focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950 ${inputClassName}`}
         />
         <button type="submit" className="btn-primary" aria-label="Search users" title="Search">
           <Search size={16} />

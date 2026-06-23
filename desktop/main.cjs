@@ -49,10 +49,18 @@ const maxRendererCrashReloads = 2;
 const rendererCrashStableResetMs = 30 * 1000;
 const desktopIdleThresholdSeconds = 5 * 60;
 const desktopIdleCheckIntervalMs = 15 * 1000;
+const webAppSignatureRequestTimeoutMs = 10 * 1000;
+const webAppLoadRetryBaseMs = 2 * 1000;
+const webAppLoadRetryMaxMs = 25 * 1000;
+const maxWebAppLoadRetries = 8;
+const maxDesktopLogEntries = 150;
 let webAppUpdateCheckTimer = null;
 let webAppSignature = null;
 let isWebAppUpdateCheckRunning = false;
 let lastWebAppReloadAt = 0;
+let webAppLoadRetryTimer = null;
+let webAppLoadRetryCount = 0;
+const pendingDesktopLogs = [];
 
 const mimeTypesByExtension = {
   '.jpg': 'image/jpeg',
@@ -187,6 +195,13 @@ function recordDesktopCrash(source, error, extra = {}) {
   if (pendingCrashReports.length > maxPendingCrashReports) {
     pendingCrashReports.length = maxPendingCrashReports;
   }
+
+  appendDesktopLog('desktop-crash', {
+    source,
+    message: detail.message,
+    stack: detail.stack,
+    ...extra
+  });
 }
 
 function readJsonIfExists(filePath) {
@@ -200,6 +215,39 @@ function readJsonIfExists(filePath) {
     console.error(`Failed to read desktop config at ${filePath}:`, error);
     return null;
   }
+}
+
+function getDesktopLogPath() {
+  const logsDir = app.getPath('logs');
+  fs.mkdirSync(logsDir, { recursive: true });
+  return path.join(logsDir, 'shield-desktop.log');
+}
+
+function appendDesktopLog(eventName, details = {}) {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    event: eventName,
+    platform: process.platform,
+    version: app.getVersion(),
+    details: typeof details === 'string' ? { message: details } : details
+  };
+
+  pendingDesktopLogs.unshift(entry);
+  if (pendingDesktopLogs.length > maxDesktopLogEntries) {
+    pendingDesktopLogs.length = maxDesktopLogEntries;
+  }
+
+  try {
+    fs.appendFileSync(
+      getDesktopLogPath(),
+      `${JSON.stringify(entry)}\n`,
+      'utf8',
+    );
+  } catch (error) {
+    console.error('Failed to write Shield desktop log:', error);
+  }
+
+  return entry;
 }
 
 function getMimeTypeForFile(filePath) {
@@ -462,24 +510,34 @@ function getWebAppUpdateCheckUrl(appUrl) {
 }
 
 async function fetchWebAppSignature(appUrl) {
-  const response = await fetch(getWebAppUpdateCheckUrl(appUrl), {
-    cache: 'no-store',
-    headers: {
-      Accept: 'text/html,*/*',
-      'Cache-Control': 'no-cache',
-      Pragma: 'no-cache'
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, webAppSignatureRequestTimeoutMs);
+
+  try {
+    const response = await fetch(getWebAppUpdateCheckUrl(appUrl), {
+      cache: 'no-store',
+      signal: controller.signal,
+      headers: {
+        Accept: 'text/html,*/*',
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Web app update check failed with HTTP ${response.status}`);
     }
-  });
 
-  if (!response.ok) {
-    throw new Error(`Web app update check failed with HTTP ${response.status}`);
+    const body = await response.text();
+    return crypto
+      .createHash('sha256')
+      .update(body)
+      .digest('hex');
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const body = await response.text();
-  return crypto
-    .createHash('sha256')
-    .update(body)
-    .digest('hex');
 }
 
 async function checkForWebAppUpdate({ initial = false } = {}) {
@@ -494,6 +552,7 @@ async function checkForWebAppUpdate({ initial = false } = {}) {
   isWebAppUpdateCheckRunning = true;
 
   try {
+    appendDesktopLog('web-app-update-check-started');
     const nextSignature = await fetchWebAppSignature(desktopConfig.appUrl);
     if (initial || !webAppSignature) {
       webAppSignature = nextSignature;
@@ -506,13 +565,79 @@ async function checkForWebAppUpdate({ initial = false } = {}) {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('shield:web-app-update-status', { type: 'reloading' });
       }
+      appendDesktopLog('web-app-update-detected', { action: 'reloadIgnoringCache' });
       mainWindow.webContents.reloadIgnoringCache();
     }
   } catch (error) {
+    appendDesktopLog('web-app-update-check-failed', {
+      message: error instanceof Error ? error.message : String(error)
+    });
     console.error('Failed to check hosted Shield web app version:', error);
   } finally {
     isWebAppUpdateCheckRunning = false;
   }
+}
+
+function clearWebAppLoadRetryTimer() {
+  if (webAppLoadRetryTimer) {
+    clearTimeout(webAppLoadRetryTimer);
+    webAppLoadRetryTimer = null;
+  }
+}
+
+function getWebAppLoadRetryDelay() {
+  const attempt = webAppLoadRetryCount + 1;
+  const delay = Math.min(webAppLoadRetryMaxMs, webAppLoadRetryBaseMs * (2 ** (attempt - 1)));
+  return { attempt, delay };
+}
+
+function scheduleWebAppLoadRetry(failedUrl) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  if (webAppLoadRetryCount >= maxWebAppLoadRetries) {
+    appendDesktopLog('web-app-load-retry-limit-reached', { failedUrl });
+    return;
+  }
+
+  const { attempt, delay } = getWebAppLoadRetryDelay();
+  webAppLoadRetryCount = attempt;
+  appendDesktopLog('web-app-load-retry-scheduled', { attempt, delay, failedUrl });
+
+  clearWebAppLoadRetryTimer();
+  webAppLoadRetryTimer = setTimeout(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+
+    const targetUrl = failedUrl || desktopConfig?.appUrl;
+    mainWindow.webContents.loadURL(targetUrl, { extraHeaders: 'Cache-Control: no-cache' }).catch((error) => {
+      appendDesktopLog('web-app-load-retry-load-failed', {
+        attempt,
+        error: error?.message || String(error),
+      });
+    });
+  }, delay);
+}
+
+function handleWebAppLoadFailure(errorCode, errorDescription, failedUrl) {
+  appendDesktopLog('web-app-load-failed', {
+    code: errorCode,
+    message: errorDescription,
+    failedUrl
+  });
+
+  if (!failedUrl || failedUrl.startsWith('data:')) {
+    return;
+  }
+
+  scheduleWebAppLoadRetry(failedUrl);
+}
+
+function setWebAppLoadSuccess() {
+  webAppLoadRetryCount = 0;
+  clearWebAppLoadRetryTimer();
 }
 
 function sendDesktopIdleStatus(status, idleSeconds) {
@@ -734,6 +859,7 @@ function checkForDesktopUpdates({ startup = false } = {}) {
 
   if (startup) {
     isStartupDesktopUpdateInProgress = true;
+    appendDesktopLog('desktop-update-startup-check');
     if (startupDesktopUpdateFallbackTimer) {
       clearTimeout(startupDesktopUpdateFallbackTimer);
     }
@@ -746,10 +872,11 @@ function checkForDesktopUpdates({ startup = false } = {}) {
   }
 
   isDesktopUpdateCheckRunning = true;
-
+  appendDesktopLog('desktop-update-check-started');
   return autoUpdater.checkForUpdates()
     .then(() => true)
     .catch((error) => {
+      appendDesktopLog('desktop-update-check-failed', { message: error.message });
       sendUpdaterStatus('error', { message: error.message });
       return false;
     })
@@ -760,9 +887,13 @@ function checkForDesktopUpdates({ startup = false } = {}) {
 
 function configureAutoUpdates(config) {
   if (!config.updateUrl) {
+    appendDesktopLog('desktop-updates-disabled', {
+      reason: 'updateUrl-not-configured'
+    });
     return;
   }
 
+  appendDesktopLog('desktop-updates-enabled', { updateUrl: config.updateUrl });
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.setFeedURL({
@@ -771,13 +902,20 @@ function configureAutoUpdates(config) {
   });
 
   autoUpdater.on('checking-for-update', () => sendUpdaterStatus('checking'));
-  autoUpdater.on('update-available', (info) => sendUpdaterStatus('available', { version: info.version }));
+  autoUpdater.on('update-available', (info) => {
+    appendDesktopLog('desktop-update-available', { version: info.version });
+    sendUpdaterStatus('available', { version: info.version });
+  });
   autoUpdater.on('update-not-available', (info) => {
+    appendDesktopLog('desktop-update-not-available', { version: info.version });
     finishStartupDesktopUpdateCheck();
     sendUpdaterStatus('not-available', { version: info.version });
   });
-  autoUpdater.on('download-progress', (progress) => sendUpdaterStatus('downloading', { percent: Math.round(progress.percent || 0) }));
+  autoUpdater.on('download-progress', (progress) => {
+    sendUpdaterStatus('downloading', { percent: Math.round(progress.percent || 0) });
+  });
   autoUpdater.on('update-downloaded', (info) => {
+    appendDesktopLog('desktop-update-downloaded', { version: info.version });
     isUpdateDownloaded = true;
     rebuildTrayMenu();
     sendUpdaterStatus('downloaded', { version: info.version });
@@ -788,6 +926,7 @@ function configureAutoUpdates(config) {
     pendingUpdateRestartTimer = setTimeout(installDownloadedUpdate, 5000);
   });
   autoUpdater.on('error', (error) => {
+    appendDesktopLog('desktop-update-error', { message: error.message });
     finishStartupDesktopUpdateCheck();
     sendUpdaterStatus('error', { message: error.message });
   });
@@ -839,6 +978,10 @@ function createMainWindow() {
   });
 
   mainWindow.webContents.on('did-finish-load', () => {
+    setWebAppLoadSuccess();
+    appendDesktopLog('web-app-load-success', {
+      url: mainWindow ? mainWindow.webContents.getURL() : desktopConfig?.appUrl
+    });
     if (rendererCrashResetTimer) {
       clearTimeout(rendererCrashResetTimer);
     }
@@ -882,6 +1025,8 @@ function createMainWindow() {
   });
 
   mainWindow.on('closed', () => {
+    clearWebAppLoadRetryTimer();
+    webAppLoadRetryCount = 0;
     stopWebAppUpdateChecks();
     stopDesktopIdleChecks();
     mainWindow = null;
@@ -896,6 +1041,7 @@ function createMainWindow() {
 
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedUrl) => {
     const failedUrl = validatedUrl || desktopConfig.appUrl;
+    handleWebAppLoadFailure(errorCode, errorDescription, failedUrl);
     mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(renderErrorPage({
       title: 'Shield could not load',
       message: 'The desktop app opened, but it could not reach the configured Shield web address.',
@@ -913,18 +1059,31 @@ function createMainWindow() {
     rendererCrashReloadCount += 1;
 
     if (rendererCrashReloadCount <= maxRendererCrashReloads) {
-      mainWindow.loadURL(desktopConfig.appUrl).catch((error) => {
+      appendDesktopLog('renderer-reload-attempt', {
+        source: 'render-process-gone',
+        attempt: rendererCrashReloadCount
+      });
+      mainWindow.loadURL(desktopConfig.appUrl, { extraHeaders: 'Cache-Control: no-cache' }).catch((error) => {
         recordDesktopCrash('renderer-reload-failed', error);
       });
       return;
     }
 
+    appendDesktopLog('renderer-stop-failed', { reason: details.reason });
     mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(renderErrorPage({
       title: 'Shield desktop renderer stopped',
       message: 'The desktop window process stopped unexpectedly.',
       detail: details.reason,
       appUrl: desktopConfig.appUrl
     }))}`);
+  });
+
+  mainWindow.webContents.on('did-frame-finish-load', () => {
+    if (mainWindow) {
+      appendDesktopLog('web-frame-finish-load', {
+        url: mainWindow.webContents.getURL()
+      });
+    }
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -945,7 +1104,11 @@ function createMainWindow() {
     }
   });
 
-  mainWindow.loadURL(desktopConfig.appUrl).catch((error) => {
+  appendDesktopLog('web-app-load-attempt', { url: desktopConfig.appUrl });
+  webAppLoadRetryCount = 0;
+  clearWebAppLoadRetryTimer();
+  mainWindow.loadURL(desktopConfig.appUrl, { extraHeaders: 'Cache-Control: no-cache' }).catch((error) => {
+    appendDesktopLog('web-app-load-initial-failed', { message: error.message });
     mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(renderErrorPage({
       title: 'Shield could not load',
       message: 'The desktop app could not open the configured Shield web address.',
@@ -965,19 +1128,24 @@ if (hasSingleInstanceLock) {
   });
 
   app.whenReady().then(() => {
+    appendDesktopLog('desktop-ready');
     Menu.setApplicationMenu(null);
     ensureDefaultDesktopPreferences();
     desktopConfig = getDesktopConfig();
+    appendDesktopLog('desktop-config-loaded', {
+      appUrl: desktopConfig?.appUrl,
+      updateUrl: desktopConfig?.updateUrl
+    });
     configureAutoUpdates(desktopConfig);
     registerPowerMonitorEvents();
     createTray();
     createMainWindow();
+  });
 
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
-        createMainWindow();
-      }
-    });
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createMainWindow();
+    }
   });
 }
 
@@ -989,6 +1157,7 @@ app.on('before-quit', () => {
     clearInterval(desktopUpdateCheckTimer);
     desktopUpdateCheckTimer = null;
   }
+  clearWebAppLoadRetryTimer();
   app.setBadgeCount(0);
   if (mainWindow && !mainWindow.isDestroyed() && process.platform === 'win32') {
     mainWindow.setOverlayIcon(null, '');
@@ -1082,6 +1251,31 @@ ipcMain.handle('shield:set-tray-mode', (_event, trayMode) => {
     updateStatus: lastDesktopUpdateStatus,
     startupUpdateInProgress: isStartupDesktopUpdateInProgress
   };
+});
+
+ipcMain.handle('shield:get-desktop-logs', () => ({
+  path: getDesktopLogPath(),
+  entries: [...pendingDesktopLogs],
+  maxEntries: maxDesktopLogEntries
+}));
+
+ipcMain.handle('shield:open-desktop-logs', async () => {
+  try {
+    const result = await shell.openPath(getDesktopLogPath());
+    if (result) {
+      throw new Error(result);
+    }
+
+    return { ok: true };
+  } catch (error) {
+    appendDesktopLog('desktop-log-open-failed', {
+      message: error instanceof Error ? error.message : String(error)
+    });
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'Unable to open the desktop log file.'
+    };
+  }
 });
 ipcMain.handle('shield:navigate', (_event, appPath) => {
   if (!mainWindow || !desktopConfig) {

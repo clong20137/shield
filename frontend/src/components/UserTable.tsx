@@ -33,6 +33,8 @@ export const UserTable: React.FC<UserTableProps> = ({
   const virtualize = users.length > 80;
   const viewportHeight = virtualize ? Math.min(620, Math.max(360, users.length * rowHeight)) : undefined;
   const overscan = 8;
+  const checkboxClassName =
+    'h-4 w-4 rounded border border-gray-300 bg-white text-accent accent-accent focus:ring-accent focus:ring-2 dark:border-gray-700 dark:bg-gray-900';
   const startIndex = virtualize ? Math.max(0, Math.floor(scrollTop / rowHeight) - overscan) : 0;
   const visibleCount = virtualize && viewportHeight ? Math.ceil(viewportHeight / rowHeight) + overscan * 2 : users.length;
   const visibleUsers = virtualize ? users.slice(startIndex, startIndex + visibleCount) : users;
@@ -95,7 +97,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                   type="checkbox"
                   checked={allVisibleSelected}
                   onChange={(event) => toggleVisibleUsers(event.target.checked)}
-                  className="h-4 w-4 rounded border-white/70 bg-white text-accent accent-accent focus:ring-accent"
+                  className={checkboxClassName}
                   aria-label={allVisibleSelected ? 'Clear visible selected users' : 'Select visible users'}
                 />
               </th>
@@ -134,7 +136,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                     checked={selectedUserIdSet.has(user.id)}
                     onChange={(event) => toggleUser(user.id, event.target.checked)}
                     onClick={(event) => event.stopPropagation()}
-                    className="h-4 w-4 rounded border-gray-300 bg-white text-accent accent-accent focus:ring-accent dark:border-gray-700 dark:bg-gray-900"
+                    className={checkboxClassName}
                     aria-label={`Select ${user.firstName} ${user.lastName}`}
                   />
                 </td>

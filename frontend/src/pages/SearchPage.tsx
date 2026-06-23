@@ -188,6 +188,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const isAdministrator = currentUser?.role === 'administrator';
   const canEditProfilePictures = isAdministrator || currentUser?.permissions?.includes('users:profile-picture');
   const canViewHiddenUsers = isAdministrator || currentUser?.permissions?.includes('users:view-hidden');
+  const searchCheckboxClassName =
+    'h-4 w-4 rounded border border-gray-300 bg-white text-accent accent-accent focus:ring-accent focus:ring-2 dark:border-gray-700 dark:bg-gray-900';
   const selectedUsers = useMemo(
     () => users.filter((user) => selectedUserIds.includes(user.id)),
     [selectedUserIds, users],
@@ -1104,6 +1106,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                     type="checkbox"
                     checked={editForm.isActive !== false}
                     onChange={(event) => updateEditField('isActive', event.target.checked)}
+                    className={searchCheckboxClassName}
                   />
                 </label>
                 {canViewHiddenUsers && (
@@ -1116,6 +1119,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                       type="checkbox"
                       checked={editForm.isHidden === true}
                       onChange={(event) => updateEditField('isHidden', event.target.checked)}
+                      className={searchCheckboxClassName}
                     />
                   </label>
                 )}

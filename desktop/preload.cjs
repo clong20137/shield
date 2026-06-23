@@ -35,5 +35,7 @@ contextBridge.exposeInMainWorld('shieldDesktop', {
     const handler = (_event, payload) => callback(payload);
     ipcRenderer.on('shield:web-app-update-status', handler);
     return () => ipcRenderer.removeListener('shield:web-app-update-status', handler);
-  }
+  },
+  getDesktopLogs: () => ipcRenderer.invoke('shield:get-desktop-logs'),
+  openDesktopLogs: () => ipcRenderer.invoke('shield:open-desktop-logs')
 });

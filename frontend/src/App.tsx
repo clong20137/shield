@@ -5612,6 +5612,32 @@ function App() {
     }
   };
 
+  const handleOpenDesktopDiagnostics = async () => {
+    if (!hasShieldDesktopFeature('openDesktopLogs')) {
+      showToast('info', 'Install the latest Shield desktop app to access diagnostics logs.', { saveToNotifications: false });
+      return;
+    }
+
+    try {
+      const openResult = await window.shieldDesktop?.openDesktopLogs?.();
+      if (!openResult || !openResult.ok) {
+        showToast('error', openResult?.message || 'Unable to open desktop diagnostics log.', { saveToNotifications: false });
+        return;
+      }
+
+      const logs = await window.shieldDesktop?.getDesktopLogs?.();
+      if (!logs) {
+        showToast('success', 'Desktop diagnostics log opened.', { saveToNotifications: false });
+        return;
+      }
+
+      showToast('success', `Diagnostics log opened: ${logs.entries.length} recent entries saved in ${logs.path}.`, { saveToNotifications: false });
+    } catch (error) {
+      console.error('Failed to open desktop diagnostics log:', error);
+      showToast('error', 'Failed to open desktop diagnostics log.', { saveToNotifications: false });
+    }
+  };
+
   const handleCheckForDesktopUpdates = async () => {
     if (!hasShieldDesktopFeature('checkForUpdates')) {
       showToast('info', 'Install the latest Shield desktop app to use in-app update checks.', { saveToNotifications: false });
@@ -8093,6 +8119,7 @@ function App() {
                       onTrayModeChange={handleTrayModeChange}
                       onCheckForDesktopUpdates={handleCheckForDesktopUpdates}
                       onInstallDesktopUpdate={handleInstallDesktopUpdate}
+                      onOpenDesktopDiagnostics={handleOpenDesktopDiagnostics}
                       onReplayGuide={replayGuide}
                       onOpenEvaluations={() => closeModal('profile')}
                       onAccountUpdate={handleAccountUpdate}

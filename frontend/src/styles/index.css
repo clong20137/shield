@@ -5,6 +5,12 @@
 :root {
   --shield-motion-duration: 500ms;
   --shield-motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  color-scheme: light;
+}
+
+
+.dark {
+  color-scheme: dark;
 }
 
 @property --shield-border-angle {
@@ -2082,6 +2088,34 @@ textarea {
   background-clip: padding-box;
 }
 
+html:not(.dark) input:not([type='checkbox']):not([type='radio']),
+html:not(.dark) textarea,
+html:not(.dark) select {
+  color-scheme: light;
+  background-color: #ffffff;
+  color: #111827;
+}
+
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
+  color: #6b7280;
+}
+
+html:not(.dark) input[type='checkbox'],
+html:not(.dark) input[type='radio'] {
+  color-scheme: light;
+  accent-color: #9c865c;
+  background-color: #ffffff;
+}
+
+.dark input:not([type='checkbox']):not([type='radio']),
+.dark textarea,
+.dark select,
+.dark input[type='checkbox'],
+.dark input[type='radio'] {
+  color-scheme: dark;
+}
+
 input.global-search-input.global-search-input {
   padding-left: 3.25rem !important;
   padding-right: 0.75rem !important;
@@ -2173,3 +2207,4 @@ select.trooper-daily-field-with-icon {
     width: 72%;
   }
 }
+

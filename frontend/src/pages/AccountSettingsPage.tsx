@@ -44,6 +44,7 @@ interface AccountSettingsPageProps {
   onTrayModeChange: (trayMode: boolean) => void;
   onCheckForDesktopUpdates: () => void;
   onInstallDesktopUpdate: () => void;
+  onOpenDesktopDiagnostics: () => void;
   onOpenEvaluations?: () => void;
   onReplayGuide?: () => void;
   onAccountUpdate: (account: AuthAccount) => void;
@@ -95,6 +96,7 @@ export function AccountSettingsPage({
   onTrayModeChange,
   onCheckForDesktopUpdates,
   onInstallDesktopUpdate,
+  onOpenDesktopDiagnostics,
   onOpenEvaluations,
   onReplayGuide,
   onAccountUpdate,
@@ -1039,11 +1041,11 @@ export function AccountSettingsPage({
                     )}
                   </span>
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <button
-                      type="button"
-                      onClick={onCheckForDesktopUpdates}
-                      className="btn-secondary justify-center"
-                      aria-label="Check for Shield desktop updates"
+                <button
+                  type="button"
+                  onClick={onCheckForDesktopUpdates}
+                  className="btn-secondary justify-center"
+                  aria-label="Check for Shield desktop updates"
                       title="Check for Updates"
                     >
                       <RefreshCw size={16} />
@@ -1061,6 +1063,20 @@ export function AccountSettingsPage({
                       <span>Restart to Update</span>
                     </button>
                   </div>
+                </div>
+                <div className="rounded border border-gray-200 p-4 dark:border-gray-800">
+                  <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Desktop diagnostics</span>
+                  <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Open recent desktop logs for diagnostics and support.</span>
+                  <button
+                    type="button"
+                    onClick={onOpenDesktopDiagnostics}
+                    className="mt-3 btn-secondary justify-center"
+                    aria-label="Open desktop diagnostics log"
+                    title="Open desktop diagnostics log"
+                  >
+                    <RefreshCw size={16} />
+                    <span>View diagnostics log</span>
+                  </button>
                 </div>
               </>
             )}
