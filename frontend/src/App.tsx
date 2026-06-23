@@ -636,13 +636,6 @@ function LoginSplash({
             <p className="max-w-2xl text-xl leading-8 text-blue-50">
               A secured workspace for personnel lookup, reporting, messages, calendar workflows, and daily operations.
             </p>
-            <div className="mt-10 grid max-w-2xl grid-cols-3 gap-3">
-              {['Personnel', 'Reports', 'Messages'].map((label) => (
-                <div key={label} className="rounded-lg border border-white/10 bg-white/8 px-4 py-3 text-sm font-bold text-blue-50 shadow-xl backdrop-blur">
-                  {label}
-                </div>
-              ))}
-            </div>
           </div>
         </section>
 

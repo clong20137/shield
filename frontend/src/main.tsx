@@ -8,7 +8,7 @@ const rootElement = document.getElementById('root');
 const initialSplash = document.querySelector('.initial-splash');
 const splashStartedAt = performance.now();
 const MINIMUM_SPLASH_MS = 1250;
-const SPLASH_EXIT_MS = 180;
+const SPLASH_EXIT_MS = 420;
 
 if (!rootElement) {
   throw new Error('Root element #root was not found.');
@@ -30,8 +30,11 @@ function finishInitialSplash() {
     return;
   }
 
+  renderApp();
   initialSplash.classList.add('initial-splash-exiting');
-  window.setTimeout(renderApp, SPLASH_EXIT_MS);
+  window.setTimeout(() => {
+    initialSplash.remove();
+  }, SPLASH_EXIT_MS);
 }
 
 const remainingSplashMs = Math.max(0, MINIMUM_SPLASH_MS - (performance.now() - splashStartedAt));
