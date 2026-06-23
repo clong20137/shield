@@ -1490,7 +1490,7 @@ interface MobileNavigationProps {
   isAdministrator: boolean;
   unreadMessages: number;
   isMessagesOpen: boolean;
-  isCalendarOpen: boolean;
+  isCalendarActive: boolean;
   showCalendar: boolean;
   onOpenMessages: () => void;
   onOpenCalendar: () => void;
@@ -1500,7 +1500,7 @@ function MobileNavigation({
   isAdministrator,
   unreadMessages,
   isMessagesOpen,
-  isCalendarOpen,
+  isCalendarActive,
   showCalendar,
   onOpenMessages,
   onOpenCalendar,
@@ -1528,7 +1528,7 @@ function MobileNavigation({
   return (
     <nav
       data-onboarding-target="navigation"
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/90 px-3 pb-[calc(env(safe-area-inset-bottom)+0.55rem)] pt-2.5 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/90 md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-[120] border-t border-gray-200 bg-white/90 px-3 pb-[calc(env(safe-area-inset-bottom)+0.55rem)] pt-2.5 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/90 md:hidden"
       aria-label="Mobile navigation"
     >
       <div data-onboarding-target="quick-launch" className="mx-auto flex max-w-lg items-stretch gap-1.5 rounded-2xl border border-gray-200 bg-white/85 p-1.5 shadow-[0_8px_24px_rgba(15,23,42,0.12)] dark:border-gray-800 dark:bg-gray-900/85">
@@ -1548,7 +1548,7 @@ function MobileNavigation({
           )}
         </button>
         {showCalendar && (
-          <button type="button" onClick={onOpenCalendar} className={actionClassName(isCalendarOpen)} aria-label="Open calendar">
+          <button type="button" onClick={onOpenCalendar} className={actionClassName(isCalendarActive)} aria-label="Open calendar">
             <CalendarDays size={20} strokeWidth={2.4} />
             <span className="truncate">Calendar</span>
           </button>
@@ -5238,6 +5238,7 @@ function SetupWizard({
 }
 
 function App() {
+  const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoginTransitioning, setIsLoginTransitioning] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthAccount | null>(null);
@@ -5298,6 +5299,7 @@ function App() {
   const [isWelcomeSplashOpen, setIsWelcomeSplashOpen] = useState(false);
   const [shouldLaunchGuideAfterWelcome, setShouldLaunchGuideAfterWelcome] = useState(false);
   const [closingModal, setClosingModal] = useState<ClosingModal | null>(null);
+  const isCalendarRoute = location.pathname === '/calendar' || location.pathname.startsWith('/calendar/');
 
   useEffect(() => {
     const collapseSidebarOnMobile = () => {
@@ -8154,7 +8156,7 @@ function App() {
             isAdministrator={isAdministrator}
             unreadMessages={messageUnreadCount}
             isMessagesOpen={isMessagesModalOpen}
-            isCalendarOpen={isCalendarModalOpen}
+            isCalendarActive={isCalendarRoute}
             showCalendar={showCalendar}
             onOpenMessages={toggleMessagesModal}
             onOpenCalendar={toggleCalendarModal}
@@ -8193,7 +8195,7 @@ function App() {
           />
           {isMessagesModalOpen && currentUser && (
             <FloatingWindow
-              className="pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[72dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(420px,calc(100dvh-1rem))] md:w-[min(900px,calc(100vw-1rem))] md:min-w-[min(360px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4"
+              className="pointer-events-auto fixed inset-x-0 top-0 bottom-[calc(env(safe-area-inset-bottom)+5.4rem)] flex min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[72dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(420px,calc(100dvh-1rem))] md:w-[min(900px,calc(100vw-1rem))] md:min-w-[min(360px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4"
               fallbackSize={{ width: Math.min(window.innerWidth - 16, 900), height: Math.min(window.innerHeight - 16, 680) }}
               initialPosition={getInitialMessagesModalPosition}
               isClosing={closingModal === 'messages'}
@@ -8235,7 +8237,7 @@ function App() {
           )}
           {isCalendarModalOpen && currentUser && showCalendar && (
             <FloatingWindow
-              className="pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[82dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(480px,calc(100dvh-1rem))] md:w-[min(1120px,calc(100vw-1rem))] md:min-w-[min(420px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4"
+              className="pointer-events-auto fixed inset-x-0 top-0 bottom-[calc(env(safe-area-inset-bottom)+5.4rem)] flex min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[82dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(480px,calc(100dvh-1rem))] md:w-[min(1120px,calc(100vw-1rem))] md:min-w-[min(420px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4"
               fallbackSize={{ width: Math.min(window.innerWidth - 16, 1120), height: Math.min(window.innerHeight - 16, 780) }}
               initialPosition={getInitialCalendarModalPosition}
               isClosing={closingModal === 'calendar'}
