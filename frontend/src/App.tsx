@@ -1,6 +1,6 @@
 import { CSSProperties, FormEvent, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Command, Delete, Download, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, RefreshCw, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
-import { BrowserRouter as Router, Navigate, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { FloatingWindow } from './components/FloatingWindow';
@@ -1489,21 +1489,13 @@ function SidebarLink({ to, label, compact, icon: Icon }: SidebarLinkProps) {
 interface MobileNavigationProps {
   isAdministrator: boolean;
   unreadMessages: number;
-  isMessagesOpen: boolean;
-  isCalendarActive: boolean;
   showCalendar: boolean;
-  onOpenMessages: () => void;
-  onOpenCalendar: () => void;
 }
 
 function MobileNavigation({
   isAdministrator,
   unreadMessages,
-  isMessagesOpen,
-  isCalendarActive,
   showCalendar,
-  onOpenMessages,
-  onOpenCalendar,
 }: MobileNavigationProps) {
   const navItems = [
     { to: '/', label: 'Home', icon: LayoutDashboard },
@@ -1514,12 +1506,6 @@ function MobileNavigation({
   ];
 
   const linkClassName = ({ isActive }: { isActive: boolean }) =>
-    [
-      'relative flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-2 text-[10px] font-black transition active:scale-[0.98]',
-      isActive ? 'bg-primary-500 text-white shadow-[0_10px_22px_rgba(37,99,235,0.28)]' : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
-    ].join(' ');
-
-  const actionClassName = (isActive: boolean) =>
     [
       'relative flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-2 text-[10px] font-black transition active:scale-[0.98]',
       isActive ? 'bg-primary-500 text-white shadow-[0_10px_22px_rgba(37,99,235,0.28)]' : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
@@ -1538,7 +1524,7 @@ function MobileNavigation({
             <span className="truncate">{label}</span>
           </NavLink>
         ))}
-        <button type="button" onClick={onOpenMessages} className={actionClassName(isMessagesOpen)} aria-label="Open messages">
+        <NavLink to="/messages" className={linkClassName} aria-label="Open messages">
           <Mail size={20} strokeWidth={2.4} />
           <span className="truncate">Messages</span>
           {unreadMessages > 0 && (
@@ -1546,12 +1532,12 @@ function MobileNavigation({
               {unreadMessages > 9 ? '9+' : unreadMessages}
             </span>
           )}
-        </button>
+        </NavLink>
         {showCalendar && (
-          <button type="button" onClick={onOpenCalendar} className={actionClassName(isCalendarActive)} aria-label="Open calendar">
+          <NavLink to="/calendar" className={linkClassName} aria-label="Open calendar">
             <CalendarDays size={20} strokeWidth={2.4} />
             <span className="truncate">Calendar</span>
-          </button>
+          </NavLink>
         )}
       </div>
     </nav>
@@ -3176,14 +3162,6 @@ function QuickLaunchTray({
       )}
     </section>
   );
-}
-
-function MessagesRouteRedirect({ onOpenMessages }: { onOpenMessages: () => void }) {
-  useEffect(() => {
-    onOpenMessages();
-  }, [onOpenMessages]);
-
-  return <Navigate to="/" replace />;
 }
 
 interface CommandPaletteItem {
@@ -5298,15 +5276,6 @@ function App() {
   const [isWelcomeSplashOpen, setIsWelcomeSplashOpen] = useState(false);
   const [shouldLaunchGuideAfterWelcome, setShouldLaunchGuideAfterWelcome] = useState(false);
   const [closingModal, setClosingModal] = useState<ClosingModal | null>(null);
-  const [currentRoutePath, setCurrentRoutePath] = useState(() => getAppRelativePathname());
-  const isCalendarRoute = currentRoutePath === '/calendar' || currentRoutePath.startsWith('/calendar/');
-
-  useEffect(() => {
-    const syncCurrentRoutePath = () => setCurrentRoutePath(getAppRelativePathname());
-    window.addEventListener('popstate', syncCurrentRoutePath);
-    return () => window.removeEventListener('popstate', syncCurrentRoutePath);
-  }, []);
-
   useEffect(() => {
     const collapseSidebarOnMobile = () => {
       if (isMobileViewport()) {
@@ -5425,6 +5394,16 @@ function App() {
   useEffect(() => {
     document.title = `${appName} - ${siteName}`;
   }, [appName, siteName]);
+
+  useEffect(() => {
+    const handleSetupSettingsUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<Partial<SetupStatus>>).detail;
+      setSetupStatus((currentStatus) => currentStatus ? { ...currentStatus, ...detail } : currentStatus);
+    };
+
+    window.addEventListener('shield:setup-settings-updated', handleSetupSettingsUpdated as EventListener);
+    return () => window.removeEventListener('shield:setup-settings-updated', handleSetupSettingsUpdated as EventListener);
+  }, []);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--app-primary', primaryColor);
@@ -6331,6 +6310,15 @@ function App() {
     }
   }, []);
 
+  const syncSetupStatus = useCallback(async () => {
+    try {
+      const response = await authService.getSetupStatus();
+      setSetupStatus(response.data);
+    } catch (err) {
+      console.error('Failed to sync setup status:', err);
+    }
+  }, []);
+
   useEffect(() => {
     if (isSetupLoading) {
       return undefined;
@@ -6977,6 +6965,7 @@ function App() {
     eventSource.addEventListener('performance-evaluation-updated', handleRealtimeAppUpdate('performance-evaluation-updated'));
     eventSource.addEventListener('settings-updated', (event) => {
       void loadNotificationSounds();
+      void syncSetupStatus();
       handleRealtimeAppUpdate('settings-updated')(event);
     });
     eventSource.addEventListener('permission-updated', (event) => {
@@ -7011,7 +7000,7 @@ function App() {
     });
 
     return () => eventSource.close();
-  }, [currentUser, handleForcedLogout, loadBugReports, loadNotificationSounds, loadUrgentAlerts, loadUserNotifications, syncSessionTimeoutFromSettings]);
+  }, [currentUser, handleForcedLogout, loadBugReports, loadNotificationSounds, loadUrgentAlerts, loadUserNotifications, syncSessionTimeoutFromSettings, syncSetupStatus]);
 
   const closeModal = (modal: ClosingModal) => {
     setClosingModal(modal);
@@ -8016,7 +8005,12 @@ function App() {
                     <Routes>
                       <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
                       {currentUser && <Route path="/updates/:postId" element={<DashboardPostPage currentUser={currentUser} onToast={showToast} />} />}
-                      {currentUser && <Route path="/messages" element={<MessagesRouteRedirect onOpenMessages={openMessagesModal} />} />}
+                      {currentUser && (
+                        <Route
+                          path="/messages"
+                          element={<MessageInboxPage currentUser={currentUser} onToast={showToast} />}
+                        />
+                      )}
                       {currentUser && (
                         <Route
                           path="/calendar"
@@ -8161,11 +8155,7 @@ function App() {
           <MobileNavigation
             isAdministrator={isAdministrator}
             unreadMessages={messageUnreadCount}
-            isMessagesOpen={isMessagesModalOpen}
-            isCalendarActive={isCalendarRoute}
             showCalendar={showCalendar}
-            onOpenMessages={toggleMessagesModal}
-            onOpenCalendar={toggleCalendarModal}
           />
           <GlobalKeyboardShortcuts
             canOpenAdminConsole={canOpenAdminConsole}

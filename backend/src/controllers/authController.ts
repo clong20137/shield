@@ -1672,9 +1672,11 @@ export class AuthController {
 
   static async updateRegistrationSettings(req: Request, res: Response) {
     try {
-      const { mode, appBaseUrl, maintenanceMode, loginWarningEnabled, loginWarningMessage, sessionTimeoutMinutes } = req.body as { mode?: string; appBaseUrl?: string; maintenanceMode?: boolean; loginWarningEnabled?: boolean; loginWarningMessage?: string; sessionTimeoutMinutes?: number };
+      const { mode, appBaseUrl, appName, siteName, maintenanceMode, loginWarningEnabled, loginWarningMessage, sessionTimeoutMinutes } = req.body as { mode?: string; appBaseUrl?: string; appName?: unknown; siteName?: unknown; maintenanceMode?: boolean; loginWarningEnabled?: boolean; loginWarningMessage?: string; sessionTimeoutMinutes?: number };
       const normalizedMode = normalizeRegistrationMode(cleanString(mode, 40));
       const normalizedUrl = cleanString(appBaseUrl, 300).replace(/\/+$/u, '');
+      const cleanAppName = cleanString(appName, 80) || DEFAULT_APP_NAME;
+      const cleanSiteName = cleanString(siteName, 120) || `${cleanAppName} Workspace`;
       const normalizedWarningMessage = cleanMultiline(loginWarningMessage, 2000) || DEFAULT_LOGIN_WARNING_MESSAGE;
       const normalizedSessionTimeoutMinutes = Math.max(0, Math.min(1440, Number(sessionTimeoutMinutes) || 0));
 
@@ -1683,6 +1685,8 @@ export class AuthController {
       }
 
       await SystemSettingModel.setString('registrationMode', normalizedMode);
+      await SystemSettingModel.setString('appName', cleanAppName);
+      await SystemSettingModel.setString('siteName', cleanSiteName);
       await SystemSettingModel.setString('maintenanceMode', maintenanceMode === true ? 'true' : 'false');
       await SystemSettingModel.setString('loginWarningEnabled', loginWarningEnabled === false ? 'false' : 'true');
       await SystemSettingModel.setString('loginWarningMessage', normalizedWarningMessage);
@@ -1691,6 +1695,7 @@ export class AuthController {
         await SystemSettingModel.setString('appBaseUrl', normalizedUrl);
       }
 
+      broadcastAppEvent({ type: 'settings-updated', appName: cleanAppName, siteName: cleanSiteName });
       broadcastAppEvent({ type: 'permission-updated' });
       const account = await getSessionAccount(req);
       await AuditLogModel.create({
@@ -1701,6 +1706,8 @@ export class AuthController {
         entityId: 'registration',
         details: JSON.stringify({
           mode: normalizedMode,
+          appName: cleanAppName,
+          siteName: cleanSiteName,
           maintenanceMode: maintenanceMode === true,
           loginWarningEnabled: loginWarningEnabled !== false,
           sessionTimeoutMinutes: normalizedSessionTimeoutMinutes,
@@ -1711,8 +1718,8 @@ export class AuthController {
       res.json({
         mode: normalizedMode,
         appBaseUrl: normalizedUrl,
-        appName: await SystemSettingModel.getString('appName', DEFAULT_APP_NAME),
-        siteName: await SystemSettingModel.getString('siteName', DEFAULT_SITE_NAME),
+        appName: cleanAppName,
+        siteName: cleanSiteName,
         brandLogoDataUrl: await SystemSettingModel.getString('brandLogoDataUrl', ''),
         primaryColor: await SystemSettingModel.getString('primaryColor', DEFAULT_PRIMARY_COLOR),
         secondaryColor: await SystemSettingModel.getString('secondaryColor', DEFAULT_SECONDARY_COLOR),

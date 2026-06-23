@@ -209,6 +209,8 @@ function PermissionsPage({
   const [registrationSettings, setRegistrationSettings] = useState<RegistrationSettings>({
     mode: 'public',
     appBaseUrl: DEFAULT_APP_BASE_URL,
+    appName: '',
+    siteName: '',
     maintenanceMode: false,
     loginWarningEnabled: true,
     loginWarningMessage: 'This is a Indiana State Police computer application system that is for Official use only. This system is subject to monitoring. Therefore, no expectation of privacy is to be assumed. Individuals found performing unauthorized activities may be subject to disciplinary action including criminal prosecution.',
@@ -361,6 +363,7 @@ function PermissionsPage({
     try {
       const response = await authService.updateRegistrationSettings(registrationSettings);
       setRegistrationSettings(response.data);
+      window.dispatchEvent(new CustomEvent('shield:setup-settings-updated', { detail: response.data }));
       try {
         const minutes = response.data.sessionTimeoutMinutes || 0;
         window.localStorage.setItem(SESSION_TIMEOUT_KEY, String(minutes));
@@ -368,7 +371,7 @@ function PermissionsPage({
           window.dispatchEvent(new CustomEvent('shield:session-timeout-updated', { detail: { minutes } }));
         } catch {}
       } catch {}
-      onToast('success', 'Registration settings saved.');
+      onToast('success', 'General settings saved.');
     } catch (err) {
       const message = getErrorMessage(err, 'Failed to save registration settings.');
       setError(message);
@@ -639,13 +642,31 @@ function PermissionsPage({
       {(section === 'all' || section === 'settings') && (
       <section className="mt-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
         <div className="mb-5">
-          <h2>Registration Access</h2>
+          <h2>General Settings</h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Control public registration or create secure invite links for new accounts.
+            Set the visible app name, control public registration, or create secure invite links for new accounts.
           </p>
         </div>
 
         <form onSubmit={saveRegistrationSettings} className="grid grid-cols-1 gap-4 lg:grid-cols-[220px_minmax(0,1fr)_auto]">
+          <label className="lg:col-span-1">
+            <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">App Name</span>
+            <input
+              value={registrationSettings.appName || ''}
+              onChange={(event) => setRegistrationSettings((settings) => ({ ...settings, appName: event.target.value }))}
+              className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+              placeholder="Shield"
+            />
+          </label>
+          <label className="lg:col-span-2">
+            <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Site Name</span>
+            <input
+              value={registrationSettings.siteName || ''}
+              onChange={(event) => setRegistrationSettings((settings) => ({ ...settings, siteName: event.target.value }))}
+              className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+              placeholder="Shield Workspace"
+            />
+          </label>
           <label>
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Registration Mode</span>
             <select
@@ -738,7 +759,7 @@ function PermissionsPage({
             <div className="mt-2 flex flex-wrap gap-2">
               <input readOnly value={latestInvite.inviteUrl} className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
               <a
-                href={`mailto:${encodeURIComponent(latestInvite.email)}?subject=${encodeURIComponent('Your Blueline invite')}&body=${encodeURIComponent(`Use this secure link to create your Blueline login:\n\n${latestInvite.inviteUrl}`)}`}
+                href={`mailto:${encodeURIComponent(latestInvite.email)}?subject=${encodeURIComponent(`Your ${(registrationSettings.appName || 'application').trim()} invite`)}&body=${encodeURIComponent(`Use this secure link to create your ${(registrationSettings.appName || 'application').trim()} login:\n\n${latestInvite.inviteUrl}`)}`}
                 className="btn-primary"
                 aria-label="Email invite"
                 title="Email Invite"

@@ -25,6 +25,8 @@ interface AppEventPayload {
   type: AppEventType;
   accountId?: string | null;
   entityId?: string;
+  appName?: string;
+  siteName?: string;
 }
 
 const globalClients = new Set<Response>();
