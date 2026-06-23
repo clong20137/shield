@@ -865,12 +865,6 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   }, [memberDirectory, selectedThread]);
 
   useEffect(() => {
-    if (!selectedThreadId && threads.length > 0) {
-      setSelectedThreadId(threads[0].id);
-    }
-  }, [selectedThreadId, threads]);
-
-  useEffect(() => {
     latestMessageRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
   }, [selectedThreadId, selectedThread?.messages.length]);
 
@@ -1365,6 +1359,17 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     }
   };
 
+  const returnToThreadList = () => {
+    setSelectedThreadId(null);
+    setDraftRecipient(null);
+    setDraftGroupRecipients([]);
+    setDraftThreadTitle('');
+    setThreadSearchTerm('');
+    setReplyBody('');
+    setReplyAttachments([]);
+    setIsEmojiPickerOpen(false);
+  };
+
   const openMentionProfile = async (mention: string) => {
     try {
       const response = await userService.search(mention);
@@ -1748,9 +1753,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   <div className="flex min-w-0 items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedThreadId(null);
-                      setThreadSearchTerm('');
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      returnToThreadList();
                     }}
                     className={`${mobileBackClass} flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-200 text-primary-500 shadow-sm dark:border-gray-700 dark:text-blue-100`}
                     aria-label="Back to conversations"
@@ -2195,7 +2201,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                     onPaste={handleMessagePaste}
                     onFocus={() => setIsComposerFocused(true)}
                     onBlur={() => setIsComposerFocused(false)}
-                    placeholder={selectedThreadAcceptsMessages ? 'Message. Use @name to mention someone.' : 'Messages are disabled for this user'}
+                    placeholder={selectedThreadAcceptsMessages ? 'Message' : 'Messages are disabled for this user'}
                     disabled={!selectedThreadAcceptsMessages}
                     rows={1}
                     className="min-h-10 resize-none overflow-hidden border-0 bg-transparent px-1 py-2 text-[16px] leading-6 outline-none ring-0 focus:border-0 focus:ring-0 dark:bg-transparent sm:min-h-8 sm:py-1.5 sm:text-sm sm:leading-5"

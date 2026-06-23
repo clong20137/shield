@@ -1515,42 +1515,42 @@ function MobileNavigation({
 
   const linkClassName = ({ isActive }: { isActive: boolean }) =>
     [
-      'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-bold transition',
-      isActive ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
+      'relative flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-2 text-[10px] font-black transition active:scale-[0.98]',
+      isActive ? 'bg-primary-500 text-white shadow-[0_10px_22px_rgba(37,99,235,0.28)]' : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
     ].join(' ');
 
   const actionClassName = (isActive: boolean) =>
     [
-      'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-bold transition',
-      isActive ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
+      'relative flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-2 text-[10px] font-black transition active:scale-[0.98]',
+      isActive ? 'bg-primary-500 text-white shadow-[0_10px_22px_rgba(37,99,235,0.28)]' : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
     ].join(' ');
 
   return (
     <nav
       data-onboarding-target="navigation"
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/95 md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/90 px-3 pb-[calc(env(safe-area-inset-bottom)+0.55rem)] pt-2.5 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/90 md:hidden"
       aria-label="Mobile navigation"
     >
-      <div data-onboarding-target="quick-launch" className="mx-auto flex max-w-lg items-stretch gap-1">
+      <div data-onboarding-target="quick-launch" className="mx-auto flex max-w-lg items-stretch gap-1.5 rounded-2xl border border-gray-200 bg-white/85 p-1.5 shadow-[0_8px_24px_rgba(15,23,42,0.12)] dark:border-gray-800 dark:bg-gray-900/85">
         {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} className={linkClassName}>
-            <Icon size={19} />
+            <Icon size={20} strokeWidth={2.4} />
             <span className="truncate">{label}</span>
           </NavLink>
         ))}
         <button type="button" onClick={onOpenMessages} className={actionClassName(isMessagesOpen)} aria-label="Open messages">
-          <Mail size={19} />
-          <span>Messages</span>
+          <Mail size={20} strokeWidth={2.4} />
+          <span className="truncate">Messages</span>
           {unreadMessages > 0 && (
-            <span className="absolute right-2 top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">
+            <span className="absolute right-2 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-black text-white ring-2 ring-white dark:ring-gray-900">
               {unreadMessages > 9 ? '9+' : unreadMessages}
             </span>
           )}
         </button>
         {showCalendar && (
           <button type="button" onClick={onOpenCalendar} className={actionClassName(isCalendarOpen)} aria-label="Open calendar">
-            <CalendarDays size={19} />
-            <span>Calendar</span>
+            <CalendarDays size={20} strokeWidth={2.4} />
+            <span className="truncate">Calendar</span>
           </button>
         )}
       </div>
