@@ -2403,8 +2403,13 @@ select.trooper-daily-field-with-icon {
 @media (max-width: 640px) {
   input,
   select,
-  textarea {
-    font-size: 16px;
+  textarea,
+  [contenteditable='true'],
+  .global-search-input,
+  .pinned-profile-search-input,
+  .EmojiPickerReact input.epr-search,
+  .epr-main input.epr-search {
+    font-size: 16px !important;
   }
 
   .modal-window {
@@ -2413,6 +2418,14 @@ select.trooper-daily-field-with-icon {
 
   .toast-notification {
     max-width: calc(100vw - 1rem);
+  }
+}
+
+@media (pointer: coarse) {
+  html,
+  body,
+  #root {
+    touch-action: pan-x pan-y;
   }
 }
 
