@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
-import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetUrl, handleAssetImageError, MileageSummary, mileageService, User } from '../services/api';
+import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetUrl, getMessageEventsUrl, handleAssetImageError, MileageSummary, mileageService, User } from '../services/api';
 import { RankBadge } from './RankBadge';
 
 interface UserDetailProps {
@@ -132,6 +132,53 @@ function getLastOnlineLabel(lastSeenAt?: string | null): string {
 }
 
 type ProfileTab = 'personal' | 'identification' | 'employment' | 'contact' | 'devices' | 'calendar' | 'additional';
+type ProfilePresenceStatus = 'active' | 'away' | 'busy';
+type ProfilePresenceState = {
+  online: boolean;
+  away: boolean;
+  status: ProfilePresenceStatus;
+  lastSeenAt: string | null;
+};
+
+function getPresenceTone(status: ProfilePresenceStatus, isOnline: boolean, isAway: boolean) {
+  if (status === 'busy') {
+    return {
+      label: 'Busy',
+      textClass: 'text-red-100',
+      dotClass: 'bg-red-400',
+      ringClass: 'border-red-300/90 shadow-[0_0_0_2px_rgba(239,68,68,0.18)]',
+      pulseClass: 'border-red-300/60',
+    };
+  }
+
+  if (status === 'away' || isAway) {
+    return {
+      label: 'Away',
+      textClass: 'text-amber-100',
+      dotClass: 'bg-amber-300',
+      ringClass: 'border-amber-300/90 shadow-[0_0_0_2px_rgba(251,191,36,0.18)]',
+      pulseClass: 'border-amber-300/70',
+    };
+  }
+
+  if (isOnline) {
+    return {
+      label: 'Active',
+      textClass: 'text-green-100/90',
+      dotClass: 'bg-green-300',
+      ringClass: 'border-green-300/80 shadow-[0_0_0_2px_rgba(34,197,94,0.14)]',
+      pulseClass: 'border-green-300/45',
+    };
+  }
+
+  return {
+    label: 'Offline',
+    textClass: 'text-blue-100',
+    dotClass: 'bg-blue-200/70',
+    ringClass: 'border-white',
+    pulseClass: '',
+  };
+}
 
 function getSupervisorLookupValues(account?: AuthAccount | null) {
   if (!account) {
@@ -221,6 +268,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const [deviceError, setDeviceError] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [presenceTick, setPresenceTick] = useState(0);
+  const [realtimePresence, setRealtimePresence] = useState<ProfilePresenceState | null>(null);
   const isDeviceLoadInFlightRef = useRef(false);
   const deviceRefreshTimerRef = useRef<number | null>(null);
   const deviceLoadRequestIdRef = useRef(0);
@@ -286,6 +334,47 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
     const timer = window.setInterval(() => setPresenceTick((current) => current + 1), 60000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    setRealtimePresence(null);
+    let isMounted = true;
+    const eventSource = new EventSource(getMessageEventsUrl(), { withCredentials: true });
+    const handlePresenceUpdate = (event: MessageEvent) => {
+      try {
+        const payload = JSON.parse(event.data || '{}') as {
+          actorAccountId?: string;
+          actorOnline?: boolean;
+          actorAway?: boolean;
+          actorStatus?: ProfilePresenceStatus;
+          actorLastSeenAt?: string | null;
+        };
+
+        if (!isMounted || payload.actorAccountId !== user.id) {
+          return;
+        }
+
+        setRealtimePresence({
+          online: payload.actorOnline === true,
+          away: payload.actorAway === true,
+          status: payload.actorStatus || 'active',
+          lastSeenAt: payload.actorLastSeenAt || null,
+        });
+      } catch (error) {
+        console.error('Failed to parse profile presence update:', error);
+      }
+    };
+
+    eventSource.addEventListener('presence-updated', handlePresenceUpdate);
+    eventSource.addEventListener('error', (event) => {
+      console.error('Profile presence connection error:', event);
+    });
+
+    return () => {
+      isMounted = false;
+      eventSource.removeEventListener('presence-updated', handlePresenceUpdate);
+      eventSource.close();
+    };
+  }, [user.id]);
 
   useEffect(() => {
     if (activeTab !== 'calendar' || !canViewProfileCalendar) {
@@ -433,14 +522,19 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const milestone = mileageSummary?.milestone || 0;
   const nextAchievement = mileageSummary?.nextAchievement || null;
   const mileagePercent = milestone > 0 ? Math.min(100, Math.round((mileage / milestone) * 100)) : 0;
-  const isOnline = isUserOnline(user.lastSeenAt);
-  const isAway = !isOnline && isUserAway(user.lastSeenAt);
-  const lastOnlineLabel = useMemo(() => getLastOnlineLabel(user.lastSeenAt), [presenceTick, user.lastSeenAt]);
-  const profileRingClass = isOnline
-    ? 'border-green-300/80 shadow-[0_0_0_2px_rgba(34,197,94,0.14)]'
-    : isAway
-      ? 'border-amber-300/90 shadow-[0_0_0_2px_rgba(251,191,36,0.18)]'
-    : 'border-white';
+  const effectiveLastSeenAt = realtimePresence?.lastSeenAt ?? user.lastSeenAt;
+  const isOnline = realtimePresence ? realtimePresence.online : isUserOnline(effectiveLastSeenAt);
+  const isAway = realtimePresence ? realtimePresence.away : !isOnline && isUserAway(effectiveLastSeenAt);
+  const presenceStatus = realtimePresence?.status || (isAway ? 'away' : 'active');
+  const lastOnlineLabel = useMemo(() => {
+    if (realtimePresence?.online) {
+      return getPresenceTone(presenceStatus, isOnline, isAway).label;
+    }
+
+    return getLastOnlineLabel(effectiveLastSeenAt);
+  }, [effectiveLastSeenAt, isAway, isOnline, presenceStatus, presenceTick, realtimePresence?.online]);
+  const presenceTone = getPresenceTone(presenceStatus, isOnline, isAway);
+  const profileRingClass = presenceTone.ringClass;
 
   return (
     <div className={`flex flex-col overflow-hidden rounded-none bg-white shadow-xl dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:rounded-lg ${isFloatingProfile ? 'h-full max-h-full' : 'h-[100dvh] sm:h-auto sm:max-h-[92dvh]'}`}>
@@ -451,8 +545,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 flex-col items-center gap-3 text-center sm:flex-row sm:items-center sm:gap-4 sm:text-left">
           <div className="relative shrink-0">
-            {isOnline && <span className="pointer-events-none absolute -inset-1 rounded-full border border-green-300/45 shield-online-pulse" />}
-            {isAway && <span className="pointer-events-none absolute -inset-1 rounded-full border border-amber-300/70 shield-online-pulse" />}
+            {(isOnline || isAway) && presenceTone.pulseClass && <span className={`pointer-events-none absolute -inset-1 rounded-full border shield-online-pulse ${presenceTone.pulseClass}`} />}
           {user.profilePictureUrl ? (
             <img
               src={getAssetUrl(user.profilePictureUrl)}
@@ -506,8 +599,8 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
             </div>
             <p className="mt-2 max-w-full truncate text-sm text-blue-100">{user.email || 'No email on file'}</p>
             <p className="mt-1 text-sm text-blue-100">PE {user.peNumber || 'N/A'} - {user.district || 'No district'}</p>
-            <p className={`mt-1 inline-flex items-center gap-1.5 text-xs font-semibold ${isOnline ? 'text-green-100/90' : 'text-blue-100'}`}>
-              {isOnline && <span className="h-1.5 w-1.5 rounded-full bg-green-300/80" />}
+            <p className={`mt-1 inline-flex items-center gap-1.5 text-xs font-semibold ${presenceTone.textClass}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${presenceTone.dotClass}`} />
               {lastOnlineLabel}
             </p>
           </div>
