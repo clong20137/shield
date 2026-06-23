@@ -5,12 +5,58 @@
 :root {
   --shield-motion-duration: 500ms;
   --shield-motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --app-primary: #1a365d;
+  --app-secondary: #9C865C;
   color-scheme: light;
 }
 
 
 .dark {
   color-scheme: dark;
+}
+
+.bg-primary-500,
+.hover\:bg-primary-500:hover {
+  background-color: var(--app-primary) !important;
+}
+
+.bg-primary-600,
+.hover\:bg-primary-600:hover {
+  background-color: color-mix(in srgb, var(--app-primary) 88%, black) !important;
+}
+
+.bg-secondary-500,
+.hover\:bg-secondary-500:hover,
+.bg-accent,
+.hover\:bg-accent:hover {
+  background-color: var(--app-secondary) !important;
+}
+
+.bg-secondary-600,
+.hover\:bg-secondary-600:hover {
+  background-color: color-mix(in srgb, var(--app-secondary) 86%, black) !important;
+}
+
+.text-primary-500,
+.hover\:text-primary-500:hover {
+  color: var(--app-primary) !important;
+}
+
+.text-secondary-500,
+.text-accent,
+.hover\:text-accent:hover {
+  color: var(--app-secondary) !important;
+}
+
+.border-primary-500,
+.border-accent,
+.focus\:border-accent:focus {
+  border-color: var(--app-secondary) !important;
+}
+
+.ring-accent,
+.focus\:ring-accent\/20:focus {
+  --tw-ring-color: color-mix(in srgb, var(--app-secondary) 24%, transparent) !important;
 }
 
 @property --shield-border-angle {

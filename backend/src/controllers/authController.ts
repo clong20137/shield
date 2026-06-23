@@ -116,6 +116,10 @@ async function withPermissions<T extends { id: string; role: string }>(account: 
 
 const registrationModes = ['public', 'invite-only', 'disabled'] as const;
 type RegistrationMode = typeof registrationModes[number];
+const DEFAULT_APP_NAME = 'Blueline';
+const DEFAULT_SITE_NAME = 'Blueline Workspace';
+const DEFAULT_PRIMARY_COLOR = '#1a365d';
+const DEFAULT_SECONDARY_COLOR = '#9C865C';
 const setupFeatureKeys = [
   'dashboardWidgets',
   'messaging',
@@ -155,6 +159,24 @@ function cleanFeatureSelection(value: unknown): string[] {
 
 function normalizeUrl(value: unknown, maxLength = 300): string {
   return cleanString(value, maxLength).replace(/\/+$/u, '');
+}
+
+function normalizeHexColor(value: unknown, fallback: string): string {
+  const cleanValue = cleanString(value, 20);
+  return /^#[0-9a-f]{6}$/iu.test(cleanValue) ? cleanValue : fallback;
+}
+
+function normalizeLogoDataUrl(value: unknown): string {
+  const cleanValue = cleanString(value, 250000);
+  if (!cleanValue) {
+    return '';
+  }
+
+  if (!/^data:image\/(?:png|jpeg|jpg|webp|gif|svg\+xml);base64,[A-Za-z0-9+/=]+$/u.test(cleanValue)) {
+    return '';
+  }
+
+  return cleanValue;
 }
 
 function getBackendEnvPath(): string {
@@ -544,7 +566,7 @@ export class AuthController {
         requiresRestart: true,
         envFile: '.env',
         values: { ...nextSettings, DB_PASSWORD: '' },
-        message: 'Environment saved. Restart the backend so SHIELD can reconnect with these values.',
+        message: `${DEFAULT_APP_NAME} environment saved. Restart the backend so the API can reconnect with these values.`,
       });
     } catch (error) {
       console.error('Save setup environment error:', error);
@@ -620,8 +642,11 @@ export class AuthController {
           initialized: true,
           name: process.env.DB_NAME || 'shield',
         },
-        appName: await SystemSettingModel.getString('appName', 'SHIELD'),
-        siteName: await SystemSettingModel.getString('siteName', 'SHIELD Workspace'),
+        appName: await SystemSettingModel.getString('appName', DEFAULT_APP_NAME),
+        siteName: await SystemSettingModel.getString('siteName', DEFAULT_SITE_NAME),
+        brandLogoDataUrl: await SystemSettingModel.getString('brandLogoDataUrl', ''),
+        primaryColor: await SystemSettingModel.getString('primaryColor', DEFAULT_PRIMARY_COLOR),
+        secondaryColor: await SystemSettingModel.getString('secondaryColor', DEFAULT_SECONDARY_COLOR),
         apiUrl: await SystemSettingModel.getString('appApiUrl', `${req.protocol}://${req.get('host')}/api`),
         appBaseUrl: await getAppBaseUrl(req),
         registrationMode: await getRegistrationMode(),
@@ -657,6 +682,9 @@ export class AuthController {
       const {
         appName,
         siteName,
+        brandLogoDataUrl,
+        primaryColor,
+        secondaryColor,
         appBaseUrl,
         apiUrl,
         registrationMode,
@@ -669,6 +697,9 @@ export class AuthController {
       } = req.body as {
         appName?: unknown;
         siteName?: unknown;
+        brandLogoDataUrl?: unknown;
+        primaryColor?: unknown;
+        secondaryColor?: unknown;
         appBaseUrl?: unknown;
         apiUrl?: unknown;
         registrationMode?: unknown;
@@ -686,8 +717,11 @@ export class AuthController {
         };
       };
 
-      const cleanAppName = cleanString(appName, 80) || 'SHIELD';
+      const cleanAppName = cleanString(appName, 80) || DEFAULT_APP_NAME;
       const cleanSiteName = cleanString(siteName, 120) || `${cleanAppName} Workspace`;
+      const cleanBrandLogoDataUrl = normalizeLogoDataUrl(brandLogoDataUrl);
+      const cleanPrimaryColor = normalizeHexColor(primaryColor, DEFAULT_PRIMARY_COLOR);
+      const cleanSecondaryColor = normalizeHexColor(secondaryColor, DEFAULT_SECONDARY_COLOR);
       const cleanAppBaseUrl = normalizeUrl(appBaseUrl);
       const cleanApiUrl = normalizeUrl(apiUrl);
       const normalizedRegistrationMode = normalizeRegistrationMode(cleanString(registrationMode, 40));
@@ -726,6 +760,9 @@ export class AuthController {
 
       await SystemSettingModel.setString('appName', cleanAppName);
       await SystemSettingModel.setString('siteName', cleanSiteName);
+      await SystemSettingModel.setString('brandLogoDataUrl', cleanBrandLogoDataUrl);
+      await SystemSettingModel.setString('primaryColor', cleanPrimaryColor);
+      await SystemSettingModel.setString('secondaryColor', cleanSecondaryColor);
       if (cleanAppBaseUrl) {
         await SystemSettingModel.setString('appBaseUrl', cleanAppBaseUrl);
       }
@@ -757,6 +794,8 @@ export class AuthController {
         details: JSON.stringify({
           appName: cleanAppName,
           siteName: cleanSiteName,
+          primaryColor: cleanPrimaryColor,
+          secondaryColor: cleanSecondaryColor,
           registrationMode: normalizedRegistrationMode,
           features: cleanFeatures,
         }),
@@ -768,6 +807,9 @@ export class AuthController {
         settings: {
           appName: cleanAppName,
           siteName: cleanSiteName,
+          brandLogoDataUrl: cleanBrandLogoDataUrl,
+          primaryColor: cleanPrimaryColor,
+          secondaryColor: cleanSecondaryColor,
           appBaseUrl: cleanAppBaseUrl,
           apiUrl: cleanApiUrl,
           registrationMode: normalizedRegistrationMode,
@@ -918,7 +960,8 @@ export class AuthController {
           details: JSON.stringify({ email: normalizeEmail(email), reason: 'maintenance' }),
           ...requestAuditFields(req),
         });
-        return res.status(503).json({ error: 'SHIELD is in maintenance mode. Only administrators can sign in right now.' });
+        const appName = await SystemSettingModel.getString('appName', DEFAULT_APP_NAME);
+        return res.status(503).json({ error: `${appName} is in maintenance mode. Only administrators can sign in right now.` });
       }
 
       if (result.requiresTwoFactor) {
@@ -1106,7 +1149,8 @@ export class AuthController {
           details: JSON.stringify({ provider: 'microsoft', email: profile.email, reason: 'no_matching_user' }),
           ...requestAuditFields(req),
         });
-        return redirectWithError('No active SHIELD user is linked to that Microsoft account.');
+        const appName = await SystemSettingModel.getString('appName', DEFAULT_APP_NAME);
+        return redirectWithError(`No active ${appName} user is linked to that Microsoft account.`);
       }
 
       if (!account.isActive) {
@@ -1119,7 +1163,8 @@ export class AuthController {
           details: JSON.stringify({ provider: 'microsoft', email: account.email, reason: 'inactive' }),
           ...requestAuditFields(req),
         });
-        return redirectWithError('This SHIELD account is inactive. Contact an administrator.');
+        const appName = await SystemSettingModel.getString('appName', DEFAULT_APP_NAME);
+        return redirectWithError(`This ${appName} account is inactive. Contact an administrator.`);
       }
 
       if (maintenanceMode && account.role !== 'administrator') {
@@ -1132,7 +1177,8 @@ export class AuthController {
           details: JSON.stringify({ provider: 'microsoft', email: account.email, reason: 'maintenance' }),
           ...requestAuditFields(req),
         });
-        return redirectWithError('SHIELD is in maintenance mode. Only administrators can sign in right now.');
+        const appName = await SystemSettingModel.getString('appName', DEFAULT_APP_NAME);
+        return redirectWithError(`${appName} is in maintenance mode. Only administrators can sign in right now.`);
       }
 
       const token = await AuthSessionModel.createSession(account.id);
@@ -1170,11 +1216,11 @@ export class AuthController {
         const resetUrl = `${appBaseUrl}/?reset=${encodeURIComponent(reset.token)}`;
         const didSend = await sendEmail({
           to: account.email,
-          subject: 'Reset your SHIELD password',
+          subject: `Reset your ${await SystemSettingModel.getString('appName', DEFAULT_APP_NAME)} password`,
           text: [
             `Hello ${account.displayName || account.email},`,
             '',
-            'Use the secure link below to reset your SHIELD password. This link expires in 1 hour.',
+            `Use the secure link below to reset your ${await SystemSettingModel.getString('appName', DEFAULT_APP_NAME)} password. This link expires in 1 hour.`,
             '',
             resetUrl,
             '',
@@ -1183,7 +1229,7 @@ export class AuthController {
         });
 
         if (!didSend && process.env.ALLOW_CONSOLE_RESET_LINKS === 'true') {
-          console.log(`SHIELD password reset for ${account.email}: ${resetUrl}`);
+          console.log(`${await SystemSettingModel.getString('appName', DEFAULT_APP_NAME)} password reset for ${account.email}: ${resetUrl}`);
         }
 
         await AuditLogModel.create({
@@ -1197,7 +1243,7 @@ export class AuthController {
         });
       }
 
-      res.json({ message: 'If that email has a SHIELD login, a reset link has been sent.' });
+      res.json({ message: `If that email has a ${await SystemSettingModel.getString('appName', DEFAULT_APP_NAME)} login, a reset link has been sent.` });
     } catch (error) {
       console.error('Request password reset error:', error);
       res.status(500).json({ error: 'Failed to request password reset' });
@@ -1602,6 +1648,11 @@ export class AuthController {
       res.json({
         mode: await getRegistrationMode(),
         appBaseUrl: await getAppBaseUrl(req),
+        appName: await SystemSettingModel.getString('appName', DEFAULT_APP_NAME),
+        siteName: await SystemSettingModel.getString('siteName', DEFAULT_SITE_NAME),
+        brandLogoDataUrl: await SystemSettingModel.getString('brandLogoDataUrl', ''),
+        primaryColor: await SystemSettingModel.getString('primaryColor', DEFAULT_PRIMARY_COLOR),
+        secondaryColor: await SystemSettingModel.getString('secondaryColor', DEFAULT_SECONDARY_COLOR),
         maintenanceMode: await SystemSettingModel.getString('maintenanceMode', 'false') === 'true',
         loginWarningEnabled: await SystemSettingModel.getString('loginWarningEnabled', 'true') === 'true',
         loginWarningMessage: await SystemSettingModel.getString('loginWarningMessage', DEFAULT_LOGIN_WARNING_MESSAGE),
@@ -1654,6 +1705,11 @@ export class AuthController {
       res.json({
         mode: normalizedMode,
         appBaseUrl: normalizedUrl,
+        appName: await SystemSettingModel.getString('appName', DEFAULT_APP_NAME),
+        siteName: await SystemSettingModel.getString('siteName', DEFAULT_SITE_NAME),
+        brandLogoDataUrl: await SystemSettingModel.getString('brandLogoDataUrl', ''),
+        primaryColor: await SystemSettingModel.getString('primaryColor', DEFAULT_PRIMARY_COLOR),
+        secondaryColor: await SystemSettingModel.getString('secondaryColor', DEFAULT_SECONDARY_COLOR),
         maintenanceMode: maintenanceMode === true,
         loginWarningEnabled: loginWarningEnabled !== false,
         loginWarningMessage: normalizedWarningMessage,
@@ -1701,7 +1757,7 @@ export class AuthController {
       );
       const inviteUrl = `${appBaseUrl}/?invite=${encodeURIComponent(invite.token)}`;
 
-      console.log(`SHIELD invite for ${cleanEmail}: ${inviteUrl}`);
+      console.log(`${await SystemSettingModel.getString('appName', DEFAULT_APP_NAME)} invite for ${cleanEmail}: ${inviteUrl}`);
       await AuditLogModel.create({
         actorId: account?.id || null,
         actorName: account?.displayName || account?.email || null,

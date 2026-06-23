@@ -17,7 +17,7 @@ const employmentTypes = ['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inact
 const userStatuses = ['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training', 'Administrative Duty', 'Inactive'] as const;
 const sexOptions = ['Male', 'Female'] as const;
 const maritalStatuses = ['Single', 'Married', 'Divorced', 'Widowed'] as const;
-const DEFAULT_IMPORT_PASSWORD = 'SHIELD2026!Temp';
+const DEFAULT_IMPORT_PASSWORD = 'Blueline2026!Temp';
 const selfEditableFields = new Set([
   'profilePictureUrl',
   'personalPhoneNumber',

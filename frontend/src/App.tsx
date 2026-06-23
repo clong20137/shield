@@ -37,10 +37,20 @@ const MODAL_CLOSE_MS = 220;
 const PASSWORD_REQUIREMENTS_MESSAGE = 'Password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.';
 const APP_BASE_PATH = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
 const ROUTER_BASENAME = APP_BASE_PATH || undefined;
+const DEFAULT_APP_NAME = 'Blueline';
+const DEFAULT_SITE_NAME = 'Blueline Workspace';
+const DEFAULT_PRIMARY_COLOR = '#1a365d';
+const DEFAULT_SECONDARY_COLOR = '#9C865C';
+const DEFAULT_BRAND_LOGO = '/shield-splash-logo.png';
+const MAX_SETUP_LOGO_SIZE_BYTES = 240 * 1024;
 
 function withAppBase(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${APP_BASE_PATH}${normalizedPath}` || '/';
+}
+
+function getBrandLogoSrc(brandLogoDataUrl?: string): string {
+  return brandLogoDataUrl || withAppBase(DEFAULT_BRAND_LOGO);
 }
 
 function getAppRelativePathname(): string {
@@ -414,14 +424,16 @@ function isNetworkConnectionError(error: unknown): boolean {
 function LoginSplash({
   onLogin,
   onToast,
-  appName = 'SHIELD',
+  appName = DEFAULT_APP_NAME,
   siteName = 'Agency Access Portal',
+  brandLogoDataUrl = '',
   isExiting = false,
 }: {
   onLogin: (account: AuthAccount) => void;
   onToast: (type: ToastType, message: string) => void;
   appName?: string;
   siteName?: string;
+  brandLogoDataUrl?: string;
   isExiting?: boolean;
 }) {
   const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset'>('login');
@@ -623,7 +635,7 @@ function LoginSplash({
           <div className="max-w-3xl">
             <div className="mb-8 flex items-center gap-4">
               <span className="flex h-20 w-20 items-center justify-center rounded-2xl border border-white/15 bg-white/10 shadow-2xl backdrop-blur">
-                <img src={withAppBase('/shield-splash-logo.png')} alt="" className="h-16 w-16 object-contain" />
+                <img src={getBrandLogoSrc(brandLogoDataUrl)} alt="" className="h-16 w-16 object-contain" />
               </span>
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.24em] text-accent">Secure Access</p>
@@ -643,7 +655,7 @@ function LoginSplash({
           <form ref={loginFormRef} onSubmit={handleSubmit} className="w-full max-w-md rounded-xl border border-white/15 bg-white/95 p-6 shadow-[0_28px_90px_rgba(0,0,0,0.35)] ring-1 ring-black/5 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-900/95 sm:p-8">
             <div className="mb-7">
               <div className="mb-5 flex items-center gap-3 lg:hidden">
-                <img src={withAppBase('/shield-splash-logo.png')} alt="" className="h-14 w-14 object-contain drop-shadow-lg" />
+                <img src={getBrandLogoSrc(brandLogoDataUrl)} alt="" className="h-14 w-14 object-contain drop-shadow-lg" />
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.2em] text-accent">Secure Access</p>
                   <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">{appName}</p>
@@ -660,7 +672,7 @@ function LoginSplash({
                   : mode === 'forgot'
                     ? 'Enter your email and we will send a secure reset link.'
                     : mode === 'reset'
-                      ? 'Choose a new password for your SHIELD login.'
+                      ? `Choose a new password for your ${appName} login.`
                       : 'Use your email and password to continue.'}
               </p>
             </div>
@@ -1177,11 +1189,13 @@ function ForcePasswordChange({
   onChanged,
   onLogout,
   onToast,
+  appName,
 }: {
   account: AuthAccount;
   onChanged: (account: AuthAccount) => void;
   onLogout: () => void;
   onToast: (type: ToastType, message: string) => void;
+  appName: string;
 }) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -1220,7 +1234,7 @@ function ForcePasswordChange({
       if (response.data.account) {
         onChanged(response.data.account);
       }
-      onToast('success', 'Password updated. Welcome to SHIELD.');
+      onToast('success', `Password updated. Welcome to ${appName}.`);
     } catch (err) {
       const message = getErrorMessage(err, 'Failed to update password.');
       setError(message);
@@ -1294,7 +1308,7 @@ function ForcePasswordChange({
 }
 
 function getInitials(name?: string, email?: string): string {
-  const source = name?.trim() || email?.trim() || 'SHIELD User';
+  const source = name?.trim() || email?.trim() || 'Blueline User';
   const parts = source.split(/\s+/u).filter(Boolean);
 
   if (parts.length === 1) {
@@ -1323,21 +1337,25 @@ async function checkApiHealth(signal?: AbortSignal): Promise<boolean> {
 }
 
 function ShieldLoading({
-  title = 'Loading SHIELD',
+  title = `Loading ${DEFAULT_APP_NAME}`,
   detail,
   steps = [],
   lastConnectedAt,
+  brandLogoDataUrl = '',
+  appName = DEFAULT_APP_NAME,
 }: {
   title?: string;
   detail?: string;
   steps?: Array<{ label: string; status: 'active' | 'complete' | 'warning' | 'waiting'; detail?: string }>;
   lastConnectedAt?: number | null;
+  brandLogoDataUrl?: string;
+  appName?: string;
 }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
       <div className="text-center">
         <div className="shield-app-icon-loader mx-auto mb-4">
-          <img src={withAppBase('/shield-splash-logo.png')} alt="SHIELD" />
+          <img src={getBrandLogoSrc(brandLogoDataUrl)} alt={appName} />
         </div>
         <p className="text-sm font-bold uppercase tracking-[0.24em] text-accent">{title}</p>
         <div className="shield-loading-bar mx-auto mt-4" aria-hidden="true">
@@ -1377,7 +1395,7 @@ function ShieldLoading({
   );
 }
 
-function ConnectionLostOverlay({ lastConnectedAt }: { lastConnectedAt: number | null }) {
+function ConnectionLostOverlay({ lastConnectedAt, appName }: { lastConnectedAt: number | null; appName: string }) {
   return (
     <div className="fixed inset-0 z-[260] flex items-center justify-center bg-gray-950/72 px-4 backdrop-blur-[2px]">
       <div className="w-full max-w-sm rounded-lg border border-white/10 bg-white p-6 text-center shadow-[0_28px_80px_rgba(15,23,42,0.45)] dark:bg-gray-950">
@@ -1387,7 +1405,7 @@ function ConnectionLostOverlay({ lastConnectedAt }: { lastConnectedAt: number | 
         <p className="text-sm font-bold uppercase tracking-[0.22em] text-danger">Connection Lost</p>
         <h2 className="mt-2 text-2xl font-bold text-primary-500 dark:text-blue-100">Reconnecting...</h2>
         <p className="mt-3 text-sm leading-6 text-gray-500 dark:text-gray-400">
-          SHIELD cannot reach the API right now. Your session is being kept open while we try again.
+          {appName} cannot reach the API right now. Your session is being kept open while we try again.
         </p>
         <p className="mt-4 rounded bg-gray-50 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-500 dark:bg-gray-900 dark:text-gray-400">
           Last connected {formatConnectionTime(lastConnectedAt)}
@@ -3310,7 +3328,7 @@ function GlobalCommandPalette({
         {
           id: 'admin',
           label: 'Admin Console',
-          detail: 'Open Shield administration.',
+          detail: 'Open administration.',
           keywords: ['settings', 'manage', 'administrator'],
           icon: Shield,
           action: () => navigate(`/admin/${defaultAdminConsoleTab}`),
@@ -3627,7 +3645,7 @@ function NotFoundPage() {
         <p className="text-sm font-bold uppercase tracking-[0.18em] text-accent">404</p>
         <h1 className="mt-2 text-3xl font-bold text-primary-500 dark:text-blue-100">Page Not Found</h1>
         <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-gray-500 dark:text-gray-400">
-          This page does not exist in SHIELD, or it may have moved.
+          This page does not exist, or it may have moved.
         </p>
         <NavLink to="/" className="btn-primary mt-6 inline-flex">
           Back to Dashboard
@@ -3710,10 +3728,10 @@ function DesktopUpdatePrompt({
             </span>
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.14em] text-accent">Desktop Update</p>
-              <h2 className="mt-1 text-xl font-black text-gray-900 dark:text-gray-100">Shield needs an update</h2>
+              <h2 className="mt-1 text-xl font-black text-gray-900 dark:text-gray-100">Desktop app needs an update</h2>
               <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
                 This workstation is running {installedVersion ? `version ${installedVersion}` : 'an older desktop version'}.
-                Shield is preparing {targetVersionLabel} and will restart automatically when it is ready.
+                The desktop app is preparing {targetVersionLabel} and will restart automatically when it is ready.
               </p>
             </div>
           </div>
@@ -3734,7 +3752,7 @@ function DesktopUpdatePrompt({
           </div>
           <p className="mt-3 flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400">
             <AlertTriangle size={14} className="mt-0.5 shrink-0 text-accent" />
-            <span>{isDownloaded || isRestarting ? 'Save any in-progress work now. Shield is ready to finish installing.' : 'You can keep working while the update downloads.'}</span>
+            <span>{isDownloaded || isRestarting ? 'Save any in-progress work now. The desktop app is ready to finish installing.' : 'You can keep working while the update downloads.'}</span>
           </p>
         </div>
 
@@ -3917,7 +3935,7 @@ const onboardingSteps: OnboardingStep[] = [
     target: 'workspace',
     eyebrow: 'Start Here',
     title: 'Your daily workspace',
-    body: 'The dashboard is the first stop for pinned people, your day, quick notes, updates, news, and the main work happening across SHIELD.',
+    body: 'The dashboard is the first stop for pinned people, your day, quick notes, updates, news, and the main work happening across the app.',
   },
   {
     target: 'workspace',
@@ -3949,7 +3967,7 @@ const onboardingSteps: OnboardingStep[] = [
     target: 'quick-notes',
     eyebrow: 'Quick Notes',
     title: 'Capture working notes',
-    body: 'Quick Notes is your private sticky-note board. Add notes, move them around, and SHIELD saves the layout automatically.',
+    body: 'Quick Notes is your private sticky-note board. Add notes, move them around, and the app saves the layout automatically.',
   },
   {
     target: 'dashboard-news',
@@ -4337,7 +4355,7 @@ function WelcomeSplash({
                 </div>
               </div>
               <div className="relative rounded-lg border border-white/15 bg-white/10 p-4 backdrop-blur">
-                <p className="text-sm font-bold">SHIELD is ready</p>
+                <p className="text-sm font-bold">Workspace is ready</p>
                 <p className="mt-2 text-sm leading-6 text-blue-100">
                   Your secure workspace is set up. The guide will walk you through the areas that matter first.
                 </p>
@@ -4346,7 +4364,7 @@ function WelcomeSplash({
           </div>
 
           <div className="p-7 sm:p-9">
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-accent">Welcome to SHIELD</p>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-accent">Welcome</p>
             <h1 className="mt-3 text-4xl font-extrabold leading-tight tracking-normal text-gray-950 dark:text-white sm:text-5xl">
               Welcome, {welcomeName}
             </h1>
@@ -4354,7 +4372,7 @@ function WelcomeSplash({
               Before you start working, take a quick guided tour of the dashboard, navigation, notifications, messages, settings, and quick launch dock.
             </p>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-              SHIELD is in beta. If something feels off, use Report a Bug so admins can review and track it.
+              This app is in beta. If something feels off, use Report a Bug so admins can review and track it.
             </p>
 
             <div className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -4488,7 +4506,7 @@ function UrgentAlertModal({
           </p>
 
           <div className="mt-5 rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
-            Sent by <span className="font-bold">{alert.createdByName || 'SHIELD'}</span> on {new Date(alert.createdAt).toLocaleString()}.
+            Sent by <span className="font-bold">{alert.createdByName || DEFAULT_APP_NAME}</span> on {new Date(alert.createdAt).toLocaleString()}.
           </div>
         </div>
 
@@ -4537,8 +4555,11 @@ function getDefaultSetupEnvironment(status: SetupStatus | null): SetupEnvironmen
 function getDefaultSetupPayload(status: SetupStatus | null): CompleteSetupPayload {
   const inferredApiUrl = getApiHealthUrl().replace(/\/health$/u, '/api');
   return {
-    appName: status?.appName || 'SHIELD',
-    siteName: status?.siteName || 'SHIELD Workspace',
+    appName: status?.appName || DEFAULT_APP_NAME,
+    siteName: status?.siteName || DEFAULT_SITE_NAME,
+    brandLogoDataUrl: status?.brandLogoDataUrl || '',
+    primaryColor: status?.primaryColor || DEFAULT_PRIMARY_COLOR,
+    secondaryColor: status?.secondaryColor || DEFAULT_SECONDARY_COLOR,
     appBaseUrl: status?.appBaseUrl || `${window.location.origin}${APP_BASE_PATH}`,
     apiUrl: status?.apiUrl || inferredApiUrl,
     registrationMode: status?.registrationMode || 'invite-only',
@@ -4583,7 +4604,7 @@ function SetupWizard({
   onToast,
 }: {
   status: SetupStatus | null;
-  onComplete: (account: AuthAccount, settings: Pick<CompleteSetupPayload, 'appName' | 'siteName' | 'appBaseUrl' | 'apiUrl' | 'registrationMode' | 'features'>) => void;
+  onComplete: (account: AuthAccount, settings: Pick<CompleteSetupPayload, 'appName' | 'siteName' | 'brandLogoDataUrl' | 'primaryColor' | 'secondaryColor' | 'appBaseUrl' | 'apiUrl' | 'registrationMode' | 'features'>) => void;
   onToast: (type: ToastType, message: string) => void;
 }) {
   const [step, setStep] = useState(0);
@@ -4709,6 +4730,35 @@ function SetupWizard({
     }));
   };
 
+  const handleLogoFileChange = (file: File | null) => {
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setError('Choose an image file for the app logo.');
+      return;
+    }
+
+    if (file.size > MAX_SETUP_LOGO_SIZE_BYTES) {
+      setError('Logo image must be 240 KB or smaller.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      if (!result.startsWith('data:image/')) {
+        setError('Logo image could not be read.');
+        return;
+      }
+      setError(null);
+      updateForm('brandLogoDataUrl', result);
+    };
+    reader.onerror = () => setError('Logo image could not be read.');
+    reader.readAsDataURL(file);
+  };
+
   const validateCurrentStep = (): string | null => {
     if (step === 0 && !status?.database.connected) {
       return 'Save the environment settings, restart the backend, and return to this installer once the database connects.';
@@ -4727,6 +4777,9 @@ function SetupWizard({
       }
       if (!/^https?:\/\//iu.test(form.apiUrl.trim())) {
         return 'API URL must start with http:// or https://.';
+      }
+      if (!/^#[0-9a-f]{6}$/iu.test(form.primaryColor) || !/^#[0-9a-f]{6}$/iu.test(form.secondaryColor)) {
+        return 'Choose valid primary and secondary colors.';
       }
     }
 
@@ -4781,6 +4834,9 @@ function SetupWizard({
       onComplete(response.data.account, {
         appName: form.appName,
         siteName: form.siteName,
+        brandLogoDataUrl: form.brandLogoDataUrl,
+        primaryColor: form.primaryColor,
+        secondaryColor: form.secondaryColor,
         appBaseUrl: form.appBaseUrl,
         apiUrl: form.apiUrl,
         registrationMode: form.registrationMode,
@@ -4802,7 +4858,7 @@ function SetupWizard({
           </div>
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-accent">First Run Installation</p>
-            <h1 className="text-3xl font-bold text-white">Configure SHIELD</h1>
+            <h1 className="text-3xl font-bold text-white">Configure {form.appName || DEFAULT_APP_NAME}</h1>
           </div>
         </div>
 
@@ -4834,7 +4890,7 @@ function SetupWizard({
               <div className="space-y-4">
                 <div>
                   <h2 className="text-2xl font-bold text-primary-500 dark:text-blue-100">Environment And Database</h2>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Fill out the backend `.env` values used by SHIELD. Database changes require a backend restart.</p>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Fill out the backend `.env` values used by this app. Database changes require a backend restart.</p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
@@ -5014,6 +5070,46 @@ function SetupWizard({
                     <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Site Name</span>
                     <input value={form.siteName} onChange={(event) => updateForm('siteName', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
                   </label>
+                  <div className="md:col-span-2">
+                    <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">App Logo</span>
+                    <div className="flex flex-wrap items-center gap-4 rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
+                      <div className="flex h-20 w-20 items-center justify-center rounded border border-gray-200 bg-white p-2 shadow-sm dark:border-gray-700">
+                        {form.brandLogoDataUrl ? (
+                          <img src={form.brandLogoDataUrl} alt="App logo preview" className="h-full w-full object-contain" />
+                        ) : (
+                          <img src={withAppBase(DEFAULT_BRAND_LOGO)} alt="Default logo preview" className="h-full w-full object-contain" />
+                        )}
+                      </div>
+                      <div className="min-w-[14rem] flex-1">
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                          onChange={(event) => handleLogoFileChange(event.target.files?.[0] || null)}
+                          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                        />
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">PNG, JPG, WebP, GIF, or SVG. Max 240 KB.</p>
+                      </div>
+                      {form.brandLogoDataUrl && (
+                        <button type="button" onClick={() => updateForm('brandLogoDataUrl', '')} className="btn-secondary">
+                          Use Default
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Primary Color</span>
+                    <div className="flex items-center gap-3">
+                      <input type="color" value={/^#[0-9a-f]{6}$/iu.test(form.primaryColor) ? form.primaryColor : DEFAULT_PRIMARY_COLOR} onChange={(event) => updateForm('primaryColor', event.target.value)} className="h-11 w-14 rounded border border-gray-300 bg-white p-1 dark:border-gray-700 dark:bg-gray-950" />
+                      <input value={form.primaryColor} onChange={(event) => updateForm('primaryColor', event.target.value)} className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                    </div>
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Secondary Color</span>
+                    <div className="flex items-center gap-3">
+                      <input type="color" value={/^#[0-9a-f]{6}$/iu.test(form.secondaryColor) ? form.secondaryColor : DEFAULT_SECONDARY_COLOR} onChange={(event) => updateForm('secondaryColor', event.target.value)} className="h-11 w-14 rounded border border-gray-300 bg-white p-1 dark:border-gray-700 dark:bg-gray-950" />
+                      <input value={form.secondaryColor} onChange={(event) => updateForm('secondaryColor', event.target.value)} className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                    </div>
+                  </label>
                   <label>
                     <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Application URL</span>
                     <input value={form.appBaseUrl} onChange={(event) => updateForm('appBaseUrl', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
@@ -5138,8 +5234,11 @@ function App() {
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const [isSetupLoading, setIsSetupLoading] = useState(true);
   const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
-  const appName = setupStatus?.appName || 'SHIELD';
-  const siteName = setupStatus?.siteName || 'Agency User Search';
+  const appName = setupStatus?.appName || DEFAULT_APP_NAME;
+  const siteName = setupStatus?.siteName || DEFAULT_SITE_NAME;
+  const brandLogoDataUrl = setupStatus?.brandLogoDataUrl || '';
+  const primaryColor = setupStatus?.primaryColor || DEFAULT_PRIMARY_COLOR;
+  const secondaryColor = setupStatus?.secondaryColor || DEFAULT_SECONDARY_COLOR;
   const [isApiConnectionLost, setIsApiConnectionLost] = useState(false);
   const [lastApiConnectedAt, setLastApiConnectedAt] = useState<number | null>(Date.now());
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -5280,6 +5379,11 @@ function App() {
   useEffect(() => {
     document.title = `${appName} - ${siteName}`;
   }, [appName, siteName]);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--app-primary', primaryColor);
+    document.documentElement.style.setProperty('--app-secondary', secondaryColor);
+  }, [primaryColor, secondaryColor]);
 
   useEffect(() => {
     if (!isAuthenticated || !currentUser || currentUser.presenceHidden) {
@@ -5567,33 +5671,33 @@ function App() {
       if (status.type === 'available') {
         setDesktopPreferences((preferences) => preferences ? { ...preferences, updateDownloaded: false } : preferences);
         setIsDesktopUpdatePromptOpen(true);
-        showToast('info', status.version ? `Shield desktop update ${status.version} is downloading.` : 'A Shield desktop update is downloading.', { saveToNotifications: false });
+        showToast('info', status.version ? `${appName} desktop update ${status.version} is downloading.` : `A ${appName} desktop update is downloading.`, { saveToNotifications: false });
         desktopUpdateCheckIsManualRef.current = false;
       }
 
       if (status.type === 'downloaded') {
         setDesktopPreferences((preferences) => preferences ? { ...preferences, updateDownloaded: true } : preferences);
         setIsDesktopUpdatePromptOpen(true);
-        showToast('success', 'Shield desktop update downloaded. Shield will restart automatically.', { saveToNotifications: false });
+        showToast('success', `${appName} desktop update downloaded. ${appName} will restart automatically.`, { saveToNotifications: false });
         desktopUpdateCheckIsManualRef.current = false;
       }
 
       if (status.type === 'restarting') {
         setIsDesktopStartupUpdateBlocking(true);
         setIsDesktopUpdatePromptOpen(true);
-        showToast('info', 'Restarting Shield to install the desktop update...', { saveToNotifications: false });
+        showToast('info', `Restarting ${appName} to install the desktop update...`, { saveToNotifications: false });
       }
 
       if (status.type === 'not-available') {
         if (desktopUpdateCheckIsManualRef.current) {
-          showToast('success', 'Shield desktop is up to date.', { saveToNotifications: false });
+          showToast('success', `${appName} desktop is up to date.`, { saveToNotifications: false });
         }
       }
 
       if (status.type === 'error') {
         console.error('Desktop update error:', status.message);
         if (desktopUpdateCheckIsManualRef.current) {
-          showToast('error', 'Failed to check for Shield desktop updates.', { saveToNotifications: false });
+          showToast('error', `Failed to check for ${appName} desktop updates.`, { saveToNotifications: false });
         }
       }
 
@@ -5610,7 +5714,7 @@ function App() {
 
     return window.shieldDesktop?.onWebAppUpdateStatus?.((status) => {
       if (status.type === 'reloading') {
-        showToast('info', 'Shield web updates were found. Refreshing desktop view...', { saveToNotifications: false });
+        showToast('info', `${appName} web updates were found. Refreshing desktop view...`, { saveToNotifications: false });
       }
     });
   }, []);
@@ -5625,7 +5729,7 @@ function App() {
       if (preferences) {
         setDesktopPreferences(preferences);
       }
-      showToast('success', startWithWindows ? 'Shield will start with Windows.' : 'Shield will not start with Windows.', { saveToNotifications: false });
+      showToast('success', startWithWindows ? `${appName} will start with Windows.` : `${appName} will not start with Windows.`, { saveToNotifications: false });
     } catch (error) {
       console.error('Failed to update startup preference:', error);
       showToast('error', 'Failed to update startup preference.', { saveToNotifications: false });
@@ -5642,7 +5746,7 @@ function App() {
       if (preferences) {
         setDesktopPreferences(preferences);
       }
-      showToast('success', trayMode ? 'Shield will minimize to the system tray.' : 'Shield will close normally.', { saveToNotifications: false });
+      showToast('success', trayMode ? `${appName} will minimize to the system tray.` : `${appName} will close normally.`, { saveToNotifications: false });
     } catch (error) {
       console.error('Failed to update tray preference:', error);
       showToast('error', 'Failed to update tray preference.', { saveToNotifications: false });
@@ -5664,7 +5768,7 @@ function App() {
 
   const handleOpenDesktopDiagnostics = async () => {
     if (!hasShieldDesktopFeature('openDesktopLogs')) {
-      showToast('info', 'Install the latest Shield desktop app to access diagnostics logs.', { saveToNotifications: false });
+      showToast('info', `Install the latest ${appName} desktop app to access diagnostics logs.`, { saveToNotifications: false });
       return;
     }
 
@@ -5690,7 +5794,7 @@ function App() {
 
   const handleCheckForDesktopUpdates = async () => {
     if (!hasShieldDesktopFeature('checkForUpdates')) {
-      showToast('info', 'Install the latest Shield desktop app to use in-app update checks.', { saveToNotifications: false });
+      showToast('info', `Install the latest ${appName} desktop app to use in-app update checks.`, { saveToNotifications: false });
       return;
     }
 
@@ -5702,7 +5806,7 @@ function App() {
         showToast('error', result.message || 'Desktop update check is not available.', { saveToNotifications: false });
         return;
       }
-      showToast('info', 'Checking for Shield desktop updates...', { saveToNotifications: false });
+      showToast('info', `Checking for ${appName} desktop updates...`, { saveToNotifications: false });
     } catch (error) {
       desktopUpdateCheckIsManualRef.current = false;
       console.error('Failed to check for desktop updates:', error);
@@ -5897,7 +6001,7 @@ function App() {
     playReminderAlarmSound();
     if (messagePreferences.browserNotifications) {
       showSystemNotification(dueReminders.length === 1 ? `Reminder: ${dueReminders[0].title}` : `${dueReminders.length} reminders due`, {
-        body: dueReminders.length === 1 ? formatReminderDueAt(dueReminders[0]) : 'Open Shield to review your due reminders.',
+        body: dueReminders.length === 1 ? formatReminderDueAt(dueReminders[0]) : `Open ${appName} to review your due reminders.`,
         tag: dueReminders.length === 1 ? `shield-reminder-${dueReminders[0].id}` : 'shield-reminders-due',
         appPath: '/',
       });
@@ -6415,7 +6519,7 @@ function App() {
           if (messagePreferences.browserNotifications) {
             const newestUnread = response.data.find((message) => !message.isRead);
             showSystemNotification(newestUnread?.senderName ? `New message from ${newestUnread.senderName}` : 'New message', {
-              body: newestUnread?.body ? getPlainNotificationMessage(newestUnread.body).slice(0, 140) : 'Open Shield to view your message.',
+              body: newestUnread?.body ? getPlainNotificationMessage(newestUnread.body).slice(0, 140) : `Open ${appName} to view your message.`,
               tag: 'shield-new-message',
               appPath: '/messages',
             });
@@ -7073,8 +7177,8 @@ function App() {
 
     if (isShieldDesktopApp()) {
       setMessagePreferences((preferences) => ({ ...preferences, browserNotifications: true }));
-      showSystemNotification('Shield notifications enabled', {
-        body: 'You will receive Windows notifications for new messages and due reminders while Shield is open.',
+      showSystemNotification(`${appName} notifications enabled`, {
+        body: `You will receive Windows notifications for new messages and due reminders while ${appName} is open.`,
         tag: 'shield-desktop-notifications-enabled',
       });
       return;
@@ -7101,10 +7205,10 @@ function App() {
     }
 
     setMessagePreferences((preferences) => ({ ...preferences, browserNotifications: true }));
-    showSystemNotification('Shield notifications enabled', {
+    showSystemNotification(`${appName} notifications enabled`, {
       body: isShieldDesktopApp()
-        ? 'You will receive Windows notifications for new messages and due reminders while Shield is open.'
-        : 'You will receive browser notifications for new messages and due reminders while Shield is open.',
+        ? `You will receive Windows notifications for new messages and due reminders while ${appName} is open.`
+        : `You will receive browser notifications for new messages and due reminders while ${appName} is open.`,
       tag: 'shield-browser-notifications-enabled',
     });
   };
@@ -7274,7 +7378,7 @@ function App() {
         handleAccountUpdate(response.data.account);
       }
       window.dispatchEvent(new CustomEvent('shield:dashboard-updated'));
-      showToast('success', 'Welcome to Shield\nFor completing the Shield guide walkthrough.');
+      showToast('success', `Welcome to ${appName}\nFor completing the guide walkthrough.`);
       setShowConfetti(true);
     } catch (err) {
       console.error(err);
@@ -7369,11 +7473,11 @@ function App() {
       }
 
       if (desktopUpdateStatus?.type === 'downloaded') {
-        return 'Desktop update downloaded. Restarting SHIELD...';
+        return `Desktop update downloaded. Restarting ${appName}...`;
       }
 
       if (desktopUpdateStatus?.type === 'restarting') {
-        return 'Restarting SHIELD to install the update...';
+        return `Restarting ${appName} to install the update...`;
       }
 
       return 'Checking for desktop updates...';
@@ -7447,9 +7551,11 @@ function App() {
       )}
       {isDesktopStartupUpdateBlocking || isSetupLoading || isSessionLoading ? (
         <ShieldLoading
-          title="Loading SHIELD"
+          title={`Loading ${appName}`}
           detail={loadingDetail}
           steps={loadingSteps}
+          brandLogoDataUrl={brandLogoDataUrl}
+          appName={appName}
         />
       ) : setupStatus?.setupRequired ? (
         <SetupWizard
@@ -7463,6 +7569,9 @@ function App() {
               accountCount: Math.max(1, currentStatus.accountCount),
               appName: settings.appName,
               siteName: settings.siteName,
+              brandLogoDataUrl: settings.brandLogoDataUrl,
+              primaryColor: settings.primaryColor,
+              secondaryColor: settings.secondaryColor,
               appBaseUrl: settings.appBaseUrl,
               apiUrl: settings.apiUrl,
               registrationMode: settings.registrationMode,
@@ -7475,7 +7584,7 @@ function App() {
       ) : setupStatus?.installed && getAppRelativePathname() === '/install' ? (
         <InstalledSetupClosedScreen appName={appName} siteName={siteName} />
       ) : !isAuthenticated ? (
-        <LoginSplash onLogin={handleLogin} onToast={showToast} appName={appName} siteName={siteName} isExiting={isLoginTransitioning} />
+        <LoginSplash onLogin={handleLogin} onToast={showToast} appName={appName} siteName={siteName} brandLogoDataUrl={brandLogoDataUrl} isExiting={isLoginTransitioning} />
       ) : (
         <div className="animate-app-enter flex h-[100dvh] overflow-hidden bg-gray-50 dark:bg-gray-950">
           <aside className={`relative hidden h-[100dvh] shrink-0 overflow-visible bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 md:block ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
@@ -7492,8 +7601,8 @@ function App() {
             <div className="flex h-16 shrink-0 items-center border-b border-white/10 px-4 dark:border-gray-800">
               {!isSidebarCollapsed && (
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded bg-white text-primary-500">
-                    <Shield size={20} />
+                  <div className="flex h-9 w-9 items-center justify-center rounded bg-white p-1 text-primary-500">
+                    {brandLogoDataUrl ? <img src={brandLogoDataUrl} alt="" className="h-full w-full object-contain" /> : <Shield size={20} />}
                   </div>
                   <div>
                     <h1 className="text-xl font-bold tracking-wider text-white">{appName}</h1>
@@ -7502,8 +7611,8 @@ function App() {
                 </div>
               )}
               {isSidebarCollapsed && (
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded bg-white text-primary-500">
-                  <Shield size={22} />
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded bg-white p-1 text-primary-500">
+                  {brandLogoDataUrl ? <img src={brandLogoDataUrl} alt={appName} className="h-full w-full object-contain" /> : <Shield size={22} />}
                 </div>
               )}
             </div>
@@ -8332,9 +8441,9 @@ function App() {
             />
           )}
           {shouldShowForcedPasswordModal && currentUser && (
-            <ForcePasswordChange account={currentUser} onChanged={handleAccountUpdate} onLogout={handleLogout} onToast={showToast} />
+            <ForcePasswordChange account={currentUser} onChanged={handleAccountUpdate} onLogout={handleLogout} onToast={showToast} appName={appName} />
           )}
-          {isApiConnectionLost && <ConnectionLostOverlay lastConnectedAt={lastApiConnectedAt} />}
+          {isApiConnectionLost && <ConnectionLostOverlay lastConnectedAt={lastApiConnectedAt} appName={appName} />}
           {isAppLocked && currentUser && (
             <LockScreen
               account={currentUser}

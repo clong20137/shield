@@ -454,11 +454,11 @@ export function AccountSettingsPage({
     }
 
     if (desktopUpdateStatus?.type === 'downloaded' || desktopUpdateStatus?.type === 'restarting') {
-      return 'Update downloaded. Shield will restart automatically.';
+      return 'Update downloaded. The desktop app will restart automatically.';
     }
 
     if (desktopUpdateStatus?.type === 'not-available') {
-      return 'Shield desktop is up to date.';
+      return 'Desktop app is up to date.';
     }
 
     if (desktopUpdateStatus?.type === 'error') {
@@ -470,7 +470,7 @@ export function AccountSettingsPage({
     }
 
     return desktopPreferences?.updateConfigured
-      ? 'Shield checks for desktop updates automatically.'
+      ? 'The desktop app checks for updates automatically.'
       : 'Check for updates from this app. Newer desktop controls appear after the latest desktop update is installed.';
   })();
 
@@ -829,7 +829,7 @@ export function AccountSettingsPage({
             </div>
             <div>
               <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Assigned Devices</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Devices currently assigned to your SHIELD account.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Devices currently assigned to your account.</p>
             </div>
           </div>
 
@@ -889,7 +889,7 @@ export function AccountSettingsPage({
             />
             <PreferenceToggle
               title="Browser notifications"
-              description="Show Windows/browser notifications for new messages and due reminders while Shield is open."
+              description="Show Windows/browser notifications for new messages and due reminders while the app is open."
               checked={messagePreferences.browserNotifications}
               onChange={onBrowserNotificationsChange}
             />
@@ -968,7 +968,7 @@ export function AccountSettingsPage({
             </label>
           </PreferenceGroup>
 
-          <PreferenceGroup title="Desktop App" description={isDesktopApp ? 'Manage the Shield desktop app on this workstation.' : 'Install the desktop version of Shield on this workstation.'}>
+          <PreferenceGroup title="Desktop App" description={isDesktopApp ? 'Manage the desktop app on this workstation.' : 'Install the desktop version on this workstation.'}>
             <div className="rounded border border-gray-200 p-4 dark:border-gray-800">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-start gap-3">
@@ -976,9 +976,9 @@ export function AccountSettingsPage({
                     <Laptop size={20} />
                   </span>
                   <div className="min-w-0">
-                    <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">Shield for Windows</h4>
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">Desktop for Windows</h4>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      {isDesktopApp ? 'You are using the installed Shield desktop app.' : 'Download the Windows desktop installer for faster access from this device.'}
+                      {isDesktopApp ? 'You are using the installed desktop app.' : 'Download the Windows desktop installer for faster access from this device.'}
                     </p>
                     {isDesktopApp && desktopPreferences?.appVersion && (
                       <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-gray-400 dark:text-gray-500">
@@ -992,7 +992,7 @@ export function AccountSettingsPage({
                     href={desktopInstallerUrl}
                     download
                     className="btn-secondary justify-center"
-                    aria-label="Download Shield desktop app"
+                    aria-label="Download desktop app"
                     title="Download Desktop App"
                   >
                     <Download size={16} />
@@ -1007,14 +1007,14 @@ export function AccountSettingsPage({
                   <>
                     <PreferenceToggle
                       title="Start with Windows"
-                      description="Launch Shield automatically when you sign in to this workstation."
+                      description="Launch the app automatically when you sign in to this workstation."
                       checked={desktopPreferences.startWithWindows}
                       onChange={onStartWithWindowsChange}
                       icon={<Power size={16} />}
                     />
                     <PreferenceToggle
                       title="Minimize to system tray"
-                      description="Keep Shield running in the tray when the desktop window is closed."
+                      description="Keep the app running in the tray when the desktop window is closed."
                       checked={desktopPreferences.trayMode}
                       onChange={onTrayModeChange}
                       icon={<Laptop size={16} />}
@@ -1045,7 +1045,7 @@ export function AccountSettingsPage({
                   type="button"
                   onClick={onCheckForDesktopUpdates}
                   className="btn-secondary justify-center"
-                  aria-label="Check for Shield desktop updates"
+                  aria-label="Check for desktop updates"
                       title="Check for Updates"
                     >
                       <RefreshCw size={16} />
@@ -1056,7 +1056,7 @@ export function AccountSettingsPage({
                       onClick={onInstallDesktopUpdate}
                       disabled={!desktopPreferences?.updateDownloaded}
                       className="btn-secondary justify-center disabled:pointer-events-none disabled:opacity-50"
-                      aria-label="Restart Shield to install desktop update"
+                      aria-label="Restart desktop app to install update"
                       title={desktopPreferences?.updateDownloaded ? 'Restart To Update' : 'No Update Ready'}
                     >
                       <RefreshCw size={16} />

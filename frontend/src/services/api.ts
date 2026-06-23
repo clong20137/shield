@@ -463,6 +463,11 @@ export type RegistrationMode = 'public' | 'invite-only' | 'disabled';
 export interface RegistrationSettings {
   mode: RegistrationMode;
   appBaseUrl: string;
+  appName?: string;
+  siteName?: string;
+  brandLogoDataUrl?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
   maintenanceMode: boolean;
   loginWarningEnabled: boolean;
   loginWarningMessage: string;
@@ -521,6 +526,9 @@ export interface SetupStatus {
   };
   appName?: string;
   siteName?: string;
+  brandLogoDataUrl?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
   apiUrl?: string;
   appBaseUrl?: string;
   registrationMode?: RegistrationMode;
@@ -531,6 +539,9 @@ export interface SetupStatus {
 export interface CompleteSetupPayload {
   appName: string;
   siteName: string;
+  brandLogoDataUrl: string;
+  primaryColor: string;
+  secondaryColor: string;
   appBaseUrl: string;
   apiUrl: string;
   registrationMode: RegistrationMode;

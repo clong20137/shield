@@ -14,7 +14,7 @@ const achievementIcons = [
   { value: 'star', label: 'Star', icon: Star },
   { value: 'medal', label: 'Medal', icon: Medal },
   { value: 'flag', label: 'Flag', icon: Flag },
-  { value: 'shield', label: 'Shield', icon: ShieldCheck },
+  { value: 'shield', label: 'Badge', icon: ShieldCheck },
   { value: 'training', label: 'Training', icon: GraduationCap },
   { value: 'service', label: 'Service', icon: BriefcaseBusiness },
   { value: 'certification', label: 'Certification', icon: BookOpenCheck },

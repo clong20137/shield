@@ -537,8 +537,8 @@ export class AuthAccountModel {
         [secret, new Date(), accountId]
       );
 
-      const label = encodeURIComponent(`SHIELD:${account.email}`);
-      const issuer = encodeURIComponent('SHIELD');
+      const label = encodeURIComponent(`Blueline:${account.email}`);
+      const issuer = encodeURIComponent('Blueline');
 
       return {
         secret,

@@ -738,7 +738,7 @@ function PermissionsPage({
             <div className="mt-2 flex flex-wrap gap-2">
               <input readOnly value={latestInvite.inviteUrl} className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
               <a
-                href={`mailto:${encodeURIComponent(latestInvite.email)}?subject=${encodeURIComponent('Your SHIELD invite')}&body=${encodeURIComponent(`Use this secure link to create your SHIELD login:\n\n${latestInvite.inviteUrl}`)}`}
+                href={`mailto:${encodeURIComponent(latestInvite.email)}?subject=${encodeURIComponent('Your Blueline invite')}&body=${encodeURIComponent(`Use this secure link to create your Blueline login:\n\n${latestInvite.inviteUrl}`)}`}
                 className="btn-primary"
                 aria-label="Email invite"
                 title="Email Invite"

@@ -45,7 +45,7 @@ if ('serviceWorker' in navigator && (window.isSecureContext || window.location.h
     const basePath = import.meta.env.BASE_URL || '/';
     const serviceWorkerUrl = `${basePath.replace(/\/?$/u, '/')}service-worker.js`;
     navigator.serviceWorker.register(serviceWorkerUrl).catch((error) => {
-      console.error('Failed to register SHIELD service worker:', error);
+      console.error('Failed to register app service worker:', error);
     });
   });
 }

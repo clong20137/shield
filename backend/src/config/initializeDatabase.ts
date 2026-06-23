@@ -582,10 +582,11 @@ export async function initializeDatabase() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS system_settings (
       \`settingKey\` VARCHAR(100) PRIMARY KEY,
-      \`settingValue\` TEXT,
+      \`settingValue\` MEDIUMTEXT,
       \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
+  await pool.query('ALTER TABLE `system_settings` MODIFY COLUMN `settingValue` MEDIUMTEXT');
 
   await pool.query(`
     INSERT IGNORE INTO system_settings (\`settingKey\`, \`settingValue\`)
@@ -623,6 +624,11 @@ export async function initializeDatabase() {
     VALUES
       ('registrationMode', 'public'),
       ('appBaseUrl', 'http://localhost:3000'),
+      ('appName', 'Blueline'),
+      ('siteName', 'Blueline Workspace'),
+      ('brandLogoDataUrl', ''),
+      ('primaryColor', '#1a365d'),
+      ('secondaryColor', '#9C865C'),
       ('maintenanceMode', 'false'),
       ('sessionTimeoutMinutes', '0'),
       ('loginWarningEnabled', 'true'),

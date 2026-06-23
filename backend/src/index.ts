@@ -300,6 +300,6 @@ initializeDatabase()
   })
   .finally(() => {
     app.listen(PORT, () => {
-      console.log(`Shield backend running on port ${PORT}`);
+    console.log(`Blueline backend running on port ${PORT}`);
     });
   });

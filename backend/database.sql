@@ -1,4 +1,4 @@
--- Create Shield Database
+-- Create Blueline Database
 CREATE DATABASE IF NOT EXISTS shield;
 USE shield;
 
