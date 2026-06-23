@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom';
 import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, Link2, List, ListOrdered, LucideIcon, MapPinned, Megaphone, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authService, AuthAccount, calendarService, CalendarEntry, DashboardReaction, dashboardPostService, DashboardPost, dashboardSummaryService, DashboardSummary, districtFeedService, DistrictFeedPost, DistrictFeedPostCategory, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
+import { authService, AuthAccount, calendarService, CalendarEntry, DashboardReaction, dashboardPostService, DashboardPost, dashboardSummaryService, DashboardSummary, districtFeedService, DistrictFeedPost, DistrictFeedPostCategory, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { UserDetail } from '../components/UserDetail';
 
@@ -1531,6 +1531,59 @@ function isProfileAway(lastSeenAt?: string | null): boolean {
   return diff >= 2 * 60 * 1000 && diff < 5 * 60 * 1000;
 }
 
+type PinnedPresenceStatus = 'active' | 'away' | 'busy';
+type PinnedPresenceState = {
+  online: boolean;
+  away: boolean;
+  status: PinnedPresenceStatus;
+  lastSeenAt: string | null;
+};
+
+function getPinnedPresence(profile: Pick<PinnedProfile, 'id' | 'lastSeenAt'>, presenceByAccount: Record<string, PinnedPresenceState>) {
+  const realtime = presenceByAccount[profile.id];
+  const online = realtime ? realtime.online : isProfileOnline(profile.lastSeenAt);
+  const away = realtime ? realtime.away : !online && isProfileAway(profile.lastSeenAt);
+  const status = realtime?.status || (away ? 'away' : online ? 'active' : 'active');
+
+  if (status === 'busy' && online) {
+    return {
+      label: 'Busy',
+      dotClass: 'bg-red-500',
+      ringClass: 'border-red-300/70 shadow-[0_0_0_1px_rgba(239,68,68,0.18)]',
+      pulseClass: 'border-red-300/50',
+      showPulse: true,
+    };
+  }
+
+  if ((status === 'away' && online) || away) {
+    return {
+      label: 'Away',
+      dotClass: 'bg-amber-400',
+      ringClass: 'border-amber-300/70 shadow-[0_0_0_1px_rgba(251,191,36,0.2)]',
+      pulseClass: 'border-amber-300/70',
+      showPulse: true,
+    };
+  }
+
+  if (online) {
+    return {
+      label: 'Active',
+      dotClass: 'bg-green-500',
+      ringClass: 'border-green-400/45 shadow-[0_0_0_1px_rgba(34,197,94,0.12)]',
+      pulseClass: 'border-green-400/45',
+      showPulse: true,
+    };
+  }
+
+  return {
+    label: 'Offline',
+    dotClass: 'bg-gray-400',
+    ringClass: 'border-gray-300/45 dark:border-gray-600/50',
+    pulseClass: '',
+    showPulse: false,
+  };
+}
+
 function isMobileViewport() {
   return window.innerWidth < 768;
 }
@@ -1564,6 +1617,7 @@ function PinnedProfilesWidget({
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [presenceByAccount, setPresenceByAccount] = useState<Record<string, PinnedPresenceState>>({});
   const pinnedRailRef = useRef<HTMLDivElement | null>(null);
   const pinSearchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -1603,6 +1657,52 @@ function PinnedProfilesWidget({
       void loadProfiles();
     }
   }, [initialProfiles, loadProfiles]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setPresenceByAccount({});
+      return undefined;
+    }
+
+    const eventSource = new EventSource(getMessageEventsUrl(), { withCredentials: true });
+    const handlePresenceUpdate = (event: MessageEvent) => {
+      try {
+        const payload = JSON.parse(event.data || '{}') as {
+          actorAccountId?: string;
+          actorOnline?: boolean;
+          actorAway?: boolean;
+          actorStatus?: PinnedPresenceStatus;
+          actorLastSeenAt?: string | null;
+        };
+
+        if (!payload.actorAccountId) {
+          return;
+        }
+
+        setPresenceByAccount((current) => ({
+          ...current,
+          [payload.actorAccountId as string]: {
+            online: payload.actorOnline === true,
+            away: payload.actorAway === true,
+            status: payload.actorStatus || 'active',
+            lastSeenAt: payload.actorLastSeenAt || null,
+          },
+        }));
+      } catch (err) {
+        console.error('Failed to parse pinned profile presence update:', err);
+      }
+    };
+
+    eventSource.addEventListener('presence-updated', handlePresenceUpdate);
+    eventSource.addEventListener('error', (event) => {
+      console.error('Pinned profile presence connection error:', event);
+    });
+
+    return () => {
+      eventSource.removeEventListener('presence-updated', handlePresenceUpdate);
+      eventSource.close();
+    };
+  }, [currentUser?.id]);
 
   useEffect(() => {
     const trimmedQuery = query.trim();
@@ -1727,15 +1827,14 @@ function PinnedProfilesWidget({
                 <span className="text-sm font-bold">Add Profile</span>
               </button>
             </div>
-            {profiles.map((profile) => (
+            {profiles.map((profile) => {
+              const presence = getPinnedPresence(profile, presenceByAccount);
+              return (
               <article key={profile.id} className="group relative w-28 shrink-0 snap-start rounded-lg border border-gray-200 bg-gray-50 p-3 text-center transition hover:-translate-y-1 hover:scale-[1.04] hover:border-accent hover:bg-white hover:shadow-lg dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900 sm:w-32">
                 <button type="button" onClick={() => onOpenProfile(profile)} className="block w-full" aria-label={`Open ${profile.firstName} ${profile.lastName}`}>
                   <span className="relative mx-auto block h-16 w-16 rounded-full sm:h-[4.5rem] sm:w-[4.5rem]">
-                    {isProfileOnline(profile.lastSeenAt) && (
-                      <span className="pointer-events-none absolute -inset-1 rounded-full border border-green-400/45 shadow-[0_0_0_1px_rgba(34,197,94,0.12)] shield-online-pulse" />
-                    )}
-                    {isProfileAway(profile.lastSeenAt) && (
-                      <span className="pointer-events-none absolute -inset-1 rounded-full border border-amber-300/70 shadow-[0_0_0_1px_rgba(251,191,36,0.2)] shield-online-pulse" />
+                    {presence.showPulse && (
+                      <span className={`pointer-events-none absolute -inset-1 rounded-full border shadow-[0_0_0_1px_rgba(15,23,42,0.12)] shield-online-pulse ${presence.pulseClass}`} />
                     )}
                     <span className="relative block h-full w-full overflow-hidden rounded-full border-2 border-white bg-primary-500 shadow group-hover:ring-4 group-hover:ring-accent/20">
                       {profile.profilePictureUrl ? (
@@ -1746,14 +1845,19 @@ function PinnedProfilesWidget({
                         </span>
                       )}
                     </span>
+                    <span className="absolute bottom-0 right-0 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow ring-1 ring-black/10 dark:bg-gray-950 dark:ring-white/10" title={presence.label} aria-label={presence.label}>
+                      <span className={`h-3 w-3 rounded-full ${presence.dotClass}`} />
+                    </span>
                   </span>
                   <span className="mt-2 block truncate text-sm font-bold text-gray-900 dark:text-gray-100">{profile.firstName} {profile.lastName}</span>
+                  <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">{presence.label}</span>
                 </button>
                 <button type="button" onClick={() => void unpinProfile(profile.id)} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-danger text-white opacity-100 shadow-sm hover:bg-red-800 sm:opacity-0 sm:group-hover:opacity-100" aria-label={`Unpin ${profile.firstName} ${profile.lastName}`} title="Unpin">
                   <PinOff size={14} />
                 </button>
               </article>
-            ))}
+            );
+            })}
           </div>
           {isAddPopoverOpen && (
             <div className="absolute left-1 top-2 z-30 w-[min(22rem,calc(100vw-3rem))] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900 sm:left-12">
