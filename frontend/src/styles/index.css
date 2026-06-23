@@ -1359,20 +1359,35 @@
   }
 
   .header-action-button.header-action-button {
-    color: rgb(255, 255, 255) !important;
+    color: var(--app-primary) !important;
   }
 
   .header-action-button.header-action-button:hover,
   .header-action-button.header-action-button:focus-visible {
-    color: rgb(255, 255, 255) !important;
+    color: var(--app-primary) !important;
   }
 
   .header-action-button.header-action-button svg {
+    color: var(--app-primary) !important;
+    stroke: var(--app-primary) !important;
+  }
+
+  .header-action-button.header-action-button [stroke] {
+    stroke: var(--app-primary) !important;
+  }
+
+  .dark .header-action-button.header-action-button,
+  .dark .header-action-button.header-action-button:hover,
+  .dark .header-action-button.header-action-button:focus-visible {
+    color: rgb(255, 255, 255) !important;
+  }
+
+  .dark .header-action-button.header-action-button svg {
     color: rgb(255, 255, 255) !important;
     stroke: rgb(255, 255, 255) !important;
   }
 
-  .header-action-button.header-action-button [stroke] {
+  .dark .header-action-button.header-action-button [stroke] {
     stroke: rgb(255, 255, 255) !important;
   }
 
