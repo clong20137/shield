@@ -5248,6 +5248,11 @@ function App() {
         awayPresenceTimerRef.current = null;
       }
       awayPresenceStateRef.current = 'active';
+      if (hasShieldDesktopFeature('setPresenceStatus')) {
+        window.shieldDesktop?.setPresenceStatus?.('active').catch((error) => {
+          console.error('Failed to update desktop presence status:', error);
+        });
+      }
       return undefined;
     }
 
@@ -5257,6 +5262,11 @@ function App() {
       }
 
       awayPresenceStateRef.current = status;
+      if (hasShieldDesktopFeature('setPresenceStatus')) {
+        window.shieldDesktop?.setPresenceStatus?.(status).catch((error) => {
+          console.error('Failed to update desktop presence status:', error);
+        });
+      }
       const requestId = awayPresenceRequestRef.current + 1;
       awayPresenceRequestRef.current = requestId;
       messageService.updatePresence(status).catch((error) => {

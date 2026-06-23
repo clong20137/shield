@@ -646,6 +646,20 @@ function sendDesktopIdleStatus(status, idleSeconds) {
   }
 }
 
+function setDesktopPresenceStatus(status, options = {}) {
+  if (!['active', 'away', 'busy'].includes(status)) {
+    return desktopPresenceStatus;
+  }
+
+  if (!options.force && status === desktopPresenceStatus) {
+    return desktopPresenceStatus;
+  }
+
+  desktopPresenceStatus = status;
+  updateUnreadBadge(desktopUnreadCount);
+  return desktopPresenceStatus;
+}
+
 function checkDesktopIdleStatus({ force = false } = {}) {
   if (!mainWindow || mainWindow.isDestroyed()) {
     return;
@@ -657,9 +671,8 @@ function checkDesktopIdleStatus({ force = false } = {}) {
   const nextStatus = isWindowActive ? (idleState === 'active' ? 'active' : 'away') : 'busy';
 
   if (force || nextStatus !== desktopPresenceStatus) {
-    desktopPresenceStatus = nextStatus;
     sendDesktopIdleStatus(nextStatus, idleSeconds);
-    updateUnreadBadge(desktopUnreadCount);
+    setDesktopPresenceStatus(nextStatus, { force });
   }
 }
 
@@ -683,21 +696,21 @@ function registerPowerMonitorEvents() {
   powerMonitor.on('resume', () => checkDesktopIdleStatus({ force: true }));
   powerMonitor.on('unlock-screen', () => checkDesktopIdleStatus({ force: true }));
   powerMonitor.on('lock-screen', () => {
-    desktopPresenceStatus = 'busy';
     sendDesktopIdleStatus('busy', powerMonitor.getSystemIdleTime());
+    setDesktopPresenceStatus('busy', { force: true });
   });
 }
 
-function getPresenceRingColor(status) {
+function getPresenceDotColor(status) {
   switch (status) {
     case 'active':
-      return '#16a34a';
+      return '#22c55e';
     case 'away':
-      return '#f59e0b';
+      return '#facc15';
     case 'busy':
-      return '#dc2626';
+      return '#ef4444';
     default:
-      return '#16a34a';
+      return '#22c55e';
   }
 }
 
@@ -735,24 +748,25 @@ function stopWebAppUpdateChecks() {
 }
 
 function createBadgeOverlay(count, status) {
-  const presenceColor = getPresenceRingColor(status || 'active');
+  const presenceColor = getPresenceDotColor(status || 'active');
   const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0;
   const label = safeCount > 99 ? '99+' : String(safeCount);
 
   if (safeCount === 0) {
     const statusSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-      <circle cx="16" cy="16" r="15" fill="transparent"/>
-      <circle cx="16" cy="16" r="14" fill="none" stroke="${presenceColor}" stroke-width="3"/>
-      <circle cx="16" cy="16" r="4" fill="${presenceColor}" opacity="0.85"/>
+      <rect width="32" height="32" fill="transparent"/>
+      <circle cx="21" cy="21" r="8.5" fill="#ffffff"/>
+      <circle cx="21" cy="21" r="6.5" fill="${presenceColor}"/>
     </svg>`;
     return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(statusSvg)}`);
   }
 
   const statusWithCount = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-    <circle cx="16" cy="16" r="15" fill="transparent"/>
-    <circle cx="16" cy="16" r="14" fill="none" stroke="${presenceColor}" stroke-width="3"/>
-    <circle cx="16" cy="16" r="11" fill="#0f172a"/>
-    <text x="16" y="21" text-anchor="middle" font-family="Arial, sans-serif" font-size="${label.length > 2 ? 11 : 15}" font-weight="700" fill="#ffffff">${label}</text>
+    <rect width="32" height="32" fill="transparent"/>
+    <rect x="2" y="5" width="23" height="18" rx="9" fill="#0f172a"/>
+    <text x="13.5" y="18.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="${label.length > 2 ? 9 : 12}" font-weight="700" fill="#ffffff">${label}</text>
+    <circle cx="23" cy="23" r="7.5" fill="#ffffff"/>
+    <circle cx="23" cy="23" r="5.5" fill="${presenceColor}"/>
   </svg>`;
   return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(statusWithCount)}`);
 }
@@ -1178,6 +1192,10 @@ ipcMain.handle('shield:desktop-notification', (_event, payload) => showDesktopNo
 ipcMain.handle('shield:set-unread-count', (_event, count) => {
   updateUnreadBadge(count);
   return true;
+});
+ipcMain.handle('shield:set-presence-status', (_event, status) => {
+  const nextStatus = setDesktopPresenceStatus(status);
+  return { status: nextStatus };
 });
 ipcMain.handle('shield:flash-attention', () => {
   if (mainWindow) {

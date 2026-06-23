@@ -74,6 +74,7 @@ interface Window {
     shell: 'electron';
     notify?: (payload: ShieldDesktopNotificationPayload) => Promise<boolean>;
     setUnreadCount?: (count: number) => Promise<boolean>;
+    setPresenceStatus?: (status: ShieldDesktopIdleStatus['status']) => Promise<{ status: ShieldDesktopIdleStatus['status'] }>;
     flashAttention?: () => Promise<boolean>;
     clearAttention?: () => Promise<boolean>;
     getClipboardFiles?: () => Promise<{ files: ShieldDesktopClipboardFile[] }>;

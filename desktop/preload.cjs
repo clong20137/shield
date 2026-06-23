@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('shieldDesktop', {
   shell: 'electron',
   notify: (payload) => ipcRenderer.invoke('shield:desktop-notification', payload),
   setUnreadCount: (count) => ipcRenderer.invoke('shield:set-unread-count', count),
+  setPresenceStatus: (status) => ipcRenderer.invoke('shield:set-presence-status', status),
   flashAttention: () => ipcRenderer.invoke('shield:flash-attention'),
   clearAttention: () => ipcRenderer.invoke('shield:clear-attention'),
   getClipboardFiles: () => ipcRenderer.invoke('shield:get-clipboard-files'),
