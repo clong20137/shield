@@ -5248,6 +5248,7 @@ function App() {
   });
   const inactivityTimerRef = useRef<number | null>(null);
   const loginTransitionTimerRef = useRef<number | null>(null);
+  const sessionTimeoutNotificationShownRef = useRef(false);
   const lastActivityRef = useRef<number>(Date.now());
   const desktopSessionActivityReportRef = useRef<number>(0);
   const [userNotifications, setUserNotifications] = useState<UserNotification[]>([]);
@@ -6202,6 +6203,18 @@ function App() {
     }
   };
 
+  const notifySessionTimeoutSignOut = () => {
+    if (sessionTimeoutNotificationShownRef.current) {
+      return;
+    }
+
+    sessionTimeoutNotificationShownRef.current = true;
+    showDesktopNotification(`${appName} signed you out`, {
+      body: 'You were automatically signed out after inactivity. Open the app to sign back in.',
+      appPath: '/',
+    });
+  };
+
   const startInactivityTimer = () => {
     clearInactivityTimer();
 
@@ -6209,7 +6222,7 @@ function App() {
 
     const ms = sessionTimeoutMinutes * 60 * 1000;
     inactivityTimerRef.current = window.setTimeout(() => {
-      // Auto logout on inactivity
+      notifySessionTimeoutSignOut();
       handleLogout();
     }, ms);
   };
@@ -6612,6 +6625,7 @@ function App() {
   const handleLogin = (account: AuthAccount) => {
     clearAuthToken();
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(account));
+    sessionTimeoutNotificationShownRef.current = false;
     setCurrentUser(account);
     setNotifications([]);
     setUserNotifications([]);
@@ -6687,6 +6701,7 @@ function App() {
     }
 
     return window.shieldDesktop?.onSessionTimeout?.(() => {
+      notifySessionTimeoutSignOut();
       showToast('info', 'Signed out after inactivity.', { saveToNotifications: false });
       void handleLogout();
     });
