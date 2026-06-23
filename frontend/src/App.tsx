@@ -43,6 +43,7 @@ const DEFAULT_PRIMARY_COLOR = '#1a365d';
 const DEFAULT_SECONDARY_COLOR = '#9C865C';
 const DEFAULT_BRAND_LOGO = '/shield-splash-logo.png';
 const MAX_SETUP_LOGO_SIZE_BYTES = 240 * 1024;
+const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/iu;
 
 function withAppBase(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
@@ -51,6 +52,10 @@ function withAppBase(path: string): string {
 
 function getBrandLogoSrc(brandLogoDataUrl?: string): string {
   return brandLogoDataUrl || withAppBase(DEFAULT_BRAND_LOGO);
+}
+
+function isHexColor(value: string): boolean {
+  return HEX_COLOR_PATTERN.test(value);
 }
 
 function getAppRelativePathname(): string {
@@ -4626,6 +4631,25 @@ function SetupWizard({
   }, [status]);
 
   useEffect(() => {
+    const previousPrimary = document.documentElement.style.getPropertyValue('--app-primary');
+    const previousSecondary = document.documentElement.style.getPropertyValue('--app-secondary');
+
+    return () => {
+      document.documentElement.style.setProperty('--app-primary', previousPrimary || status?.primaryColor || DEFAULT_PRIMARY_COLOR);
+      document.documentElement.style.setProperty('--app-secondary', previousSecondary || status?.secondaryColor || DEFAULT_SECONDARY_COLOR);
+    };
+  }, [status?.primaryColor, status?.secondaryColor]);
+
+  useEffect(() => {
+    if (isHexColor(form.primaryColor)) {
+      document.documentElement.style.setProperty('--app-primary', form.primaryColor);
+    }
+    if (isHexColor(form.secondaryColor)) {
+      document.documentElement.style.setProperty('--app-secondary', form.secondaryColor);
+    }
+  }, [form.primaryColor, form.secondaryColor]);
+
+  useEffect(() => {
     let isMounted = true;
     authService.getSetupEnvironment()
       .then((response) => {
@@ -4778,7 +4802,7 @@ function SetupWizard({
       if (!/^https?:\/\//iu.test(form.apiUrl.trim())) {
         return 'API URL must start with http:// or https://.';
       }
-      if (!/^#[0-9a-f]{6}$/iu.test(form.primaryColor) || !/^#[0-9a-f]{6}$/iu.test(form.secondaryColor)) {
+      if (!isHexColor(form.primaryColor) || !isHexColor(form.secondaryColor)) {
         return 'Choose valid primary and secondary colors.';
       }
     }
@@ -5099,14 +5123,14 @@ function SetupWizard({
                   <label>
                     <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Primary Color</span>
                     <div className="flex items-center gap-3">
-                      <input type="color" value={/^#[0-9a-f]{6}$/iu.test(form.primaryColor) ? form.primaryColor : DEFAULT_PRIMARY_COLOR} onChange={(event) => updateForm('primaryColor', event.target.value)} className="h-11 w-14 rounded border border-gray-300 bg-white p-1 dark:border-gray-700 dark:bg-gray-950" />
+                      <input type="color" value={isHexColor(form.primaryColor) ? form.primaryColor : DEFAULT_PRIMARY_COLOR} onChange={(event) => updateForm('primaryColor', event.target.value)} className="h-11 w-14 rounded border border-gray-300 bg-white p-1 dark:border-gray-700 dark:bg-gray-950" />
                       <input value={form.primaryColor} onChange={(event) => updateForm('primaryColor', event.target.value)} className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
                     </div>
                   </label>
                   <label>
                     <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Secondary Color</span>
                     <div className="flex items-center gap-3">
-                      <input type="color" value={/^#[0-9a-f]{6}$/iu.test(form.secondaryColor) ? form.secondaryColor : DEFAULT_SECONDARY_COLOR} onChange={(event) => updateForm('secondaryColor', event.target.value)} className="h-11 w-14 rounded border border-gray-300 bg-white p-1 dark:border-gray-700 dark:bg-gray-950" />
+                      <input type="color" value={isHexColor(form.secondaryColor) ? form.secondaryColor : DEFAULT_SECONDARY_COLOR} onChange={(event) => updateForm('secondaryColor', event.target.value)} className="h-11 w-14 rounded border border-gray-300 bg-white p-1 dark:border-gray-700 dark:bg-gray-950" />
                       <input value={form.secondaryColor} onChange={(event) => updateForm('secondaryColor', event.target.value)} className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
                     </div>
                   </label>
