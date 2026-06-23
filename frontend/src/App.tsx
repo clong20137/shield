@@ -2124,7 +2124,7 @@ function HeaderMessagesButton({
       data-onboarding-control="messages"
       type="button"
       onClick={onOpenMessages}
-      className="relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+      className="header-action-button relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
       aria-label="Open messages"
       title="Messages"
     >
@@ -7770,7 +7770,7 @@ function App() {
                     data-onboarding-control="notifications"
                     type="button"
                     onClick={() => setIsNotificationsOpen((value) => !value)}
-                    className="relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                    className="header-action-button relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
                     aria-label="Open notifications"
                   >
                     <Bell size={18} />
@@ -7920,7 +7920,7 @@ function App() {
                   data-onboarding-control="theme"
                   type="button"
                   onClick={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
-                  className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                  className="header-action-button flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
                   aria-label="Toggle light and dark mode"
                 >
                   {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
@@ -7930,7 +7930,7 @@ function App() {
                   data-onboarding-control="settings"
                   type="button"
                   onClick={() => setIsAccountMenuOpen((value) => !value)}
-                  className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                  className="header-action-button flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
                   aria-label="Open account menu"
                   title="Account"
                 >

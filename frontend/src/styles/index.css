@@ -1308,6 +1308,40 @@
     box-shadow: 0 0 0 2px rgba(156, 134, 92, 0.16);
   }
 
+  .dark .quick-launch-sidebar-placement .quick-launch-gold-frame {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .dark .quick-launch-sidebar-placement .quick-launch-slot,
+  .dark .quick-launch-sidebar-placement .quick-launch-slot.quick-launch-slot-configured {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.15);
+    color: rgb(239, 246, 255);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  }
+
+  .dark .quick-launch-sidebar-placement .quick-launch-slot:hover,
+  .dark .quick-launch-sidebar-placement .quick-launch-slot:focus-visible,
+  .dark .quick-launch-sidebar-placement .quick-launch-slot.quick-launch-slot-active,
+  .dark .quick-launch-sidebar-placement .quick-launch-slot.quick-launch-slot-editing {
+    border-color: rgba(156, 134, 92, 0.86);
+    background: rgba(156, 134, 92, 0.24);
+    color: rgb(255, 255, 255);
+    box-shadow: 0 0 0 2px rgba(156, 134, 92, 0.16);
+  }
+
+  .header-action-button.header-action-button {
+    color: rgb(255, 255, 255);
+  }
+
+  .header-action-button.header-action-button:hover,
+  .header-action-button.header-action-button:focus-visible {
+    color: rgb(255, 255, 255);
+  }
+
   .global-search-input {
     background: rgba(255, 255, 255, 0.1);
     color: rgb(255, 255, 255);
