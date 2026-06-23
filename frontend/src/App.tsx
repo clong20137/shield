@@ -5238,7 +5238,6 @@ function SetupWizard({
 }
 
 function App() {
-  const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoginTransitioning, setIsLoginTransitioning] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthAccount | null>(null);
@@ -5299,7 +5298,14 @@ function App() {
   const [isWelcomeSplashOpen, setIsWelcomeSplashOpen] = useState(false);
   const [shouldLaunchGuideAfterWelcome, setShouldLaunchGuideAfterWelcome] = useState(false);
   const [closingModal, setClosingModal] = useState<ClosingModal | null>(null);
-  const isCalendarRoute = location.pathname === '/calendar' || location.pathname.startsWith('/calendar/');
+  const [currentRoutePath, setCurrentRoutePath] = useState(() => getAppRelativePathname());
+  const isCalendarRoute = currentRoutePath === '/calendar' || currentRoutePath.startsWith('/calendar/');
+
+  useEffect(() => {
+    const syncCurrentRoutePath = () => setCurrentRoutePath(getAppRelativePathname());
+    window.addEventListener('popstate', syncCurrentRoutePath);
+    return () => window.removeEventListener('popstate', syncCurrentRoutePath);
+  }, []);
 
   useEffect(() => {
     const collapseSidebarOnMobile = () => {
