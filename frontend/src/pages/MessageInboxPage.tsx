@@ -401,6 +401,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const [selectedMentionUser, setSelectedMentionUser] = useState<User | null>(null);
   const [isComposerFocused, setIsComposerFocused] = useState(false);
   const [isCompactComposeOpen, setIsCompactComposeOpen] = useState(false);
+  const [composeKeyboardInset, setComposeKeyboardInset] = useState(12);
   const [presenceByAccount, setPresenceByAccount] = useState<Record<string, { online: boolean; away: boolean; status?: 'active' | 'away' | 'busy'; lastSeenAt: string | null }>>({});
   const [memberDirectory, setMemberDirectory] = useState<Record<string, ThreadMemberPreview>>({});
   const [composePopoverPosition, setComposePopoverPosition] = useState({ right: 16, bottom: 88 });
@@ -642,6 +643,28 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     mediaQuery.addEventListener('change', syncCompactCompose);
     return () => mediaQuery.removeEventListener('change', syncCompactCompose);
   }, [isModalView]);
+
+  useEffect(() => {
+    if (!isComposeOpen || !isCompactComposeOpen || !window.visualViewport) {
+      setComposeKeyboardInset(12);
+      return undefined;
+    }
+
+    const syncKeyboardInset = () => {
+      const viewport = window.visualViewport;
+      if (!viewport) return;
+      const keyboardInset = Math.max(12, window.innerHeight - viewport.height - viewport.offsetTop + 12);
+      setComposeKeyboardInset(keyboardInset);
+    };
+
+    syncKeyboardInset();
+    window.visualViewport.addEventListener('resize', syncKeyboardInset);
+    window.visualViewport.addEventListener('scroll', syncKeyboardInset);
+    return () => {
+      window.visualViewport?.removeEventListener('resize', syncKeyboardInset);
+      window.visualViewport?.removeEventListener('scroll', syncKeyboardInset);
+    };
+  }, [isComposeOpen, isCompactComposeOpen]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -1585,10 +1608,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
               className={[
                 'quick-launch-context-menu fixed z-[95] overflow-y-auto border border-gray-200 bg-white shadow-2xl ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-950 dark:ring-white/10',
                 isCompactComposeOpen
-                  ? 'inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] max-h-[min(42rem,calc(100vh-2rem))] rounded-2xl p-4'
+                  ? 'inset-x-3 max-h-[min(42rem,calc(100dvh-2rem))] rounded-2xl p-4'
                   : 'max-h-[min(34rem,calc(100vh-6rem))] w-[min(25rem,calc(100vw-1.5rem))] rounded-lg p-3',
               ].join(' ')}
-              style={isCompactComposeOpen ? undefined : { right: composePopoverPosition.right, bottom: composePopoverPosition.bottom }}
+              style={isCompactComposeOpen ? { bottom: composeKeyboardInset } : { right: composePopoverPosition.right, bottom: composePopoverPosition.bottom }}
             >
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
@@ -1624,7 +1647,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   onChange={(event) => setRecipientQuery(event.target.value)}
                   placeholder="Search name, PE, or email"
                   className="global-search-input w-full rounded-xl border border-gray-300 bg-white py-3 text-[16px] dark:border-gray-700 dark:bg-gray-900 sm:rounded sm:py-2 sm:text-sm"
-                  autoFocus
+                  autoFocus={!isCompactComposeOpen}
                 />
               </div>
 

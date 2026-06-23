@@ -1,4 +1,5 @@
 import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
 import { AlertTriangle, ArchiveX, Camera, CheckCircle2, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, QrCode, Radio, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, deviceService, DeviceRecord } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
@@ -10,16 +11,6 @@ type DeviceForm = Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'>;
 type DeviceConditionalField = 'phoneNumber' | 'imei' | 'simNumber' | 'radioId' | 'hostname' | 'routerId';
 type SortKey = keyof Pick<DeviceRecord, 'type' | 'assetTag' | 'makeModel' | 'assignedTo' | 'status' | 'location' | 'maintenanceDueDate' | 'replacementDueDate' | 'updatedAt'>;
 type ScanMode = 'lookup' | 'check-in' | 'check-out';
-type NativeBarcodeDetector = {
-  detect: (source: CanvasImageSource) => Promise<Array<{ rawValue?: string }>>;
-};
-type NativeBarcodeDetectorConstructor = new (options?: { formats?: string[] }) => NativeBarcodeDetector;
-
-declare global {
-  interface Window {
-    BarcodeDetector?: NativeBarcodeDetectorConstructor;
-  }
-}
 
 const deviceTypes: DeviceType[] = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio', 'Cradlepoint'];
 const deviceStatuses: DeviceStatus[] = ['Available', 'Assigned', 'Maintenance', 'Damaged', 'Lost', 'Retired'];
@@ -289,9 +280,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const isUserLoadInFlightRef = useRef(false);
   const deviceRefreshTimerRef = useRef<number | null>(null);
   const scannerVideoRef = useRef<HTMLVideoElement | null>(null);
-  const scannerStreamRef = useRef<MediaStream | null>(null);
-  const scannerFrameRef = useRef<number | null>(null);
-  const isCameraScanActiveRef = useRef(false);
+  const scannerControlsRef = useRef<IScannerControls | null>(null);
 
   const canManageDevices = currentUser?.role === 'administrator';
   const actor = { actorId: currentUser?.id, actorName: currentUser?.displayName || currentUser?.email };
@@ -388,19 +377,11 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   }, [loadRegisteredUsers]);
 
   const stopCameraScanner = useCallback(() => {
-    isCameraScanActiveRef.current = false;
-    if (scannerFrameRef.current) {
-      window.cancelAnimationFrame(scannerFrameRef.current);
-      scannerFrameRef.current = null;
-    }
-
-    scannerStreamRef.current?.getTracks().forEach((track) => track.stop());
-    scannerStreamRef.current = null;
-
+    scannerControlsRef.current?.stop();
+    scannerControlsRef.current = null;
     if (scannerVideoRef.current) {
       scannerVideoRef.current.srcObject = null;
     }
-
     setIsCameraScanActive(false);
   }, []);
 
@@ -416,68 +397,45 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setCameraScanStatus('Starting camera...');
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraScanStatus('Camera scanning is not available in this browser.');
-      return;
-    }
-
-    if (!window.BarcodeDetector) {
-      setCameraScanStatus('This browser does not support live barcode scanning yet. Try Chrome/Edge, or enter the code manually.');
+      setCameraScanStatus('Camera scanning needs HTTPS and browser camera permission. Open the secure app URL, then try again.');
       return;
     }
 
     try {
       stopCameraScanner();
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const video = scannerVideoRef.current;
+      if (!video) {
+        setCameraScanStatus('Camera preview is not ready yet.');
+        return;
+      }
+
+      const reader = new BrowserMultiFormatReader();
+      setIsCameraScanActive(true);
+      setCameraScanStatus('Point the camera at a QR code or barcode.');
+      scannerControlsRef.current = await reader.decodeFromConstraints({
         video: {
           facingMode: { ideal: 'environment' },
         },
         audio: false,
-      });
-      scannerStreamRef.current = stream;
-
-      const video = scannerVideoRef.current;
-      if (!video) {
-        setCameraScanStatus('Camera preview is not ready yet.');
-        stopCameraScanner();
-        return;
-      }
-
-      video.srcObject = stream;
-      await video.play();
-
-      const detector = new window.BarcodeDetector({
-        formats: ['qr_code', 'code_128', 'code_39', 'code_93', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'itf', 'codabar', 'data_matrix', 'pdf417'],
-      });
-      isCameraScanActiveRef.current = true;
-      setIsCameraScanActive(true);
-      setCameraScanStatus('Point the camera at a QR code or barcode.');
-
-      const scanFrame = async () => {
-        if (!isCameraScanActiveRef.current || !scannerVideoRef.current) {
+      }, video, (result, error, controls) => {
+        if (error && !result) {
           return;
         }
 
-        try {
-          const results = await detector.detect(scannerVideoRef.current);
-          const value = results.find((result) => result.rawValue)?.rawValue?.trim();
-          if (value) {
-            setScanValue(value);
-            setScanFeedback(`Scanned ${value}. Tap Apply to continue.`);
-            setCameraScanStatus('Scan captured.');
-            closeCameraScanner();
-            return;
-          }
-        } catch (err) {
-          console.error('Barcode scan failed:', err);
+        const value = result?.getText().trim();
+        if (value) {
+          controls.stop();
+          scannerControlsRef.current = null;
+          setIsCameraScanActive(false);
+          setScanValue(value);
+          setScanFeedback(`Scanned ${value}. Tap Apply to continue.`);
+          setCameraScanStatus('Scan captured.');
+          setIsCameraScannerOpen(false);
         }
-
-        scannerFrameRef.current = window.requestAnimationFrame(scanFrame);
-      };
-
-      scannerFrameRef.current = window.requestAnimationFrame(scanFrame);
+      });
     } catch (err) {
       console.error('Failed to start device scanner:', err);
-      setCameraScanStatus('Unable to start the camera. Check browser camera permissions and try again.');
+      setCameraScanStatus('Unable to start the camera. Use HTTPS, allow camera access, and try again.');
       stopCameraScanner();
     }
   };
