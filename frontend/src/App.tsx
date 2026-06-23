@@ -4978,7 +4978,7 @@ function SetupWizard({
                   </label>
                   <label>
                     <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">DB Password</span>
-                    <input type="password" value={environmentForm.DB_PASSWORD} onChange={(event) => updateEnvironment('DB_PASSWORD', event.target.value)} disabled={!canWriteEnvironment || isEnvironmentLoading} placeholder={canWriteEnvironment ? '' : 'Hidden after save'} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 disabled:opacity-60" />
+                    <input type="password" value={environmentForm.DB_PASSWORD} onChange={(event) => updateEnvironment('DB_PASSWORD', event.target.value)} disabled={!canWriteEnvironment || isEnvironmentLoading} placeholder={canWriteEnvironment ? 'Leave blank to keep current password' : 'Hidden after save'} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 disabled:opacity-60" />
                   </label>
                   <label>
                     <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">DB Name</span>

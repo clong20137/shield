@@ -255,12 +255,13 @@ async function updateBackendEnv(values: Record<string, string>): Promise<void> {
   await fs.promises.writeFile(envPath, serializeEnvFile({ ...currentSettings, ...values }), { encoding: 'utf8' });
 }
 
-function getSetupDatabaseSettings(input: Record<string, unknown>) {
+function getSetupDatabaseSettings(input: Record<string, unknown>, fallbackPassword = '') {
+  const inputPassword = typeof input.DB_PASSWORD === 'string' ? input.DB_PASSWORD.slice(0, 500) : '';
   return {
     host: cleanString(input.DB_HOST, 255) || 'localhost',
     port: Math.max(1, Math.min(65535, Number(input.DB_PORT) || 3306)),
     user: cleanString(input.DB_USER, 255) || 'root',
-    password: typeof input.DB_PASSWORD === 'string' ? input.DB_PASSWORD.slice(0, 500) : '',
+    password: inputPassword || fallbackPassword,
     database: cleanString(input.DB_NAME, 120) || 'shield',
   };
 }
@@ -538,6 +539,9 @@ export class AuthController {
 
       const envPath = getBackendEnvPath();
       const currentSettings = fs.existsSync(envPath) ? parseEnvFile(await fs.promises.readFile(envPath, 'utf8')) : {};
+      const nextDbPassword = typeof input.DB_PASSWORD === 'string' && input.DB_PASSWORD.length > 0
+        ? input.DB_PASSWORD.slice(0, 500)
+        : currentSettings.DB_PASSWORD || process.env.DB_PASSWORD || '';
       const cleanNodeEnv = cleanString(input.NODE_ENV, 40);
       const cleanSameSite = cleanString(input.SESSION_COOKIE_SAMESITE, 20).toLowerCase();
       const nextSettings = {
@@ -547,7 +551,7 @@ export class AuthController {
         DB_HOST: cleanString(input.DB_HOST, 255) || 'localhost',
         DB_PORT: cleanDbPort,
         DB_USER: cleanString(input.DB_USER, 255) || 'root',
-        DB_PASSWORD: typeof input.DB_PASSWORD === 'string' ? input.DB_PASSWORD.slice(0, 500) : '',
+        DB_PASSWORD: nextDbPassword,
         DB_NAME: cleanString(input.DB_NAME, 120) || 'shield',
         ALLOWED_ORIGINS: cleanAllowedOrigins,
         APP_BASE_URL: cleanAppBaseUrl,
@@ -582,7 +586,9 @@ export class AuthController {
       }
 
       const input = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as Record<string, unknown>;
-      const settings = getSetupDatabaseSettings(input);
+      const envPath = getBackendEnvPath();
+      const fileSettings = fs.existsSync(envPath) ? parseEnvFile(await fs.promises.readFile(envPath, 'utf8')) : {};
+      const settings = getSetupDatabaseSettings(input, fileSettings.DB_PASSWORD || process.env.DB_PASSWORD || '');
       if (!/^[A-Za-z0-9_$-]+$/u.test(settings.database)) {
         return res.status(400).json({ error: 'Database name can only include letters, numbers, underscore, dollar sign, or hyphen' });
       }
