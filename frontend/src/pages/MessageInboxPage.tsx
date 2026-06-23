@@ -400,6 +400,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const [threadPendingDelete, setThreadPendingDelete] = useState<MessageThread | null>(null);
   const [selectedMentionUser, setSelectedMentionUser] = useState<User | null>(null);
   const [isComposerFocused, setIsComposerFocused] = useState(false);
+  const [isCompactComposeOpen, setIsCompactComposeOpen] = useState(false);
   const [presenceByAccount, setPresenceByAccount] = useState<Record<string, { online: boolean; away: boolean; status?: 'active' | 'away' | 'busy'; lastSeenAt: string | null }>>({});
   const [memberDirectory, setMemberDirectory] = useState<Record<string, ThreadMemberPreview>>({});
   const [composePopoverPosition, setComposePopoverPosition] = useState({ right: 16, bottom: 88 });
@@ -632,6 +633,15 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       window.removeEventListener('scroll', syncComposePopoverPosition, true);
     };
   }, [isComposeOpen]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(isModalView ? '(max-width: 767px)' : '(max-width: 1279px)');
+    const syncCompactCompose = () => setIsCompactComposeOpen(mediaQuery.matches);
+
+    syncCompactCompose();
+    mediaQuery.addEventListener('change', syncCompactCompose);
+    return () => mediaQuery.removeEventListener('change', syncCompactCompose);
+  }, [isModalView]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -1558,17 +1568,35 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
             </div>
           )}
           {isComposeOpen && createPortal((
+            <>
+            {isCompactComposeOpen && (
+              <button
+                type="button"
+                className="fixed inset-0 z-[94] bg-black/35 backdrop-blur-[2px]"
+                onClick={() => {
+                  setIsComposeOpen(false);
+                  setRecipientQuery('');
+                  setRecipientResults([]);
+                }}
+                aria-label="Close new message"
+              />
+            )}
             <div
-              className="quick-launch-context-menu fixed z-[95] max-h-[min(34rem,calc(100vh-6rem))] w-[min(25rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-gray-200 bg-white p-3 shadow-2xl ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-950 dark:ring-white/10"
-              style={{ right: composePopoverPosition.right, bottom: composePopoverPosition.bottom }}
+              className={[
+                'quick-launch-context-menu fixed z-[95] overflow-y-auto border border-gray-200 bg-white shadow-2xl ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-950 dark:ring-white/10',
+                isCompactComposeOpen
+                  ? 'inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] max-h-[min(42rem,calc(100vh-2rem))] rounded-2xl p-4'
+                  : 'max-h-[min(34rem,calc(100vh-6rem))] w-[min(25rem,calc(100vw-1.5rem))] rounded-lg p-3',
+              ].join(' ')}
+              style={isCompactComposeOpen ? undefined : { right: composePopoverPosition.right, bottom: composePopoverPosition.bottom }}
             >
-              <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-primary-500/10 text-primary-500 dark:text-blue-100">
-                    <Send size={16} />
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary-500/10 text-primary-500 dark:text-blue-100">
+                    <Send size={18} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-gray-900 dark:text-gray-100">New Message</p>
+                    <p className="text-base font-black text-gray-900 dark:text-gray-100">New Message</p>
                     <p className="truncate text-xs font-semibold text-gray-500 dark:text-gray-400">Start a chat, group, or district message</p>
                   </div>
                 </div>
@@ -1595,7 +1623,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   value={recipientQuery}
                   onChange={(event) => setRecipientQuery(event.target.value)}
                   placeholder="Search name, PE, or email"
-                  className="global-search-input w-full rounded border border-gray-300 bg-white py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                  className="global-search-input w-full rounded-xl border border-gray-300 bg-white py-3 text-[16px] dark:border-gray-700 dark:bg-gray-900 sm:rounded sm:py-2 sm:text-sm"
                   autoFocus
                 />
               </div>
@@ -1605,7 +1633,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   type="button"
                   onClick={() => void loadDistrictRecipients()}
                   disabled={isLoadingDistrictRecipients}
-                  className="inline-flex h-9 items-center gap-1.5 rounded border border-accent/30 bg-accent/10 px-3 text-xs font-bold text-accent transition hover:bg-accent/15 disabled:opacity-60"
+                  className="inline-flex h-10 items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 text-xs font-bold text-accent transition hover:bg-accent/15 disabled:opacity-60"
                   aria-label="Message district members"
                   title="Message district members"
                 >
@@ -1613,7 +1641,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   <span>{isLoadingDistrictRecipients ? 'Loading...' : 'My District'}</span>
                 </button>
                 {draftGroupRecipients.length > 0 && (
-                  <span className="inline-flex h-9 items-center rounded border border-primary-500/20 bg-primary-500/10 px-3 text-xs font-bold text-primary-500 dark:text-blue-100">
+                  <span className="inline-flex h-10 items-center rounded-full border border-primary-500/20 bg-primary-500/10 px-3 text-xs font-bold text-primary-500 dark:text-blue-100">
                     {draftGroupRecipients.length} selected
                   </span>
                 )}
@@ -1657,7 +1685,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                 </div>
               )}
 
-              <div className="mt-3 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+              <div className="mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-lg">
                 {isRecipientSearching ? (
                   <div className="px-3 py-4 text-sm font-semibold text-gray-500 dark:text-gray-400">Searching...</div>
                 ) : recipientResults.length === 0 ? (
@@ -1668,7 +1696,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   recipientResults.map((user) => (
                     <div
                       key={user.id}
-                      className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                      className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 sm:py-2.5"
                     >
                       {user.profilePictureUrl ? (
                         <img
@@ -1704,14 +1732,14 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                               setReplyAttachments([]);
                               focusReplyComposer();
                             }}
-                            className="inline-flex h-8 items-center rounded bg-primary-500 px-2.5 text-xs font-bold text-white hover:bg-primary-600"
+                            className="inline-flex h-9 items-center rounded-full bg-primary-500 px-3 text-xs font-bold text-white hover:bg-primary-600"
                           >
                             Chat
                           </button>
                           <button
                             type="button"
                             onClick={() => addGroupRecipient(user)}
-                            className="inline-flex h-8 items-center rounded bg-accent px-2.5 text-xs font-bold text-white hover:bg-accent/90"
+                            className="inline-flex h-9 items-center rounded-full bg-accent px-3 text-xs font-bold text-white hover:bg-accent/90"
                           >
                             Add
                           </button>
@@ -1722,6 +1750,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                 )}
               </div>
             </div>
+            </>
           ), document.body)}
           <button
             ref={composeButtonRef}

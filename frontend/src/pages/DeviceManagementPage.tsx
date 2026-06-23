@@ -1,5 +1,5 @@
 import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArchiveX, CheckCircle2, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, QrCode, Radio, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
+import { AlertTriangle, ArchiveX, Camera, CheckCircle2, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, QrCode, Radio, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, deviceService, DeviceRecord } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
 
@@ -10,6 +10,16 @@ type DeviceForm = Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'>;
 type DeviceConditionalField = 'phoneNumber' | 'imei' | 'simNumber' | 'radioId' | 'hostname' | 'routerId';
 type SortKey = keyof Pick<DeviceRecord, 'type' | 'assetTag' | 'makeModel' | 'assignedTo' | 'status' | 'location' | 'maintenanceDueDate' | 'replacementDueDate' | 'updatedAt'>;
 type ScanMode = 'lookup' | 'check-in' | 'check-out';
+type NativeBarcodeDetector = {
+  detect: (source: CanvasImageSource) => Promise<Array<{ rawValue?: string }>>;
+};
+type NativeBarcodeDetectorConstructor = new (options?: { formats?: string[] }) => NativeBarcodeDetector;
+
+declare global {
+  interface Window {
+    BarcodeDetector?: NativeBarcodeDetectorConstructor;
+  }
+}
 
 const deviceTypes: DeviceType[] = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio', 'Cradlepoint'];
 const deviceStatuses: DeviceStatus[] = ['Available', 'Assigned', 'Maintenance', 'Damaged', 'Lost', 'Retired'];
@@ -270,11 +280,18 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [scanMode, setScanMode] = useState<ScanMode>('lookup');
   const [scanAssignee, setScanAssignee] = useState('');
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
+  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
+  const [isCameraScanActive, setIsCameraScanActive] = useState(false);
+  const [cameraScanStatus, setCameraScanStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const isDeviceLoadInFlightRef = useRef(false);
   const isUserLoadInFlightRef = useRef(false);
   const deviceRefreshTimerRef = useRef<number | null>(null);
+  const scannerVideoRef = useRef<HTMLVideoElement | null>(null);
+  const scannerStreamRef = useRef<MediaStream | null>(null);
+  const scannerFrameRef = useRef<number | null>(null);
+  const isCameraScanActiveRef = useRef(false);
 
   const canManageDevices = currentUser?.role === 'administrator';
   const actor = { actorId: currentUser?.id, actorName: currentUser?.displayName || currentUser?.email };
@@ -369,6 +386,101 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       window.removeEventListener('shield:permission-updated', handleUserUpdate);
     };
   }, [loadRegisteredUsers]);
+
+  const stopCameraScanner = useCallback(() => {
+    isCameraScanActiveRef.current = false;
+    if (scannerFrameRef.current) {
+      window.cancelAnimationFrame(scannerFrameRef.current);
+      scannerFrameRef.current = null;
+    }
+
+    scannerStreamRef.current?.getTracks().forEach((track) => track.stop());
+    scannerStreamRef.current = null;
+
+    if (scannerVideoRef.current) {
+      scannerVideoRef.current.srcObject = null;
+    }
+
+    setIsCameraScanActive(false);
+  }, []);
+
+  useEffect(() => stopCameraScanner, [stopCameraScanner]);
+
+  const closeCameraScanner = () => {
+    stopCameraScanner();
+    setIsCameraScannerOpen(false);
+  };
+
+  const startCameraScanner = async () => {
+    setIsCameraScannerOpen(true);
+    setCameraScanStatus('Starting camera...');
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraScanStatus('Camera scanning is not available in this browser.');
+      return;
+    }
+
+    if (!window.BarcodeDetector) {
+      setCameraScanStatus('This browser does not support live barcode scanning yet. Try Chrome/Edge, or enter the code manually.');
+      return;
+    }
+
+    try {
+      stopCameraScanner();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+        },
+        audio: false,
+      });
+      scannerStreamRef.current = stream;
+
+      const video = scannerVideoRef.current;
+      if (!video) {
+        setCameraScanStatus('Camera preview is not ready yet.');
+        stopCameraScanner();
+        return;
+      }
+
+      video.srcObject = stream;
+      await video.play();
+
+      const detector = new window.BarcodeDetector({
+        formats: ['qr_code', 'code_128', 'code_39', 'code_93', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'itf', 'codabar', 'data_matrix', 'pdf417'],
+      });
+      isCameraScanActiveRef.current = true;
+      setIsCameraScanActive(true);
+      setCameraScanStatus('Point the camera at a QR code or barcode.');
+
+      const scanFrame = async () => {
+        if (!isCameraScanActiveRef.current || !scannerVideoRef.current) {
+          return;
+        }
+
+        try {
+          const results = await detector.detect(scannerVideoRef.current);
+          const value = results.find((result) => result.rawValue)?.rawValue?.trim();
+          if (value) {
+            setScanValue(value);
+            setScanFeedback(`Scanned ${value}. Tap Apply to continue.`);
+            setCameraScanStatus('Scan captured.');
+            closeCameraScanner();
+            return;
+          }
+        } catch (err) {
+          console.error('Barcode scan failed:', err);
+        }
+
+        scannerFrameRef.current = window.requestAnimationFrame(scanFrame);
+      };
+
+      scannerFrameRef.current = window.requestAnimationFrame(scanFrame);
+    } catch (err) {
+      console.error('Failed to start device scanner:', err);
+      setCameraScanStatus('Unable to start the camera. Check browser camera permissions and try again.');
+      stopCameraScanner();
+    }
+  };
 
   const filteredDevices = useMemo(() => {
     const searchTerm = query.trim().toLowerCase();
@@ -704,7 +816,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             </div>
           </div>
 
-          <form onSubmit={handleScannerSubmit} className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_160px_minmax(0,1fr)_auto]">
+          <form onSubmit={handleScannerSubmit} className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_160px_minmax(0,1fr)_auto_auto]">
             <input
               value={scanValue}
               onChange={(event) => setScanValue(event.target.value)}
@@ -733,11 +845,37 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <option key={user.id} value={user.email}>{user.displayName || user.email}</option>
               ))}
             </select>
+            <button type="button" onClick={() => void startCameraScanner()} className="btn-secondary justify-center" aria-label="Scan with camera" title="Scan with Camera">
+              <Camera size={16} />
+              <span>Camera</span>
+            </button>
             <button type="submit" className="btn-primary justify-center" aria-label="Apply scan" title="Apply Scan">
               <QrCode size={16} />
               <span>Apply</span>
             </button>
           </form>
+
+          {isCameraScannerOpen && (
+            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-950 text-white shadow-lg dark:border-gray-800">
+              <div className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-black">Camera Scan</p>
+                  <p className="truncate text-xs font-semibold text-white/65">{cameraScanStatus || 'Point the camera at a device label.'}</p>
+                </div>
+                <button type="button" onClick={closeCameraScanner} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20" aria-label="Close camera scanner" title="Close">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="relative aspect-[4/3] bg-black">
+                <video ref={scannerVideoRef} className="h-full w-full object-cover" playsInline muted />
+                {isCameraScanActive && (
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <div className="h-36 w-64 max-w-[78vw] rounded-2xl border-2 border-accent shadow-[0_0_0_999px_rgba(0,0,0,0.28)]" />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {scanFeedback && (
             <div className="rounded border border-accent/30 bg-accent/10 px-3 py-2 text-sm font-semibold text-accent">
