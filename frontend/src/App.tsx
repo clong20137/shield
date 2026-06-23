@@ -44,6 +44,7 @@ const DEFAULT_SECONDARY_COLOR = '#9C865C';
 const DEFAULT_BRAND_LOGO = '/shield-splash-logo.png';
 const MAX_SETUP_LOGO_SIZE_BYTES = 240 * 1024;
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/iu;
+const LOGIN_TRANSITION_MS = 560;
 
 function withAppBase(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
@@ -632,7 +633,7 @@ function LoginSplash({
     (registrationSettings?.mode === 'invite-only' && Boolean(inviteToken));
 
   return (
-    <div className={`login-shell relative min-h-screen overflow-hidden bg-gray-950 text-gray-900 dark:text-gray-100 ${isExiting ? 'animate-login-exit pointer-events-none' : ''}`}>
+    <div className={`login-shell relative min-h-screen overflow-hidden bg-gray-950 text-gray-900 dark:text-gray-100 ${isExiting ? 'animate-login-exit pointer-events-none' : 'animate-login-enter'}`}>
       <div className="login-moving-grid" aria-hidden="true" />
       <div className="login-scan-band" aria-hidden="true" />
       <div className="relative z-10 grid min-h-screen grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(27rem,31rem)]">
@@ -657,7 +658,7 @@ function LoginSplash({
         </section>
 
         <section className="flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:bg-white/6 lg:backdrop-blur-xl">
-          <form ref={loginFormRef} onSubmit={handleSubmit} className="w-full max-w-md rounded-xl border border-white/15 bg-white/95 p-6 shadow-[0_28px_90px_rgba(0,0,0,0.35)] ring-1 ring-black/5 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-900/95 sm:p-8">
+          <form ref={loginFormRef} onSubmit={handleSubmit} className="login-panel w-full max-w-md rounded-xl border border-white/15 bg-white/95 p-6 shadow-[0_28px_90px_rgba(0,0,0,0.35)] ring-1 ring-black/5 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-900/95 sm:p-8">
             <div className="mb-7">
               <div className="mb-5 flex items-center gap-3 lg:hidden">
                 <img src={getBrandLogoSrc(brandLogoDataUrl)} alt="" className="h-14 w-14 object-contain drop-shadow-lg" />
@@ -6630,7 +6631,7 @@ function App() {
       setIsAuthenticated(true);
       setIsLoginTransitioning(false);
       loginTransitionTimerRef.current = null;
-    }, 380);
+    }, LOGIN_TRANSITION_MS);
   };
 
   const handleLogout = async () => {

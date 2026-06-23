@@ -7,8 +7,8 @@ import './styles/index.css';
 const rootElement = document.getElementById('root');
 const initialSplash = document.querySelector('.initial-splash');
 const splashStartedAt = performance.now();
-const MINIMUM_SPLASH_MS = 1250;
-const SPLASH_EXIT_MS = 420;
+const MINIMUM_SPLASH_MS = 1500;
+const SPLASH_EXIT_MS = 560;
 
 if (!rootElement) {
   throw new Error('Root element #root was not found.');

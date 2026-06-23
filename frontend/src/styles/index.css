@@ -194,6 +194,26 @@
   }
 }
 
+@keyframes login-panel-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+    filter: blur(9px);
+  }
+
+  68% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.005);
+    filter: blur(1px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
 @keyframes app-enter {
   0% {
     opacity: 0;
@@ -1119,8 +1139,12 @@
   }
 
   .animate-login-exit {
-    animation: login-exit 380ms cubic-bezier(0.4, 0, 0.2, 1) both;
+    animation: login-exit 560ms cubic-bezier(0.32, 0, 0.2, 1) both;
     transform-origin: center;
+  }
+
+  .animate-login-enter {
+    animation: login-enter 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   .login-shell {
@@ -1128,7 +1152,12 @@
       radial-gradient(circle at 18% 24%, rgba(156, 134, 92, 0.28), transparent 21rem),
       radial-gradient(circle at 84% 72%, rgba(29, 63, 111, 0.5), transparent 24rem),
       linear-gradient(135deg, #07111f, #0f2542 46%, #07111f);
-    animation: login-enter 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .login-panel {
+    animation: login-panel-enter 480ms cubic-bezier(0.17, 0.84, 0.44, 1) both;
+    animation-delay: 90ms;
+    will-change: opacity, transform, filter;
   }
 
   .login-moving-grid {
@@ -2273,6 +2302,8 @@ select.trooper-daily-field-with-icon {
   .modal-backdrop,
   .modal-backdrop-exit,
   .animate-login-exit,
+  .animate-login-enter,
+  .login-panel,
   .animate-app-enter,
   .login-shell,
   .login-moving-grid,
