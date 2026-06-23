@@ -108,6 +108,32 @@
   }
 }
 
+@keyframes login-grid-drift {
+  0% {
+    background-position: 0 0, 0 0, center;
+  }
+
+  100% {
+    background-position: 72px 48px, -56px 64px, center;
+  }
+}
+
+@keyframes login-scan-drift {
+  0% {
+    opacity: 0.2;
+    transform: translateX(-36vw) rotate(14deg);
+  }
+
+  50% {
+    opacity: 0.38;
+  }
+
+  100% {
+    opacity: 0.2;
+    transform: translateX(88vw) rotate(14deg);
+  }
+}
+
 @keyframes app-enter {
   0% {
     opacity: 0;
@@ -1035,6 +1061,30 @@
   .animate-login-exit {
     animation: login-exit 380ms cubic-bezier(0.4, 0, 0.2, 1) both;
     transform-origin: center;
+  }
+
+  .login-shell {
+    background:
+      radial-gradient(circle at 18% 24%, rgba(156, 134, 92, 0.28), transparent 21rem),
+      radial-gradient(circle at 84% 72%, rgba(29, 63, 111, 0.5), transparent 24rem),
+      linear-gradient(135deg, #07111f, #0f2542 46%, #07111f);
+  }
+
+  .login-moving-grid {
+    @apply pointer-events-none absolute inset-0 opacity-70;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+      radial-gradient(circle at center, transparent, rgba(3, 7, 18, 0.46));
+    background-size: 48px 48px, 48px 48px, 100% 100%;
+    animation: login-grid-drift 18s linear infinite;
+  }
+
+  .login-scan-band {
+    @apply pointer-events-none absolute -top-32 bottom-[-8rem] w-36 bg-white/10 blur-sm;
+    left: 10%;
+    box-shadow: 0 0 80px rgba(255, 255, 255, 0.12);
+    animation: login-scan-drift 9s ease-in-out infinite alternate;
   }
 
   .animate-app-enter {
@@ -2163,6 +2213,8 @@ select.trooper-daily-field-with-icon {
   .modal-backdrop-exit,
   .animate-login-exit,
   .animate-app-enter,
+  .login-moving-grid,
+  .login-scan-band,
   .page-route-enter,
   .page-loader-enter,
   .onboarding-spotlight,

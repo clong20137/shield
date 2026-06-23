@@ -441,7 +441,7 @@ function LoginSplash({
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const [isLoginWarningOpen, setIsLoginWarningOpen] = useState(false);
   const [hasAcknowledgedLoginWarning, setHasAcknowledgedLoginWarning] = useState(false);
-  const loginInputClass = 'w-full rounded border-2 border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400';
+  const loginInputClass = 'w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400';
   const loginFormRef = useRef<HTMLFormElement | null>(null);
   const lastAutoSubmittedTwoFactorCodeRef = useRef('');
 
@@ -615,26 +615,48 @@ function LoginSplash({
     (registrationSettings?.mode === 'invite-only' && Boolean(inviteToken));
 
   return (
-    <div className={`min-h-screen bg-gray-100 text-gray-900 dark:bg-gray-950 dark:text-gray-100 ${isExiting ? 'animate-login-exit pointer-events-none' : ''}`}>
-      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[minmax(0,1fr)_480px]">
-        <section className="flex items-center bg-primary-500 px-8 py-12 text-white lg:px-16">
+    <div className={`login-shell relative min-h-screen overflow-hidden bg-gray-950 text-gray-900 dark:text-gray-100 ${isExiting ? 'animate-login-exit pointer-events-none' : ''}`}>
+      <div className="login-moving-grid" aria-hidden="true" />
+      <div className="login-scan-band" aria-hidden="true" />
+      <div className="relative z-10 grid min-h-screen grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(27rem,31rem)]">
+        <section className="hidden min-h-screen items-center px-8 py-12 text-white lg:flex lg:px-16">
           <div className="max-w-3xl">
-            <p className="mb-4 text-sm font-semibold uppercase tracking-[0.24em] text-blue-100">
-              {siteName}
-            </p>
-            <h1 className="mb-5 text-5xl font-bold leading-tight text-white">
+            <div className="mb-8 flex items-center gap-4">
+              <span className="flex h-20 w-20 items-center justify-center rounded-2xl border border-white/15 bg-white/10 shadow-2xl backdrop-blur">
+                <img src={withAppBase('/shield-splash-logo.png')} alt="" className="h-16 w-16 object-contain" />
+              </span>
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-accent">Secure Access</p>
+                <p className="mt-1 text-sm font-semibold text-blue-100">{siteName}</p>
+              </div>
+            </div>
+            <h1 className="mb-5 text-6xl font-black leading-none text-white">
               {appName}
             </h1>
-            <p className="max-w-2xl text-lg leading-8 text-blue-50">
-              Search personnel records, review operational reporting, and monitor agency activity from one secured workspace.
+            <p className="max-w-2xl text-xl leading-8 text-blue-50">
+              A secured workspace for personnel lookup, reporting, messages, calendar workflows, and daily operations.
             </p>
+            <div className="mt-10 grid max-w-2xl grid-cols-3 gap-3">
+              {['Personnel', 'Reports', 'Messages'].map((label) => (
+                <div key={label} className="rounded-lg border border-white/10 bg-white/8 px-4 py-3 text-sm font-bold text-blue-50 shadow-xl backdrop-blur">
+                  {label}
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
-        <section className="flex items-center justify-center px-6 py-10">
-          <form ref={loginFormRef} onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-6 shadow-lg dark:border-gray-800 dark:bg-gray-900">
-            <div className="mb-6">
-              <h2 className="mb-2 text-2xl font-bold text-primary-500">
+        <section className="flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:bg-white/6 lg:backdrop-blur-xl">
+          <form ref={loginFormRef} onSubmit={handleSubmit} className="w-full max-w-md rounded-xl border border-white/15 bg-white/95 p-6 shadow-[0_28px_90px_rgba(0,0,0,0.35)] ring-1 ring-black/5 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-900/95 sm:p-8">
+            <div className="mb-7">
+              <div className="mb-5 flex items-center gap-3 lg:hidden">
+                <img src={withAppBase('/shield-splash-logo.png')} alt="" className="h-14 w-14 object-contain drop-shadow-lg" />
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-accent">Secure Access</p>
+                  <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">{appName}</p>
+                </div>
+              </div>
+              <h2 className="mb-2 text-3xl font-black text-primary-500 dark:text-blue-100">
                 {mode === 'register' ? 'Create login' : mode === 'forgot' ? 'Reset password' : mode === 'reset' ? 'Set new password' : 'Sign in'}
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -670,7 +692,7 @@ function LoginSplash({
                   onClick={() => {
                     window.location.assign(authService.getMicrosoftSsoStartUrl(`${window.location.pathname}${window.location.search}` || '/'));
                   }}
-                  className="flex w-full items-center justify-center gap-2 rounded border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-primary-500 shadow-sm transition hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-950 dark:text-blue-100"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-primary-500 shadow-sm transition hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-950 dark:text-blue-100"
                   disabled={isSubmitting}
                 >
                   <Shield size={17} />
@@ -761,7 +783,7 @@ function LoginSplash({
               </label>
             )}
 
-            <button type="submit" className="btn-primary w-full py-3" disabled={isSubmitting || (mode === 'register' && !canRegister)}>
+            <button type="submit" className="btn-primary w-full rounded-lg py-3.5 text-base" disabled={isSubmitting || (mode === 'register' && !canRegister)}>
               {isSubmitting ? 'Working...' : mode === 'register' ? 'Create login' : mode === 'forgot' ? 'Send reset link' : mode === 'reset' ? 'Set password' : 'Sign in'}
             </button>
 
