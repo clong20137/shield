@@ -3,6 +3,7 @@ const { autoUpdater } = require('electron-updater');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('zlib');
 
 const defaultConfig = {
   appUrl: 'https://shield.example.gov',
@@ -58,6 +59,180 @@ const desktopSessionTimeoutCheckIntervalMs = 5 * 1000;
 const webAppSignatureRequestTimeoutMs = 10 * 1000;
 const webAppLoadRetryBaseMs = 2 * 1000;
 const webAppLoadRetryMaxMs = 25 * 1000;
+
+const pngCrcTable = Array.from({ length: 256 }, (_, index) => {
+  let value = index;
+  for (let bit = 0; bit < 8; bit += 1) {
+    value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+  }
+  return value >>> 0;
+});
+
+function pngCrc32(buffer) {
+  let crc = 0xffffffff;
+  for (let index = 0; index < buffer.length; index += 1) {
+    crc = pngCrcTable[(crc ^ buffer[index]) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function createPngChunk(type, data) {
+  const typeBuffer = Buffer.from(type, 'ascii');
+  const lengthBuffer = Buffer.alloc(4);
+  const crcBuffer = Buffer.alloc(4);
+  lengthBuffer.writeUInt32BE(data.length, 0);
+  crcBuffer.writeUInt32BE(pngCrc32(Buffer.concat([typeBuffer, data])), 0);
+  return Buffer.concat([lengthBuffer, typeBuffer, data, crcBuffer]);
+}
+
+function createPngImage(width, height, draw) {
+  const pixels = Buffer.alloc(width * height * 4, 0);
+  const canvas = {
+    width,
+    height,
+    setPixel(x, y, color) {
+      const px = Math.round(x);
+      const py = Math.round(y);
+      if (px < 0 || py < 0 || px >= width || py >= height) {
+        return;
+      }
+      const offset = (py * width + px) * 4;
+      pixels[offset] = color[0];
+      pixels[offset + 1] = color[1];
+      pixels[offset + 2] = color[2];
+      pixels[offset + 3] = color[3];
+    }
+  };
+
+  draw(canvas);
+
+  const rawRows = [];
+  for (let y = 0; y < height; y += 1) {
+    rawRows.push(Buffer.from([0]));
+    rawRows.push(pixels.subarray(y * width * 4, (y + 1) * width * 4));
+  }
+
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8;
+  header[9] = 6;
+  header[10] = 0;
+  header[11] = 0;
+  header[12] = 0;
+
+  return nativeImage.createFromBuffer(Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    createPngChunk('IHDR', header),
+    createPngChunk('IDAT', zlib.deflateSync(Buffer.concat(rawRows))),
+    createPngChunk('IEND', Buffer.alloc(0))
+  ]));
+}
+
+function colorToRgba(hex, alpha = 255) {
+  const value = String(hex || '#000000').replace('#', '');
+  return [
+    parseInt(value.slice(0, 2), 16) || 0,
+    parseInt(value.slice(2, 4), 16) || 0,
+    parseInt(value.slice(4, 6), 16) || 0,
+    alpha
+  ];
+}
+
+function drawCircle(canvas, centerX, centerY, radius, color) {
+  const radiusSquared = radius * radius;
+  for (let y = Math.floor(centerY - radius); y <= Math.ceil(centerY + radius); y += 1) {
+    for (let x = Math.floor(centerX - radius); x <= Math.ceil(centerX + radius); x += 1) {
+      const dx = x - centerX;
+      const dy = y - centerY;
+      if (dx * dx + dy * dy <= radiusSquared) {
+        canvas.setPixel(x, y, color);
+      }
+    }
+  }
+}
+
+function drawRect(canvas, x, y, width, height, color) {
+  for (let py = Math.round(y); py < Math.round(y + height); py += 1) {
+    for (let px = Math.round(x); px < Math.round(x + width); px += 1) {
+      canvas.setPixel(px, py, color);
+    }
+  }
+}
+
+function drawRoundedRect(canvas, x, y, width, height, radius, color) {
+  const right = x + width - 1;
+  const bottom = y + height - 1;
+  for (let py = Math.round(y); py <= Math.round(bottom); py += 1) {
+    for (let px = Math.round(x); px <= Math.round(right); px += 1) {
+      const nearLeft = px < x + radius;
+      const nearRight = px > right - radius;
+      const nearTop = py < y + radius;
+      const nearBottom = py > bottom - radius;
+      if ((nearLeft && nearTop && (px - (x + radius)) ** 2 + (py - (y + radius)) ** 2 > radius ** 2) ||
+        (nearRight && nearTop && (px - (right - radius)) ** 2 + (py - (y + radius)) ** 2 > radius ** 2) ||
+        (nearLeft && nearBottom && (px - (x + radius)) ** 2 + (py - (bottom - radius)) ** 2 > radius ** 2) ||
+        (nearRight && nearBottom && (px - (right - radius)) ** 2 + (py - (bottom - radius)) ** 2 > radius ** 2)) {
+        continue;
+      }
+      canvas.setPixel(px, py, color);
+    }
+  }
+}
+
+function drawPolygon(canvas, points, color) {
+  const minY = Math.floor(Math.min(...points.map((point) => point[1])));
+  const maxY = Math.ceil(Math.max(...points.map((point) => point[1])));
+  for (let y = minY; y <= maxY; y += 1) {
+    const intersections = [];
+    for (let index = 0; index < points.length; index += 1) {
+      const [x1, y1] = points[index];
+      const [x2, y2] = points[(index + 1) % points.length];
+      if ((y1 <= y && y2 > y) || (y2 <= y && y1 > y)) {
+        intersections.push(x1 + ((y - y1) * (x2 - x1)) / (y2 - y1));
+      }
+    }
+    intersections.sort((a, b) => a - b);
+    for (let pair = 0; pair < intersections.length; pair += 2) {
+      for (let x = Math.ceil(intersections[pair]); x <= Math.floor(intersections[pair + 1]); x += 1) {
+        canvas.setPixel(x, y, color);
+      }
+    }
+  }
+}
+
+const digitPatterns = {
+  '0': ['111', '101', '101', '101', '111'],
+  '1': ['010', '110', '010', '010', '111'],
+  '2': ['111', '001', '111', '100', '111'],
+  '3': ['111', '001', '111', '001', '111'],
+  '4': ['101', '101', '111', '001', '001'],
+  '5': ['111', '100', '111', '001', '111'],
+  '6': ['111', '100', '111', '101', '111'],
+  '7': ['111', '001', '010', '010', '010'],
+  '8': ['111', '101', '111', '101', '111'],
+  '9': ['111', '101', '111', '001', '111'],
+  '+': ['010', '010', '111', '010', '010']
+};
+
+function drawPixelText(canvas, text, x, y, scale, color) {
+  let cursorX = x;
+  for (const char of String(text)) {
+    const pattern = digitPatterns[char];
+    if (!pattern) {
+      cursorX += 2 * scale;
+      continue;
+    }
+    pattern.forEach((row, rowIndex) => {
+      row.split('').forEach((cell, columnIndex) => {
+        if (cell === '1') {
+          drawRect(canvas, cursorX + columnIndex * scale, y + rowIndex * scale, scale, scale, color);
+        }
+      });
+    });
+    cursorX += 4 * scale;
+  }
+}
 const maxWebAppLoadRetries = 8;
 const maxDesktopLogEntries = 150;
 let webAppUpdateCheckTimer = null;
@@ -380,23 +555,21 @@ function getDesktopConfig() {
 
 function createShieldTrayIcon(count = desktopUnreadCount, status = desktopPresenceStatus) {
   const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0;
-  const presenceColor = getPresenceDotColor(status || 'active');
-  const label = safeCount > 99 ? '99+' : String(safeCount);
-  const badgeText = safeCount > 0
-    ? `<rect x="1.5" y="2.25" width="${label.length > 2 ? 20 : 16}" height="11" rx="5.5" fill="#dc2626"/>
-       <text x="${label.length > 2 ? 11.5 : 9.5}" y="10.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="${label.length > 2 ? 7 : 8.5}" font-weight="800" fill="#ffffff">${label}</text>`
-    : '';
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-    <rect width="32" height="32" rx="7" fill="#0f172a"/>
-    <path d="M16 4.2 25 7.4v6.8c0 5.8-3.7 10.9-9 13.6-5.3-2.7-9-7.8-9-13.6V7.4l9-3.2Z" fill="#2563eb"/>
-    <path d="M16 7.1 22.2 9.3v4.6c0 4-2.5 7.6-6.2 9.7-3.7-2.1-6.2-5.7-6.2-9.7V9.3L16 7.1Z" fill="#e5e7eb"/>
-    <path d="M16 9.2 20.1 10.7v3.1c0 2.7-1.6 5.1-4.1 6.8-2.5-1.7-4.1-4.1-4.1-6.8v-3.1L16 9.2Z" fill="#dc2626"/>
-    ${badgeText}
-    <circle cx="25" cy="25" r="6.5" fill="#ffffff"/>
-    <circle cx="25" cy="25" r="4.9" fill="${presenceColor}"/>
-  </svg>`;
+  const presenceColor = colorToRgba(getPresenceDotColor(status || 'active'));
 
-  return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+  return createPngImage(32, 32, (canvas) => {
+    drawRoundedRect(canvas, 1, 1, 30, 30, 7, colorToRgba('#0f172a'));
+    drawPolygon(canvas, [[16, 4], [25, 7.5], [25, 15], [22, 23], [16, 28], [10, 23], [7, 15], [7, 7.5]], colorToRgba('#2563eb'));
+    drawPolygon(canvas, [[16, 7], [22, 9.5], [22, 14.5], [20, 20.5], [16, 24], [12, 20.5], [10, 14.5], [10, 9.5]], colorToRgba('#e5e7eb'));
+    drawPolygon(canvas, [[16, 10], [20, 12], [20, 15], [18.5, 19], [16, 21], [13.5, 19], [12, 15], [12, 12]], colorToRgba('#dc2626'));
+    if (safeCount > 0) {
+      const label = safeCount > 99 ? '99+' : String(safeCount);
+      drawRoundedRect(canvas, 1, 2, label.length > 2 ? 20 : 16, 11, 5, colorToRgba('#dc2626'));
+      drawPixelText(canvas, label, label.length > 2 ? 3 : 4, 4, 1, colorToRgba('#ffffff'));
+    }
+    drawCircle(canvas, 25, 25, 6.7, colorToRgba('#ffffff'));
+    drawCircle(canvas, 25, 25, 4.9, presenceColor);
+  });
 }
 
 function createBaseAppIcon() {
@@ -405,14 +578,7 @@ function createBaseAppIcon() {
     return nativeImage.createFromPath(iconPath);
   }
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-    <rect width="32" height="32" rx="7" fill="#0f172a"/>
-    <path d="M16 4.2 25 7.4v6.8c0 5.8-3.7 10.9-9 13.6-5.3-2.7-9-7.8-9-13.6V7.4l9-3.2Z" fill="#2563eb"/>
-    <path d="M16 7.1 22.2 9.3v4.6c0 4-2.5 7.6-6.2 9.7-3.7-2.1-6.2-5.7-6.2-9.7V9.3L16 7.1Z" fill="#e5e7eb"/>
-    <path d="M16 9.2 20.1 10.7v3.1c0 2.7-1.6 5.1-4.1 6.8-2.5-1.7-4.1-4.1-4.1-6.8v-3.1L16 9.2Z" fill="#dc2626"/>
-  </svg>`;
-
-  return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+  return createShieldTrayIcon(0, 'active');
 }
 
 function showMainWindow() {
@@ -868,27 +1034,22 @@ function stopWebAppUpdateChecks() {
 }
 
 function createBadgeOverlay(count, status) {
-  const presenceColor = getPresenceDotColor(status || 'active');
+  const presenceColor = colorToRgba(getPresenceDotColor(status || 'active'));
   const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0;
-  const label = safeCount > 99 ? '99+' : String(safeCount);
 
-  if (safeCount === 0) {
-    const statusSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-      <rect width="64" height="64" fill="transparent"/>
-      <circle cx="40" cy="40" r="17" fill="#ffffff"/>
-      <circle cx="40" cy="40" r="12.5" fill="${presenceColor}"/>
-    </svg>`;
-    return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(statusSvg)}`);
-  }
+  return createPngImage(64, 64, (canvas) => {
+    if (safeCount > 0) {
+      const label = safeCount > 99 ? '99+' : String(safeCount);
+      drawRoundedRect(canvas, 2, 9, label.length > 2 ? 44 : 36, 29, 14, colorToRgba('#dc2626'));
+      drawPixelText(canvas, label, label.length > 2 ? 9 : 12, 15, label.length > 2 ? 3 : 4, colorToRgba('#ffffff'));
+      drawCircle(canvas, 48, 48, 15, colorToRgba('#ffffff'));
+      drawCircle(canvas, 48, 48, 11, presenceColor);
+      return;
+    }
 
-  const statusWithCount = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-    <rect width="64" height="64" fill="transparent"/>
-    <rect x="2" y="10" width="${label.length > 2 ? 43 : 35}" height="28" rx="14" fill="#dc2626"/>
-    <text x="${label.length > 2 ? 23.5 : 19.5}" y="30.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="${label.length > 2 ? 15 : 18}" font-weight="800" fill="#ffffff">${label}</text>
-    <circle cx="47" cy="47" r="14.5" fill="#ffffff"/>
-    <circle cx="47" cy="47" r="10.5" fill="${presenceColor}"/>
-  </svg>`;
-  return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(statusWithCount)}`);
+    drawCircle(canvas, 42, 42, 18, colorToRgba('#ffffff'));
+    drawCircle(canvas, 42, 42, 13, presenceColor);
+  });
 }
 
 function getShieldIconPath() {
