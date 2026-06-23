@@ -399,6 +399,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const [messagePendingDelete, setMessagePendingDelete] = useState<UserMessage | null>(null);
   const [threadPendingDelete, setThreadPendingDelete] = useState<MessageThread | null>(null);
   const [selectedMentionUser, setSelectedMentionUser] = useState<User | null>(null);
+  const [isComposerFocused, setIsComposerFocused] = useState(false);
   const [presenceByAccount, setPresenceByAccount] = useState<Record<string, { online: boolean; away: boolean; status?: 'active' | 'away' | 'busy'; lastSeenAt: string | null }>>({});
   const [memberDirectory, setMemberDirectory] = useState<Record<string, ThreadMemberPreview>>({});
   const [composePopoverPosition, setComposePopoverPosition] = useState({ right: 16, bottom: 88 });
@@ -2124,7 +2125,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                     ))}
                   </div>
                 )}
-                <div className="relative flex min-h-14 items-end gap-1.5 rounded-2xl border border-gray-200 bg-white px-2.5 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-950 sm:items-center sm:gap-2 sm:rounded-full sm:px-3 sm:py-1.5">
+                <div className={`relative flex min-h-14 items-end gap-1.5 rounded-2xl border bg-white px-2.5 py-2 shadow-sm transition duration-200 dark:bg-gray-950 sm:items-center sm:gap-2 sm:rounded-full sm:px-3 sm:py-1.5 ${
+                  isComposerFocused
+                    ? 'border-primary-500 shadow-[0_10px_28px_rgba(26,54,93,0.16)] ring-2 ring-primary-500/10 dark:border-blue-300 dark:ring-blue-300/10'
+                    : 'border-gray-200 dark:border-gray-700'
+                }`}>
                   <button
                     type="button"
                     onClick={() => setIsEmojiPickerOpen((value) => !value)}
@@ -2188,10 +2193,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                     wrapperClassName="min-w-0 flex-1"
                     onKeyDown={handleReplyKeyDown}
                     onPaste={handleMessagePaste}
+                    onFocus={() => setIsComposerFocused(true)}
+                    onBlur={() => setIsComposerFocused(false)}
                     placeholder={selectedThreadAcceptsMessages ? 'Message. Use @name to mention someone.' : 'Messages are disabled for this user'}
                     disabled={!selectedThreadAcceptsMessages}
                     rows={1}
-                    className="min-h-10 resize-none overflow-hidden border-0 bg-transparent px-1 py-2 text-sm leading-5 outline-none ring-0 focus:border-0 focus:ring-0 dark:bg-transparent sm:min-h-8 sm:py-1.5"
+                    className="min-h-10 resize-none overflow-hidden border-0 bg-transparent px-1 py-2 text-[16px] leading-6 outline-none ring-0 focus:border-0 focus:ring-0 dark:bg-transparent sm:min-h-8 sm:py-1.5 sm:text-sm sm:leading-5"
                   />
                   <button type="submit" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9" disabled={isSending || !selectedThreadAcceptsMessages} aria-label="Send message">
                     <Send size={17} />
