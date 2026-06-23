@@ -1,0 +1,26 @@
+{
+  "name": "SHIELD",
+  "short_name": "SHIELD",
+  "description": "Secure internal agency user search and reporting.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f9fafb",
+  "theme_color": "#1d3f6f",
+  "categories": ["productivity", "business"],
+  "icons": [
+    {
+      "src": "shield-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "shield-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

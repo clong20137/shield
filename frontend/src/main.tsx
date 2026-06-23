@@ -36,3 +36,13 @@ function finishInitialSplash() {
 
 const remainingSplashMs = Math.max(0, MINIMUM_SPLASH_MS - (performance.now() - splashStartedAt));
 window.setTimeout(finishInitialSplash, remainingSplashMs);
+
+if ('serviceWorker' in navigator && (window.isSecureContext || window.location.hostname === 'localhost')) {
+  window.addEventListener('load', () => {
+    const basePath = import.meta.env.BASE_URL || '/';
+    const serviceWorkerUrl = `${basePath.replace(/\/?$/u, '/')}service-worker.js`;
+    navigator.serviceWorker.register(serviceWorkerUrl).catch((error) => {
+      console.error('Failed to register SHIELD service worker:', error);
+    });
+  });
+}

@@ -3,7 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="%BASE_URL%shield-icon.png" />
+    <link rel="apple-touch-icon" href="%BASE_URL%shield-icon.png" />
+    <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1d3f6f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SHIELD" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>SHIELD - Agency User Search & Reporting System</title>
     <style>
       :root {
@@ -45,18 +52,6 @@
         align-items: center;
         justify-content: center;
         overflow: visible;
-      }
-
-      .initial-splash-mark::after {
-        content: '';
-        position: absolute;
-        inset: 1.25rem;
-        z-index: 4;
-        background: linear-gradient(115deg, transparent 18%, rgba(255, 255, 255, 0.72) 46%, transparent 72%);
-        opacity: 0.68;
-        transform: translateX(-150%) rotate(10deg);
-        animation: splash-logo-shine 2.4s ease-in-out infinite;
-        pointer-events: none;
       }
 
       .initial-splash-mark img {
@@ -137,18 +132,6 @@
         }
       }
 
-      @keyframes splash-logo-shine {
-        0%,
-        24% {
-          transform: translateX(-150%) rotate(10deg);
-        }
-
-        58%,
-        100% {
-          transform: translateX(150%) rotate(10deg);
-        }
-      }
-
       @keyframes splash-progress {
         0% {
           transform: scaleX(0);
@@ -189,7 +172,6 @@
       }
 
       @media (prefers-reduced-motion: reduce) {
-        .initial-splash-mark::after,
         .initial-splash-mark img,
         .initial-splash-progress span,
         .initial-splash-fallback {
