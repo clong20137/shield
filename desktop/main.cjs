@@ -378,7 +378,28 @@ function getDesktopConfig() {
   };
 }
 
-function createShieldTrayIcon() {
+function createShieldTrayIcon(count = desktopUnreadCount, status = desktopPresenceStatus) {
+  const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0;
+  const presenceColor = getPresenceDotColor(status || 'active');
+  const label = safeCount > 99 ? '99+' : String(safeCount);
+  const badgeText = safeCount > 0
+    ? `<rect x="1.5" y="2.25" width="${label.length > 2 ? 20 : 16}" height="11" rx="5.5" fill="#dc2626"/>
+       <text x="${label.length > 2 ? 11.5 : 9.5}" y="10.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="${label.length > 2 ? 7 : 8.5}" font-weight="800" fill="#ffffff">${label}</text>`
+    : '';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+    <rect width="32" height="32" rx="7" fill="#0f172a"/>
+    <path d="M16 4.2 25 7.4v6.8c0 5.8-3.7 10.9-9 13.6-5.3-2.7-9-7.8-9-13.6V7.4l9-3.2Z" fill="#2563eb"/>
+    <path d="M16 7.1 22.2 9.3v4.6c0 4-2.5 7.6-6.2 9.7-3.7-2.1-6.2-5.7-6.2-9.7V9.3L16 7.1Z" fill="#e5e7eb"/>
+    <path d="M16 9.2 20.1 10.7v3.1c0 2.7-1.6 5.1-4.1 6.8-2.5-1.7-4.1-4.1-4.1-6.8v-3.1L16 9.2Z" fill="#dc2626"/>
+    ${badgeText}
+    <circle cx="25" cy="25" r="6.5" fill="#ffffff"/>
+    <circle cx="25" cy="25" r="4.9" fill="${presenceColor}"/>
+  </svg>`;
+
+  return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+}
+
+function createBaseAppIcon() {
   const iconPath = getShieldIconPath();
   if (iconPath) {
     return nativeImage.createFromPath(iconPath);
@@ -414,14 +435,23 @@ function rebuildTrayMenu() {
   }
 
   const preferences = getDesktopPreferences();
-  const unreadLabel = desktopUnreadCount > 0 ? `Messages (${desktopUnreadCount > 99 ? '99+' : desktopUnreadCount})` : 'Messages';
+  const activityLabel = desktopUnreadCount > 0 ? `Activity: ${desktopUnreadCount > 99 ? '99+' : desktopUnreadCount}` : 'Activity: Clear';
+  const statusLabel = getPresenceStatusLabel(desktopPresenceStatus);
   tray.setContextMenu(Menu.buildFromTemplate([
     {
       label: 'Open Shield',
       click: showMainWindow
     },
     {
-      label: unreadLabel,
+      label: `Status: ${statusLabel}`,
+      enabled: false
+    },
+    {
+      label: activityLabel,
+      enabled: false
+    },
+    {
+      label: 'Messages',
       click: () => {
         showMainWindow();
         if (mainWindow) {
@@ -485,7 +515,9 @@ function updateTrayBadge(count) {
   }
 
   const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0;
-  tray.setToolTip(safeCount > 0 ? `Shield - ${safeCount} unread message${safeCount === 1 ? '' : 's'}` : 'Shield');
+  const statusLabel = getPresenceStatusLabel(desktopPresenceStatus);
+  tray.setImage(createShieldTrayIcon(safeCount, desktopPresenceStatus));
+  tray.setToolTip(safeCount > 0 ? `Shield - ${statusLabel} - ${safeCount} unread item${safeCount === 1 ? '' : 's'}` : `Shield - ${statusLabel}`);
   rebuildTrayMenu();
 }
 
@@ -841,20 +873,20 @@ function createBadgeOverlay(count, status) {
   const label = safeCount > 99 ? '99+' : String(safeCount);
 
   if (safeCount === 0) {
-    const statusSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-      <rect width="32" height="32" fill="transparent"/>
-      <circle cx="21" cy="21" r="8.5" fill="#ffffff"/>
-      <circle cx="21" cy="21" r="6.5" fill="${presenceColor}"/>
+    const statusSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+      <rect width="64" height="64" fill="transparent"/>
+      <circle cx="40" cy="40" r="17" fill="#ffffff"/>
+      <circle cx="40" cy="40" r="12.5" fill="${presenceColor}"/>
     </svg>`;
     return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(statusSvg)}`);
   }
 
-  const statusWithCount = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-    <rect width="32" height="32" fill="transparent"/>
-    <rect x="2" y="5" width="23" height="18" rx="9" fill="#0f172a"/>
-    <text x="13.5" y="18.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="${label.length > 2 ? 9 : 12}" font-weight="700" fill="#ffffff">${label}</text>
-    <circle cx="23" cy="23" r="7.5" fill="#ffffff"/>
-    <circle cx="23" cy="23" r="5.5" fill="${presenceColor}"/>
+  const statusWithCount = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+    <rect width="64" height="64" fill="transparent"/>
+    <rect x="2" y="10" width="${label.length > 2 ? 43 : 35}" height="28" rx="14" fill="#dc2626"/>
+    <text x="${label.length > 2 ? 23.5 : 19.5}" y="30.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="${label.length > 2 ? 15 : 18}" font-weight="800" fill="#ffffff">${label}</text>
+    <circle cx="47" cy="47" r="14.5" fill="#ffffff"/>
+    <circle cx="47" cy="47" r="10.5" fill="${presenceColor}"/>
   </svg>`;
   return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(statusWithCount)}`);
 }
@@ -876,14 +908,14 @@ function getShieldIconPath() {
 }
 
 function updateUnreadBadge(count) {
-  if (!mainWindow) {
-    return;
-  }
-
   const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0;
   desktopUnreadCount = safeCount;
   app.setBadgeCount(safeCount);
   updateTrayBadge(safeCount);
+
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
 
   if (process.platform === 'win32') {
     const overlay = createBadgeOverlay(safeCount, desktopPresenceStatus);

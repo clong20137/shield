@@ -6603,22 +6603,6 @@ function App() {
   }, [currentUser, getCustomNotificationSoundUrl, messagePreferences.receiveMessages, messagePreferences.playMessageSound, messagePreferences.messageSound, messagePreferences.browserNotifications]);
 
   useEffect(() => {
-    if (!hasShieldDesktopFeature('setUnreadCount')) {
-      return;
-    }
-
-    window.shieldDesktop?.setUnreadCount?.(messageUnreadCount).catch((error) => {
-      console.error('Failed to update desktop unread badge:', error);
-    });
-
-    if (messageUnreadCount === 0 && hasShieldDesktopFeature('clearAttention')) {
-      window.shieldDesktop?.clearAttention?.().catch((error) => {
-        console.error('Failed to clear desktop attention state:', error);
-      });
-    }
-  }, [messageUnreadCount]);
-
-  useEffect(() => {
     if (!hasShieldDesktopFeature('onNotificationClick')) {
       return;
     }
@@ -6820,10 +6804,27 @@ function App() {
   const unreadUserNotifications = userNotifications.filter((notification) => !notification.isRead);
   const recentNotificationCount = notifications.length;
   const totalNotificationCount = recentNotificationCount + unreadNotificationCount + (isAdministrator ? openBugCount : 0);
+  const desktopBadgeCount = messageUnreadCount + unreadNotificationCount + (isAdministrator ? openBugCount : 0);
   const hasNotificationCenterItems = totalNotificationCount > 0 || userNotifications.length > 0;
   const shouldShowForcedPasswordModal = Boolean(
     currentUser?.mustChangePassword && !isWelcomeSplashOpen && !isFirstLoginGuideOpen,
   );
+
+  useEffect(() => {
+    if (!hasShieldDesktopFeature('setUnreadCount')) {
+      return;
+    }
+
+    window.shieldDesktop?.setUnreadCount?.(desktopBadgeCount).catch((error) => {
+      console.error('Failed to update desktop badge:', error);
+    });
+
+    if (desktopBadgeCount === 0 && hasShieldDesktopFeature('clearAttention')) {
+      window.shieldDesktop?.clearAttention?.().catch((error) => {
+        console.error('Failed to clear desktop attention state:', error);
+      });
+    }
+  }, [desktopBadgeCount]);
 
   const loadBugReports = useCallback(async () => {
     if (!isAdministrator) return;
