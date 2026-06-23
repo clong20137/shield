@@ -74,18 +74,6 @@
   }
 }
 
-@keyframes shield-logo-shine {
-  0%,
-  24% {
-    transform: translateX(-150%) rotate(10deg);
-  }
-
-  58%,
-  100% {
-    transform: translateX(150%) rotate(10deg);
-  }
-}
-
 @keyframes shield-loading-progress {
   0% {
     transform: translateX(-105%);
@@ -2004,16 +1992,6 @@
 
   .shield-app-icon-loader {
     @apply relative flex h-32 w-32 items-center justify-center overflow-visible;
-  }
-
-  .shield-app-icon-loader::after {
-    content: '';
-    @apply pointer-events-none absolute z-40;
-    inset: 1.25rem;
-    background: linear-gradient(115deg, transparent 18%, rgba(255, 255, 255, 0.72) 46%, transparent 72%);
-    opacity: 0.68;
-    transform: translateX(-150%) rotate(10deg);
-    animation: shield-logo-shine 2.4s ease-in-out infinite;
   }
 
   .shield-app-icon-loader img {
