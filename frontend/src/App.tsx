@@ -461,6 +461,7 @@ function LoginSplash({
   const [hasAcknowledgedLoginWarning, setHasAcknowledgedLoginWarning] = useState(false);
   const loginInputClass = 'w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400';
   const loginFormRef = useRef<HTMLFormElement | null>(null);
+  const twoFactorInputRef = useRef<HTMLInputElement | null>(null);
   const lastAutoSubmittedTwoFactorCodeRef = useRef('');
 
   useEffect(() => {
@@ -495,6 +496,15 @@ function LoginSplash({
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [onToast, ssoError]);
+
+  useEffect(() => {
+    if (requiresTwoFactor && mode === 'login') {
+      window.setTimeout(() => {
+        twoFactorInputRef.current?.focus();
+        twoFactorInputRef.current?.select();
+      }, 0);
+    }
+  }, [mode, requiresTwoFactor]);
 
   useEffect(() => {
     const cleanCode = twoFactorCode.replace(/[^A-Z0-9]/giu, '');
@@ -613,6 +623,7 @@ function LoginSplash({
 
       if (response.data.requiresTwoFactor) {
         setRequiresTwoFactor(true);
+        setTwoFactorCode('');
         return;
       }
 
@@ -784,6 +795,7 @@ function LoginSplash({
               <label className="mb-6 block">
                 <span className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">MFA code or recovery code</span>
                 <input
+                  ref={twoFactorInputRef}
                   value={twoFactorCode}
                   onChange={(event) => setTwoFactorCode(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/gu, '').slice(0, 12))}
                   className={loginInputClass}

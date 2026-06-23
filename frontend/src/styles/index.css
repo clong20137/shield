@@ -1155,9 +1155,34 @@
   }
 
   .login-panel {
-    animation: login-panel-enter 480ms cubic-bezier(0.17, 0.84, 0.44, 1) both;
-    animation-delay: 90ms;
+    border-color: transparent;
+    background:
+      linear-gradient(rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.96)) padding-box,
+      conic-gradient(
+        from var(--shield-border-angle),
+        rgba(156, 134, 92, 0.18),
+        rgba(26, 54, 93, 0.46),
+        rgba(156, 134, 92, 0.96),
+        rgba(26, 54, 93, 0.24),
+        rgba(156, 134, 92, 0.18)
+      ) border-box;
+    animation:
+      login-panel-enter 480ms cubic-bezier(0.17, 0.84, 0.44, 1) 90ms both,
+      shield-border-spin 9s linear infinite;
     will-change: opacity, transform, filter;
+  }
+
+  .dark .login-panel {
+    background:
+      linear-gradient(rgba(17, 24, 39, 0.96), rgba(17, 24, 39, 0.96)) padding-box,
+      conic-gradient(
+        from var(--shield-border-angle),
+        rgba(156, 134, 92, 0.2),
+        rgba(147, 197, 253, 0.48),
+        rgba(156, 134, 92, 0.96),
+        rgba(59, 130, 246, 0.22),
+        rgba(156, 134, 92, 0.2)
+      ) border-box;
   }
 
   .login-moving-grid {
@@ -1334,12 +1359,21 @@
   }
 
   .header-action-button.header-action-button {
-    color: rgb(255, 255, 255);
+    color: rgb(255, 255, 255) !important;
   }
 
   .header-action-button.header-action-button:hover,
   .header-action-button.header-action-button:focus-visible {
-    color: rgb(255, 255, 255);
+    color: rgb(255, 255, 255) !important;
+  }
+
+  .header-action-button.header-action-button svg {
+    color: rgb(255, 255, 255) !important;
+    stroke: rgb(255, 255, 255) !important;
+  }
+
+  .header-action-button.header-action-button [stroke] {
+    stroke: rgb(255, 255, 255) !important;
   }
 
   .global-search-input {
