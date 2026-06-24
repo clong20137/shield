@@ -321,6 +321,29 @@ const wholeNumberDetailFields = new Set<string>(
     .filter((key) => !key.toLowerCase().includes('grams') && key !== 'pbt'),
 );
 
+const narrativeActivityKeys = [
+  'citations',
+  'warnings',
+  'crashesInvestigated',
+  'callsForService',
+  'motoristAssists',
+  'totalCriminalArrests',
+  'criminalDefendants',
+  'owiDefendants',
+  'vehicleInspections',
+  'commercialVehicleInspections',
+  'totalDrugArrests',
+  'totalDrugDefendants',
+] as const;
+
+type NarrativeLearningProfile = {
+  exampleCount: number;
+  firstPerson: boolean;
+  terse: boolean;
+  sentenceJoiner: string;
+  hourWord: 'hours' | 'hrs';
+};
+
 const getDefaultDistrict = (currentUser?: AuthAccount) =>
   currentUser?.district && districtOptions.includes(currentUser.district)
     ? currentUser.district
@@ -602,6 +625,94 @@ function calculateTimeRangeHours(details: Record<string, string>, startKey: stri
 
 function formatHours(value: number): string {
   return value.toFixed(2).replace(/\.?0+$/u, '');
+}
+
+function formatNarrativeHours(value: string | number, profile: NarrativeLearningProfile): string {
+  return `${typeof value === 'number' ? formatHours(value) : value} ${profile.hourWord}`;
+}
+
+function getNarrativeActivitySummary(details: Record<string, string>): string[] {
+  return narrativeActivityKeys
+    .map((key) => {
+      const value = parseNumericDetail(details, key);
+      const label = trooperDailyFieldLabels.get(key);
+      return value > 0 && label ? `${formatHours(value)} ${label.toLowerCase()}` : '';
+    })
+    .filter(Boolean);
+}
+
+function getNarrativeTokens(entry: Pick<CalendarEntryForm, 'dutyHours' | 'districtWorked' | 'specialStatus' | 'details'>): Set<string> {
+  const details = entry.details || {};
+  const tokens = new Set<string>();
+  if (entry.dutyHours) tokens.add('duty-hours');
+  if (entry.districtWorked) tokens.add(`district:${entry.districtWorked.toLowerCase()}`);
+  if (entry.specialStatus && entry.specialStatus !== 'None') tokens.add(`status:${entry.specialStatus.toLowerCase()}`);
+  if (calculateShiftHours(details) > 0) tokens.add('shift-time');
+  if (parseNumericDetail(details, 'regularDutyMiles') > 0) tokens.add('miles');
+  getNarrativeActivitySummary(details).forEach((summary) => tokens.add(`activity:${summary.replace(/^\d+(\.\d+)?\s+/u, '')}`));
+  parseTCodeDetails(details)
+    .filter((row) => row.code.trim() || row.timeWorked.trim())
+    .forEach((row) => tokens.add(`tcode:${row.code.trim().toLowerCase() || 'unspecified'}`));
+  return tokens;
+}
+
+function scoreNarrativeExample(entry: CalendarEntry, currentForm: CalendarEntryForm): number {
+  if (entry.category !== 'Trooper Daily' || !entry.details?.narrative?.trim()) {
+    return 0;
+  }
+
+  const currentTokens = getNarrativeTokens(currentForm);
+  const entryTokens = getNarrativeTokens(entry);
+  let score = 0;
+  currentTokens.forEach((token) => {
+    if (entryTokens.has(token)) {
+      score += token.startsWith('activity:') || token.startsWith('tcode:') ? 2 : 1;
+    }
+  });
+
+  if (entry.specialStatus === currentForm.specialStatus) score += 2;
+  if (entry.districtWorked === currentForm.districtWorked) score += 1;
+  return score;
+}
+
+function getNarrativeLearningProfile(entries: CalendarEntry[], currentForm: CalendarEntryForm, editingEntryId: string | null): NarrativeLearningProfile {
+  const scoredExamples = entries
+    .filter((entry) => entry.id !== editingEntryId && entry.category === 'Trooper Daily' && entry.details?.narrative?.trim())
+    .map((entry) => ({
+      entry,
+      score: scoreNarrativeExample(entry, currentForm),
+    }))
+    .sort((left, right) => right.score - left.score || new Date(right.entry.date).getTime() - new Date(left.entry.date).getTime());
+  const examples = (scoredExamples.some((example) => example.score > 0)
+    ? scoredExamples.filter((example) => example.score > 0)
+    : scoredExamples)
+    .slice(0, 8)
+    .map((example) => example.entry.details.narrative.trim());
+
+  if (examples.length === 0) {
+    return {
+      exampleCount: 0,
+      firstPerson: false,
+      terse: false,
+      sentenceJoiner: ' ',
+      hourWord: 'hours',
+    };
+  }
+
+  const firstPersonCount = examples.filter((narrative) => /\bI\s+(worked|patrolled|responded|completed|conducted|handled|reported|recorded)\b/iu.test(narrative)).length;
+  const hrsCount = examples.filter((narrative) => /\bhrs?\b/iu.test(narrative)).length;
+  const hoursCount = examples.filter((narrative) => /\bhours?\b/iu.test(narrative)).length;
+  const semicolonCount = examples.filter((narrative) => narrative.split(';').length > narrative.split('.').length).length;
+  const newlineCount = examples.filter((narrative) => narrative.includes('\n')).length;
+  const averageWords = examples.reduce((total, narrative) => total + narrative.split(/\s+/u).filter(Boolean).length, 0) / examples.length;
+
+  return {
+    exampleCount: examples.length,
+    firstPerson: firstPersonCount > examples.length / 2,
+    terse: semicolonCount > examples.length / 2 || averageWords < 34,
+    sentenceJoiner: newlineCount > examples.length / 2 ? '\n' : semicolonCount > examples.length / 2 ? '; ' : ' ',
+    hourWord: hrsCount > hoursCount ? 'hrs' : 'hours',
+  };
 }
 
 function getDefaultDutyHours(currentUser?: AuthAccount): string {
@@ -1957,44 +2068,55 @@ function CalendarPage({
 
   const buildAutoNarrative = () => {
     const details = entryForm.details || {};
+    const profile = getNarrativeLearningProfile(entries, entryForm, editingEntryId);
     const parts: string[] = [];
     const shiftHours = calculateShiftHours(details);
     const tCodeRowsForNarrative = parseTCodeDetails(details).filter((row) => row.code.trim() || row.timeWorked.trim());
     const regularDutyMiles = parseNumericDetail(details, 'regularDutyMiles');
-    const activityKeys = [
-      'citations',
-      'warnings',
-      'crashesInvestigated',
-      'callsForService',
-      'motoristAssists',
-      'totalCriminalArrests',
-      'criminalDefendants',
-      'owiDefendants',
-      'vehicleInspections',
-      'commercialVehicleInspections',
-      'totalDrugArrests',
-      'totalDrugDefendants',
-    ];
-    const activitySummary = activityKeys
-      .map((key) => {
-        const value = parseNumericDetail(details, key);
-        const label = trooperDailyFieldLabels.get(key);
-        return value > 0 && label ? `${formatHours(value)} ${label.toLowerCase()}` : '';
-      })
-      .filter(Boolean);
+    const activitySummary = getNarrativeActivitySummary(details);
+    const statusLabel = entryForm.specialStatus && entryForm.specialStatus !== 'None' ? entryForm.specialStatus : 'regular duty';
+    const districtLabel = entryForm.districtWorked || currentUser.district || 'the assigned district';
 
-    parts.push(`Worked ${entryForm.specialStatus || 'regular duty'} in ${entryForm.districtWorked || currentUser.district || 'the assigned district'}.`);
+    if (profile.terse) {
+      parts.push(`${profile.firstPerson ? 'I worked' : 'Worked'} ${statusLabel} in ${districtLabel}`);
+
+      if (entryForm.dutyHours) {
+        parts.push(`${entryForm.dutyHours} ${profile.hourWord} duty`);
+      }
+
+      if (shiftHours > 0) {
+        parts.push(`${formatNarrativeHours(shiftHours, profile)} shift time`);
+      }
+
+      if (regularDutyMiles > 0) {
+        parts.push(`${formatHours(regularDutyMiles)} regular duty mile${regularDutyMiles === 1 ? '' : 's'}`);
+      }
+
+      if (activitySummary.length > 0) {
+        parts.push(`activity: ${activitySummary.join(', ')}`);
+      }
+
+      if (tCodeRowsForNarrative.length > 0) {
+        parts.push(`T-Code: ${tCodeRowsForNarrative.map((row) => `${row.code || 'unspecified'}${row.timeWorked ? ` (${formatNarrativeHours(row.timeWorked, profile)})` : ''}`).join(', ')}`);
+      }
+
+      const narrative = parts.join(profile.sentenceJoiner).replace(/\s+$/u, '');
+      updateDailyDetail('narrative', narrative.endsWith('.') ? narrative : `${narrative}.`);
+      return;
+    }
+
+    parts.push(`${profile.firstPerson ? 'I worked' : 'Worked'} ${statusLabel} in ${districtLabel}.`);
 
     if (entryForm.dutyHours) {
-      parts.push(`Reported ${entryForm.dutyHours} duty hour${entryForm.dutyHours === '1' ? '' : 's'}.`);
+      parts.push(`${profile.firstPerson ? 'I reported' : 'Reported'} ${formatNarrativeHours(entryForm.dutyHours, profile)} of duty.`);
     }
 
     if (shiftHours > 0) {
-      parts.push(`Shift time totaled ${formatHours(shiftHours)} hour${shiftHours === 1 ? '' : 's'}.`);
+      parts.push(`Shift time totaled ${formatNarrativeHours(shiftHours, profile)}.`);
     }
 
     if (regularDutyMiles > 0) {
-      parts.push(`Recorded ${formatHours(regularDutyMiles)} regular duty mile${regularDutyMiles === 1 ? '' : 's'}.`);
+      parts.push(`${profile.firstPerson ? 'I recorded' : 'Recorded'} ${formatHours(regularDutyMiles)} regular duty mile${regularDutyMiles === 1 ? '' : 's'}.`);
     }
 
     if (activitySummary.length > 0) {
@@ -2002,10 +2124,10 @@ function CalendarPage({
     }
 
     if (tCodeRowsForNarrative.length > 0) {
-      parts.push(`T-Code activity included ${tCodeRowsForNarrative.map((row) => `${row.code || 'unspecified'}${row.timeWorked ? ` (${row.timeWorked}h)` : ''}`).join(', ')}.`);
+      parts.push(`T-Code activity included ${tCodeRowsForNarrative.map((row) => `${row.code || 'unspecified'}${row.timeWorked ? ` (${formatNarrativeHours(row.timeWorked, profile)})` : ''}`).join(', ')}.`);
     }
 
-    updateDailyDetail('narrative', parts.join(' '));
+    updateDailyDetail('narrative', parts.join(profile.sentenceJoiner));
   };
 
   const updateTCodeRows = (rows: TrooperDailyTCode[]) => {
