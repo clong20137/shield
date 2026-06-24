@@ -1,10 +1,11 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, Link2, List, ListOrdered, LucideIcon, MapPinned, Megaphone, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, Link2, List, ListOrdered, LucideIcon, MapPinned, Megaphone, MessageSquare, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, RefreshCw, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService, AuthAccount, calendarService, CalendarEntry, DashboardReaction, dashboardPostService, DashboardPost, dashboardSummaryService, DashboardSummary, districtFeedService, DistrictFeedPost, DistrictFeedPostCategory, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { UserDetail } from '../components/UserDetail';
+import { AppContextMenu, AppContextMenuPosition, shouldUseNativeContextMenu } from '../components/AppContextMenu';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 type DashboardPostForm = Pick<DashboardPost, 'title' | 'body' | 'category' | 'imageUrl' | 'allowComments'>;
@@ -2873,6 +2874,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null);
+  const [pageContextMenu, setPageContextMenu] = useState<AppContextMenuPosition | null>(null);
   const [selectedProfile, setSelectedProfile] = useState<User | null>(null);
   const [profileWindowPosition, setProfileWindowPosition] = useState(getInitialProfileWindowPosition);
   const [isProfileDragging, setIsProfileDragging] = useState(false);
@@ -3077,9 +3079,25 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
     </div>
   ), document.body) : null;
 
+  const dashboardContextActions = [
+    { label: 'Refresh Dashboard', icon: RefreshCw, onSelect: () => void loadDashboard(false) },
+    { label: 'Open Calendar', icon: CalendarDays, onSelect: () => navigate('/calendar') },
+    { label: 'Open Messages', icon: MessageSquare, onSelect: () => navigate('/messages') },
+    { label: 'Search Users', icon: Search, onSelect: () => navigate('/search') },
+  ];
+
+  const openPageContextMenu = (event: React.MouseEvent<HTMLElement>) => {
+    if (event.defaultPrevented || shouldUseNativeContextMenu(event.target)) {
+      return;
+    }
+
+    event.preventDefault();
+    setPageContextMenu({ x: event.clientX, y: event.clientY });
+  };
+
   if (!isAdministrator) {
     return (
-      <div>
+      <div onContextMenu={openPageContextMenu}>
         <div className="mb-8">
           <h1>Dashboard</h1>
         </div>
@@ -3093,12 +3111,19 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
           <DistrictFeedWidget currentUser={currentUser} initialPosts={dashboardSummary?.districtFeedPosts} />
         </div>
         {profileWindow}
+        {pageContextMenu && (
+          <AppContextMenu
+            position={pageContextMenu}
+            actions={dashboardContextActions}
+            onClose={() => setPageContextMenu(null)}
+          />
+        )}
       </div>
     );
   }
 
   return (
-    <div>
+    <div onContextMenu={openPageContextMenu}>
       <div className="mb-8">
         <div>
           <h1>Dashboard</h1>
@@ -3120,6 +3145,13 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
         <DistrictFeedWidget currentUser={currentUser} initialPosts={dashboardSummary?.districtFeedPosts} />
       </div>
       {profileWindow}
+      {pageContextMenu && (
+        <AppContextMenu
+          position={pageContextMenu}
+          actions={dashboardContextActions}
+          onClose={() => setPageContextMenu(null)}
+        />
+      )}
     </div>
   );
 };

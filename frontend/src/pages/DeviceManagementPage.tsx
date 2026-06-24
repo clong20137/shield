@@ -1,8 +1,9 @@
-import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, MouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
-import { AlertTriangle, ArchiveX, Camera, CheckCircle2, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, QrCode, Radio, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
+import { AlertTriangle, ArchiveX, Camera, CheckCircle2, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, QrCode, Radio, RefreshCw, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, deviceService, DeviceRecord } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
+import { AppContextMenu, AppContextMenuPosition, shouldUseNativeContextMenu } from '../components/AppContextMenu';
 
 type DeviceType = DeviceRecord['type'];
 type DeviceStatus = DeviceRecord['status'];
@@ -265,6 +266,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
+  const [pageContextMenu, setPageContextMenu] = useState<AppContextMenuPosition | null>(null);
   const [devicePendingDelete, setDevicePendingDelete] = useState<DeviceRecord | null>(null);
   const [eventNotes, setEventNotes] = useState('');
   const [scanValue, setScanValue] = useState('');
@@ -738,8 +740,25 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setSelectedDevices([]);
   };
 
+  const clearDeviceView = () => {
+    setFilter('All');
+    setStatusFilter('All');
+    setQuery('');
+    setSelectedDevices([]);
+    setPage(1);
+  };
+
+  const openPageContextMenu = (event: MouseEvent<HTMLElement>) => {
+    if (event.defaultPrevented || shouldUseNativeContextMenu(event.target)) {
+      return;
+    }
+
+    event.preventDefault();
+    setPageContextMenu({ x: event.clientX, y: event.clientY });
+  };
+
   return (
-    <div>
+    <div onContextMenu={openPageContextMenu}>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-3 lg:pr-56">
         <div>
           <h1>Device Management</h1>
@@ -1134,6 +1153,19 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             </div>
           </div>
         </div>
+      )}
+      {pageContextMenu && (
+        <AppContextMenu
+          position={pageContextMenu}
+          onClose={() => setPageContextMenu(null)}
+          actions={[
+            { label: 'Refresh Inventory', icon: RefreshCw, onSelect: () => void loadDevices(false), disabled: !canManageDevices },
+            { label: 'Add Device', icon: Plus, onSelect: openAddDeviceModal, disabled: !canManageDevices },
+            { label: 'Scan With Camera', icon: Camera, onSelect: () => void startCameraScanner(), disabled: !canManageDevices },
+            { label: 'Export CSV', icon: Download, onSelect: exportCsv, disabled: filteredDevices.length === 0 },
+            { label: 'Clear Filters', icon: X, onSelect: clearDeviceView },
+          ]}
+        />
       )}
     </div>
   );

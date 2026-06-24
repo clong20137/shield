@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BadgeCheck, CalendarClock, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, DollarSign, Eye, EyeOff, FileText, Gavel, ListChecks, LucideIcon, MapPin, Palette, Pill, Plus, Save, ShieldAlert, Sparkles, Timer, Trash2, Truck, X } from 'lucide-react';
+import { BadgeCheck, CalendarClock, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, DollarSign, Eye, EyeOff, FileText, Gavel, ListChecks, LucideIcon, MapPin, Palette, Pill, Plus, RefreshCw, Save, ShieldAlert, Sparkles, Timer, Trash2, Truck, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { AuthAccount, CalendarEntry, CalendarShortcut, authService, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
+import { AppContextMenu, AppContextMenuPosition, shouldUseNativeContextMenu } from '../components/AppContextMenu';
 
 type DailyStripStyle = React.CSSProperties & {
   '--trooper-daily-strip-rgb'?: string;
@@ -1146,6 +1147,7 @@ function CalendarPage({
   const [invalidDailyPanel, setInvalidDailyPanel] = useState<string | null>(null);
   const [dailyStripTooltip, setDailyStripTooltip] = useState<(OverlayPosition & { dateKey: string; entry: CalendarEntry | null }) | null>(null);
   const [dailyStripContextMenu, setDailyStripContextMenu] = useState<(OverlayPosition & { dateKey: string; entry: CalendarEntry | null }) | null>(null);
+  const [pageContextMenu, setPageContextMenu] = useState<AppContextMenuPosition | null>(null);
   const [dailyStatusHours, setDailyStatusHours] = useState(() => {
     const defaultHours = getDefaultDutyHours(currentUser);
     return { vacation: defaultHours, sick: defaultHours };
@@ -2991,6 +2993,22 @@ function CalendarPage({
     });
   };
 
+  const clearCalendarFilters = () => {
+    setDistrictFilter('');
+    setStatusFilter('');
+  };
+
+  const openPageContextMenu = (event: React.MouseEvent<HTMLElement>) => {
+    if (event.defaultPrevented || shouldUseNativeContextMenu(event.target)) {
+      return;
+    }
+
+    event.preventDefault();
+    setDailyStripTooltip(null);
+    setDailyStripContextMenu(null);
+    setPageContextMenu({ x: event.clientX, y: event.clientY });
+  };
+
   useEffect(() => {
     if (!dailyPanelOptions.includes(activeDailyPanel)) {
       setActiveDailyPanel('Administrative');
@@ -2998,7 +3016,7 @@ function CalendarPage({
   }, [activeDailyPanel, dailyPanelOptions]);
 
   return (
-    <div className="theme-polished-surface relative flex h-full min-h-0 flex-col">
+    <div className="theme-polished-surface relative flex h-full min-h-0 flex-col" onContextMenu={openPageContextMenu}>
       {(!selectedDate || isFloatingApp) && (
       <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -4099,6 +4117,24 @@ function CalendarPage({
             <span className="mt-1 block text-gray-300">No daily report yet</span>
           )}
         </div>
+      )}
+
+      {pageContextMenu && (
+        <AppContextMenu
+          position={pageContextMenu}
+          onClose={() => setPageContextMenu(null)}
+          actions={[
+            { label: 'Refresh Calendar', icon: RefreshCw, onSelect: () => void loadCalendarEntries(false) },
+            { label: 'Go To Today', icon: CalendarClock, onSelect: goToToday },
+            { label: 'Create Today Daily', icon: Plus, onSelect: () => openDay(todayKey) },
+            { label: 'Previous Period', icon: ChevronLeft, onSelect: () => changeCalendarPeriod(-1), shortcut: 'Left' },
+            { label: 'Next Period', icon: ChevronRight, onSelect: () => changeCalendarPeriod(1), shortcut: 'Right' },
+            { label: 'Day View', icon: CalendarDays, onSelect: () => setCalendarView('day'), disabled: calendarView === 'day' },
+            { label: 'Week View', icon: CalendarDays, onSelect: () => setCalendarView('week'), disabled: calendarView === 'week' },
+            { label: 'Month View', icon: CalendarDays, onSelect: () => setCalendarView('month'), disabled: calendarView === 'month' },
+            { label: 'Clear Filters', icon: X, onSelect: clearCalendarFilters, disabled: !districtFilter && !statusFilter },
+          ]}
+        />
       )}
 
       {dailyStripContextMenu && (
