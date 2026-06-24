@@ -527,6 +527,72 @@ const getDayLabel = (date: Date) =>
 const getShortDayLabel = (date: Date) =>
   date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
+const getDailyReviewStatus = (entry?: CalendarEntry | null): CalendarEntry['reviewStatus'] =>
+  entry?.reviewStatus || 'Pending';
+
+const getDailyReviewLabel = (entry?: CalendarEntry | null): string | null => {
+  if (!entry || entry.submissionStatus !== 'Submitted') {
+    return null;
+  }
+
+  if (getDailyReviewStatus(entry) === 'Approved') {
+    return 'Approved by supervisor';
+  }
+
+  if (getDailyReviewStatus(entry) === 'Returned') {
+    return 'Returned by supervisor';
+  }
+
+  return 'Pending supervisor review';
+};
+
+const getDailyReviewBadgeClass = (entry?: CalendarEntry | null): string => {
+  const status = getDailyReviewStatus(entry);
+
+  if (status === 'Approved') {
+    return 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200';
+  }
+
+  if (status === 'Returned') {
+    return 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200';
+  }
+
+  return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200';
+};
+
+const getDailyReviewIcon = (entry?: CalendarEntry | null) => {
+  const status = getDailyReviewStatus(entry);
+
+  if (status === 'Approved') {
+    return BadgeCheck;
+  }
+
+  if (status === 'Returned') {
+    return X;
+  }
+
+  return ShieldAlert;
+};
+
+const formatDailyReviewedAt = (value?: string | null): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
 function getViewportMenuPosition(clientX: number, clientY: number, width: number, height: number, gutter = 8) {
   return {
     x: Math.min(Math.max(gutter, clientX), Math.max(gutter, window.innerWidth - width - gutter)),
@@ -3053,16 +3119,25 @@ function CalendarPage({
                   )}
                 </div>
                 <div className="hidden space-y-1 sm:block">
-                  {dayEntries.slice(0, 3).map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="truncate rounded px-2 py-1 text-xs font-semibold text-white"
-                      style={{ backgroundColor: entry.color }}
-                      title={`${entry.dutyHours} hours - ${entry.districtWorked}`}
-                    >
-                      {entry.submissionStatus === 'Draft' ? 'Draft - ' : ''}{entry.dutyHours}h {entry.districtWorked}
-                    </div>
-                  ))}
+                  {dayEntries.slice(0, 3).map((entry) => {
+                    const reviewLabel = getDailyReviewLabel(entry);
+                    return (
+                      <div
+                        key={entry.id}
+                        className="truncate rounded px-2 py-1 text-xs font-semibold text-white"
+                        style={{ backgroundColor: entry.color }}
+                        title={`${entry.dutyHours} hours - ${entry.districtWorked}${reviewLabel ? ` - ${reviewLabel}` : ''}`}
+                      >
+                        {entry.submissionStatus === 'Draft' ? 'Draft - ' : ''}{entry.dutyHours}h {entry.districtWorked}
+                        {entry.submissionStatus === 'Submitted' && getDailyReviewStatus(entry) === 'Approved' && (
+                          <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1 py-0.5 text-[9px] uppercase">
+                            <BadgeCheck size={10} />
+                            Approved
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                   {dayEntries.length > 3 && (
                     <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">
                       +{dayEntries.length - 3} more
@@ -3109,7 +3184,15 @@ function CalendarPage({
                       <p className="text-xs font-semibold text-gray-400">No report</p>
                     ) : dayEntries.map((entry) => (
                       <div key={entry.id} className="rounded px-2 py-1.5 text-xs font-bold text-white" style={{ backgroundColor: entry.color }}>
-                        {entry.submissionStatus === 'Draft' && <span className="mb-1 inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] uppercase">Draft</span>}
+                        <div className="mb-1 flex flex-wrap items-center gap-1">
+                          {entry.submissionStatus === 'Draft' && <span className="inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] uppercase">Draft</span>}
+                          {entry.submissionStatus === 'Submitted' && getDailyReviewStatus(entry) === 'Approved' && (
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] uppercase">
+                              <BadgeCheck size={11} />
+                              Approved
+                            </span>
+                          )}
+                        </div>
                         {entry.dutyHours}h<br />{entry.districtWorked}
                       </div>
                     ))}
@@ -3156,6 +3239,12 @@ function CalendarPage({
                         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                           {entry.submissionStatus === 'Draft' ? 'Draft - ' : 'Submitted - '}{entry.dutyHours} duty hours - {entry.specialStatus}
                         </p>
+                        {entry.submissionStatus === 'Submitted' && (
+                          <span className={`mt-2 inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-bold ${getDailyReviewBadgeClass(entry)}`}>
+                            {React.createElement(getDailyReviewIcon(entry), { size: 13 })}
+                            {getDailyReviewLabel(entry)}
+                          </span>
+                        )}
                       </div>
                       <span className="h-4 w-4 rounded-full" style={{ backgroundColor: entry.color }} />
                     </div>
@@ -3353,6 +3442,7 @@ function CalendarPage({
                             const isSelectedShortcutDay = selectedDate === dateKey;
                             const isTodayShortcutDay = dateKey === todayKey;
                             const isLeaveShortcutDay = entry?.specialStatus === vacationStatus || entry?.specialStatus === sickStatus;
+                            const isApprovedShortcutDay = entry?.submissionStatus === 'Submitted' && getDailyReviewStatus(entry) === 'Approved';
                             const leaveShortcutColor = entry?.specialStatus === sickStatus ? sickColor : vacationColor;
                             const dailyStripStyle: DailyStripStyle | undefined = entry || isSelectedShortcutDay
                               ? {
@@ -3379,8 +3469,8 @@ function CalendarPage({
                                     : 'border-gray-300 bg-white text-gray-700 hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
                                 } ${isSelectedShortcutDay ? 'trooper-daily-strip-selected border-accent' : ''}`}
                                 style={dailyStripStyle}
-                                aria-label={`${isLeaveShortcutDay ? `Open ${entry?.specialStatus.toLowerCase()}` : entry ? 'Open' : 'Create'} daily report for ${dateKey}`}
-                              title={`${isLeaveShortcutDay ? entry?.specialStatus : entry ? 'Open' : 'Create'} ${dateKey}`}
+                                aria-label={`${isLeaveShortcutDay ? `Open ${entry?.specialStatus.toLowerCase()}` : entry ? 'Open' : 'Create'} daily report for ${dateKey}${isApprovedShortcutDay ? ', approved by supervisor' : ''}`}
+                              title={`${isLeaveShortcutDay ? entry?.specialStatus : entry ? 'Open' : 'Create'} ${dateKey}${isApprovedShortcutDay ? ' - Approved by supervisor' : ''}`}
                             >
                               {day}
                               {isTodayShortcutDay && (
@@ -3394,13 +3484,15 @@ function CalendarPage({
                               {entry && (
                                 <span
                                   className={`trooper-daily-strip-filled-icon ${
-                                    entry.submissionStatus === 'Submitted'
+                                    isApprovedShortcutDay
+                                      ? 'trooper-daily-strip-filled-icon-approved'
+                                      : entry.submissionStatus === 'Submitted'
                                       ? 'trooper-daily-strip-filled-icon-submitted'
                                       : 'trooper-daily-strip-filled-icon-draft'
                                   }`}
                                   aria-hidden="true"
                                 >
-                                  <CheckCircle2 size={8} />
+                                  {isApprovedShortcutDay ? <BadgeCheck size={9} /> : <CheckCircle2 size={8} />}
                                 </span>
                               )}
                             </button>
@@ -3418,6 +3510,25 @@ function CalendarPage({
                         <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Administrative</h3>
                         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Set the report date, hours, district, status, and color coding.</p>
                       </div>
+                      {editingEntry?.submissionStatus === 'Submitted' && (
+                        <div className={`rounded-lg border px-3 py-2 text-sm font-semibold ${getDailyReviewBadgeClass(editingEntry)}`}>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {React.createElement(getDailyReviewIcon(editingEntry), { size: 16 })}
+                            <span>{getDailyReviewLabel(editingEntry)}</span>
+                          </div>
+                          {(editingEntry.reviewedByName || editingEntry.reviewedAt) && (
+                            <p className="mt-1 text-xs font-bold opacity-85">
+                              {editingEntry.reviewedByName ? `Reviewed by ${editingEntry.reviewedByName}` : 'Reviewed'}
+                              {formatDailyReviewedAt(editingEntry.reviewedAt) ? ` on ${formatDailyReviewedAt(editingEntry.reviewedAt)}` : ''}
+                            </p>
+                          )}
+                          {getDailyReviewStatus(editingEntry) === 'Returned' && editingEntry.reviewNotes && (
+                            <p className="mt-2 rounded border border-current/20 bg-white/35 px-2 py-1 text-xs font-bold dark:bg-black/20">
+                              {editingEntry.reviewNotes}
+                            </p>
+                          )}
+                        </div>
+                      )}
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Date</span>
@@ -3971,6 +4082,18 @@ function CalendarPage({
             <>
               <span className="mt-1 block">{dailyStripTooltip.entry.submissionStatus} - {dailyStripTooltip.entry.dutyHours || 0}h</span>
               <span className="mt-0.5 block text-gray-300">{dailyStripTooltip.entry.districtWorked || 'No district'}</span>
+              {dailyStripTooltip.entry.submissionStatus === 'Submitted' && (
+                <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${
+                  getDailyReviewStatus(dailyStripTooltip.entry) === 'Approved'
+                    ? 'bg-green-500/20 text-green-100'
+                    : getDailyReviewStatus(dailyStripTooltip.entry) === 'Returned'
+                      ? 'bg-red-500/20 text-red-100'
+                      : 'bg-amber-500/20 text-amber-100'
+                }`}>
+                  {React.createElement(getDailyReviewIcon(dailyStripTooltip.entry), { size: 12 })}
+                  {getDailyReviewLabel(dailyStripTooltip.entry)}
+                </span>
+              )}
             </>
           ) : (
             <span className="mt-1 block text-gray-300">No daily report yet</span>
