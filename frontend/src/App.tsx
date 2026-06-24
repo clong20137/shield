@@ -7800,7 +7800,7 @@ function App() {
                       <div className="border-b border-gray-200 bg-gray-50 px-4 py-4 dark:border-gray-700 dark:bg-gray-950">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="text-base font-bold text-primary-500 dark:text-blue-100">Notification Center</p>
+                            <p className="text-base font-bold text-primary-500 dark:text-gray-100">Notification Center</p>
                           </div>
                           {hasNotificationCenterItems && (
                             <button
@@ -7828,7 +7828,7 @@ function App() {
                                   : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'
                               }`}
                             >
-                              {tab.label} <span className={notificationCenterTab === tab.id ? 'text-blue-100' : 'text-gray-400'}>{tab.count}</span>
+                              {tab.label} <span className={notificationCenterTab === tab.id ? 'text-white' : 'text-gray-400 dark:text-gray-500'}>{tab.count}</span>
                             </button>
                           ))}
                         </div>
@@ -7836,7 +7836,7 @@ function App() {
                       <div className="max-h-[70dvh] overflow-y-auto p-2">
                         {!hasNotificationCenterItems ? (
                           <div className="px-5 py-10 text-center">
-                            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary-500 dark:bg-gray-800 dark:text-blue-100">
+                            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary-500 dark:bg-gray-800 dark:text-gray-100">
                               <Bell size={20} />
                             </div>
                             <p className="text-sm font-bold text-gray-800 dark:text-gray-100">No notifications yet</p>

@@ -2818,7 +2818,7 @@ function CalendarPage({
           <button type="button" onClick={() => changeCalendarPeriod(-1)} className="btn-secondary" aria-label="Previous calendar period" title="Previous">
             <ChevronLeft size={16} />
           </button>
-          <div className="min-w-32 text-center text-lg font-bold text-primary-500 dark:text-blue-100 sm:min-w-40 sm:text-2xl">
+          <div className="min-w-32 text-center text-lg font-bold text-primary-500 dark:text-gray-100 sm:min-w-40 sm:text-2xl">
             {activeViewLabel}
           </div>
           <button type="button" onClick={() => changeCalendarPeriod(1)} className="btn-secondary" aria-label="Next calendar period" title="Next">
@@ -2875,16 +2875,16 @@ function CalendarPage({
 
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-950">
-          <p className="text-xs font-bold uppercase text-gray-400">This {calendarView}</p>
-          <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{activeViewEntries.length}</p>
+          <p className="text-xs font-bold uppercase text-gray-400 dark:text-gray-500">This {calendarView}</p>
+          <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-gray-100">{activeViewEntries.length}</p>
         </div>
         <div className="rounded border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-950">
-          <p className="text-xs font-bold uppercase text-gray-400">Duty Hours</p>
-          <p className="mt-1 text-2xl font-bold text-accent">{activeViewDutyHours.toFixed(2).replace(/\.?0+$/u, '')}</p>
+          <p className="text-xs font-bold uppercase text-gray-400 dark:text-gray-500">Duty Hours</p>
+          <p className="mt-1 text-2xl font-bold text-accent dark:text-gray-100">{activeViewDutyHours.toFixed(2).replace(/\.?0+$/u, '')}</p>
         </div>
         <div className="rounded border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-950">
-          <p className="text-xs font-bold uppercase text-gray-400">Visible Entries</p>
-          <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-blue-100">{visibleEntries.length}</p>
+          <p className="text-xs font-bold uppercase text-gray-400 dark:text-gray-500">Visible Entries</p>
+          <p className="mt-1 text-2xl font-bold text-primary-500 dark:text-gray-100">{visibleEntries.length}</p>
         </div>
       </div>
 
@@ -3129,7 +3129,7 @@ function CalendarPage({
                           icon: <span className="h-2.5 w-2.5 rounded-full bg-amber-500 shadow-[0_0_0_3px_rgba(245,158,11,0.18)]" />,
                         },
                         progress: {
-                          item: 'border-blue-200 bg-blue-50/80 text-blue-800 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100',
+                          item: 'border-blue-200 bg-blue-50/80 text-blue-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100',
                           rail: 'bg-blue-500',
                           icon: <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />,
                         },
