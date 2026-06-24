@@ -964,6 +964,34 @@
     @apply btn bg-success text-white hover:bg-green-700 hover:-translate-y-0.5 hover:shadow-lg;
   }
 
+  .btn-primary:not(:disabled):hover,
+  .btn-primary:not(:disabled):focus-visible,
+  .btn-primary:not(:disabled):active {
+    background-color: color-mix(in srgb, var(--app-primary) 84%, white) !important;
+    color: white !important;
+  }
+
+  .btn-secondary:not(:disabled):hover,
+  .btn-secondary:not(:disabled):focus-visible,
+  .btn-secondary:not(:disabled):active {
+    background-color: color-mix(in srgb, var(--app-secondary) 84%, white) !important;
+    color: white !important;
+  }
+
+  .btn-danger:not(:disabled):hover,
+  .btn-danger:not(:disabled):focus-visible,
+  .btn-danger:not(:disabled):active {
+    background-color: color-mix(in srgb, #dc2626 84%, white) !important;
+    color: white !important;
+  }
+
+  .btn-success:not(:disabled):hover,
+  .btn-success:not(:disabled):focus-visible,
+  .btn-success:not(:disabled):active {
+    background-color: color-mix(in srgb, #16a34a 84%, white) !important;
+    color: white !important;
+  }
+
   .icon-close-button {
     @apply flex h-11 w-11 shrink-0 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-blue-100 dark:hover:bg-gray-800;
     transition-duration: var(--shield-motion-duration);

@@ -13,6 +13,7 @@ export const rankOptions = [
 ] as const;
 
 export const leadershipRanks = [
+  'Master Trooper',
   'Sergeant',
   'First Sergeant',
   'Lieutenant',

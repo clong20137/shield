@@ -3487,7 +3487,6 @@ function CalendarPage({
                               aria-label="Zero out Regular Duty fields"
                             >
                               <Trash2 size={16} />
-                              <span>Zero Section</span>
                             </button>
                             <div className="inline-flex rounded border border-gray-300 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-900" aria-label="Time input format">
                               <button
@@ -3524,7 +3523,6 @@ function CalendarPage({
                             aria-label={`Zero out ${activeDailySection.title} fields`}
                           >
                             <Trash2 size={16} />
-                            <span>Zero Section</span>
                           </button>
                         )}
                       </div>
@@ -3650,7 +3648,6 @@ function CalendarPage({
                             title="Zero out T-Codes"
                           >
                             <Trash2 size={16} />
-                            <span>Zero Section</span>
                           </button>
                           <button
                             type="button"
@@ -3785,7 +3782,6 @@ function CalendarPage({
                             title="Clear narrative"
                           >
                             <Trash2 size={16} />
-                            <span>Zero Section</span>
                           </button>
                         </div>
                       </div>

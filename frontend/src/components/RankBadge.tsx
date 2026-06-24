@@ -2,9 +2,13 @@ import { Eye, Medal, Shield, Sparkles, User } from 'lucide-react';
 import { leadershipRanks } from '../constants/ranks';
 
 const importantRanks = new Map(leadershipRanks.map((rank) => [rank.toLowerCase(), rank]));
+const rankAliases = new Map([
+  ['trooper (master)', 'master trooper'],
+]);
 
 function normalizeRank(rank?: string | null): string {
-  return (rank || '').trim().replace(/\s+/gu, ' ').toLowerCase();
+  const normalizedRank = (rank || '').trim().replace(/\s+/gu, ' ').toLowerCase();
+  return rankAliases.get(normalizedRank) || normalizedRank;
 }
 
 export function isImportantRank(rank?: string | null): boolean {
@@ -26,7 +30,7 @@ const rankStyles = {
     title: 'Trooper rank',
   },
   'master trooper': {
-    className: 'shield-rank-badge shield-rank-master-trooper border-blue-300/70 bg-blue-50 text-blue-900 dark:border-blue-700/80 dark:bg-blue-950/50 dark:text-blue-100',
+    className: 'shield-rank-badge shield-rank-master-trooper shield-rank-command border-blue-300/70 bg-blue-50 text-blue-900 dark:border-blue-700/80 dark:bg-blue-950/50 dark:text-blue-100',
     title: 'Master Trooper rank',
   },
   detective: {
