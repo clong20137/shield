@@ -112,7 +112,7 @@ const getReminderPriorityClass = (priority: Reminder['priority'] = 'Normal') => 
   if (priority === 'Critical') return 'bg-danger/10 text-danger';
   if (priority === 'High') return 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-100';
   if (priority === 'Low') return 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300';
-  return 'bg-primary-500/10 text-primary-500 dark:text-blue-100';
+  return 'bg-primary-500/10 text-primary-500 dark:text-white';
 };
 
 const postHtmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span|h1|h2|h3|blockquote|a|figure|img)\b[^>]*>/iu;
@@ -1792,7 +1792,7 @@ function PinnedProfilesWidget({
               <button
                 type="button"
                 onClick={() => slidePinnedProfiles(-1)}
-                className="absolute left-0 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-primary-500 shadow-lg transition hover:scale-105 hover:border-accent dark:border-gray-700 dark:bg-gray-900/95 dark:text-blue-100"
+                className="absolute left-0 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-primary-500 shadow-lg transition hover:scale-105 hover:border-accent dark:border-gray-700 dark:bg-gray-900/95 dark:text-white"
                 aria-label="Show previous pinned profiles"
                 title="Previous"
               >
@@ -1801,7 +1801,7 @@ function PinnedProfilesWidget({
               <button
                 type="button"
                 onClick={() => slidePinnedProfiles(1)}
-                className="absolute right-0 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-primary-500 shadow-lg transition hover:scale-105 hover:border-accent dark:border-gray-700 dark:bg-gray-900/95 dark:text-blue-100"
+                className="absolute right-0 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-primary-500 shadow-lg transition hover:scale-105 hover:border-accent dark:border-gray-700 dark:bg-gray-900/95 dark:text-white"
                 aria-label="Show more pinned profiles"
                 title="Next"
               >
@@ -2073,7 +2073,7 @@ function MyDayWidget({
             <button
               type="button"
               onClick={() => setActiveTab('entries')}
-              className={`flex items-center justify-center gap-2 rounded px-3 py-2 text-sm font-black transition ${activeTab === 'entries' ? 'bg-white text-primary-500 shadow-sm dark:bg-gray-900 dark:text-blue-100' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'}`}
+              className={`flex items-center justify-center gap-2 rounded px-3 py-2 text-sm font-black transition ${activeTab === 'entries' ? 'bg-white text-primary-500 shadow-sm dark:bg-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'}`}
             >
               <NotebookPen size={15} />
               Entries
@@ -2081,7 +2081,7 @@ function MyDayWidget({
             <button
               type="button"
               onClick={() => setActiveTab('reminders')}
-              className={`flex items-center justify-center gap-2 rounded px-3 py-2 text-sm font-black transition ${activeTab === 'reminders' ? 'bg-white text-primary-500 shadow-sm dark:bg-gray-900 dark:text-blue-100' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'}`}
+              className={`flex items-center justify-center gap-2 rounded px-3 py-2 text-sm font-black transition ${activeTab === 'reminders' ? 'bg-white text-primary-500 shadow-sm dark:bg-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'}`}
             >
               <Bell size={15} />
               Reminders
@@ -2521,7 +2521,7 @@ function QuickNotesWidget({
             <NotebookPen size={19} />
           </div>
           <div className="min-w-0">
-            <h2 className="text-xl font-bold text-primary-500 dark:text-blue-100">Quick Notes</h2>
+            <h2 className="text-xl font-bold text-primary-500 dark:text-white">Quick Notes</h2>
             <p className="mt-1 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
               {status === 'saving' ? <Clock3 size={14} /> : status === 'saved' ? <CheckCircle2 size={14} className="text-success" /> : status === 'error' ? <AlertCircle size={14} className="text-danger" /> : <NotebookPen size={14} />}
               {statusLabel}
@@ -2724,11 +2724,11 @@ function DistrictFeedWidget({
       <div className="border-b border-gray-200 p-4 dark:border-gray-800 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-primary-500/10 text-primary-500 dark:text-blue-100">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-primary-500/10 text-primary-500 dark:text-white">
               <MapPinned size={19} />
             </div>
             <div className="min-w-0">
-              <h2 className="text-xl font-bold text-primary-500 dark:text-blue-100">District Feed</h2>
+              <h2 className="text-xl font-bold text-primary-500 dark:text-white">District Feed</h2>
               <p className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">
                 {districtName ? `${districtName} command posts only` : 'No assigned district'}
               </p>
