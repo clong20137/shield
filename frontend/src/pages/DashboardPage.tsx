@@ -2517,12 +2517,12 @@ function QuickNotesWidget({
     <section data-onboarding-target="quick-notes" className="relative z-0 isolate flex h-full min-h-[32rem] flex-col rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-accent/10 text-accent dark:text-white">
             <NotebookPen size={19} />
           </div>
           <div className="min-w-0">
             <h2 className="text-xl font-bold text-primary-500 dark:text-white">Quick Notes</h2>
-            <p className="mt-1 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-gray-500 dark:text-white">
               {status === 'saving' ? <Clock3 size={14} /> : status === 'saved' ? <CheckCircle2 size={14} className="text-success" /> : status === 'error' ? <AlertCircle size={14} className="text-danger" /> : <NotebookPen size={14} />}
               {statusLabel}
             </p>
@@ -2543,7 +2543,7 @@ function QuickNotesWidget({
           <button
             type="button"
             onClick={addNote}
-            className="absolute inset-4 flex items-center justify-center rounded border border-dashed border-gray-300 text-sm font-semibold text-gray-500 transition hover:border-accent hover:text-accent dark:border-gray-700 dark:text-gray-400"
+            className="absolute inset-4 flex items-center justify-center rounded border border-dashed border-gray-300 text-sm font-semibold text-gray-500 transition hover:border-accent hover:text-accent dark:border-gray-700 dark:text-white dark:hover:text-white"
           >
             <Plus size={17} />
           </button>
@@ -2729,7 +2729,7 @@ function DistrictFeedWidget({
             </div>
             <div className="min-w-0">
               <h2 className="text-xl font-bold text-primary-500 dark:text-white">District Feed</h2>
-              <p className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">
+              <p className="mt-1 truncate text-sm text-gray-500 dark:text-white">
                 {districtName ? `${districtName} command posts only` : 'No assigned district'}
               </p>
             </div>
@@ -2755,7 +2755,7 @@ function DistrictFeedWidget({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
         {!districtName ? (
-          <div className="flex h-full items-center justify-center rounded border border-dashed border-gray-300 px-4 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+          <div className="flex h-full items-center justify-center rounded border border-dashed border-gray-300 px-4 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-white">
             Assign a district to your profile to see district activity.
           </div>
         ) : (
@@ -2767,7 +2767,7 @@ function DistrictFeedWidget({
                   <select
                     value={postCategory}
                     onChange={(event) => setPostCategory(event.target.value as DistrictFeedPostCategory)}
-                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
                   >
                     <option value="Announcement">Announcement</option>
                     <option value="Update">Update</option>
@@ -2779,7 +2779,7 @@ function DistrictFeedWidget({
                     onChange={(event) => setPostTitle(event.target.value)}
                     maxLength={140}
                     placeholder="Feed title"
-                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
                   />
                 </div>
                 <textarea
@@ -2787,10 +2787,10 @@ function DistrictFeedWidget({
                   onChange={(event) => setPostBody(event.target.value)}
                   maxLength={1600}
                   placeholder={`Post to ${districtName}`}
-                  className="mt-2 min-h-24 w-full resize-y rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                  className="mt-2 min-h-24 w-full resize-y rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
                 />
                 <div className="mt-2 flex items-center justify-between gap-3">
-                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{postBody.length}/1600</span>
+                  <span className="text-xs font-semibold text-gray-500 dark:text-white">{postBody.length}/1600</span>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => {
                       resetComposer();
@@ -2809,7 +2809,7 @@ function DistrictFeedWidget({
             )}
 
             {posts.length === 0 ? (
-              <div className="rounded border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+              <div className="rounded border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-white">
                 No command posts have been added for {districtName} yet.
               </div>
             ) : posts.map((post) => (
@@ -2819,10 +2819,10 @@ function DistrictFeedWidget({
                     <span className={`inline-flex rounded px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${getCategoryClass(post.category)}`}>
                       {post.category}
                     </span>
-                    <h3 className="mt-2 line-clamp-2 text-sm font-black text-gray-900 dark:text-gray-100">{post.title}</h3>
+                    <h3 className="mt-2 line-clamp-2 text-sm font-black text-gray-900 dark:text-white">{post.title}</h3>
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
-                    <span className="text-xs font-semibold text-gray-400">
+                    <span className="text-xs font-semibold text-gray-400 dark:text-white">
                       {new Date(post.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     </span>
                     {canPost && (
@@ -2837,8 +2837,8 @@ function DistrictFeedWidget({
                     )}
                   </div>
                 </div>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-600 dark:text-gray-300">{post.body}</p>
-                <p className="mt-3 text-xs font-semibold text-gray-400">Posted by {post.authorName}</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-600 dark:text-white">{post.body}</p>
+                <p className="mt-3 text-xs font-semibold text-gray-400 dark:text-white">Posted by {post.authorName}</p>
               </article>
             ))}
 
