@@ -2869,6 +2869,7 @@ function QuickLaunchTray({
           const isLaunching = launchingSlot === index;
           const hasFailedLaunch = failedLaunchSlot === index;
           const previewLabel = visibleSlot ? `Open ${label}` : 'Add app';
+          const showSidebarRailPreview = isSidebarPlacement && isSidebarCollapsed;
           const slotStateClass = visibleSlot
             ? [
                 'quick-launch-slot-configured',
@@ -2886,7 +2887,7 @@ function QuickLaunchTray({
           return (
             <div
               key={slotRenderKey}
-              className="quick-launch-slot-shell relative"
+              className={`quick-launch-slot-shell relative ${showSidebarRailPreview ? 'sidebar-rail-tooltip-host' : ''}`}
               ref={(element) => {
                 slotRefs.current[index] = element;
                 slotAnimationRefs.current[slotRenderKey] = element;
@@ -2968,6 +2969,11 @@ function QuickLaunchTray({
                 <span className="quick-launch-slot-label">{hasFailedLaunch ? 'Blocked' : isLaunching ? 'Opening' : label}</span>
               </button>
               <span className="quick-launch-hover-preview" role="presentation">{previewLabel}</span>
+              {showSidebarRailPreview && (
+                <span className="sidebar-rail-tooltip" role="tooltip">
+                  {hasFailedLaunch ? 'Blocked' : isLaunching ? 'Opening' : label}
+                </span>
+              )}
 
               {badgeCount > 0 && (
                 <span key={`quick-launch-badge-${index}-${badgeCount}`} className="quick-launch-badge">
@@ -7656,7 +7662,7 @@ function App() {
         <LoginSplash onLogin={handleLogin} onToast={showToast} appName={appName} siteName={siteName} brandLogoDataUrl={brandLogoDataUrl} isExiting={isLoginTransitioning} />
       ) : (
         <div className="animate-app-enter flex h-[100dvh] overflow-hidden bg-gray-50 dark:bg-gray-950">
-          <aside className={`shield-left-panel relative hidden h-[100dvh] shrink-0 overflow-visible bg-primary-500 text-white shadow-xl transition-all duration-200 md:block ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
+          <aside className={`shield-left-panel relative z-50 hidden h-[100dvh] shrink-0 overflow-visible bg-primary-500 text-white shadow-xl transition-all duration-200 md:block ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed((value) => !value)}
@@ -7669,7 +7675,7 @@ function App() {
               </span>
             </button>
 
-            <div className="shield-sidebar flex h-[100dvh] flex-col overflow-y-auto overflow-x-hidden">
+            <div className="shield-sidebar flex h-[100dvh] flex-col overflow-y-auto overflow-x-visible">
             <div className="flex h-16 shrink-0 items-center border-b border-white/10 px-4">
               {!isSidebarCollapsed && (
                 <div className="flex items-center gap-3">
