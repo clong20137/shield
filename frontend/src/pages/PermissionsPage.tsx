@@ -4,6 +4,13 @@ import { AccessReviewResponse, AuthAccount, AuthInvite, AuthRole, RegistrationSe
 
 const APP_BASE_PATH = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
 const DEFAULT_APP_BASE_URL = `${window.location.origin}${APP_BASE_PATH}`;
+const DEFAULT_BRAND_LOGO = '/shield-splash-logo.png';
+const MAX_LOGO_SIZE_BYTES = 240 * 1024;
+
+function withAppBase(path: string): string {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${APP_BASE_PATH}${normalizedPath}` || '/';
+}
 
 interface PermissionsPageProps {
   account: AuthAccount;
@@ -211,6 +218,7 @@ function PermissionsPage({
     appBaseUrl: DEFAULT_APP_BASE_URL,
     appName: '',
     siteName: '',
+    brandLogoDataUrl: '',
     maintenanceMode: false,
     loginWarningEnabled: true,
     loginWarningMessage: 'This is a Indiana State Police computer application system that is for Official use only. This system is subject to monitoring. Therefore, no expectation of privacy is to be assumed. Individuals found performing unauthorized activities may be subject to disciplinary action including criminal prosecution.',
@@ -379,6 +387,34 @@ function PermissionsPage({
     } finally {
       setIsSavingRegistration(false);
     }
+  };
+
+  const handleLogoFileChange = (file: File | null) => {
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      onToast('error', 'Choose an image file for the app logo.');
+      return;
+    }
+
+    if (file.size > MAX_LOGO_SIZE_BYTES) {
+      onToast('error', 'Logo image must be 240 KB or smaller.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      if (!result.startsWith('data:image/')) {
+        onToast('error', 'Logo image could not be read.');
+        return;
+      }
+      setRegistrationSettings((settings) => ({ ...settings, brandLogoDataUrl: result }));
+    };
+    reader.onerror = () => onToast('error', 'Logo image could not be read.');
+    reader.readAsDataURL(file);
   };
 
   const createInvite = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -667,6 +703,48 @@ function PermissionsPage({
               placeholder="Shield Workspace"
             />
           </label>
+          <div className="rounded border border-gray-200 p-4 dark:border-gray-800 lg:col-span-3">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-950">
+                  <img
+                    src={registrationSettings.brandLogoDataUrl || withAppBase(DEFAULT_BRAND_LOGO)}
+                    alt="Current app logo"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">App Logo</span>
+                  <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Use a transparent PNG/WebP/SVG for the splash screen and left navigation panel.</span>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <label className="btn-secondary cursor-pointer" title="Upload Logo">
+                  <span>Upload Logo</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={(event) => {
+                      handleLogoFileChange(event.target.files?.[0] || null);
+                      event.currentTarget.value = '';
+                    }}
+                  />
+                </label>
+                {registrationSettings.brandLogoDataUrl && (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setRegistrationSettings((settings) => ({ ...settings, brandLogoDataUrl: '' }))}
+                    aria-label="Use default app logo"
+                    title="Use Default Logo"
+                  >
+                    Use Default
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
           <label>
             <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Registration Mode</span>
             <select

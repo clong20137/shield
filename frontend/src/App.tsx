@@ -7651,8 +7651,8 @@ function App() {
             <div className="flex h-16 shrink-0 items-center border-b border-white/10 px-4 dark:border-gray-800">
               {!isSidebarCollapsed && (
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded bg-white p-1 text-primary-500">
-                    {brandLogoDataUrl ? <img src={brandLogoDataUrl} alt="" className="h-full w-full object-contain" /> : <Shield size={20} />}
+                  <div className="flex h-9 w-9 items-center justify-center">
+                    <img src={getBrandLogoSrc(brandLogoDataUrl)} alt="" className="h-full w-full object-contain" />
                   </div>
                   <div>
                     <h1 className="text-xl font-bold tracking-wider text-white">{appName}</h1>
@@ -7661,8 +7661,8 @@ function App() {
                 </div>
               )}
               {isSidebarCollapsed && (
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded bg-white p-1 text-primary-500">
-                  {brandLogoDataUrl ? <img src={brandLogoDataUrl} alt={appName} className="h-full w-full object-contain" /> : <Shield size={22} />}
+                <div className="mx-auto flex h-10 w-10 items-center justify-center">
+                  <img src={getBrandLogoSrc(brandLogoDataUrl)} alt={appName} className="h-full w-full object-contain" />
                 </div>
               )}
             </div>

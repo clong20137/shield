@@ -27,6 +27,7 @@ interface AppEventPayload {
   entityId?: string;
   appName?: string;
   siteName?: string;
+  brandLogoDataUrl?: string;
 }
 
 const globalClients = new Set<Response>();
