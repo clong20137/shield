@@ -538,9 +538,37 @@
     transform: translateX(-140%) skewX(-18deg);
   }
 
-  48%,
+  34% {
+    transform: translateX(180%) skewX(-18deg);
+  }
+
+  35%,
   100% {
     transform: translateX(180%) skewX(-18deg);
+  }
+}
+
+@keyframes shield-rank-command-pulse {
+  0%,
+  100% {
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.42), 0 0 0 0 rgba(var(--shield-rank-glow-rgb, 156, 134, 92), 0);
+  }
+
+  48% {
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.52), 0 0 0 4px rgba(var(--shield-rank-glow-rgb, 156, 134, 92), 0.12);
+  }
+}
+
+@keyframes shield-rank-icon-glint {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.25));
+  }
+
+  45% {
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 0.45rem rgba(var(--shield-rank-glow-rgb, 156, 134, 92), 0.42));
   }
 }
 
@@ -1001,6 +1029,8 @@
   }
 
   .shield-rank-badge {
+    --shield-rank-glow-rgb: 156, 134, 92;
+    --shield-rank-motion-delay: 0ms;
     position: relative;
     isolation: isolate;
     line-height: 1;
@@ -1023,8 +1053,10 @@
     z-index: 0;
     width: 42%;
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
-    opacity: 0;
+    opacity: 0.78;
     pointer-events: none;
+    animation: shield-rank-sheen 7.5s ease-in-out infinite;
+    animation-delay: var(--shield-rank-motion-delay);
   }
 
   .shield-rank-badge > * {
@@ -1034,10 +1066,15 @@
 
   .shield-rank-icon {
     filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.25));
+    transform-origin: center;
+    animation: shield-rank-icon-glint 6.8s ease-in-out infinite;
+    animation-delay: var(--shield-rank-motion-delay);
   }
 
   .shield-rank-command {
     box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.42);
+    animation: shield-rank-command-pulse 6.4s ease-in-out infinite;
+    animation-delay: var(--shield-rank-motion-delay);
   }
 
   .shield-rank-command:hover {
@@ -1045,42 +1082,63 @@
     box-shadow: 0 12px 26px rgba(15, 23, 42, 0.13), 0 0 0 1px rgba(156, 134, 92, 0.2);
   }
 
-  .shield-rank-metal:hover::after,
+  .shield-rank-metal::after,
   .shield-rank-executive::after {
     opacity: 1;
-    animation: shield-rank-sheen 3.8s ease-in-out infinite;
+    animation-duration: 4.6s;
   }
 
   .shield-rank-trooper {
+    --shield-rank-glow-rgb: 14, 165, 233;
+    --shield-rank-motion-delay: 0ms;
     color: rgb(12, 74, 110) !important;
   }
 
   .shield-rank-master-trooper {
+    --shield-rank-glow-rgb: 37, 99, 235;
+    --shield-rank-motion-delay: 650ms;
     color: rgb(30, 64, 175) !important;
   }
 
   .shield-rank-detective {
+    --shield-rank-glow-rgb: 99, 102, 241;
+    --shield-rank-motion-delay: 1200ms;
     color: rgb(55, 48, 163) !important;
   }
 
   .shield-rank-sergeant {
+    --shield-rank-glow-rgb: 245, 158, 11;
+    --shield-rank-motion-delay: 300ms;
     color: rgb(146, 64, 14) !important;
   }
 
-  .shield-rank-first-sergeant,
+  .shield-rank-first-sergeant {
+    --shield-rank-glow-rgb: 234, 179, 8;
+    --shield-rank-motion-delay: 850ms;
+    color: rgb(133, 77, 14) !important;
+  }
+
   .shield-rank-colonel {
+    --shield-rank-glow-rgb: 250, 204, 21;
+    --shield-rank-motion-delay: 1450ms;
     color: rgb(133, 77, 14) !important;
   }
 
   .shield-rank-lieutenant {
+    --shield-rank-glow-rgb: 148, 163, 184;
+    --shield-rank-motion-delay: 500ms;
     color: rgb(51, 65, 85) !important;
   }
 
   .shield-rank-captain {
+    --shield-rank-glow-rgb: 59, 130, 246;
+    --shield-rank-motion-delay: 1050ms;
     color: rgb(30, 58, 138) !important;
   }
 
   .shield-rank-superintendent {
+    --shield-rank-glow-rgb: 250, 204, 21;
+    --shield-rank-motion-delay: 0ms;
     color: rgb(26, 54, 93) !important;
     box-shadow: 0 10px 28px rgba(156, 134, 92, 0.18), inset 0 0 0 1px rgba(156, 134, 92, 0.28);
   }
@@ -1101,6 +1159,14 @@
   .dark .shield-rank-lieutenant,
   .dark .shield-rank-superintendent {
     color: rgb(255, 255, 255) !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shield-rank-badge,
+    .shield-rank-badge::after,
+    .shield-rank-icon {
+      animation: none !important;
+    }
   }
 
   .formatted-content figure {
