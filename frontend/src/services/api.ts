@@ -1290,6 +1290,9 @@ export const messageService = {
   getInbox: (accountId: string) =>
     api.get<UserMessage[]>(`/messages/inbox/${accountId}`),
 
+  getUnreadCount: (accountId: string) =>
+    api.get<{ unreadCount: number }>(`/messages/unread-count/${accountId}`),
+
   getSent: (accountId: string) =>
     api.get<UserMessage[]>(`/messages/sent/${accountId}`),
 

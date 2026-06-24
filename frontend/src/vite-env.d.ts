@@ -99,6 +99,8 @@ interface Window {
     onIdleStatus?: (callback: (payload: ShieldDesktopIdleStatus) => void) => () => void;
     onWebAppUpdateStatus?: (callback: (payload: ShieldDesktopWebAppUpdateStatus) => void) => () => void;
     onSessionTimeout?: (callback: (payload: ShieldDesktopSessionTimeoutPayload) => void) => () => void;
+    onBeforeQuit?: (callback: () => void) => () => void;
+    notifyQuitSignOutComplete?: () => Promise<{ ok: boolean }>;
     getDesktopLogs?: () => Promise<{
       path: string;
       entries: ShieldDesktopLog[];

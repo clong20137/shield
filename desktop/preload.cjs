@@ -45,6 +45,12 @@ contextBridge.exposeInMainWorld('shieldDesktop', {
     ipcRenderer.on('shield:session-timeout', handler);
     return () => ipcRenderer.removeListener('shield:session-timeout', handler);
   },
+  onBeforeQuit: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('shield:before-quit', handler);
+    return () => ipcRenderer.removeListener('shield:before-quit', handler);
+  },
+  notifyQuitSignOutComplete: () => ipcRenderer.invoke('shield:quit-signout-complete'),
   getDesktopLogs: () => ipcRenderer.invoke('shield:get-desktop-logs'),
   openDesktopLogs: () => ipcRenderer.invoke('shield:open-desktop-logs')
 });

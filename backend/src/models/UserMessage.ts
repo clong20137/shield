@@ -232,6 +232,25 @@ export class UserMessageModel {
     }
   }
 
+  static async countUnreadInbox(accountId: string): Promise<number> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<Array<RowDataPacket & { unreadCount: number }>>(
+        `SELECT COUNT(*) as unreadCount
+        FROM user_messages
+        WHERE \`recipientUserId\` = ?
+          AND \`recipientDeleted\` = 0
+          AND \`isArchived\` = 0
+          AND \`isRead\` = 0`,
+        [accountId]
+      );
+
+      return Number(rows[0]?.unreadCount || 0);
+    } finally {
+      conn.release();
+    }
+  }
+
   static async listSent(accountId: string, limit = 250, offset = 0, options: { canViewIncognitoPresence?: boolean } = {}): Promise<UserMessage[]> {
     const conn = await pool.getConnection();
     try {

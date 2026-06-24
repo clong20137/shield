@@ -441,6 +441,21 @@ export class MessageController {
     }
   }
 
+  static async getUnreadCount(req: Request, res: Response) {
+    try {
+      const accountId = cleanString(req.params.accountId, 36);
+      if (!accountId) {
+        return res.status(400).json({ error: 'Account is required' });
+      }
+
+      const unreadCount = await UserMessageModel.countUnreadInbox(accountId);
+      res.json({ unreadCount });
+    } catch (error) {
+      console.error('Get unread message count error:', error);
+      res.status(500).json({ error: 'Failed to load unread count' });
+    }
+  }
+
   static async listSent(req: Request, res: Response) {
     try {
       const accountId = cleanString(req.params.accountId, 36);

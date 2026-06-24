@@ -5326,6 +5326,8 @@ function App() {
   const sessionTimeoutNotificationShownRef = useRef(false);
   const lastActivityRef = useRef<number>(Date.now());
   const desktopSessionActivityReportRef = useRef<number>(0);
+  const desktopQuitSignOutStartedRef = useRef(false);
+  const handleLogoutRef = useRef<() => Promise<void>>(async () => undefined);
   const [userNotifications, setUserNotifications] = useState<UserNotification[]>([]);
   const [urgentAlerts, setUrgentAlerts] = useState<UrgentAlert[]>([]);
   const [acknowledgingUrgentAlertId, setAcknowledgingUrgentAlertId] = useState<string | null>(null);
@@ -6698,16 +6700,15 @@ function App() {
 
     const loadUnreadCount = async () => {
       try {
-        const response = await messageService.getInbox(currentUser.id);
+        const response = await messageService.getUnreadCount(currentUser.id);
         if (!isMounted) return;
 
-        const nextUnreadCount = response.data.filter((message) => !message.isRead).length;
+        const nextUnreadCount = response.data.unreadCount;
         if (previousMessageUnreadCount.current !== null && nextUnreadCount > previousMessageUnreadCount.current) {
           playMessagePing();
           if (messagePreferences.browserNotifications) {
-            const newestUnread = response.data.find((message) => !message.isRead);
-            showSystemNotification(newestUnread?.senderName ? `New message from ${newestUnread.senderName}` : 'New message', {
-              body: newestUnread?.body ? getPlainNotificationMessage(newestUnread.body).slice(0, 140) : `Open ${appName} to view your message.`,
+            showSystemNotification('New message', {
+              body: `Open ${appName} to view your message.`,
               tag: 'shield-new-message',
               appPath: '/messages',
             });
@@ -6815,6 +6816,33 @@ function App() {
       });
     }
   };
+
+  useEffect(() => {
+    handleLogoutRef.current = handleLogout;
+  });
+
+  useEffect(() => {
+    if (!hasShieldDesktopFeature('onBeforeQuit')) {
+      return undefined;
+    }
+
+    return window.shieldDesktop?.onBeforeQuit?.(() => {
+      if (desktopQuitSignOutStartedRef.current) {
+        return;
+      }
+
+      desktopQuitSignOutStartedRef.current = true;
+      void (async () => {
+        try {
+          await handleLogoutRef.current();
+        } finally {
+          await window.shieldDesktop?.notifyQuitSignOutComplete?.().catch((error) => {
+            console.error('Failed to notify desktop quit sign-out completion:', error);
+          });
+        }
+      })();
+    });
+  }, []);
 
   useEffect(() => {
     if (!hasShieldDesktopFeature('setSessionTimeout')) {

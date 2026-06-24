@@ -32,6 +32,9 @@ let isStartupDesktopUpdateInProgress = false;
 let startupDesktopUpdateFallbackTimer = null;
 let rendererCrashReloadCount = 0;
 let rendererCrashResetTimer = null;
+let quitSignOutRequested = false;
+let quitSignOutComplete = false;
+let quitSignOutTimer = null;
 const pendingCrashReports = [];
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -61,6 +64,7 @@ const desktopSessionTimeoutCheckIntervalMs = 5 * 1000;
 const webAppSignatureRequestTimeoutMs = 10 * 1000;
 const webAppLoadRetryBaseMs = 2 * 1000;
 const webAppLoadRetryMaxMs = 25 * 1000;
+const quitSignOutWaitMs = 1800;
 
 const pngCrcTable = Array.from({ length: 256 }, (_, index) => {
   let value = index;
@@ -603,6 +607,40 @@ function showMainWindow() {
 
   mainWindow.show();
   mainWindow.focus();
+}
+
+function finishQuitAfterSignOut() {
+  quitSignOutComplete = true;
+  if (quitSignOutTimer) {
+    clearTimeout(quitSignOutTimer);
+    quitSignOutTimer = null;
+  }
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.close();
+    return;
+  }
+
+  app.quit();
+}
+
+function requestRendererSignOutBeforeQuit(event) {
+  if (!mainWindow || mainWindow.isDestroyed() || quitSignOutComplete) {
+    return false;
+  }
+
+  event.preventDefault();
+  if (!quitSignOutRequested) {
+    quitSignOutRequested = true;
+    appendDesktopLog('quit-signout-requested');
+    mainWindow.webContents.send('shield:before-quit');
+    quitSignOutTimer = setTimeout(() => {
+      appendDesktopLog('quit-signout-timeout', { timeoutMs: quitSignOutWaitMs });
+      finishQuitAfterSignOut();
+    }, quitSignOutWaitMs);
+  }
+
+  return true;
 }
 
 function rebuildTrayMenu() {
@@ -1328,6 +1366,10 @@ function createMainWindow() {
 
   mainWindow.on('close', (event) => {
     const preferences = getDesktopPreferences();
+    if (isQuitting && requestRendererSignOutBeforeQuit(event)) {
+      return;
+    }
+
     if (!isQuitting && preferences.trayMode) {
       event.preventDefault();
       mainWindow.hide();
@@ -1525,6 +1567,11 @@ ipcMain.handle('shield:set-session-timeout', (_event, options) => configureDeskt
 ipcMain.handle('shield:report-session-activity', () => ({
   ok: reportDesktopSessionActivity()
 }));
+ipcMain.handle('shield:quit-signout-complete', () => {
+  appendDesktopLog('quit-signout-complete');
+  finishQuitAfterSignOut();
+  return { ok: true };
+});
 ipcMain.handle('shield:flash-attention', () => {
   if (mainWindow) {
     mainWindow.flashFrame(true);
