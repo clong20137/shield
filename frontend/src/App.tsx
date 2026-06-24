@@ -1467,8 +1467,17 @@ interface SidebarLinkProps {
   icon: LucideIcon;
 }
 
-function SidebarLink({ to, label, compact, icon: Icon }: SidebarLinkProps) {
+function SidebarRailTooltip({ label, children }: { label: string; children: ReactNode }) {
   return (
+    <span className="sidebar-rail-tooltip-host">
+      {children}
+      <span className="sidebar-rail-tooltip" role="tooltip">{label}</span>
+    </span>
+  );
+}
+
+function SidebarLink({ to, label, compact, icon: Icon }: SidebarLinkProps) {
+  const link = (
     <NavLink
       to={to}
       className={({ isActive }) =>
@@ -1478,12 +1487,13 @@ function SidebarLink({ to, label, compact, icon: Icon }: SidebarLinkProps) {
           isActive ? 'bg-white text-primary-500 shadow' : 'text-blue-50 hover:bg-white/10',
         ].join(' ')
       }
-      title={compact ? label : undefined}
     >
       <Icon className={compact ? '' : 'mr-3'} size={19} />
       {!compact && <span>{label}</span>}
     </NavLink>
   );
+
+  return compact ? <SidebarRailTooltip label={label}>{link}</SidebarRailTooltip> : link;
 }
 
 interface MobileNavigationProps {
@@ -1756,15 +1766,16 @@ function SidebarCalendarWidget({
 
   if (compact) {
     return (
-      <button
-        type="button"
-        onClick={() => onOpenCalendar()}
-        className="mb-3 flex h-11 w-full items-center justify-center rounded bg-white/10 text-white transition hover:bg-white/15"
-        aria-label="Open calendar"
-        title="Open calendar"
-      >
-        <CalendarDays size={20} />
-      </button>
+      <SidebarRailTooltip label="Calendar">
+        <button
+          type="button"
+          onClick={() => onOpenCalendar()}
+          className="mb-3 flex h-11 w-full items-center justify-center rounded bg-white/10 text-white transition hover:bg-white/15"
+          aria-label="Open calendar"
+        >
+          <CalendarDays size={20} />
+        </button>
+      </SidebarRailTooltip>
     );
   }
 
