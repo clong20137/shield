@@ -20,6 +20,7 @@ const PerformanceEvaluationsPage = lazy(() => import('./pages/PerformanceEvaluat
 
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
+const GLASS_THEME_KEY = 'shield_glass_theme';
 const MESSAGE_PREFERENCES_KEY = 'shield_message_preferences';
 const MILITARY_TIME_DEFAULT_APPLIED_KEY = 'shield_military_time_default_applied';
 const SESSION_TIMEOUT_KEY = 'shield_session_timeout_minutes';
@@ -46,7 +47,7 @@ const DEFAULT_BRAND_LOGO = '/shield-splash-logo.png';
 const MAX_SETUP_LOGO_SIZE_BYTES = 240 * 1024;
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/iu;
 const LOGIN_TRANSITION_MS = 560;
-type AppTheme = 'light' | 'dark' | 'glass';
+type AppTheme = 'light' | 'dark';
 
 function withAppBase(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
@@ -5306,6 +5307,7 @@ function App() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showConfetti, setShowConfetti] = useState(false);
   const [theme, setTheme] = useState<AppTheme>('light');
+  const [isGlassTheme, setIsGlassTheme] = useState(false);
   const [notifications, setNotifications] = useState<ToastMessage[]>([]);
   const [desktopPreferences, setDesktopPreferences] = useState<ShieldDesktopPreferences | null>(null);
   const [desktopUpdateStatus, setDesktopUpdateStatus] = useState<ShieldDesktopUpdateStatus | null>(null);
@@ -5908,17 +5910,8 @@ function App() {
     }
   };
 
-  const getNextTheme = (value: AppTheme): AppTheme => {
-    if (value === 'light') return 'dark';
-    if (value === 'dark') return 'glass';
-    return 'light';
-  };
-
   const getThemeToggleLabel = () => {
-    const nextTheme = getNextTheme(theme);
-    if (nextTheme === 'dark') return 'Dark Mode';
-    if (nextTheme === 'glass') return 'Glass Mode';
-    return 'Light Mode';
+    return theme === 'light' ? 'Dark Mode' : 'Light Mode';
   };
 
   const handleOpenDesktopDiagnostics = async () => {
@@ -6392,12 +6385,25 @@ function App() {
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem(THEME_KEY);
+    const storedGlassTheme = window.localStorage.getItem(GLASS_THEME_KEY);
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (storedTheme === 'glass' || storedTheme === 'dark' || storedTheme === 'light') {
-      setTheme(storedTheme);
+
+    if (storedTheme === 'glass') {
+      setTheme('dark');
+      setIsGlassTheme(true);
+      window.localStorage.setItem(THEME_KEY, 'dark');
+      window.localStorage.setItem(GLASS_THEME_KEY, 'true');
       return;
     }
+
+    if (storedTheme === 'dark' || storedTheme === 'light') {
+      setTheme(storedTheme);
+      setIsGlassTheme(storedGlassTheme === 'true');
+      return;
+    }
+
     setTheme(prefersDark ? 'dark' : 'light');
+    setIsGlassTheme(storedGlassTheme === 'true');
   }, []);
 
   useEffect(() => {
@@ -6419,10 +6425,11 @@ function App() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark' || theme === 'glass');
-    document.documentElement.classList.toggle('glass', theme === 'glass');
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.documentElement.classList.toggle('glass', isGlassTheme);
     window.localStorage.setItem(THEME_KEY, theme);
-  }, [theme]);
+    window.localStorage.setItem(GLASS_THEME_KEY, String(isGlassTheme));
+  }, [isGlassTheme, theme]);
 
   useEffect(() => {
     const appScale = normalizeAppScale(currentUser?.appScale);
@@ -8072,11 +8079,11 @@ function App() {
                   <button
                     data-onboarding-control="theme"
                     type="button"
-                    onClick={() => setTheme((value) => getNextTheme(value))}
+                    onClick={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
                     className="header-action-button flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
                     aria-label="Change theme"
                   >
-                    {theme === 'light' ? <Moon size={18} /> : theme === 'dark' ? <Shield size={18} /> : <Sun size={18} />}
+                    {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
                   </button>
                 </IconButtonTooltip>
                 <div ref={accountMenuRef} className="relative">
@@ -8456,6 +8463,7 @@ function App() {
                       account={currentUser}
                       messagePreferences={messagePreferences}
                       appTheme={theme}
+                      isGlassTheme={isGlassTheme}
                       isDesktopApp={isShieldDesktopApp()}
                       desktopPreferences={desktopPreferences}
                       desktopUpdateStatus={desktopUpdateStatus}
@@ -8510,6 +8518,7 @@ function App() {
                       onAppScaleChange={handleAppScaleChange}
                       onDefaultDutyHoursChange={handleDefaultDutyHoursChange}
                       onAppThemeChange={setTheme}
+                      onGlassThemeChange={setIsGlassTheme}
                       onStartWithWindowsChange={handleStartWithWindowsChange}
                       onTrayModeChange={handleTrayModeChange}
                       onCheckForDesktopUpdates={handleCheckForDesktopUpdates}

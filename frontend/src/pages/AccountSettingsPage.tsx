@@ -8,7 +8,7 @@ import { downloadPerformanceEvaluationPdf } from '../utils/performanceEvaluation
 
 const appBasePath = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
 const desktopInstallerUrl = `${appBasePath}/downloads/Shield-Setup.exe`;
-type AppTheme = 'light' | 'dark' | 'glass';
+type AppTheme = 'light' | 'dark';
 
 interface AccountSettingsPageProps {
   account: AuthAccount;
@@ -24,6 +24,7 @@ interface AccountSettingsPageProps {
     quickLaunchSlotCount: number;
   };
   appTheme: AppTheme;
+  isGlassTheme: boolean;
   isDesktopApp: boolean;
   desktopPreferences: ShieldDesktopPreferences | null;
   desktopUpdateStatus: ShieldDesktopUpdateStatus | null;
@@ -43,6 +44,7 @@ interface AccountSettingsPageProps {
   onAppScaleChange: (appScale: AuthAccount['appScale']) => void;
   onDefaultDutyHoursChange: (defaultDutyHours: string) => void;
   onAppThemeChange: (theme: AppTheme) => void;
+  onGlassThemeChange: (isGlassTheme: boolean) => void;
   onStartWithWindowsChange: (startWithWindows: boolean) => void;
   onTrayModeChange: (trayMode: boolean) => void;
   onCheckForDesktopUpdates: () => void;
@@ -78,6 +80,7 @@ export function AccountSettingsPage({
   account,
   messagePreferences,
   appTheme,
+  isGlassTheme,
   isDesktopApp,
   desktopPreferences,
   desktopUpdateStatus,
@@ -97,6 +100,7 @@ export function AccountSettingsPage({
   onAppScaleChange,
   onDefaultDutyHoursChange,
   onAppThemeChange,
+  onGlassThemeChange,
   onStartWithWindowsChange,
   onTrayModeChange,
   onCheckForDesktopUpdates,
@@ -887,13 +891,12 @@ export function AccountSettingsPage({
 
           <PreferenceGroup title="Appearance" description="Choose how the workspace surfaces should feel on this device.">
             <div className="rounded border border-gray-200 p-4 dark:border-gray-800">
-              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Theme</span>
-              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Glass uses translucent panels and a darker polished workspace.</span>
-              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Base theme</span>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose the core light or dark workspace, then layer glass surfaces on top if desired.</span>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {([
                   ['light', 'Light', 'Clean bright workspace'],
                   ['dark', 'Dark', 'Low-light workspace'],
-                  ['glass', 'Glass', 'Translucent app surfaces'],
                 ] as const).map(([themeValue, label, description]) => (
                   <button
                     key={themeValue}
@@ -911,6 +914,12 @@ export function AccountSettingsPage({
                 ))}
               </div>
             </div>
+            <PreferenceToggle
+              title="Glass mode"
+              description="Use translucent app surfaces with blur and depth in the selected light or dark theme."
+              checked={isGlassTheme}
+              onChange={onGlassThemeChange}
+            />
           </PreferenceGroup>
 
           <PreferenceGroup title="Messaging" description="Control message availability, alerts, and sounds.">
