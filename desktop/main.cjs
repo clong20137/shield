@@ -50,6 +50,8 @@ const webAppUpdateCheckIntervalMs = 30 * 1000;
 const webAppReloadCooldownMs = 15 * 1000;
 const desktopUpdateCheckIntervalMs = 15 * 60 * 1000;
 const desktopStartupUpdateFallbackMs = 2 * 60 * 1000;
+const desktopStartupUpdateRestartDelayMs = 1500;
+const desktopUpdateRestartDelayMs = 5000;
 const maxPendingCrashReports = 10;
 const maxRendererCrashReloads = 2;
 const rendererCrashStableResetMs = 30 * 1000;
@@ -544,13 +546,21 @@ function getDesktopConfig() {
   const allowedOrigins = Array.isArray(fileConfig.allowedOrigins) && fileConfig.allowedOrigins.length > 0
     ? fileConfig.allowedOrigins
     : [appUrl];
-  const updateUrl = process.env.SHIELD_UPDATE_URL || fileConfig.updateUrl || defaultConfig.updateUrl;
+  const updateUrl = process.env.SHIELD_UPDATE_URL || fileConfig.updateUrl || defaultConfig.updateUrl || getDefaultUpdateUrl(appUrl);
 
   return {
     appUrl,
     allowedOrigins,
     updateUrl
   };
+}
+
+function getDefaultUpdateUrl(appUrl) {
+  try {
+    return new URL('/downloads/', appUrl).toString();
+  } catch {
+    return '';
+  }
 }
 
 function createShieldTrayIcon(count = desktopUnreadCount, status = desktopPresenceStatus) {
@@ -1147,14 +1157,18 @@ function installDownloadedUpdate() {
   autoUpdater.quitAndInstall(true, true);
 }
 
-function checkForDesktopUpdates({ startup = false } = {}) {
+function checkForDesktopUpdates({ startup = false, reason = 'manual' } = {}) {
   if (!desktopConfig?.updateUrl || isUpdateDownloaded || isDesktopUpdateCheckRunning) {
     return Promise.resolve(false);
   }
 
   if (startup) {
     isStartupDesktopUpdateInProgress = true;
-    appendDesktopLog('desktop-update-startup-check');
+    appendDesktopLog('desktop-update-startup-check', {
+      reason,
+      installedVersion: app.getVersion(),
+      updateUrl: desktopConfig.updateUrl
+    });
     if (startupDesktopUpdateFallbackTimer) {
       clearTimeout(startupDesktopUpdateFallbackTimer);
     }
@@ -1167,7 +1181,11 @@ function checkForDesktopUpdates({ startup = false } = {}) {
   }
 
   isDesktopUpdateCheckRunning = true;
-  appendDesktopLog('desktop-update-check-started');
+  appendDesktopLog('desktop-update-check-started', {
+    reason,
+    startup,
+    installedVersion: app.getVersion()
+  });
   return autoUpdater.checkForUpdates()
     .then(() => true)
     .catch((error) => {
@@ -1198,8 +1216,13 @@ function configureAutoUpdates(config) {
 
   autoUpdater.on('checking-for-update', () => sendUpdaterStatus('checking'));
   autoUpdater.on('update-available', (info) => {
-    appendDesktopLog('desktop-update-available', { version: info.version });
-    sendUpdaterStatus('available', { version: info.version });
+    appendDesktopLog('desktop-update-available', {
+      version: info.version,
+      installedVersion: app.getVersion(),
+      startup: isStartupDesktopUpdateInProgress,
+      action: 'auto-download'
+    });
+    sendUpdaterStatus('available', { version: info.version, message: 'Desktop update found. Downloading automatically.' });
   });
   autoUpdater.on('update-not-available', (info) => {
     appendDesktopLog('desktop-update-not-available', { version: info.version });
@@ -1218,7 +1241,10 @@ function configureAutoUpdates(config) {
       title: 'Shield update downloaded',
       body: 'Shield will restart automatically to finish installing the desktop update.'
     });
-    pendingUpdateRestartTimer = setTimeout(installDownloadedUpdate, 5000);
+    pendingUpdateRestartTimer = setTimeout(
+      installDownloadedUpdate,
+      isStartupDesktopUpdateInProgress ? desktopStartupUpdateRestartDelayMs : desktopUpdateRestartDelayMs
+    );
   });
   autoUpdater.on('error', (error) => {
     appendDesktopLog('desktop-update-error', { message: error.message });
@@ -1226,7 +1252,7 @@ function configureAutoUpdates(config) {
     sendUpdaterStatus('error', { message: error.message });
   });
 
-  void checkForDesktopUpdates({ startup: true });
+  void checkForDesktopUpdates({ startup: true, reason: 'app-launch' });
   if (desktopUpdateCheckTimer) {
     clearInterval(desktopUpdateCheckTimer);
   }
