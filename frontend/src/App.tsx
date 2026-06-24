@@ -46,6 +46,7 @@ const DEFAULT_BRAND_LOGO = '/shield-splash-logo.png';
 const MAX_SETUP_LOGO_SIZE_BYTES = 240 * 1024;
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/iu;
 const LOGIN_TRANSITION_MS = 560;
+type AppTheme = 'light' | 'dark' | 'glass';
 
 function withAppBase(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
@@ -5304,7 +5305,7 @@ function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<AppTheme>('light');
   const [notifications, setNotifications] = useState<ToastMessage[]>([]);
   const [desktopPreferences, setDesktopPreferences] = useState<ShieldDesktopPreferences | null>(null);
   const [desktopUpdateStatus, setDesktopUpdateStatus] = useState<ShieldDesktopUpdateStatus | null>(null);
@@ -5907,6 +5908,19 @@ function App() {
     }
   };
 
+  const getNextTheme = (value: AppTheme): AppTheme => {
+    if (value === 'light') return 'dark';
+    if (value === 'dark') return 'glass';
+    return 'light';
+  };
+
+  const getThemeToggleLabel = () => {
+    const nextTheme = getNextTheme(theme);
+    if (nextTheme === 'dark') return 'Dark Mode';
+    if (nextTheme === 'glass') return 'Glass Mode';
+    return 'Light Mode';
+  };
+
   const handleOpenDesktopDiagnostics = async () => {
     if (!hasShieldDesktopFeature('openDesktopLogs')) {
       showToast('info', `Install the latest ${appName} desktop app to access diagnostics logs.`, { saveToNotifications: false });
@@ -6379,7 +6393,11 @@ function App() {
   useEffect(() => {
     const storedTheme = window.localStorage.getItem(THEME_KEY);
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setTheme(storedTheme === 'dark' || (!storedTheme && prefersDark) ? 'dark' : 'light');
+    if (storedTheme === 'glass' || storedTheme === 'dark' || storedTheme === 'light') {
+      setTheme(storedTheme);
+      return;
+    }
+    setTheme(prefersDark ? 'dark' : 'light');
   }, []);
 
   useEffect(() => {
@@ -6401,7 +6419,8 @@ function App() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.documentElement.classList.toggle('dark', theme === 'dark' || theme === 'glass');
+    document.documentElement.classList.toggle('glass', theme === 'glass');
     window.localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
 
@@ -8049,15 +8068,15 @@ function App() {
                     onOpenMessages={toggleMessagesModal}
                   />
                 </IconButtonTooltip>
-                <IconButtonTooltip label={theme === 'light' ? 'Dark Mode' : 'Light Mode'}>
+                <IconButtonTooltip label={getThemeToggleLabel()}>
                   <button
                     data-onboarding-control="theme"
                     type="button"
-                    onClick={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
+                    onClick={() => setTheme((value) => getNextTheme(value))}
                     className="header-action-button flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
-                    aria-label="Toggle light and dark mode"
+                    aria-label="Change theme"
                   >
-                    {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+                    {theme === 'light' ? <Moon size={18} /> : theme === 'dark' ? <Shield size={18} /> : <Sun size={18} />}
                   </button>
                 </IconButtonTooltip>
                 <div ref={accountMenuRef} className="relative">
@@ -8436,6 +8455,7 @@ function App() {
                     <AccountSettingsPage
                       account={currentUser}
                       messagePreferences={messagePreferences}
+                      appTheme={theme}
                       isDesktopApp={isShieldDesktopApp()}
                       desktopPreferences={desktopPreferences}
                       desktopUpdateStatus={desktopUpdateStatus}
@@ -8489,6 +8509,7 @@ function App() {
                       onCalendarHiddenChange={handleCalendarHiddenChange}
                       onAppScaleChange={handleAppScaleChange}
                       onDefaultDutyHoursChange={handleDefaultDutyHoursChange}
+                      onAppThemeChange={setTheme}
                       onStartWithWindowsChange={handleStartWithWindowsChange}
                       onTrayModeChange={handleTrayModeChange}
                       onCheckForDesktopUpdates={handleCheckForDesktopUpdates}

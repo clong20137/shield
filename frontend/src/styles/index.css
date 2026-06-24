@@ -894,6 +894,27 @@
     @apply font-sans text-gray-800 bg-gray-50 dark:bg-gray-950 dark:text-gray-100;
   }
 
+  html.glass body {
+    background:
+      radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--app-primary) 42%, transparent), transparent 30rem),
+      radial-gradient(circle at 82% 8%, color-mix(in srgb, var(--app-secondary) 32%, transparent), transparent 26rem),
+      linear-gradient(135deg, #07111f 0%, #0b1727 42%, #111827 100%) !important;
+    color: rgb(243, 244, 246);
+  }
+
+  html.glass body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    background:
+      linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.82), transparent 86%);
+  }
+
   html,
   body,
   #root {
@@ -1022,6 +1043,71 @@
   .dark .theme-polished-surface .ring-blue-100,
   .dark .theme-polished-surface .dark\:ring-blue-900 {
     --tw-ring-color: rgb(55, 65, 81) !important;
+  }
+
+  html.glass .animate-app-enter {
+    background: transparent !important;
+  }
+
+  html.glass main {
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.2), rgba(15, 23, 42, 0.08)) !important;
+  }
+
+  html.glass .theme-polished-surface,
+  html.glass .modal-window,
+  html.glass .quick-launch-context-menu,
+  html.glass .quick-launch-picker-enter,
+  html.glass .floating-window,
+  html.glass section[class~='bg-white'],
+  html.glass article[class~='bg-white'],
+  html.glass div[class~='bg-white']:not(.shield-left-panel):not(.shield-left-panel *):not(.quick-launch-sidebar-placement):not(.quick-launch-sidebar-placement *) {
+    border-color: rgba(255, 255, 255, 0.13) !important;
+    background-color: rgba(15, 23, 42, 0.64) !important;
+    color: rgb(243, 244, 246) !important;
+    box-shadow:
+      0 18px 52px rgba(0, 0, 0, 0.32),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+    backdrop-filter: blur(22px) saturate(1.22);
+    -webkit-backdrop-filter: blur(22px) saturate(1.22);
+  }
+
+  html.glass .header-action-button.header-action-button,
+  html.glass [data-onboarding-target='header-actions'] {
+    border-color: rgba(255, 255, 255, 0.16) !important;
+    background-color: rgba(15, 23, 42, 0.58) !important;
+    color: rgb(248, 250, 252) !important;
+    backdrop-filter: blur(18px) saturate(1.18);
+    -webkit-backdrop-filter: blur(18px) saturate(1.18);
+  }
+
+  html.glass .theme-polished-surface .text-primary-500,
+  html.glass .theme-polished-surface .text-accent,
+  html.glass .theme-polished-surface .dark\:text-blue-100,
+  html.glass .theme-polished-surface .dark\:text-primary-500 {
+    color: rgb(248, 250, 252) !important;
+  }
+
+  html.glass input:not([type='checkbox']):not([type='radio']),
+  html.glass textarea,
+  html.glass select {
+    border-color: rgba(255, 255, 255, 0.16) !important;
+    background-color: rgba(2, 6, 23, 0.46) !important;
+    color: rgb(248, 250, 252) !important;
+  }
+
+  html.glass input::placeholder,
+  html.glass textarea::placeholder {
+    color: rgba(203, 213, 225, 0.7) !important;
+  }
+
+  html.glass .loading,
+  html.glass .empty-state,
+  html.glass .skeleton-shimmer {
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    background-color: rgba(15, 23, 42, 0.46) !important;
+    color: rgb(203, 213, 225) !important;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
   }
 
   .icon-close-button {
