@@ -1,4 +1,4 @@
-import { CSSProperties, FormEvent, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, FormEvent, ReactNode, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Command, Delete, Download, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, RefreshCw, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
@@ -2110,6 +2110,15 @@ function GlobalSearch({ compact }: { compact: boolean }) {
   );
 }
 
+function IconButtonTooltip({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <span className="app-icon-tooltip-host">
+      {children}
+      <span className="app-icon-tooltip" role="tooltip">{label}</span>
+    </span>
+  );
+}
+
 function HeaderMessagesButton({
   unreadCount,
   onOpenMessages,
@@ -2124,7 +2133,6 @@ function HeaderMessagesButton({
       onClick={onOpenMessages}
       className="header-action-button relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
       aria-label="Open messages"
-      title="Messages"
     >
       <Mail size={18} />
       {unreadCount > 0 && (
@@ -7637,18 +7645,21 @@ function App() {
         <LoginSplash onLogin={handleLogin} onToast={showToast} appName={appName} siteName={siteName} brandLogoDataUrl={brandLogoDataUrl} isExiting={isLoginTransitioning} />
       ) : (
         <div className="animate-app-enter flex h-[100dvh] overflow-hidden bg-gray-50 dark:bg-gray-950">
-          <aside className={`relative hidden h-[100dvh] shrink-0 overflow-visible bg-primary-500 text-white shadow-xl transition-all duration-200 dark:bg-gray-900 md:block ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
+          <aside className={`shield-left-panel relative hidden h-[100dvh] shrink-0 overflow-visible bg-primary-500 text-white shadow-xl transition-all duration-200 md:block ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed((value) => !value)}
-              className="absolute -right-5 top-1/2 z-30 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-primary-500 shadow-lg hover:bg-gray-50 md:flex"
+              className="sidebar-collapse-button absolute -right-5 top-1/2 z-30 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-primary-500 shadow-lg hover:bg-gray-50 md:flex"
               aria-label={isSidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
             >
               {isSidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+              <span className="sidebar-collapse-tooltip" role="tooltip">
+                {isSidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+              </span>
             </button>
 
             <div className="shield-sidebar flex h-[100dvh] flex-col overflow-y-auto overflow-x-hidden">
-            <div className="flex h-16 shrink-0 items-center border-b border-white/10 px-4 dark:border-gray-800">
+            <div className="flex h-16 shrink-0 items-center border-b border-white/10 px-4">
               {!isSidebarCollapsed && (
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center">
@@ -7776,20 +7787,22 @@ function App() {
           <div className="relative flex h-[100dvh] min-w-0 flex-1 flex-col overflow-hidden">
               <div data-onboarding-target="header-actions" className="pointer-events-auto fixed right-3 top-3 z-40 flex select-none items-center gap-1.5 rounded-2xl border border-gray-200 bg-white/90 p-2 shadow-[0_16px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/85 sm:right-5 sm:top-4 sm:gap-2">
                 <div ref={notificationsMenuRef} className="relative">
-                  <button
-                    data-onboarding-control="notifications"
-                    type="button"
-                    onClick={() => setIsNotificationsOpen((value) => !value)}
-                    className="header-action-button relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
-                    aria-label="Open notifications"
-                  >
-                    <Bell size={18} />
-                    {totalNotificationCount > 0 && (
-                      <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
-                        {totalNotificationCount > 9 ? '9+' : totalNotificationCount}
-                      </span>
-                    )}
-                  </button>
+                  <IconButtonTooltip label="Notifications">
+                    <button
+                      data-onboarding-control="notifications"
+                      type="button"
+                      onClick={() => setIsNotificationsOpen((value) => !value)}
+                      className="header-action-button relative flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                      aria-label="Open notifications"
+                    >
+                      <Bell size={18} />
+                      {totalNotificationCount > 0 && (
+                        <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white">
+                          {totalNotificationCount > 9 ? '9+' : totalNotificationCount}
+                        </span>
+                      )}
+                    </button>
+                  </IconButtonTooltip>
 
                   <div
                     className={`theme-polished-surface absolute right-0 top-12 z-40 w-[calc(100vw-2rem)] max-w-[26rem] origin-top-right overflow-hidden rounded-lg border border-gray-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.2)] transition duration-200 ease-out dark:border-gray-700 dark:bg-gray-900 sm:w-[26rem] ${
@@ -7922,30 +7935,35 @@ function App() {
                       </div>
                   </div>
                 </div>
-                <HeaderMessagesButton
-                  unreadCount={messageUnreadCount}
-                  onOpenMessages={toggleMessagesModal}
-                />
-                <button
-                  data-onboarding-control="theme"
-                  type="button"
-                  onClick={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
-                  className="header-action-button flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
-                  aria-label="Toggle light and dark mode"
-                >
-                  {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-                </button>
+                <IconButtonTooltip label="Messages">
+                  <HeaderMessagesButton
+                    unreadCount={messageUnreadCount}
+                    onOpenMessages={toggleMessagesModal}
+                  />
+                </IconButtonTooltip>
+                <IconButtonTooltip label={theme === 'light' ? 'Dark Mode' : 'Light Mode'}>
+                  <button
+                    data-onboarding-control="theme"
+                    type="button"
+                    onClick={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
+                    className="header-action-button flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                    aria-label="Toggle light and dark mode"
+                  >
+                    {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+                  </button>
+                </IconButtonTooltip>
                 <div ref={accountMenuRef} className="relative">
-                <button
-                  data-onboarding-control="settings"
-                  type="button"
-                  onClick={() => setIsAccountMenuOpen((value) => !value)}
-                  className="header-action-button flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
-                  aria-label="Open account menu"
-                  title="Account"
-                >
-                  <Settings size={18} />
-                </button>
+                <IconButtonTooltip label="Settings">
+                  <button
+                    data-onboarding-control="settings"
+                    type="button"
+                    onClick={() => setIsAccountMenuOpen((value) => !value)}
+                    className="header-action-button flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                    aria-label="Open account menu"
+                  >
+                    <Settings size={18} />
+                  </button>
+                </IconButtonTooltip>
                 <div
                   className={`absolute right-0 top-12 z-40 w-[calc(100vw-6.5rem)] max-w-64 origin-top-right rounded border border-gray-200 bg-white shadow-xl transition duration-200 ease-out dark:border-gray-700 dark:bg-gray-900 sm:w-64 ${
                     isAccountMenuOpen ? 'pointer-events-auto translate-y-0 scale-100 opacity-100' : 'pointer-events-none -translate-y-1 scale-95 opacity-0'
