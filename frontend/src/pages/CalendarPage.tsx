@@ -220,6 +220,12 @@ const regularDutySplitTimeFields: readonly TrooperDailyField[] = [
   ['thirdSplitEndTime', '3rd Split End Time'],
 ] as const;
 
+const regularDutySplitPairs: readonly (readonly [string, string])[] = [
+  ['splitStartTime', 'splitEndTime'],
+  ['secondSplitStartTime', 'secondSplitEndTime'],
+  ['thirdSplitStartTime', 'thirdSplitEndTime'],
+] as const;
+
 const getRegularDutySplitPairCountFromDetails = (details?: Record<string, string>): number => {
   if (details?.thirdSplitStartTime?.trim() || details?.thirdSplitEndTime?.trim()) {
     return 3;
@@ -1808,6 +1814,120 @@ function CalendarPage({
 
   const addRegularDutySplitPair = () => {
     setRegularDutySplitPairCount((currentPairCount) => Math.min(3, currentPairCount + 1));
+  };
+
+  const removeRegularDutySplitPair = () => {
+    const nextPairCount = Math.max(1, regularDutySplitPairCount - 1);
+    const pairToRemove = regularDutySplitPairs[regularDutySplitPairCount - 1];
+    if (!pairToRemove) {
+      setRegularDutySplitPairCount(nextPairCount);
+      return;
+    }
+
+    setEntryForm((currentForm) => {
+      const nextDetails = { ...(currentForm.details || {}) };
+      pairToRemove.forEach((key) => {
+        delete nextDetails[key];
+      });
+
+      const nextForm = {
+        ...currentForm,
+        details: nextDetails,
+      };
+
+      if (!isDutyHoursManual) {
+        const shiftHours = calculateShiftHours(nextDetails);
+        if (shiftHours > 0) {
+          const formattedHours = formatHours(shiftHours);
+          nextForm.dutyHours = formattedHours;
+          lastAutoDutyHoursRef.current = formattedHours;
+        } else if (currentForm.dutyHours === lastAutoDutyHoursRef.current) {
+          nextForm.dutyHours = '';
+          lastAutoDutyHoursRef.current = '';
+        }
+      }
+
+      return nextForm;
+    });
+    setRegularDutySplitPairCount(nextPairCount);
+    setInvalidDailyField((field) => (field && pairToRemove.includes(field) ? null : field));
+  };
+
+  const clearDailySectionFields = (section: TrooperDailySection) => {
+    if (section.title === 'Regular Duty') {
+      setRegularDutySplitPairCount(1);
+    }
+
+    setEntryForm((currentForm) => {
+      const nextDetails = { ...(currentForm.details || {}) };
+      const sectionKeys = section.fields.map(([key]) => key);
+
+      sectionKeys.forEach((key) => {
+        if (timeDetailFields.has(key) || key === 'narrative') {
+          delete nextDetails[key];
+          return;
+        }
+
+        nextDetails[key] = '0';
+      });
+
+      const nextForm = {
+        ...currentForm,
+        details: nextDetails,
+      };
+
+      if (section.title === 'Regular Duty') {
+        regularDutySplitPairs.slice(1).flat().forEach((key) => {
+          delete nextDetails[key];
+        });
+      }
+
+      if (!isDutyHoursManual && section.fields.some(([key]) => timeDetailFields.has(key))) {
+        const shiftHours = calculateShiftHours(nextDetails);
+        if (shiftHours > 0) {
+          const formattedHours = formatHours(shiftHours);
+          nextForm.dutyHours = formattedHours;
+          lastAutoDutyHoursRef.current = formattedHours;
+        } else if (currentForm.dutyHours === lastAutoDutyHoursRef.current) {
+          nextForm.dutyHours = '';
+          lastAutoDutyHoursRef.current = '';
+        }
+      }
+
+      return nextForm;
+    });
+    setInvalidDailyField((field) => (field && section.fields.some(([key]) => key === field) ? null : field));
+  };
+
+  const clearTCodesSection = () => {
+    setEntryForm((currentForm) => {
+      const nextDetails = { ...(currentForm.details || {}) };
+      delete nextDetails[tCodeDetailsKey];
+      delete nextDetails[noTCodeDetailsKey];
+      const nextForm = {
+        ...currentForm,
+        details: nextDetails,
+      };
+
+      if (!isDutyHoursManual && currentForm.dutyHours === lastAutoDutyHoursRef.current) {
+        const shiftHours = calculateShiftHours(nextDetails);
+        if (shiftHours > 0) {
+          const formattedHours = formatHours(shiftHours);
+          nextForm.dutyHours = formattedHours;
+          lastAutoDutyHoursRef.current = formattedHours;
+        } else {
+          nextForm.dutyHours = '';
+          lastAutoDutyHoursRef.current = '';
+        }
+      }
+
+      return nextForm;
+    });
+    setInvalidDailyField((field) => (field?.startsWith('tCode-') ? null : field));
+  };
+
+  const clearNarrativeSection = () => {
+    updateDailyDetail('narrative', '');
   };
 
   const updateTCodeRows = (rows: TrooperDailyTCode[]) => {
@@ -3441,6 +3561,28 @@ function CalendarPage({
                               <Plus size={16} />
                               <span>Add Split</span>
                             </button>
+                            {regularDutySplitPairCount > 1 && (
+                              <button
+                                type="button"
+                                onClick={removeRegularDutySplitPair}
+                                className="btn-secondary"
+                                title="Remove the last split interval"
+                                aria-label="Remove split interval"
+                              >
+                                <X size={16} />
+                                <span>Remove Split</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => clearDailySectionFields(activeDailySection)}
+                              className="btn-secondary"
+                              title="Zero out Regular Duty fields"
+                              aria-label="Zero out Regular Duty fields"
+                            >
+                              <Trash2 size={16} />
+                              <span>Zero Section</span>
+                            </button>
                             <div className="inline-flex rounded border border-gray-300 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-900" aria-label="Time input format">
                               <button
                                 type="button"
@@ -3466,6 +3608,18 @@ function CalendarPage({
                               </button>
                             </div>
                           </div>
+                        )}
+                        {activeDailySection.title !== 'Regular Duty' && (
+                          <button
+                            type="button"
+                            onClick={() => clearDailySectionFields(activeDailySection)}
+                            className="btn-secondary"
+                            title={`Zero out ${activeDailySection.title} fields`}
+                            aria-label={`Zero out ${activeDailySection.title} fields`}
+                          >
+                            <Trash2 size={16} />
+                            <span>Zero Section</span>
+                          </button>
                         )}
                       </div>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -3543,17 +3697,29 @@ function CalendarPage({
                             </p>
                           )}
                         </div>
-                        <button
-                          type="button"
-                          onClick={addTCodeRow}
-                          className="btn-secondary"
-                          disabled={tCodeOptions.length === 0}
-                          aria-label="Add T-Code"
-                          title="Add T-Code"
-                        >
-                          <Plus size={16} />
-                          <span>Add T-Code</span>
-                        </button>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={clearTCodesSection}
+                            className="btn-secondary"
+                            aria-label="Zero out T-Codes"
+                            title="Zero out T-Codes"
+                          >
+                            <Trash2 size={16} />
+                            <span>Zero Section</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={addTCodeRow}
+                            className="btn-secondary"
+                            disabled={tCodeOptions.length === 0}
+                            aria-label="Add T-Code"
+                            title="Add T-Code"
+                          >
+                            <Plus size={16} />
+                            <span>Add T-Code</span>
+                          </button>
+                        </div>
                       </div>
 
                       <label className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-sm font-bold text-gray-700 dark:border-gray-800 dark:bg-gray-900/60 dark:text-gray-200">
@@ -3653,9 +3819,21 @@ function CalendarPage({
                           <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Narrative</h3>
                           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Add context for the daily report.</p>
                         </div>
-                        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
-                          {(entryForm.details?.narrative || '').length}/{narrativeCharacterLimit}
-                        </span>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
+                            {(entryForm.details?.narrative || '').length}/{narrativeCharacterLimit}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={clearNarrativeSection}
+                            className="btn-secondary"
+                            aria-label="Clear narrative"
+                            title="Clear narrative"
+                          >
+                            <Trash2 size={16} />
+                            <span>Zero Section</span>
+                          </button>
+                        </div>
                       </div>
                       <div className="relative">
                         <span className="pointer-events-none absolute left-3 top-3 z-10 text-gray-400 dark:text-gray-500">

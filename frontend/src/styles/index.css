@@ -1083,54 +1083,27 @@
     width: 1.08em;
     height: 0.98em;
     flex-direction: column;
-    gap: 0.03em;
+    gap: 0.02em;
   }
 
   .shield-rank-chevron-stack > span {
-    position: relative;
     display: block;
-    width: 0.86em;
-    height: 0.22em;
-    border: 0;
-    transform: none;
-  }
-
-  .shield-rank-chevron-stack > span + span {
-    margin-top: -0.01em;
-  }
-
-  .shield-rank-chevron-stack > span::before,
-  .shield-rank-chevron-stack > span::after {
-    content: '';
-    position: absolute;
-    top: 0.04em;
-    width: 0.5em;
-    height: 0.15em;
-    border-radius: 999px;
+    width: 0.94em;
+    height: 0.24em;
     background: currentColor;
-  }
-
-  .shield-rank-chevron-stack > span::before {
-    left: 0.01em;
-    transform: rotate(24deg);
-    transform-origin: right center;
-  }
-
-  .shield-rank-chevron-stack > span::after {
-    right: 0.01em;
-    transform: rotate(-24deg);
-    transform-origin: left center;
+    clip-path: polygon(50% 0, 100% 72%, 84% 100%, 50% 46%, 16% 100%, 0 72%);
   }
 
   .shield-rank-first-sergeant-mark::after {
     content: '';
     position: absolute;
-    bottom: -0.09em;
+    bottom: -0.07em;
     left: 50%;
     width: 0.28em;
     height: 0.28em;
-    border: 0.09em solid currentColor;
-    transform: translateX(-50%) rotate(45deg);
+    background: currentColor;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    transform: translateX(-50%);
   }
 
   .shield-rank-bar {
