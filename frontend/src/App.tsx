@@ -7792,7 +7792,7 @@ function App() {
                   </button>
 
                   <div
-                    className={`absolute right-0 top-12 z-40 w-[calc(100vw-2rem)] max-w-[26rem] origin-top-right overflow-hidden rounded-lg border border-gray-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.2)] transition duration-200 ease-out dark:border-gray-700 dark:bg-gray-900 sm:w-[26rem] ${
+                    className={`theme-polished-surface absolute right-0 top-12 z-40 w-[calc(100vw-2rem)] max-w-[26rem] origin-top-right overflow-hidden rounded-lg border border-gray-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.2)] transition duration-200 ease-out dark:border-gray-700 dark:bg-gray-900 sm:w-[26rem] ${
                       isNotificationsOpen ? 'pointer-events-auto translate-y-0 scale-100 opacity-100' : 'pointer-events-none -translate-y-1 scale-95 opacity-0'
                     }`}
                     aria-hidden={!isNotificationsOpen}

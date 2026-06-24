@@ -2810,7 +2810,7 @@ function CalendarPage({
   }, [activeDailyPanel, dailyPanelOptions]);
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col">
+    <div className="theme-polished-surface relative flex h-full min-h-0 flex-col">
       {(!selectedDate || isFloatingApp) && (
       <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

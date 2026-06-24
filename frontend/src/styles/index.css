@@ -42,6 +42,12 @@
   color: var(--app-primary) !important;
 }
 
+.dark .text-primary-500,
+.dark .hover\:text-primary-500:hover,
+.dark .dark\:text-primary-500 {
+  color: rgb(243, 244, 246) !important;
+}
+
 .text-secondary-500,
 .text-accent,
 .hover\:text-accent:hover {
@@ -995,6 +1001,27 @@
   .btn-success:not(:disabled):active {
     background-color: color-mix(in srgb, #16a34a 84%, white) !important;
     color: white !important;
+  }
+
+  .dark .theme-polished-surface .text-primary-500,
+  .dark .theme-polished-surface .dark\:text-blue-100,
+  .dark .theme-polished-surface .dark\:text-primary-500 {
+    color: rgb(243, 244, 246) !important;
+  }
+
+  .dark .theme-polished-surface .text-accent {
+    color: rgb(229, 231, 235) !important;
+  }
+
+  .dark .theme-polished-surface .bg-blue-50,
+  .dark .theme-polished-surface .dark\:bg-blue-950\/40,
+  .dark .theme-polished-surface .dark\:bg-blue-950\/50 {
+    background-color: rgb(17, 24, 39) !important;
+  }
+
+  .dark .theme-polished-surface .ring-blue-100,
+  .dark .theme-polished-surface .dark\:ring-blue-900 {
+    --tw-ring-color: rgb(55, 65, 81) !important;
   }
 
   .icon-close-button {
