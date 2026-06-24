@@ -535,11 +535,11 @@
 
 @keyframes shield-rank-sheen {
   0% {
-    transform: translateX(-140%) skewX(-18deg);
+    left: -75%;
   }
 
   100% {
-    transform: translateX(180%) skewX(-18deg);
+    left: 125%;
   }
 }
 
@@ -1044,12 +1044,15 @@
   .shield-rank-badge::after {
     content: '';
     position: absolute;
-    inset: -40% auto -40% -45%;
+    top: -40%;
+    bottom: -40%;
+    left: -75%;
     z-index: 0;
-    width: 42%;
+    width: 58%;
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
     opacity: 0.78;
     pointer-events: none;
+    transform: skewX(-18deg);
     animation: shield-rank-sheen 3.6s linear infinite;
     animation-delay: var(--shield-rank-motion-delay);
   }
@@ -1064,6 +1067,78 @@
     transform-origin: center;
     animation: shield-rank-icon-glint 6.8s ease-in-out infinite;
     animation-delay: var(--shield-rank-motion-delay);
+  }
+
+  .shield-rank-insignia {
+    position: relative;
+    display: inline-flex;
+    width: 1em;
+    height: 1em;
+    align-items: center;
+    justify-content: center;
+    color: currentColor;
+  }
+
+  .shield-rank-chevron-stack {
+    width: 1.05em;
+    height: 0.95em;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .shield-rank-chevron-stack > span {
+    display: block;
+    width: 0.68em;
+    height: 0.34em;
+    border-top: 0.16em solid currentColor;
+    border-left: 0.16em solid currentColor;
+    transform: rotate(45deg);
+  }
+
+  .shield-rank-chevron-stack > span + span {
+    margin-top: -0.16em;
+  }
+
+  .shield-rank-first-sergeant-mark::after {
+    content: '';
+    position: absolute;
+    bottom: -0.04em;
+    left: 50%;
+    width: 0.3em;
+    height: 0.3em;
+    border: 0.1em solid currentColor;
+    transform: translateX(-50%) rotate(45deg);
+  }
+
+  .shield-rank-bar {
+    gap: 0.14em;
+  }
+
+  .shield-rank-bar > span {
+    display: block;
+    width: 0.18em;
+    height: 0.84em;
+    border-radius: 999px;
+    background: currentColor;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+  }
+
+  .shield-rank-eagle > span,
+  .shield-rank-star > span {
+    display: block;
+    background: currentColor;
+  }
+
+  .shield-rank-eagle > span {
+    width: 1em;
+    height: 0.68em;
+    clip-path: polygon(50% 0, 61% 33%, 100% 16%, 72% 58%, 83% 100%, 50% 76%, 17% 100%, 28% 58%, 0 16%, 39% 33%);
+  }
+
+  .shield-rank-star > span {
+    width: 0.92em;
+    height: 0.92em;
+    clip-path: polygon(50% 0, 61% 34%, 98% 34%, 68% 55%, 79% 91%, 50% 69%, 21% 91%, 32% 55%, 2% 34%, 39% 34%);
   }
 
   .shield-rank-command {
@@ -1081,6 +1156,12 @@
   .shield-rank-executive::after {
     opacity: 1;
     animation-duration: 2.8s;
+  }
+
+  .shield-rank-civilian {
+    --shield-rank-glow-rgb: 107, 114, 128;
+    --shield-rank-motion-delay: 150ms;
+    color: rgb(75, 85, 99) !important;
   }
 
   .shield-rank-trooper {
@@ -1136,6 +1217,10 @@
     --shield-rank-motion-delay: 0ms;
     color: rgb(26, 54, 93) !important;
     box-shadow: 0 10px 28px rgba(156, 134, 92, 0.18), inset 0 0 0 1px rgba(156, 134, 92, 0.28);
+  }
+
+  .dark .shield-rank-civilian {
+    color: rgb(229, 231, 235) !important;
   }
 
   .dark .shield-rank-trooper,

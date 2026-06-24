@@ -1,4 +1,4 @@
-import { BadgeCheck, ChevronsUp, Crown, Eye, Medal, Shield, ShieldCheck, Sparkles, Star } from 'lucide-react';
+import { Eye, Medal, Shield, Sparkles, User } from 'lucide-react';
 import { leadershipRanks } from '../constants/ranks';
 
 const importantRanks = new Map(leadershipRanks.map((rank) => [rank.toLowerCase(), rank]));
@@ -17,48 +17,43 @@ export function getDisplayRank(rank?: string | null): string {
 }
 
 const rankStyles = {
+  civilian: {
+    className: 'shield-rank-badge shield-rank-civilian border-gray-300 bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200',
+    title: 'Civilian',
+  },
   trooper: {
-    icon: Shield,
     className: 'shield-rank-badge shield-rank-trooper border-sky-300/70 bg-sky-50 text-sky-900 dark:border-sky-700/70 dark:bg-sky-950/45 dark:text-sky-100',
     title: 'Trooper rank',
   },
   'master trooper': {
-    icon: Medal,
     className: 'shield-rank-badge shield-rank-master-trooper border-blue-300/70 bg-blue-50 text-blue-900 dark:border-blue-700/80 dark:bg-blue-950/50 dark:text-blue-100',
     title: 'Master Trooper rank',
   },
   detective: {
-    icon: Eye,
     className: 'shield-rank-badge shield-rank-detective border-indigo-300/70 bg-indigo-50 text-indigo-900 dark:border-indigo-700/70 dark:bg-indigo-950/45 dark:text-indigo-100',
     title: 'Detective rank',
   },
   sergeant: {
-    icon: ChevronsUp,
     className: 'shield-rank-badge shield-rank-sergeant shield-rank-command border-amber-300/80 bg-amber-50 text-amber-900 dark:border-amber-600/70 dark:bg-amber-950/45 dark:text-amber-100',
     title: 'Sergeant leadership rank',
   },
   'first sergeant': {
-    icon: BadgeCheck,
     className: 'shield-rank-badge shield-rank-first-sergeant shield-rank-command border-yellow-400/80 bg-yellow-50 text-yellow-950 dark:border-yellow-500/70 dark:bg-yellow-950/45 dark:text-yellow-100',
     title: 'First Sergeant leadership rank',
   },
   lieutenant: {
-    icon: ShieldCheck,
     className: 'shield-rank-badge shield-rank-lieutenant shield-rank-command border-slate-300 bg-slate-50 text-slate-900 dark:border-slate-500/70 dark:bg-slate-900/70 dark:text-slate-100',
     title: 'Lieutenant command rank',
   },
   captain: {
-    icon: Star,
     className: 'shield-rank-badge shield-rank-captain shield-rank-command shield-rank-metal border-blue-300 bg-blue-50 text-blue-950 dark:border-blue-500/70 dark:bg-blue-950/55 dark:text-blue-100',
     title: 'Captain command rank',
   },
   colonel: {
-    icon: Crown,
     className: 'shield-rank-badge shield-rank-colonel shield-rank-command shield-rank-metal border-yellow-400/80 bg-yellow-50 text-yellow-950 dark:border-yellow-500/75 dark:bg-yellow-950/55 dark:text-yellow-100',
     title: 'Colonel command rank',
   },
   superintendent: {
-    icon: Sparkles,
     className: 'shield-rank-badge shield-rank-superintendent shield-rank-command shield-rank-metal shield-rank-executive border-yellow-300 bg-white text-primary-500 dark:border-yellow-300/80 dark:bg-slate-950 dark:text-white',
     title: 'Superintendent executive command rank',
   },
@@ -69,6 +64,72 @@ type KnownRankKey = keyof typeof rankStyles;
 function getRankStyle(rank?: string | null) {
   const key = normalizeRank(rank) as KnownRankKey;
   return rankStyles[key];
+}
+
+function RankInsignia({ rank, compact }: { rank?: string | null; compact: boolean }) {
+  const normalizedRank = normalizeRank(rank);
+  const iconSize = compact ? 13 : 14;
+
+  if (normalizedRank === 'civilian') {
+    return <User size={iconSize} />;
+  }
+
+  if (normalizedRank === 'trooper') {
+    return <Shield size={iconSize} />;
+  }
+
+  if (normalizedRank === 'master trooper') {
+    return <Medal size={iconSize} />;
+  }
+
+  if (normalizedRank === 'detective') {
+    return <Eye size={iconSize} />;
+  }
+
+  if (normalizedRank === 'sergeant' || normalizedRank === 'first sergeant') {
+    return (
+      <span className={`shield-rank-insignia shield-rank-chevron-stack ${normalizedRank === 'first sergeant' ? 'shield-rank-first-sergeant-mark' : ''}`} aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </span>
+    );
+  }
+
+  if (normalizedRank === 'lieutenant') {
+    return (
+      <span className="shield-rank-insignia shield-rank-bar shield-rank-bar-single" aria-hidden="true">
+        <span />
+      </span>
+    );
+  }
+
+  if (normalizedRank === 'captain') {
+    return (
+      <span className="shield-rank-insignia shield-rank-bar shield-rank-bar-double" aria-hidden="true">
+        <span />
+        <span />
+      </span>
+    );
+  }
+
+  if (normalizedRank === 'colonel') {
+    return (
+      <span className="shield-rank-insignia shield-rank-eagle" aria-hidden="true">
+        <span />
+      </span>
+    );
+  }
+
+  if (normalizedRank === 'superintendent') {
+    return (
+      <span className="shield-rank-insignia shield-rank-star" aria-hidden="true">
+        <span />
+      </span>
+    );
+  }
+
+  return <Sparkles size={iconSize} />;
 }
 
 export function RankBadge({
@@ -92,8 +153,6 @@ export function RankBadge({
     );
   }
 
-  const Icon = rankStyle?.icon || Shield;
-
   return (
     <span
       className={`inline-flex max-w-full items-center gap-1.5 overflow-hidden rounded-full border font-black shadow-sm transition ${
@@ -104,7 +163,7 @@ export function RankBadge({
       title={rankStyle?.title || (important ? `${displayRank} leadership rank` : displayRank)}
     >
       <span className="shield-rank-icon flex shrink-0 items-center justify-center">
-        <Icon size={compact ? 13 : 14} />
+        <RankInsignia rank={rank} compact={compact} />
       </span>
       <span className="truncate">{displayRank}</span>
     </span>
