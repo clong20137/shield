@@ -48,6 +48,11 @@
   color: var(--app-secondary) !important;
 }
 
+.dark .dark\:text-white,
+.dark .dark\:hover\:text-white:hover {
+  color: rgb(255, 255, 255) !important;
+}
+
 .border-primary-500,
 .border-accent,
 .focus\:border-accent:focus {
