@@ -1468,10 +1468,40 @@ interface SidebarLinkProps {
 }
 
 function SidebarRailTooltip({ label, children }: { label: string; children: ReactNode }) {
+  const hostRef = useRef<HTMLSpanElement | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<{ left: number; top: number } | null>(null);
+
+  const showTooltip = () => {
+    const rect = hostRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setTooltipPosition({
+      left: rect.right + 10,
+      top: rect.top + rect.height / 2,
+    });
+  };
+
   return (
-    <span className="sidebar-rail-tooltip-host">
+    <span
+      ref={hostRef}
+      className="sidebar-rail-tooltip-host"
+      onMouseEnter={showTooltip}
+      onMouseLeave={() => setTooltipPosition(null)}
+      onFocusCapture={showTooltip}
+      onBlurCapture={() => setTooltipPosition(null)}
+    >
       {children}
-      <span className="sidebar-rail-tooltip" role="tooltip">{label}</span>
+      {tooltipPosition && (
+        <span
+          className="sidebar-rail-tooltip sidebar-rail-tooltip-fixed"
+          role="tooltip"
+          style={{
+            left: tooltipPosition.left,
+            top: tooltipPosition.top,
+          }}
+        >
+          {label}
+        </span>
+      )}
     </span>
   );
 }
@@ -2367,6 +2397,7 @@ function QuickLaunchTray({
   const [failedLaunchSlot, setFailedLaunchSlot] = useState<number | null>(null);
   const [isPickerClosing, setIsPickerClosing] = useState(false);
   const [activeIndicators, setActiveIndicators] = useState<Array<{ key: string; left: number; top: number }>>([]);
+  const [sidebarTooltip, setSidebarTooltip] = useState<{ label: string; left: number; top: number } | null>(null);
   const didDragSlotRef = useRef(false);
   const trayRef = useRef<HTMLDivElement | null>(null);
   const slotRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -2788,6 +2819,19 @@ function QuickLaunchTray({
     return activeTargets.sort((left, right) => left.index - right.index);
   }, [activeModalAppSet, availableApps, launchingSlot, location.pathname, slots]);
 
+  const showSidebarSlotTooltip = (target: HTMLElement, label: string) => {
+    if (!isSidebarPlacement || !isSidebarCollapsed) {
+      return;
+    }
+
+    const rect = target.getBoundingClientRect();
+    setSidebarTooltip({
+      label,
+      left: rect.right + 10,
+      top: rect.top + rect.height / 2,
+    });
+  };
+
   useLayoutEffect(() => {
     if (activeQuickLaunchTargets.length === 0) {
       setActiveIndicators([]);
@@ -2840,7 +2884,7 @@ function QuickLaunchTray({
 
   return (
     <section className={isSidebarPlacement
-      ? 'quick-launch-sidebar-placement pointer-events-none relative hidden select-none md:block'
+      ? `quick-launch-sidebar-placement pointer-events-none relative hidden select-none md:block ${isSidebarCollapsed ? 'quick-launch-sidebar-collapsed' : ''}`
       : `pointer-events-none fixed bottom-3 left-3 right-3 z-30 hidden select-none transition-all duration-200 sm:bottom-5 sm:right-6 md:block ${isSidebarCollapsed ? 'sm:left-24' : 'sm:left-[19.5rem]'}`
     }>
       <div
@@ -2869,7 +2913,6 @@ function QuickLaunchTray({
           const isLaunching = launchingSlot === index;
           const hasFailedLaunch = failedLaunchSlot === index;
           const previewLabel = visibleSlot ? `Open ${label}` : 'Add app';
-          const showSidebarRailPreview = isSidebarPlacement && isSidebarCollapsed;
           const slotStateClass = visibleSlot
             ? [
                 'quick-launch-slot-configured',
@@ -2887,7 +2930,7 @@ function QuickLaunchTray({
           return (
             <div
               key={slotRenderKey}
-              className={`quick-launch-slot-shell relative ${showSidebarRailPreview ? 'sidebar-rail-tooltip-host' : ''}`}
+              className="quick-launch-slot-shell relative"
               ref={(element) => {
                 slotRefs.current[index] = element;
                 slotAnimationRefs.current[slotRenderKey] = element;
@@ -2929,6 +2972,10 @@ function QuickLaunchTray({
                   didDragSlotRef.current = false;
                 }, 0);
               }}
+              onMouseEnter={(event) => showSidebarSlotTooltip(event.currentTarget, hasFailedLaunch ? 'Blocked' : isLaunching ? 'Opening' : label)}
+              onMouseLeave={() => setSidebarTooltip(null)}
+              onFocusCapture={(event) => showSidebarSlotTooltip(event.currentTarget, hasFailedLaunch ? 'Blocked' : isLaunching ? 'Opening' : label)}
+              onBlurCapture={() => setSidebarTooltip(null)}
               onContextMenu={(event) => {
                 event.preventDefault();
                 setContextMenu({ index, x: event.clientX, y: event.clientY });
@@ -2969,11 +3016,6 @@ function QuickLaunchTray({
                 <span className="quick-launch-slot-label">{hasFailedLaunch ? 'Blocked' : isLaunching ? 'Opening' : label}</span>
               </button>
               <span className="quick-launch-hover-preview" role="presentation">{previewLabel}</span>
-              {showSidebarRailPreview && (
-                <span className="sidebar-rail-tooltip" role="tooltip">
-                  {hasFailedLaunch ? 'Blocked' : isLaunching ? 'Opening' : label}
-                </span>
-              )}
 
               {badgeCount > 0 && (
                 <span key={`quick-launch-badge-${index}-${badgeCount}`} className="quick-launch-badge">
@@ -3006,6 +3048,18 @@ function QuickLaunchTray({
             }}
           />
         ))}
+        {sidebarTooltip && (
+          <span
+            className="sidebar-rail-tooltip sidebar-rail-tooltip-fixed"
+            role="tooltip"
+            style={{
+              left: sidebarTooltip.left,
+              top: sidebarTooltip.top,
+            }}
+          >
+            {sidebarTooltip.label}
+          </span>
+        )}
       </div>
 
       {contextMenu && (

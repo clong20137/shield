@@ -1845,6 +1845,13 @@
     transform: translate(0, -50%) scale(1);
   }
 
+  .sidebar-rail-tooltip-fixed {
+    position: fixed !important;
+    z-index: 9999 !important;
+    opacity: 1 !important;
+    transform: translate(0, -50%) scale(1) !important;
+  }
+
   .global-search-input {
     background: rgba(255, 255, 255, 0.1);
     color: rgb(255, 255, 255);
@@ -2198,6 +2205,7 @@
     filter: blur(0);
   }
 
+  .quick-launch-sidebar-collapsed .quick-launch-hover-preview,
   .quick-launch-sidebar-placement .sidebar-rail-tooltip-host .quick-launch-hover-preview {
     display: none;
   }
