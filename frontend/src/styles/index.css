@@ -538,11 +538,6 @@
     transform: translateX(-140%) skewX(-18deg);
   }
 
-  34% {
-    transform: translateX(180%) skewX(-18deg);
-  }
-
-  35%,
   100% {
     transform: translateX(180%) skewX(-18deg);
   }
@@ -1055,7 +1050,7 @@
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
     opacity: 0.78;
     pointer-events: none;
-    animation: shield-rank-sheen 7.5s ease-in-out infinite;
+    animation: shield-rank-sheen 3.6s linear infinite;
     animation-delay: var(--shield-rank-motion-delay);
   }
 
@@ -1085,7 +1080,7 @@
   .shield-rank-metal::after,
   .shield-rank-executive::after {
     opacity: 1;
-    animation-duration: 4.6s;
+    animation-duration: 2.8s;
   }
 
   .shield-rank-trooper {
