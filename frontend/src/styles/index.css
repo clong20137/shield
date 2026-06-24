@@ -1080,33 +1080,56 @@
   }
 
   .shield-rank-chevron-stack {
-    width: 1.05em;
-    height: 0.95em;
+    width: 1.08em;
+    height: 0.98em;
     flex-direction: column;
-    gap: 0;
+    gap: 0.03em;
   }
 
   .shield-rank-chevron-stack > span {
+    position: relative;
     display: block;
-    width: 0.68em;
-    height: 0.34em;
-    border-top: 0.16em solid currentColor;
-    border-left: 0.16em solid currentColor;
-    transform: rotate(45deg);
+    width: 0.86em;
+    height: 0.22em;
+    border: 0;
+    transform: none;
   }
 
   .shield-rank-chevron-stack > span + span {
-    margin-top: -0.16em;
+    margin-top: -0.01em;
+  }
+
+  .shield-rank-chevron-stack > span::before,
+  .shield-rank-chevron-stack > span::after {
+    content: '';
+    position: absolute;
+    top: 0.04em;
+    width: 0.5em;
+    height: 0.15em;
+    border-radius: 999px;
+    background: currentColor;
+  }
+
+  .shield-rank-chevron-stack > span::before {
+    left: 0.01em;
+    transform: rotate(24deg);
+    transform-origin: right center;
+  }
+
+  .shield-rank-chevron-stack > span::after {
+    right: 0.01em;
+    transform: rotate(-24deg);
+    transform-origin: left center;
   }
 
   .shield-rank-first-sergeant-mark::after {
     content: '';
     position: absolute;
-    bottom: -0.04em;
+    bottom: -0.09em;
     left: 50%;
-    width: 0.3em;
-    height: 0.3em;
-    border: 0.1em solid currentColor;
+    width: 0.28em;
+    height: 0.28em;
+    border: 0.09em solid currentColor;
     transform: translateX(-50%) rotate(45deg);
   }
 
