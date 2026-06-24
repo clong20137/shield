@@ -533,6 +533,17 @@
   }
 }
 
+@keyframes shield-rank-sheen {
+  0% {
+    transform: translateX(-140%) skewX(-18deg);
+  }
+
+  48%,
+  100% {
+    transform: translateX(180%) skewX(-18deg);
+  }
+}
+
 @keyframes modal-backdrop-enter {
   0% {
     opacity: 0;
@@ -987,6 +998,109 @@
 
   .dashboard-reaction-pop {
     animation: dashboard-reaction-pop 520ms var(--shield-motion-ease) both;
+  }
+
+  .shield-rank-badge {
+    position: relative;
+    isolation: isolate;
+    line-height: 1;
+  }
+
+  .shield-rank-badge::before {
+    content: '';
+    position: absolute;
+    inset: 2px auto 2px 2px;
+    width: 3px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.46;
+  }
+
+  .shield-rank-badge::after {
+    content: '';
+    position: absolute;
+    inset: -40% auto -40% -45%;
+    z-index: 0;
+    width: 42%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .shield-rank-badge > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .shield-rank-icon {
+    filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.25));
+  }
+
+  .shield-rank-command {
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  }
+
+  .shield-rank-command:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.13), 0 0 0 1px rgba(156, 134, 92, 0.2);
+  }
+
+  .shield-rank-metal:hover::after,
+  .shield-rank-executive::after {
+    opacity: 1;
+    animation: shield-rank-sheen 3.8s ease-in-out infinite;
+  }
+
+  .shield-rank-trooper {
+    color: rgb(12, 74, 110) !important;
+  }
+
+  .shield-rank-master-trooper {
+    color: rgb(30, 64, 175) !important;
+  }
+
+  .shield-rank-detective {
+    color: rgb(55, 48, 163) !important;
+  }
+
+  .shield-rank-sergeant {
+    color: rgb(146, 64, 14) !important;
+  }
+
+  .shield-rank-first-sergeant,
+  .shield-rank-colonel {
+    color: rgb(133, 77, 14) !important;
+  }
+
+  .shield-rank-lieutenant {
+    color: rgb(51, 65, 85) !important;
+  }
+
+  .shield-rank-captain {
+    color: rgb(30, 58, 138) !important;
+  }
+
+  .shield-rank-superintendent {
+    color: rgb(26, 54, 93) !important;
+    box-shadow: 0 10px 28px rgba(156, 134, 92, 0.18), inset 0 0 0 1px rgba(156, 134, 92, 0.28);
+  }
+
+  .dark .shield-rank-trooper,
+  .dark .shield-rank-master-trooper,
+  .dark .shield-rank-detective,
+  .dark .shield-rank-captain {
+    color: rgb(219, 234, 254) !important;
+  }
+
+  .dark .shield-rank-sergeant,
+  .dark .shield-rank-first-sergeant,
+  .dark .shield-rank-colonel {
+    color: rgb(254, 240, 138) !important;
+  }
+
+  .dark .shield-rank-lieutenant,
+  .dark .shield-rank-superintendent {
+    color: rgb(255, 255, 255) !important;
   }
 
   .formatted-content figure {
