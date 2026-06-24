@@ -1,4 +1,5 @@
 import { CSSProperties, FormEvent, ReactNode, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Command, Delete, Download, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, RefreshCw, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
 import { BrowserRouter as Router, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
@@ -3048,19 +3049,21 @@ function QuickLaunchTray({
             }}
           />
         ))}
-        {sidebarTooltip && (
-          <span
-            className="sidebar-rail-tooltip sidebar-rail-tooltip-fixed"
-            role="tooltip"
-            style={{
-              left: sidebarTooltip.left,
-              top: sidebarTooltip.top,
-            }}
-          >
-            {sidebarTooltip.label}
-          </span>
-        )}
       </div>
+
+      {sidebarTooltip && typeof document !== 'undefined' && createPortal(
+        <span
+          className="sidebar-rail-tooltip sidebar-rail-tooltip-fixed"
+          role="tooltip"
+          style={{
+            left: sidebarTooltip.left,
+            top: sidebarTooltip.top,
+          }}
+        >
+          {sidebarTooltip.label}
+        </span>,
+        document.body,
+      )}
 
       {contextMenu && (
         <div
