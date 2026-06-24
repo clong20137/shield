@@ -88,6 +88,7 @@ interface Window {
     getCrashReports?: () => Promise<{ reports: ShieldDesktopCrashReport[] }>;
     clearCrashReports?: (ids: string[]) => Promise<{ cleared: number }>;
     checkForUpdates?: () => Promise<{ ok: boolean; message?: string }>;
+    checkWebAppUpdate?: () => Promise<{ ok: boolean; message?: string }>;
     installUpdate?: () => Promise<void>;
     getDesktopPreferences?: () => Promise<ShieldDesktopPreferences>;
     setStartWithWindows?: (startWithWindows: boolean) => Promise<ShieldDesktopPreferences>;

@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('shieldDesktop', {
   getCrashReports: () => ipcRenderer.invoke('shield:get-crash-reports'),
   clearCrashReports: (ids) => ipcRenderer.invoke('shield:clear-crash-reports', ids),
   checkForUpdates: () => ipcRenderer.invoke('shield:check-for-updates'),
+  checkWebAppUpdate: () => ipcRenderer.invoke('shield:check-web-app-update'),
   installUpdate: () => ipcRenderer.invoke('shield:install-update'),
   getDesktopPreferences: () => ipcRenderer.invoke('shield:get-desktop-preferences'),
   setStartWithWindows: (startWithWindows) => ipcRenderer.invoke('shield:set-start-with-windows', startWithWindows),

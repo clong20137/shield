@@ -46,8 +46,8 @@ const desktopPreferencesDefault = {
 };
 
 const clipboardFileSizeLimit = 25 * 1024 * 1024;
-const webAppUpdateCheckIntervalMs = 30 * 1000;
-const webAppReloadCooldownMs = 15 * 1000;
+const webAppUpdateCheckIntervalMs = 5 * 1000;
+const webAppReloadCooldownMs = 3 * 1000;
 const desktopUpdateCheckIntervalMs = 15 * 60 * 1000;
 const desktopStartupUpdateFallbackMs = 2 * 60 * 1000;
 const desktopStartupUpdateRestartDelayMs = 1500;
@@ -779,7 +779,14 @@ async function checkForWebAppUpdate({ initial = false } = {}) {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('shield:web-app-update-status', { type: 'reloading' });
       }
-      appendDesktopLog('web-app-update-detected', { action: 'reloadIgnoringCache' });
+      appendDesktopLog('web-app-update-detected', { action: 'clearCacheAndReloadIgnoringCache' });
+      try {
+        await mainWindow.webContents.session.clearCache();
+      } catch (cacheError) {
+        appendDesktopLog('web-app-cache-clear-failed', {
+          message: cacheError instanceof Error ? cacheError.message : String(cacheError)
+        });
+      }
       mainWindow.webContents.reloadIgnoringCache();
     }
   } catch (error) {
@@ -989,8 +996,14 @@ function stopDesktopIdleChecks() {
 }
 
 function registerPowerMonitorEvents() {
-  powerMonitor.on('resume', () => checkDesktopIdleStatus({ force: true }));
-  powerMonitor.on('unlock-screen', () => checkDesktopIdleStatus({ force: true }));
+  powerMonitor.on('resume', () => {
+    checkDesktopIdleStatus({ force: true });
+    void checkForWebAppUpdate();
+  });
+  powerMonitor.on('unlock-screen', () => {
+    checkDesktopIdleStatus({ force: true });
+    void checkForWebAppUpdate();
+  });
   powerMonitor.on('lock-screen', () => {
     sendDesktopIdleStatus('busy', powerMonitor.getSystemIdleTime());
     setDesktopPresenceStatus('busy', { force: true });
@@ -1323,6 +1336,7 @@ function createMainWindow() {
 
   mainWindow.on('focus', () => {
     checkDesktopIdleStatus({ force: true });
+    void checkForWebAppUpdate();
   });
 
   mainWindow.on('blur', () => {
@@ -1331,6 +1345,7 @@ function createMainWindow() {
 
   mainWindow.on('show', () => {
     checkDesktopIdleStatus({ force: true });
+    void checkForWebAppUpdate();
   });
 
   mainWindow.on('hide', () => {
@@ -1343,6 +1358,7 @@ function createMainWindow() {
 
   mainWindow.on('restore', () => {
     checkDesktopIdleStatus({ force: true });
+    void checkForWebAppUpdate();
   });
 
   mainWindow.on('closed', () => {
@@ -1527,6 +1543,10 @@ ipcMain.handle('shield:check-for-updates', async () => {
   }
 
   await checkForDesktopUpdates();
+  return { ok: true };
+});
+ipcMain.handle('shield:check-web-app-update', async () => {
+  await checkForWebAppUpdate();
   return { ok: true };
 });
 ipcMain.handle('shield:install-update', () => {

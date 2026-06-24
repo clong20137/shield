@@ -5826,6 +5826,40 @@ function App() {
     });
   }, []);
 
+  useEffect(() => {
+    if (!hasShieldDesktopFeature('checkWebAppUpdate')) {
+      return undefined;
+    }
+
+    let lastCheckAt = 0;
+    const requestWebUpdateCheck = () => {
+      const now = Date.now();
+      if (now - lastCheckAt < 2500) {
+        return;
+      }
+      lastCheckAt = now;
+      window.shieldDesktop?.checkWebAppUpdate?.().catch((error) => {
+        console.error('Failed to check for web app updates:', error);
+      });
+    };
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        requestWebUpdateCheck();
+      }
+    };
+
+    window.addEventListener('focus', requestWebUpdateCheck);
+    window.addEventListener('online', requestWebUpdateCheck);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    requestWebUpdateCheck();
+
+    return () => {
+      window.removeEventListener('focus', requestWebUpdateCheck);
+      window.removeEventListener('online', requestWebUpdateCheck);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   const handleStartWithWindowsChange = async (startWithWindows: boolean) => {
     if (!hasShieldDesktopFeature('setStartWithWindows')) {
       return;
