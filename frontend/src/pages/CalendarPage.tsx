@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BadgeCheck, CalendarClock, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCopy, Clock3, DollarSign, Eye, EyeOff, FileText, Gavel, ListChecks, LucideIcon, MapPin, Palette, Pencil, Pill, Plus, Save, ShieldAlert, Sparkles, Timer, Trash2, Truck, X } from 'lucide-react';
+import { BadgeCheck, CalendarClock, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, DollarSign, Eye, EyeOff, FileText, Gavel, ListChecks, LucideIcon, MapPin, Palette, Pill, Plus, Save, ShieldAlert, Sparkles, Timer, Trash2, Truck, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { AuthAccount, CalendarEntry, CalendarShortcut, authService, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
@@ -211,6 +211,10 @@ const trooperDailySections: readonly TrooperDailySection[] = [
   },
 ] as const;
 
+const trooperDailyFieldLabels = new Map(
+  trooperDailySections.flatMap((section) => section.fields.map(([key, label]) => [key, label] as const)),
+);
+
 const regularDutySplitTimeFields: readonly TrooperDailyField[] = [
   ['splitStartTime', 'Split Start Time'],
   ['splitEndTime', 'Split End Time'],
@@ -225,6 +229,12 @@ const regularDutySplitPairs: readonly (readonly [string, string])[] = [
   ['secondSplitStartTime', 'secondSplitEndTime'],
   ['thirdSplitStartTime', 'thirdSplitEndTime'],
 ] as const;
+
+const getRegularDutySplitPairIndex = (key: string): number =>
+  regularDutySplitPairs.findIndex((pair) => pair.includes(key));
+
+const getRegularDutySplitPairKeysFrom = (pairIndex: number): string[] =>
+  regularDutySplitPairs.slice(pairIndex).flat();
 
 const getRegularDutySplitPairCountFromDetails = (details?: Record<string, string>): number => {
   if (details?.thirdSplitStartTime?.trim() || details?.thirdSplitEndTime?.trim()) {
@@ -947,9 +957,6 @@ function CalendarPage({
   const [hiddenDailySections, setHiddenDailySections] = useState<string[]>(currentUser.trooperDailyHiddenSections || []);
   const [shortcuts, setShortcuts] = useState<CalendarShortcut[]>([]);
   const [tCodeOptions, setTCodeOptions] = useState<string[]>([]);
-  const [selectedShortcutId, setSelectedShortcutId] = useState('');
-  const [shortcutName, setShortcutName] = useState('');
-  const [editingShortcutId, setEditingShortcutId] = useState<string | null>(null);
   const [isSavingShortcut, setIsSavingShortcut] = useState(false);
   const [isCalendarLoading, setIsCalendarLoading] = useState(true);
   const [calendarError, setCalendarError] = useState<string | null>(null);
@@ -1816,17 +1823,35 @@ function CalendarPage({
     setRegularDutySplitPairCount((currentPairCount) => Math.min(3, currentPairCount + 1));
   };
 
-  const removeRegularDutySplitPair = () => {
+  const removeRegularDutySplitPair = (pairIndex: number) => {
+    if (pairIndex <= 0 || pairIndex >= regularDutySplitPairCount) {
+      return;
+    }
+
     const nextPairCount = Math.max(1, regularDutySplitPairCount - 1);
-    const pairToRemove = regularDutySplitPairs[regularDutySplitPairCount - 1];
-    if (!pairToRemove) {
+    const keysToClearValidation = getRegularDutySplitPairKeysFrom(pairIndex);
+    if (keysToClearValidation.length === 0) {
       setRegularDutySplitPairCount(nextPairCount);
       return;
     }
 
     setEntryForm((currentForm) => {
       const nextDetails = { ...(currentForm.details || {}) };
-      pairToRemove.forEach((key) => {
+
+      for (let index = pairIndex; index < regularDutySplitPairCount - 1; index += 1) {
+        const currentPair = regularDutySplitPairs[index];
+        const nextPair = regularDutySplitPairs[index + 1];
+        currentPair.forEach((key, keyIndex) => {
+          const nextKey = nextPair[keyIndex];
+          if (nextDetails[nextKey]) {
+            nextDetails[key] = nextDetails[nextKey];
+          } else {
+            delete nextDetails[key];
+          }
+        });
+      }
+
+      regularDutySplitPairs[regularDutySplitPairCount - 1].forEach((key) => {
         delete nextDetails[key];
       });
 
@@ -1850,7 +1875,7 @@ function CalendarPage({
       return nextForm;
     });
     setRegularDutySplitPairCount(nextPairCount);
-    setInvalidDailyField((field) => (field && pairToRemove.includes(field) ? null : field));
+    setInvalidDailyField((field) => (field && keysToClearValidation.includes(field) ? null : field));
   };
 
   const clearDailySectionFields = (section: TrooperDailySection) => {
@@ -1930,6 +1955,59 @@ function CalendarPage({
     updateDailyDetail('narrative', '');
   };
 
+  const buildAutoNarrative = () => {
+    const details = entryForm.details || {};
+    const parts: string[] = [];
+    const shiftHours = calculateShiftHours(details);
+    const tCodeRowsForNarrative = parseTCodeDetails(details).filter((row) => row.code.trim() || row.timeWorked.trim());
+    const regularDutyMiles = parseNumericDetail(details, 'regularDutyMiles');
+    const activityKeys = [
+      'citations',
+      'warnings',
+      'crashesInvestigated',
+      'callsForService',
+      'motoristAssists',
+      'totalCriminalArrests',
+      'criminalDefendants',
+      'owiDefendants',
+      'vehicleInspections',
+      'commercialVehicleInspections',
+      'totalDrugArrests',
+      'totalDrugDefendants',
+    ];
+    const activitySummary = activityKeys
+      .map((key) => {
+        const value = parseNumericDetail(details, key);
+        const label = trooperDailyFieldLabels.get(key);
+        return value > 0 && label ? `${formatHours(value)} ${label.toLowerCase()}` : '';
+      })
+      .filter(Boolean);
+
+    parts.push(`Worked ${entryForm.specialStatus || 'regular duty'} in ${entryForm.districtWorked || currentUser.district || 'the assigned district'}.`);
+
+    if (entryForm.dutyHours) {
+      parts.push(`Reported ${entryForm.dutyHours} duty hour${entryForm.dutyHours === '1' ? '' : 's'}.`);
+    }
+
+    if (shiftHours > 0) {
+      parts.push(`Shift time totaled ${formatHours(shiftHours)} hour${shiftHours === 1 ? '' : 's'}.`);
+    }
+
+    if (regularDutyMiles > 0) {
+      parts.push(`Recorded ${formatHours(regularDutyMiles)} regular duty mile${regularDutyMiles === 1 ? '' : 's'}.`);
+    }
+
+    if (activitySummary.length > 0) {
+      parts.push(`Activity included ${activitySummary.join(', ')}.`);
+    }
+
+    if (tCodeRowsForNarrative.length > 0) {
+      parts.push(`T-Code activity included ${tCodeRowsForNarrative.map((row) => `${row.code || 'unspecified'}${row.timeWorked ? ` (${row.timeWorked}h)` : ''}`).join(', ')}.`);
+    }
+
+    updateDailyDetail('narrative', parts.join(' '));
+  };
+
   const updateTCodeRows = (rows: TrooperDailyTCode[]) => {
     setEntryForm((currentForm) => {
       const nextDetails = { ...(currentForm.details || {}) };
@@ -2003,85 +2081,63 @@ function CalendarPage({
     setEntryForm((currentForm) => ({ ...currentForm, dutyHours: nextValue }));
   };
 
-  const applyShortcut = (shortcut: CalendarShortcut) => {
+  const getDailyFormForDate = (dateKey: string): CalendarEntryForm => {
+    if (selectedDate === dateKey) {
+      return entryForm;
+    }
+
+    const existingEntry = getCalendarEntryForDate(entries, dateKey, editingEntryId);
+    return existingEntry ? createEntryFormFromEntry(existingEntry) : createDefaultEntryForm(dateKey, currentUser);
+  };
+
+  const applyShortcutToDate = (shortcut: CalendarShortcut, dateKey: string) => {
+    const baseForm = getDailyFormForDate(dateKey);
     const nextForm: CalendarEntryForm = {
-      ...entryForm,
+      ...baseForm,
+      date: dateKey,
       dutyHours: shortcut.dutyHours,
-      districtWorked: shortcut.districtWorked || entryForm.districtWorked,
+      districtWorked: shortcut.districtWorked || baseForm.districtWorked,
       specialStatus: shortcut.specialStatus,
       color: shortcut.color,
       details: {
-        ...(entryForm.details || {}),
+        ...(baseForm.details || {}),
         ...(shortcut.details || {}),
       },
     };
+
+    openDay(dateKey);
     setEntryFormAndSyncSplitPairs(nextForm);
     setIsDutyHoursManual(true);
     lastAutoDutyHoursRef.current = '';
   };
 
-  const startEditingShortcut = (shortcut: CalendarShortcut) => {
-    setSelectedShortcutId(shortcut.id);
-    setShortcutName(shortcut.name);
-    setEditingShortcutId(shortcut.id);
-    applyShortcut(shortcut);
-  };
-
-  const resetShortcutEditor = () => {
-    setShortcutName('');
-    setEditingShortcutId(null);
-  };
-
-  const saveShortcut = async () => {
-    if (!shortcutName.trim()) {
-      setCalendarError('Enter a shortcut name.');
+  const createShortcutFromDate = async (dateKey: string) => {
+    const name = window.prompt('Shortcut name');
+    if (!name?.trim()) {
       return;
     }
 
+    const sourceForm = getDailyFormForDate(dateKey);
     setIsSavingShortcut(true);
     setCalendarError(null);
 
-    const payload = {
-      ownerAccountId: currentUser.id,
-      name: shortcutName.trim(),
-      dutyHours: entryForm.dutyHours || '0',
-      districtWorked: entryForm.districtWorked,
-      specialStatus: entryForm.specialStatus,
-      color: entryForm.color,
-      details: entryForm.details || {},
-    };
-
     try {
-      if (editingShortcutId) {
-        const response = await calendarService.updateShortcut(editingShortcutId, payload);
-        setShortcuts((items) => items.map((item) => (item.id === editingShortcutId ? response.data : item)));
-      } else {
-        const response = await calendarService.createShortcut(payload);
-        setShortcuts((items) => [...items, response.data].sort((a, b) => a.name.localeCompare(b.name)));
-      }
-      resetShortcutEditor();
+      const payload = {
+        ownerAccountId: currentUser.id,
+        name: name.trim(),
+        dutyHours: sourceForm.dutyHours,
+        districtWorked: sourceForm.districtWorked,
+        specialStatus: sourceForm.specialStatus,
+        color: sourceForm.color,
+        details: sourceForm.details || {},
+      };
+      const response = await calendarService.createShortcut(payload);
+      setShortcuts((items) => [...items, response.data].sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
-      console.error('Failed to save shortcut:', err);
-      setCalendarError(getApiErrorMessage(err, 'Failed to save shortcut.'));
+      console.error('Failed to create shortcut:', err);
+      setCalendarError(getApiErrorMessage(err, 'Failed to create shortcut.'));
     } finally {
       setIsSavingShortcut(false);
-    }
-  };
-
-  const deleteShortcut = async (shortcut: CalendarShortcut) => {
-    setCalendarError(null);
-    try {
-      await calendarService.deleteShortcut(shortcut.id);
-      setShortcuts((items) => items.filter((item) => item.id !== shortcut.id));
-      if (selectedShortcutId === shortcut.id) {
-        setSelectedShortcutId('');
-      }
-      if (editingShortcutId === shortcut.id) {
-        resetShortcutEditor();
-      }
-    } catch (err) {
-      console.error('Failed to delete shortcut:', err);
-      setCalendarError(getApiErrorMessage(err, 'Failed to delete shortcut.'));
     }
   };
 
@@ -2113,57 +2169,6 @@ function CalendarPage({
   const showDailySection = (sectionTitle: string) => {
     setActiveDailyPanel(sectionTitle);
     void saveHiddenDailySections(hiddenDailySections.filter((title) => title !== sectionTitle));
-  };
-
-  const fillBlankNumericDetailsWithZero = () => {
-    setEntryForm((currentForm) => {
-      const details = { ...(currentForm.details || {}) };
-      timeDetailFields.forEach((key) => {
-        if (!details[key]) {
-          details[key] = '00:00';
-        }
-      });
-      numericDetailFields.forEach((key) => {
-        if (!details[key]) {
-          details[key] = '0';
-        }
-      });
-
-      return {
-        ...currentForm,
-        details,
-      };
-    });
-  };
-
-  const copyPreviousDaily = () => {
-    if (!selectedDate) {
-      return;
-    }
-
-    const previousEntry = entries
-      .filter((entry) => entry.date < selectedDate)
-      .sort((firstEntry, secondEntry) => secondEntry.date.localeCompare(firstEntry.date))[0];
-
-    if (!previousEntry) {
-      setCalendarError('No previous Trooper Daily entry found to copy.');
-      return;
-    }
-
-    setCalendarError(null);
-    const nextForm: CalendarEntryForm = {
-      category: 'Trooper Daily',
-      date: selectedDate,
-      dutyHours: previousEntry.dutyHours,
-      districtWorked: previousEntry.districtWorked || getDefaultDistrict(currentUser),
-      specialStatus: previousEntry.specialStatus,
-      color: previousEntry.color,
-      submissionStatus: 'Draft',
-      details: { ...(previousEntry.details || {}) },
-    };
-    setEntryFormAndSyncSplitPairs(nextForm);
-    setIsDutyHoursManual(true);
-    lastAutoDutyHoursRef.current = '';
   };
 
   const copyPreviousDailyToDate = (dateKey: string) => {
@@ -3284,82 +3289,6 @@ function CalendarPage({
                     </div>
                   </div>
 
-                  <div className="grid items-center gap-2 border-b border-gray-200 bg-accent/5 p-2 dark:border-gray-800 2xl:grid-cols-[minmax(12rem,18rem)_auto_minmax(10rem,1fr)_auto]">
-                    <select
-                      value={selectedShortcutId}
-                      onChange={(event) => {
-                        const shortcut = shortcuts.find((item) => item.id === event.target.value);
-                        setSelectedShortcutId(event.target.value);
-                        if (shortcut) {
-                          applyShortcut(shortcut);
-                        }
-                      }}
-                      className="h-10 rounded border border-gray-300 bg-white px-3 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
-                      aria-label="Apply saved Trooper Daily shortcut"
-                      disabled={shortcuts.length === 0}
-                    >
-                      <option value="">{shortcuts.length > 0 ? 'Apply saved shortcut' : 'No saved shortcuts'}</option>
-                      {shortcuts.map((shortcut) => (
-                        <option key={shortcut.id} value={shortcut.id}>{shortcut.name}</option>
-                      ))}
-                    </select>
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={copyPreviousDaily} className="btn-secondary" aria-label="Copy previous daily" title="Copy Previous Daily">
-                        <ClipboardCopy size={16} />
-                      </button>
-                      <button type="button" onClick={fillBlankNumericDetailsWithZero} className="btn-secondary" aria-label="Fill blank numeric fields with zero" title="Fill Blanks With Zero">
-                        <Sparkles size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const shortcut = shortcuts.find((item) => item.id === selectedShortcutId);
-                          if (shortcut) {
-                            startEditingShortcut(shortcut);
-                          }
-                        }}
-                        className="btn-secondary"
-                        disabled={!selectedShortcutId}
-                        aria-label="Edit selected shortcut"
-                        title="Edit Selected Shortcut"
-                      >
-                        <Pencil size={16} />
-                      </button>
-                    </div>
-                    <input
-                      value={shortcutName}
-                      onChange={(event) => setShortcutName(event.target.value)}
-                      placeholder={editingShortcutId ? 'Update shortcut name' : 'Save current form as...'}
-                      className="h-10 rounded border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-950"
-                      aria-label="Shortcut name"
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={saveShortcut} className="btn-primary" disabled={isSavingShortcut || !shortcutName.trim()} aria-label={editingShortcutId ? 'Update shortcut from current daily form' : 'Save current daily form as shortcut'} title={editingShortcutId ? 'Update Shortcut' : 'Save Shortcut'}>
-                        <Save size={16} />
-                      </button>
-                      {editingShortcutId && (
-                        <button type="button" onClick={resetShortcutEditor} className="btn-secondary" aria-label="Cancel shortcut edit" title="Cancel Shortcut Edit">
-                          <X size={16} />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const shortcut = shortcuts.find((item) => item.id === (editingShortcutId || selectedShortcutId));
-                          if (shortcut) {
-                            void deleteShortcut(shortcut);
-                          }
-                        }}
-                        className="btn-danger"
-                        disabled={!editingShortcutId && !selectedShortcutId}
-                        aria-label="Delete selected shortcut"
-                        title="Delete Selected Shortcut"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-
                 <section className="min-w-0 p-4">
                   {activeDailyPanel === 'Administrative' && (
                     <div className="space-y-4">
@@ -3552,29 +3481,6 @@ function CalendarPage({
                           <div className="flex flex-wrap gap-2">
                             <button
                               type="button"
-                              onClick={addRegularDutySplitPair}
-                              disabled={regularDutySplitPairCount >= 3}
-                              className="btn-secondary"
-                              title="Add another split interval"
-                              aria-label="Add split interval"
-                            >
-                              <Plus size={16} />
-                              <span>Add Split</span>
-                            </button>
-                            {regularDutySplitPairCount > 1 && (
-                              <button
-                                type="button"
-                                onClick={removeRegularDutySplitPair}
-                                className="btn-secondary"
-                                title="Remove the last split interval"
-                                aria-label="Remove split interval"
-                              >
-                                <X size={16} />
-                                <span>Remove Split</span>
-                              </button>
-                            )}
-                            <button
-                              type="button"
                               onClick={() => clearDailySectionFields(activeDailySection)}
                               className="btn-secondary"
                               title="Zero out Regular Duty fields"
@@ -3628,9 +3534,47 @@ function CalendarPage({
                           const isComplete = isDetailComplete(entryForm.details, key);
                           const isInvalid = invalidDailyField === key;
                           const FieldIcon = getDailyFieldIcon(key);
+                          const splitPairIndex = activeDailySection.title === 'Regular Duty' ? getRegularDutySplitPairIndex(key) : -1;
+                          const isSplitEndField = splitPairIndex >= 0 && regularDutySplitPairs[splitPairIndex][1] === key;
+                          const canAddSplitFromField = isSplitEndField && splitPairIndex === regularDutySplitPairCount - 1 && regularDutySplitPairCount < regularDutySplitPairs.length;
+                          const canRemoveSplitFromField = splitPairIndex > 0;
                           return (
                             <label key={key} className="block">
-                              <span className="mb-1 block text-xs font-bold uppercase text-gray-500 dark:text-gray-400">{label}</span>
+                              <span className="mb-1 flex min-h-8 items-center justify-between gap-2 text-xs font-bold uppercase text-gray-500 dark:text-gray-400">
+                                <span className="truncate">{label}</span>
+                                {(canAddSplitFromField || canRemoveSplitFromField) && (
+                                  <span className="flex shrink-0 items-center gap-1">
+                                    {canRemoveSplitFromField && (
+                                      <button
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.preventDefault();
+                                          removeRegularDutySplitPair(splitPairIndex);
+                                        }}
+                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white shadow-sm transition hover:bg-red-700"
+                                        aria-label={`Remove ${label}`}
+                                        title={`Remove ${label}`}
+                                      >
+                                        <X size={15} />
+                                      </button>
+                                    )}
+                                    {canAddSplitFromField && (
+                                      <button
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.preventDefault();
+                                          addRegularDutySplitPair();
+                                        }}
+                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-green-600 text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                        aria-label="Add split interval"
+                                        title="Add Split"
+                                      >
+                                        <Plus size={15} />
+                                      </button>
+                                    )}
+                                  </span>
+                                )}
+                              </span>
                               {isTimeField ? (
                                 <TimeDetailInput
                                   value={entryForm.details?.[key] || ''}
@@ -3825,6 +3769,16 @@ function CalendarPage({
                           </span>
                           <button
                             type="button"
+                            onClick={buildAutoNarrative}
+                            className="btn-primary"
+                            aria-label="Build narrative from daily fields"
+                            title="Build Narrative"
+                          >
+                            <Sparkles size={16} />
+                            <span>Build Narrative</span>
+                          </button>
+                          <button
+                            type="button"
                             onClick={clearNarrativeSection}
                             className="btn-secondary"
                             aria-label="Clear narrative"
@@ -3962,6 +3916,44 @@ function CalendarPage({
             <span>Copy Previous Daily</span>
             <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">P</span>
           </button>
+          <div className="my-1 h-px bg-gray-200 dark:bg-gray-700" />
+          <div className="px-2 py-1">
+            <label className="mb-1 block text-xs font-black uppercase tracking-wide text-gray-400 dark:text-gray-500">
+              Apply Shortcut
+            </label>
+            <select
+              defaultValue=""
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) => {
+                const shortcut = shortcuts.find((item) => item.id === event.target.value);
+                if (shortcut) {
+                  applyShortcutToDate(shortcut, dailyStripContextMenu.dateKey);
+                  setDailyStripContextMenu(null);
+                }
+              }}
+              disabled={shortcuts.length === 0}
+              className="h-9 w-full rounded border border-gray-300 bg-white px-2 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200"
+              aria-label="Apply shortcut to daily"
+            >
+              <option value="">{shortcuts.length > 0 ? 'Choose shortcut' : 'No shortcuts saved'}</option>
+              {shortcuts.map((shortcut) => (
+                <option key={shortcut.id} value={shortcut.id}>{shortcut.name}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              void createShortcutFromDate(dailyStripContextMenu.dateKey);
+              setDailyStripContextMenu(null);
+            }}
+            disabled={isSavingShortcut}
+            className="quick-launch-context-menu-item text-gray-700 disabled:cursor-not-allowed disabled:opacity-45 dark:text-gray-200"
+          >
+            <span>Create Shortcut</span>
+            <span className="ml-auto text-xs font-black text-gray-400 dark:text-gray-500">Save</span>
+          </button>
+          <div className="my-1 h-px bg-gray-200 dark:bg-gray-700" />
           <div className="daily-strip-leave-menu-item text-gray-700 dark:text-gray-200">
             <button
               type="button"
