@@ -1557,6 +1557,67 @@ function getRecentConversationPresence(
   };
 }
 
+function getRelativeActivityText(lastSeenAt: string | null): string {
+  if (!lastSeenAt) {
+    return 'Not seen recently';
+  }
+
+  const seenAt = new Date(lastSeenAt).getTime();
+  if (Number.isNaN(seenAt)) {
+    return 'Not seen recently';
+  }
+
+  const diffMs = Date.now() - seenAt;
+  const minutes = Math.floor(diffMs / (1000 * 60));
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (minutes < 1) {
+    return 'Just now';
+  }
+
+  if (minutes < 60) {
+    return `${minutes} min ago`;
+  }
+
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
+
+  if (days < 7) {
+    return `${days}d ago`;
+  }
+
+  return new Date(lastSeenAt).toLocaleDateString([], {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function getRecentConversationActivityText(
+  conversation: RecentConversation,
+  presence: {
+    label: string;
+    dotClass: string;
+  } | null,
+) {
+  if (!conversation.directParticipantId || !presence) {
+    return conversation.threadType === 'direct' ? 'Direct message' : 'Group conversation';
+  }
+
+  if (presence.label === 'Active' || presence.label === 'Busy') {
+    return presence.label;
+  }
+
+  if (presence.label === 'Away' && conversation.directLastSeenAt) {
+    return `Away - ${getRelativeActivityText(conversation.directLastSeenAt)}`;
+  }
+
+  return conversation.directLastSeenAt
+    ? `${presence.label} - ${getRelativeActivityText(conversation.directLastSeenAt)}`
+    : presence.label;
+}
+
 function RecentConversationsDock({
   conversations,
   isCollapsed,
@@ -1630,6 +1691,10 @@ function RecentConversationsDock({
           const typing = typingByConversation[conversation.id];
           const previewText = conversation.unreadPreview || conversation.subtitle || 'New message';
           const shouldShowPreview = conversation.unreadCount > 0;
+          const presence = conversation.threadType === 'direct'
+            ? getRecentConversationPresence(conversation, presenceByAccount)
+            : null;
+          const activityText = getRecentConversationActivityText(conversation, presence);
           return (
             <div
               key={conversation.id}
@@ -1651,18 +1716,29 @@ function RecentConversationsDock({
                   <span className="mt-0.5 flex items-center gap-1 truncate rounded-md px-1 py-0.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
                     <span className="truncate">{previewText}</span>
                   </span>
+                  {presence && (
+                    <span className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 dark:text-gray-400">
+                      <span className={`h-1.5 w-1.5 rounded-full ${presence.dotClass}`} />
+                      <span className="truncate">{activityText}</span>
+                    </span>
+                  )}
+                  {!presence && activityText && (
+                    <span className="mt-1 block truncate text-[10px] font-semibold text-gray-500 dark:text-gray-400">{activityText}</span>
+                  )}
                 </button>
               )}
               {conversation.unreadCount === 0 && !typing && (
-                <span className="pointer-events-none absolute right-14 max-w-56 translate-x-2 whitespace-nowrap rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-black text-primary-500 opacity-0 shadow-xl transition duration-200 group-hover/recent:translate-x-0 group-hover/recent:opacity-100 dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100">
-                  {conversation.title}
+                <span className="pointer-events-none absolute right-14 max-w-56 translate-x-2 rounded-md border border-gray-200 bg-white/95 px-3 py-1.5 text-xs text-primary-500 opacity-0 shadow-xl transition duration-200 group-hover/recent:translate-x-0 group-hover/recent:opacity-100 dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100">
+                  <span className="block truncate font-black">{conversation.title}</span>
+                  {activityText && (
+                    <span className="mt-0.5 block truncate text-[10px] font-semibold text-gray-500 dark:text-gray-400">
+                      {activityText}
+                    </span>
+                  )}
                 </span>
               )}
               {(() => {
-                  const presence = conversation.threadType === 'direct'
-                  ? getRecentConversationPresence(conversation, presenceByAccount)
-                  : null;
-              const conversationAvatarErrorKey = `${conversation.id}:${conversation.imageUrl || ''}`;
+                  const conversationAvatarErrorKey = `${conversation.id}:${conversation.imageUrl || ''}`;
 
                 return (
                   <button
