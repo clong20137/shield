@@ -2099,16 +2099,9 @@
     opacity: 1;
   }
 
-  html.glass .shield-left-panel .sidebar-search-input,
-  html.glass .shield-left-panel .sidebar-search-input:focus {
-    border-color: rgba(255, 255, 255, 0.18) !important;
-    background: rgba(15, 23, 42, 0.42) !important;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      0 10px 24px rgba(2, 6, 23, 0.18) !important;
-    color: rgb(255, 255, 255) !important;
-    backdrop-filter: blur(14px) saturate(1.08);
-    -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  .shield-left-panel .sidebar-search-icon {
+    color: rgb(219, 234, 254) !important;
+    opacity: 1 !important;
   }
 
   html.glass .shield-left-panel .global-search-results {
@@ -2129,13 +2122,6 @@
   html.glass .shield-left-panel .global-search-results .text-gray-500,
   html.glass .shield-left-panel .global-search-results .dark\:text-gray-400 {
     color: rgb(203, 213, 225) !important;
-  }
-
-  html.glass:not(.dark) .shield-left-panel .sidebar-search-input,
-  html.glass:not(.dark) .shield-left-panel .sidebar-search-input:focus {
-    border-color: rgba(255, 255, 255, 0.22) !important;
-    background: rgba(15, 23, 42, 0.36) !important;
-    color: rgb(255, 255, 255) !important;
   }
 
   html.glass:not(.dark) .shield-left-panel .global-search-results {
