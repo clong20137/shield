@@ -1577,6 +1577,7 @@ function RecentConversationsDock({
   onToggleCollapsed: () => void;
 }) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; conversation: RecentConversation } | null>(null);
+  const [conversationImageLoadFailed, setConversationImageLoadFailed] = useState<Record<string, boolean>>({});
 
   const openContextMenu = (event: ReactMouseEvent, conversation: RecentConversation) => {
     event.preventDefault();
@@ -1608,7 +1609,7 @@ function RecentConversationsDock({
       aria-label={isCollapsed ? 'Recent conversations collapsed' : 'Recent conversations'}
     >
       <div
-        className={`pointer-events-auto flex flex-col items-center overflow-hidden rounded-full border border-gray-200 bg-white/95 shadow-2xl backdrop-blur transition-all duration-300 ease-out dark:border-gray-800 dark:bg-gray-900/95 ${
+        className={`pointer-events-auto theme-polished-surface flex flex-col items-center overflow-visible rounded-full border border-white/25 bg-white/70 shadow-2xl shadow-black/10 backdrop-blur-xl transition-all duration-300 ease-out dark:border-white/10 dark:bg-slate-900/70 ${
           isCollapsed ? 'max-h-[3.25rem] gap-0 p-1.5' : 'max-h-[28rem] gap-2 p-2'
         }`}
       >
@@ -1627,7 +1628,8 @@ function RecentConversationsDock({
         </button>
         {conversations.map((conversation) => {
           const typing = typingByConversation[conversation.id];
-          const previewText = typing ? `${typing.name} is typing...` : conversation.unreadPreview || conversation.subtitle || 'No preview';
+          const previewText = typing ? `${typing.name} is typing...` : conversation.unreadPreview || conversation.subtitle || 'New message';
+          const shouldShowPreview = typing || conversation.unreadCount > 0;
           return (
             <div
               key={conversation.id}
@@ -1637,20 +1639,20 @@ function RecentConversationsDock({
               aria-hidden={isCollapsed}
               onContextMenu={(event) => openContextMenu(event, conversation)}
             >
-          {(typing || previewText) && (
-            <button
-              type="button"
-              onClick={() => onOpenConversation(conversation)}
-              tabIndex={isCollapsed ? -1 : 0}
-                  className={`recent-message-preview-pop absolute right-14 w-64 rounded-lg border bg-white px-3 py-2 text-left shadow-xl transition hover:border-accent dark:bg-gray-900 ${
-                    typing ? 'border-accent/40 dark:border-accent/40' : 'border-gray-200 dark:border-gray-800'
+              {shouldShowPreview && (
+                <button
+                  type="button"
+                  onClick={() => onOpenConversation(conversation)}
+                  tabIndex={isCollapsed ? -1 : 0}
+                  className={`recent-message-preview-pop absolute right-14 z-20 w-64 rounded-lg border border-white/30 bg-white/80 px-3 py-2 text-left shadow-xl backdrop-blur-md transition hover:border-accent dark:border-white/20 dark:bg-slate-900/75 ${
+                    typing ? 'border-accent/60 dark:border-accent/60' : 'border-white/30 dark:border-white/20'
                   }`}
                   aria-label={typing ? `${conversation.title} is typing` : `Open latest message from ${conversation.title}`}
                 >
                   <span className="block truncate text-xs font-black text-primary-500 dark:text-blue-100">{conversation.title}</span>
-                  <span className="mt-0.5 flex items-center gap-1 truncate text-xs font-semibold text-gray-600 dark:text-gray-300">
+                  <span className="mt-0.5 flex items-center gap-1 truncate rounded-md px-1 py-0.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
                     {typing && (
-              <span className="inline-flex items-center gap-0.5 py-0.5">
+                      <span className="inline-flex items-center gap-0.5 py-0.5">
                         <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
                         <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse [animation-delay:120ms]" />
                         <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse [animation-delay:240ms]" />
@@ -1666,9 +1668,10 @@ function RecentConversationsDock({
                 </span>
               )}
               {(() => {
-                const presence = conversation.threadType === 'direct'
+                  const presence = conversation.threadType === 'direct'
                   ? getRecentConversationPresence(conversation, presenceByAccount)
                   : null;
+              const conversationAvatarErrorKey = `${conversation.id}:${conversation.imageUrl || ''}`;
 
                 return (
                   <button
@@ -1680,11 +1683,30 @@ function RecentConversationsDock({
                     aria-label={`Open conversation with ${conversation.title}${typing ? ', typing' : presence ? `, ${presence.label}` : ''}`}
                     title={`${conversation.title}${typing ? ' - typing' : presence ? ` - ${presence.label}` : ''}${conversation.subtitle ? ` - ${conversation.subtitle}` : ''}`}
                   >
-                    {conversation.imageUrl ? (
+                    {conversation.imageUrl && !conversationImageLoadFailed[conversationAvatarErrorKey] ? (
                       <img
                         src={getAssetThumbnailUrl(conversation.imageUrl, 96)}
                         alt=""
-                        onError={(event) => handleAssetThumbnailError(event, conversation.imageUrl)}
+                        onError={(event) => {
+                          const image = event.currentTarget;
+                          const fallbackUrl = getAssetUrl(conversation.imageUrl);
+
+                          if (fallbackUrl && image.src !== fallbackUrl) {
+                            image.src = fallbackUrl;
+                            return;
+                          }
+
+                          setConversationImageLoadFailed((previous) => {
+                            if (previous[conversationAvatarErrorKey]) {
+                              return previous;
+                            }
+
+                            return {
+                              ...previous,
+                              [conversationAvatarErrorKey]: true,
+                            };
+                          });
+                        }}
                         className="h-full w-full rounded-full object-cover"
                       />
                     ) : conversation.threadType !== 'direct' ? (
