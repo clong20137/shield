@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, ChevronLeft, ChevronRight, Download, FileText, RotateCcw, Search, Table, X } from 'lucide-react';
 import { AuthAccount, reportService, TrooperDailyReportEntry } from '../services/api';
 import { districtOptions } from '../constants/districts';
@@ -176,6 +176,9 @@ const ReportsPage: React.FC<{
   const [selectedDaily, setSelectedDaily] = useState<TrooperDailyReportEntry | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
   const [isReviewSaving, setIsReviewSaving] = useState(false);
+  const dailyRefreshTimerRef = useRef<number | null>(null);
+  const dailyLoadInFlightRef = useRef(false);
+  const dailyLoadPendingRef = useRef(false);
   const canReviewTrooperDailies = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('reports:trooper-dailies'));
 
   const loadTrooperDailies = async (
@@ -189,6 +192,12 @@ const ReportsPage: React.FC<{
       pageSize: dailyPageSize,
     },
   ) => {
+    if (dailyLoadInFlightRef.current) {
+      dailyLoadPendingRef.current = true;
+      return;
+    }
+
+    dailyLoadInFlightRef.current = true;
     if (showLoading) {
       setDailyLoading(true);
     }
@@ -213,7 +222,12 @@ const ReportsPage: React.FC<{
       setDailyError(getErrorMessage(err, 'Trooper Daily reports require permission.'));
       console.error(err);
     } finally {
+      dailyLoadInFlightRef.current = false;
       setDailyLoading(false);
+      if (dailyLoadPendingRef.current) {
+        dailyLoadPendingRef.current = false;
+        void loadTrooperDailies(false);
+      }
     }
   };
 
@@ -222,9 +236,18 @@ const ReportsPage: React.FC<{
       void loadTrooperDailies();
     }
     const handleReportsUpdate = () => {
-      if (selectedReportType === 'trooper-daily') {
-        void loadTrooperDailies(false);
+      if (selectedReportType !== 'trooper-daily') {
+        return;
       }
+
+      if (dailyRefreshTimerRef.current) {
+        window.clearTimeout(dailyRefreshTimerRef.current);
+      }
+
+      dailyRefreshTimerRef.current = window.setTimeout(() => {
+        dailyRefreshTimerRef.current = null;
+        void loadTrooperDailies(false);
+      }, 500);
     };
 
     window.addEventListener('shield:user-updated', handleReportsUpdate);
@@ -234,6 +257,10 @@ const ReportsPage: React.FC<{
       window.removeEventListener('shield:user-updated', handleReportsUpdate);
       window.removeEventListener('shield:dashboard-updated', handleReportsUpdate);
       window.removeEventListener('shield:calendar-updated', handleReportsUpdate);
+      if (dailyRefreshTimerRef.current) {
+        window.clearTimeout(dailyRefreshTimerRef.current);
+        dailyRefreshTimerRef.current = null;
+      }
     };
   }, [selectedReportType]);
 

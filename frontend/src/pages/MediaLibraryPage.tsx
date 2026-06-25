@@ -68,6 +68,9 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
   const profilePhotoFolderInputRef = useRef<HTMLInputElement | null>(null);
+  const mediaRefreshTimerRef = useRef<number | null>(null);
+  const mediaLoadInFlightRef = useRef(false);
+  const mediaLoadPendingRef = useRef(false);
   const canImportProfilePhotos = hasPermission(account, 'users:profile-picture');
   const canViewMedia = hasPermission(account, 'media:view') || hasPermission(account, 'media:upload') || hasPermission(account, 'media:edit') || hasPermission(account, 'media:delete') || canImportProfilePhotos;
   const canUploadMedia = hasPermission(account, 'media:upload');
@@ -84,6 +87,12 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
   }, [searchTerm]);
 
   const loadMedia = async () => {
+    if (mediaLoadInFlightRef.current) {
+      mediaLoadPendingRef.current = true;
+      return;
+    }
+
+    mediaLoadInFlightRef.current = true;
     setIsLoading(true);
     setError(null);
     try {
@@ -102,7 +111,12 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
       console.error('Failed to load media library:', err);
       setError('Failed to load media library.');
     } finally {
+      mediaLoadInFlightRef.current = false;
       setIsLoading(false);
+      if (mediaLoadPendingRef.current) {
+        mediaLoadPendingRef.current = false;
+        void loadMedia();
+      }
     }
   };
 
@@ -111,9 +125,24 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
   }, [activeFolder, debouncedSearchTerm, page]);
 
   useEffect(() => {
-    const handleMediaUpdate = () => void loadMedia();
+    const handleMediaUpdate = () => {
+      if (mediaRefreshTimerRef.current) {
+        window.clearTimeout(mediaRefreshTimerRef.current);
+      }
+
+      mediaRefreshTimerRef.current = window.setTimeout(() => {
+        mediaRefreshTimerRef.current = null;
+        void loadMedia();
+      }, 500);
+    };
     window.addEventListener('shield:media-updated', handleMediaUpdate);
-    return () => window.removeEventListener('shield:media-updated', handleMediaUpdate);
+    return () => {
+      window.removeEventListener('shield:media-updated', handleMediaUpdate);
+      if (mediaRefreshTimerRef.current) {
+        window.clearTimeout(mediaRefreshTimerRef.current);
+        mediaRefreshTimerRef.current = null;
+      }
+    };
   }, [activeFolder, debouncedSearchTerm, page]);
 
   const activeFolderDetails = useMemo(

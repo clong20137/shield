@@ -420,6 +420,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const groupImageInputRef = useRef<HTMLInputElement | null>(null);
   const messageImageInputRef = useRef<HTMLInputElement | null>(null);
   const messageReloadTimerRef = useRef<number | null>(null);
+  const messageLoadInFlightRef = useRef(false);
+  const messageLoadPendingRef = useRef(false);
   const focusReplyComposer = () => {
     window.setTimeout(() => replyTextareaRef.current?.focus(), 0);
   };
@@ -448,6 +450,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   }, [currentUser.id, targetRecipient?.id]);
 
   const loadMessages = async (showLoading = false) => {
+    if (messageLoadInFlightRef.current) {
+      messageLoadPendingRef.current = true;
+      return;
+    }
+
+    messageLoadInFlightRef.current = true;
     if (showLoading) {
       setIsLoading(true);
     }
@@ -463,7 +471,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       console.error(err);
       onToast('error', 'Failed to load messages.');
     } finally {
+      messageLoadInFlightRef.current = false;
       setIsLoading(false);
+      if (messageLoadPendingRef.current) {
+        messageLoadPendingRef.current = false;
+        void loadMessages(false);
+      }
     }
   };
 

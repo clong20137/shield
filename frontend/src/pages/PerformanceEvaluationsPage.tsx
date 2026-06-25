@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { BellRing, CheckCircle2, Download, FileSignature, Plus, Save, Search, Send, X } from 'lucide-react';
 import { AuthAccount, PerformanceEvaluation, performanceEvaluationService, authService } from '../services/api';
 import { downloadPerformanceEvaluationPdf } from '../utils/performanceEvaluationPdf';
@@ -219,6 +219,12 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage, com
   const [periodFilter, setPeriodFilter] = useState('all');
   const [form, setForm] = useState(emptyForm);
   const [canCreateCpar, setCanCreateCpar] = useState(currentUser.role === 'administrator');
+  const evaluationRefreshTimerRef = useRef<number | null>(null);
+  const accountRefreshTimerRef = useRef<number | null>(null);
+  const evaluationLoadInFlightRef = useRef(false);
+  const evaluationLoadPendingRef = useRef(false);
+  const accountLoadInFlightRef = useRef(false);
+  const accountLoadPendingRef = useRef(false);
 
   const periodOptions = useMemo(
     () => Array.from(new Set(evaluations.map((evaluation) => evaluation.evaluationPeriod).filter(Boolean))).sort().reverse(),
@@ -247,6 +253,12 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage, com
   const selectedEvaluation = filteredEvaluations.find((evaluation) => evaluation.id === selectedId) || filteredEvaluations[0] || null;
 
   const loadEvaluations = async (showLoading = false) => {
+    if (evaluationLoadInFlightRef.current) {
+      evaluationLoadPendingRef.current = true;
+      return;
+    }
+
+    evaluationLoadInFlightRef.current = true;
     if (showLoading) setIsLoading(true);
     try {
       const response = await performanceEvaluationService.getAll();
@@ -255,19 +267,45 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage, com
     } catch (error) {
       onToast('error', getErrorMessage(error, 'Failed to load evaluations.'));
     } finally {
+      evaluationLoadInFlightRef.current = false;
       setIsLoading(false);
+      if (evaluationLoadPendingRef.current) {
+        evaluationLoadPendingRef.current = false;
+        void loadEvaluations(false);
+      }
     }
   };
 
   useEffect(() => {
     loadEvaluations(true);
-    const handleUpdate = () => loadEvaluations(false);
+    const handleUpdate = () => {
+      if (evaluationRefreshTimerRef.current) {
+        window.clearTimeout(evaluationRefreshTimerRef.current);
+      }
+
+      evaluationRefreshTimerRef.current = window.setTimeout(() => {
+        evaluationRefreshTimerRef.current = null;
+        void loadEvaluations(false);
+      }, 500);
+    };
     window.addEventListener('shield:performance-evaluation-updated', handleUpdate);
 
-    return () => window.removeEventListener('shield:performance-evaluation-updated', handleUpdate);
+    return () => {
+      window.removeEventListener('shield:performance-evaluation-updated', handleUpdate);
+      if (evaluationRefreshTimerRef.current) {
+        window.clearTimeout(evaluationRefreshTimerRef.current);
+        evaluationRefreshTimerRef.current = null;
+      }
+    };
   }, []);
 
   const loadEvaluationAccounts = () => {
+    if (accountLoadInFlightRef.current) {
+      accountLoadPendingRef.current = true;
+      return;
+    }
+
+    accountLoadInFlightRef.current = true;
     authService.getAccounts(currentUser.id)
       .then((response) => {
         setAccounts(response.data.filter((account) => account.id !== currentUser.id));
@@ -276,6 +314,13 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage, com
       .catch((error) => {
         console.error('Failed to load accounts for evaluations:', error);
         setCanCreateCpar(currentUser.role === 'administrator');
+      })
+      .finally(() => {
+        accountLoadInFlightRef.current = false;
+        if (accountLoadPendingRef.current) {
+          accountLoadPendingRef.current = false;
+          loadEvaluationAccounts();
+        }
       });
   };
 
@@ -285,7 +330,14 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage, com
 
   useEffect(() => {
     const handleUserUpdate = () => {
-      loadEvaluationAccounts();
+      if (accountRefreshTimerRef.current) {
+        window.clearTimeout(accountRefreshTimerRef.current);
+      }
+
+      accountRefreshTimerRef.current = window.setTimeout(() => {
+        accountRefreshTimerRef.current = null;
+        loadEvaluationAccounts();
+      }, 500);
     };
 
     window.addEventListener('shield:user-updated', handleUserUpdate);
@@ -293,6 +345,10 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage, com
     return () => {
       window.removeEventListener('shield:user-updated', handleUserUpdate);
       window.removeEventListener('shield:permission-updated', handleUserUpdate);
+      if (accountRefreshTimerRef.current) {
+        window.clearTimeout(accountRefreshTimerRef.current);
+        accountRefreshTimerRef.current = null;
+      }
     };
   }, [currentUser.id, currentUser.role]);
 
