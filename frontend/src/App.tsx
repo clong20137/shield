@@ -1,6 +1,6 @@
 import { CSSProperties, FormEvent, ReactNode, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Command, Delete, Download, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, RefreshCw, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, Users, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Command, Delete, Download, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, RefreshCw, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, Users, X } from 'lucide-react';
 import { BrowserRouter as Router, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
@@ -1560,18 +1560,20 @@ function RecentConversationsDock({
 }) {
   return (
     <aside
-      className={`pointer-events-none fixed bottom-5 right-5 z-40 hidden flex-col items-end gap-2 transition-all duration-300 ease-out md:flex ${
-        isCollapsed ? 'translate-x-[4.45rem]' : 'translate-x-0'
-      }`}
+      className="pointer-events-none fixed bottom-5 right-5 z-40 hidden flex-col items-end gap-2 md:flex"
       aria-label={isCollapsed ? 'Recent conversations collapsed' : 'Recent conversations'}
     >
-      <div className="pointer-events-auto flex flex-col items-center gap-2 rounded-full border border-gray-200 bg-white/95 p-2 shadow-2xl backdrop-blur transition-transform duration-300 ease-out dark:border-gray-800 dark:bg-gray-900/95">
+      <div
+        className={`pointer-events-auto flex flex-col items-center overflow-hidden rounded-full border border-gray-200 bg-white/95 shadow-2xl backdrop-blur transition-all duration-300 ease-out dark:border-gray-800 dark:bg-gray-900/95 ${
+          isCollapsed ? 'max-h-[3.25rem] gap-0 p-1.5' : 'max-h-[28rem] gap-2 p-2'
+        }`}
+      >
         <button
           type="button"
           onClick={onCompose}
           tabIndex={isCollapsed ? -1 : 0}
-          className={`flex h-11 w-11 items-center justify-center rounded-full bg-accent text-white shadow-sm transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
-            isCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100'
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-sm transition-all duration-300 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+            isCollapsed ? 'pointer-events-none -mb-11 translate-y-6 scale-75 opacity-0' : 'mb-0 translate-y-0 scale-100 opacity-100'
           }`}
           aria-label="Start new message"
           title="New Message"
@@ -1583,7 +1585,7 @@ function RecentConversationsDock({
           <div
             key={conversation.id}
             className={`group/recent relative flex items-center transition-all duration-300 ease-out ${
-              isCollapsed ? 'pointer-events-none translate-x-2 opacity-0' : 'translate-x-0 opacity-100'
+              isCollapsed ? 'pointer-events-none -mb-12 translate-y-8 scale-75 opacity-0' : 'mb-0 translate-y-0 scale-100 opacity-100'
             }`}
             aria-hidden={isCollapsed}
           >
@@ -1592,7 +1594,7 @@ function RecentConversationsDock({
                 type="button"
                 onClick={() => onOpenConversation(conversation)}
                 tabIndex={isCollapsed ? -1 : 0}
-                className="absolute right-14 w-64 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left shadow-xl transition hover:border-accent dark:border-gray-800 dark:bg-gray-900"
+                className="recent-message-preview-pop absolute right-14 w-64 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left shadow-xl transition hover:border-accent dark:border-gray-800 dark:bg-gray-900"
                 aria-label={`Open unread message from ${conversation.title}`}
               >
                 <span className="block truncate text-xs font-black text-primary-500 dark:text-blue-100">{conversation.title}</span>
@@ -1649,13 +1651,11 @@ function RecentConversationsDock({
         <button
           type="button"
           onClick={onToggleCollapsed}
-          className={`flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition duration-300 hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 ${
-            isCollapsed ? '-translate-x-[4.45rem] shadow-2xl' : 'translate-x-0'
-          }`}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition duration-300 hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
           aria-label={isCollapsed ? 'Show recent conversations' : 'Collapse recent conversations'}
           title={isCollapsed ? 'Show Recent Conversations' : 'Collapse Recent Conversations'}
         >
-          <ChevronRight className={`transition-transform duration-300 ${isCollapsed ? 'rotate-180' : 'rotate-0'}`} size={16} />
+          <ChevronDown className={`transition-transform duration-300 ${isCollapsed ? 'rotate-180' : 'rotate-0'}`} size={16} />
         </button>
       </div>
     </aside>

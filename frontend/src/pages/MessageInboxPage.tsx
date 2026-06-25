@@ -841,6 +841,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const selectedThreadAcceptsMessages = selectedThread?.contactReceivesMessages !== false;
   const selectedTyping = selectedThreadId ? typingByThread[selectedThreadId] : null;
   const selectedThreadParticipantKey = selectedThread?.participantIds.join('|') || '';
+  const selectedDirectRecipientId = selectedThread?.threadType === 'direct'
+    ? selectedThread.participantIds.find((id) => id && id !== currentUser.id) || selectedThread.id
+    : '';
 
   useEffect(() => {
     if (!targetThreadId || !filteredThreads.some((thread) => thread.id === targetThreadId)) {
@@ -1283,7 +1286,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       lastTypingSentRef.current = now;
       messageService.sendTyping(
         currentUser.id,
-        selectedThread.id,
+        selectedDirectRecipientId,
         currentUser.displayName || currentUser.email || 'Someone',
         true,
       ).catch((err) => console.error('Failed to send typing status:', err));
@@ -1297,7 +1300,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       if (selectedThread.threadType === 'direct') {
         messageService.sendTyping(
           currentUser.id,
-          selectedThread.id,
+          selectedDirectRecipientId,
           currentUser.displayName || currentUser.email || 'Someone',
           false,
         ).catch((err) => console.error('Failed to clear typing status:', err));
@@ -1405,7 +1408,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       } else {
         await messageService.send({
           senderAccountId: currentUser.id,
-          recipientUserId: selectedThread.id,
+          recipientUserId: selectedDirectRecipientId,
           subject: selectedThread.subject,
           body: messageBody,
         });
@@ -1418,7 +1421,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       if (selectedThread.threadType === 'direct') {
         messageService.sendTyping(
           currentUser.id,
-          selectedThread.id,
+          selectedDirectRecipientId,
           currentUser.displayName || currentUser.email || 'Someone',
           false,
         ).catch((err) => console.error('Failed to clear typing status:', err));
