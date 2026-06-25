@@ -3104,6 +3104,13 @@ select.trooper-daily-field-with-icon {
   }
 }
 
+html.shield-app-backgrounded *,
+html.shield-app-backgrounded *::before,
+html.shield-app-backgrounded *::after {
+  animation-play-state: paused !important;
+  transition-duration: 0.01ms !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

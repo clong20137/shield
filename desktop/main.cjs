@@ -609,6 +609,19 @@ function showMainWindow() {
   mainWindow.focus();
 }
 
+function sendWindowVisibilityStatus() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  const isVisible = mainWindow.isVisible() && !mainWindow.isMinimized();
+  mainWindow.webContents.send('shield:window-visibility', {
+    visible: isVisible,
+    backgrounded: !isVisible,
+    minimized: mainWindow.isMinimized(),
+  });
+}
+
 function finishQuitAfterSignOut() {
   quitSignOutComplete = true;
   if (quitSignOutTimer) {
@@ -1362,6 +1375,7 @@ function createMainWindow() {
       rendererCrashResetTimer = null;
     }, rendererCrashStableResetMs);
     checkDesktopIdleStatus({ force: true });
+    sendWindowVisibilityStatus();
   });
 
   mainWindow.on('close', (event) => {
@@ -1377,28 +1391,34 @@ function createMainWindow() {
   });
 
   mainWindow.on('focus', () => {
+    sendWindowVisibilityStatus();
     checkDesktopIdleStatus({ force: true });
     void checkForWebAppUpdate();
   });
 
   mainWindow.on('blur', () => {
+    sendWindowVisibilityStatus();
     checkDesktopIdleStatus({ force: true });
   });
 
   mainWindow.on('show', () => {
+    sendWindowVisibilityStatus();
     checkDesktopIdleStatus({ force: true });
     void checkForWebAppUpdate();
   });
 
   mainWindow.on('hide', () => {
+    sendWindowVisibilityStatus();
     checkDesktopIdleStatus({ force: true });
   });
 
   mainWindow.on('minimize', () => {
+    sendWindowVisibilityStatus();
     checkDesktopIdleStatus({ force: true });
   });
 
   mainWindow.on('restore', () => {
+    sendWindowVisibilityStatus();
     checkDesktopIdleStatus({ force: true });
     void checkForWebAppUpdate();
   });

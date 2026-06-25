@@ -5350,6 +5350,7 @@ function App() {
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
   const [isAppLocked, setIsAppLocked] = useState(false);
+  const [isAppBackgrounded, setIsAppBackgrounded] = useState(() => document.hidden);
   const [reminderModalDate, setReminderModalDate] = useState<string | null>(null);
   const [isReminderSaving, setIsReminderSaving] = useState(false);
   const [dueReminderPopup, setDueReminderPopup] = useState<Reminder[]>([]);
@@ -5363,6 +5364,29 @@ function App() {
   const [isWelcomeSplashOpen, setIsWelcomeSplashOpen] = useState(false);
   const [shouldLaunchGuideAfterWelcome, setShouldLaunchGuideAfterWelcome] = useState(false);
   const [closingModal, setClosingModal] = useState<ClosingModal | null>(null);
+  useEffect(() => {
+    const updateDocumentVisibility = () => {
+      setIsAppBackgrounded(document.hidden);
+    };
+    const removeDesktopVisibilityListener = hasShieldDesktopFeature('onWindowVisibility')
+      ? window.shieldDesktop?.onWindowVisibility?.((payload) => {
+        setIsAppBackgrounded(payload.backgrounded);
+      })
+      : undefined;
+
+    updateDocumentVisibility();
+    document.addEventListener('visibilitychange', updateDocumentVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', updateDocumentVisibility);
+      removeDesktopVisibilityListener?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('shield-app-backgrounded', isAppBackgrounded);
+  }, [isAppBackgrounded]);
+
   useEffect(() => {
     const collapseSidebarOnMobile = () => {
       if (isMobileViewport()) {
@@ -5564,8 +5588,8 @@ function App() {
     };
 
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        markBusy(true);
+      if (document.hidden || isAppBackgrounded) {
+        markAway();
         return;
       }
 
@@ -5588,9 +5612,14 @@ function App() {
       })
       : undefined;
 
-    markActive(true);
+    if (isAppBackgrounded) {
+      markAway();
+    } else {
+      markActive(true);
+    }
+
     const activeHeartbeat = window.setInterval(() => {
-      if (awayPresenceStateRef.current === 'active') {
+      if (!isAppBackgrounded && awayPresenceStateRef.current === 'active') {
         messageService.updatePresence('active').catch((error) => {
           console.error('Failed to refresh active presence:', error);
         });
@@ -5621,7 +5650,7 @@ function App() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       removeDesktopIdleStatusListener?.();
     };
-  }, [currentUser, isAuthenticated]);
+  }, [currentUser, isAppBackgrounded, isAuthenticated]);
 
   useEffect(() => {
     if (isSetupLoading || !setupStatus) {
@@ -6201,7 +6230,7 @@ function App() {
   };
 
   const checkDueReminders = useCallback(async () => {
-    if (!currentUser || isAppLocked) {
+    if (!currentUser || isAppLocked || isAppBackgrounded) {
       return;
     }
 
@@ -6225,7 +6254,7 @@ function App() {
     } catch (error) {
       console.error('Failed to check due reminders:', error);
     }
-  }, [currentUser, isAppLocked, scheduleReminder, showDueReminders]);
+  }, [currentUser, isAppBackgrounded, isAppLocked, scheduleReminder, showDueReminders]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -6235,20 +6264,28 @@ function App() {
       return undefined;
     }
 
-    void checkDueReminders();
-    const handleReminderUpdate = () => {
+    if (!isAppBackgrounded) {
       void checkDueReminders();
+    }
+    const handleReminderUpdate = () => {
+      if (!isAppBackgrounded) {
+        void checkDueReminders();
+      }
     };
     window.addEventListener('shield:reminder-updated', handleReminderUpdate);
-    const intervalId = window.setInterval(() => {
-      void checkDueReminders();
-    }, 30 * 1000);
+    const intervalId = isAppBackgrounded
+      ? null
+      : window.setInterval(() => {
+        void checkDueReminders();
+      }, 30 * 1000);
 
     return () => {
       window.removeEventListener('shield:reminder-updated', handleReminderUpdate);
-      window.clearInterval(intervalId);
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+      }
     };
-  }, [checkDueReminders, currentUser]);
+  }, [checkDueReminders, currentUser, isAppBackgrounded]);
 
   useEffect(() => {
     if (!currentUser || !isAppLocked) {
@@ -6548,7 +6585,7 @@ function App() {
   }, [isAccountMenuOpen]);
 
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUser || isAppBackgrounded) {
       return;
     }
 
@@ -6578,8 +6615,12 @@ function App() {
   }, [currentUser]);
 
   useEffect(() => {
+    if (isAppBackgrounded) {
+      return;
+    }
+
     void loadUserNotifications();
-  }, [loadUserNotifications]);
+  }, [isAppBackgrounded, loadUserNotifications]);
 
   const playUrgentAlertSound = useCallback(() => {
     try {
@@ -6631,8 +6672,12 @@ function App() {
   }, [currentUser, playUrgentAlertSound]);
 
   useEffect(() => {
+    if (isAppBackgrounded) {
+      return;
+    }
+
     void loadUrgentAlerts(true);
-  }, [loadUrgentAlerts]);
+  }, [isAppBackgrounded, loadUrgentAlerts]);
 
   const acknowledgeUrgentAlert = async (alert: UrgentAlert) => {
     setAcknowledgingUrgentAlertId(alert.id);
@@ -6653,24 +6698,32 @@ function App() {
       return;
     }
 
+    if (isAppBackgrounded) {
+      return;
+    }
+
     try {
       const response = await calendarService.getAll(currentUser.id);
       setSidebarCalendarEntries(response.data);
     } catch (err) {
       console.error('Failed to load sidebar calendar entries:', err);
     }
-  }, [currentUser]);
+  }, [currentUser, isAppBackgrounded]);
 
   useEffect(() => {
-    void loadSidebarCalendarEntries();
+    if (!isAppBackgrounded) {
+      void loadSidebarCalendarEntries();
+    }
 
     const handleCalendarUpdate = () => {
-      void loadSidebarCalendarEntries();
+      if (!isAppBackgrounded) {
+        void loadSidebarCalendarEntries();
+      }
     };
 
     window.addEventListener('shield:calendar-updated', handleCalendarUpdate);
     return () => window.removeEventListener('shield:calendar-updated', handleCalendarUpdate);
-  }, [loadSidebarCalendarEntries]);
+  }, [isAppBackgrounded, loadSidebarCalendarEntries]);
 
   useEffect(() => {
     if (currentUser && !currentUser.hasCompletedOnboarding && !isWelcomeSplashOpen && shouldLaunchGuideAfterWelcome) {
@@ -7171,7 +7224,7 @@ function App() {
     });
 
     return () => eventSource.close();
-  }, [currentUser, handleForcedLogout, loadBugReports, loadNotificationSounds, loadUrgentAlerts, loadUserNotifications, syncSessionTimeoutFromSettings, syncSetupStatus]);
+  }, [currentUser, handleForcedLogout, isAppBackgrounded, loadBugReports, loadNotificationSounds, loadUrgentAlerts, loadUserNotifications, syncSessionTimeoutFromSettings, syncSetupStatus]);
 
   const closeModal = (modal: ClosingModal) => {
     setClosingModal(modal);

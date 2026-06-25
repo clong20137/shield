@@ -73,6 +73,12 @@ interface ShieldDesktopLog {
   details?: Record<string, unknown>;
 }
 
+interface ShieldDesktopWindowVisibility {
+  visible: boolean;
+  backgrounded: boolean;
+  minimized: boolean;
+}
+
 interface Window {
   shieldDesktop?: {
     platform: string;
@@ -100,6 +106,7 @@ interface Window {
     onWebAppUpdateStatus?: (callback: (payload: ShieldDesktopWebAppUpdateStatus) => void) => () => void;
     onSessionTimeout?: (callback: (payload: ShieldDesktopSessionTimeoutPayload) => void) => () => void;
     onBeforeQuit?: (callback: () => void) => () => void;
+    onWindowVisibility?: (callback: (payload: ShieldDesktopWindowVisibility) => void) => () => void;
     notifyQuitSignOutComplete?: () => Promise<{ ok: boolean }>;
     getDesktopLogs?: () => Promise<{
       path: string;

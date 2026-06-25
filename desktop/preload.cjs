@@ -50,6 +50,11 @@ contextBridge.exposeInMainWorld('shieldDesktop', {
     ipcRenderer.on('shield:before-quit', handler);
     return () => ipcRenderer.removeListener('shield:before-quit', handler);
   },
+  onWindowVisibility: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on('shield:window-visibility', handler);
+    return () => ipcRenderer.removeListener('shield:window-visibility', handler);
+  },
   notifyQuitSignOutComplete: () => ipcRenderer.invoke('shield:quit-signout-complete'),
   getDesktopLogs: () => ipcRenderer.invoke('shield:get-desktop-logs'),
   openDesktopLogs: () => ipcRenderer.invoke('shield:open-desktop-logs')
