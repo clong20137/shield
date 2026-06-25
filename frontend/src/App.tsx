@@ -1666,23 +1666,33 @@ function getRecentConversationActivityText(
 function RecentConversationsDock({
   conversations,
   isCollapsed,
+  currentUser,
+  quickReplyConversationId,
   presenceByAccount,
   typingByConversation,
   onOpenConversation,
   onMarkRead,
   onReply,
+  onQuickReplyClose,
+  onQuickReplySent,
   onCompose,
   onToggleCollapsed,
+  onToast,
 }: {
   conversations: RecentConversation[];
   isCollapsed: boolean;
+  currentUser: AuthAccount | null;
+  quickReplyConversationId: string | null;
   presenceByAccount: Record<string, RecentPresenceState>;
   typingByConversation: Record<string, RecentTypingState>;
   onOpenConversation: (conversation: RecentConversation) => void;
   onMarkRead: (conversation: RecentConversation) => void;
   onReply: (conversation: RecentConversation) => void;
+  onQuickReplyClose: () => void;
+  onQuickReplySent: () => void;
   onCompose: () => void;
   onToggleCollapsed: () => void;
+  onToast: (type: ToastType, message: string, options?: { saveToNotifications?: boolean }) => void;
 }) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; conversation: RecentConversation } | null>(null);
   const [conversationImageLoadFailed, setConversationImageLoadFailed] = useState<Record<string, boolean>>({});
@@ -1738,7 +1748,8 @@ function RecentConversationsDock({
         {conversations.map((conversation) => {
           const typing = typingByConversation[conversation.id];
           const previewText = conversation.unreadPreview || conversation.subtitle || 'New message';
-          const shouldShowPreview = conversation.unreadCount > 0;
+          const isQuickReplyOpen = quickReplyConversationId === conversation.id;
+          const shouldShowPreview = conversation.unreadCount > 0 && !isQuickReplyOpen;
           const presence = conversation.threadType === 'direct'
             ? getRecentConversationPresence(conversation, presenceByAccount)
             : null;
@@ -1775,6 +1786,16 @@ function RecentConversationsDock({
                   )}
                   <span className="mt-1 block text-[10px] font-black uppercase tracking-wide text-accent">Quick reply</span>
                 </button>
+              )}
+              {isQuickReplyOpen && currentUser && (
+                <RecentMessageReplyPopover
+                  key={conversation.id}
+                  currentUser={currentUser}
+                  conversation={conversation}
+                  onClose={onQuickReplyClose}
+                  onSent={onQuickReplySent}
+                  onToast={onToast}
+                />
               )}
               {conversation.unreadCount === 0 && !typing && (
                 <span className="pointer-events-none absolute right-14 max-w-56 translate-x-2 rounded-md border border-gray-200 bg-white/95 px-3 py-1.5 text-xs text-primary-500 opacity-0 shadow-xl transition duration-200 group-hover/recent:translate-x-0 group-hover/recent:opacity-100 dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100">
@@ -2225,19 +2246,23 @@ function RecentMessageReplyPopover({
   };
 
   return (
-    <aside className="fixed bottom-5 right-[5.4rem] z-50 hidden w-[min(20rem,calc(100vw-2rem))] md:block" aria-label="Quick reply">
-      <form onSubmit={sendReply} className="quick-launch-context-menu overflow-hidden rounded-lg border border-gray-200 bg-white p-2.5 shadow-2xl ring-1 ring-black/5 dark:border-gray-800 dark:bg-gray-950 dark:ring-white/10">
-        <div className="space-y-2">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-900">
-              <span className="block truncate text-xs font-black text-primary-500 dark:text-blue-100">{conversation.title}</span>
-              <span className="mt-0.5 block line-clamp-2 text-xs text-gray-500 dark:text-gray-400">{previewText}</span>
-            </div>
-            <button type="button" onClick={onClose} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-900" aria-label="Close quick reply" title="Close">
-              <X size={15} />
-            </button>
+    <form
+      onSubmit={sendReply}
+      className="recent-message-preview-pop recent-message-preview-pop--arrow recent-message-preview-pop--modern absolute right-14 z-30 w-80 rounded-2xl p-3 text-left shadow-[0_22px_55px_rgba(15,23,42,0.28)] backdrop-blur-xl"
+      aria-label="Quick reply"
+    >
+      <div className="space-y-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <span className="block truncate text-xs font-black text-primary-500 dark:text-blue-100">{conversation.title}</span>
+            <span className="mt-0.5 block line-clamp-2 text-xs font-semibold text-gray-600 dark:text-gray-300">{previewText}</span>
           </div>
+          <button type="button" onClick={onClose} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-white/70 dark:text-gray-300 dark:hover:bg-gray-900/70" aria-label="Close quick reply" title="Close">
+            <X size={15} />
+          </button>
+        </div>
 
+        <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}
             value={body}
@@ -2246,23 +2271,20 @@ function RecentMessageReplyPopover({
             placeholder="Reply..."
             rows={2}
             maxLength={1200}
-            className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-[16px] leading-5 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-gray-700 dark:bg-gray-900 sm:text-sm"
+            className="min-h-14 flex-1 resize-none rounded-xl border border-gray-300 bg-white/90 px-3 py-2 text-[16px] leading-5 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-gray-700 dark:bg-gray-900/90 sm:text-sm"
           />
-
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="submit"
-              disabled={isSending || !body.trim()}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white transition hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-55"
-              aria-label="Send reply"
-              title="Send"
-            >
-              <Send size={15} />
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={isSending || !body.trim()}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white transition hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-55"
+            aria-label="Send reply"
+            title="Send"
+          >
+            <Send size={16} />
+          </button>
         </div>
-      </form>
-    </aside>
+      </div>
+    </form>
   );
 }
 
@@ -9826,28 +9848,24 @@ function App() {
             <RecentConversationsDock
               conversations={recentConversations}
               isCollapsed={areRecentConversationsCollapsed}
+              currentUser={currentUser}
+              quickReplyConversationId={quickReplyConversation?.id || null}
               presenceByAccount={recentConversationPresenceByAccount}
               typingByConversation={recentConversationTypingById}
               onOpenConversation={openRecentConversation}
               onMarkRead={markRecentConversationRead}
               onReply={openRecentQuickReply}
+              onQuickReplyClose={() => setQuickReplyConversation(null)}
+              onQuickReplySent={() => window.dispatchEvent(new CustomEvent('shield:messages-updated'))}
               onCompose={openNewMessageComposer}
               onToggleCollapsed={() => setAreRecentConversationsCollapsed((collapsed) => !collapsed)}
+              onToast={showToast}
             />
           )}
           {shouldShowRecentConversations && isRecentMessageComposerOpen && currentUser && (
             <RecentMessageComposerPopup
               currentUser={currentUser}
               onClose={() => setIsRecentMessageComposerOpen(false)}
-              onSent={() => window.dispatchEvent(new CustomEvent('shield:messages-updated'))}
-              onToast={showToast}
-            />
-          )}
-          {shouldShowRecentConversations && quickReplyConversation && currentUser && (
-            <RecentMessageReplyPopover
-              currentUser={currentUser}
-              conversation={quickReplyConversation}
-              onClose={() => setQuickReplyConversation(null)}
               onSent={() => window.dispatchEvent(new CustomEvent('shield:messages-updated'))}
               onToast={showToast}
             />
