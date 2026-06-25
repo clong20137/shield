@@ -720,7 +720,7 @@ function LoginSplash({
               <h2 className="mb-2 text-3xl font-black text-primary-500 dark:text-blue-100">
                 {mode === 'register' ? 'Create login' : mode === 'forgot' ? 'Reset password' : mode === 'reset' ? 'Set new password' : 'Sign in'}
               </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
                 {mode === 'register'
                   ? inviteToken
                     ? 'Create your login from this secure invite.'
@@ -731,6 +731,27 @@ function LoginSplash({
                       ? `Choose a new password for your ${appName} login.`
                       : 'Use your email and password to continue.'}
               </p>
+              {mode === 'login' && !isShieldDesktopApp() && (
+                <div className="mt-4 rounded-lg border border-accent/20 bg-accent/5 p-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Recommended</p>
+                      <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                        Install the desktop app for faster access, offline startup, and native notifications.
+                      </p>
+                    </div>
+                    <a
+                      href={withAppBase('/downloads/Shield-Setup.exe')}
+                      download
+                      className="btn-secondary mt-2 shrink-0 justify-center whitespace-nowrap sm:mt-0"
+                      aria-label="Download desktop application"
+                    >
+                      <Download size={16} />
+                      <span>Download App</span>
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
 
             {error && <div className="error">{error}</div>}
