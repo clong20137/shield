@@ -9423,7 +9423,19 @@ function App() {
                 <Suspense fallback={<PageLoader label="Loading page..." />}>
                   <RouteTransition>
                     <Routes>
-                      <Route path="/" element={<DashboardPage currentUser={currentUser} isAppBackgrounded={isAppBackgrounded} />} />
+                      <Route
+                        path="/"
+                        element={(
+                          <DashboardPage
+                            currentUser={currentUser}
+                            isAppBackgrounded={isAppBackgrounded}
+                            isGlassTheme={isGlassTheme}
+                            appScale={normalizeAppScale(currentUser?.appScale)}
+                            onGlassThemeChange={setIsGlassTheme}
+                            onAppScaleChange={handleAppScaleChange}
+                          />
+                        )}
+                      />
                       {currentUser && <Route path="/updates/:postId" element={<DashboardPostPage currentUser={currentUser} onToast={showToast} />} />}
                       {currentUser && (
                         <Route

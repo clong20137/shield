@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, Link2, List, ListOrdered, LucideIcon, MapPinned, Megaphone, MessageSquare, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, RefreshCw, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, Link2, List, ListOrdered, LucideIcon, MapPinned, Megaphone, MessageSquare, Minus, Moon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, Sun, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService, AuthAccount, calendarService, CalendarEntry, DashboardReaction, dashboardPostService, DashboardPost, dashboardSummaryService, DashboardSummary, districtFeedService, DistrictFeedPost, DistrictFeedPostCategory, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
@@ -38,6 +38,13 @@ const dashboardReactionOptions: Array<{ value: DashboardReaction; label: string;
 
 const MEDIA_PICKER_PAGE_SIZE = 18;
 const DASHBOARD_POST_MEDIA_FOLDER = 'dashboard-posts';
+type AppScale = AuthAccount['appScale'];
+const APP_SCALE_SEQUENCE: AppScale[] = ['compact', 'comfortable', 'large'];
+const APP_SCALE_LABELS: Record<AppScale, string> = {
+  compact: 'Compact',
+  comfortable: 'Comfortable',
+  large: 'Large',
+};
 
 const getPostCategoryBannerClass = (category: DashboardPost['category']) => {
   if (category === 'Alert') {
@@ -2914,7 +2921,21 @@ function DistrictFeedWidget({
   );
 }
 
-const DashboardPage: React.FC<{ currentUser: AuthAccount | null; isAppBackgrounded?: boolean }> = ({ currentUser, isAppBackgrounded = false }) => {
+const DashboardPage: React.FC<{
+  currentUser: AuthAccount | null;
+  isAppBackgrounded?: boolean;
+  isGlassTheme: boolean;
+  appScale: AppScale;
+  onGlassThemeChange: (isGlassTheme: boolean) => void;
+  onAppScaleChange: (appScale: AppScale) => void;
+}> = ({
+  currentUser,
+  isAppBackgrounded = false,
+  isGlassTheme,
+  appScale,
+  onGlassThemeChange,
+  onAppScaleChange,
+}) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -3143,11 +3164,42 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null; isAppBackground
     </div>
   ), document.body) : null;
 
+  const currentScaleIndex = APP_SCALE_SEQUENCE.indexOf(appScale);
+  const canDecreaseAppScale = currentScaleIndex > 0;
+  const canIncreaseAppScale = currentScaleIndex < APP_SCALE_SEQUENCE.length - 1;
+  const previousScaleLabel = APP_SCALE_LABELS[APP_SCALE_SEQUENCE[Math.max(0, currentScaleIndex - 1)]];
+
   const dashboardContextActions = [
-    { label: 'Refresh Dashboard', icon: RefreshCw, onSelect: () => void loadDashboard(false) },
+    { label: 'Search Users', icon: Search, onSelect: () => navigate('/search') },
+    {
+      label: `Glass Mode (${isGlassTheme ? 'On' : 'Off'})`,
+      icon: isGlassTheme ? Sun : Moon,
+      onSelect: () => onGlassThemeChange(!isGlassTheme),
+    },
+    {
+      label: `App Scale - ${previousScaleLabel}`,
+      icon: Minus,
+      disabled: !canDecreaseAppScale,
+      onSelect: () => {
+        const nextScale = APP_SCALE_SEQUENCE[currentScaleIndex - 1];
+        if (nextScale) {
+          onAppScaleChange(nextScale);
+        }
+      },
+    },
+    {
+      label: 'App Scale +',
+      icon: Plus,
+      disabled: !canIncreaseAppScale,
+      onSelect: () => {
+        const nextScale = APP_SCALE_SEQUENCE[currentScaleIndex + 1];
+        if (nextScale) {
+          onAppScaleChange(nextScale);
+        }
+      },
+    },
     { label: 'Open Calendar', icon: CalendarDays, onSelect: () => navigate('/calendar') },
     { label: 'Open Messages', icon: MessageSquare, onSelect: () => navigate('/messages') },
-    { label: 'Search Users', icon: Search, onSelect: () => navigate('/search') },
   ];
 
   const openPageContextMenu = (event: React.MouseEvent<HTMLElement>) => {
