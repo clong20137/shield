@@ -439,6 +439,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       return missingMessages.length > 0 ? [...messages, ...missingMessages] : messages;
     });
   };
+  const refreshMessagesQuietly = async () => {
+    try {
+      await loadMessages(false);
+    } catch (error) {
+      console.error('Failed to refresh messages after send:', error);
+    }
+  };
 
   useEffect(() => {
     if (!targetRecipient || targetRecipient.id === currentUser.id) {
@@ -1406,9 +1413,23 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     }
 
     setIsSending(true);
+    const draftBody = replyBody;
+    const draftAttachments = replyAttachments;
+    const sentAfter = Date.now() - 5000;
+    const previousThreadId = selectedThread.id;
+    const previousThreadType = selectedThread.threadType;
+    const directRecipientId = selectedDirectRecipientId;
+    let didClearDraft = false;
+    let submittedMessageBody = draftBody;
+
     try {
       const uploadedAttachments = await uploadReplyAttachments();
-      const messageBody = withAttachmentSummary(replyBody, uploadedAttachments);
+      const messageBody = withAttachmentSummary(draftBody, uploadedAttachments);
+      submittedMessageBody = messageBody;
+      setReplyBody('');
+      setReplyAttachments([]);
+      didClearDraft = true;
+
       if (selectedThread.threadType !== 'direct') {
         const recipientIds = selectedThread.participantIds.filter((id) => id !== currentUser.id);
         const response = await messageService.sendGroup({
@@ -1425,22 +1446,20 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       } else {
         const response = await messageService.send({
           senderAccountId: currentUser.id,
-          recipientUserId: selectedDirectRecipientId,
+          recipientUserId: directRecipientId,
           subject: selectedThread.subject,
           body: messageBody,
         });
         mergeSentMessages([response.data]);
-        setSelectedThreadId(selectedDirectRecipientId);
+        setSelectedThreadId(directRecipientId);
       }
-      setReplyBody('');
-      setReplyAttachments([]);
       if (typingStopTimerRef.current) {
         window.clearTimeout(typingStopTimerRef.current);
       }
       if (selectedThread.threadType === 'direct') {
         messageService.sendTyping(
           currentUser.id,
-          selectedDirectRecipientId,
+          directRecipientId,
           currentUser.displayName || currentUser.email || 'Someone',
           false,
         ).catch((err) => console.error('Failed to clear typing status:', err));
@@ -1448,10 +1467,51 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       setDraftRecipient(null);
       setDraftGroupRecipients([]);
       setDraftThreadTitle('');
-      await loadMessages(false);
+      void refreshMessagesQuietly();
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
     } catch (err) {
       console.error(err);
+      try {
+        const sentResponse = await messageService.getSent(currentUser.id);
+        setSentMessages(sentResponse.data);
+        const confirmedSent = sentResponse.data.some((message) => {
+          const createdAt = new Date(message.createdAt).getTime();
+          const recentEnough = Number.isNaN(createdAt) || createdAt >= sentAfter;
+          const bodyMatches = message.body === submittedMessageBody;
+
+          if (!recentEnough || !bodyMatches) {
+            return false;
+          }
+
+          if (previousThreadType === 'direct') {
+            return message.recipientUserId === directRecipientId;
+          }
+
+          return message.threadId === previousThreadId || message.threadId === selectedThread.id;
+        });
+
+        if (confirmedSent) {
+          if (!didClearDraft) {
+            setReplyBody('');
+            setReplyAttachments([]);
+          }
+          setDraftRecipient(null);
+          setDraftGroupRecipients([]);
+          setDraftThreadTitle('');
+          if (previousThreadType === 'direct') {
+            setSelectedThreadId(directRecipientId);
+          }
+          window.dispatchEvent(new CustomEvent('shield:messages-updated'));
+          return;
+        }
+      } catch (refreshError) {
+        console.error('Failed to verify sent message after send error:', refreshError);
+      }
+
+      if (didClearDraft) {
+        setReplyBody(draftBody);
+        setReplyAttachments(draftAttachments);
+      }
       onToast('error', getApiErrorMessage(err, 'Failed to send message.'));
     } finally {
       setIsSending(false);
