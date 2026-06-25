@@ -1763,41 +1763,36 @@ function RecentMessageComposerPopup({
   };
 
   return (
-    <aside className="fixed bottom-5 right-[5.4rem] z-50 hidden w-[min(24rem,calc(100vw-2rem))] md:block" aria-label="Quick new message">
-      <form onSubmit={sendQuickMessage} className="quick-launch-context-menu overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl ring-1 ring-black/5 dark:border-gray-800 dark:bg-gray-950 dark:ring-white/10">
-        <div className="border-b border-gray-200 bg-primary-500 px-4 py-3 text-white dark:border-gray-800">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-black uppercase tracking-[0.14em] text-white/70">New Message</p>
-              <p className="truncate text-lg font-black">Quick compose</p>
-            </div>
-            <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20" aria-label="Close quick message" title="Close">
-              <X size={18} />
+    <aside className="fixed bottom-5 right-[5.4rem] z-50 hidden w-[min(20rem,calc(100vw-2rem))] md:block" aria-label="Quick new message">
+      <form onSubmit={sendQuickMessage} className="quick-launch-context-menu overflow-hidden rounded-lg border border-gray-200 bg-white p-2.5 shadow-2xl ring-1 ring-black/5 dark:border-gray-800 dark:bg-gray-950 dark:ring-white/10">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate text-xs font-black uppercase text-primary-500 dark:text-blue-100">New Message</span>
+            <button type="button" onClick={onClose} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-900" aria-label="Close quick message" title="Close">
+              <X size={15} />
             </button>
           </div>
-        </div>
 
-        <div className="space-y-3 p-4">
           {selectedRecipient ? (
-            <div className="flex items-center gap-3 rounded-xl border border-accent/25 bg-accent/10 p-2.5">
+            <div className="flex items-center gap-2 rounded-lg border border-accent/25 bg-accent/10 p-2">
               {selectedRecipient.profilePictureUrl ? (
                 <img
                   src={getAssetThumbnailUrl(selectedRecipient.profilePictureUrl, 96)}
                   alt=""
                   onError={(event) => handleAssetThumbnailError(event, selectedRecipient.profilePictureUrl)}
-                  className="h-11 w-11 rounded-full object-cover"
+                  className="h-8 w-8 rounded-full object-cover"
                 />
               ) : (
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-sm font-black text-accent dark:bg-gray-950">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-[11px] font-black text-accent dark:bg-gray-950">
                   {getInitials(`${selectedRecipient.firstName || ''} ${selectedRecipient.lastName || ''}`, selectedRecipient.email)}
                 </span>
               )}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-black text-gray-900 dark:text-gray-100">{`${selectedRecipient.firstName || ''} ${selectedRecipient.lastName || ''}`.trim() || selectedRecipient.email}</p>
-                <p className="truncate text-xs font-semibold text-gray-500 dark:text-gray-400">{selectedRecipient.email || selectedRecipient.peNumber}</p>
+                <p className="truncate text-xs font-black text-gray-900 dark:text-gray-100">{`${selectedRecipient.firstName || ''} ${selectedRecipient.lastName || ''}`.trim() || selectedRecipient.email}</p>
+                <p className="truncate text-[11px] font-semibold text-gray-500 dark:text-gray-400">{selectedRecipient.email || selectedRecipient.peNumber}</p>
               </div>
-              <button type="button" onClick={() => setSelectedRecipient(null)} className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-white/70 dark:hover:bg-gray-900" aria-label="Change recipient" title="Change">
-                <X size={15} />
+              <button type="button" onClick={() => setSelectedRecipient(null)} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-white/70 dark:hover:bg-gray-900" aria-label="Change recipient" title="Change">
+                <X size={14} />
               </button>
             </div>
           ) : (
@@ -1808,15 +1803,15 @@ function RecentMessageComposerPopup({
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search recipient"
-                  className="global-search-input w-full rounded-xl border border-gray-300 bg-white py-3 text-sm dark:border-gray-700 dark:bg-gray-900"
+                  className="global-search-input w-full rounded-lg border border-gray-300 bg-white py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
                   autoFocus
                 />
               </div>
-              <div className="max-h-60 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-800">
+              <div className="max-h-44 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-800">
                 {isSearching ? (
-                  <div className="px-3 py-4 text-sm font-semibold text-gray-500 dark:text-gray-400">Searching...</div>
+                  <div className="px-3 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400">Searching...</div>
                 ) : results.length === 0 ? (
-                  <div className="px-3 py-4 text-sm font-semibold text-gray-500 dark:text-gray-400">{query.trim().length < 2 ? 'Type at least 2 characters.' : 'No people found.'}</div>
+                  <div className="px-3 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400">{query.trim().length < 2 ? 'Type at least 2 characters.' : 'No people found.'}</div>
                 ) : (
                   results.map((user) => (
                     <button
@@ -1827,16 +1822,16 @@ function RecentMessageComposerPopup({
                         setQuery('');
                         setResults([]);
                       }}
-                      className="flex w-full items-center gap-3 border-b border-gray-100 px-3 py-2.5 text-left last:border-b-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900"
+                      className="flex w-full items-center gap-2 border-b border-gray-100 px-2.5 py-2 text-left last:border-b-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900"
                     >
                       {user.profilePictureUrl ? (
-                        <img src={getAssetThumbnailUrl(user.profilePictureUrl, 96)} alt="" onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)} className="h-10 w-10 rounded-full object-cover" />
+                        <img src={getAssetThumbnailUrl(user.profilePictureUrl, 96)} alt="" onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)} className="h-8 w-8 rounded-full object-cover" />
                       ) : (
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 text-xs font-black text-accent">{getInitials(`${user.firstName || ''} ${user.lastName || ''}`, user.email)}</span>
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/10 text-[11px] font-black text-accent">{getInitials(`${user.firstName || ''} ${user.lastName || ''}`, user.email)}</span>
                       )}
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-black text-gray-800 dark:text-gray-100">{`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email}</span>
-                        <span className="block truncate text-xs font-semibold text-gray-500">{user.email || user.peNumber}</span>
+                        <span className="block truncate text-xs font-black text-gray-800 dark:text-gray-100">{`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email}</span>
+                        <span className="block truncate text-[11px] font-semibold text-gray-500">{user.email || user.peNumber}</span>
                       </span>
                       {user.receivesMessages === false && <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-black text-danger dark:bg-red-950">OFF</span>}
                     </button>
@@ -1850,17 +1845,21 @@ function RecentMessageComposerPopup({
             value={body}
             onChange={(event) => setBody(event.target.value)}
             placeholder="Message"
-            rows={4}
-            className="w-full resize-none rounded-xl border border-gray-300 bg-white px-3 py-3 text-[16px] leading-6 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-gray-700 dark:bg-gray-900 sm:text-sm"
+            rows={2}
+            className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-[16px] leading-5 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-gray-700 dark:bg-gray-900 sm:text-sm"
           />
-          <button
-            type="submit"
-            disabled={isSending || !selectedRecipient || !body.trim()}
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 text-sm font-black text-white transition hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-55"
-          >
-            {isSending ? 'Sending...' : 'Send Message'}
-            <Send size={16} />
-          </button>
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate text-[11px] font-semibold text-gray-400">{isSending ? 'Sending...' : selectedRecipient ? selectedRecipient.email || 'Ready' : 'Choose recipient'}</span>
+            <button
+              type="submit"
+              disabled={isSending || !selectedRecipient || !body.trim()}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white transition hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-55"
+              aria-label="Send message"
+              title="Send"
+            >
+              <Send size={15} />
+            </button>
+          </div>
         </div>
       </form>
     </aside>
