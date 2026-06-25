@@ -47,6 +47,7 @@ const DEFAULT_BRAND_LOGO = '/shield-splash-logo.png';
 const MAX_SETUP_LOGO_SIZE_BYTES = 240 * 1024;
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/iu;
 const LOGIN_TRANSITION_MS = 560;
+const DESKTOP_UNREAD_FALLBACK_POLL_MS = 12 * 1000;
 type AppTheme = 'light' | 'dark';
 
 function withAppBase(path: string): string {
@@ -6809,6 +6810,9 @@ function App() {
 
     loadUnreadCount();
     window.addEventListener('shield:messages-updated', queueUnreadCountLoad);
+    const desktopUnreadFallbackInterval = isShieldDesktopApp()
+      ? window.setInterval(() => void loadUnreadCount(), DESKTOP_UNREAD_FALLBACK_POLL_MS)
+      : null;
 
     const eventsUrl = getMessageEventsUrl();
     const eventSource = new EventSource(eventsUrl, { withCredentials: true });
@@ -6827,6 +6831,9 @@ function App() {
       if (messageUnreadRefreshTimerRef.current) {
         window.clearTimeout(messageUnreadRefreshTimerRef.current);
         messageUnreadRefreshTimerRef.current = null;
+      }
+      if (desktopUnreadFallbackInterval) {
+        window.clearInterval(desktopUnreadFallbackInterval);
       }
       eventSource?.close();
     };
