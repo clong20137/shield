@@ -1798,7 +1798,11 @@ function PinnedProfilesWidget({
   };
 
   return (
-    <section data-onboarding-target="pinned-profiles" className="mb-8 rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5">
+    <section
+      data-onboarding-target="pinned-profiles"
+      data-no-global-context-menu="true"
+      className="mb-8 rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-5"
+    >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Pinned Profiles</p>

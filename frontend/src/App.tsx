@@ -1,6 +1,6 @@
 import { CSSProperties, FormEvent, MouseEvent as ReactMouseEvent, ReactNode, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Command, Delete, Download, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, RefreshCw, Save, Search, Send, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, Users, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Command, Delete, Download, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Minus, Moon, Pencil, Plus, RefreshCw, Save, Search, Send, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, Users, X } from 'lucide-react';
 import { BrowserRouter as Router, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
@@ -35,6 +35,9 @@ const QUICK_LAUNCH_PICKER_CLOSE_MS = 500;
 const QUICK_LAUNCH_CONTEXT_MENU_WIDTH = 256;
 const QUICK_LAUNCH_CONTEXT_MENU_HEIGHT = 300;
 const QUICK_LAUNCH_CONTEXT_MENU_GUTTER = 12;
+const GLOBAL_CONTEXT_MENU_WIDTH = 220;
+const GLOBAL_CONTEXT_MENU_HEIGHT = 120;
+const GLOBAL_CONTEXT_MENU_GUTTER = 12;
 const AWAY_PRESENCE_IDLE_MS = 5 * 60 * 1000;
 const MODAL_CLOSE_MS = 220;
 const PASSWORD_REQUIREMENTS_MESSAGE = 'Password must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.';
@@ -84,6 +87,12 @@ function isSecurePassword(password: string): boolean {
 type ClosingModal = 'messages' | 'calendar' | 'calculator' | 'profile' | 'reportBug' | 'bugTracker';
 type FloatingAppId = 'messages' | 'calendar' | 'calculator' | 'profile';
 type AppScale = AuthAccount['appScale'];
+const APP_SCALE_SEQUENCE: AppScale[] = ['compact', 'comfortable', 'large'];
+const APP_SCALE_LABELS: Record<AppScale, string> = {
+  compact: 'Compact',
+  comfortable: 'Comfortable',
+  large: 'Large',
+};
 
 interface MessagePreferences {
   receiveMessages: boolean;
@@ -1640,10 +1649,6 @@ function RecentConversationsDock({
   isCollapsed,
   presenceByAccount,
   typingByConversation,
-  isGlassTheme,
-  appScale,
-  onGlassThemeChange,
-  onAppScaleChange,
   onOpenConversation,
   onMarkRead,
   onCompose,
@@ -1653,10 +1658,6 @@ function RecentConversationsDock({
   isCollapsed: boolean;
   presenceByAccount: Record<string, RecentPresenceState>;
   typingByConversation: Record<string, RecentTypingState>;
-  isGlassTheme: boolean;
-  appScale: AppScale;
-  onGlassThemeChange: (isGlassTheme: boolean) => void;
-  onAppScaleChange: (appScale: AppScale) => void;
   onOpenConversation: (conversation: RecentConversation) => void;
   onMarkRead: (conversation: RecentConversation) => void;
   onCompose: () => void;
@@ -1695,6 +1696,7 @@ function RecentConversationsDock({
       aria-label={isCollapsed ? 'Recent conversations collapsed' : 'Recent conversations'}
     >
       <div
+        data-no-global-context-menu="true"
         className={`pointer-events-auto theme-polished-surface flex flex-col items-center overflow-visible rounded-full border border-white/25 bg-white/70 shadow-2xl shadow-black/10 backdrop-blur-xl transition-all duration-300 ease-out dark:border-white/10 dark:bg-slate-900/70 ${
           isCollapsed ? 'max-h-[3.25rem] gap-0 p-1.5' : 'max-h-[28rem] gap-2 p-2'
         }`}
@@ -1889,34 +1891,6 @@ function RecentConversationsDock({
           >
             {isCollapsed ? 'Expand dock' : 'Collapse dock'}
           </button>
-          <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
-          <button
-            type="button"
-            className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
-            onClick={() => {
-              onGlassThemeChange(!isGlassTheme);
-              setContextMenu(null);
-            }}
-          >
-            {isGlassTheme ? 'Disable glass mode' : 'Enable glass mode'}
-          </button>
-          {appScaleOptions.map((option) => {
-            const isSelected = appScale === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                className={`quick-launch-context-menu-item text-gray-700 dark:text-gray-200 ${isSelected ? 'font-bold text-accent' : ''}`}
-                onClick={() => {
-                  onAppScaleChange(option.value);
-                  setContextMenu(null);
-                }}
-                disabled={isSelected}
-              >
-                {option.label}{isSelected ? ' (current)' : ''}
-              </button>
-            );
-          })}
         </div>
       )}
     </aside>
@@ -3152,10 +3126,6 @@ function QuickLaunchTray({
   onQuickLaunchHiddenChange,
   onQuickLaunchPlacementChange,
   onQuickLaunchSlotCountChange,
-  isGlassTheme,
-  appScale,
-  onGlassThemeChange,
-  onAppScaleChange,
 }: {
   isAdministrator: boolean;
   permissions: string[];
@@ -3174,10 +3144,6 @@ function QuickLaunchTray({
   onQuickLaunchHiddenChange: (hideQuickLaunch: boolean) => void;
   onQuickLaunchPlacementChange: (placement: QuickLaunchPlacement) => void;
   onQuickLaunchSlotCountChange: (slotCount: number) => void;
-  isGlassTheme: boolean;
-  appScale: AppScale;
-  onGlassThemeChange: (isGlassTheme: boolean) => void;
-  onAppScaleChange: (appScale: AppScale) => void;
 }) {
   const normalizedSlotCount = normalizeQuickLaunchSlotCount(slotCount);
   const isSidebarPlacement = placement === 'sidebar';
@@ -3678,7 +3644,9 @@ function QuickLaunchTray({
   }, [activeQuickLaunchTargets, isSidebarCollapsed]);
 
   return (
-    <section className={isSidebarPlacement
+    <section
+      data-no-global-context-menu="true"
+      className={isSidebarPlacement
       ? `quick-launch-sidebar-placement pointer-events-none relative hidden select-none md:block ${isSidebarCollapsed ? 'quick-launch-sidebar-collapsed' : ''}`
       : `pointer-events-none fixed bottom-3 left-3 right-3 z-30 hidden select-none transition-all duration-200 sm:bottom-5 sm:right-6 md:block ${isSidebarCollapsed ? 'sm:left-24' : 'sm:left-[19.5rem]'}`
     }>
@@ -3932,28 +3900,6 @@ function QuickLaunchTray({
             <X size={15} /> Remove All
           </button>
           <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
-          <button
-            type="button"
-            onClick={() => onGlassThemeChange(!isGlassTheme)}
-            className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
-          >
-            {isGlassTheme ? 'Disable glass mode' : 'Enable glass mode'}
-          </button>
-          {appScaleOptions.map((option) => {
-            const isSelected = appScale === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => onAppScaleChange(option.value)}
-                className={`quick-launch-context-menu-item text-gray-700 dark:text-gray-200 ${isSelected ? 'font-bold text-accent' : ''}`}
-                disabled={isSelected}
-              >
-                <span className="truncate">{option.label}</span>
-                {isSelected && <span className="ml-auto text-xs font-black text-accent">(current)</span>}
-              </button>
-            );
-          })}
         </div>
       )}
 
@@ -6123,6 +6069,7 @@ function App() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [theme, setTheme] = useState<AppTheme>('light');
   const [isGlassTheme, setIsGlassTheme] = useState(false);
+  const [globalContextMenu, setGlobalContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [notifications, setNotifications] = useState<ToastMessage[]>([]);
   const [desktopPreferences, setDesktopPreferences] = useState<ShieldDesktopPreferences | null>(null);
   const [desktopUpdateStatus, setDesktopUpdateStatus] = useState<ShieldDesktopUpdateStatus | null>(null);
@@ -8812,14 +8759,118 @@ function App() {
     return () => document.removeEventListener('keydown', handleEscape);
   }, [activeFloatingApp, isAccountMenuOpen, isBugTrackerOpen, isCalculatorOpen, isCalendarModalOpen, isCommandPaletteOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isProfileModalOpen, isReportBugOpen]);
 
+  const shouldShowGlobalContextMenu = useCallback((target: EventTarget | null): boolean => {
+    if (!(target instanceof Element)) {
+      return false;
+    }
+
+    if (target.closest('[data-no-global-context-menu="true"]')) {
+      return false;
+    }
+
+    if (target.closest('.quick-launch-context-menu, .quick-launch-picker, .recent-message-preview-pop, .recent-message-preview, .context-menu, .floating-window, .modal, .dialog')) {
+      return false;
+    }
+
+    if (target.closest(
+      'button, a, input, textarea, select, option, label, summary, details, [role=\"button\"], [role=\"menuitem\"], [role=\"link\"], [role=\"textbox\"], [contenteditable=\"true\"], img',
+    )) {
+      return false;
+    }
+
+    if (target.closest('.shield-left-panel, [data-onboarding-target="pinned-profiles"]')) {
+      return false;
+    }
+
+    return true;
+  }, []);
+
   useEffect(() => {
-    const blockContextMenu = (event: MouseEvent) => {
+    const openGlobalContextMenu = (event: MouseEvent) => {
+      if (!isAuthenticated || !currentUser || isAppLocked) {
+        return;
+      }
+
+      const composedPath = typeof event.composedPath === 'function' ? event.composedPath() : [];
+      const contextTarget = event.target instanceof Element
+        ? event.target
+        : (composedPath.find((node): node is Element => node instanceof Element) ?? null);
+
+      if (event.ctrlKey || !shouldShowGlobalContextMenu(contextTarget)) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const menuWidth = GLOBAL_CONTEXT_MENU_WIDTH;
+      const menuHeight = GLOBAL_CONTEXT_MENU_HEIGHT;
+
+      setGlobalContextMenu({
+        x: Math.min(
+          window.innerWidth - menuWidth - GLOBAL_CONTEXT_MENU_GUTTER,
+          Math.max(GLOBAL_CONTEXT_MENU_GUTTER, event.clientX),
+        ),
+        y: Math.min(
+          window.innerHeight - menuHeight - GLOBAL_CONTEXT_MENU_GUTTER,
+          Math.max(GLOBAL_CONTEXT_MENU_GUTTER, event.clientY),
+        ),
+      });
+    };
+
+    document.addEventListener('contextmenu', openGlobalContextMenu);
+    return () => document.removeEventListener('contextmenu', openGlobalContextMenu);
+  }, [currentUser, isAuthenticated, isAppLocked, shouldShowGlobalContextMenu]);
+
+  useEffect(() => {
+    if (!globalContextMenu) {
+      return undefined;
+    }
+
+    const closeContextMenu = () => {
+      setGlobalContextMenu(null);
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      closeContextMenu();
       event.preventDefault();
     };
 
-    document.addEventListener('contextmenu', blockContextMenu);
-    return () => document.removeEventListener('contextmenu', blockContextMenu);
-  }, []);
+    document.addEventListener('click', closeContextMenu);
+    document.addEventListener('scroll', closeContextMenu, true);
+    window.addEventListener('resize', closeContextMenu);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('click', closeContextMenu);
+      document.removeEventListener('scroll', closeContextMenu, true);
+      window.removeEventListener('resize', closeContextMenu);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [globalContextMenu]);
+
+  const currentAppScale = normalizeAppScale(currentUser?.appScale);
+  const canDecreaseAppScale = currentAppScale !== 'compact';
+  const canIncreaseAppScale = currentAppScale !== 'large';
+
+  const decreaseAppScale = () => {
+    const currentIndex = APP_SCALE_SEQUENCE.indexOf(currentAppScale);
+    const nextScale = APP_SCALE_SEQUENCE[currentIndex - 1];
+    if (nextScale) {
+      void handleAppScaleChange(nextScale);
+    }
+  };
+
+  const increaseAppScale = () => {
+    const currentIndex = APP_SCALE_SEQUENCE.indexOf(currentAppScale);
+    const nextScale = APP_SCALE_SEQUENCE[currentIndex + 1];
+    if (nextScale) {
+      void handleAppScaleChange(nextScale);
+    }
+  };
 
   const loadingDetail = (() => {
     if (isDesktopStartupUpdateBlocking) {
@@ -8950,6 +9001,51 @@ function App() {
         <LoginSplash onLogin={handleLogin} onToast={showToast} appName={appName} siteName={siteName} brandLogoDataUrl={brandLogoDataUrl} isExiting={isLoginTransitioning} />
       ) : (
         <div className="animate-app-enter flex h-[100dvh] overflow-hidden bg-gray-50 dark:bg-gray-950">
+          {globalContextMenu && (
+            <div
+              className="fixed z-[999] w-56 overflow-hidden rounded-xl border border-white/25 bg-white/95 p-1 shadow-[0_20px_55px_rgba(15,23,42,0.28)] ring-1 ring-black/5 backdrop-blur dark:border-gray-700 dark:bg-gray-900 dark:ring-white/10"
+              style={{ left: globalContextMenu.x, top: globalContextMenu.y }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setIsGlassTheme((value) => !value)}
+                className="group flex w-full items-center justify-between rounded-lg px-2.5 py-2.5 text-sm transition hover:bg-black/5 dark:hover:bg-white/10"
+              >
+                <span className="font-semibold text-gray-700 dark:text-gray-100">Glass Mode</span>
+                <span className="rounded-full border border-gray-300 px-2 py-0.5 text-[11px] font-black uppercase tracking-[0.08em] text-gray-500 dark:border-gray-600 dark:text-gray-300">
+                  {isGlassTheme ? 'On' : 'Off'}
+                </span>
+              </button>
+              <div className="mx-2 my-1 border-t border-gray-200 dark:border-gray-700" />
+              <div className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5">
+                <span className="font-semibold text-sm text-gray-700 dark:text-gray-100">App Scale</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={decreaseAppScale}
+                    disabled={!canDecreaseAppScale}
+                    className={`rounded-md border border-gray-300 p-1 transition ${canDecreaseAppScale ? 'hover:bg-black/5 dark:border-gray-600 dark:hover:bg-white/10' : 'cursor-not-allowed opacity-40'}`}
+                    aria-label="Decrease app scale"
+                  >
+                    <Minus size={12} />
+                  </button>
+                  <span className="w-20 text-center text-xs font-black text-primary-500 dark:text-blue-100">
+                    {APP_SCALE_LABELS[currentAppScale]}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={increaseAppScale}
+                    disabled={!canIncreaseAppScale}
+                    className={`rounded-md border border-gray-300 p-1 transition ${canIncreaseAppScale ? 'hover:bg-black/5 dark:border-gray-600 dark:hover:bg-white/10' : 'cursor-not-allowed opacity-40'}`}
+                    aria-label="Increase app scale"
+                  >
+                    <span className="inline-block h-[12px] w-[12px] select-none text-sm leading-[12px] font-black">+</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           <aside className={`shield-left-panel relative z-50 hidden h-[100dvh] shrink-0 overflow-visible bg-primary-500 text-white shadow-xl transition-all duration-200 md:block ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
             <button
               type="button"
@@ -9069,10 +9165,6 @@ function App() {
                     onOpenCalendar={toggleCalendarModal}
                     onOpenCalculator={toggleCalculator}
                     onOpenCreateUser={toggleCreateUserModal}
-                    isGlassTheme={isGlassTheme}
-                    appScale={normalizeAppScale(currentUser?.appScale)}
-                    onGlassThemeChange={setIsGlassTheme}
-                    onAppScaleChange={handleAppScaleChange}
                     onQuickLaunchHiddenChange={(hideQuickLaunch) =>
                       setMessagePreferences((preferences) => ({
                         ...preferences,
@@ -9463,10 +9555,6 @@ function App() {
                   onOpenCalendar={toggleCalendarModal}
                   onOpenCalculator={toggleCalculator}
                   onOpenCreateUser={toggleCreateUserModal}
-                  isGlassTheme={isGlassTheme}
-                  appScale={normalizeAppScale(currentUser?.appScale)}
-                  onGlassThemeChange={setIsGlassTheme}
-                  onAppScaleChange={handleAppScaleChange}
                   onQuickLaunchHiddenChange={(hideQuickLaunch) =>
                     setMessagePreferences((preferences) => ({
                       ...preferences,
@@ -9527,10 +9615,6 @@ function App() {
               isCollapsed={areRecentConversationsCollapsed}
               presenceByAccount={recentConversationPresenceByAccount}
               typingByConversation={recentConversationTypingById}
-              isGlassTheme={isGlassTheme}
-              appScale={normalizeAppScale(currentUser?.appScale)}
-              onGlassThemeChange={setIsGlassTheme}
-              onAppScaleChange={handleAppScaleChange}
               onOpenConversation={openRecentConversation}
               onMarkRead={markRecentConversationRead}
               onCompose={openNewMessageComposer}
