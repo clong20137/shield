@@ -837,16 +837,6 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
               <div className="block">
                 <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
                   <span className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Post</span>
-                  <button
-                    type="button"
-                    onClick={() => setIsPreviewMode((isPreview) => !isPreview)}
-                    className="btn-secondary"
-                    aria-label={isPreviewMode ? 'Edit story' : 'Preview story'}
-                    title={isPreviewMode ? 'Edit Story' : 'Preview Story'}
-                  >
-                    {isPreviewMode ? <Edit3 size={16} /> : <Eye size={16} />}
-                    <span>{isPreviewMode ? 'Edit' : 'Preview'}</span>
-                  </button>
                 </div>
                 {isPreviewMode ? (
                   <article className="overflow-hidden rounded border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
@@ -899,6 +889,15 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
                 >
                   <X size={16} />
                   Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewMode((isPreview) => !isPreview)}
+                  className="btn-secondary"
+                  aria-label={isPreviewMode ? 'Edit story' : 'Preview story'}
+                  title={isPreviewMode ? 'Edit Story' : 'Preview Story'}
+                >
+                  {isPreviewMode ? <Edit3 size={16} /> : <Eye size={16} />}
                 </button>
                 <button type="submit" className="btn-primary" disabled={isSavingPost} aria-label="Publish story" title={isSavingPost ? 'Publishing' : 'Publish'}>
                   {isSavingPost ? (

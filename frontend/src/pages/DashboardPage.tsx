@@ -317,47 +317,48 @@ export function RichPostEditor({
 
   return (
     <div>
-      <div className="mb-2 flex flex-wrap items-center gap-2 rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-950">
-        <button
-          type="button"
-          onMouseDown={preserveEditorFocus}
-          onClick={() => applyBlockStyle('p')}
-          className="btn-secondary"
-          aria-label="Apply paragraph"
-          title="Paragraph"
-        >
-          <Pilcrow size={16} />
-        </button>
-        <div className="relative">
+      <div className="relative mb-2">
+        <div className="flex flex-nowrap items-center gap-1.5 rounded border border-gray-200 bg-gray-50 p-1.5 dark:border-gray-800 dark:bg-gray-950 [&>button]:shrink-0 [&>div]:shrink-0">
           <button
             type="button"
             onMouseDown={preserveEditorFocus}
-            onClick={() => setIsHeadingMenuOpen((isOpen) => !isOpen)}
+            onClick={() => applyBlockStyle('p')}
             className="btn-secondary"
-            aria-label="Choose heading style"
-            title="Heading"
+            aria-label="Apply paragraph"
+            title="Paragraph"
           >
-            <Heading size={16} />
-            <ChevronDown size={14} />
+            <Pilcrow size={16} />
           </button>
-          {isHeadingMenuOpen && (
-            <div className="absolute left-0 top-11 z-30 grid w-28 gap-1 rounded border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-800 dark:bg-gray-950">
-              {headingStyleOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onMouseDown={preserveEditorFocus}
-                  onClick={() => applyBlockStyle(option.value)}
-                  className="rounded px-3 py-2 text-left text-sm font-bold text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
-                  aria-label={`Apply heading ${option.label}`}
-                  title={option.label}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+          <div className="relative">
+            <button
+              type="button"
+              onMouseDown={preserveEditorFocus}
+              onClick={() => setIsHeadingMenuOpen((isOpen) => !isOpen)}
+              className="btn-secondary"
+              aria-label="Choose heading style"
+              title="Heading"
+            >
+              <Heading size={16} />
+              <ChevronDown size={14} />
+            </button>
+            {isHeadingMenuOpen && (
+              <div className="absolute left-0 top-11 z-30 grid w-28 gap-1 rounded border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-800 dark:bg-gray-950">
+                {headingStyleOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onMouseDown={preserveEditorFocus}
+                    onClick={() => applyBlockStyle(option.value)}
+                    className="rounded px-3 py-2 text-left text-sm font-bold text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+                    aria-label={`Apply heading ${option.label}`}
+                    title={option.label}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         <button type="button" onMouseDown={preserveEditorFocus} onClick={() => runCommand('bold')} className="btn-secondary" aria-label="Bold selected text" title="Bold">
           <Bold size={16} />
         </button>
@@ -434,7 +435,7 @@ export function RichPostEditor({
         )}
       </div>
       {isLinkPopoverOpen && (
-        <div className="mb-2 w-full max-w-xl rounded border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-800 dark:bg-gray-950">
+        <div className="absolute right-0 top-[calc(100%+0.5rem)] z-40 w-[min(32rem,calc(100vw-2rem))] rounded border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-800 dark:bg-gray-950">
           <div className="mb-3 inline-flex rounded border border-gray-200 bg-gray-50 p-1 text-sm font-semibold dark:border-gray-800 dark:bg-gray-900">
             <button
               type="button"
@@ -496,6 +497,7 @@ export function RichPostEditor({
           </div>
         </div>
       )}
+      </div>
       <div
         ref={editorRef}
         contentEditable
