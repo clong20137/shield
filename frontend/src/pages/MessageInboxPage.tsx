@@ -1,8 +1,9 @@
-import { ClipboardEvent, DragEvent, FormEvent, KeyboardEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { ClipboardEvent, DragEvent, FormEvent, KeyboardEvent, MouseEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Building2, Check, CheckCheck, Download, Image as ImageIcon, Pencil, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Save, Send, Trash2, Users, X } from 'lucide-react';
 import type { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, errorLogService, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, handleAssetThumbnailError, messageService, userService, User, UserMessage } from '../services/api';
+import { AppContextMenu } from '../components/AppContextMenu';
 import { RankBadge } from '../components/RankBadge';
 import { MentionText } from '../components/MentionText';
 import { MentionTextarea } from '../components/MentionTextarea';
@@ -398,6 +399,26 @@ function parseAttachmentLine(value: string): { fileName: string; fileUrl: string
   }
 }
 
+function getMessageImageFileName(assetUrl: string): string {
+  try {
+    const pathname = new URL(assetUrl, window.location.origin).pathname;
+    const fileName = pathname.split('/').filter(Boolean).pop() || 'message-image';
+    return decodeURIComponent(fileName.split('?')[0] || 'message-image');
+  } catch {
+    return 'message-image';
+  }
+}
+
+function downloadMessageImage(assetUrl: string, fileName: string): void {
+  const link = document.createElement('a');
+  link.href = assetUrl;
+  link.download = fileName;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRecipient = null, targetThreadId = null, composeRequestKey = 0, isBackgrounded = false }: MessageInboxPageProps) {
   const [inboxMessages, setInboxMessages] = useState<UserMessage[]>([]);
   const [sentMessages, setSentMessages] = useState<UserMessage[]>([]);
@@ -419,6 +440,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   });
   const [typingByThread, setTypingByThread] = useState<Record<string, { name: string; expiresAt: number }>>({});
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [messageImageMenu, setMessageImageMenu] = useState<{
+    imageUrl: string;
+    fileName: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [recipientQuery, setRecipientQuery] = useState('');
   const [recipientResults, setRecipientResults] = useState<User[]>([]);
@@ -494,6 +521,17 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     window.setTimeout(() => replyTextareaRef.current?.focus(), 0);
   };
   const emojiButtonLabel = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
+  const handleMessageImageContextMenu = (event: MouseEvent<HTMLImageElement>, line: string) => {
+    const imageUrl = getAssetUrl(line);
+    setMessageImageMenu({
+      imageUrl,
+      fileName: getMessageImageFileName(imageUrl),
+      x: event.clientX,
+      y: event.clientY,
+    });
+    event.preventDefault();
+    event.stopPropagation();
+  };
   const mergeSentMessages = (newMessages: UserMessage[]) => {
     if (newMessages.length === 0) {
       return;
@@ -2525,6 +2563,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                                     src={getAssetUrl(line)}
                                     alt="Message upload"
                                     onError={handleAssetImageError}
+                                    onContextMenu={(event) => handleMessageImageContextMenu(event, line)}
                                     className="max-h-72 max-w-full rounded-lg object-contain"
                                   />
                                 ) : (
@@ -2704,6 +2743,28 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           )}
         </section>
       </div>
+
+      {messageImageMenu && (
+        <AppContextMenu
+          position={{ x: messageImageMenu.x, y: messageImageMenu.y }}
+          width={190}
+          onClose={() => setMessageImageMenu(null)}
+          actions={[
+            {
+              label: 'Download image',
+              icon: Download,
+              onSelect: () => {
+                try {
+                  downloadMessageImage(messageImageMenu.imageUrl, messageImageMenu.fileName);
+                  onToast('success', 'Image download started.');
+                } catch {
+                  onToast('error', 'Unable to download this image.');
+                }
+              },
+            },
+          ]}
+        />
+      )}
 
       {threadPendingDelete && (
         <div className="modal-backdrop fixed inset-0 z-[70] flex items-end justify-center bg-black/45 sm:items-center">
