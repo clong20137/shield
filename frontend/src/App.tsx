@@ -23,6 +23,7 @@ const THEME_KEY = 'shield_theme';
 const GLASS_THEME_KEY = 'shield_glass_theme';
 const MESSAGE_PREFERENCES_KEY = 'shield_message_preferences';
 const MILITARY_TIME_DEFAULT_APPLIED_KEY = 'shield_military_time_default_applied';
+const RECENT_CONVERSATIONS_DEFAULT_APPLIED_KEY = 'shield_recent_conversations_default_applied';
 const SESSION_TIMEOUT_KEY = 'shield_session_timeout_minutes';
 const QUICK_LAUNCH_KEY = 'shield_quick_launch';
 const QUICK_LAUNCH_MIN_SLOT_COUNT = 4;
@@ -243,14 +244,19 @@ function loadMessagePreferences(): MessagePreferences {
     const storedPreferences = window.localStorage.getItem(MESSAGE_PREFERENCES_KEY);
     const parsedPreferences = storedPreferences ? JSON.parse(storedPreferences) : {};
     const shouldApplyMilitaryTimeDefault = window.localStorage.getItem(MILITARY_TIME_DEFAULT_APPLIED_KEY) !== 'true';
+    const shouldApplyRecentConversationsDefault = window.localStorage.getItem(RECENT_CONVERSATIONS_DEFAULT_APPLIED_KEY) !== 'true';
     if (shouldApplyMilitaryTimeDefault) {
       window.localStorage.setItem(MILITARY_TIME_DEFAULT_APPLIED_KEY, 'true');
+    }
+    if (shouldApplyRecentConversationsDefault) {
+      window.localStorage.setItem(RECENT_CONVERSATIONS_DEFAULT_APPLIED_KEY, 'true');
     }
 
     return {
       ...defaultMessagePreferences,
       ...parsedPreferences,
       useMilitaryTime: shouldApplyMilitaryTimeDefault ? true : parsedPreferences.useMilitaryTime ?? defaultMessagePreferences.useMilitaryTime,
+      hideRecentConversations: shouldApplyRecentConversationsDefault ? false : parsedPreferences.hideRecentConversations ?? defaultMessagePreferences.hideRecentConversations,
       quickLaunchPlacement: parsedPreferences.quickLaunchPlacement === 'sidebar' ? 'sidebar' : 'dock',
       quickLaunchSlotCount: normalizeQuickLaunchSlotCount(parsedPreferences.quickLaunchSlotCount),
     };
@@ -1552,46 +1558,51 @@ function RecentConversationsDock({
   onCompose: () => void;
   onToggleCollapsed: () => void;
 }) {
-  if (isCollapsed) {
-    return (
-      <aside className="pointer-events-none fixed bottom-5 right-5 z-40 hidden md:block" aria-label="Recent conversations collapsed">
-        <button
-          type="button"
-          onClick={onToggleCollapsed}
-          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-primary-500 shadow-2xl backdrop-blur transition hover:-translate-x-0.5 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900/95 dark:text-blue-100"
-          aria-label="Show recent conversations"
-          title="Show Recent Conversations"
-        >
-          <ChevronLeft size={20} />
-        </button>
-      </aside>
-    );
-  }
-
   return (
-    <aside className="pointer-events-none fixed bottom-5 right-5 z-40 hidden flex-col items-end gap-2 md:flex" aria-label="Recent conversations">
-      <div className="pointer-events-auto flex flex-col items-center gap-2 rounded-full border border-gray-200 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
+    <aside
+      className={`pointer-events-none fixed bottom-5 right-5 z-40 hidden flex-col items-end gap-2 transition-all duration-300 ease-out md:flex ${
+        isCollapsed ? 'translate-x-[4.45rem]' : 'translate-x-0'
+      }`}
+      aria-label={isCollapsed ? 'Recent conversations collapsed' : 'Recent conversations'}
+    >
+      <div className="pointer-events-auto flex flex-col items-center gap-2 rounded-full border border-gray-200 bg-white/95 p-2 shadow-2xl backdrop-blur transition-transform duration-300 ease-out dark:border-gray-800 dark:bg-gray-900/95">
         <button
           type="button"
           onClick={onCompose}
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-white shadow-sm transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+          tabIndex={isCollapsed ? -1 : 0}
+          className={`flex h-11 w-11 items-center justify-center rounded-full bg-accent text-white shadow-sm transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+            isCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100'
+          }`}
           aria-label="Start new message"
           title="New Message"
+          aria-hidden={isCollapsed}
         >
           <Plus size={22} />
         </button>
         {conversations.map((conversation) => (
-          <div key={conversation.id} className="relative flex items-center">
+          <div
+            key={conversation.id}
+            className={`group/recent relative flex items-center transition-all duration-300 ease-out ${
+              isCollapsed ? 'pointer-events-none translate-x-2 opacity-0' : 'translate-x-0 opacity-100'
+            }`}
+            aria-hidden={isCollapsed}
+          >
             {conversation.unreadCount > 0 && conversation.unreadPreview && (
               <button
                 type="button"
                 onClick={() => onOpenConversation(conversation)}
+                tabIndex={isCollapsed ? -1 : 0}
                 className="absolute right-14 w-64 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left shadow-xl transition hover:border-accent dark:border-gray-800 dark:bg-gray-900"
                 aria-label={`Open unread message from ${conversation.title}`}
               >
                 <span className="block truncate text-xs font-black text-primary-500 dark:text-blue-100">{conversation.title}</span>
                 <span className="mt-0.5 block truncate text-xs font-semibold text-gray-600 dark:text-gray-300">{conversation.unreadPreview}</span>
               </button>
+            )}
+            {conversation.unreadCount === 0 && (
+              <span className="pointer-events-none absolute right-14 max-w-56 translate-x-2 whitespace-nowrap rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-black text-primary-500 opacity-0 shadow-xl transition duration-200 group-hover/recent:translate-x-0 group-hover/recent:opacity-100 dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100">
+                {conversation.title}
+              </span>
             )}
             {(() => {
               const presence = conversation.threadType === 'direct'
@@ -1602,6 +1613,7 @@ function RecentConversationsDock({
                 <button
                   type="button"
                   onClick={() => onOpenConversation(conversation)}
+                  tabIndex={isCollapsed ? -1 : 0}
                   className={`group relative flex h-12 w-12 items-center justify-center rounded-full bg-primary-500 text-sm font-black text-white shadow-sm ring-2 transition hover:-translate-x-1 hover:scale-105 hover:ring-accent ${presence?.ringClass || 'ring-white dark:ring-gray-900'}`}
                   aria-label={`Open conversation with ${conversation.title}${presence ? `, ${presence.label}` : ''}`}
                   title={`${conversation.title}${presence ? ` - ${presence.label}` : ''}${conversation.subtitle ? ` - ${conversation.subtitle}` : ''}`}
@@ -1637,11 +1649,13 @@ function RecentConversationsDock({
         <button
           type="button"
           onClick={onToggleCollapsed}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-          aria-label="Collapse recent conversations"
-          title="Collapse Recent Conversations"
+          className={`flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition duration-300 hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 ${
+            isCollapsed ? '-translate-x-[4.45rem] shadow-2xl' : 'translate-x-0'
+          }`}
+          aria-label={isCollapsed ? 'Show recent conversations' : 'Collapse recent conversations'}
+          title={isCollapsed ? 'Show Recent Conversations' : 'Collapse Recent Conversations'}
         >
-          <ChevronRight size={16} />
+          <ChevronRight className={`transition-transform duration-300 ${isCollapsed ? 'rotate-180' : 'rotate-0'}`} size={16} />
         </button>
       </div>
     </aside>
