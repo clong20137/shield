@@ -1309,8 +1309,11 @@ export const messageService = {
   getForUser: (userId: string) =>
     api.get<UserMessage[]>(`/messages/user/${userId}`, MESSAGE_REQUEST_OPTIONS),
 
-  getInbox: (accountId: string) =>
-    api.get<UserMessage[]>(`/messages/inbox/${accountId}`, MESSAGE_REQUEST_OPTIONS),
+  getInbox: (accountId: string, pageSize?: number) =>
+    api.get<UserMessage[]>(`/messages/inbox/${accountId}`, {
+      ...MESSAGE_REQUEST_OPTIONS,
+      params: pageSize ? { pageSize } : undefined,
+    }),
 
   getThread: (threadId: string, accountId: string, page = 1, pageSize = 250) =>
     api.get<UserMessage[]>(`/messages/thread/${threadId}/messages`, {
@@ -1321,8 +1324,11 @@ export const messageService = {
   getUnreadCount: (accountId: string) =>
     api.get<{ unreadCount: number }>(`/messages/unread-count/${accountId}`),
 
-  getSent: (accountId: string) =>
-    api.get<UserMessage[]>(`/messages/sent/${accountId}`, MESSAGE_REQUEST_OPTIONS),
+  getSent: (accountId: string, pageSize?: number) =>
+    api.get<UserMessage[]>(`/messages/sent/${accountId}`, {
+      ...MESSAGE_REQUEST_OPTIONS,
+      params: pageSize ? { pageSize } : undefined,
+    }),
 
   markRead: (messageId: string, recipientUserId: string) =>
     api.put(`/messages/${messageId}/read`, { recipientUserId }),

@@ -54,6 +54,7 @@ interface ThreadMessageWindowState {
 
 const PINNED_THREADS_KEY_PREFIX = 'shield_pinned_message_threads';
 const THREAD_MESSAGE_PAGE_SIZE = 40;
+const THREAD_LIST_MESSAGE_PAGE_SIZE = 80;
 const messageReactionOptions = [
   { key: 'thumbsUp', label: 'Thumbs up', icon: '👍' },
   { key: 'check', label: 'Check', icon: '✅' },
@@ -620,8 +621,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
     try {
       const [inboxResult, sentResult] = await Promise.allSettled([
-        messageService.getInbox(currentUser.id),
-        messageService.getSent(currentUser.id),
+        messageService.getInbox(currentUser.id, THREAD_LIST_MESSAGE_PAGE_SIZE),
+        messageService.getSent(currentUser.id, THREAD_LIST_MESSAGE_PAGE_SIZE),
       ]);
 
       if (inboxResult.status === 'fulfilled') {
@@ -863,7 +864,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       });
 
-      mergeThreadMessages(fetchedMessages, !isLoadOlder);
+      if (!isLoadOlder) {
+        mergeThreadMessages(fetchedMessages, true);
+      }
 
       setThreadMessageWindows((current) => {
         const currentWindowState = current[threadId];
@@ -1300,6 +1303,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const selectedThread = filteredThreads.find((thread) => thread.id === selectedThreadId) || null;
   const selectedThreadAcceptsMessages = selectedThread?.contactReceivesMessages !== false;
   const selectedTyping = selectedThreadId ? typingByThread[selectedThreadId] : null;
+  const selectedThreadWindow = selectedThreadId ? threadMessageWindows[selectedThreadId] : null;
   const selectedThreadParticipantKey = selectedThread?.participantIds.join('|') || '';
   const selectedDirectRecipientId = selectedThread?.threadType === 'direct'
     ? selectedThread.participantIds.find((id) => id && id !== currentUser.id) || selectedThread.id
@@ -2760,6 +2764,18 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                 {selectedThreadMessages.length > 0 && displayedMessages.length === 0 && (
                   <div className="flex h-full min-h-48 items-center justify-center text-center text-sm font-semibold text-gray-500">
                     No messages match this search.
+                  </div>
+                )}
+                {selectedThreadMessages.length > 0 && !threadSearchTerm.trim() && selectedThreadWindow?.hasMore && (
+                  <div className="flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => selectedThreadId && void loadThreadMessages(selectedThreadId, false)}
+                      disabled={selectedThreadWindow.isLoading}
+                      className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-500 shadow-sm transition hover:border-accent hover:text-accent disabled:cursor-wait disabled:opacity-60 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                    >
+                      {selectedThreadWindow.isLoading ? 'Loading older messages...' : 'Load older messages'}
+                    </button>
                   </div>
                 )}
                 {displayedMessages.map((message, index) => {
