@@ -1107,7 +1107,26 @@
     background-color: rgba(15, 23, 42, 0.86) !important;
   }
 
+  html.glass .user-detail-panel {
+    background-color: rgba(15, 23, 42, 0.94) !important;
+    box-shadow:
+      0 30px 90px rgba(0, 0, 0, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  }
+
+  html.glass .user-detail-body {
+    background-color: rgba(15, 23, 42, 0.92) !important;
+  }
+
   html.glass .glass-workspace-window .user-detail-section {
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  html.glass .user-detail-section {
     border-color: transparent !important;
     background: transparent !important;
     box-shadow: none !important;
@@ -1197,7 +1216,26 @@
     background-color: rgba(255, 255, 255, 0.96) !important;
   }
 
+  html.glass:not(.dark) .user-detail-panel {
+    background-color: rgba(255, 255, 255, 0.98) !important;
+    box-shadow:
+      0 30px 90px rgba(15, 23, 42, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  }
+
+  html.glass:not(.dark) .user-detail-body {
+    background-color: rgba(255, 255, 255, 0.98) !important;
+  }
+
   html.glass:not(.dark) .glass-workspace-window .user-detail-section {
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  html.glass:not(.dark) .user-detail-section {
     border-color: transparent !important;
     background: transparent !important;
     box-shadow: none !important;
