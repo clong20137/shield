@@ -115,6 +115,7 @@ interface RecentConversation {
   threadType: string;
   directParticipantId: string;
   directLastSeenAt: string | null;
+  threadParticipantIds: string[];
   latestMessage?: UserMessage;
   unreadPreview: string;
   unreadCount: number;
@@ -1458,6 +1459,17 @@ function getRecentConversationDirectParticipantId(message: UserMessage, currentU
   return message.senderAccountId === currentUserId ? message.recipientUserId : message.senderAccountId;
 }
 
+function getRecentConversationParticipantIds(message: UserMessage, currentUserId: string): string[] {
+  const ids = parseRecentConversationList(message.threadParticipantIds)
+    .filter((id) => id && id !== currentUserId);
+
+  if (ids.length > 0) {
+    return Array.from(new Set(ids));
+  }
+
+  return [getRecentConversationDirectParticipantId(message, currentUserId)].filter(Boolean);
+}
+
 function getRecentConversationDirectLastSeenAt(message: UserMessage, currentUserId: string): string | null {
   if (message.threadType && message.threadType !== 'direct') {
     return null;
@@ -1499,6 +1511,7 @@ function buildRecentConversations(messages: UserMessage[], currentUserId: string
       threadType: message.threadType || 'direct',
       directParticipantId: getRecentConversationDirectParticipantId(message, currentUserId),
       directLastSeenAt: getRecentConversationDirectLastSeenAt(message, currentUserId),
+      threadParticipantIds: getRecentConversationParticipantIds(message, currentUserId),
       latestMessage: message,
       unreadPreview: unreadIncrement > 0 ? subtitle : existingConversation?.unreadPreview || '',
       unreadCount: (existingConversation?.unreadCount || 0) + unreadIncrement,
@@ -1508,7 +1521,13 @@ function buildRecentConversations(messages: UserMessage[], currentUserId: string
   });
 
   return Array.from(threadMap.values())
-    .sort((a, b) => new Date(b.latestMessage?.createdAt || 0).getTime() - new Date(a.latestMessage?.createdAt || 0).getTime())
+    .sort((a, b) => {
+      if (a.unreadCount !== b.unreadCount) {
+        return b.unreadCount - a.unreadCount;
+      }
+
+      return new Date(b.latestMessage?.createdAt || 0).getTime() - new Date(a.latestMessage?.createdAt || 0).getTime();
+    })
     .slice(0, 5);
 }
 
@@ -1651,6 +1670,7 @@ function RecentConversationsDock({
   typingByConversation,
   onOpenConversation,
   onMarkRead,
+  onReply,
   onCompose,
   onToggleCollapsed,
 }: {
@@ -1660,6 +1680,7 @@ function RecentConversationsDock({
   typingByConversation: Record<string, RecentTypingState>;
   onOpenConversation: (conversation: RecentConversation) => void;
   onMarkRead: (conversation: RecentConversation) => void;
+  onReply: (conversation: RecentConversation) => void;
   onCompose: () => void;
   onToggleCollapsed: () => void;
 }) {
@@ -1734,10 +1755,10 @@ function RecentConversationsDock({
               {shouldShowPreview && (
                 <button
                   type="button"
-                  onClick={() => onOpenConversation(conversation)}
+                  onClick={() => onReply(conversation)}
                   tabIndex={isCollapsed ? -1 : 0}
                   className="recent-message-preview-pop recent-message-preview-pop--arrow recent-message-preview-pop--modern absolute right-14 z-20 w-64 rounded-2xl px-4 py-2 text-left backdrop-blur-xl transition duration-200 hover:scale-[1.03] hover:-translate-x-1 hover:shadow-[0_22px_55px_rgba(15,23,42,0.3)]"
-                  aria-label={`Open latest message from ${conversation.title}`}
+                  aria-label={`Reply to latest message from ${conversation.title}`}
                 >
                   <span className="block truncate text-xs font-black text-primary-500 dark:text-blue-100">{conversation.title}</span>
                   <span className="mt-0.5 flex items-center gap-1 truncate rounded-md px-1 py-0.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
@@ -1752,6 +1773,7 @@ function RecentConversationsDock({
                   {!presence && activityText && (
                     <span className="mt-1 block truncate text-[10px] font-semibold text-gray-500 dark:text-gray-400">{activityText}</span>
                   )}
+                  <span className="mt-1 block text-[10px] font-black uppercase tracking-wide text-accent">Quick reply</span>
                 </button>
               )}
               {conversation.unreadCount === 0 && !typing && (
@@ -1870,6 +1892,16 @@ function RecentConversationsDock({
             }}
           >
             Mark read
+          </button>
+          <button
+            type="button"
+            className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
+            onClick={() => {
+              onReply(contextMenu.conversation);
+              setContextMenu(null);
+            }}
+          >
+            Quick reply
           </button>
           <button
             type="button"
@@ -2086,6 +2118,140 @@ function RecentMessageComposerPopup({
               disabled={isSending || !selectedRecipient || !body.trim()}
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white transition hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-55"
               aria-label="Send message"
+              title="Send"
+            >
+              <Send size={15} />
+            </button>
+          </div>
+        </div>
+      </form>
+    </aside>
+  );
+}
+
+function RecentMessageReplyPopover({
+  currentUser,
+  conversation,
+  onClose,
+  onSent,
+  onOpenConversation,
+  onToast,
+}: {
+  currentUser: AuthAccount;
+  conversation: RecentConversation;
+  onClose: () => void;
+  onSent: () => void;
+  onOpenConversation: (conversation: RecentConversation) => void;
+  onToast: (type: ToastType, message: string, options?: { saveToNotifications?: boolean }) => void;
+}) {
+  const [body, setBody] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const previewText = conversation.unreadPreview || conversation.subtitle || 'No preview available';
+
+  useEffect(() => {
+    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0);
+    return () => window.clearTimeout(focusTimer);
+  }, [conversation.id]);
+
+  const sendReply = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const text = body.trim();
+
+    if (!text) {
+      onToast('error', 'Enter a reply.', { saveToNotifications: false });
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      if (conversation.threadType !== 'direct') {
+        const recipientUserIds = conversation.threadParticipantIds.filter((id) => id && id !== currentUser.id);
+        if (recipientUserIds.length === 0) {
+          throw new Error('No recipients found for this thread.');
+        }
+
+        await messageService.sendGroup({
+          senderAccountId: currentUser.id,
+          recipientUserIds,
+          subject: conversation.latestMessage?.subject || conversation.title || 'Message',
+          body: text,
+          audienceType: conversation.threadType === 'district' ? 'district' : 'group',
+          threadId: conversation.id,
+          threadTitle: conversation.latestMessage?.threadTitle || conversation.title,
+        });
+      } else {
+        await messageService.resolveRecipient(conversation.directParticipantId);
+        await messageService.send({
+          senderAccountId: currentUser.id,
+          recipientUserId: conversation.directParticipantId,
+          subject: conversation.latestMessage?.subject || 'Message',
+          body: text,
+        });
+      }
+
+      onSent();
+      onToast('success', `Reply sent to ${conversation.title}.`, { saveToNotifications: false });
+      onClose();
+    } catch (error) {
+      console.error('Recent message reply failed:', error);
+      errorLogService.createClientLog({
+        level: 'error',
+        message: 'Recent message quick reply failed',
+        route: window.location.pathname,
+        context: JSON.stringify({
+          area: 'messages',
+          action: 'recent-quick-reply',
+          currentUserId: currentUser.id,
+          conversationId: conversation.id,
+          threadType: conversation.threadType,
+          bodyLength: text.length,
+          error: getErrorMessage(error, 'Failed to send reply.'),
+        }, null, 2),
+      }).catch((logError) => console.error('Failed to write quick reply diagnostic:', logError));
+      onToast('error', getErrorMessage(error, 'Failed to send reply.'), { saveToNotifications: false });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <aside className="fixed bottom-5 right-[5.4rem] z-50 hidden w-[min(22rem,calc(100vw-2rem))] md:block" aria-label="Quick reply">
+      <form onSubmit={sendReply} className="quick-launch-context-menu overflow-hidden rounded-lg border border-gray-200 bg-white p-2.5 shadow-2xl ring-1 ring-black/5 dark:border-gray-800 dark:bg-gray-950 dark:ring-white/10">
+        <div className="space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <span className="block truncate text-xs font-black uppercase text-primary-500 dark:text-blue-100">Reply to {conversation.title}</span>
+              <span className="mt-1 block line-clamp-2 text-xs text-gray-500 dark:text-gray-400">{previewText}</span>
+            </div>
+            <button type="button" onClick={onClose} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-900" aria-label="Close quick reply" title="Close">
+              <X size={15} />
+            </button>
+          </div>
+
+          <textarea
+            ref={inputRef}
+            value={body}
+            onChange={(event) => setBody(event.target.value.slice(0, 1200))}
+            placeholder="Write a quick reply..."
+            rows={3}
+            maxLength={1200}
+            className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-[16px] leading-5 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-gray-700 dark:bg-gray-900 sm:text-sm"
+          />
+
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => onOpenConversation(conversation)}
+              className="text-xs font-bold text-accent hover:underline"
+            >
+              Open thread
+            </button>
+            <button
+              type="submit"
+              disabled={isSending || !body.trim()}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white transition hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-55"
+              aria-label="Send reply"
               title="Send"
             >
               <Send size={15} />
@@ -6171,6 +6337,7 @@ function App() {
   const [recentConversationPresenceByAccount, setRecentConversationPresenceByAccount] = useState<Record<string, RecentPresenceState>>({});
   const [recentConversationTypingById, setRecentConversationTypingById] = useState<Record<string, RecentTypingState>>({});
   const [areRecentConversationsCollapsed, setAreRecentConversationsCollapsed] = useState(false);
+  const [quickReplyConversation, setQuickReplyConversation] = useState<RecentConversation | null>(null);
   const [bugReports, setBugReports] = useState<BugReport[]>([]);
   const [sidebarCalendarEntries, setSidebarCalendarEntries] = useState<CalendarEntry[]>([]);
   const [sidebarReminders, setSidebarReminders] = useState<Reminder[]>([]);
@@ -8220,6 +8387,7 @@ function App() {
 
   const openRecentConversation = (conversation: RecentConversation) => {
     setIsRecentMessageComposerOpen(false);
+    setQuickReplyConversation(null);
     setMessageTargetUser(null);
     setMessageTargetThreadId(conversation.id);
     openMessagesModal();
@@ -8241,7 +8409,13 @@ function App() {
   };
 
   const openNewMessageComposer = () => {
+    setQuickReplyConversation(null);
     setIsRecentMessageComposerOpen((isOpen) => !isOpen);
+  };
+
+  const openRecentQuickReply = (conversation: RecentConversation) => {
+    setIsRecentMessageComposerOpen(false);
+    setQuickReplyConversation(conversation);
   };
 
   useEffect(() => {
@@ -9650,6 +9824,7 @@ function App() {
               typingByConversation={recentConversationTypingById}
               onOpenConversation={openRecentConversation}
               onMarkRead={markRecentConversationRead}
+              onReply={openRecentQuickReply}
               onCompose={openNewMessageComposer}
               onToggleCollapsed={() => setAreRecentConversationsCollapsed((collapsed) => !collapsed)}
             />
@@ -9659,6 +9834,16 @@ function App() {
               currentUser={currentUser}
               onClose={() => setIsRecentMessageComposerOpen(false)}
               onSent={() => window.dispatchEvent(new CustomEvent('shield:messages-updated'))}
+              onToast={showToast}
+            />
+          )}
+          {shouldShowRecentConversations && quickReplyConversation && currentUser && (
+            <RecentMessageReplyPopover
+              currentUser={currentUser}
+              conversation={quickReplyConversation}
+              onClose={() => setQuickReplyConversation(null)}
+              onSent={() => window.dispatchEvent(new CustomEvent('shield:messages-updated'))}
+              onOpenConversation={openRecentConversation}
               onToast={showToast}
             />
           )}
