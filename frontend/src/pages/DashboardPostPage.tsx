@@ -26,6 +26,7 @@ interface DashboardPostPageProps {
   currentUser: AuthAccount | null;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
   isCreateMode?: boolean;
+  isEditMode?: boolean;
 }
 
 interface DashboardPostComposeForm {
@@ -53,10 +54,12 @@ const sortComments = (items: DashboardPostComment[]) =>
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
 
-export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicitCreateMode }: DashboardPostPageProps) {
+export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicitCreateMode, isEditMode: explicitEditMode }: DashboardPostPageProps) {
   const { postId = '' } = useParams();
   const navigate = useNavigate();
   const isCreateMode = explicitCreateMode || postId.toLowerCase() === 'new';
+  const isEditMode = Boolean(explicitEditMode && !isCreateMode);
+  const isComposeMode = isCreateMode || isEditMode;
   const [post, setPost] = useState<DashboardPost | null>(null);
   const [comments, setComments] = useState<DashboardPostComment[]>([]);
   const [composeForm, setComposeForm] = useState<DashboardPostComposeForm>(defaultComposeForm);
@@ -86,7 +89,8 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
   const [reactionPulseMap, setReactionPulseMap] = useState<Record<string, number>>({});
   const canManageDashboard = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('dashboard:manage'));
   const canCreateDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:create'));
-  const canUploadMedia = canCreateDashboardPosts || Boolean(currentUser?.permissions?.includes('media:upload'));
+  const canEditDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:edit'));
+  const canUploadMedia = canCreateDashboardPosts || canEditDashboardPosts || Boolean(currentUser?.permissions?.includes('media:upload'));
   const isAdministrator = currentUser?.role === 'administrator';
   const canManageComments = Boolean(
     isAdministrator ||
@@ -107,7 +111,17 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
         dashboardPostService.getById(postId),
         dashboardPostService.getComments(postId),
       ]);
-      setPost(postResponse.data);
+      const loadedPost = postResponse.data;
+      setPost(loadedPost);
+      if (isEditMode) {
+        setComposeForm({
+          title: loadedPost.title,
+          body: loadedPost.body,
+          category: loadedPost.category,
+          imageUrl: loadedPost.imageUrl || '',
+          allowComments: loadedPost.allowComments,
+        });
+      }
       const sortedComments = sortComments(commentsResponse.data);
       setComments(sortedComments);
       const parentsWithReplies = new Set(
@@ -133,7 +147,7 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
     }
 
     void loadPost();
-  }, [postId, isCreateMode]);
+  }, [postId, isCreateMode, isEditMode]);
 
   useEffect(() => {
     if (!postId || isCreateMode) return;
@@ -192,6 +206,46 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
     }
   };
 
+  const updateStory = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!currentUser) {
+      setError('You need to sign in to update this story.');
+      return;
+    }
+
+    if (!canEditDashboardPosts) {
+      setError('You do not have permission to edit stories.');
+      return;
+    }
+
+    if (!post) {
+      setError('This story could not be loaded.');
+      return;
+    }
+
+    if (!composeForm.title.trim() || !composeForm.body.replace(/<[^>]*>/gu, '').trim()) {
+      setError('Title and story body are required.');
+      return;
+    }
+
+    setIsSavingPost(true);
+    setError(null);
+    try {
+      const response = await dashboardPostService.update(post.id, {
+        ...composeForm,
+        imageUrl: composeForm.imageUrl || null,
+      });
+      onToast('success', 'Story updated.');
+      navigate(`/updates/${response.data.id}`);
+    } catch (err) {
+      console.error('Failed to update story:', err);
+      setError('Failed to update story.');
+    } finally {
+      setIsSavingPost(false);
+    }
+  };
+
   const loadMediaItems = useCallback(async () => {
     setIsLoadingMedia(true);
     setError(null);
@@ -212,7 +266,7 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
   }, [mediaSearchTerm]);
 
   useEffect(() => {
-    if (!isCreateMode || !isMediaPickerOpen) {
+    if (!isComposeMode || !isMediaPickerOpen) {
       return undefined;
     }
 
@@ -221,7 +275,7 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
     }, 200);
 
     return () => window.clearTimeout(timer);
-  }, [isCreateMode, isMediaPickerOpen, loadMediaItems]);
+  }, [isComposeMode, isMediaPickerOpen, loadMediaItems]);
 
   const uploadStoryImage = async (file: File) => {
     if (!canUploadMedia) {
@@ -670,18 +724,27 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
     );
   };
 
-  if (isCreateMode) {
+  if (isComposeMode) {
+    const hasComposePermission = isCreateMode ? canCreateDashboardPosts : canEditDashboardPosts;
+    const composeTitle = isEditMode ? 'Edit Story' : 'Create New Story';
+    const composeDescription = isEditMode ? 'Update this published story.' : 'Publish news, updates, or alerts to the dashboard.';
+    const submitTitle = isEditMode ? 'Save Story' : 'Publish';
+    const submitLabel = isEditMode ? 'Save story' : 'Publish story';
+    const savingLabel = isEditMode ? 'Saving...' : 'Publishing...';
+    const cancelTarget = isEditMode && post ? `/updates/${post.id}` : '/';
+
     return (
       <div className="mx-auto max-w-4xl">
         <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <Link to="/" className="text-sm font-bold text-accent">Back to dashboard</Link>
-              <h1 className="mt-2 text-xl font-bold sm:text-2xl">Create New Story</h1>
+              <Link to={cancelTarget} className="text-sm font-bold text-accent">{isEditMode ? 'Back to story' : 'Back to dashboard'}</Link>
+              <h1 className="mt-2 text-xl font-bold sm:text-2xl">{composeTitle}</h1>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{composeDescription}</p>
             </div>
             <button
               type="button"
-              onClick={() => navigate('/')}
+              onClick={() => navigate(cancelTarget)}
               className="btn-secondary"
               aria-label="Cancel story"
               title="Cancel"
@@ -692,12 +755,20 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
 
           {error && <div className="error mt-4">{error}</div>}
 
-          {!canCreateDashboardPosts ? (
+          {isEditMode && isLoading ? (
             <div className="mt-4 rounded border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700">
-              You do not have permission to create stories.
+              Loading story...
+            </div>
+          ) : isEditMode && !post ? (
+            <div className="mt-4 rounded border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700">
+              This story could not be found.
+            </div>
+          ) : !hasComposePermission ? (
+            <div className="mt-4 rounded border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700">
+              You do not have permission to {isEditMode ? 'edit' : 'create'} stories.
             </div>
           ) : (
-            <form onSubmit={createStory} className="mt-4 space-y-4">
+            <form onSubmit={isEditMode ? updateStory : createStory} className="mt-4 space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-[150px_minmax(0,1fr)]">
                 <label>
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Type</span>
@@ -882,7 +953,7 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
               <div className="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
                 <button
                   type="button"
-                  onClick={() => navigate('/')}
+                  onClick={() => navigate(cancelTarget)}
                   className="btn-secondary"
                   aria-label="Cancel story"
                   title="Cancel"
@@ -899,11 +970,11 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
                 >
                   {isPreviewMode ? <Edit3 size={16} /> : <Eye size={16} />}
                 </button>
-                <button type="submit" className="btn-primary" disabled={isSavingPost} aria-label="Publish story" title={isSavingPost ? 'Publishing' : 'Publish'}>
+                <button type="submit" className="btn-primary" disabled={isSavingPost} aria-label={submitLabel} title={isSavingPost ? 'Saving' : submitTitle}>
                   {isSavingPost ? (
-                    <span>Publishing...</span>
+                    <span>{savingLabel}</span>
                   ) : (
-                    <span>Publish story</span>
+                    <span>{submitLabel}</span>
                   )}
                 </button>
               </div>
@@ -944,7 +1015,15 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
     <div className="mx-auto max-w-4xl">
       {error && <div className="error">{error}</div>}
       <article className="rounded-lg bg-white p-6 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
-        <Link to="/" className="text-sm font-bold text-accent">Back to dashboard</Link>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link to="/" className="text-sm font-bold text-accent">Back to dashboard</Link>
+          {canEditDashboardPosts && (
+            <Link to={`/updates/${post.id}/edit`} className="btn-secondary" aria-label={`Edit ${post.title}`} title="Edit Story">
+              <Edit3 size={16} />
+              <span>Edit story</span>
+            </Link>
+          )}
+        </div>
         <div className="mt-5">
           <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold uppercase text-accent">{post.category}</span>
           <h1 className="mt-4">{post.title}</h1>

@@ -1109,9 +1109,26 @@
   html.glass .quick-launch-picker-enter,
   html.glass .floating-window,
   html.glass .glass-workspace-window,
+  html.glass .icon-close-button,
+  html.glass .global-search-results,
+  html.glass .recent-message-preview-pop,
+  html.glass .rich-post-editor,
   html.glass section[class~='bg-white'],
   html.glass article[class~='bg-white'],
-  html.glass div[class~='bg-white']:not(.shield-left-panel):not(.shield-left-panel *):not(.quick-launch-sidebar-placement):not(.quick-launch-sidebar-placement *) {
+  html.glass aside[class~='bg-white'],
+  html.glass form[class~='bg-white'],
+  html.glass nav[class~='bg-white'],
+  html.glass header[class~='bg-white'],
+  html.glass footer[class~='bg-white'],
+  html.glass section[class*='bg-white/'],
+  html.glass article[class*='bg-white/'],
+  html.glass aside[class*='bg-white/'],
+  html.glass form[class*='bg-white/'],
+  html.glass nav[class*='bg-white/'],
+  html.glass header[class*='bg-white/'],
+  html.glass footer[class*='bg-white/'],
+  html.glass div[class~='bg-white']:not(.shield-left-panel):not(.shield-left-panel *):not(.quick-launch-sidebar-placement):not(.quick-launch-sidebar-placement *),
+  html.glass div[class*='bg-white/']:not(.shield-left-panel):not(.shield-left-panel *):not(.quick-launch-sidebar-placement):not(.quick-launch-sidebar-placement *) {
     border-color: rgba(255, 255, 255, 0.13) !important;
     background-color: rgba(15, 23, 42, 0.64) !important;
     color: rgb(243, 244, 246) !important;
@@ -1129,6 +1146,19 @@
     box-shadow:
       0 28px 80px rgba(0, 0, 0, 0.5),
       inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  }
+
+  html.glass .modal-backdrop {
+    background-color: rgba(2, 6, 23, 0.58) !important;
+    backdrop-filter: blur(10px) saturate(1.08);
+    -webkit-backdrop-filter: blur(10px) saturate(1.08);
+  }
+
+  html.glass .global-search-results,
+  html.glass .quick-launch-context-menu,
+  html.glass .quick-launch-picker-enter,
+  html.glass .recent-message-preview-pop {
+    background-color: rgba(15, 23, 42, 0.82) !important;
   }
 
   html.glass .glass-workspace-window section[class~='bg-white'],
@@ -1219,9 +1249,26 @@
   html.glass:not(.dark) .quick-launch-picker-enter,
   html.glass:not(.dark) .floating-window,
   html.glass:not(.dark) .glass-workspace-window,
+  html.glass:not(.dark) .icon-close-button,
+  html.glass:not(.dark) .global-search-results,
+  html.glass:not(.dark) .recent-message-preview-pop,
+  html.glass:not(.dark) .rich-post-editor,
   html.glass:not(.dark) section[class~='bg-white'],
   html.glass:not(.dark) article[class~='bg-white'],
-  html.glass:not(.dark) div[class~='bg-white']:not(.shield-left-panel):not(.shield-left-panel *):not(.quick-launch-sidebar-placement):not(.quick-launch-sidebar-placement *) {
+  html.glass:not(.dark) aside[class~='bg-white'],
+  html.glass:not(.dark) form[class~='bg-white'],
+  html.glass:not(.dark) nav[class~='bg-white'],
+  html.glass:not(.dark) header[class~='bg-white'],
+  html.glass:not(.dark) footer[class~='bg-white'],
+  html.glass:not(.dark) section[class*='bg-white/'],
+  html.glass:not(.dark) article[class*='bg-white/'],
+  html.glass:not(.dark) aside[class*='bg-white/'],
+  html.glass:not(.dark) form[class*='bg-white/'],
+  html.glass:not(.dark) nav[class*='bg-white/'],
+  html.glass:not(.dark) header[class*='bg-white/'],
+  html.glass:not(.dark) footer[class*='bg-white/'],
+  html.glass:not(.dark) div[class~='bg-white']:not(.shield-left-panel):not(.shield-left-panel *):not(.quick-launch-sidebar-placement):not(.quick-launch-sidebar-placement *),
+  html.glass:not(.dark) div[class*='bg-white/']:not(.shield-left-panel):not(.shield-left-panel *):not(.quick-launch-sidebar-placement):not(.quick-launch-sidebar-placement *) {
     border-color: rgba(15, 23, 42, 0.12) !important;
     background-color: rgba(255, 255, 255, 0.82) !important;
     color: rgb(17, 24, 39) !important;
@@ -1238,6 +1285,19 @@
     box-shadow:
       0 28px 82px rgba(15, 23, 42, 0.22),
       inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  }
+
+  html.glass:not(.dark) .modal-backdrop {
+    background-color: rgba(15, 23, 42, 0.28) !important;
+    backdrop-filter: blur(10px) saturate(1.08);
+    -webkit-backdrop-filter: blur(10px) saturate(1.08);
+  }
+
+  html.glass:not(.dark) .global-search-results,
+  html.glass:not(.dark) .quick-launch-context-menu,
+  html.glass:not(.dark) .quick-launch-picker-enter,
+  html.glass:not(.dark) .recent-message-preview-pop {
+    background-color: rgba(255, 255, 255, 0.92) !important;
   }
 
   html.glass:not(.dark) .glass-workspace-window section[class~='bg-white'],

@@ -1075,16 +1075,7 @@ function DashboardNews({
   };
 
   const startEditingPost = (post: DashboardPost) => {
-    setEditingPost(post);
-    setPostForm({
-      title: post.title,
-      body: post.body,
-      category: post.category,
-      imageUrl: post.imageUrl || '',
-      allowComments: post.allowComments,
-    });
-    setPostError(null);
-    setIsCreatePostOpen(false);
+    navigate(`/updates/${post.id}/edit`);
   };
 
   const reactToPost = async (post: DashboardPost, reaction: DashboardReaction) => {
