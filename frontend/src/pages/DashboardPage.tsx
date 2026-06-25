@@ -3185,11 +3185,11 @@ const DashboardPage: React.FC<{
   const dashboardContextActions = [
     { label: 'Search Users', icon: Search, onSelect: () => navigate('/search') },
     {
-      label: `Glass Mode (${isGlassTheme ? 'On' : 'Off'})`,
+      label: 'Glass Mode',
       icon: isGlassTheme ? Sun : Moon,
-      render: ({ onClose }: { onClose: () => void }) => (
+      render: () => (
         <div className={`quick-launch-context-menu-item ${isGlassTheme ? 'text-accent dark:text-white' : 'text-gray-700 dark:text-gray-200'}`}>
-          <span>{`Glass Mode (${isGlassTheme ? 'On' : 'Off'})`}</span>
+          <span>Glass Mode</span>
           <button
             type="button"
             onMouseDown={(event) => event.stopPropagation()}
@@ -3197,7 +3197,6 @@ const DashboardPage: React.FC<{
               event.preventDefault();
               event.stopPropagation();
               onGlassThemeChange(!isGlassTheme);
-              onClose();
             }}
             className={`ml-auto inline-flex h-5 w-10 items-center rounded-full p-0.5 transition ${
               isGlassTheme ? 'justify-end bg-accent' : 'bg-gray-300 dark:bg-gray-600'
@@ -3211,7 +3210,7 @@ const DashboardPage: React.FC<{
     },
     {
       label: 'App Scale',
-      render: ({ onClose }: { onClose: () => void }) => (
+      render: () => (
         <div className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200">
           <span>App Scale</span>
           <div className="ml-auto flex items-center gap-2">
@@ -3223,7 +3222,6 @@ const DashboardPage: React.FC<{
                 event.stopPropagation();
                 if (canDecreaseAppScale) {
                   decreaseAppScale();
-                  onClose();
                 }
               }}
               disabled={!canDecreaseAppScale}
@@ -3231,7 +3229,7 @@ const DashboardPage: React.FC<{
             >
               <Minus size={14} />
             </button>
-            <span className="min-w-[70px] text-center text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-200">
+            <span className="min-w-[72px] shrink-0 text-center text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-200 whitespace-nowrap">
               {APP_SCALE_LABELS[appScale]}
             </span>
             <button
@@ -3242,7 +3240,6 @@ const DashboardPage: React.FC<{
                 event.stopPropagation();
                 if (canIncreaseAppScale) {
                   increaseAppScale();
-                  onClose();
                 }
               }}
               disabled={!canIncreaseAppScale}
