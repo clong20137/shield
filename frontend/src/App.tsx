@@ -1388,7 +1388,11 @@ function normalizeRecentConversationSubject(value?: string | null): string {
 }
 
 function getRecentConversationId(message: UserMessage, currentUserId: string): string {
-  return message.threadId || (message.senderAccountId === currentUserId ? message.recipientUserId : message.senderAccountId);
+  if (message.threadType && message.threadType !== 'direct' && message.threadId) {
+    return message.threadId;
+  }
+
+  return message.senderAccountId === currentUserId ? message.recipientUserId : message.senderAccountId;
 }
 
 function getRecentConversationTitle(message: UserMessage, currentUserId: string): string {
@@ -8963,7 +8967,7 @@ function App() {
                 </div>
                 <div className="min-h-0 flex-1">
                   <Suspense fallback={<PageLoader label="Loading messages..." />}>
-                    <MessageInboxPage currentUser={currentUser} onToast={showToast} isModalView targetRecipient={messageTargetUser} targetThreadId={messageTargetThreadId} composeRequestKey={messageComposeRequestKey} isBackgrounded={isAppBackgrounded} />
+                    <MessageInboxPage currentUser={currentUser} onToast={showToast} isModalView targetRecipient={messageTargetUser} targetThreadId={messageTargetThreadId} composeRequestKey={messageComposeRequestKey} isBackgrounded={false} />
                   </Suspense>
                 </div>
               </>

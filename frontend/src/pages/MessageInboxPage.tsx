@@ -136,7 +136,7 @@ function PresenceDot({
 }
 
 function getThreadId(message: UserMessage, currentUserId: string): string {
-  if (message.threadId) {
+  if (message.threadId && getThreadType(message) !== 'direct') {
     return message.threadId;
   }
 
@@ -1397,6 +1397,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
     if (selectedThread.contactReceivesMessages === false) {
       onToast('error', `${selectedThread.contactName} is not accepting messages right now.`);
+      return;
+    }
+
+    if (selectedThread.threadType === 'direct' && !selectedDirectRecipientId) {
+      onToast('error', 'Could not identify the message recipient. Reopen the conversation and try again.');
       return;
     }
 
