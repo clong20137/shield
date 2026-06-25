@@ -87,11 +87,33 @@ function isOnlineFromLastSeen(value?: string | null, now = Date.now()): boolean 
   return now - lastActivityTime <= 5 * 60 * 1000;
 }
 
+function isAwayFromLastSeen(value?: string | null, now = Date.now()): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const lastActivityTime = new Date(value).getTime();
+  if (Number.isNaN(lastActivityTime)) {
+    return false;
+  }
+
+  const diff = now - lastActivityTime;
+  return diff > 5 * 60 * 1000 && diff <= 10 * 60 * 1000;
+}
+
 function getPresenceDisplay(
   value: string | null | undefined,
   isOnline: boolean,
   status: 'active' | 'away' | 'busy' = 'active',
 ): string {
+  if (status === 'busy') {
+    return 'Busy';
+  }
+
+  if (status === 'away') {
+    return 'Away';
+  }
+
   if (!value) {
     return 'Never';
   }
@@ -103,14 +125,6 @@ function getPresenceDisplay(
 
   if (!isOnline) {
     return `Last online ${formatMessageTime(value)}`;
-  }
-
-  if (status === 'busy') {
-    return 'Busy';
-  }
-
-  if (status === 'away') {
-    return 'Away';
   }
 
   return 'Active';
@@ -486,10 +500,17 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     }
 
     setSentMessages((messages) => {
-      const existingIds = new Set(messages.map((message) => message.id));
-      const missingMessages = newMessages.filter((message) => message.id && !existingIds.has(message.id));
-      return missingMessages.length > 0 ? [...messages, ...missingMessages] : messages;
+      const nextMessages = new Map(messages.map((message) => [message.id, message]));
+      newMessages.forEach((message) => {
+        if (message.id) {
+          nextMessages.set(message.id, message);
+        }
+      });
+      return Array.from(nextMessages.values());
     });
+  };
+  const removeLocalSentMessage = (messageId: string) => {
+    setSentMessages((messages) => messages.filter((message) => message.id !== messageId));
   };
   const refreshMessagesQuietly = async () => {
     try {
@@ -1119,8 +1140,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
     const realtimePresence = presenceByAccount[thread.id];
     const lastSeenAt = realtimePresence?.lastSeenAt || thread.contactLastSeenAt;
-    const online = realtimePresence?.online === true;
-    const away = online && realtimePresence?.away === true;
+    const online = realtimePresence
+      ? realtimePresence.online === true || realtimePresence.status === 'busy' || realtimePresence.status === 'away'
+      : isOnlineFromLastSeen(thread.contactLastSeenAt);
+    const away = realtimePresence ? realtimePresence.away === true || realtimePresence.status === 'away' : isAwayFromLastSeen(thread.contactLastSeenAt);
     const status = realtimePresence?.status === 'busy' || realtimePresence?.status === 'away' || realtimePresence?.status === 'active'
       ? realtimePresence.status
       : away ? 'away' : 'active';
@@ -1552,11 +1575,51 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     const directRecipientId = selectedDirectRecipientId;
     let didClearDraft = false;
     let submittedMessageBody = draftBody;
+    let optimisticMessageId = '';
 
     try {
       const uploadedAttachments = await uploadReplyAttachments();
       const messageBody = withAttachmentSummary(draftBody, uploadedAttachments);
       submittedMessageBody = messageBody;
+      optimisticMessageId = `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const optimisticCreatedAt = new Date().toISOString();
+      const optimisticThreadId = selectedThread.threadType === 'direct'
+        ? null
+        : selectedThread.id;
+      const optimisticMessage: UserMessage = {
+        id: optimisticMessageId,
+        senderAccountId: currentUser.id,
+        recipientUserId: selectedThread.threadType === 'direct'
+          ? directRecipientId
+          : selectedThread.participantIds.find((id) => id !== currentUser.id) || directRecipientId,
+        subject: selectedThread.subject || selectedThread.contactName || 'Message',
+        body: messageBody,
+        isRead: false,
+        isDeleted: false,
+        senderDeleted: false,
+        recipientDeleted: false,
+        senderReaction: null,
+        recipientReaction: null,
+        threadId: optimisticThreadId,
+        threadType: selectedThread.threadType,
+        threadTitle: selectedThread.threadType === 'direct' ? null : selectedThread.contactName,
+        threadParticipantIds: selectedThread.threadType === 'direct' ? null : JSON.stringify(selectedThread.participantIds),
+        threadParticipantNames: selectedThread.threadType === 'direct' ? null : JSON.stringify(selectedThread.participantNames),
+        threadImageUrl: selectedThread.threadImageUrl || null,
+        groupMessageId: optimisticMessageId,
+        createdAt: optimisticCreatedAt,
+        senderName: currentUser.displayName || `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email,
+        senderEmail: currentUser.email,
+        senderRank: '',
+        senderProfilePictureUrl: currentUser.profilePictureUrl,
+        recipientName: selectedThread.contactName,
+        recipientEmail: selectedThread.contactEmail,
+        recipientRank: selectedThread.contactRank,
+        recipientProfilePictureUrl: selectedThread.contactProfilePictureUrl,
+        recipientLastSeenAt: selectedThread.contactLastSeenAt,
+        recipientReceivesMessages: selectedThread.contactReceivesMessages,
+      };
+      mergeSentMessages([optimisticMessage]);
       setReplyBody('');
       setReplyAttachments([]);
       didClearDraft = true;
@@ -1573,6 +1636,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           threadTitle: selectedThread.contactName,
         });
         setSelectedThreadId(response.data.threadId);
+        removeLocalSentMessage(optimisticMessageId);
         mergeSentMessages(response.data.messages || []);
       } else {
         const response = await messageService.send({
@@ -1581,6 +1645,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           subject: selectedThread.subject,
           body: messageBody,
         });
+        removeLocalSentMessage(optimisticMessageId);
         mergeSentMessages([response.data]);
         setSelectedThreadId(directRecipientId);
       }
@@ -1661,6 +1726,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       }
 
       if (didClearDraft) {
+        if (optimisticMessageId) {
+          removeLocalSentMessage(optimisticMessageId);
+        }
         setReplyBody(draftBody);
         setReplyAttachments(draftAttachments);
       }

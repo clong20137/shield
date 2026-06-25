@@ -1568,7 +1568,7 @@ function getPinnedPresence(profile: Pick<PinnedProfile, 'id' | 'lastSeenAt'>, pr
   const away = realtime ? realtime.away : !online && isProfileAway(profile.lastSeenAt);
   const status = realtime?.status || (away ? 'away' : online ? 'active' : 'active');
 
-  if (status === 'busy' && online) {
+  if (realtime && status === 'busy') {
     return {
       label: 'Busy',
       dotClass: 'bg-red-500',
@@ -1578,7 +1578,7 @@ function getPinnedPresence(profile: Pick<PinnedProfile, 'id' | 'lastSeenAt'>, pr
     };
   }
 
-  if ((status === 'away' && online) || away) {
+  if ((realtime && status === 'away') || away) {
     return {
       label: 'Away',
       dotClass: 'bg-amber-400',

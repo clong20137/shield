@@ -1508,7 +1508,7 @@ function getRecentConversationPresence(
   const away = realtime ? realtime.away : !online && isRecentConversationAway(conversation.directLastSeenAt);
   const status = realtime?.status || (away ? 'away' : online ? 'active' : 'active');
 
-  if (status === 'busy' && online) {
+  if (realtime && status === 'busy') {
     return {
       label: 'Busy',
       dotClass: 'bg-red-500',
@@ -1518,7 +1518,7 @@ function getRecentConversationPresence(
     };
   }
 
-  if ((status === 'away' && online) || away) {
+  if ((realtime && status === 'away') || away) {
     return {
       label: 'Away',
       dotClass: 'bg-amber-400',
@@ -6169,7 +6169,6 @@ function App() {
     window.addEventListener('scroll', markActive, true);
     window.addEventListener('touchstart', markActive);
     window.addEventListener('focus', markActive);
-    window.addEventListener('blur', markBusy);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
@@ -6184,7 +6183,6 @@ function App() {
       window.removeEventListener('scroll', markActive, true);
       window.removeEventListener('touchstart', markActive);
       window.removeEventListener('focus', markActive);
-      window.removeEventListener('blur', markBusy);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       removeDesktopIdleStatusListener?.();
     };
