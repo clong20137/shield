@@ -2110,7 +2110,7 @@ function GlobalSearch({ compact }: { compact: boolean }) {
       </button>
 
       {isResultsOpen && query.trim().length >= 2 && (
-        <div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded border border-gray-200 bg-white text-gray-800 shadow-xl dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+        <div className="global-search-results absolute left-0 right-0 top-12 z-50 overflow-hidden rounded border border-gray-200 bg-white text-gray-800 shadow-xl dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
           {isSearching ? (
             <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">Searching...</div>
           ) : results.length > 0 ? (
