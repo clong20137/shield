@@ -68,11 +68,11 @@ export class ErrorLogModel {
       if (filters.q) {
         const q = `%${escapeLike(filters.q)}%`;
         where.push(`(
-          \`message\` LIKE ? ESCAPE '\\'
-          OR \`stack\` LIKE ? ESCAPE '\\'
-          OR \`route\` LIKE ? ESCAPE '\\'
-          OR \`userId\` LIKE ? ESCAPE '\\'
-          OR \`ipAddress\` LIKE ? ESCAPE '\\'
+          \`message\` LIKE ? ESCAPE '\\\\'
+          OR \`stack\` LIKE ? ESCAPE '\\\\'
+          OR \`route\` LIKE ? ESCAPE '\\\\'
+          OR \`userId\` LIKE ? ESCAPE '\\\\'
+          OR \`ipAddress\` LIKE ? ESCAPE '\\\\'
         )`);
         params.push(q, q, q, q, q);
       }

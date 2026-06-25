@@ -81,13 +81,13 @@ export class AuditLogModel {
       if (filters.q) {
         const q = `%${escapeLike(filters.q)}%`;
         where.push(`(
-          \`actorName\` LIKE ? ESCAPE '\\'
-          OR \`actorId\` LIKE ? ESCAPE '\\'
-          OR \`action\` LIKE ? ESCAPE '\\'
-          OR \`entityType\` LIKE ? ESCAPE '\\'
-          OR \`entityId\` LIKE ? ESCAPE '\\'
-          OR \`details\` LIKE ? ESCAPE '\\'
-          OR \`ipAddress\` LIKE ? ESCAPE '\\'
+          \`actorName\` LIKE ? ESCAPE '\\\\'
+          OR \`actorId\` LIKE ? ESCAPE '\\\\'
+          OR \`action\` LIKE ? ESCAPE '\\\\'
+          OR \`entityType\` LIKE ? ESCAPE '\\\\'
+          OR \`entityId\` LIKE ? ESCAPE '\\\\'
+          OR \`details\` LIKE ? ESCAPE '\\\\'
+          OR \`ipAddress\` LIKE ? ESCAPE '\\\\'
         )`);
         params.push(q, q, q, q, q, q, q);
       }
