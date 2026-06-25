@@ -704,6 +704,23 @@ function LoginSplash({
             <p className="max-w-2xl text-xl leading-8 text-blue-50">
               A secured workspace for personnel lookup, reporting, messages, calendar workflows, and daily operations.
             </p>
+            {mode === 'login' && !isShieldDesktopApp() && (
+              <div className="mt-8 inline-block rounded-lg border border-accent/30 bg-accent/10 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.18)]">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Recommended</p>
+                <p className="mt-1 max-w-xl text-sm text-blue-50">
+                  Install the desktop app for faster access, offline startup, and native notifications.
+                </p>
+                <a
+                  href={withAppBase('/downloads/Shield-Setup.exe')}
+                  download
+                  className="btn-secondary mt-3 inline-flex items-center gap-2"
+                  aria-label="Download desktop application"
+                >
+                  <Download size={16} />
+                  <span>Download App</span>
+                </a>
+              </div>
+            )}
           </div>
         </section>
 
@@ -731,27 +748,6 @@ function LoginSplash({
                       ? `Choose a new password for your ${appName} login.`
                       : 'Use your email and password to continue.'}
               </p>
-              {mode === 'login' && !isShieldDesktopApp() && (
-                <div className="mt-4 rounded-lg border border-accent/20 bg-accent/5 p-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Recommended</p>
-                      <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                        Install the desktop app for faster access, offline startup, and native notifications.
-                      </p>
-                    </div>
-                    <a
-                      href={withAppBase('/downloads/Shield-Setup.exe')}
-                      download
-                      className="btn-secondary mt-2 shrink-0 justify-center whitespace-nowrap sm:mt-0"
-                      aria-label="Download desktop application"
-                    >
-                      <Download size={16} />
-                      <span>Download App</span>
-                    </a>
-                  </div>
-                </div>
-              )}
             </div>
 
             {error && <div className="error">{error}</div>}
