@@ -1102,6 +1102,19 @@
     background-color: rgba(15, 23, 42, 0.7) !important;
   }
 
+  html.glass .glass-workspace-window .user-detail-panel,
+  html.glass .glass-workspace-window .user-detail-body {
+    background-color: rgba(15, 23, 42, 0.86) !important;
+  }
+
+  html.glass .glass-workspace-window .user-detail-section {
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
   html.glass .header-action-button.header-action-button,
   html.glass [data-onboarding-target='header-actions'] {
     border-color: rgba(255, 255, 255, 0.16) !important;
@@ -1177,6 +1190,19 @@
   html.glass:not(.dark) .glass-workspace-window div[class~='bg-white'],
   html.glass:not(.dark) .glass-workspace-window div[class~='bg-gray-50'] {
     background-color: rgba(255, 255, 255, 0.9) !important;
+  }
+
+  html.glass:not(.dark) .glass-workspace-window .user-detail-panel,
+  html.glass:not(.dark) .glass-workspace-window .user-detail-body {
+    background-color: rgba(255, 255, 255, 0.96) !important;
+  }
+
+  html.glass:not(.dark) .glass-workspace-window .user-detail-section {
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
   html.glass:not(.dark) .glass-workspace-window div[class~='bg-gray-100'] {

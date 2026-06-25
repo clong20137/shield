@@ -54,7 +54,7 @@ function DetailRow({
 
 function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mb-6 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 sm:border-0 sm:p-0">
+    <div className="user-detail-section mb-6 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 sm:border-0 sm:p-0">
       <h3 className="mb-2 border-b border-gray-200 pb-2 text-base font-bold text-primary-500 dark:border-gray-700 dark:text-blue-100 sm:mb-4 sm:border-b-2">
         {title}
       </h3>
@@ -537,7 +537,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const profileRingClass = presenceTone.ringClass;
 
   return (
-    <div className={`flex flex-col overflow-hidden rounded-none bg-white shadow-xl dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:rounded-lg ${isFloatingProfile ? 'h-full max-h-full' : 'h-[100dvh] sm:h-auto sm:max-h-[92dvh]'}`}>
+    <div className={`user-detail-panel flex flex-col overflow-hidden rounded-none bg-white shadow-xl dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:rounded-lg ${isFloatingProfile ? 'h-full max-h-full' : 'h-[100dvh] sm:h-auto sm:max-h-[92dvh]'}`}>
       <div
         onPointerDown={onHeaderPointerDown}
         className={`shrink-0 select-none bg-primary-500 px-4 text-white sm:px-5 ${isFloatingProfile ? 'py-3 sm:py-3 md:cursor-grab' : 'py-4 sm:py-5'}`}
@@ -648,7 +648,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
         </div>
       </div>
 
-      <div className={`min-h-0 flex-1 overflow-y-auto bg-gray-50 px-3 dark:bg-gray-950 sm:bg-transparent sm:px-5 sm:dark:bg-transparent ${isFloatingProfile ? 'py-3 sm:py-4' : 'py-4 sm:py-6'}`}>
+      <div className={`user-detail-body min-h-0 flex-1 overflow-y-auto bg-gray-50 px-3 dark:bg-gray-950 sm:bg-transparent sm:px-5 sm:dark:bg-transparent ${isFloatingProfile ? 'py-3 sm:py-4' : 'py-4 sm:py-6'}`}>
         {activeTab === 'personal' && <DetailSection title="Personal Information">
           <DetailRow label="Name" value={`${user.firstName} ${user.lastName}`} />
           <DetailRow label="Email" value={user.email} copyValue={user.email} onCopy={copyProfileValue} isCopied={copiedField === 'Email'} />
