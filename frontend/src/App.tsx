@@ -1628,8 +1628,8 @@ function RecentConversationsDock({
         </button>
         {conversations.map((conversation) => {
           const typing = typingByConversation[conversation.id];
-          const previewText = typing ? `${typing.name} is typing...` : conversation.unreadPreview || conversation.subtitle || 'New message';
-          const shouldShowPreview = typing || conversation.unreadCount > 0;
+          const previewText = conversation.unreadPreview || conversation.subtitle || 'New message';
+          const shouldShowPreview = conversation.unreadCount > 0;
           return (
             <div
               key={conversation.id}
@@ -1644,20 +1644,11 @@ function RecentConversationsDock({
                   type="button"
                   onClick={() => onOpenConversation(conversation)}
                   tabIndex={isCollapsed ? -1 : 0}
-                  className={`recent-message-preview-pop absolute right-14 z-20 w-64 rounded-lg border border-white/30 bg-white/80 px-3 py-2 text-left shadow-xl backdrop-blur-md transition hover:border-accent dark:border-white/20 dark:bg-slate-900/75 ${
-                    typing ? 'border-accent/60 dark:border-accent/60' : 'border-white/30 dark:border-white/20'
-                  }`}
-                  aria-label={typing ? `${conversation.title} is typing` : `Open latest message from ${conversation.title}`}
+                  className="recent-message-preview-pop absolute right-14 z-20 w-64 rounded-lg border border-white/30 bg-white/80 px-3 py-2 text-left shadow-xl backdrop-blur-md transition hover:border-accent dark:border-white/20 dark:bg-slate-900/75"
+                  aria-label={`Open latest message from ${conversation.title}`}
                 >
                   <span className="block truncate text-xs font-black text-primary-500 dark:text-blue-100">{conversation.title}</span>
                   <span className="mt-0.5 flex items-center gap-1 truncate rounded-md px-1 py-0.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
-                    {typing && (
-                      <span className="inline-flex items-center gap-0.5 py-0.5">
-                        <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
-                        <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse [animation-delay:120ms]" />
-                        <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse [animation-delay:240ms]" />
-                      </span>
-                    )}
                     <span className="truncate">{previewText}</span>
                   </span>
                 </button>
