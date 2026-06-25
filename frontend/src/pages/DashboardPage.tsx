@@ -3167,36 +3167,92 @@ const DashboardPage: React.FC<{
   const currentScaleIndex = APP_SCALE_SEQUENCE.indexOf(appScale);
   const canDecreaseAppScale = currentScaleIndex > 0;
   const canIncreaseAppScale = currentScaleIndex < APP_SCALE_SEQUENCE.length - 1;
-  const previousScaleLabel = APP_SCALE_LABELS[APP_SCALE_SEQUENCE[Math.max(0, currentScaleIndex - 1)]];
+
+  const decreaseAppScale = () => {
+    const nextScale = APP_SCALE_SEQUENCE[currentScaleIndex - 1];
+    if (nextScale) {
+      onAppScaleChange(nextScale);
+    }
+  };
+
+  const increaseAppScale = () => {
+    const nextScale = APP_SCALE_SEQUENCE[currentScaleIndex + 1];
+    if (nextScale) {
+      onAppScaleChange(nextScale);
+    }
+  };
 
   const dashboardContextActions = [
     { label: 'Search Users', icon: Search, onSelect: () => navigate('/search') },
     {
       label: `Glass Mode (${isGlassTheme ? 'On' : 'Off'})`,
       icon: isGlassTheme ? Sun : Moon,
-      onSelect: () => onGlassThemeChange(!isGlassTheme),
+      render: ({ onClose }: { onClose: () => void }) => (
+        <div className={`quick-launch-context-menu-item ${isGlassTheme ? 'text-accent dark:text-white' : 'text-gray-700 dark:text-gray-200'}`}>
+          <span>{`Glass Mode (${isGlassTheme ? 'On' : 'Off'})`}</span>
+          <button
+            type="button"
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onGlassThemeChange(!isGlassTheme);
+              onClose();
+            }}
+            className={`ml-auto inline-flex h-5 w-10 items-center rounded-full p-0.5 transition ${
+              isGlassTheme ? 'justify-end bg-accent' : 'bg-gray-300 dark:bg-gray-600'
+            }`}
+            aria-label={`Toggle glass mode ${isGlassTheme ? 'off' : 'on'}`}
+          >
+            <span className="h-4 w-4 rounded-full bg-white shadow-sm transition" />
+          </button>
+        </div>
+      ),
     },
     {
-      label: `App Scale - ${previousScaleLabel}`,
-      icon: Minus,
-      disabled: !canDecreaseAppScale,
-      onSelect: () => {
-        const nextScale = APP_SCALE_SEQUENCE[currentScaleIndex - 1];
-        if (nextScale) {
-          onAppScaleChange(nextScale);
-        }
-      },
-    },
-    {
-      label: 'App Scale +',
-      icon: Plus,
-      disabled: !canIncreaseAppScale,
-      onSelect: () => {
-        const nextScale = APP_SCALE_SEQUENCE[currentScaleIndex + 1];
-        if (nextScale) {
-          onAppScaleChange(nextScale);
-        }
-      },
+      label: 'App Scale',
+      render: ({ onClose }: { onClose: () => void }) => (
+        <div className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200">
+          <span>App Scale</span>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (canDecreaseAppScale) {
+                  decreaseAppScale();
+                  onClose();
+                }
+              }}
+              disabled={!canDecreaseAppScale}
+              className="inline-flex h-6 w-6 items-center justify-center rounded border border-gray-300 bg-white px-0 py-0 text-gray-700 transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-accent dark:hover:text-accent"
+            >
+              <Minus size={14} />
+            </button>
+            <span className="min-w-[70px] text-center text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-200">
+              {APP_SCALE_LABELS[appScale]}
+            </span>
+            <button
+              type="button"
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (canIncreaseAppScale) {
+                  increaseAppScale();
+                  onClose();
+                }
+              }}
+              disabled={!canIncreaseAppScale}
+              className="inline-flex h-6 w-6 items-center justify-center rounded border border-gray-300 bg-white px-0 py-0 text-gray-700 transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-accent dark:hover:text-accent"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+        </div>
+      ),
     },
     { label: 'Open Calendar', icon: CalendarDays, onSelect: () => navigate('/calendar') },
     { label: 'Open Messages', icon: MessageSquare, onSelect: () => navigate('/messages') },

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { LucideIcon } from 'lucide-react';
 
@@ -13,7 +13,10 @@ export type AppContextMenuAction = {
   shortcut?: string;
   disabled?: boolean;
   danger?: boolean;
-  onSelect: () => void;
+  onSelect?: () => void;
+  render?: (context: {
+    onClose: () => void;
+  }) => ReactNode;
 };
 
 function getMenuPosition(position: AppContextMenuPosition, width = 248, height = 260) {
@@ -72,6 +75,19 @@ export function AppContextMenu({
     >
       {actions.map((action, index) => {
         const Icon = action.icon;
+        if (action.render) {
+          return (
+            <div key={`${action.label}-${index}`} onClick={(event) => event.stopPropagation()}>
+              {action.render({ onClose })}
+            </div>
+          );
+        }
+
+        if (!action.onSelect) {
+          return null;
+        }
+        const onSelect = action.onSelect;
+
         return (
           <button
             key={`${action.label}-${index}`}
@@ -80,7 +96,7 @@ export function AppContextMenu({
               if (action.disabled) {
                 return;
               }
-              action.onSelect();
+              onSelect();
               onClose();
             }}
             disabled={action.disabled}
