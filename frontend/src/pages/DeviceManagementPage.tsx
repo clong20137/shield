@@ -280,7 +280,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [loading, setLoading] = useState(true);
   const isDeviceLoadInFlightRef = useRef(false);
   const isUserLoadInFlightRef = useRef(false);
+  const hasLoadedRegisteredUsersRef = useRef(false);
   const deviceRefreshTimerRef = useRef<number | null>(null);
+  const userRefreshTimerRef = useRef<number | null>(null);
   const scannerVideoRef = useRef<HTMLVideoElement | null>(null);
   const scannerControlsRef = useRef<IScannerControls | null>(null);
 
@@ -291,6 +293,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     if (!currentUser || !canManageDevices || isUserLoadInFlightRef.current) {
       if (!currentUser || !canManageDevices) {
         setRegisteredUsers([]);
+        hasLoadedRegisteredUsersRef.current = false;
       }
       return;
     }
@@ -299,6 +302,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     try {
       const response = await authService.getAccounts(currentUser.id);
       setRegisteredUsers(response.data);
+      hasLoadedRegisteredUsersRef.current = true;
     } catch (err) {
       console.error('Failed to load registered users:', err);
       setRegisteredUsers([]);
@@ -344,7 +348,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
 
   useEffect(() => {
     void loadDevices(true);
-    void loadRegisteredUsers();
 
     const handleDeviceUpdate = () => {
       if (deviceRefreshTimerRef.current) {
@@ -363,11 +366,22 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         window.clearTimeout(deviceRefreshTimerRef.current);
       }
     };
-  }, [loadDevices, loadRegisteredUsers]);
+  }, [loadDevices]);
 
   useEffect(() => {
     const handleUserUpdate = () => {
-      void loadRegisteredUsers();
+      if (!hasLoadedRegisteredUsersRef.current) {
+        return;
+      }
+
+      if (userRefreshTimerRef.current) {
+        window.clearTimeout(userRefreshTimerRef.current);
+      }
+
+      userRefreshTimerRef.current = window.setTimeout(() => {
+        userRefreshTimerRef.current = null;
+        void loadRegisteredUsers();
+      }, 350);
     };
 
     window.addEventListener('shield:user-updated', handleUserUpdate);
@@ -375,6 +389,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     return () => {
       window.removeEventListener('shield:user-updated', handleUserUpdate);
       window.removeEventListener('shield:permission-updated', handleUserUpdate);
+      if (userRefreshTimerRef.current) {
+        window.clearTimeout(userRefreshTimerRef.current);
+      }
     };
   }, [loadRegisteredUsers]);
 
@@ -546,6 +563,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setForm(toDeviceForm(device));
     setEventNotes('');
     setIsDeviceFormOpen(true);
+    if (!hasLoadedRegisteredUsersRef.current) {
+      void loadRegisteredUsers();
+    }
   };
 
   const openAddDeviceModal = () => {
@@ -553,6 +573,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setForm(defaultDeviceForm);
     setEventNotes('');
     setIsDeviceFormOpen(true);
+    if (!hasLoadedRegisteredUsersRef.current) {
+      void loadRegisteredUsers();
+    }
   };
 
   const closeDeviceFormModal = () => {
@@ -561,6 +584,12 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setForm(defaultDeviceForm);
     setEventNotes('');
   };
+
+  useEffect(() => {
+    if (scanMode === 'check-out' && !hasLoadedRegisteredUsersRef.current) {
+      void loadRegisteredUsers();
+    }
+  }, [loadRegisteredUsers, scanMode]);
 
   const updateDeviceStatus = async (
     device: DeviceRecord,

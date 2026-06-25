@@ -1159,6 +1159,8 @@ function CalendarPage({
   const skipNextDailyDraftWriteRef = useRef(false);
   const backendAutosaveRequestRef = useRef(0);
   const entriesRef = useRef<CalendarEntry[]>([]);
+  const calendarLoadInFlightRef = useRef(false);
+  const calendarRefreshTimerRef = useRef<number | null>(null);
   const deletedDailyUndoRef = useRef<DeletedDailyUndo | null>(null);
   const dailyUndoStackRef = useRef<CalendarEntryForm[]>([]);
   const dailyRedoStackRef = useRef<CalendarEntryForm[]>([]);
@@ -1186,6 +1188,11 @@ function CalendarPage({
   }, [useMilitaryTime]);
 
   const loadCalendarEntries = async (showLoading = true) => {
+    if (calendarLoadInFlightRef.current) {
+      return;
+    }
+
+    calendarLoadInFlightRef.current = true;
     if (showLoading) {
       setIsCalendarLoading(true);
     }
@@ -1197,6 +1204,7 @@ function CalendarPage({
       console.error('Failed to load calendar entries:', err);
       setCalendarError(getApiErrorMessage(err, 'Failed to load calendar entries.'));
     } finally {
+      calendarLoadInFlightRef.current = false;
       setIsCalendarLoading(false);
     }
   };
@@ -1225,10 +1233,25 @@ function CalendarPage({
     loadCalendarEntries();
     void loadShortcuts();
     void loadTCodeOptions();
-    const handleCalendarUpdate = () => loadCalendarEntries(false);
+    const handleCalendarUpdate = () => {
+      if (calendarRefreshTimerRef.current) {
+        window.clearTimeout(calendarRefreshTimerRef.current);
+      }
+
+      calendarRefreshTimerRef.current = window.setTimeout(() => {
+        calendarRefreshTimerRef.current = null;
+        void loadCalendarEntries(false);
+      }, 350);
+    };
 
     window.addEventListener('shield:calendar-updated', handleCalendarUpdate);
-    return () => window.removeEventListener('shield:calendar-updated', handleCalendarUpdate);
+    return () => {
+      window.removeEventListener('shield:calendar-updated', handleCalendarUpdate);
+      if (calendarRefreshTimerRef.current) {
+        window.clearTimeout(calendarRefreshTimerRef.current);
+        calendarRefreshTimerRef.current = null;
+      }
+    };
   }, [currentUser.id]);
 
   useEffect(() => {

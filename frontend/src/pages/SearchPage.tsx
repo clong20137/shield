@@ -180,6 +180,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const [isProfileMediaPickerOpen, setIsProfileMediaPickerOpen] = useState(false);
   const searchRequestRef = useRef(0);
+  const realtimeSearchRefreshTimerRef = useRef<number | null>(null);
+  const hasLoadedUserEditOptionsRef = useRef(false);
   const [addressLookupQuery, setAddressLookupQuery] = useState('');
   const [searchParams] = useSearchParams();
   const globalQuery = useMemo(() => searchParams.get('q') ?? '', [searchParams]);
@@ -306,6 +308,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       setSupervisorOptions(loadedUsers);
       setRoleOptions(roleResponse?.data || []);
       setAddressSuggestions(Array.from(new Set(addresses)).slice(0, 100));
+      hasLoadedUserEditOptionsRef.current = true;
     } catch (err) {
       console.error('Failed to load user edit options:', err);
       onToast('error', 'Failed to load user edit options.');
@@ -684,7 +687,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   }, [addressLookupQuery]);
 
   useEffect(() => {
-    const handleRealtimeUserUpdate = async (event: Event) => {
+    const handleRealtimeUserUpdate = (event: Event) => {
       let entityId = '';
       try {
         entityId = ((event as CustomEvent<{ entityId?: string }>).detail?.entityId || '').trim();
@@ -692,7 +695,14 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
         entityId = '';
       }
 
-      await handleSearch(currentQuery);
+      if (realtimeSearchRefreshTimerRef.current) {
+        window.clearTimeout(realtimeSearchRefreshTimerRef.current);
+      }
+
+      realtimeSearchRefreshTimerRef.current = window.setTimeout(() => {
+        realtimeSearchRefreshTimerRef.current = null;
+        void handleSearch(currentQuery);
+      }, 350);
 
       if (selectedUser && (!entityId || entityId === selectedUser.id)) {
         userService.getById(selectedUser.id)
@@ -710,7 +720,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
           .catch((err) => console.error('Failed to refresh editing user:', err));
       }
 
-      if (!entityId || supervisorOptions.some((user) => user.id === entityId)) {
+      if (hasLoadedUserEditOptionsRef.current && (!entityId || supervisorOptions.some((user) => user.id === entityId))) {
         void loadUserEditOptions();
       }
     };
@@ -720,6 +730,10 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     return () => {
       window.removeEventListener('shield:user-updated', handleRealtimeUserUpdate);
       window.removeEventListener('shield:permission-updated', handleRealtimeUserUpdate);
+      if (realtimeSearchRefreshTimerRef.current) {
+        window.clearTimeout(realtimeSearchRefreshTimerRef.current);
+        realtimeSearchRefreshTimerRef.current = null;
+      }
     };
   }, [currentQuery, editingUser, selectedUser, supervisorOptions]);
 
