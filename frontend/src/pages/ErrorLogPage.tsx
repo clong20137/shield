@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, Copy, Search, X } from 'lucide-react';
 import { ErrorLog, ErrorLogFilters, errorLogService } from '../services/api';
 
@@ -155,25 +156,28 @@ export function ErrorLogPage() {
       <p className="mt-3 text-xs font-semibold text-gray-500 dark:text-gray-400">{total.toLocaleString()} total error log entries</p>
 
       {selectedLog && (
-        <div className="modal-backdrop fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4">
-          <div className="modal-window max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Error Details</h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{new Date(selectedLog.createdAt).toLocaleString()}</p>
+        createPortal(
+          <div className="modal-backdrop fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4" onClick={() => setSelectedLog(null)}>
+            <div className="modal-window max-h-[90dvh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900" onClick={(event) => event.stopPropagation()}>
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Error Details</h2>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{new Date(selectedLog.createdAt).toLocaleString()}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => void copyErrorLog(selectedLog)} className="btn-secondary h-9 w-9 p-0" aria-label="Copy error details" title="Copy error details">
+                    {copiedErrorId === selectedLog.id ? <Check size={18} /> : <Copy size={18} />}
+                  </button>
+                  <button type="button" onClick={() => setSelectedLog(null)} className="icon-close-button" aria-label="Close error details" title="Close">
+                    <X size={18} />
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => void copyErrorLog(selectedLog)} className="btn-secondary h-9 w-9 p-0" aria-label="Copy error details" title="Copy error details">
-                  {copiedErrorId === selectedLog.id ? <Check size={18} /> : <Copy size={18} />}
-                </button>
-                <button type="button" onClick={() => setSelectedLog(null)} className="icon-close-button" aria-label="Close error details" title="Close">
-                  <X size={18} />
-                </button>
-              </div>
+              <pre className="max-h-[60vh] min-h-0 overflow-auto rounded bg-gray-950 p-4 text-xs leading-5 text-gray-100">{getErrorText(selectedLog)}</pre>
             </div>
-            <pre className="max-h-[60vh] overflow-auto rounded bg-gray-950 p-4 text-xs leading-5 text-gray-100">{getErrorText(selectedLog)}</pre>
-          </div>
-        </div>
+          </div>,
+          document.body,
+        )
       )}
     </div>
   );
