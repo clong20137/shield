@@ -428,6 +428,17 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     window.setTimeout(() => replyTextareaRef.current?.focus(), 0);
   };
   const emojiButtonLabel = useMemo(() => ['🙂', '😀', '😎', '👍', '✨'][Math.floor(Math.random() * 5)], []);
+  const mergeSentMessages = (newMessages: UserMessage[]) => {
+    if (newMessages.length === 0) {
+      return;
+    }
+
+    setSentMessages((messages) => {
+      const existingIds = new Set(messages.map((message) => message.id));
+      const missingMessages = newMessages.filter((message) => message.id && !existingIds.has(message.id));
+      return missingMessages.length > 0 ? [...messages, ...missingMessages] : messages;
+    });
+  };
 
   useEffect(() => {
     if (!targetRecipient || targetRecipient.id === currentUser.id) {
@@ -1405,13 +1416,16 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           threadTitle: selectedThread.contactName,
         });
         setSelectedThreadId(response.data.threadId);
+        mergeSentMessages(response.data.messages || []);
       } else {
-        await messageService.send({
+        const response = await messageService.send({
           senderAccountId: currentUser.id,
           recipientUserId: selectedDirectRecipientId,
           subject: selectedThread.subject,
           body: messageBody,
         });
+        mergeSentMessages([response.data]);
+        setSelectedThreadId(selectedDirectRecipientId);
       }
       setReplyBody('');
       setReplyAttachments([]);
