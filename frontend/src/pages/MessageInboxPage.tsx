@@ -726,7 +726,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const getThreadMessagesWithWindow = (threadId: string, fallbackMessages: UserMessage[]) => {
     const windowState = threadMessageWindows[threadId];
     const sortedFallback = [...fallbackMessages].sort((a, b) => {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
 
     if (!windowState || windowState.messages.length === 0) {
@@ -740,7 +740,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     });
 
     return Array.from(byId.values()).sort((a, b) => {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
   };
 
