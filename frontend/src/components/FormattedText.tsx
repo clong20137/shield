@@ -6,7 +6,7 @@ interface FormattedTextProps {
 }
 
 const inlinePattern = /(\*\*[^*]+\*\*|\*[^*]+\*|\+\+[^+]+\+\+)/gu;
-const htmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span|h1|h2|h3|blockquote|a|figure|img)\b[^>]*>/iu;
+const htmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span|h1|h2|h3|h4|h5|h6|blockquote|a|figure|img)\b[^>]*>/iu;
 const internalLinkTargets = new Set([
   'account-preferences',
   'calendar',
@@ -40,7 +40,7 @@ function sanitizeFormattedHtml(html: string): string {
 
   const parser = new DOMParser();
   const document = parser.parseFromString(`<div>${html}</div>`, 'text/html');
-  const allowedTags = new Set(['P', 'DIV', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'UL', 'OL', 'LI', 'SPAN', 'H1', 'H2', 'H3', 'BLOCKQUOTE', 'A', 'FIGURE', 'IMG']);
+  const allowedTags = new Set(['P', 'DIV', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'UL', 'OL', 'LI', 'SPAN', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'A', 'FIGURE', 'IMG']);
 
   const cleanNode = (node: Node) => {
     Array.from(node.childNodes).forEach((child) => {

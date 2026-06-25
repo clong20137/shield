@@ -1,17 +1,19 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import type { EmojiClickData } from 'emoji-picker-react';
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Edit3, Flag, Heart, LucideIcon, Megaphone, MessageSquare, PartyPopper, Pin, PinOff, Reply, Send, ShieldCheck, Smile, ThumbsUp, Trash2, X } from 'lucide-react';
+import { Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Edit3, Eye, Flag, Heart, Image, LucideIcon, Megaphone, MessageSquare, PartyPopper, Pin, PinOff, Reply, Search, Send, ShieldCheck, Smile, ThumbsUp, Trash2, Upload, X } from 'lucide-react';
 import { RichPostEditor } from './DashboardPage';
 import { UserDetail } from '../components/UserDetail';
 import { FormattedText } from '../components/FormattedText';
 import { MentionTextarea } from '../components/MentionTextarea';
 import { MentionText } from '../components/MentionText';
-import { AuthAccount, DashboardPost, DashboardPostComment, DashboardReaction, User, dashboardPostService, getAssetUrl, handleAssetImageError, userService } from '../services/api';
+import { AuthAccount, DashboardPost, DashboardPostComment, DashboardReaction, MediaLibraryItem, User, dashboardPostService, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, userService } from '../services/api';
 
 const EmojiPicker = lazy(() => import('emoji-picker-react'));
+const DASHBOARD_POST_MEDIA_FOLDER = 'dashboard-posts';
+const MEDIA_PICKER_PAGE_SIZE = 18;
 
 const dashboardReactionOptions: Array<{ value: DashboardReaction; label: string; icon: LucideIcon }> = [
   { value: 'like', label: 'Like', icon: ThumbsUp },
@@ -58,6 +60,10 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
   const [post, setPost] = useState<DashboardPost | null>(null);
   const [comments, setComments] = useState<DashboardPostComment[]>([]);
   const [composeForm, setComposeForm] = useState<DashboardPostComposeForm>(defaultComposeForm);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
+  const [mediaItems, setMediaItems] = useState<MediaLibraryItem[]>([]);
+  const [mediaSearchTerm, setMediaSearchTerm] = useState('');
   const [commentBody, setCommentBody] = useState('');
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState('');
@@ -69,6 +75,8 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
   const [selectedCommentUser, setSelectedCommentUser] = useState<User | null>(null);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMedia, setIsLoadingMedia] = useState(false);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [isSavingPost, setIsSavingPost] = useState(false);
   const [savingReplyParentId, setSavingReplyParentId] = useState<string | null>(null);
@@ -78,6 +86,7 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
   const [reactionPulseMap, setReactionPulseMap] = useState<Record<string, number>>({});
   const canManageDashboard = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('dashboard:manage'));
   const canCreateDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:create'));
+  const canUploadMedia = canCreateDashboardPosts || Boolean(currentUser?.permissions?.includes('media:upload'));
   const isAdministrator = currentUser?.role === 'administrator';
   const canManageComments = Boolean(
     isAdministrator ||
@@ -180,6 +189,81 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
       setError('Failed to publish story.');
     } finally {
       setIsSavingPost(false);
+    }
+  };
+
+  const loadMediaItems = useCallback(async () => {
+    setIsLoadingMedia(true);
+    setError(null);
+    try {
+      const response = await mediaService.getAll({
+        folder: DASHBOARD_POST_MEDIA_FOLDER,
+        q: mediaSearchTerm.trim() || undefined,
+        page: 1,
+        limit: MEDIA_PICKER_PAGE_SIZE,
+      });
+      setMediaItems(response.data.items);
+    } catch (err) {
+      console.error('Failed to load media library images:', err);
+      setError('Failed to load media library.');
+    } finally {
+      setIsLoadingMedia(false);
+    }
+  }, [mediaSearchTerm]);
+
+  useEffect(() => {
+    if (!isCreateMode || !isMediaPickerOpen) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      void loadMediaItems();
+    }, 200);
+
+    return () => window.clearTimeout(timer);
+  }, [isCreateMode, isMediaPickerOpen, loadMediaItems]);
+
+  const uploadStoryImage = async (file: File) => {
+    if (!canUploadMedia) {
+      setError('You do not have permission to upload media.');
+      return;
+    }
+
+    setIsUploadingMedia(true);
+    setError(null);
+    try {
+      const response = await mediaService.uploadImages(DASHBOARD_POST_MEDIA_FOLDER, [file]);
+      const uploadedFileName = response.data.uploaded[0];
+      if (!uploadedFileName) {
+        setError(response.data.skipped[0]?.reason || 'No image was uploaded.');
+        return;
+      }
+      const imageUrl = `/uploads/${DASHBOARD_POST_MEDIA_FOLDER}/${uploadedFileName}`;
+      setComposeForm((form) => ({ ...form, imageUrl }));
+      setIsMediaPickerOpen(false);
+      await loadMediaItems();
+    } catch (err) {
+      console.error('Failed to upload story image:', err);
+      setError('Failed to upload story image.');
+    } finally {
+      setIsUploadingMedia(false);
+    }
+  };
+
+  const uploadInlineStoryImage = async (file: File) => {
+    if (!canUploadMedia) {
+      setError('You do not have permission to upload media.');
+      throw new Error('Missing media upload permission');
+    }
+
+    setError(null);
+    try {
+      const response = await dashboardPostService.uploadImage(file);
+      return response.data.imageUrl;
+    } catch (err) {
+      console.error('Failed to upload inline story image:', err);
+      setError('Failed to insert image into story.');
+      throw err;
     }
   };
 
@@ -639,12 +723,158 @@ export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicit
                   />
                 </label>
               </div>
+              <div className="rounded border border-gray-200 p-3 dark:border-gray-800">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Story image</span>
+                    <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose a dashboard image for the story cover.</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsMediaPickerOpen((isOpen) => !isOpen)}
+                      className="btn-secondary"
+                      aria-label="Choose story image"
+                      title="Choose Image"
+                    >
+                      <Image size={16} />
+                    </button>
+                    {composeForm.imageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setComposeForm((form) => ({ ...form, imageUrl: '' }))}
+                        className="btn-danger"
+                        aria-label="Remove story image"
+                        title="Remove Image"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {isMediaPickerOpen && (
+                  <div className="mt-3 rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <div className="relative min-w-[14rem] flex-1">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <input
+                          value={mediaSearchTerm}
+                          onChange={(event) => setMediaSearchTerm(event.target.value)}
+                          placeholder="Search media"
+                          className="w-full rounded border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-gray-700 dark:bg-gray-900"
+                        />
+                      </div>
+                      {canUploadMedia && (
+                        <label className="btn-secondary cursor-pointer" aria-label="Upload story image" title={isUploadingMedia ? 'Uploading' : 'Upload Image'}>
+                          <Upload size={16} />
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/gif,image/webp"
+                            className="hidden"
+                            disabled={isUploadingMedia}
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              event.target.value = '';
+                              if (file) {
+                                void uploadStoryImage(file);
+                              }
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                    {isLoadingMedia ? (
+                      <div className="loading py-6">Loading media...</div>
+                    ) : mediaItems.length === 0 ? (
+                      <div className="rounded border border-dashed border-gray-300 px-3 py-5 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                        No dashboard post images found.
+                      </div>
+                    ) : (
+                      <div className="grid max-h-80 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-6">
+                        {mediaItems.map((item) => {
+                          const isSelected = composeForm.imageUrl === item.url;
+
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => {
+                                setComposeForm((form) => ({ ...form, imageUrl: item.url }));
+                                setIsMediaPickerOpen(false);
+                              }}
+                              className={`group relative aspect-[4/3] overflow-hidden rounded border bg-white text-left transition hover:border-accent dark:bg-gray-900 ${
+                                isSelected ? 'border-accent ring-2 ring-accent/30' : 'border-gray-200 dark:border-gray-800'
+                              }`}
+                              aria-label={`Use ${item.label}`}
+                              title={item.label}
+                            >
+                              <img src={getAssetThumbnailUrl(item.url, 256)} alt="" onError={(event) => handleAssetThumbnailError(event, item.url)} className="h-full w-full object-cover transition group-hover:scale-[1.03]" />
+                              <span className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-xs font-semibold text-white">
+                                <span className="block truncate">{item.label}</span>
+                              </span>
+                              {isSelected && (
+                                <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-accent text-white shadow">
+                                  <CheckCircle2 size={15} />
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {composeForm.imageUrl ? (
+                  <div className="mt-3 overflow-hidden rounded border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-950">
+                    <img src={getAssetUrl(composeForm.imageUrl)} alt="" onError={handleAssetImageError} className="max-h-72 w-full object-contain" />
+                  </div>
+                ) : (
+                  <div className="mt-3 flex h-28 items-center justify-center rounded border border-dashed border-gray-300 text-gray-400 dark:border-gray-700">
+                    <Image size={24} />
+                  </div>
+                )}
+              </div>
               <div className="block">
-                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Post</span>
-                <RichPostEditor
-                  value={composeForm.body}
-                  onChange={(body) => setComposeForm((form) => ({ ...form, body }))}
-                />
+                <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+                  <span className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Post</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsPreviewMode((isPreview) => !isPreview)}
+                    className="btn-secondary"
+                    aria-label={isPreviewMode ? 'Edit story' : 'Preview story'}
+                    title={isPreviewMode ? 'Edit Story' : 'Preview Story'}
+                  >
+                    {isPreviewMode ? <Edit3 size={16} /> : <Eye size={16} />}
+                    <span>{isPreviewMode ? 'Edit' : 'Preview'}</span>
+                  </button>
+                </div>
+                {isPreviewMode ? (
+                  <article className="overflow-hidden rounded border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
+                    {composeForm.imageUrl && (
+                      <img src={getAssetUrl(composeForm.imageUrl)} alt="" onError={handleAssetImageError} className="max-h-[420px] w-full object-cover" />
+                    )}
+                    <div className="p-4 sm:p-5">
+                      <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold uppercase text-accent">{composeForm.category}</span>
+                      <h1 className="mt-4">{composeForm.title || 'Untitled story'}</h1>
+                      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        Posted by {currentUser?.displayName || currentUser?.email || 'Administrator'} on {new Date().toLocaleString()}
+                      </p>
+                      {composeForm.body ? (
+                        <FormattedText text={composeForm.body} className="mt-6 text-base leading-8 text-gray-700 dark:text-gray-300" />
+                      ) : (
+                        <div className="mt-6 rounded border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                          Story content preview will appear here.
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                ) : (
+                  <RichPostEditor
+                    value={composeForm.body}
+                    onChange={(body) => setComposeForm((form) => ({ ...form, body }))}
+                    onImageUpload={canUploadMedia ? uploadInlineStoryImage : undefined}
+                  />
+                )}
               </div>
               <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-3 dark:border-gray-800">
                 <span>

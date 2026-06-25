@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, Link2, List, ListOrdered, LucideIcon, MapPinned, Megaphone, MessageSquare, Minus, Moon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, Sun, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading, Heart, Image, Indent, Italic, Link2, List, ListOrdered, LucideIcon, MapPinned, Megaphone, MessageSquare, Minus, Moon, NotebookPen, Outdent, PartyPopper, Pencil, Pilcrow, Pin, PinOff, Plus, Quote, Save, Search, Send, Sun, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService, AuthAccount, calendarService, CalendarEntry, DashboardReaction, dashboardPostService, DashboardPost, dashboardSummaryService, DashboardSummary, districtFeedService, DistrictFeedPost, DistrictFeedPostCategory, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
@@ -122,7 +122,15 @@ const getReminderPriorityClass = (priority: Reminder['priority'] = 'Normal') => 
   return 'bg-primary-500/10 text-primary-500 dark:text-white';
 };
 
-const postHtmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span|h1|h2|h3|blockquote|a|figure|img)\b[^>]*>/iu;
+const postHtmlPattern = /<\/?(p|div|br|strong|b|em|i|u|ul|ol|li|span|h1|h2|h3|h4|h5|h6|blockquote|a|figure|img)\b[^>]*>/iu;
+const headingStyleOptions = [
+  { value: 'h1', label: 'H1' },
+  { value: 'h2', label: 'H2' },
+  { value: 'h3', label: 'H3' },
+  { value: 'h4', label: 'H4' },
+  { value: 'h5', label: 'H5' },
+  { value: 'h6', label: 'H6' },
+];
 const internalPostLinks = [
   { value: 'account-preferences', label: 'Account Preferences' },
   { value: 'calendar', label: 'Calendar' },
@@ -166,6 +174,7 @@ export function RichPostEditor({
   const [isLinkPopoverOpen, setIsLinkPopoverOpen] = useState(false);
   const [isUploadingInlineImage, setIsUploadingInlineImage] = useState(false);
   const [linkType, setLinkType] = useState<'internal' | 'external'>('external');
+  const [isHeadingMenuOpen, setIsHeadingMenuOpen] = useState(false);
   const [internalLinkTarget, setInternalLinkTarget] = useState(internalPostLinks[0]?.value || '');
   const [externalLinkUrl, setExternalLinkUrl] = useState('');
   const savedLinkRangeRef = useRef<Range | null>(null);
@@ -184,6 +193,7 @@ export function RichPostEditor({
 
   const applyBlockStyle = (block: string) => {
     runCommand('formatBlock', block);
+    setIsHeadingMenuOpen(false);
   };
 
   const getCurrentEditorRange = () => {
@@ -308,19 +318,46 @@ export function RichPostEditor({
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center gap-2 rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-950">
-        <select
-          onChange={(event) => applyBlockStyle(event.target.value)}
-          defaultValue="p"
-          className="h-10 rounded border border-gray-300 bg-white px-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-          aria-label="Text style"
-          title="Text Style"
+        <button
+          type="button"
+          onMouseDown={preserveEditorFocus}
+          onClick={() => applyBlockStyle('p')}
+          className="btn-secondary"
+          aria-label="Apply paragraph"
+          title="Paragraph"
         >
-          <option value="p">Paragraph</option>
-          <option value="h1">Heading 1</option>
-          <option value="h2">Heading 2</option>
-          <option value="h3">Heading 3</option>
-          <option value="blockquote">Quote</option>
-        </select>
+          <Pilcrow size={16} />
+        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onMouseDown={preserveEditorFocus}
+            onClick={() => setIsHeadingMenuOpen((isOpen) => !isOpen)}
+            className="btn-secondary"
+            aria-label="Choose heading style"
+            title="Heading"
+          >
+            <Heading size={16} />
+            <ChevronDown size={14} />
+          </button>
+          {isHeadingMenuOpen && (
+            <div className="absolute left-0 top-11 z-30 grid w-28 gap-1 rounded border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-800 dark:bg-gray-950">
+              {headingStyleOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onMouseDown={preserveEditorFocus}
+                  onClick={() => applyBlockStyle(option.value)}
+                  className="rounded px-3 py-2 text-left text-sm font-bold text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+                  aria-label={`Apply heading ${option.label}`}
+                  title={option.label}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button type="button" onMouseDown={preserveEditorFocus} onClick={() => runCommand('bold')} className="btn-secondary" aria-label="Bold selected text" title="Bold">
           <Bold size={16} />
         </button>
@@ -350,12 +387,6 @@ export function RichPostEditor({
         </button>
         <button type="button" onMouseDown={preserveEditorFocus} onClick={() => runCommand('indent')} className="btn-secondary" aria-label="Indent text" title="Indent">
           <Indent size={16} />
-        </button>
-        <button type="button" onMouseDown={preserveEditorFocus} onClick={() => applyBlockStyle('h1')} className="btn-secondary" aria-label="Apply heading one" title="Heading 1">
-          <Heading1 size={16} />
-        </button>
-        <button type="button" onMouseDown={preserveEditorFocus} onClick={() => applyBlockStyle('h2')} className="btn-secondary" aria-label="Apply heading two" title="Heading 2">
-          <Heading2 size={16} />
         </button>
         <button type="button" onMouseDown={preserveEditorFocus} onClick={() => applyBlockStyle('blockquote')} className="btn-secondary" aria-label="Apply quote style" title="Quote">
           <Quote size={16} />
