@@ -8997,6 +8997,8 @@ function App() {
             <div
               className="fixed z-[999] w-64 overflow-hidden rounded-xl border border-white/25 bg-white/95 p-1 shadow-[0_20px_55px_rgba(15,23,42,0.28)] ring-1 ring-black/5 backdrop-blur dark:border-gray-700 dark:bg-gray-900 dark:ring-white/10"
               style={{ left: globalContextMenu.x, top: globalContextMenu.y }}
+              onMouseDown={(event) => event.stopPropagation()}
+              onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => event.stopPropagation()}
             >
               <button
@@ -9033,7 +9035,12 @@ function App() {
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={decreaseAppScale}
+                    onMouseDown={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      decreaseAppScale();
+                    }}
                     disabled={!canDecreaseAppScale}
                     className={`rounded-md border border-gray-300 p-1 transition ${canDecreaseAppScale ? 'hover:bg-black/5 dark:border-gray-600 dark:hover:bg-white/10' : 'cursor-not-allowed opacity-40'}`}
                     aria-label="Decrease app scale"
@@ -9045,7 +9052,12 @@ function App() {
                   </span>
                   <button
                     type="button"
-                    onClick={increaseAppScale}
+                    onMouseDown={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      increaseAppScale();
+                    }}
                     disabled={!canIncreaseAppScale}
                     className={`rounded-md border border-gray-300 p-1 transition ${canIncreaseAppScale ? 'hover:bg-black/5 dark:border-gray-600 dark:hover:bg-white/10' : 'cursor-not-allowed opacity-40'}`}
                     aria-label="Increase app scale"
