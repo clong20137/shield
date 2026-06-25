@@ -1,4 +1,4 @@
-import { CSSProperties, FormEvent, ReactNode, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, FormEvent, MouseEvent as ReactMouseEvent, ReactNode, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Command, Delete, Download, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, RefreshCw, Save, Search, Send, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, Users, X } from 'lucide-react';
 import { BrowserRouter as Router, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
@@ -109,6 +109,7 @@ interface RecentConversation {
   latestMessage?: UserMessage;
   unreadPreview: string;
   unreadCount: number;
+  unreadMessageIds: string[];
 }
 
 type RecentPresenceStatus = 'active' | 'away' | 'busy';
@@ -117,6 +118,11 @@ interface RecentPresenceState {
   away: boolean;
   status: RecentPresenceStatus;
   lastSeenAt: string | null;
+}
+
+interface RecentTypingState {
+  name: string;
+  expiresAt: number;
 }
 
 type ReminderAlarmSound = '' | `custom:${string}`;
@@ -1456,6 +1462,9 @@ function buildRecentConversations(messages: UserMessage[], currentUserId: string
     const existingConversation = threadMap.get(id);
     const unreadIncrement = message.recipientUserId === currentUserId && !message.isRead ? 1 : 0;
     const subtitle = getRecentConversationSubtitle(message, currentUserId);
+    const unreadMessageIds = unreadIncrement > 0
+      ? [...(existingConversation?.unreadMessageIds || []), message.id]
+      : existingConversation?.unreadMessageIds || [];
     const nextConversation: RecentConversation = {
       id,
       title: getRecentConversationTitle(message, currentUserId),
@@ -1467,6 +1476,7 @@ function buildRecentConversations(messages: UserMessage[], currentUserId: string
       latestMessage: message,
       unreadPreview: unreadIncrement > 0 ? subtitle : existingConversation?.unreadPreview || '',
       unreadCount: (existingConversation?.unreadCount || 0) + unreadIncrement,
+      unreadMessageIds,
     };
     threadMap.set(id, nextConversation);
   });
@@ -1551,17 +1561,47 @@ function RecentConversationsDock({
   conversations,
   isCollapsed,
   presenceByAccount,
+  typingByConversation,
   onOpenConversation,
+  onMarkRead,
   onCompose,
   onToggleCollapsed,
 }: {
   conversations: RecentConversation[];
   isCollapsed: boolean;
   presenceByAccount: Record<string, RecentPresenceState>;
+  typingByConversation: Record<string, RecentTypingState>;
   onOpenConversation: (conversation: RecentConversation) => void;
+  onMarkRead: (conversation: RecentConversation) => void;
   onCompose: () => void;
   onToggleCollapsed: () => void;
 }) {
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; conversation: RecentConversation } | null>(null);
+
+  const openContextMenu = (event: ReactMouseEvent, conversation: RecentConversation) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({
+      x: Math.min(event.clientX, window.innerWidth - 220),
+      y: Math.min(event.clientY, window.innerHeight - 180),
+      conversation,
+    });
+  };
+
+  useEffect(() => {
+    if (!contextMenu) {
+      return undefined;
+    }
+
+    const closeContextMenu = () => setContextMenu(null);
+    window.addEventListener('click', closeContextMenu);
+    window.addEventListener('scroll', closeContextMenu, true);
+    return () => {
+      window.removeEventListener('click', closeContextMenu);
+      window.removeEventListener('scroll', closeContextMenu, true);
+    };
+  }, [contextMenu]);
+
   return (
     <aside
       className="pointer-events-none fixed bottom-5 right-5 z-40 hidden flex-col items-end gap-2 md:flex"
@@ -1585,73 +1625,98 @@ function RecentConversationsDock({
         >
           <Plus size={22} />
         </button>
-        {conversations.map((conversation) => (
-          <div
-            key={conversation.id}
-            className={`group/recent relative flex items-center transition-all duration-300 ease-out ${
-              isCollapsed ? 'pointer-events-none -mb-12 translate-y-8 scale-75 opacity-0' : 'mb-0 translate-y-0 scale-100 opacity-100'
-            }`}
-            aria-hidden={isCollapsed}
-          >
-            {conversation.unreadCount > 0 && conversation.unreadPreview && (
-              <button
-                type="button"
-                onClick={() => onOpenConversation(conversation)}
-                tabIndex={isCollapsed ? -1 : 0}
-                className="recent-message-preview-pop absolute right-14 w-64 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left shadow-xl transition hover:border-accent dark:border-gray-800 dark:bg-gray-900"
-                aria-label={`Open unread message from ${conversation.title}`}
-              >
-                <span className="block truncate text-xs font-black text-primary-500 dark:text-blue-100">{conversation.title}</span>
-                <span className="mt-0.5 block truncate text-xs font-semibold text-gray-600 dark:text-gray-300">{conversation.unreadPreview}</span>
-              </button>
-            )}
-            {conversation.unreadCount === 0 && (
-              <span className="pointer-events-none absolute right-14 max-w-56 translate-x-2 whitespace-nowrap rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-black text-primary-500 opacity-0 shadow-xl transition duration-200 group-hover/recent:translate-x-0 group-hover/recent:opacity-100 dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100">
-                {conversation.title}
-              </span>
-            )}
-            {(() => {
-              const presence = conversation.threadType === 'direct'
-                ? getRecentConversationPresence(conversation, presenceByAccount)
-                : null;
-
-              return (
+        {conversations.map((conversation) => {
+          const typing = typingByConversation[conversation.id];
+          const previewText = typing ? `${typing.name} is typing...` : conversation.unreadPreview;
+          return (
+            <div
+              key={conversation.id}
+              className={`group/recent relative flex items-center transition-all duration-300 ease-out ${
+                isCollapsed ? 'pointer-events-none -mb-12 translate-y-8 scale-75 opacity-0' : 'mb-0 translate-y-0 scale-100 opacity-100'
+              }`}
+              aria-hidden={isCollapsed}
+              onContextMenu={(event) => openContextMenu(event, conversation)}
+            >
+              {((conversation.unreadCount > 0 && conversation.unreadPreview) || typing) && (
                 <button
                   type="button"
                   onClick={() => onOpenConversation(conversation)}
                   tabIndex={isCollapsed ? -1 : 0}
-                  className={`group relative flex h-12 w-12 items-center justify-center rounded-full bg-primary-500 text-sm font-black text-white shadow-sm ring-2 transition hover:-translate-x-1 hover:scale-105 hover:ring-accent ${presence?.ringClass || 'ring-white dark:ring-gray-900'}`}
-                  aria-label={`Open conversation with ${conversation.title}${presence ? `, ${presence.label}` : ''}`}
-                  title={`${conversation.title}${presence ? ` - ${presence.label}` : ''}${conversation.subtitle ? ` - ${conversation.subtitle}` : ''}`}
+                  className={`recent-message-preview-pop absolute right-14 w-64 rounded-lg border bg-white px-3 py-2 text-left shadow-xl transition hover:border-accent dark:bg-gray-900 ${
+                    typing ? 'border-accent/40 dark:border-accent/40' : 'border-gray-200 dark:border-gray-800'
+                  }`}
+                  aria-label={typing ? `${conversation.title} is typing` : `Open unread message from ${conversation.title}`}
                 >
-                  {conversation.imageUrl ? (
-                    <img
-                      src={getAssetThumbnailUrl(conversation.imageUrl, 96)}
-                      alt=""
-                      onError={(event) => handleAssetThumbnailError(event, conversation.imageUrl)}
-                      className="h-full w-full rounded-full object-cover"
-                    />
-                  ) : conversation.threadType !== 'direct' ? (
-                    <Users size={19} />
-                  ) : (
-                    getInitials(conversation.title)
-                  )}
-                  {presence && (
-                    <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-white dark:border-gray-900 dark:bg-gray-900">
-                      {presence.showPulse && <span className={`absolute inset-[-0.2rem] rounded-full border shield-online-pulse ${presence.pulseClass}`} />}
-                      <span className={`relative h-2.5 w-2.5 rounded-full ${presence.dotClass}`} />
-                    </span>
-                  )}
-                  {conversation.unreadCount > 0 && (
-                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-danger px-1 text-[10px] font-black text-white dark:border-gray-900">
-                      {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
-                    </span>
-                  )}
+                  <span className="block truncate text-xs font-black text-primary-500 dark:text-blue-100">{conversation.title}</span>
+                  <span className="mt-0.5 flex items-center gap-1 truncate text-xs font-semibold text-gray-600 dark:text-gray-300">
+                    {typing && (
+                      <span className="inline-flex items-center gap-0.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse [animation-delay:120ms]" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse [animation-delay:240ms]" />
+                      </span>
+                    )}
+                    <span className="truncate">{previewText}</span>
+                  </span>
                 </button>
-              );
-            })()}
-          </div>
-        ))}
+              )}
+              {conversation.unreadCount === 0 && !typing && (
+                <span className="pointer-events-none absolute right-14 max-w-56 translate-x-2 whitespace-nowrap rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-black text-primary-500 opacity-0 shadow-xl transition duration-200 group-hover/recent:translate-x-0 group-hover/recent:opacity-100 dark:border-gray-800 dark:bg-gray-900 dark:text-blue-100">
+                  {conversation.title}
+                </span>
+              )}
+              {(() => {
+                const presence = conversation.threadType === 'direct'
+                  ? getRecentConversationPresence(conversation, presenceByAccount)
+                  : null;
+
+                return (
+                  <button
+                    type="button"
+                    onClick={() => onOpenConversation(conversation)}
+                    onContextMenu={(event) => openContextMenu(event, conversation)}
+                    tabIndex={isCollapsed ? -1 : 0}
+                    className={`group relative flex h-12 w-12 items-center justify-center rounded-full bg-primary-500 text-sm font-black text-white shadow-sm ring-2 transition hover:-translate-x-1 hover:scale-105 hover:ring-accent ${typing ? 'ring-accent shadow-[0_0_0_4px_rgba(37,99,235,0.12)]' : presence?.ringClass || 'ring-white dark:ring-gray-900'}`}
+                    aria-label={`Open conversation with ${conversation.title}${typing ? ', typing' : presence ? `, ${presence.label}` : ''}`}
+                    title={`${conversation.title}${typing ? ' - typing' : presence ? ` - ${presence.label}` : ''}${conversation.subtitle ? ` - ${conversation.subtitle}` : ''}`}
+                  >
+                    {conversation.imageUrl ? (
+                      <img
+                        src={getAssetThumbnailUrl(conversation.imageUrl, 96)}
+                        alt=""
+                        onError={(event) => handleAssetThumbnailError(event, conversation.imageUrl)}
+                        className="h-full w-full rounded-full object-cover"
+                      />
+                    ) : conversation.threadType !== 'direct' ? (
+                      <Users size={19} />
+                    ) : (
+                      getInitials(conversation.title)
+                    )}
+                    {presence && !typing && (
+                      <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-white dark:border-gray-900 dark:bg-gray-900">
+                        {presence.showPulse && <span className={`absolute inset-[-0.2rem] rounded-full border shield-online-pulse ${presence.pulseClass}`} />}
+                        <span className={`relative h-2.5 w-2.5 rounded-full ${presence.dotClass}`} />
+                      </span>
+                    )}
+                    {typing && (
+                      <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-accent text-white dark:border-gray-900">
+                        <span className="flex gap-0.5">
+                          <span className="h-1 w-1 rounded-full bg-white animate-pulse" />
+                          <span className="h-1 w-1 rounded-full bg-white animate-pulse [animation-delay:120ms]" />
+                        </span>
+                      </span>
+                    )}
+                    {conversation.unreadCount > 0 && (
+                      <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-danger px-1 text-[10px] font-black text-white dark:border-gray-900">
+                        {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })()}
+            </div>
+          );
+        })}
         <button
           type="button"
           onClick={onToggleCollapsed}
@@ -1662,6 +1727,55 @@ function RecentConversationsDock({
           <ChevronDown className={`transition-transform duration-300 ${isCollapsed ? 'rotate-180' : 'rotate-0'}`} size={16} />
         </button>
       </div>
+      {contextMenu && (
+        <div
+          className="quick-launch-context-menu pointer-events-auto fixed z-[90] w-52 overflow-hidden rounded-lg border border-gray-200 bg-white p-1 text-sm shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <button
+            type="button"
+            className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
+            onClick={() => {
+              onOpenConversation(contextMenu.conversation);
+              setContextMenu(null);
+            }}
+          >
+            Open conversation
+          </button>
+          <button
+            type="button"
+            disabled={contextMenu.conversation.unreadCount === 0}
+            className="quick-launch-context-menu-item text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-200"
+            onClick={() => {
+              onMarkRead(contextMenu.conversation);
+              setContextMenu(null);
+            }}
+          >
+            Mark read
+          </button>
+          <button
+            type="button"
+            className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
+            onClick={() => {
+              onCompose();
+              setContextMenu(null);
+            }}
+          >
+            New message
+          </button>
+          <button
+            type="button"
+            className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
+            onClick={() => {
+              onToggleCollapsed();
+              setContextMenu(null);
+            }}
+          >
+            {isCollapsed ? 'Expand dock' : 'Collapse dock'}
+          </button>
+        </div>
+      )}
     </aside>
   );
 }
@@ -5934,6 +6048,7 @@ function App() {
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
   const [recentConversationPresenceByAccount, setRecentConversationPresenceByAccount] = useState<Record<string, RecentPresenceState>>({});
+  const [recentConversationTypingById, setRecentConversationTypingById] = useState<Record<string, RecentTypingState>>({});
   const [areRecentConversationsCollapsed, setAreRecentConversationsCollapsed] = useState(false);
   const [bugReports, setBugReports] = useState<BugReport[]>([]);
   const [sidebarCalendarEntries, setSidebarCalendarEntries] = useState<CalendarEntry[]>([]);
@@ -7450,10 +7565,40 @@ function App() {
         console.error('Failed to parse recent conversation presence update:', error);
       }
     };
+    const handleTypingUpdate = (event: MessageEvent) => {
+      try {
+        const payload = JSON.parse(event.data || '{}') as {
+          actorAccountId?: string;
+          typingThreadId?: string;
+          typingName?: string;
+          typingIsActive?: boolean;
+        };
+        const conversationId = payload.typingThreadId || payload.actorAccountId;
+        if (!conversationId || payload.actorAccountId === currentUser.id) {
+          return;
+        }
+
+        setRecentConversationTypingById((current) => {
+          const next = { ...current };
+          if (payload.typingIsActive === false) {
+            delete next[conversationId];
+          } else {
+            next[conversationId] = {
+              name: payload.typingName || 'Someone',
+              expiresAt: Date.now() + 3500,
+            };
+          }
+          return next;
+        });
+      } catch (error) {
+        console.error('Failed to parse recent conversation typing update:', error);
+      }
+    };
     eventSource.addEventListener('message-created', queueRecentConversationLoad);
     eventSource.addEventListener('message-read', queueRecentConversationLoad);
     eventSource.addEventListener('message-archived', queueRecentConversationLoad);
     eventSource.addEventListener('message-deleted', queueRecentConversationLoad);
+    eventSource.addEventListener('message-typing', handleTypingUpdate);
     eventSource.addEventListener('presence-updated', handlePresenceUpdate);
     eventSource.addEventListener('error', (event) => {
       console.error('Recent conversations realtime connection error:', event);
@@ -7465,6 +7610,7 @@ function App() {
       if (refreshTimer) {
         window.clearTimeout(refreshTimer);
       }
+      eventSource.removeEventListener('message-typing', handleTypingUpdate);
       eventSource.removeEventListener('presence-updated', handlePresenceUpdate);
       eventSource.close();
     };
@@ -7473,7 +7619,27 @@ function App() {
   useEffect(() => {
     if (!currentUser || !messagePreferences.receiveMessages) {
       setRecentConversationPresenceByAccount({});
+      setRecentConversationTypingById({});
     }
+  }, [currentUser, messagePreferences.receiveMessages]);
+
+  useEffect(() => {
+    if (!currentUser || !messagePreferences.receiveMessages) {
+      return undefined;
+    }
+
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      setRecentConversationTypingById((current) => {
+        const activeEntries = Object.entries(current).filter(([, typing]) => typing.expiresAt > now);
+        if (activeEntries.length === Object.keys(current).length) {
+          return current;
+        }
+        return Object.fromEntries(activeEntries);
+      });
+    }, 1200);
+
+    return () => window.clearInterval(timer);
   }, [currentUser, messagePreferences.receiveMessages]);
 
   useEffect(() => {
@@ -7936,6 +8102,21 @@ function App() {
     setMessageTargetUser(null);
     setMessageTargetThreadId(conversation.id);
     openMessagesModal();
+  };
+
+  const markRecentConversationRead = async (conversation: RecentConversation) => {
+    const unreadMessageIds = conversation.unreadMessageIds.filter(Boolean);
+    if (unreadMessageIds.length === 0 || !currentUser) {
+      return;
+    }
+
+    try {
+      await Promise.all(unreadMessageIds.map((messageId) => messageService.markRead(messageId, currentUser.id)));
+      window.dispatchEvent(new CustomEvent('shield:messages-updated'));
+    } catch (error) {
+      console.error('Failed to mark recent conversation read:', error);
+      showToast('error', getErrorMessage(error, 'Failed to mark conversation read.'), { saveToNotifications: false });
+    }
   };
 
   const openNewMessageComposer = () => {
@@ -9163,7 +9344,9 @@ function App() {
               conversations={recentConversations}
               isCollapsed={areRecentConversationsCollapsed}
               presenceByAccount={recentConversationPresenceByAccount}
+              typingByConversation={recentConversationTypingById}
               onOpenConversation={openRecentConversation}
+              onMarkRead={markRecentConversationRead}
               onCompose={openNewMessageComposer}
               onToggleCollapsed={() => setAreRecentConversationsCollapsed((collapsed) => !collapsed)}
             />
