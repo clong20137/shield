@@ -122,6 +122,7 @@ function sendEventForViewer(viewerAccountId: string, response: Response, payload
 
 export function addMessageEventClient(accountId: string, response: Response) {
   const accountClients = clients.get(accountId) || new Set<Response>();
+  const isFirstClientForAccount = accountClients.size === 0;
   accountClients.add(response);
   clients.set(accountId, accountClients);
 
@@ -196,9 +197,11 @@ export function addMessageEventClient(accountId: string, response: Response) {
     });
   };
 
-  void announceOnline().catch((error) => {
-    console.error('Failed to announce message presence:', error);
-  });
+  if (isFirstClientForAccount) {
+    void announceOnline().catch((error) => {
+      console.error('Failed to announce message presence:', error);
+    });
+  }
 
   const keepAlive = windowlessInterval(() => {
     response.write(': keep-alive\n\n');

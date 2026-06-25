@@ -613,10 +613,18 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     });
 
     setSentMessages((currentMessages) => {
+      const incomingSentMessages = messages.filter((message) => message.senderAccountId === currentUser.id);
       const nextMessages = new Map(currentMessages.map((message) => [message.id, message]));
-      messages
-        .filter((message) => message.senderAccountId === currentUser.id)
-        .forEach((message) => nextMessages.set(message.id, message));
+      incomingSentMessages.forEach((message) => {
+        currentMessages
+          .filter((existingMessage) =>
+            existingMessage.id.startsWith('local-') &&
+            existingMessage.body === message.body &&
+            existingMessage.recipientUserId === message.recipientUserId
+          )
+          .forEach((existingMessage) => nextMessages.delete(existingMessage.id));
+        nextMessages.set(message.id, message);
+      });
       return Array.from(nextMessages.values());
     });
   };
@@ -646,8 +654,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           void loadMessages(false);
           return;
         }
-        setInboxMessages((messages) => messages.map((message) => (message.id === payload.message?.id ? payload.message : message)));
-        setSentMessages((messages) => messages.map((message) => (message.id === payload.message?.id ? payload.message : message)));
+        mergeThreadMessages([payload.message]);
       } catch (err) {
         console.error('Message update parse error:', err);
         void loadMessages(false);
@@ -709,7 +716,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         loadMessages(false);
       }
     };
-    eventSource?.addEventListener('message-created', handleRealtimeMessageUpdate);
+    eventSource?.addEventListener('message-created', handleMessageUpdate);
     eventSource?.addEventListener('message-read', handleRealtimeMessageUpdate);
     eventSource?.addEventListener('message-reaction', handleMessageUpdate);
     eventSource?.addEventListener('message-typing', handleTypingUpdate);

@@ -5955,6 +5955,7 @@ function App() {
   const awayPresenceTimerRef = useRef<number | null>(null);
   const awayPresenceStateRef = useRef<'active' | 'away' | 'busy'>('active');
   const awayPresenceRequestRef = useRef(0);
+  const lastPresencePostRef = useRef<Record<'active' | 'away' | 'busy', number>>({ active: 0, away: 0, busy: 0 });
   const sidebarCalendarRefreshTimerRef = useRef<number | null>(null);
   const messageUnreadRefreshTimerRef = useRef<number | null>(null);
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
@@ -6085,6 +6086,12 @@ function App() {
           console.error('Failed to update desktop presence status:', error);
         });
       }
+      const now = Date.now();
+      const minimumInterval = status === 'active' ? 45 * 1000 : 10 * 1000;
+      if (!force && now - lastPresencePostRef.current[status] < minimumInterval) {
+        return;
+      }
+      lastPresencePostRef.current[status] = now;
       const requestId = awayPresenceRequestRef.current + 1;
       awayPresenceRequestRef.current = requestId;
       messageService.updatePresence(status).catch((error) => {
@@ -7417,31 +7424,6 @@ function App() {
 
     const eventsUrl = getMessageEventsUrl();
     const eventSource = new EventSource(eventsUrl, { withCredentials: true });
-    eventSource.addEventListener('message-created', queueRecentConversationLoad);
-    eventSource.addEventListener('message-read', queueRecentConversationLoad);
-    eventSource.addEventListener('message-archived', queueRecentConversationLoad);
-    eventSource.addEventListener('message-deleted', queueRecentConversationLoad);
-    eventSource.addEventListener('error', (event) => {
-      console.error('Recent conversations realtime connection error:', event);
-    });
-
-    return () => {
-      isMounted = false;
-      window.removeEventListener('shield:messages-updated', queueRecentConversationLoad);
-      if (refreshTimer) {
-        window.clearTimeout(refreshTimer);
-      }
-      eventSource.close();
-    };
-  }, [currentUser, messagePreferences.receiveMessages]);
-
-  useEffect(() => {
-    if (!currentUser || !messagePreferences.receiveMessages) {
-      setRecentConversationPresenceByAccount({});
-      return;
-    }
-
-    const eventSource = new EventSource(getMessageEventsUrl(), { withCredentials: true });
     const handlePresenceUpdate = (event: MessageEvent) => {
       try {
         const payload = JSON.parse(event.data || '{}') as {
@@ -7469,16 +7451,30 @@ function App() {
         console.error('Failed to parse recent conversation presence update:', error);
       }
     };
-
+    eventSource.addEventListener('message-created', queueRecentConversationLoad);
+    eventSource.addEventListener('message-read', queueRecentConversationLoad);
+    eventSource.addEventListener('message-archived', queueRecentConversationLoad);
+    eventSource.addEventListener('message-deleted', queueRecentConversationLoad);
     eventSource.addEventListener('presence-updated', handlePresenceUpdate);
     eventSource.addEventListener('error', (event) => {
-      console.error('Recent conversation presence connection error:', event);
+      console.error('Recent conversations realtime connection error:', event);
     });
 
     return () => {
+      isMounted = false;
+      window.removeEventListener('shield:messages-updated', queueRecentConversationLoad);
+      if (refreshTimer) {
+        window.clearTimeout(refreshTimer);
+      }
       eventSource.removeEventListener('presence-updated', handlePresenceUpdate);
       eventSource.close();
     };
+  }, [currentUser, messagePreferences.receiveMessages]);
+
+  useEffect(() => {
+    if (!currentUser || !messagePreferences.receiveMessages) {
+      setRecentConversationPresenceByAccount({});
+    }
   }, [currentUser, messagePreferences.receiveMessages]);
 
   useEffect(() => {

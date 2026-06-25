@@ -291,8 +291,7 @@ export class UserMessageModel {
     try {
       const senderLastSeenSql = visibleLastSeenExpression('s', Boolean(options.canViewIncognitoPresence));
       const recipientLastSeenSql = visibleLastSeenExpression('r', Boolean(options.canViewIncognitoPresence));
-      const [rows] = await conn.query<UserMessageRow[]>(
-        `SELECT m.*,
+      const selectMessageSql = `SELECT m.*,
           COALESCE(s.displayName, CONCAT(s.firstName, ' ', s.lastName), s.email) as senderName,
           s.email as senderEmail,
           s.rank as senderRank,
@@ -307,42 +306,37 @@ export class UserMessageModel {
           r.receivesMessages as recipientReceivesMessages
         FROM user_messages m
         LEFT JOIN users s ON s.id = m.senderAccountId
-        LEFT JOIN users r ON r.id = m.recipientUserId
-        WHERE (
-          (
-            m.threadId = ?
-            AND (m.senderAccountId = ? OR m.recipientUserId = ?)
-            AND (
-              (m.senderAccountId = ? AND m.senderDeleted = 0)
-              OR (m.recipientUserId = ? AND m.recipientDeleted = 0 AND m.isArchived = 0)
-            )
+        LEFT JOIN users r ON r.id = m.recipientUserId`;
+      const [groupRows] = await conn.query<UserMessageRow[]>(
+        `${selectMessageSql}
+        WHERE m.threadId = ?
+          AND (m.senderAccountId = ? OR m.recipientUserId = ?)
+          AND (
+            (m.senderAccountId = ? AND m.senderDeleted = 0)
+            OR (m.recipientUserId = ? AND m.recipientDeleted = 0 AND m.isArchived = 0)
           )
-          OR (
-            COALESCE(m.threadType, 'direct') = 'direct'
-            AND (
-              (m.senderAccountId = ? AND m.recipientUserId = ? AND m.senderDeleted = 0)
-              OR (m.senderAccountId = ? AND m.recipientUserId = ? AND m.recipientDeleted = 0 AND m.isArchived = 0)
-            )
-          )
-        )
         ORDER BY m.createdAt DESC
         LIMIT ? OFFSET ?`,
-        [
-          threadId,
-          accountId,
-          accountId,
-          accountId,
-          accountId,
-          accountId,
-          threadId,
-          threadId,
-          accountId,
-          limit,
-          offset,
-        ]
+        [threadId, accountId, accountId, accountId, accountId, limit, offset]
+      );
+      const [directRows] = await conn.query<UserMessageRow[]>(
+        `${selectMessageSql}
+        WHERE COALESCE(m.threadType, 'direct') = 'direct'
+          AND (
+            (m.senderAccountId = ? AND m.recipientUserId = ? AND m.senderDeleted = 0)
+            OR (m.senderAccountId = ? AND m.recipientUserId = ? AND m.recipientDeleted = 0 AND m.isArchived = 0)
+          )
+        ORDER BY m.createdAt DESC
+        LIMIT ? OFFSET ?`,
+        [accountId, threadId, threadId, accountId, limit, offset]
       );
 
-      return rows.map(toUserMessage);
+      const rowsById = new Map<string, UserMessageRow>();
+      [...groupRows, ...directRows].forEach((row) => rowsById.set(row.id, row));
+      return Array.from(rowsById.values())
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, limit)
+        .map(toUserMessage);
     } finally {
       conn.release();
     }

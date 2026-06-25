@@ -285,10 +285,15 @@ export class MessageController {
         message: `${sender.displayName || sender.email || 'A user'} mentioned you in Messages.`,
       });
 
-      broadcastMessageEvent(participantIds, {
-        type: 'message-created',
-        message: firstMessage,
-        actorAccountId: senderAccountId,
+      participantIds.forEach((participantId) => {
+        const participantMessage = enrichedMessages.find((message) =>
+          message && (message.senderAccountId === participantId || message.recipientUserId === participantId)
+        );
+        broadcastMessageEvent([participantId], {
+          type: 'message-created',
+          message: participantMessage || firstMessage,
+          actorAccountId: senderAccountId,
+        });
       });
 
       res.status(201).json({

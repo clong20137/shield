@@ -452,6 +452,7 @@ export async function initializeDatabase() {
   await ensureIndex('user_messages', 'idx_messages_recipient_visible_created', '`recipientUserId`, `recipientDeleted`, `isArchived`, `createdAt`');
   await ensureIndex('user_messages', 'idx_messages_sender_visible_created', '`senderAccountId`, `senderDeleted`, `createdAt`');
   await ensureIndex('user_messages', 'idx_messages_recipient_read_created', '`recipientUserId`, `isRead`, `createdAt`');
+  await ensureIndex('user_messages', 'idx_messages_unread_visible', '`recipientUserId`, `recipientDeleted`, `isArchived`, `isRead`');
   await ensureIndex('user_messages', 'idx_messages_thread_created', '`senderAccountId`, `recipientUserId`, `createdAt`');
   await ensureIndex('user_messages', 'idx_messages_group_thread_created', '`threadId`, `createdAt`');
 
