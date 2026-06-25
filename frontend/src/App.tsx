@@ -9436,6 +9436,9 @@ function App() {
                           />
                         )}
                       />
+                      {currentUser && (
+                        <Route path="/updates/new" element={<DashboardPostPage currentUser={currentUser} onToast={showToast} />} />
+                      )}
                       {currentUser && <Route path="/updates/:postId" element={<DashboardPostPage currentUser={currentUser} onToast={showToast} />} />}
                       {currentUser && (
                         <Route

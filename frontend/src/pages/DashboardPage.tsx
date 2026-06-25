@@ -152,7 +152,7 @@ function getPostBodyText(value: string): string {
   return (container.textContent || '').trim();
 }
 
-function RichPostEditor({
+export function RichPostEditor({
   value,
   onChange,
   onImageUpload,
@@ -219,6 +219,30 @@ function RichPostEditor({
   const closeLinkPopover = () => {
     setIsLinkPopoverOpen(false);
     savedLinkRangeRef.current = null;
+  };
+
+  const handleEditorKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Tab' || !editorRef.current) {
+      return;
+    }
+
+    const selection = window.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    if (!range) {
+      return;
+    }
+
+    const anchorNode = range.startContainer.nodeType === Node.TEXT_NODE
+      ? range.startContainer.parentElement
+      : (range.startContainer as Element);
+
+    const listItem = anchorNode?.closest?.('li');
+    if (!listItem || !editorRef.current.contains(listItem)) {
+      return;
+    }
+
+    event.preventDefault();
+    runCommand(event.shiftKey ? 'outdent' : 'indent');
   };
 
   const getNormalizedExternalUrl = () => {
@@ -448,6 +472,7 @@ function RichPostEditor({
         tabIndex={0}
         role="textbox"
         aria-multiline="true"
+        onKeyDown={handleEditorKeyDown}
         onClick={() => editorRef.current?.focus()}
         onInput={(event) => onChange(event.currentTarget.innerHTML)}
         onBlur={(event) => onChange(event.currentTarget.innerHTML)}
@@ -902,6 +927,7 @@ function DashboardNews({
   const canEditDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:edit'));
   const canDeleteDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:delete'));
   const canUploadMedia = canCreateDashboardPosts || canEditDashboardPosts || Boolean(currentUser?.permissions?.includes('media:upload'));
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!initialPosts) {
@@ -1182,7 +1208,7 @@ function DashboardNews({
             {canCreateDashboardPosts && (
               <button
                 type="button"
-                onClick={() => setIsCreatePostOpen(true)}
+                onClick={() => navigate('/updates/new')}
                 className="btn-primary"
                 aria-label="Create new story"
                 title="New Story"
@@ -1224,7 +1250,7 @@ function DashboardNews({
                   {canCreateDashboardPosts && index === normalizedActiveFeaturedIndex && (
                     <button
                       type="button"
-                      onClick={() => setIsCreatePostOpen(true)}
+                      onClick={() => navigate('/updates/new')}
                       className="inline-flex h-8 items-center gap-1.5 rounded border border-accent/60 bg-accent px-2.5 text-xs font-bold text-white shadow-lg backdrop-blur transition hover:bg-accent/90"
                       aria-label="Create new story"
                       title="New Story"

@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import type { EmojiClickData } from 'emoji-picker-react';
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Edit3, Flag, Heart, LucideIcon, Megaphone, MessageSquare, PartyPopper, Pin, PinOff, Reply, Send, ShieldCheck, Smile, ThumbsUp, Trash2, X } from 'lucide-react';
+import { RichPostEditor } from './DashboardPage';
 import { UserDetail } from '../components/UserDetail';
 import { FormattedText } from '../components/FormattedText';
 import { MentionTextarea } from '../components/MentionTextarea';
@@ -24,6 +25,22 @@ interface DashboardPostPageProps {
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
+interface DashboardPostComposeForm {
+  title: string;
+  body: string;
+  category: DashboardPost['category'];
+  imageUrl: string;
+  allowComments: boolean;
+}
+
+const defaultComposeForm: DashboardPostComposeForm = {
+  title: '',
+  body: '',
+  category: 'Update',
+  imageUrl: '',
+  allowComments: true,
+};
+
 const sortComments = (items: DashboardPostComment[]) =>
   [...items].sort((a, b) => {
     if (a.isPinned !== b.isPinned) {
@@ -36,8 +53,10 @@ const sortComments = (items: DashboardPostComment[]) =>
 export function DashboardPostPage({ currentUser, onToast }: DashboardPostPageProps) {
   const { postId = '' } = useParams();
   const navigate = useNavigate();
+  const isCreateMode = postId === 'new';
   const [post, setPost] = useState<DashboardPost | null>(null);
   const [comments, setComments] = useState<DashboardPostComment[]>([]);
+  const [composeForm, setComposeForm] = useState<DashboardPostComposeForm>(defaultComposeForm);
   const [commentBody, setCommentBody] = useState('');
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState('');
@@ -50,11 +69,14 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingComment, setIsSavingComment] = useState(false);
+  const [isSavingPost, setIsSavingPost] = useState(false);
   const [savingReplyParentId, setSavingReplyParentId] = useState<string | null>(null);
   const [savingEditCommentId, setSavingEditCommentId] = useState<string | null>(null);
   const [moderatingCommentId, setModeratingCommentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reactionPulseMap, setReactionPulseMap] = useState<Record<string, number>>({});
+  const canManageDashboard = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('dashboard:manage'));
+  const canCreateDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:create'));
   const isAdministrator = currentUser?.role === 'administrator';
   const canManageComments = Boolean(
     isAdministrator ||
@@ -63,7 +85,11 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
   );
 
   const loadPost = async () => {
-    if (!postId) return;
+    if (!postId || isCreateMode) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
@@ -89,11 +115,18 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
   };
 
   useEffect(() => {
+    if (isCreateMode) {
+      setPost(null);
+      setComments([]);
+      setIsLoading(false);
+      return;
+    }
+
     void loadPost();
-  }, [postId]);
+  }, [postId, isCreateMode]);
 
   useEffect(() => {
-    if (!postId) return;
+    if (!postId || isCreateMode) return;
 
     const handleDashboardUpdate = (event: Event) => {
       try {
@@ -111,6 +144,43 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
     window.addEventListener('shield:dashboard-updated', handleDashboardUpdate);
     return () => window.removeEventListener('shield:dashboard-updated', handleDashboardUpdate);
   }, [postId]);
+
+  const createStory = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!currentUser) {
+      setError('You need to sign in to publish a story.');
+      return;
+    }
+
+    if (!canCreateDashboardPosts) {
+      setError('You do not have permission to create stories.');
+      return;
+    }
+
+    if (!composeForm.title.trim() || !composeForm.body.replace(/<[^>]*>/gu, '').trim()) {
+      setError('Title and story body are required.');
+      return;
+    }
+
+    setIsSavingPost(true);
+    setError(null);
+    try {
+      const response = await dashboardPostService.create({
+        ...composeForm,
+        imageUrl: composeForm.imageUrl || null,
+        requesterId: currentUser.id,
+        authorName: currentUser.displayName || currentUser.email,
+      });
+      onToast('success', 'Story published.');
+      navigate(`/updates/${response.data.id}`);
+    } catch (err) {
+      console.error('Failed to create story:', err);
+      setError('Failed to publish story.');
+    } finally {
+      setIsSavingPost(false);
+    }
+  };
 
   const submitComment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -514,6 +584,105 @@ export function DashboardPostPage({ currentUser, onToast }: DashboardPostPagePro
       </div>
     );
   };
+
+  if (isCreateMode) {
+    return (
+      <div className="mx-auto max-w-4xl">
+        <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <Link to="/" className="text-sm font-bold text-accent">Back to dashboard</Link>
+              <h1 className="mt-2 text-xl font-bold sm:text-2xl">Create New Story</h1>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="btn-secondary"
+              aria-label="Cancel story"
+              title="Cancel"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {error && <div className="error mt-4">{error}</div>}
+
+          {!canCreateDashboardPosts ? (
+            <div className="mt-4 rounded border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700">
+              You do not have permission to create stories.
+            </div>
+          ) : (
+            <form onSubmit={createStory} className="mt-4 space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-[150px_minmax(0,1fr)]">
+                <label>
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Type</span>
+                  <select
+                    value={composeForm.category}
+                    onChange={(event) =>
+                      setComposeForm((form) => ({ ...form, category: event.target.value as DashboardPost['category'] }))
+                    }
+                    className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                  >
+                    <option>Update</option>
+                    <option>News</option>
+                    <option>Alert</option>
+                  </select>
+                </label>
+                <label>
+                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Title</span>
+                  <input
+                    value={composeForm.title}
+                    onChange={(event) => setComposeForm((form) => ({ ...form, title: event.target.value }))}
+                    className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                    placeholder="Add a story title"
+                  />
+                </label>
+              </div>
+              <div className="block">
+                <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Post</span>
+                <RichPostEditor
+                  value={composeForm.body}
+                  onChange={(body) => setComposeForm((form) => ({ ...form, body }))}
+                />
+              </div>
+              <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-3 dark:border-gray-800">
+                <span>
+                  <span className="block text-sm font-bold text-gray-700 dark:text-gray-300">Allow comments</span>
+                  <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                    Readers can comment on the full story page.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={composeForm.allowComments}
+                  onChange={(event) => setComposeForm((form) => ({ ...form, allowComments: event.target.checked }))}
+                />
+              </label>
+              <div className="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
+                <button
+                  type="button"
+                  onClick={() => navigate('/')}
+                  className="btn-secondary"
+                  aria-label="Cancel story"
+                  title="Cancel"
+                >
+                  <X size={16} />
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={isSavingPost} aria-label="Publish story" title={isSavingPost ? 'Publishing' : 'Publish'}>
+                  {isSavingPost ? (
+                    <span>Publishing...</span>
+                  ) : (
+                    <span>Publish story</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
