@@ -23,6 +23,7 @@ const dashboardReactionOptions: Array<{ value: DashboardReaction; label: string;
 interface DashboardPostPageProps {
   currentUser: AuthAccount | null;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
+  isCreateMode?: boolean;
 }
 
 interface DashboardPostComposeForm {
@@ -50,10 +51,10 @@ const sortComments = (items: DashboardPostComment[]) =>
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
 
-export function DashboardPostPage({ currentUser, onToast }: DashboardPostPageProps) {
+export function DashboardPostPage({ currentUser, onToast, isCreateMode: explicitCreateMode }: DashboardPostPageProps) {
   const { postId = '' } = useParams();
   const navigate = useNavigate();
-  const isCreateMode = postId === 'new';
+  const isCreateMode = explicitCreateMode || postId.toLowerCase() === 'new';
   const [post, setPost] = useState<DashboardPost | null>(null);
   const [comments, setComments] = useState<DashboardPostComment[]>([]);
   const [composeForm, setComposeForm] = useState<DashboardPostComposeForm>(defaultComposeForm);
