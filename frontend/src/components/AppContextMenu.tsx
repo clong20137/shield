@@ -40,11 +40,13 @@ export function AppContextMenu({
   actions,
   onClose,
   width = 248,
+  closeOnScroll = true,
 }: {
   position: AppContextMenuPosition;
   actions: AppContextMenuAction[];
   onClose: () => void;
   width?: number;
+  closeOnScroll?: boolean;
 }) {
   useEffect(() => {
     const close = () => onClose();
@@ -55,14 +57,18 @@ export function AppContextMenu({
     };
 
     window.addEventListener('click', close);
-    window.addEventListener('scroll', close, true);
+    if (closeOnScroll) {
+      window.addEventListener('scroll', close, true);
+    }
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('click', close);
-      window.removeEventListener('scroll', close, true);
+      if (closeOnScroll) {
+        window.removeEventListener('scroll', close, true);
+      }
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onClose]);
+  }, [onClose, closeOnScroll]);
 
   const estimatedHeight = Math.max(56, actions.length * 42 + 12);
   const menuPosition = getMenuPosition(position, width, estimatedHeight);

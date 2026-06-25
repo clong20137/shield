@@ -3266,7 +3266,7 @@ const DashboardPage: React.FC<{
 
   if (!isAdministrator) {
     return (
-      <div onContextMenu={openPageContextMenu}>
+      <div onContextMenu={openPageContextMenu} data-no-global-context-menu="true">
         <div className="mb-8">
           <h1>Dashboard</h1>
         </div>
@@ -3285,6 +3285,7 @@ const DashboardPage: React.FC<{
             position={pageContextMenu}
             actions={dashboardContextActions}
             onClose={() => setPageContextMenu(null)}
+            closeOnScroll={false}
           />
         )}
       </div>
@@ -3292,7 +3293,7 @@ const DashboardPage: React.FC<{
   }
 
   return (
-    <div onContextMenu={openPageContextMenu}>
+    <div onContextMenu={openPageContextMenu} data-no-global-context-menu="true">
       <div className="mb-8">
         <div>
           <h1>Dashboard</h1>
@@ -3319,6 +3320,7 @@ const DashboardPage: React.FC<{
           position={pageContextMenu}
           actions={dashboardContextActions}
           onClose={() => setPageContextMenu(null)}
+          closeOnScroll={false}
         />
       )}
     </div>
