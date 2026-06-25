@@ -1644,7 +1644,7 @@ function RecentConversationsDock({
                   type="button"
                   onClick={() => onOpenConversation(conversation)}
                   tabIndex={isCollapsed ? -1 : 0}
-                  className="recent-message-preview-pop recent-message-preview-pop--arrow absolute right-14 z-20 w-64 rounded-2xl border border-white/30 bg-white/80 px-4 py-2 text-left shadow-[0_12px_35px_rgba(15,23,42,0.18)] backdrop-blur-md transition hover:border-accent dark:border-white/20 dark:bg-slate-900/75"
+                  className="recent-message-preview-pop recent-message-preview-pop--arrow recent-message-preview-pop--modern absolute right-14 z-20 w-64 rounded-2xl px-4 py-2 text-left backdrop-blur-xl transition duration-200 hover:scale-[1.03] hover:-translate-x-1 hover:shadow-[0_22px_55px_rgba(15,23,42,0.3)]"
                   aria-label={`Open latest message from ${conversation.title}`}
                 >
                   <span className="block truncate text-xs font-black text-primary-500 dark:text-blue-100">{conversation.title}</span>
