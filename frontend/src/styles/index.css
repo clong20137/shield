@@ -1072,6 +1072,7 @@
   html.glass .quick-launch-context-menu,
   html.glass .quick-launch-picker-enter,
   html.glass .floating-window,
+  html.glass .glass-workspace-window,
   html.glass section[class~='bg-white'],
   html.glass article[class~='bg-white'],
   html.glass div[class~='bg-white']:not(.shield-left-panel):not(.shield-left-panel *):not(.quick-launch-sidebar-placement):not(.quick-launch-sidebar-placement *) {
@@ -1083,6 +1084,22 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
     backdrop-filter: blur(22px) saturate(1.22);
     -webkit-backdrop-filter: blur(22px) saturate(1.22);
+  }
+
+  html.glass .modal-window,
+  html.glass .floating-window,
+  html.glass .glass-workspace-window {
+    background-color: rgba(15, 23, 42, 0.86) !important;
+    box-shadow:
+      0 28px 80px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  }
+
+  html.glass .glass-workspace-window section[class~='bg-white'],
+  html.glass .glass-workspace-window article[class~='bg-white'],
+  html.glass .glass-workspace-window div[class~='bg-white'],
+  html.glass .glass-workspace-window div[class~='bg-gray-50'] {
+    background-color: rgba(15, 23, 42, 0.7) !important;
   }
 
   html.glass .header-action-button.header-action-button,
@@ -1133,15 +1150,37 @@
   html.glass:not(.dark) .quick-launch-context-menu,
   html.glass:not(.dark) .quick-launch-picker-enter,
   html.glass:not(.dark) .floating-window,
+  html.glass:not(.dark) .glass-workspace-window,
   html.glass:not(.dark) section[class~='bg-white'],
   html.glass:not(.dark) article[class~='bg-white'],
   html.glass:not(.dark) div[class~='bg-white']:not(.shield-left-panel):not(.shield-left-panel *):not(.quick-launch-sidebar-placement):not(.quick-launch-sidebar-placement *) {
     border-color: rgba(15, 23, 42, 0.12) !important;
-    background-color: rgba(255, 255, 255, 0.68) !important;
+    background-color: rgba(255, 255, 255, 0.82) !important;
     color: rgb(17, 24, 39) !important;
     box-shadow:
       0 18px 52px rgba(15, 23, 42, 0.12),
       inset 0 1px 0 rgba(255, 255, 255, 0.72) !important;
+  }
+
+  html.glass:not(.dark) .modal-window,
+  html.glass:not(.dark) .floating-window,
+  html.glass:not(.dark) .glass-workspace-window {
+    border-color: rgba(15, 23, 42, 0.16) !important;
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    box-shadow:
+      0 28px 82px rgba(15, 23, 42, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  }
+
+  html.glass:not(.dark) .glass-workspace-window section[class~='bg-white'],
+  html.glass:not(.dark) .glass-workspace-window article[class~='bg-white'],
+  html.glass:not(.dark) .glass-workspace-window div[class~='bg-white'],
+  html.glass:not(.dark) .glass-workspace-window div[class~='bg-gray-50'] {
+    background-color: rgba(255, 255, 255, 0.9) !important;
+  }
+
+  html.glass:not(.dark) .glass-workspace-window div[class~='bg-gray-100'] {
+    background-color: rgba(243, 244, 246, 0.92) !important;
   }
 
   html.glass:not(.dark) .header-action-button.header-action-button,

@@ -8459,7 +8459,7 @@ function App() {
           />
           {isMessagesModalOpen && currentUser && (
             <FloatingWindow
-              className="pointer-events-auto fixed inset-x-0 top-0 bottom-[calc(env(safe-area-inset-bottom)+5.4rem)] flex min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[72dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(420px,calc(100dvh-1rem))] md:w-[min(900px,calc(100vw-1rem))] md:min-w-[min(360px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4"
+              className="glass-workspace-window pointer-events-auto fixed inset-x-0 top-0 bottom-[calc(env(safe-area-inset-bottom)+5.4rem)] flex min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[72dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(420px,calc(100dvh-1rem))] md:w-[min(900px,calc(100vw-1rem))] md:min-w-[min(360px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4"
               fallbackSize={{ width: Math.min(window.innerWidth - 16, 900), height: Math.min(window.innerHeight - 16, 680) }}
               initialPosition={getInitialMessagesModalPosition}
               isClosing={closingModal === 'messages'}
@@ -8501,7 +8501,7 @@ function App() {
           )}
           {isCalendarModalOpen && currentUser && showCalendar && (
             <FloatingWindow
-              className="pointer-events-auto fixed inset-x-0 top-0 bottom-[calc(env(safe-area-inset-bottom)+5.4rem)] flex min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[82dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(480px,calc(100dvh-1rem))] md:w-[min(1120px,calc(100vw-1rem))] md:min-w-[min(420px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4"
+              className="glass-workspace-window pointer-events-auto fixed inset-x-0 top-0 bottom-[calc(env(safe-area-inset-bottom)+5.4rem)] flex min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[82dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(480px,calc(100dvh-1rem))] md:w-[min(1120px,calc(100vw-1rem))] md:min-w-[min(420px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4"
               fallbackSize={{ width: Math.min(window.innerWidth - 16, 1120), height: Math.min(window.innerHeight - 16, 780) }}
               initialPosition={getInitialCalendarModalPosition}
               isClosing={closingModal === 'calendar'}
@@ -8543,7 +8543,7 @@ function App() {
           )}
           {isProfileModalOpen && currentUser && (
             <FloatingWindow
-              className="pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[min(88dvh,760px)] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(460px,calc(100dvh-1rem))] md:w-[min(900px,calc(100vw-1rem))] md:min-w-[min(380px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4"
+              className="glass-workspace-window pointer-events-auto fixed inset-0 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[min(88dvh,760px)] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(460px,calc(100dvh-1rem))] md:w-[min(900px,calc(100vw-1rem))] md:min-w-[min(380px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4"
               fallbackSize={{ width: Math.min(window.innerWidth - 16, 900), height: Math.min(window.innerHeight - 16, 760) }}
               initialPosition={getInitialProfileSettingsPosition}
               isClosing={closingModal === 'profile'}
