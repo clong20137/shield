@@ -9429,10 +9429,6 @@ function App() {
                           <DashboardPage
                             currentUser={currentUser}
                             isAppBackgrounded={isAppBackgrounded}
-                            isGlassTheme={isGlassTheme}
-                            appScale={normalizeAppScale(currentUser?.appScale)}
-                            onGlassThemeChange={setIsGlassTheme}
-                            onAppScaleChange={handleAppScaleChange}
                           />
                         )}
                       />

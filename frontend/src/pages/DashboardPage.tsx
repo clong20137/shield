@@ -1,11 +1,10 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, Link2, List, ListOrdered, LucideIcon, MapPinned, Megaphone, MessageSquare, Minus, Moon, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, Sun, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, AlertCircle, Bell, Bold, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heading1, Heading2, Heart, Image, Indent, Italic, Link2, List, ListOrdered, LucideIcon, MapPinned, Megaphone, NotebookPen, Outdent, PartyPopper, Pencil, Pin, PinOff, Plus, Quote, Save, Search, Send, ThumbsUp, Trash2, Underline, Upload, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService, AuthAccount, calendarService, CalendarEntry, DashboardReaction, dashboardPostService, DashboardPost, dashboardSummaryService, DashboardSummary, districtFeedService, DistrictFeedPost, DistrictFeedPostCategory, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { UserDetail } from '../components/UserDetail';
-import { AppContextMenu, AppContextMenuPosition, shouldUseNativeContextMenu } from '../components/AppContextMenu';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 type DashboardPostForm = Pick<DashboardPost, 'title' | 'body' | 'category' | 'imageUrl' | 'allowComments'>;
@@ -38,14 +37,6 @@ const dashboardReactionOptions: Array<{ value: DashboardReaction; label: string;
 
 const MEDIA_PICKER_PAGE_SIZE = 18;
 const DASHBOARD_POST_MEDIA_FOLDER = 'dashboard-posts';
-type AppScale = AuthAccount['appScale'];
-const APP_SCALE_SEQUENCE: AppScale[] = ['compact', 'comfortable', 'large'];
-const APP_SCALE_LABELS: Record<AppScale, string> = {
-  compact: 'Compact',
-  comfortable: 'Comfortable',
-  large: 'Large',
-};
-
 const getPostCategoryBannerClass = (category: DashboardPost['category']) => {
   if (category === 'Alert') {
     return 'bg-danger text-white shadow-red-950/30';
@@ -2924,24 +2915,15 @@ function DistrictFeedWidget({
 const DashboardPage: React.FC<{
   currentUser: AuthAccount | null;
   isAppBackgrounded?: boolean;
-  isGlassTheme: boolean;
-  appScale: AppScale;
-  onGlassThemeChange: (isGlassTheme: boolean) => void;
-  onAppScaleChange: (appScale: AppScale) => void;
 }> = ({
   currentUser,
   isAppBackgrounded = false,
-  isGlassTheme,
-  appScale,
-  onGlassThemeChange,
-  onAppScaleChange,
 }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null);
-  const [pageContextMenu, setPageContextMenu] = useState<AppContextMenuPosition | null>(null);
   const [selectedProfile, setSelectedProfile] = useState<User | null>(null);
   const [profileWindowPosition, setProfileWindowPosition] = useState(getInitialProfileWindowPosition);
   const [isProfileDragging, setIsProfileDragging] = useState(false);
@@ -3164,140 +3146,12 @@ const DashboardPage: React.FC<{
     </div>
   ), document.body) : null;
 
-  const currentScaleIndex = APP_SCALE_SEQUENCE.indexOf(appScale);
-  const canDecreaseAppScale = currentScaleIndex > 0;
-  const canIncreaseAppScale = currentScaleIndex < APP_SCALE_SEQUENCE.length - 1;
-
-  const decreaseAppScale = () => {
-    const nextScale = APP_SCALE_SEQUENCE[currentScaleIndex - 1];
-    if (nextScale) {
-      onAppScaleChange(nextScale);
-    }
-  };
-
-  const increaseAppScale = () => {
-    const nextScale = APP_SCALE_SEQUENCE[currentScaleIndex + 1];
-    if (nextScale) {
-      onAppScaleChange(nextScale);
-    }
-  };
-
-  const dashboardContextActions = [
-    { label: 'Search Users', icon: Search, onSelect: () => navigate('/search') },
-    {
-      label: 'Glass Mode',
-      icon: isGlassTheme ? Sun : Moon,
-      render: () => (
-        <div className={`quick-launch-context-menu-item ${isGlassTheme ? 'text-accent dark:text-white' : 'text-gray-700 dark:text-gray-200'}`}>
-          <span>Glass Mode</span>
-          <button
-            type="button"
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              onGlassThemeChange(!isGlassTheme);
-            }}
-            className={`ml-auto inline-flex h-5 w-10 items-center rounded-full p-0.5 transition ${
-              isGlassTheme ? 'justify-end bg-accent' : 'bg-gray-300 dark:bg-gray-600'
-            }`}
-            aria-label={`Toggle glass mode ${isGlassTheme ? 'off' : 'on'}`}
-          >
-            <span className="h-4 w-4 rounded-full bg-white shadow-sm transition" />
-          </button>
-        </div>
-      ),
-    },
-    {
-      label: 'App Scale',
-      render: () => (
-        <div className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200">
-          <span>App Scale</span>
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              type="button"
-              onMouseDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                if (canDecreaseAppScale) {
-                  decreaseAppScale();
-                }
-              }}
-              disabled={!canDecreaseAppScale}
-              className="inline-flex h-6 w-6 items-center justify-center rounded border border-gray-300 bg-white px-0 py-0 text-gray-700 transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-accent dark:hover:text-accent"
-            >
-              <Minus size={14} />
-            </button>
-            <span className="min-w-[72px] shrink-0 text-center text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-200 whitespace-nowrap">
-              {APP_SCALE_LABELS[appScale]}
-            </span>
-            <button
-              type="button"
-              onMouseDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                if (canIncreaseAppScale) {
-                  increaseAppScale();
-                }
-              }}
-              disabled={!canIncreaseAppScale}
-              className="inline-flex h-6 w-6 items-center justify-center rounded border border-gray-300 bg-white px-0 py-0 text-gray-700 transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-accent dark:hover:text-accent"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-        </div>
-      ),
-    },
-    { label: 'Open Calendar', icon: CalendarDays, onSelect: () => navigate('/calendar') },
-    { label: 'Open Messages', icon: MessageSquare, onSelect: () => navigate('/messages') },
-  ];
-
-  const openPageContextMenu = (event: React.MouseEvent<HTMLElement>) => {
-    if (event.defaultPrevented || shouldUseNativeContextMenu(event.target)) {
-      return;
-    }
-
-    event.preventDefault();
-    setPageContextMenu({ x: event.clientX, y: event.clientY });
-  };
-
-  if (!isAdministrator) {
-    return (
-      <div onContextMenu={openPageContextMenu} data-no-global-context-menu="true">
-        <div className="mb-8">
-          <h1>Dashboard</h1>
-        </div>
-        <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} initialProfiles={dashboardSummary?.pinnedProfiles} />
-        <div className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)]">
-          <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} isAppBackgrounded={isAppBackgrounded} />
-          <DashboardNews currentUser={currentUser} initialPosts={dashboardSummary?.posts} isAppBackgrounded={isAppBackgrounded} />
-        </div>
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-          <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
-          <DistrictFeedWidget currentUser={currentUser} initialPosts={dashboardSummary?.districtFeedPosts} />
-        </div>
-        {profileWindow}
-        {pageContextMenu && (
-          <AppContextMenu
-            position={pageContextMenu}
-            actions={dashboardContextActions}
-            onClose={() => setPageContextMenu(null)}
-            closeOnScroll={false}
-          />
-        )}
-      </div>
-    );
-  }
-
   return (
-    <div onContextMenu={openPageContextMenu} data-no-global-context-menu="true">
+    <div>
       <div className="mb-8">
         <div>
           <h1>Dashboard</h1>
-          {lastUpdated && (
+          {isAdministrator && lastUpdated && (
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Live data updated at {lastUpdated}</p>
           )}
         </div>
@@ -3315,14 +3169,6 @@ const DashboardPage: React.FC<{
         <DistrictFeedWidget currentUser={currentUser} initialPosts={dashboardSummary?.districtFeedPosts} />
       </div>
       {profileWindow}
-      {pageContextMenu && (
-        <AppContextMenu
-          position={pageContextMenu}
-          actions={dashboardContextActions}
-          onClose={() => setPageContextMenu(null)}
-          closeOnScroll={false}
-        />
-      )}
     </div>
   );
 };
