@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthAccountModel } from '../models/AuthAccount';
+import { ErrorLogModel } from '../models/ErrorLog';
 import { UserMessageModel } from '../models/UserMessage';
 import { addMessageEventClient, broadcastMessageEvent, MessagePresenceStatus, updateMessagePresence } from '../services/messageEvents';
 import { notifyMentions } from '../services/mentionService';
@@ -36,6 +37,37 @@ function getSystemMessageBody(message: string): string {
 
 function getMessageAttachmentUrl(filename: string): string {
   return `/uploads/messages/${filename}`;
+}
+
+function getMessageErrorContext(req: Request, extra: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    route: req.originalUrl,
+    method: req.method,
+    body: {
+      senderAccountId: cleanString(req.body?.senderAccountId, 36),
+      recipientUserId: cleanString(req.body?.recipientUserId, 36),
+      recipientUserIds: Array.isArray(req.body?.recipientUserIds) ? req.body.recipientUserIds : undefined,
+      subject: cleanString(req.body?.subject, 180),
+      threadId: cleanString(req.body?.threadId, 36),
+      threadTitle: cleanString(req.body?.threadTitle, 180),
+      audienceType: cleanString(req.body?.audienceType, 30),
+      bodyLength: typeof req.body?.body === 'string' ? req.body.body.length : 0,
+    },
+    ...extra,
+  }, null, 2).slice(0, 8000);
+}
+
+function logMessageControllerError(req: Request, message: string, error: unknown, extra: Record<string, unknown> = {}) {
+  ErrorLogModel.create({
+    level: 'error',
+    message,
+    stack: `${error instanceof Error ? error.stack || error.message : String(error)}\n\nContext:\n${getMessageErrorContext(req, extra)}`.slice(0, 8000),
+    route: req.originalUrl,
+    method: req.method,
+    userId: cleanString(req.body?.senderAccountId, 36) || cleanString(req.params.accountId, 36) || cleanString(req.params.id, 36) || null,
+    ipAddress: req.ip || null,
+    userAgent: req.get('user-agent') || null,
+  }).catch((logError) => console.error('Failed to write message error log:', logError));
 }
 
 export class MessageController {
@@ -98,6 +130,7 @@ export class MessageController {
       res.json({ account });
     } catch (error) {
       console.error('Resolve message recipient error:', error);
+      logMessageControllerError(req, 'Message recipient validation failed', error, { accountId: req.params.accountId });
       res.status(500).json({ error: 'Failed to validate message recipient' });
     }
   }
@@ -155,6 +188,7 @@ export class MessageController {
       res.status(201).json(enrichedMessage || message);
     } catch (error) {
       console.error('Create message error:', error);
+      logMessageControllerError(req, 'Direct message send failed', error);
       res.status(500).json({ error: 'Failed to send message' });
     }
   }
@@ -264,6 +298,7 @@ export class MessageController {
       });
     } catch (error) {
       console.error('Create group message error:', error);
+      logMessageControllerError(req, 'Group message send failed', error);
       res.status(500).json({ error: 'Failed to send group message' });
     }
   }
@@ -465,6 +500,7 @@ export class MessageController {
       res.json(messages);
     } catch (error) {
       console.error('List inbox error:', error);
+      logMessageControllerError(req, 'Message inbox load failed', error, { accountId: req.params.accountId });
       res.status(500).json({ error: 'Failed to load inbox' });
     }
   }
@@ -499,6 +535,7 @@ export class MessageController {
       res.json(messages);
     } catch (error) {
       console.error('List sent messages error:', error);
+      logMessageControllerError(req, 'Sent messages load failed', error, { accountId: req.params.accountId });
       res.status(500).json({ error: 'Failed to load sent messages' });
     }
   }

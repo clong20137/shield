@@ -1221,6 +1221,9 @@ export const auditService = {
 export const errorLogService = {
   getAll: (filters: ErrorLogFilters = {}) =>
     api.get<ErrorLogResponse>('/errors', { params: filters }),
+
+  createClientLog: (log: { level?: string; message: string; context?: string; route?: string }) =>
+    api.post<{ ok: boolean }>('/errors/client', log),
 };
 
 export const deviceService = {

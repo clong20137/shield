@@ -2,7 +2,7 @@ import { ClipboardEvent, DragEvent, FormEvent, KeyboardEvent, lazy, Suspense, us
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Building2, Check, CheckCheck, Download, Image as ImageIcon, Pencil, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Save, Send, Trash2, Users, X } from 'lucide-react';
 import type { EmojiClickData } from 'emoji-picker-react';
-import { AuthAccount, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, handleAssetThumbnailError, messageService, userService, User, UserMessage } from '../services/api';
+import { AuthAccount, errorLogService, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, handleAssetThumbnailError, messageService, userService, User, UserMessage } from '../services/api';
 import { RankBadge } from '../components/RankBadge';
 import { MentionText } from '../components/MentionText';
 import { MentionTextarea } from '../components/MentionTextarea';
@@ -299,6 +299,23 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function getDiagnosticErrorDetails(error: unknown): Record<string, unknown> {
+  if (typeof error === 'object' && error !== null && 'response' in error) {
+    const response = (error as { response?: { status?: number; data?: unknown }; message?: string; code?: string }).response;
+    return {
+      message: (error as { message?: string }).message || '',
+      code: (error as { code?: string }).code || '',
+      status: response?.status,
+      responseData: response?.data,
+    };
+  }
+
+  return {
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : '',
+  };
+}
+
 function getDraftGroupThreadId(recipients: Pick<User, 'id'>[]): string {
   return `draft-group:${recipients.map((user) => user.id).sort().join(',')}`;
 }
@@ -425,6 +442,40 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const messageLoadInFlightRef = useRef(false);
   const messageLoadPendingRef = useRef(false);
   const appliedTargetThreadIdRef = useRef<string | null>(null);
+  const logMessageDiagnostic = (message: string, details: Record<string, unknown> = {}, level = 'warning') => {
+    const context = {
+      area: 'messages',
+      currentUserId: currentUser.id,
+      selectedThreadId,
+      targetRecipientId: targetRecipient?.id || null,
+      targetThreadId,
+      composeRequestKey,
+      isModalView,
+      isBackgrounded,
+      replyBodyLength: replyBody.length,
+      attachmentCount: replyAttachments.length,
+      inboxCount: inboxMessages.length,
+      sentCount: sentMessages.length,
+      threadCount: threads.length,
+      filteredThreadCount: filteredThreads.length,
+      selectedThread: selectedThread ? {
+        id: selectedThread.id,
+        type: selectedThread.threadType,
+        participantIds: selectedThread.participantIds,
+        contactName: selectedThread.contactName,
+        acceptsMessages: selectedThread.contactReceivesMessages,
+        messageCount: selectedThread.messages.length,
+      } : null,
+      details,
+    };
+
+    errorLogService.createClientLog({
+      level,
+      message,
+      route: window.location.pathname,
+      context: JSON.stringify(context, null, 2),
+    }).catch((error) => console.error('Failed to write message diagnostic:', error));
+  };
   const focusReplyComposer = () => {
     window.setTimeout(() => replyTextareaRef.current?.focus(), 0);
   };
@@ -490,6 +541,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       setSentMessages(sentResponse.data);
     } catch (err) {
       console.error(err);
+      logMessageDiagnostic('Message load failed', {
+        error: getDiagnosticErrorDetails(err),
+        showLoading,
+        inFlight: messageLoadInFlightRef.current,
+        pending: messageLoadPendingRef.current,
+      }, 'error');
       onToast('error', 'Failed to load messages.');
     } finally {
       messageLoadInFlightRef.current = false;
@@ -863,6 +920,18 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const selectedDirectRecipientId = selectedThread?.threadType === 'direct'
     ? selectedThread.participantIds.find((id) => id && id !== currentUser.id) || selectedThread.id
     : '';
+
+  useEffect(() => {
+    if (!selectedThreadId || selectedThread || isLoading) {
+      return;
+    }
+
+    logMessageDiagnostic('Selected message thread was not found', {
+      missingSelectedThreadId: selectedThreadId,
+      visibleThreadIds: filteredThreads.map((thread) => thread.id),
+      allThreadIds: threads.map((thread) => thread.id),
+    }, 'warning');
+  }, [filteredThreads, isLoading, selectedThread, selectedThreadId, threads]);
 
   useEffect(() => {
     if (!targetThreadId) {
@@ -1478,6 +1547,14 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       window.dispatchEvent(new CustomEvent('shield:messages-updated'));
     } catch (err) {
       console.error(err);
+      logMessageDiagnostic('Message send request failed', {
+        error: getDiagnosticErrorDetails(err),
+        previousThreadId,
+        previousThreadType,
+        directRecipientId,
+        submittedMessageBodyLength: submittedMessageBody.length,
+        didClearDraft,
+      }, 'error');
       try {
         const sentResponse = await messageService.getSent(currentUser.id);
         setSentMessages(sentResponse.data);
@@ -1498,6 +1575,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         });
 
         if (confirmedSent) {
+          logMessageDiagnostic('Message send failure was confirmed as saved', {
+            previousThreadId,
+            previousThreadType,
+            directRecipientId,
+            matchedSentCount: sentResponse.data.length,
+          }, 'warning');
           if (!didClearDraft) {
             setReplyBody('');
             setReplyAttachments([]);
@@ -1513,6 +1596,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         }
       } catch (refreshError) {
         console.error('Failed to verify sent message after send error:', refreshError);
+        logMessageDiagnostic('Message send verification failed', {
+          originalError: getDiagnosticErrorDetails(err),
+          verificationError: getDiagnosticErrorDetails(refreshError),
+          previousThreadId,
+          previousThreadType,
+          directRecipientId,
+        }, 'error');
       }
 
       if (didClearDraft) {

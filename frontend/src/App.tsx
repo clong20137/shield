@@ -5,7 +5,7 @@ import { BrowserRouter as Router, NavLink, Routes, Route, useLocation, useNaviga
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { FloatingWindow } from './components/FloatingWindow';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, CalendarEntryPayload, calendarService, clearAuthToken, CompleteSetupPayload, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, notificationSoundService, NotificationSound, quickLaunchService, reminderService, RegistrationSettings, Reminder, SetupEnvironmentValues, SetupStatus, urgentAlertService, UrgentAlert, UserMessage, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, CalendarEntryPayload, calendarService, clearAuthToken, CompleteSetupPayload, errorLogService, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, notificationSoundService, NotificationSound, quickLaunchService, reminderService, RegistrationSettings, Reminder, SetupEnvironmentValues, SetupStatus, urgentAlertService, UrgentAlert, UserMessage, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
@@ -7771,6 +7771,23 @@ function App() {
         })
         .catch((error) => {
           console.error('Failed to open message recipient:', error);
+          errorLogService.createClientLog({
+            level: 'error',
+            message: 'Open message recipient failed',
+            route: window.location.pathname,
+            context: JSON.stringify({
+              area: 'messages',
+              action: 'open-recipient',
+              currentUserId: currentUser?.id || null,
+              targetUser: {
+                id: user.id,
+                email: user.email,
+                name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+                receivesMessages: user.receivesMessages,
+              },
+              error: getErrorMessage(error, 'This user cannot receive messages.'),
+            }, null, 2),
+          }).catch((logError) => console.error('Failed to write message open diagnostic:', logError));
           showToast('error', getErrorMessage(error, 'This user cannot receive messages.'), { saveToNotifications: false });
         });
     };
