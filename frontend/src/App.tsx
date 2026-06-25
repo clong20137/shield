@@ -1,11 +1,11 @@
 import { CSSProperties, FormEvent, ReactNode, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Command, Delete, Download, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, RefreshCw, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Command, Delete, Download, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, RefreshCw, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, Users, X } from 'lucide-react';
 import { BrowserRouter as Router, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { FloatingWindow } from './components/FloatingWindow';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, CalendarEntryPayload, calendarService, clearAuthToken, CompleteSetupPayload, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, notificationSoundService, NotificationSound, quickLaunchService, reminderService, RegistrationSettings, Reminder, SetupEnvironmentValues, SetupStatus, urgentAlertService, UrgentAlert, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, CalendarEntryPayload, calendarService, clearAuthToken, CompleteSetupPayload, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, notificationSoundService, NotificationSound, quickLaunchService, reminderService, RegistrationSettings, Reminder, SetupEnvironmentValues, SetupStatus, urgentAlertService, UrgentAlert, UserMessage, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
@@ -94,6 +94,16 @@ interface MessagePreferences {
   hideQuickLaunch: boolean;
   quickLaunchPlacement: QuickLaunchPlacement;
   quickLaunchSlotCount: number;
+}
+
+interface RecentConversation {
+  id: string;
+  title: string;
+  subtitle: string;
+  imageUrl: string;
+  threadType: string;
+  latestMessage?: UserMessage;
+  unreadCount: number;
 }
 
 type ReminderAlarmSound = '' | `custom:${string}`;
@@ -1338,6 +1348,158 @@ function getInitials(name?: string, email?: string): string {
   }
 
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+function parseRecentConversationList(value?: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeRecentConversationSubject(value?: string | null): string {
+  const subject = value?.trim();
+  return subject && subject.toLowerCase() !== 'message' ? subject : '';
+}
+
+function getRecentConversationId(message: UserMessage, currentUserId: string): string {
+  return message.threadId || (message.senderAccountId === currentUserId ? message.recipientUserId : message.senderAccountId);
+}
+
+function getRecentConversationTitle(message: UserMessage, currentUserId: string): string {
+  if (message.threadType && message.threadType !== 'direct') {
+    const participantNames = parseRecentConversationList(message.threadParticipantNames).filter((name) => name !== 'You');
+    return message.threadTitle || participantNames.join(', ') || (message.threadType === 'district' ? 'District Message' : 'Group Message');
+  }
+
+  if (message.senderAccountId === currentUserId) {
+    return message.recipientName || message.recipientEmail || 'Recipient';
+  }
+
+  return message.senderName || message.senderEmail || 'Sender';
+}
+
+function getRecentConversationImage(message: UserMessage, currentUserId: string): string {
+  if (message.threadType && message.threadType !== 'direct') {
+    return message.threadImageUrl || '';
+  }
+
+  return message.senderAccountId === currentUserId
+    ? message.recipientProfilePictureUrl || ''
+    : message.senderProfilePictureUrl || '';
+}
+
+function getRecentConversationSubtitle(message: UserMessage, currentUserId: string): string {
+  const prefix = message.senderAccountId === currentUserId ? 'You: ' : '';
+  const deletedText = message.isDeleted ? 'Message deleted' : '';
+  const bodyText = deletedText || message.body || normalizeRecentConversationSubject(message.subject) || 'No preview';
+  return `${prefix}${bodyText}`.replace(/\s+/gu, ' ').trim();
+}
+
+function buildRecentConversations(messages: UserMessage[], currentUserId: string): RecentConversation[] {
+  const threadMap = new Map<string, RecentConversation>();
+  const sortedMessages = [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  sortedMessages.forEach((message) => {
+    const id = getRecentConversationId(message, currentUserId);
+    if (!id) {
+      return;
+    }
+
+    const existingConversation = threadMap.get(id);
+    const unreadIncrement = message.recipientUserId === currentUserId && !message.isRead ? 1 : 0;
+    const nextConversation: RecentConversation = {
+      id,
+      title: getRecentConversationTitle(message, currentUserId),
+      subtitle: getRecentConversationSubtitle(message, currentUserId),
+      imageUrl: getRecentConversationImage(message, currentUserId),
+      threadType: message.threadType || 'direct',
+      latestMessage: message,
+      unreadCount: (existingConversation?.unreadCount || 0) + unreadIncrement,
+    };
+    threadMap.set(id, nextConversation);
+  });
+
+  return Array.from(threadMap.values())
+    .sort((a, b) => new Date(b.latestMessage?.createdAt || 0).getTime() - new Date(a.latestMessage?.createdAt || 0).getTime())
+    .slice(0, 4);
+}
+
+function RecentConversationsDock({
+  conversations,
+  onOpenConversation,
+  onOpenMessages,
+}: {
+  conversations: RecentConversation[];
+  onOpenConversation: (conversation: RecentConversation) => void;
+  onOpenMessages: () => void;
+}) {
+  if (conversations.length === 0) {
+    return null;
+  }
+
+  return (
+    <aside className="pointer-events-none fixed bottom-5 right-5 z-40 hidden w-72 flex-col items-end gap-2 md:flex" aria-label="Recent conversations">
+      <div className="pointer-events-auto overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+        <button
+          type="button"
+          onClick={onOpenMessages}
+          className="flex w-full items-center justify-between gap-3 border-b border-gray-200 px-3 py-2 text-left text-sm font-bold text-gray-800 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-100 dark:hover:bg-gray-800"
+        >
+          <span className="inline-flex items-center gap-2">
+            <Mail size={15} />
+            Recent Conversations
+          </span>
+          <span className="text-xs font-semibold text-gray-400">Open</span>
+        </button>
+        <div className="max-h-80 overflow-y-auto">
+          {conversations.map((conversation) => (
+            <button
+              key={conversation.id}
+              type="button"
+              onClick={() => onOpenConversation(conversation)}
+              className="group flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-gray-50 dark:hover:bg-gray-800"
+              aria-label={`Open conversation with ${conversation.title}`}
+            >
+              <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary-500 text-sm font-black text-white">
+                {conversation.imageUrl ? (
+                  <img
+                    src={getAssetThumbnailUrl(conversation.imageUrl, 96)}
+                    alt=""
+                    onError={(event) => handleAssetThumbnailError(event, conversation.imageUrl)}
+                    className="h-full w-full object-cover"
+                  />
+                ) : conversation.threadType !== 'direct' ? (
+                  <Users size={17} />
+                ) : (
+                  getInitials(conversation.title)
+                )}
+                {conversation.unreadCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-danger px-1 text-[10px] font-black text-white dark:border-gray-900">
+                    {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
+                  </span>
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className={`block truncate text-sm ${conversation.unreadCount > 0 ? 'font-black text-primary-500 dark:text-blue-100' : 'font-bold text-gray-800 dark:text-gray-100'}`}>
+                  {conversation.title}
+                </span>
+                <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
+                  {conversation.subtitle}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </aside>
+  );
 }
 
 function formatConnectionTime(value: number | null): string {
@@ -5360,6 +5522,7 @@ function App() {
   const [activeFloatingApp, setActiveFloatingApp] = useState<FloatingAppId>('messages');
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [messageTargetUser, setMessageTargetUser] = useState<User | null>(null);
+  const [messageTargetThreadId, setMessageTargetThreadId] = useState<string | null>(null);
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
   const [isBugTrackerOpen, setIsBugTrackerOpen] = useState(false);
   const [isFirstLoginGuideOpen, setIsFirstLoginGuideOpen] = useState(false);
@@ -5403,6 +5566,7 @@ function App() {
     return () => window.removeEventListener('resize', collapseSidebarOnMobile);
   }, []);
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
+  const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
   const [bugReports, setBugReports] = useState<BugReport[]>([]);
   const [sidebarCalendarEntries, setSidebarCalendarEntries] = useState<CalendarEntry[]>([]);
   const [sidebarReminders, setSidebarReminders] = useState<Reminder[]>([]);
@@ -6840,6 +7004,65 @@ function App() {
   }, [appName, currentUser, getCustomNotificationSoundUrl, messagePreferences.receiveMessages, messagePreferences.playMessageSound, messagePreferences.messageSound, messagePreferences.browserNotifications]);
 
   useEffect(() => {
+    if (!currentUser || !messagePreferences.receiveMessages) {
+      setRecentConversations([]);
+      return;
+    }
+
+    let isMounted = true;
+    let refreshTimer: number | null = null;
+
+    const loadRecentConversations = async () => {
+      try {
+        const [inboxResponse, sentResponse] = await Promise.all([
+          messageService.getInbox(currentUser.id),
+          messageService.getSent(currentUser.id),
+        ]);
+        if (!isMounted) {
+          return;
+        }
+
+        setRecentConversations(buildRecentConversations([...inboxResponse.data, ...sentResponse.data], currentUser.id));
+      } catch (error) {
+        console.error('Failed to load recent conversations:', error);
+      }
+    };
+
+    const queueRecentConversationLoad = () => {
+      if (refreshTimer) {
+        window.clearTimeout(refreshTimer);
+      }
+
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        void loadRecentConversations();
+      }, isAppBackgroundedRef.current ? 1200 : 250);
+    };
+
+    void loadRecentConversations();
+    window.addEventListener('shield:messages-updated', queueRecentConversationLoad);
+
+    const eventsUrl = getMessageEventsUrl();
+    const eventSource = new EventSource(eventsUrl, { withCredentials: true });
+    eventSource.addEventListener('message-created', queueRecentConversationLoad);
+    eventSource.addEventListener('message-read', queueRecentConversationLoad);
+    eventSource.addEventListener('message-archived', queueRecentConversationLoad);
+    eventSource.addEventListener('message-deleted', queueRecentConversationLoad);
+    eventSource.addEventListener('error', (event) => {
+      console.error('Recent conversations realtime connection error:', event);
+    });
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('shield:messages-updated', queueRecentConversationLoad);
+      if (refreshTimer) {
+        window.clearTimeout(refreshTimer);
+      }
+      eventSource.close();
+    };
+  }, [currentUser, messagePreferences.receiveMessages]);
+
+  useEffect(() => {
     if (!hasShieldDesktopFeature('onNotificationClick')) {
       return;
     }
@@ -7070,6 +7293,15 @@ function App() {
   const totalNotificationCount = recentNotificationCount + unreadNotificationCount + (isAdministrator ? openBugCount : 0);
   const desktopBadgeCount = messageUnreadCount + unreadNotificationCount + (isAdministrator ? openBugCount : 0);
   const hasNotificationCenterItems = totalNotificationCount > 0 || userNotifications.length > 0;
+  const shouldShowRecentConversations = Boolean(
+    currentUser &&
+    isAuthenticated &&
+    !isAppLocked &&
+    messagePreferences.receiveMessages &&
+    recentConversations.length > 0 &&
+    !isMessagesModalOpen &&
+    !getAppRelativePathname().startsWith('/messages'),
+  );
   const shouldShowForcedPasswordModal = Boolean(
     currentUser?.mustChangePassword && !isWelcomeSplashOpen && !isFirstLoginGuideOpen,
   );
@@ -7286,6 +7518,12 @@ function App() {
     setIsMessagesModalOpen(true);
   };
 
+  const openRecentConversation = (conversation: RecentConversation) => {
+    setMessageTargetUser(null);
+    setMessageTargetThreadId(conversation.id);
+    openMessagesModal();
+  };
+
   useEffect(() => {
     const openMessageThread = (event: Event) => {
       const user = (event as CustomEvent<User>).detail;
@@ -7294,6 +7532,7 @@ function App() {
       }
 
       setMessageTargetUser({ ...user });
+      setMessageTargetThreadId(null);
       openMessagesModal();
     };
 
@@ -8464,6 +8703,13 @@ function App() {
               setIsAccountMenuOpen(false);
             }}
           />
+          {shouldShowRecentConversations && (
+            <RecentConversationsDock
+              conversations={recentConversations}
+              onOpenConversation={openRecentConversation}
+              onOpenMessages={openMessagesModal}
+            />
+          )}
           {isMessagesModalOpen && currentUser && (
             <FloatingWindow
               className="glass-workspace-window pointer-events-auto fixed inset-x-0 top-0 bottom-[calc(env(safe-area-inset-bottom)+5.4rem)] flex min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[72dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(420px,calc(100dvh-1rem))] md:w-[min(900px,calc(100vw-1rem))] md:min-w-[min(360px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4"
@@ -8499,7 +8745,7 @@ function App() {
                 </div>
                 <div className="min-h-0 flex-1">
                   <Suspense fallback={<PageLoader label="Loading messages..." />}>
-                    <MessageInboxPage currentUser={currentUser} onToast={showToast} isModalView targetRecipient={messageTargetUser} isBackgrounded={isAppBackgrounded} />
+                    <MessageInboxPage currentUser={currentUser} onToast={showToast} isModalView targetRecipient={messageTargetUser} targetThreadId={messageTargetThreadId} isBackgrounded={isAppBackgrounded} />
                   </Suspense>
                 </div>
               </>
