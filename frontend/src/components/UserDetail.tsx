@@ -540,10 +540,10 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
     <div className={`flex flex-col overflow-hidden rounded-none bg-white shadow-xl dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:rounded-lg ${isFloatingProfile ? 'h-full max-h-full' : 'h-[100dvh] sm:h-auto sm:max-h-[92dvh]'}`}>
       <div
         onPointerDown={onHeaderPointerDown}
-        className={`shrink-0 select-none bg-primary-500 px-4 py-4 text-white sm:px-5 sm:py-5 ${isFloatingProfile ? 'md:cursor-grab' : ''}`}
+        className={`shrink-0 select-none bg-primary-500 px-4 text-white sm:px-5 ${isFloatingProfile ? 'py-3 sm:py-3 md:cursor-grab' : 'py-4 sm:py-5'}`}
       >
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex min-w-0 flex-col items-center gap-3 text-center sm:flex-row sm:items-center sm:gap-4 sm:text-left">
+        <div className={`flex flex-col lg:flex-row lg:items-start lg:justify-between ${isFloatingProfile ? 'gap-3' : 'gap-4'}`}>
+          <div className={`flex min-w-0 flex-col items-center text-center sm:flex-row sm:items-center sm:text-left ${isFloatingProfile ? 'gap-3' : 'gap-3 sm:gap-4'}`}>
           <div className="relative shrink-0">
             {(isOnline || isAway) && presenceTone.pulseClass && <span className={`pointer-events-none absolute -inset-1 rounded-full border shield-online-pulse ${presenceTone.pulseClass}`} />}
           {user.profilePictureUrl ? (
@@ -551,17 +551,17 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
               src={getAssetUrl(user.profilePictureUrl)}
               alt={`${user.firstName} ${user.lastName}`}
               onError={handleAssetImageError}
-              className={`relative h-20 w-20 rounded-full border-2 object-cover sm:h-20 sm:w-20 ${profileRingClass}`}
+              className={`relative rounded-full border-2 object-cover ${isFloatingProfile ? 'h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem]' : 'h-20 w-20 sm:h-20 sm:w-20'} ${profileRingClass}`}
             />
           ) : (
-            <div className={`relative flex h-20 w-20 items-center justify-center rounded-full border-2 bg-white text-2xl font-bold text-primary-500 sm:h-20 sm:w-20 ${profileRingClass}`}>
+            <div className={`relative flex items-center justify-center rounded-full border-2 bg-white font-bold text-primary-500 ${isFloatingProfile ? 'h-16 w-16 text-xl sm:h-[4.5rem] sm:w-[4.5rem]' : 'h-20 w-20 text-2xl sm:h-20 sm:w-20'} ${profileRingClass}`}>
               {getInitials(user)}
             </div>
           )}
           </div>
           <div>
-            <div className="flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
-              <h2 className="m-0 text-xl font-bold text-white sm:text-2xl">{user.firstName} {user.lastName}</h2>
+            <div className={`flex flex-col items-center sm:flex-row sm:flex-wrap sm:items-center ${isFloatingProfile ? 'gap-2' : 'gap-3 sm:gap-2'}`}>
+              <h2 className={`m-0 font-bold text-white ${isFloatingProfile ? 'text-xl sm:text-xl' : 'text-xl sm:text-2xl'}`}>{user.firstName} {user.lastName}</h2>
               {user.isHidden && (
                 <span className="rounded-full border border-amber-200/40 bg-amber-300/15 px-2 py-1 text-xs font-bold uppercase tracking-wide text-amber-100">
                   Hidden
@@ -594,11 +594,11 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
                 )}
               </div>
             </div>
-            <div className="mt-2">
+            <div className={isFloatingProfile ? 'mt-1.5' : 'mt-2'}>
               <RankBadge rank={user.rank} />
             </div>
-            <p className="mt-2 max-w-full truncate text-sm text-blue-100">{user.email || 'No email on file'}</p>
-            <p className="mt-1 text-sm text-blue-100">PE {user.peNumber || 'N/A'} - {user.district || 'No district'}</p>
+            <p className={`${isFloatingProfile ? 'mt-1.5' : 'mt-2'} max-w-full truncate text-sm text-blue-100`}>{user.email || 'No email on file'}</p>
+            <p className="mt-0.5 text-sm text-blue-100">PE {user.peNumber || 'N/A'} - {user.district || 'No district'}</p>
             <p className={`mt-1 inline-flex items-center gap-1.5 text-xs font-semibold ${presenceTone.textClass}`}>
               <span className={`h-1.5 w-1.5 rounded-full ${presenceTone.dotClass}`} />
               {lastOnlineLabel}
@@ -606,8 +606,8 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           </div>
         </div>
           <div className="flex w-full items-start gap-3 lg:ml-auto lg:w-auto">
-            <div className="min-w-0 flex-1 rounded border border-white/15 bg-white/10 p-3 lg:min-w-52 lg:max-w-xs">
-              <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-white">
+            <div className={`min-w-0 flex-1 rounded border border-white/15 bg-white/10 lg:max-w-xs ${isFloatingProfile ? 'p-2.5 lg:min-w-52' : 'p-3 lg:min-w-52'}`}>
+              <div className="mb-1.5 flex items-center justify-between gap-3 text-sm font-bold text-white">
                 <span className="inline-flex items-center gap-2">
                   <Gauge size={15} />
                   Mileage
@@ -634,13 +634,13 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           </button>
           </div>
         </div>
-        <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto border-t border-white/15 px-4 pt-3 sm:mx-0 sm:mt-5 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pt-4">
+        <div className={`-mx-4 flex gap-2 overflow-x-auto border-t border-white/15 px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 ${isFloatingProfile ? 'mt-3 pt-2.5' : 'mt-4 pt-3 sm:mt-5 sm:pt-4'}`}>
           {tabs.map(([tab, label]) => (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`shrink-0 rounded px-3 py-2 text-sm font-bold transition ${activeTab === tab ? 'bg-white text-primary-500' : 'bg-white/10 text-white hover:bg-white/20'}`}
+              className={`shrink-0 rounded text-sm font-bold transition ${isFloatingProfile ? 'px-3 py-1.5' : 'px-3 py-2'} ${activeTab === tab ? 'bg-white text-primary-500' : 'bg-white/10 text-white hover:bg-white/20'}`}
             >
               {label}
             </button>
@@ -648,7 +648,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-gray-50 px-3 py-4 dark:bg-gray-950 sm:bg-transparent sm:px-5 sm:py-6 sm:dark:bg-transparent">
+      <div className={`min-h-0 flex-1 overflow-y-auto bg-gray-50 px-3 dark:bg-gray-950 sm:bg-transparent sm:px-5 sm:dark:bg-transparent ${isFloatingProfile ? 'py-3 sm:py-4' : 'py-4 sm:py-6'}`}>
         {activeTab === 'personal' && <DetailSection title="Personal Information">
           <DetailRow label="Name" value={`${user.firstName} ${user.lastName}`} />
           <DetailRow label="Email" value={user.email} copyValue={user.email} onCopy={copyProfileValue} isCopied={copiedField === 'Email'} />
