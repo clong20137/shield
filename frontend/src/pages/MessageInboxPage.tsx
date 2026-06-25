@@ -424,6 +424,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const messageReloadTimerRef = useRef<number | null>(null);
   const messageLoadInFlightRef = useRef(false);
   const messageLoadPendingRef = useRef(false);
+  const appliedTargetThreadIdRef = useRef<string | null>(null);
   const focusReplyComposer = () => {
     window.setTimeout(() => replyTextareaRef.current?.focus(), 0);
   };
@@ -864,21 +865,27 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     : '';
 
   useEffect(() => {
-    if (!targetThreadId || !filteredThreads.some((thread) => thread.id === targetThreadId)) {
+    if (!targetThreadId) {
+      appliedTargetThreadIdRef.current = null;
       return;
     }
 
-    if (selectedThreadId === targetThreadId && !draftRecipient && draftGroupRecipients.length === 0 && !isComposeOpen && !searchTerm) {
+    if (appliedTargetThreadIdRef.current === targetThreadId) {
       return;
     }
 
+    if (!filteredThreads.some((thread) => thread.id === targetThreadId)) {
+      return;
+    }
+
+    appliedTargetThreadIdRef.current = targetThreadId;
     setSelectedThreadId(targetThreadId);
     setDraftRecipient(null);
     setDraftGroupRecipients([]);
     setDraftThreadTitle('');
     setIsComposeOpen(false);
     setSearchTerm('');
-  }, [draftGroupRecipients.length, draftRecipient, filteredThreads, isComposeOpen, searchTerm, selectedThreadId, targetThreadId]);
+  }, [filteredThreads, targetThreadId]);
 
   useEffect(() => {
     if (composeRequestKey <= 0) {
