@@ -721,6 +721,70 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       });
       return Array.from(nextMessages.values());
     });
+
+    const messagesByThread = new Map<string, UserMessage[]>();
+    messages.forEach((message) => {
+      const threadId = getThreadId(message, currentUser.id);
+      if (!threadId || threadId.startsWith('draft-group:')) {
+        return;
+      }
+
+      const existing = messagesByThread.get(threadId) ?? [];
+      existing.push(message);
+      messagesByThread.set(threadId, existing);
+    });
+
+    if (messagesByThread.size === 0) {
+      return;
+    }
+
+    setThreadMessageWindows((current) => {
+      const next = { ...current };
+      let changed = false;
+
+      messagesByThread.forEach((newMessages, threadId) => {
+        const currentWindow = current[threadId];
+        if (!currentWindow) {
+          return;
+        }
+
+        const nextMessages = [...currentWindow.messages, ...newMessages].reduce((acc, message) => {
+          const existingLocalMessage = acc.find((existingMessage) =>
+            existingMessage.id.startsWith('local-') &&
+            message.id !== existingMessage.id &&
+            existingMessage.senderAccountId === message.senderAccountId &&
+            existingMessage.body === message.body &&
+            ((existingMessage.senderAccountId === currentUser.id
+              ? existingMessage.recipientUserId === message.recipientUserId
+              : existingMessage.senderAccountId === message.senderAccountId)
+            )
+          );
+
+          if (existingLocalMessage) {
+            const filtered = acc.filter((item) => item.id !== existingLocalMessage.id);
+            filtered.push(message);
+            return filtered;
+          }
+
+          if (!acc.some((item) => item.id === message.id)) {
+            acc.push(message);
+          }
+          return acc;
+        }, [...currentWindow.messages]).sort((a, b) => {
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        });
+
+        if (nextMessages.length !== currentWindow.messages.length || nextMessages.some((message, index) => message.id !== currentWindow.messages[index]?.id)) {
+          next[threadId] = {
+            ...currentWindow,
+            messages: nextMessages,
+          };
+          changed = true;
+        }
+      });
+
+      return changed ? next : current;
+    });
   };
 
   const getThreadMessagesWithWindow = (threadId: string, fallbackMessages: UserMessage[]) => {
@@ -730,12 +794,15 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     });
 
     if (!windowState || windowState.messages.length === 0) {
-      return sortedFallback.slice(0, THREAD_MESSAGE_PAGE_SIZE);
+      if (sortedFallback.length === 0) {
+        return [];
+      }
+
+      return sortedFallback.slice(Math.max(0, sortedFallback.length - THREAD_MESSAGE_PAGE_SIZE));
     }
 
-    const mergedMessages = [...windowState.messages, ...sortedFallback.slice(0, THREAD_MESSAGE_PAGE_SIZE)];
     const byId = new Map<string, UserMessage>();
-    mergedMessages.forEach((message) => {
+    windowState.messages.forEach((message) => {
       byId.set(message.id, message);
     });
 
@@ -792,6 +859,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     try {
       const response = await messageService.getThread(threadId, currentUser.id, nextPage, THREAD_MESSAGE_PAGE_SIZE);
       const fetchedMessages = response.data;
+      const sortedFetchedMessages = [...fetchedMessages].sort((a, b) => {
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      });
 
       mergeThreadMessages(fetchedMessages, !isLoadOlder);
 
@@ -799,9 +869,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         const currentWindowState = current[threadId];
         const existingMessages = currentWindowState?.messages ?? [];
         const existingMessageIds = new Set(existingMessages.map((message) => message.id));
-        const nextMessages = reset
-          ? fetchedMessages
-          : [...existingMessages, ...fetchedMessages.filter((message) => !existingMessageIds.has(message.id))];
+        const nextMessages = [
+          ...(reset ? [] : existingMessages),
+          ...sortedFetchedMessages.filter((message) => !existingMessageIds.has(message.id)),
+        ].sort((a, b) => {
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        });
 
         return {
           ...current,
