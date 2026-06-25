@@ -1500,7 +1500,7 @@ function buildRecentConversations(messages: UserMessage[], currentUserId: string
 
   return Array.from(threadMap.values())
     .sort((a, b) => new Date(b.latestMessage?.createdAt || 0).getTime() - new Date(a.latestMessage?.createdAt || 0).getTime())
-    .slice(0, 4);
+    .slice(0, 5);
 }
 
 function isRecentConversationOnline(lastSeenAt?: string | null): boolean {
@@ -1640,6 +1640,10 @@ function RecentConversationsDock({
   isCollapsed,
   presenceByAccount,
   typingByConversation,
+  isGlassTheme,
+  appScale,
+  onGlassThemeChange,
+  onAppScaleChange,
   onOpenConversation,
   onMarkRead,
   onCompose,
@@ -1649,6 +1653,10 @@ function RecentConversationsDock({
   isCollapsed: boolean;
   presenceByAccount: Record<string, RecentPresenceState>;
   typingByConversation: Record<string, RecentTypingState>;
+  isGlassTheme: boolean;
+  appScale: AppScale;
+  onGlassThemeChange: (isGlassTheme: boolean) => void;
+  onAppScaleChange: (appScale: AppScale) => void;
   onOpenConversation: (conversation: RecentConversation) => void;
   onMarkRead: (conversation: RecentConversation) => void;
   onCompose: () => void;
@@ -1881,6 +1889,34 @@ function RecentConversationsDock({
           >
             {isCollapsed ? 'Expand dock' : 'Collapse dock'}
           </button>
+          <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+          <button
+            type="button"
+            className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
+            onClick={() => {
+              onGlassThemeChange(!isGlassTheme);
+              setContextMenu(null);
+            }}
+          >
+            {isGlassTheme ? 'Disable glass mode' : 'Enable glass mode'}
+          </button>
+          {appScaleOptions.map((option) => {
+            const isSelected = appScale === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={`quick-launch-context-menu-item text-gray-700 dark:text-gray-200 ${isSelected ? 'font-bold text-accent' : ''}`}
+                onClick={() => {
+                  onAppScaleChange(option.value);
+                  setContextMenu(null);
+                }}
+                disabled={isSelected}
+              >
+                {option.label}{isSelected ? ' (current)' : ''}
+              </button>
+            );
+          })}
         </div>
       )}
     </aside>
@@ -3116,6 +3152,10 @@ function QuickLaunchTray({
   onQuickLaunchHiddenChange,
   onQuickLaunchPlacementChange,
   onQuickLaunchSlotCountChange,
+  isGlassTheme,
+  appScale,
+  onGlassThemeChange,
+  onAppScaleChange,
 }: {
   isAdministrator: boolean;
   permissions: string[];
@@ -3134,6 +3174,10 @@ function QuickLaunchTray({
   onQuickLaunchHiddenChange: (hideQuickLaunch: boolean) => void;
   onQuickLaunchPlacementChange: (placement: QuickLaunchPlacement) => void;
   onQuickLaunchSlotCountChange: (slotCount: number) => void;
+  isGlassTheme: boolean;
+  appScale: AppScale;
+  onGlassThemeChange: (isGlassTheme: boolean) => void;
+  onAppScaleChange: (appScale: AppScale) => void;
 }) {
   const normalizedSlotCount = normalizeQuickLaunchSlotCount(slotCount);
   const isSidebarPlacement = placement === 'sidebar';
@@ -3887,6 +3931,29 @@ function QuickLaunchTray({
           >
             <X size={15} /> Remove All
           </button>
+          <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+          <button
+            type="button"
+            onClick={() => onGlassThemeChange(!isGlassTheme)}
+            className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200"
+          >
+            {isGlassTheme ? 'Disable glass mode' : 'Enable glass mode'}
+          </button>
+          {appScaleOptions.map((option) => {
+            const isSelected = appScale === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onAppScaleChange(option.value)}
+                className={`quick-launch-context-menu-item text-gray-700 dark:text-gray-200 ${isSelected ? 'font-bold text-accent' : ''}`}
+                disabled={isSelected}
+              >
+                <span className="truncate">{option.label}</span>
+                {isSelected && <span className="ml-auto text-xs font-black text-accent">(current)</span>}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -9002,6 +9069,10 @@ function App() {
                     onOpenCalendar={toggleCalendarModal}
                     onOpenCalculator={toggleCalculator}
                     onOpenCreateUser={toggleCreateUserModal}
+                    isGlassTheme={isGlassTheme}
+                    appScale={normalizeAppScale(currentUser?.appScale)}
+                    onGlassThemeChange={setIsGlassTheme}
+                    onAppScaleChange={handleAppScaleChange}
                     onQuickLaunchHiddenChange={(hideQuickLaunch) =>
                       setMessagePreferences((preferences) => ({
                         ...preferences,
@@ -9392,6 +9463,10 @@ function App() {
                   onOpenCalendar={toggleCalendarModal}
                   onOpenCalculator={toggleCalculator}
                   onOpenCreateUser={toggleCreateUserModal}
+                  isGlassTheme={isGlassTheme}
+                  appScale={normalizeAppScale(currentUser?.appScale)}
+                  onGlassThemeChange={setIsGlassTheme}
+                  onAppScaleChange={handleAppScaleChange}
                   onQuickLaunchHiddenChange={(hideQuickLaunch) =>
                     setMessagePreferences((preferences) => ({
                       ...preferences,
@@ -9452,6 +9527,10 @@ function App() {
               isCollapsed={areRecentConversationsCollapsed}
               presenceByAccount={recentConversationPresenceByAccount}
               typingByConversation={recentConversationTypingById}
+              isGlassTheme={isGlassTheme}
+              appScale={normalizeAppScale(currentUser?.appScale)}
+              onGlassThemeChange={setIsGlassTheme}
+              onAppScaleChange={handleAppScaleChange}
               onOpenConversation={openRecentConversation}
               onMarkRead={markRecentConversationRead}
               onCompose={openNewMessageComposer}
