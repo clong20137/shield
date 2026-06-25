@@ -3162,6 +3162,20 @@
     transform-origin: right center;
   }
 
+  .recent-message-preview-pop--arrow::after {
+    content: '';
+    position: absolute;
+    right: -0.45rem;
+    top: 50%;
+    width: 0.65rem;
+    height: 0.65rem;
+    transform: translateY(-50%) rotate(45deg);
+    border-right: 1px solid rgba(255, 255, 255, 0.3);
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    background-color: inherit;
+    border-radius: 2px;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
