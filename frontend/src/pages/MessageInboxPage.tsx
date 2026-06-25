@@ -560,7 +560,15 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       ]);
 
       if (inboxResult.status === 'fulfilled') {
-        setInboxMessages(inboxResult.value.data);
+        if (showLoading) {
+          setInboxMessages(inboxResult.value.data);
+        } else {
+          setInboxMessages((currentMessages) => {
+            const nextMessages = new Map(currentMessages.map((message) => [message.id, message]));
+            inboxResult.value.data.forEach((message) => nextMessages.set(message.id, message));
+            return Array.from(nextMessages.values());
+          });
+        }
       } else {
         logMessageDiagnostic('Message inbox load failed', {
           error: getDiagnosticErrorDetails(inboxResult.reason),
@@ -569,7 +577,24 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       }
 
       if (sentResult.status === 'fulfilled') {
-        setSentMessages(sentResult.value.data);
+        if (showLoading) {
+          setSentMessages(sentResult.value.data);
+        } else {
+          setSentMessages((currentMessages) => {
+            const nextMessages = new Map(currentMessages.map((message) => [message.id, message]));
+            sentResult.value.data.forEach((message) => {
+              currentMessages
+                .filter((existingMessage) =>
+                  existingMessage.id.startsWith('local-') &&
+                  existingMessage.body === message.body &&
+                  existingMessage.recipientUserId === message.recipientUserId
+                )
+                .forEach((existingMessage) => nextMessages.delete(existingMessage.id));
+              nextMessages.set(message.id, message);
+            });
+            return Array.from(nextMessages.values());
+          });
+        }
       } else {
         logMessageDiagnostic('Message sent load failed', {
           error: getDiagnosticErrorDetails(sentResult.reason),
@@ -726,6 +751,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     eventSource?.addEventListener('error', (event) => {
       console.error('Message realtime connection error:', event);
     });
+    window.addEventListener('shield:messages-updated', handleRealtimeMessageUpdate);
     window.addEventListener('shield:api-reconnected', handleRealtimeMessageUpdate);
 
     return () => {
@@ -734,6 +760,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         messageReloadTimerRef.current = null;
       }
       eventSource?.close();
+      window.removeEventListener('shield:messages-updated', handleRealtimeMessageUpdate);
       window.removeEventListener('shield:api-reconnected', handleRealtimeMessageUpdate);
     };
   }, [currentUser.id, isBackgrounded]);
