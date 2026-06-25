@@ -1,6 +1,6 @@
 import { CSSProperties, FormEvent, ReactNode, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Command, Delete, Download, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, RefreshCw, Save, Search, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, Users, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Bug, Calculator, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Command, Delete, Download, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LogOut, LucideIcon, Mail, Moon, Pencil, Plus, RefreshCw, Save, Search, Send, Settings, Shield, Sun, Trash2, UserCircle, UserPlus, Users, X } from 'lucide-react';
 import { BrowserRouter as Router, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
@@ -1662,6 +1662,207 @@ function RecentConversationsDock({
           <ChevronDown className={`transition-transform duration-300 ${isCollapsed ? 'rotate-180' : 'rotate-0'}`} size={16} />
         </button>
       </div>
+    </aside>
+  );
+}
+
+function RecentMessageComposerPopup({
+  currentUser,
+  onClose,
+  onSent,
+  onToast,
+}: {
+  currentUser: AuthAccount;
+  onClose: () => void;
+  onSent: () => void;
+  onToast: (type: ToastType, message: string, options?: { saveToNotifications?: boolean }) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<User[]>([]);
+  const [selectedRecipient, setSelectedRecipient] = useState<User | null>(null);
+  const [body, setBody] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+
+  useEffect(() => {
+    const term = query.trim();
+    if (term.length < 2) {
+      setResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    let isMounted = true;
+    setIsSearching(true);
+    const timer = window.setTimeout(() => {
+      userService.search(term)
+        .then((response) => {
+          if (!isMounted) return;
+          setResults(response.data.filter((user: User) => user.id !== currentUser.id).slice(0, 8));
+        })
+        .catch((error) => {
+          console.error('Recent message recipient search failed:', error);
+          if (isMounted) setResults([]);
+        })
+        .finally(() => {
+          if (isMounted) setIsSearching(false);
+        });
+    }, 220);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timer);
+    };
+  }, [currentUser.id, query]);
+
+  const sendQuickMessage = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedRecipient) {
+      onToast('error', 'Choose a recipient first.', { saveToNotifications: false });
+      return;
+    }
+
+    const text = body.trim();
+    if (!text) {
+      onToast('error', 'Enter a message.', { saveToNotifications: false });
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      await messageService.resolveRecipient(selectedRecipient.id);
+      await messageService.send({
+        senderAccountId: currentUser.id,
+        recipientUserId: selectedRecipient.id,
+        subject: 'Message',
+        body: text,
+      });
+      onSent();
+      onToast('success', `Message sent to ${`${selectedRecipient.firstName || ''} ${selectedRecipient.lastName || ''}`.trim() || selectedRecipient.email}.`, { saveToNotifications: false });
+      onClose();
+    } catch (error) {
+      console.error('Recent message send failed:', error);
+      errorLogService.createClientLog({
+        level: 'error',
+        message: 'Recent message popup send failed',
+        route: window.location.pathname,
+        context: JSON.stringify({
+          area: 'messages',
+          action: 'recent-compose-send',
+          currentUserId: currentUser.id,
+          recipientId: selectedRecipient.id,
+          recipientEmail: selectedRecipient.email,
+          bodyLength: text.length,
+          error: getErrorMessage(error, 'Failed to send message.'),
+        }, null, 2),
+      }).catch((logError) => console.error('Failed to write recent message diagnostic:', logError));
+      onToast('error', getErrorMessage(error, 'Failed to send message.'), { saveToNotifications: false });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <aside className="fixed bottom-5 right-[5.4rem] z-50 hidden w-[min(24rem,calc(100vw-2rem))] md:block" aria-label="Quick new message">
+      <form onSubmit={sendQuickMessage} className="quick-launch-context-menu overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl ring-1 ring-black/5 dark:border-gray-800 dark:bg-gray-950 dark:ring-white/10">
+        <div className="border-b border-gray-200 bg-primary-500 px-4 py-3 text-white dark:border-gray-800">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-black uppercase tracking-[0.14em] text-white/70">New Message</p>
+              <p className="truncate text-lg font-black">Quick compose</p>
+            </div>
+            <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20" aria-label="Close quick message" title="Close">
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-3 p-4">
+          {selectedRecipient ? (
+            <div className="flex items-center gap-3 rounded-xl border border-accent/25 bg-accent/10 p-2.5">
+              {selectedRecipient.profilePictureUrl ? (
+                <img
+                  src={getAssetThumbnailUrl(selectedRecipient.profilePictureUrl, 96)}
+                  alt=""
+                  onError={(event) => handleAssetThumbnailError(event, selectedRecipient.profilePictureUrl)}
+                  className="h-11 w-11 rounded-full object-cover"
+                />
+              ) : (
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-sm font-black text-accent dark:bg-gray-950">
+                  {getInitials(`${selectedRecipient.firstName || ''} ${selectedRecipient.lastName || ''}`, selectedRecipient.email)}
+                </span>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-black text-gray-900 dark:text-gray-100">{`${selectedRecipient.firstName || ''} ${selectedRecipient.lastName || ''}`.trim() || selectedRecipient.email}</p>
+                <p className="truncate text-xs font-semibold text-gray-500 dark:text-gray-400">{selectedRecipient.email || selectedRecipient.peNumber}</p>
+              </div>
+              <button type="button" onClick={() => setSelectedRecipient(null)} className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-white/70 dark:hover:bg-gray-900" aria-label="Change recipient" title="Change">
+                <X size={15} />
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search recipient"
+                  className="global-search-input w-full rounded-xl border border-gray-300 bg-white py-3 text-sm dark:border-gray-700 dark:bg-gray-900"
+                  autoFocus
+                />
+              </div>
+              <div className="max-h-60 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-800">
+                {isSearching ? (
+                  <div className="px-3 py-4 text-sm font-semibold text-gray-500 dark:text-gray-400">Searching...</div>
+                ) : results.length === 0 ? (
+                  <div className="px-3 py-4 text-sm font-semibold text-gray-500 dark:text-gray-400">{query.trim().length < 2 ? 'Type at least 2 characters.' : 'No people found.'}</div>
+                ) : (
+                  results.map((user) => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedRecipient(user);
+                        setQuery('');
+                        setResults([]);
+                      }}
+                      className="flex w-full items-center gap-3 border-b border-gray-100 px-3 py-2.5 text-left last:border-b-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900"
+                    >
+                      {user.profilePictureUrl ? (
+                        <img src={getAssetThumbnailUrl(user.profilePictureUrl, 96)} alt="" onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)} className="h-10 w-10 rounded-full object-cover" />
+                      ) : (
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 text-xs font-black text-accent">{getInitials(`${user.firstName || ''} ${user.lastName || ''}`, user.email)}</span>
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-black text-gray-800 dark:text-gray-100">{`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email}</span>
+                        <span className="block truncate text-xs font-semibold text-gray-500">{user.email || user.peNumber}</span>
+                      </span>
+                      {user.receivesMessages === false && <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-black text-danger dark:bg-red-950">OFF</span>}
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+
+          <textarea
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
+            placeholder="Message"
+            rows={4}
+            className="w-full resize-none rounded-xl border border-gray-300 bg-white px-3 py-3 text-[16px] leading-6 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-gray-700 dark:bg-gray-900 sm:text-sm"
+          />
+          <button
+            type="submit"
+            disabled={isSending || !selectedRecipient || !body.trim()}
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 text-sm font-black text-white transition hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-55"
+          >
+            {isSending ? 'Sending...' : 'Send Message'}
+            <Send size={16} />
+          </button>
+        </div>
+      </form>
     </aside>
   );
 }
@@ -5687,7 +5888,8 @@ function App() {
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [messageTargetUser, setMessageTargetUser] = useState<User | null>(null);
   const [messageTargetThreadId, setMessageTargetThreadId] = useState<string | null>(null);
-  const [messageComposeRequestKey, setMessageComposeRequestKey] = useState(0);
+  const [messageComposeRequestKey] = useState(0);
+  const [isRecentMessageComposerOpen, setIsRecentMessageComposerOpen] = useState(false);
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
   const [isBugTrackerOpen, setIsBugTrackerOpen] = useState(false);
   const [isFirstLoginGuideOpen, setIsFirstLoginGuideOpen] = useState(false);
@@ -7731,16 +7933,14 @@ function App() {
   };
 
   const openRecentConversation = (conversation: RecentConversation) => {
+    setIsRecentMessageComposerOpen(false);
     setMessageTargetUser(null);
     setMessageTargetThreadId(conversation.id);
     openMessagesModal();
   };
 
   const openNewMessageComposer = () => {
-    setMessageTargetUser(null);
-    setMessageTargetThreadId(null);
-    setMessageComposeRequestKey((key) => key + 1);
-    openMessagesModal();
+    setIsRecentMessageComposerOpen((isOpen) => !isOpen);
   };
 
   useEffect(() => {
@@ -8967,6 +9167,14 @@ function App() {
               onOpenConversation={openRecentConversation}
               onCompose={openNewMessageComposer}
               onToggleCollapsed={() => setAreRecentConversationsCollapsed((collapsed) => !collapsed)}
+            />
+          )}
+          {shouldShowRecentConversations && isRecentMessageComposerOpen && currentUser && (
+            <RecentMessageComposerPopup
+              currentUser={currentUser}
+              onClose={() => setIsRecentMessageComposerOpen(false)}
+              onSent={() => window.dispatchEvent(new CustomEvent('shield:messages-updated'))}
+              onToast={showToast}
             />
           )}
           {isMessagesModalOpen && currentUser && (

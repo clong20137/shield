@@ -1884,21 +1884,22 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
             )}
             <div
               className={[
-                'quick-launch-context-menu fixed z-[95] overflow-y-auto border border-gray-200 bg-white shadow-2xl ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-950 dark:ring-white/10',
+                'quick-launch-context-menu fixed z-[95] overflow-y-auto border border-gray-200 bg-white/95 shadow-[0_28px_90px_rgba(15,23,42,0.28)] ring-1 ring-black/5 backdrop-blur-xl dark:border-gray-700 dark:bg-gray-950/95 dark:ring-white/10',
                 isCompactComposeOpen
-                  ? 'inset-x-3 max-h-[min(42rem,calc(100dvh-2rem))] rounded-2xl p-4'
-                  : 'max-h-[min(34rem,calc(100vh-6rem))] w-[min(25rem,calc(100vw-1.5rem))] rounded-lg p-3',
+                  ? 'inset-x-3 max-h-[min(44rem,calc(100dvh-2rem))] rounded-3xl p-4'
+                  : 'max-h-[min(38rem,calc(100vh-6rem))] w-[min(30rem,calc(100vw-1.5rem))] rounded-2xl p-4',
               ].join(' ')}
               style={isCompactComposeOpen ? { bottom: composeKeyboardInset } : { right: composePopoverPosition.right, bottom: composePopoverPosition.bottom }}
             >
-              <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="-mx-4 -mt-4 mb-4 rounded-t-2xl border-b border-white/15 bg-primary-500 px-4 py-4 text-white">
+                <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary-500/10 text-primary-500 dark:text-blue-100">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/12 text-white ring-1 ring-white/20">
                     <Send size={18} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-base font-black text-gray-900 dark:text-gray-100">New Message</p>
-                    <p className="truncate text-xs font-semibold text-gray-500 dark:text-gray-400">Start a chat, group, or district message</p>
+                    <p className="text-base font-black text-white">New Message</p>
+                    <p className="truncate text-xs font-semibold text-white/70">Start a chat, group, or district message</p>
                   </div>
                 </div>
                 <button
@@ -1910,12 +1911,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                     setDraftGroupRecipients([]);
                     setDraftThreadTitle('');
                   }}
-                  className="icon-close-button h-8 w-8"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
                   aria-label="Close new message"
                   title="Close"
                 >
                   <X size={16} />
                 </button>
+                </div>
               </div>
 
               <div className="relative">
@@ -1924,7 +1926,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   value={recipientQuery}
                   onChange={(event) => setRecipientQuery(event.target.value)}
                   placeholder="Search name, PE, or email"
-                  className="global-search-input w-full rounded-xl border border-gray-300 bg-white py-3 text-[16px] dark:border-gray-700 dark:bg-gray-900 sm:rounded sm:py-2 sm:text-sm"
+                  className="global-search-input w-full rounded-2xl border border-gray-300 bg-white py-3 text-[16px] shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:text-sm"
                   autoFocus={!isCompactComposeOpen}
                 />
               </div>
@@ -1934,7 +1936,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   type="button"
                   onClick={() => void loadDistrictRecipients()}
                   disabled={isLoadingDistrictRecipients}
-                  className="inline-flex h-10 items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 text-xs font-bold text-accent transition hover:bg-accent/15 disabled:opacity-60"
+                  className="inline-flex h-10 items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 text-xs font-black text-accent transition hover:bg-accent/15 disabled:opacity-60"
                   aria-label="Message district members"
                   title="Message district members"
                 >
@@ -1942,14 +1944,14 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   <span>{isLoadingDistrictRecipients ? 'Loading...' : 'My District'}</span>
                 </button>
                 {draftGroupRecipients.length > 0 && (
-                  <span className="inline-flex h-10 items-center rounded-full border border-primary-500/20 bg-primary-500/10 px-3 text-xs font-bold text-primary-500 dark:text-blue-100">
+                  <span className="inline-flex h-10 items-center rounded-full border border-primary-500/20 bg-primary-500/10 px-3 text-xs font-black text-primary-500 dark:text-blue-100">
                     {draftGroupRecipients.length} selected
                   </span>
                 )}
               </div>
 
               {draftGroupRecipients.length > 0 && (
-                <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900">
+                <div className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900">
                   <label className="block">
                     <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Group name</span>
                     <input
@@ -1986,7 +1988,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                 </div>
               )}
 
-              <div className="mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 sm:rounded-lg">
+              <div className="mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 {isRecipientSearching ? (
                   <div className="px-3 py-4 text-sm font-semibold text-gray-500 dark:text-gray-400">Searching...</div>
                 ) : recipientResults.length === 0 ? (
@@ -1997,26 +1999,26 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   recipientResults.map((user) => (
                     <div
                       key={user.id}
-                      className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 sm:py-2.5"
+                      className="flex w-full items-center gap-3 border-b border-gray-100 px-3 py-3 text-left text-sm transition last:border-b-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800 sm:py-3"
                     >
                       {user.profilePictureUrl ? (
                         <img
                           src={getAssetThumbnailUrl(user.profilePictureUrl, 96)}
                           alt={`${user.firstName} ${user.lastName}`}
                           onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)}
-                          className="h-10 w-10 rounded-full object-cover"
+                          className="h-11 w-11 rounded-full object-cover ring-2 ring-white dark:ring-gray-950"
                         />
                       ) : (
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 text-xs font-bold text-accent">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-accent/10 text-xs font-black text-accent ring-2 ring-white dark:ring-gray-950">
                           {getInitials(`${user.firstName} ${user.lastName}`)}
                         </span>
                       )}
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-bold text-gray-800 dark:text-gray-100">{user.firstName} {user.lastName}</span>
+                        <span className="block truncate font-black text-gray-800 dark:text-gray-100">{user.firstName} {user.lastName}</span>
                         <span className="block truncate text-xs font-semibold text-gray-500">{user.email || user.peNumber}</span>
                       </span>
                       {user.receivesMessages === false ? (
-                        <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-danger dark:bg-red-950">Off</span>
+                        <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-black text-danger dark:bg-red-950">Off</span>
                       ) : (
                         <span className="flex shrink-0 gap-1.5">
                           <button
@@ -2033,14 +2035,14 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                               setReplyAttachments([]);
                               focusReplyComposer();
                             }}
-                            className="inline-flex h-9 items-center rounded-full bg-primary-500 px-3 text-xs font-bold text-white hover:bg-primary-600"
+                            className="inline-flex h-9 items-center rounded-full bg-primary-500 px-3 text-xs font-black text-white shadow-sm hover:bg-primary-600"
                           >
                             Chat
                           </button>
                           <button
                             type="button"
                             onClick={() => addGroupRecipient(user)}
-                            className="inline-flex h-9 items-center rounded-full bg-accent px-3 text-xs font-bold text-white hover:bg-accent/90"
+                            className="inline-flex h-9 items-center rounded-full bg-accent px-3 text-xs font-black text-white shadow-sm hover:bg-accent/90"
                           >
                             Add
                           </button>
