@@ -103,8 +103,19 @@ interface RecentConversation {
   subtitle: string;
   imageUrl: string;
   threadType: string;
+  directParticipantId: string;
+  directLastSeenAt: string | null;
   latestMessage?: UserMessage;
+  unreadPreview: string;
   unreadCount: number;
+}
+
+type RecentPresenceStatus = 'active' | 'away' | 'busy';
+interface RecentPresenceState {
+  online: boolean;
+  away: boolean;
+  status: RecentPresenceStatus;
+  lastSeenAt: string | null;
 }
 
 type ReminderAlarmSound = '' | `custom:${string}`;
@@ -1397,6 +1408,24 @@ function getRecentConversationImage(message: UserMessage, currentUserId: string)
     : message.senderProfilePictureUrl || '';
 }
 
+function getRecentConversationDirectParticipantId(message: UserMessage, currentUserId: string): string {
+  if (message.threadType && message.threadType !== 'direct') {
+    return '';
+  }
+
+  return message.senderAccountId === currentUserId ? message.recipientUserId : message.senderAccountId;
+}
+
+function getRecentConversationDirectLastSeenAt(message: UserMessage, currentUserId: string): string | null {
+  if (message.threadType && message.threadType !== 'direct') {
+    return null;
+  }
+
+  return message.senderAccountId === currentUserId
+    ? message.recipientLastSeenAt || null
+    : message.senderLastSeenAt || null;
+}
+
 function getRecentConversationSubtitle(message: UserMessage, currentUserId: string): string {
   const prefix = message.senderAccountId === currentUserId ? 'You: ' : '';
   const deletedText = message.isDeleted ? 'Message deleted' : '';
@@ -1416,13 +1445,17 @@ function buildRecentConversations(messages: UserMessage[], currentUserId: string
 
     const existingConversation = threadMap.get(id);
     const unreadIncrement = message.recipientUserId === currentUserId && !message.isRead ? 1 : 0;
+    const subtitle = getRecentConversationSubtitle(message, currentUserId);
     const nextConversation: RecentConversation = {
       id,
       title: getRecentConversationTitle(message, currentUserId),
-      subtitle: getRecentConversationSubtitle(message, currentUserId),
+      subtitle,
       imageUrl: getRecentConversationImage(message, currentUserId),
       threadType: message.threadType || 'direct',
+      directParticipantId: getRecentConversationDirectParticipantId(message, currentUserId),
+      directLastSeenAt: getRecentConversationDirectLastSeenAt(message, currentUserId),
       latestMessage: message,
+      unreadPreview: unreadIncrement > 0 ? subtitle : existingConversation?.unreadPreview || '',
       unreadCount: (existingConversation?.unreadCount || 0) + unreadIncrement,
     };
     threadMap.set(id, nextConversation);
@@ -1433,17 +1466,108 @@ function buildRecentConversations(messages: UserMessage[], currentUserId: string
     .slice(0, 4);
 }
 
+function isRecentConversationOnline(lastSeenAt?: string | null): boolean {
+  if (!lastSeenAt) {
+    return false;
+  }
+
+  const value = new Date(lastSeenAt).getTime();
+  return !Number.isNaN(value) && Date.now() - value < 2 * 60 * 1000;
+}
+
+function isRecentConversationAway(lastSeenAt?: string | null): boolean {
+  if (!lastSeenAt) {
+    return false;
+  }
+
+  const value = new Date(lastSeenAt).getTime();
+  if (Number.isNaN(value)) {
+    return false;
+  }
+
+  const diff = Date.now() - value;
+  return diff >= 2 * 60 * 1000 && diff < 5 * 60 * 1000;
+}
+
+function getRecentConversationPresence(
+  conversation: RecentConversation,
+  presenceByAccount: Record<string, RecentPresenceState>,
+) {
+  const realtime = conversation.directParticipantId ? presenceByAccount[conversation.directParticipantId] : null;
+  const online = realtime ? realtime.online : isRecentConversationOnline(conversation.directLastSeenAt);
+  const away = realtime ? realtime.away : !online && isRecentConversationAway(conversation.directLastSeenAt);
+  const status = realtime?.status || (away ? 'away' : online ? 'active' : 'active');
+
+  if (status === 'busy' && online) {
+    return {
+      label: 'Busy',
+      dotClass: 'bg-red-500',
+      ringClass: 'ring-red-300/70 shadow-[0_0_0_1px_rgba(239,68,68,0.18)]',
+      pulseClass: 'border-red-300/50',
+      showPulse: true,
+    };
+  }
+
+  if ((status === 'away' && online) || away) {
+    return {
+      label: 'Away',
+      dotClass: 'bg-amber-400',
+      ringClass: 'ring-amber-300/80 shadow-[0_0_0_1px_rgba(251,191,36,0.2)]',
+      pulseClass: 'border-amber-300/70',
+      showPulse: true,
+    };
+  }
+
+  if (online) {
+    return {
+      label: 'Active',
+      dotClass: 'bg-green-500',
+      ringClass: 'ring-green-400/60 shadow-[0_0_0_1px_rgba(34,197,94,0.12)]',
+      pulseClass: 'border-green-400/45',
+      showPulse: true,
+    };
+  }
+
+  return {
+    label: 'Offline',
+    dotClass: 'bg-gray-400',
+    ringClass: 'ring-gray-300/60 dark:ring-gray-600/60',
+    pulseClass: '',
+    showPulse: false,
+  };
+}
+
 function RecentConversationsDock({
   conversations,
+  isCollapsed,
+  presenceByAccount,
   onOpenConversation,
   onCompose,
-  onHide,
+  onToggleCollapsed,
 }: {
   conversations: RecentConversation[];
+  isCollapsed: boolean;
+  presenceByAccount: Record<string, RecentPresenceState>;
   onOpenConversation: (conversation: RecentConversation) => void;
   onCompose: () => void;
-  onHide: () => void;
+  onToggleCollapsed: () => void;
 }) {
+  if (isCollapsed) {
+    return (
+      <aside className="pointer-events-none fixed bottom-5 right-5 z-40 hidden md:block" aria-label="Recent conversations collapsed">
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-primary-500 shadow-2xl backdrop-blur transition hover:-translate-x-0.5 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900/95 dark:text-blue-100"
+          aria-label="Show recent conversations"
+          title="Show Recent Conversations"
+        >
+          <ChevronLeft size={20} />
+        </button>
+      </aside>
+    );
+  }
+
   return (
     <aside className="pointer-events-none fixed bottom-5 right-5 z-40 hidden flex-col items-end gap-2 md:flex" aria-label="Recent conversations">
       <div className="pointer-events-auto flex flex-col items-center gap-2 rounded-full border border-gray-200 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
@@ -1457,41 +1581,67 @@ function RecentConversationsDock({
           <Plus size={22} />
         </button>
         {conversations.map((conversation) => (
-          <button
-            key={conversation.id}
-            type="button"
-            onClick={() => onOpenConversation(conversation)}
-            className="group relative flex h-12 w-12 items-center justify-center rounded-full bg-primary-500 text-sm font-black text-white shadow-sm ring-2 ring-white transition hover:-translate-x-1 hover:scale-105 hover:ring-accent dark:ring-gray-900"
-            aria-label={`Open conversation with ${conversation.title}`}
-            title={`${conversation.title}${conversation.subtitle ? ` - ${conversation.subtitle}` : ''}`}
-          >
-            {conversation.imageUrl ? (
-              <img
-                src={getAssetThumbnailUrl(conversation.imageUrl, 96)}
-                alt=""
-                onError={(event) => handleAssetThumbnailError(event, conversation.imageUrl)}
-                className="h-full w-full rounded-full object-cover"
-              />
-            ) : conversation.threadType !== 'direct' ? (
-              <Users size={19} />
-            ) : (
-              getInitials(conversation.title)
+          <div key={conversation.id} className="relative flex items-center">
+            {conversation.unreadCount > 0 && conversation.unreadPreview && (
+              <button
+                type="button"
+                onClick={() => onOpenConversation(conversation)}
+                className="absolute right-14 w-64 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left shadow-xl transition hover:border-accent dark:border-gray-800 dark:bg-gray-900"
+                aria-label={`Open unread message from ${conversation.title}`}
+              >
+                <span className="block truncate text-xs font-black text-primary-500 dark:text-blue-100">{conversation.title}</span>
+                <span className="mt-0.5 block truncate text-xs font-semibold text-gray-600 dark:text-gray-300">{conversation.unreadPreview}</span>
+              </button>
             )}
-            {conversation.unreadCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-danger px-1 text-[10px] font-black text-white dark:border-gray-900">
-                {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
-              </span>
-            )}
-          </button>
+            {(() => {
+              const presence = conversation.threadType === 'direct'
+                ? getRecentConversationPresence(conversation, presenceByAccount)
+                : null;
+
+              return (
+                <button
+                  type="button"
+                  onClick={() => onOpenConversation(conversation)}
+                  className={`group relative flex h-12 w-12 items-center justify-center rounded-full bg-primary-500 text-sm font-black text-white shadow-sm ring-2 transition hover:-translate-x-1 hover:scale-105 hover:ring-accent ${presence?.ringClass || 'ring-white dark:ring-gray-900'}`}
+                  aria-label={`Open conversation with ${conversation.title}${presence ? `, ${presence.label}` : ''}`}
+                  title={`${conversation.title}${presence ? ` - ${presence.label}` : ''}${conversation.subtitle ? ` - ${conversation.subtitle}` : ''}`}
+                >
+                  {conversation.imageUrl ? (
+                    <img
+                      src={getAssetThumbnailUrl(conversation.imageUrl, 96)}
+                      alt=""
+                      onError={(event) => handleAssetThumbnailError(event, conversation.imageUrl)}
+                      className="h-full w-full rounded-full object-cover"
+                    />
+                  ) : conversation.threadType !== 'direct' ? (
+                    <Users size={19} />
+                  ) : (
+                    getInitials(conversation.title)
+                  )}
+                  {presence && (
+                    <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-white dark:border-gray-900 dark:bg-gray-900">
+                      {presence.showPulse && <span className={`absolute inset-[-0.2rem] rounded-full border shield-online-pulse ${presence.pulseClass}`} />}
+                      <span className={`relative h-2.5 w-2.5 rounded-full ${presence.dotClass}`} />
+                    </span>
+                  )}
+                  {conversation.unreadCount > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-danger px-1 text-[10px] font-black text-white dark:border-gray-900">
+                      {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })()}
+          </div>
         ))}
         <button
           type="button"
-          onClick={onHide}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition hover:border-danger hover:text-danger dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-          aria-label="Hide recent conversations"
-          title="Hide Recent Conversations"
+          onClick={onToggleCollapsed}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+          aria-label="Collapse recent conversations"
+          title="Collapse Recent Conversations"
         >
-          <X size={16} />
+          <ChevronRight size={16} />
         </button>
       </div>
     </aside>
@@ -5564,6 +5714,8 @@ function App() {
   }, []);
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
+  const [recentConversationPresenceByAccount, setRecentConversationPresenceByAccount] = useState<Record<string, RecentPresenceState>>({});
+  const [areRecentConversationsCollapsed, setAreRecentConversationsCollapsed] = useState(false);
   const [bugReports, setBugReports] = useState<BugReport[]>([]);
   const [sidebarCalendarEntries, setSidebarCalendarEntries] = useState<CalendarEntry[]>([]);
   const [sidebarReminders, setSidebarReminders] = useState<Reminder[]>([]);
@@ -7060,6 +7212,52 @@ function App() {
   }, [currentUser, messagePreferences.receiveMessages]);
 
   useEffect(() => {
+    if (!currentUser || !messagePreferences.receiveMessages) {
+      setRecentConversationPresenceByAccount({});
+      return;
+    }
+
+    const eventSource = new EventSource(getMessageEventsUrl(), { withCredentials: true });
+    const handlePresenceUpdate = (event: MessageEvent) => {
+      try {
+        const payload = JSON.parse(event.data || '{}') as {
+          actorAccountId?: string;
+          actorOnline?: boolean;
+          actorAway?: boolean;
+          actorStatus?: RecentPresenceStatus;
+          actorLastSeenAt?: string | null;
+        };
+
+        if (!payload.actorAccountId) {
+          return;
+        }
+
+        setRecentConversationPresenceByAccount((current) => ({
+          ...current,
+          [payload.actorAccountId as string]: {
+            online: payload.actorOnline === true,
+            away: payload.actorAway === true,
+            status: payload.actorStatus || 'active',
+            lastSeenAt: payload.actorLastSeenAt || null,
+          },
+        }));
+      } catch (error) {
+        console.error('Failed to parse recent conversation presence update:', error);
+      }
+    };
+
+    eventSource.addEventListener('presence-updated', handlePresenceUpdate);
+    eventSource.addEventListener('error', (event) => {
+      console.error('Recent conversation presence connection error:', event);
+    });
+
+    return () => {
+      eventSource.removeEventListener('presence-updated', handlePresenceUpdate);
+      eventSource.close();
+    };
+  }, [currentUser, messagePreferences.receiveMessages]);
+
+  useEffect(() => {
     if (!hasShieldDesktopFeature('onNotificationClick')) {
       return;
     }
@@ -7296,7 +7494,6 @@ function App() {
     !isAppLocked &&
     messagePreferences.receiveMessages &&
     !messagePreferences.hideRecentConversations &&
-    !isMessagesModalOpen &&
     !getAppRelativePathname().startsWith('/messages'),
   );
   const shouldShowForcedPasswordModal = Boolean(
@@ -8710,14 +8907,11 @@ function App() {
           {shouldShowRecentConversations && (
             <RecentConversationsDock
               conversations={recentConversations}
+              isCollapsed={areRecentConversationsCollapsed}
+              presenceByAccount={recentConversationPresenceByAccount}
               onOpenConversation={openRecentConversation}
               onCompose={openNewMessageComposer}
-              onHide={() =>
-                setMessagePreferences((preferences) => ({
-                  ...preferences,
-                  hideRecentConversations: true,
-                }))
-              }
+              onToggleCollapsed={() => setAreRecentConversationsCollapsed((collapsed) => !collapsed)}
             />
           )}
           {isMessagesModalOpen && currentUser && (
