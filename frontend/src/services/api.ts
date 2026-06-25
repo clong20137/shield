@@ -1312,10 +1312,10 @@ export const messageService = {
   getInbox: (accountId: string) =>
     api.get<UserMessage[]>(`/messages/inbox/${accountId}`, MESSAGE_REQUEST_OPTIONS),
 
-  getThread: (threadId: string, accountId: string) =>
+  getThread: (threadId: string, accountId: string, page = 1, pageSize = 250) =>
     api.get<UserMessage[]>(`/messages/thread/${threadId}/messages`, {
       ...MESSAGE_REQUEST_OPTIONS,
-      params: { accountId },
+      params: { accountId, page, pageSize },
     }),
 
   getUnreadCount: (accountId: string) =>

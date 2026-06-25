@@ -45,7 +45,15 @@ interface ThreadMemberPreview {
   profilePictureUrl: string;
 }
 
+interface ThreadMessageWindowState {
+  page: number;
+  hasMore: boolean;
+  isLoading: boolean;
+  messages: UserMessage[];
+}
+
 const PINNED_THREADS_KEY_PREFIX = 'shield_pinned_message_threads';
+const THREAD_MESSAGE_PAGE_SIZE = 40;
 const messageReactionOptions = [
   { key: 'thumbsUp', label: 'Thumbs up', icon: '👍' },
   { key: 'check', label: 'Check', icon: '✅' },
@@ -474,6 +482,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const [isCompactComposeOpen, setIsCompactComposeOpen] = useState(false);
   const [composeKeyboardInset, setComposeKeyboardInset] = useState(12);
   const [presenceByAccount, setPresenceByAccount] = useState<Record<string, { online: boolean; away: boolean; status?: 'active' | 'away' | 'busy'; lastSeenAt: string | null }>>({});
+  const [threadMessageWindows, setThreadMessageWindows] = useState<Record<string, ThreadMessageWindowState>>({});
   const [memberDirectory, setMemberDirectory] = useState<Record<string, ThreadMemberPreview>>(() => ({
     [currentUser.id]: {
       id: currentUser.id,
@@ -486,7 +495,15 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const lastTypingSentRef = useRef(0);
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
   const composeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const threadMessageContainerRef = useRef<HTMLDivElement | null>(null);
   const replyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const threadLoadScrollStateRef = useRef<{
+    threadId: string;
+    previousScrollTop: number;
+    previousScrollHeight: number;
+  } | null>(null);
+  const autoScrollToNewestRef = useRef(true);
+  const threadMessageLoadInFlightRef = useRef<Record<string, boolean>>({});
   const groupImageInputRef = useRef<HTMLInputElement | null>(null);
   const messageImageInputRef = useRef<HTMLInputElement | null>(null);
   const messageReloadTimerRef = useRef<number | null>(null);
@@ -672,9 +689,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     }
   };
 
-  const mergeThreadMessages = (messages: UserMessage[]) => {
+  const mergeThreadMessages = (messages: UserMessage[], shouldAutoScroll = true) => {
     if (messages.length === 0) {
       return;
+    }
+
+    if (shouldAutoScroll && selectedThreadId && messages.some((message) => getThreadId(message, currentUser.id) === selectedThreadId)) {
+      autoScrollToNewestRef.current = true;
     }
 
     setInboxMessages((currentMessages) => {
@@ -700,6 +721,151 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       });
       return Array.from(nextMessages.values());
     });
+  };
+
+  const getThreadMessagesWithWindow = (threadId: string, fallbackMessages: UserMessage[]) => {
+    const windowState = threadMessageWindows[threadId];
+    const sortedFallback = [...fallbackMessages].sort((a, b) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    if (!windowState || windowState.messages.length === 0) {
+      return sortedFallback.slice(0, THREAD_MESSAGE_PAGE_SIZE);
+    }
+
+    const mergedMessages = [...windowState.messages, ...sortedFallback.slice(0, THREAD_MESSAGE_PAGE_SIZE)];
+    const byId = new Map<string, UserMessage>();
+    mergedMessages.forEach((message) => {
+      byId.set(message.id, message);
+    });
+
+    return Array.from(byId.values()).sort((a, b) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  };
+
+  const loadThreadMessages = async (threadId: string, reset = false) => {
+    if (!threadId || threadId.startsWith('draft-group:')) {
+      return;
+    }
+
+    if (threadMessageLoadInFlightRef.current[threadId]) {
+      return;
+    }
+
+    const currentWindow = threadMessageWindows[threadId];
+    if (currentWindow && currentWindow.isLoading) {
+      return;
+    }
+
+    if (!reset && currentWindow && !currentWindow.hasMore) {
+      return;
+    }
+
+    const nextPage = reset || !currentWindow ? 1 : currentWindow.page + 1;
+    const isLoadOlder = !reset && currentWindow && currentWindow.messages.length > 0;
+
+    if (isLoadOlder) {
+      const container = threadMessageContainerRef.current;
+      if (container) {
+        threadLoadScrollStateRef.current = {
+          threadId,
+          previousScrollTop: container.scrollTop,
+          previousScrollHeight: container.scrollHeight,
+        };
+      }
+      autoScrollToNewestRef.current = false;
+    } else {
+      autoScrollToNewestRef.current = true;
+    }
+
+    threadMessageLoadInFlightRef.current[threadId] = true;
+    setThreadMessageWindows((current) => ({
+      ...current,
+      [threadId]: {
+        ...(current[threadId] || { page: 0, hasMore: true, messages: [] }),
+        page: nextPage,
+        isLoading: true,
+      },
+    }));
+
+    try {
+      const response = await messageService.getThread(threadId, currentUser.id, nextPage, THREAD_MESSAGE_PAGE_SIZE);
+      const fetchedMessages = response.data;
+
+      mergeThreadMessages(fetchedMessages, !isLoadOlder);
+
+      setThreadMessageWindows((current) => {
+        const currentWindowState = current[threadId];
+        const existingMessages = currentWindowState?.messages ?? [];
+        const existingMessageIds = new Set(existingMessages.map((message) => message.id));
+        const nextMessages = reset
+          ? fetchedMessages
+          : [...existingMessages, ...fetchedMessages.filter((message) => !existingMessageIds.has(message.id))];
+
+        return {
+          ...current,
+          [threadId]: {
+            page: nextPage,
+            hasMore: fetchedMessages.length === THREAD_MESSAGE_PAGE_SIZE,
+            isLoading: false,
+            messages: nextMessages,
+          },
+        };
+      });
+
+      if (isLoadOlder) {
+        window.requestAnimationFrame(() => {
+          const state = threadLoadScrollStateRef.current;
+          const container = threadMessageContainerRef.current;
+          if (!state || !container || state.threadId !== threadId) {
+            return;
+          }
+
+          const addedHeight = container.scrollHeight - state.previousScrollHeight;
+          container.scrollTop = state.previousScrollTop + Math.max(0, addedHeight);
+          threadLoadScrollStateRef.current = null;
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load thread messages:', error);
+      logMessageDiagnostic('Failed to load thread messages', {
+        error: getDiagnosticErrorDetails(error),
+        threadId,
+        page: nextPage,
+      }, 'error');
+      setThreadMessageWindows((current) => {
+        const currentWindowState = current[threadId];
+        if (!currentWindowState) {
+          return current;
+        }
+
+        return {
+          ...current,
+          [threadId]: {
+            ...currentWindowState,
+            isLoading: false,
+          },
+        };
+      });
+      onToast('error', 'Failed to load older messages.');
+    } finally {
+      threadMessageLoadInFlightRef.current[threadId] = false;
+      setThreadMessageWindows((current) => {
+        const currentWindowState = current[threadId];
+        if (!currentWindowState) {
+          return current;
+        }
+
+        return {
+          ...current,
+          [threadId]: {
+            ...currentWindowState,
+            isLoading: false,
+          },
+        };
+      });
+    }
   };
 
   useEffect(() => {
@@ -1095,24 +1261,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     setDraftThreadTitle('');
     setIsComposeOpen(false);
     setSearchTerm('');
-
-    if (filteredThreads.some((thread) => thread.id === targetThreadId)) {
-      return;
-    }
-
-    messageService.getThread(targetThreadId, currentUser.id)
-      .then((response) => {
-        mergeThreadMessages(response.data);
-      })
-      .catch((err) => {
-        console.error('Target message thread load failed:', err);
-        logMessageDiagnostic('Target message thread load failed', {
-          error: getDiagnosticErrorDetails(err),
-          targetThreadId,
-        }, 'error');
-        onToast('error', 'Failed to load that conversation.');
-      });
-  }, [currentUser.id, filteredThreads, targetThreadId]);
+  }, [currentUser.id, targetThreadId]);
 
   useEffect(() => {
     if (composeRequestKey <= 0) {
@@ -1189,6 +1338,14 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     setEditingThreadTitle(selectedThread?.contactName || '');
   }, [selectedThread?.id, selectedThread?.contactName]);
 
+  const selectedThreadMessages = useMemo(() => {
+    if (!selectedThread) {
+      return [];
+    }
+
+    return getThreadMessagesWithWindow(selectedThread.id, selectedThread.messages);
+  }, [selectedThread, threadMessageWindows]);
+
   const displayedMessages = useMemo(() => {
     if (!selectedThread) {
       return [];
@@ -1196,10 +1353,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
     const term = threadSearchTerm.trim().toLowerCase();
     if (!term) {
-      return selectedThread.messages;
+      return selectedThreadMessages;
     }
 
-    return selectedThread.messages.filter((message) =>
+    return selectedThreadMessages.filter((message) =>
       [
         message.body,
         message.senderName || '',
@@ -1208,7 +1365,22 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         message.recipientEmail || '',
       ].join(' ').toLowerCase().includes(term),
     );
-  }, [selectedThread, threadSearchTerm]);
+  }, [selectedThreadMessages, threadSearchTerm]);
+
+  useEffect(() => {
+    if (!selectedThreadId) {
+      return;
+    }
+
+    void loadThreadMessages(selectedThreadId, true).catch((err) => {
+      console.error('Thread message load failed:', err);
+      logMessageDiagnostic('Thread message load failed', {
+        error: getDiagnosticErrorDetails(err),
+        threadId: selectedThreadId,
+      }, 'error');
+      onToast('error', 'Failed to load that conversation.');
+    });
+  }, [selectedThreadId]);
   const getThreadPresence = (thread: MessageThread) => {
     if (thread.threadType !== 'direct') {
       return {
@@ -1254,8 +1426,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   }, [memberDirectory, selectedThread]);
 
   useEffect(() => {
+    if (!autoScrollToNewestRef.current || displayedMessages.length === 0) {
+      return;
+    }
+
     latestMessageRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
-  }, [selectedThreadId, selectedThread?.messages.length]);
+  }, [selectedThreadId, displayedMessages.length]);
 
   useEffect(() => {
     if (!selectedThread) {
@@ -1264,15 +1440,15 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       return;
     }
 
-    const firstUnread = selectedThread.messages.find((message) => message.recipientUserId === currentUser.id && !message.isRead);
+    const firstUnread = selectedThreadMessages.find((message) => message.recipientUserId === currentUser.id && !message.isRead);
     setUnreadDividerMessageId(firstUnread?.id || null);
     setThreadSearchTerm('');
-  }, [currentUser.id, selectedThreadId]);
+  }, [currentUser.id, selectedThreadId, selectedThreadMessages]);
 
   useEffect(() => {
     if (!selectedThread) return;
 
-    const unreadMessages = selectedThread.messages.filter(
+    const unreadMessages = selectedThreadMessages.filter(
       (message) => message.recipientUserId === currentUser.id && !message.isRead,
     );
 
@@ -1290,7 +1466,27 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       ),
     );
     window.dispatchEvent(new CustomEvent('shield:messages-updated'));
-  }, [currentUser.id, selectedThread]);
+  }, [currentUser.id, selectedThread, selectedThreadMessages]);
+
+  const handleThreadMessageScroll = () => {
+    if (!selectedThreadId) {
+      return;
+    }
+
+    const threadWindow = threadMessageWindows[selectedThreadId];
+    if (!threadWindow || threadWindow.isLoading || !threadWindow.hasMore) {
+      return;
+    }
+
+    const container = threadMessageContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    if (container.scrollTop <= 100) {
+      void loadThreadMessages(selectedThreadId, false);
+    }
+  };
 
   useEffect(() => {
     const handleEscape = (event: globalThis.KeyboardEvent) => {
@@ -2475,8 +2671,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                 )}
               </div>
 
-              <div className="flex-1 space-y-3 overflow-y-auto bg-gray-50 p-3 dark:bg-gray-950 sm:space-y-4 sm:p-4">
-                {selectedThread.messages.length === 0 && (
+              <div
+                ref={threadMessageContainerRef}
+                onScroll={handleThreadMessageScroll}
+                className="flex-1 space-y-3 overflow-y-auto bg-gray-50 p-3 dark:bg-gray-950 sm:space-y-4 sm:p-4"
+              >
+                {selectedThreadMessages.length === 0 && (
                   <div className="flex h-full min-h-48 items-center justify-center text-center">
                     <div>
                       <p className="text-sm font-bold text-gray-700 dark:text-gray-200">New chat with {selectedThread.contactName}</p>
@@ -2484,7 +2684,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                     </div>
                   </div>
                 )}
-                {selectedThread.messages.length > 0 && displayedMessages.length === 0 && (
+                {selectedThreadMessages.length > 0 && displayedMessages.length === 0 && (
                   <div className="flex h-full min-h-48 items-center justify-center text-center text-sm font-semibold text-gray-500">
                     No messages match this search.
                   </div>
