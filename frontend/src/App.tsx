@@ -9016,14 +9016,20 @@ function App() {
                 onClick={() => setIsGlassTheme((value) => !value)}
                 className="group flex w-full items-center justify-between rounded-lg px-2.5 py-2.5 text-sm transition hover:bg-black/5 dark:hover:bg-white/10"
               >
-                <span className="font-semibold text-gray-700 dark:text-gray-100">Glass Mode</span>
-                <span className="rounded-full border border-gray-300 px-2 py-0.5 text-[11px] font-black uppercase tracking-[0.08em] text-gray-500 dark:border-gray-600 dark:text-gray-300">
-                  {isGlassTheme ? 'On' : 'Off'}
+                <span className="flex items-center gap-2 font-semibold text-gray-700 dark:text-gray-100">
+                  {isGlassTheme ? <Sun size={15} /> : <Moon size={15} />}
+                  <span>Glass Mode</span>
+                </span>
+                <span className={`flex h-5 w-10 items-center rounded-full p-0.5 transition ${isGlassTheme ? 'justify-end bg-accent' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                  <span className="h-4 w-4 rounded-full bg-white shadow-sm" />
                 </span>
               </button>
               <div className="mx-2 my-1 border-t border-gray-200 dark:border-gray-700" />
               <div className="flex items-center justify-between gap-3 rounded-lg px-2.5 py-2.5">
-                <span className="whitespace-nowrap text-sm font-semibold text-gray-700 dark:text-gray-100">App Scale</span>
+                <span className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-gray-700 dark:text-gray-100">
+                  <Settings size={15} />
+                  <span>App Scale</span>
+                </span>
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
@@ -9433,10 +9439,6 @@ function App() {
                           <DashboardPage
                             currentUser={currentUser}
                             isAppBackgrounded={isAppBackgrounded}
-                            isGlassTheme={isGlassTheme}
-                            appScale={normalizeAppScale(currentUser?.appScale)}
-                            onGlassThemeChange={setIsGlassTheme}
-                            onAppScaleChange={handleAppScaleChange}
                           />
                         )}
                       />
