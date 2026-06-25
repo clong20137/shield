@@ -5351,6 +5351,7 @@ function App() {
   const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false);
   const [isAppLocked, setIsAppLocked] = useState(false);
   const [isAppBackgrounded, setIsAppBackgrounded] = useState(() => document.hidden);
+  const isAppBackgroundedRef = useRef(isAppBackgrounded);
   const [reminderModalDate, setReminderModalDate] = useState<string | null>(null);
   const [isReminderSaving, setIsReminderSaving] = useState(false);
   const [dueReminderPopup, setDueReminderPopup] = useState<Reminder[]>([]);
@@ -5384,6 +5385,7 @@ function App() {
   }, []);
 
   useEffect(() => {
+    isAppBackgroundedRef.current = isAppBackgrounded;
     document.documentElement.classList.toggle('shield-app-backgrounded', isAppBackgrounded);
   }, [isAppBackgrounded]);
 
@@ -5419,6 +5421,8 @@ function App() {
   const awayPresenceTimerRef = useRef<number | null>(null);
   const awayPresenceStateRef = useRef<'active' | 'away' | 'busy'>('active');
   const awayPresenceRequestRef = useRef(0);
+  const sidebarCalendarRefreshTimerRef = useRef<number | null>(null);
+  const messageUnreadRefreshTimerRef = useRef<number | null>(null);
   const [messagePreferences, setMessagePreferences] = useState<MessagePreferences>(() => loadMessagePreferences());
   const [notificationSounds, setNotificationSounds] = useState<NotificationSound[]>([]);
 
@@ -5743,14 +5747,14 @@ function App() {
     void checkConnection();
     const intervalId = window.setInterval(() => {
       void checkConnection();
-    }, 3500);
+    }, isAppBackgrounded ? 15000 : 3500);
 
     return () => {
       isCancelled = true;
       controller.abort();
       window.clearInterval(intervalId);
     };
-  }, [isApiConnectionLost]);
+  }, [isApiConnectionLost, isAppBackgrounded]);
 
   const showToast = (type: ToastType, message: string, options: { saveToNotifications?: boolean } = {}) => {
     if (/too many|rate limit/iu.test(message)) {
@@ -6716,13 +6720,28 @@ function App() {
     }
 
     const handleCalendarUpdate = () => {
-      if (!isAppBackgrounded) {
-        void loadSidebarCalendarEntries();
+      if (isAppBackgrounded) {
+        return;
       }
+
+      if (sidebarCalendarRefreshTimerRef.current) {
+        window.clearTimeout(sidebarCalendarRefreshTimerRef.current);
+      }
+
+      sidebarCalendarRefreshTimerRef.current = window.setTimeout(() => {
+        sidebarCalendarRefreshTimerRef.current = null;
+        void loadSidebarCalendarEntries();
+      }, 350);
     };
 
     window.addEventListener('shield:calendar-updated', handleCalendarUpdate);
-    return () => window.removeEventListener('shield:calendar-updated', handleCalendarUpdate);
+    return () => {
+      window.removeEventListener('shield:calendar-updated', handleCalendarUpdate);
+      if (sidebarCalendarRefreshTimerRef.current) {
+        window.clearTimeout(sidebarCalendarRefreshTimerRef.current);
+        sidebarCalendarRefreshTimerRef.current = null;
+      }
+    };
   }, [isAppBackgrounded, loadSidebarCalendarEntries]);
 
   useEffect(() => {
@@ -6777,12 +6796,23 @@ function App() {
       }
     };
 
+    const queueUnreadCountLoad = () => {
+      if (messageUnreadRefreshTimerRef.current) {
+        window.clearTimeout(messageUnreadRefreshTimerRef.current);
+      }
+
+      messageUnreadRefreshTimerRef.current = window.setTimeout(() => {
+        messageUnreadRefreshTimerRef.current = null;
+        void loadUnreadCount();
+      }, isAppBackgroundedRef.current ? 1250 : 250);
+    };
+
     loadUnreadCount();
-    window.addEventListener('shield:messages-updated', loadUnreadCount);
+    window.addEventListener('shield:messages-updated', queueUnreadCountLoad);
 
     const eventsUrl = getMessageEventsUrl();
     const eventSource = new EventSource(eventsUrl, { withCredentials: true });
-    const handleRealtimeMessageUpdate = () => loadUnreadCount();
+    const handleRealtimeMessageUpdate = () => queueUnreadCountLoad();
     eventSource?.addEventListener('message-created', handleRealtimeMessageUpdate);
     eventSource?.addEventListener('message-read', handleRealtimeMessageUpdate);
     eventSource?.addEventListener('message-archived', handleRealtimeMessageUpdate);
@@ -6793,10 +6823,14 @@ function App() {
 
     return () => {
       isMounted = false;
-      window.removeEventListener('shield:messages-updated', loadUnreadCount);
+      window.removeEventListener('shield:messages-updated', queueUnreadCountLoad);
+      if (messageUnreadRefreshTimerRef.current) {
+        window.clearTimeout(messageUnreadRefreshTimerRef.current);
+        messageUnreadRefreshTimerRef.current = null;
+      }
       eventSource?.close();
     };
-  }, [currentUser, getCustomNotificationSoundUrl, messagePreferences.receiveMessages, messagePreferences.playMessageSound, messagePreferences.messageSound, messagePreferences.browserNotifications]);
+  }, [appName, currentUser, getCustomNotificationSoundUrl, messagePreferences.receiveMessages, messagePreferences.playMessageSound, messagePreferences.messageSound, messagePreferences.browserNotifications]);
 
   useEffect(() => {
     if (!hasShieldDesktopFeature('onNotificationClick')) {
@@ -8237,7 +8271,7 @@ function App() {
                 <Suspense fallback={<PageLoader label="Loading page..." />}>
                   <RouteTransition>
                     <Routes>
-                      <Route path="/" element={<DashboardPage currentUser={currentUser} />} />
+                      <Route path="/" element={<DashboardPage currentUser={currentUser} isAppBackgrounded={isAppBackgrounded} />} />
                       {currentUser && <Route path="/updates/:postId" element={<DashboardPostPage currentUser={currentUser} onToast={showToast} />} />}
                       {currentUser && (
                         <Route

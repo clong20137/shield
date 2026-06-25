@@ -869,9 +869,11 @@ export function DashboardCalendar() {
 function DashboardNews({
   currentUser,
   initialPosts,
+  isAppBackgrounded = false,
 }: {
   currentUser: AuthAccount | null;
   initialPosts?: DashboardPost[];
+  isAppBackgrounded?: boolean;
 }) {
   const [posts, setPosts] = useState<DashboardPost[]>([]);
   const [activeFeaturedIndex, setActiveFeaturedIndex] = useState(0);
@@ -888,6 +890,7 @@ function DashboardNews({
   const [postPendingDelete, setPostPendingDelete] = useState<DashboardPost | null>(null);
   const [postError, setPostError] = useState<string | null>(null);
   const [reactionPulseMap, setReactionPulseMap] = useState<Record<string, number>>({});
+  const postRefreshTimerRef = useRef<number | null>(null);
   const canManageDashboard = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('dashboard:manage'));
   const canCreateDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:create'));
   const canEditDashboardPosts = canManageDashboard || Boolean(currentUser?.permissions?.includes('dashboard:edit'));
@@ -925,14 +928,33 @@ function DashboardNews({
   }, [currentUser?.mustChangePassword]);
 
   useEffect(() => {
-    if (!initialPosts) {
+    if (!initialPosts && !isAppBackgrounded) {
       loadPosts();
     }
-    const handleDashboardUpdate = () => loadPosts(false);
+    const handleDashboardUpdate = () => {
+      if (isAppBackgrounded) {
+        return;
+      }
+
+      if (postRefreshTimerRef.current) {
+        window.clearTimeout(postRefreshTimerRef.current);
+      }
+
+      postRefreshTimerRef.current = window.setTimeout(() => {
+        postRefreshTimerRef.current = null;
+        loadPosts(false);
+      }, 500);
+    };
 
     window.addEventListener('shield:dashboard-updated', handleDashboardUpdate);
-    return () => window.removeEventListener('shield:dashboard-updated', handleDashboardUpdate);
-  }, [initialPosts, loadPosts]);
+    return () => {
+      window.removeEventListener('shield:dashboard-updated', handleDashboardUpdate);
+      if (postRefreshTimerRef.current) {
+        window.clearTimeout(postRefreshTimerRef.current);
+        postRefreshTimerRef.current = null;
+      }
+    };
+  }, [initialPosts, isAppBackgrounded, loadPosts]);
 
   const featuredPosts = useMemo(() => posts.slice(0, 4), [posts]);
 
@@ -941,7 +963,7 @@ function DashboardNews({
   }, [posts.length]);
 
   useEffect(() => {
-    if (featuredPosts.length < 2) {
+    if (featuredPosts.length < 2 || isAppBackgrounded) {
       return undefined;
     }
 
@@ -950,7 +972,7 @@ function DashboardNews({
     }, 6500);
 
     return () => window.clearInterval(timer);
-  }, [featuredPosts.length]);
+  }, [featuredPosts.length, isAppBackgrounded]);
 
   const createPost = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1913,15 +1935,18 @@ function MyDayWidget({
   currentUser,
   initialEntries,
   initialReminders,
+  isAppBackgrounded = false,
 }: {
   currentUser: AuthAccount | null;
   initialEntries?: CalendarEntry[];
   initialReminders?: Reminder[];
+  isAppBackgrounded?: boolean;
 }) {
   const [entries, setEntries] = useState<CalendarEntry[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const myDayRefreshTimerRef = useRef<number | null>(null);
   const [activeTab, setActiveTab] = useState<'entries' | 'reminders'>('entries');
   const todayKey = formatDateKey(new Date());
 
@@ -1963,10 +1988,23 @@ function MyDayWidget({
   }, [currentUser]);
 
   useEffect(() => {
-    if (!initialEntries || !initialReminders) {
+    if ((!initialEntries || !initialReminders) && !isAppBackgrounded) {
       void loadMyDay();
     }
-    const refresh = () => void loadMyDay(false);
+    const refresh = () => {
+      if (isAppBackgrounded) {
+        return;
+      }
+
+      if (myDayRefreshTimerRef.current) {
+        window.clearTimeout(myDayRefreshTimerRef.current);
+      }
+
+      myDayRefreshTimerRef.current = window.setTimeout(() => {
+        myDayRefreshTimerRef.current = null;
+        void loadMyDay(false);
+      }, 500);
+    };
 
     window.addEventListener('shield:calendar-updated', refresh);
     window.addEventListener('shield:reminder-updated', refresh);
@@ -1974,8 +2012,12 @@ function MyDayWidget({
     return () => {
       window.removeEventListener('shield:calendar-updated', refresh);
       window.removeEventListener('shield:reminder-updated', refresh);
+      if (myDayRefreshTimerRef.current) {
+        window.clearTimeout(myDayRefreshTimerRef.current);
+        myDayRefreshTimerRef.current = null;
+      }
     };
-  }, [initialEntries, initialReminders, loadMyDay]);
+  }, [initialEntries, initialReminders, isAppBackgrounded, loadMyDay]);
 
   const todaysEntries = entries
     .filter((entry) => entry.date === todayKey)
@@ -2868,7 +2910,7 @@ function DistrictFeedWidget({
   );
 }
 
-const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentUser }) => {
+const DashboardPage: React.FC<{ currentUser: AuthAccount | null; isAppBackgrounded?: boolean }> = ({ currentUser, isAppBackgrounded = false }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -2883,6 +2925,7 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
   const profileWindowRef = useRef<HTMLDivElement | null>(null);
   const profileDragOffsetRef = useRef({ x: 0, y: 0 });
   const profileDragStartRef = useRef({ pointerX: 0, pointerY: 0, windowX: 0, windowY: 0 });
+  const dashboardRefreshTimerRef = useRef<number | null>(null);
   const isAdministrator = currentUser?.role === 'administrator';
 
   useEffect(() => {
@@ -3010,9 +3053,22 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
       return;
     }
 
-    loadDashboard();
+    if (!isAppBackgrounded) {
+      loadDashboard();
+    }
     const handleDashboardUpdate = () => {
-      loadDashboard(false);
+      if (isAppBackgrounded) {
+        return;
+      }
+
+      if (dashboardRefreshTimerRef.current) {
+        window.clearTimeout(dashboardRefreshTimerRef.current);
+      }
+
+      dashboardRefreshTimerRef.current = window.setTimeout(() => {
+        dashboardRefreshTimerRef.current = null;
+        loadDashboard(false);
+      }, 500);
     };
 
     window.addEventListener('shield:dashboard-updated', handleDashboardUpdate);
@@ -3030,8 +3086,12 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
       window.removeEventListener('shield:performance-evaluation-updated', handleDashboardUpdate);
       window.removeEventListener('shield:permission-updated', handleDashboardUpdate);
       window.removeEventListener('shield:user-updated', handleDashboardUpdate);
+      if (dashboardRefreshTimerRef.current) {
+        window.clearTimeout(dashboardRefreshTimerRef.current);
+        dashboardRefreshTimerRef.current = null;
+      }
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isAppBackgrounded]);
 
   const loadDashboard = async (showLoading = true) => {
     if (showLoading) {
@@ -3103,8 +3163,8 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
         </div>
         <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} initialProfiles={dashboardSummary?.pinnedProfiles} />
         <div className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)]">
-          <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} />
-          <DashboardNews currentUser={currentUser} initialPosts={dashboardSummary?.posts} />
+          <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} isAppBackgrounded={isAppBackgrounded} />
+          <DashboardNews currentUser={currentUser} initialPosts={dashboardSummary?.posts} isAppBackgrounded={isAppBackgrounded} />
         </div>
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
           <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
@@ -3137,8 +3197,8 @@ const DashboardPage: React.FC<{ currentUser: AuthAccount | null }> = ({ currentU
 
       <PinnedProfilesWidget currentUser={currentUser} onOpenProfile={openPinnedProfile} initialProfiles={dashboardSummary?.pinnedProfiles} />
       <div className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)]">
-        <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} />
-        <DashboardNews currentUser={currentUser} initialPosts={dashboardSummary?.posts} />
+        <MyDayWidget currentUser={currentUser} initialEntries={dashboardSummary?.calendarEntries} initialReminders={dashboardSummary?.reminders} isAppBackgrounded={isAppBackgrounded} />
+        <DashboardNews currentUser={currentUser} initialPosts={dashboardSummary?.posts} isAppBackgrounded={isAppBackgrounded} />
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
         <QuickNotesWidget currentUser={currentUser} initialNote={dashboardSummary?.quickNote} />
