@@ -409,14 +409,24 @@ function getMessageImageFileName(assetUrl: string): string {
   }
 }
 
-function downloadMessageImage(assetUrl: string, fileName: string): void {
+async function downloadMessageImage(assetUrl: string, fileName: string): Promise<void> {
+  const response = await fetch(assetUrl, {
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    throw new Error('Failed to download image');
+  }
+
+  const blob = await response.blob();
+  const blobUrl = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = assetUrl;
+  link.href = blobUrl;
   link.download = fileName;
   link.rel = 'noopener';
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(blobUrl);
 }
 
 function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRecipient = null, targetThreadId = null, composeRequestKey = 0, isBackgrounded = false }: MessageInboxPageProps) {
@@ -2754,12 +2764,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
               label: 'Download image',
               icon: Download,
               onSelect: () => {
-                try {
-                  downloadMessageImage(messageImageMenu.imageUrl, messageImageMenu.fileName);
-                  onToast('success', 'Image download started.');
-                } catch {
-                  onToast('error', 'Unable to download this image.');
-                }
+                void downloadMessageImage(messageImageMenu.imageUrl, messageImageMenu.fileName)
+                  .then(() => onToast('success', 'Image download started.'))
+                  .catch(() => onToast('error', 'Unable to download this image.'));
               },
             },
           ]}
