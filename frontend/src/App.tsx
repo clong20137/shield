@@ -7383,7 +7383,7 @@ function App() {
 
     const loadRecentConversations = async () => {
       try {
-        const [inboxResponse, sentResponse] = await Promise.all([
+        const [inboxResult, sentResult] = await Promise.allSettled([
           messageService.getInbox(currentUser.id),
           messageService.getSent(currentUser.id),
         ]);
@@ -7391,7 +7391,13 @@ function App() {
           return;
         }
 
-        setRecentConversations(buildRecentConversations([...inboxResponse.data, ...sentResponse.data], currentUser.id));
+        const inboxMessages = inboxResult.status === 'fulfilled' ? inboxResult.value.data : [];
+        const sentMessages = sentResult.status === 'fulfilled' ? sentResult.value.data : [];
+        if (inboxResult.status === 'rejected' && sentResult.status === 'rejected') {
+          throw inboxResult.reason;
+        }
+
+        setRecentConversations(buildRecentConversations([...inboxMessages, ...sentMessages], currentUser.id));
       } catch (error) {
         console.error('Failed to load recent conversations:', error);
       }

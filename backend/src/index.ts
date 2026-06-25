@@ -50,6 +50,7 @@ const apiRateLimitWindowMs = Number(process.env.API_RATE_LIMIT_WINDOW_MS || 60 *
 const apiRateLimitMax = Number(process.env.API_RATE_LIMIT_MAX || 3600);
 const apiRequestTimeoutMs = Number(process.env.API_REQUEST_TIMEOUT_MS || 30 * 1000);
 const isProduction = process.env.NODE_ENV === 'production';
+const thumbnailGenerationPromises = new Map<string, Promise<string | null>>();
 
 function getCspOrigins(): string[] {
   const configuredApiUrl = process.env.VITE_API_URL || process.env.API_BASE_URL || '';
@@ -103,6 +104,11 @@ async function generateMissingUploadThumbnail(req: Request, _res: Response, next
     return next();
   }
 
+  const thumbnailPath = path.join(originalDirectory, 'thumbs', `${originalBaseName}-${width}.webp`);
+  if (isPathInside(uploadsRoot, thumbnailPath) && fs.existsSync(thumbnailPath)) {
+    return next();
+  }
+
   const allowedExtensions = ['.jpg', '.jpeg', '.jfif', '.png', '.gif', '.webp'];
   const originalPath = allowedExtensions
     .map((extension) => path.join(originalDirectory, `${originalBaseName}${extension}`))
@@ -112,7 +118,15 @@ async function generateMissingUploadThumbnail(req: Request, _res: Response, next
     return next();
   }
 
-  await createImageThumbnail(originalPath, width);
+  const thumbnailKey = `${originalPath}:${width}`;
+  let generationPromise = thumbnailGenerationPromises.get(thumbnailKey);
+  if (!generationPromise) {
+    generationPromise = createImageThumbnail(originalPath, width);
+    thumbnailGenerationPromises.set(thumbnailKey, generationPromise);
+    generationPromise.finally(() => thumbnailGenerationPromises.delete(thumbnailKey));
+  }
+
+  await generationPromise;
   return next();
 }
 
@@ -174,11 +188,13 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use('/api', csrfProtection({ allowedOrigins }));
 const uploadsStaticMiddleware = express.static(path.join(process.cwd(), 'uploads'), {
   fallthrough: false,
-  immutable: false,
-  maxAge: 0,
+  etag: true,
+  immutable: true,
+  lastModified: true,
+  maxAge: '1d',
   setHeaders: (res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
   },
 });
 app.use('/uploads', requireAuthenticated(), generateMissingUploadThumbnail);

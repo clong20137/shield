@@ -53,6 +53,8 @@ const api = axios.create({
 const AUTH_TOKEN_KEY = 'shield_auth_token';
 const API_CONNECTION_LOST_EVENT = 'shield:api-connection-lost';
 const API_CONNECTION_RESTORED_EVENT = 'shield:api-connection-restored';
+let consecutiveNetworkFailures = 0;
+let lastNetworkFailureAt = 0;
 
 function dispatchApiConnectionEvent(type: typeof API_CONNECTION_LOST_EVENT | typeof API_CONNECTION_RESTORED_EVENT) {
   if (typeof window === 'undefined') {
@@ -73,12 +75,24 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => {
+    consecutiveNetworkFailures = 0;
     dispatchApiConnectionEvent(API_CONNECTION_RESTORED_EVENT);
     return response;
   },
   (error) => {
-    if (axios.isAxiosError(error) && !error.response) {
+    if (!navigator.onLine) {
       dispatchApiConnectionEvent(API_CONNECTION_LOST_EVENT);
+      return Promise.reject(error);
+    }
+
+    if (axios.isAxiosError(error) && !error.response && error.code === 'ERR_NETWORK') {
+      const now = Date.now();
+      consecutiveNetworkFailures = now - lastNetworkFailureAt < 10000 ? consecutiveNetworkFailures + 1 : 1;
+      lastNetworkFailureAt = now;
+
+      if (consecutiveNetworkFailures >= 2) {
+        dispatchApiConnectionEvent(API_CONNECTION_LOST_EVENT);
+      }
     }
 
     return Promise.reject(error);

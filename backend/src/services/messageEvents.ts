@@ -23,6 +23,9 @@ const clients = new Map<string, Set<Response>>();
 const hiddenPresenceAccounts = new Set<string>();
 const awayPresenceAccounts = new Set<string>();
 const presenceStatuses = new Map<string, MessagePresenceStatus>();
+const accountCache = new Map<string, { expiresAt: number; account: Awaited<ReturnType<typeof AuthAccountModel.getAccountById>> }>();
+const permissionCache = new Map<string, { expiresAt: number; permissions: string[] }>();
+const PRESENCE_CACHE_TTL_MS = 15 * 1000;
 
 function normalizePresenceStatus(status?: string): MessagePresenceStatus {
   return status === 'away' || status === 'busy' || status === 'active'
@@ -32,6 +35,28 @@ function normalizePresenceStatus(status?: string): MessagePresenceStatus {
 
 function getPresenceStatus(actorAccountId: string): MessagePresenceStatus {
   return presenceStatuses.get(actorAccountId) || 'active';
+}
+
+async function getCachedAccount(accountId: string) {
+  const cached = accountCache.get(accountId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.account;
+  }
+
+  const account = await AuthAccountModel.getAccountById(accountId);
+  accountCache.set(accountId, { account, expiresAt: Date.now() + PRESENCE_CACHE_TTL_MS });
+  return account;
+}
+
+async function getCachedPermissions(accountId: string): Promise<string[]> {
+  const cached = permissionCache.get(accountId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.permissions;
+  }
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(accountId);
+  permissionCache.set(accountId, { permissions, expiresAt: Date.now() + PRESENCE_CACHE_TTL_MS });
+  return permissions;
 }
 
 function sendEvent(response: Response, payload: MessageEventPayload) {
@@ -44,7 +69,7 @@ async function canViewIncognitoPresence(viewerAccountId: string, actorAccountId?
     return true;
   }
 
-  const viewer = await AuthAccountModel.getAccountById(viewerAccountId);
+  const viewer = await getCachedAccount(viewerAccountId);
   if (!viewer) {
     return false;
   }
@@ -53,7 +78,7 @@ async function canViewIncognitoPresence(viewerAccountId: string, actorAccountId?
     return true;
   }
 
-  const permissions = await AuthAccountModel.getPermissionsForAccount(viewerAccountId);
+  const permissions = await getCachedPermissions(viewerAccountId);
   return permissions.includes('presence:view-incognito');
 }
 
@@ -62,7 +87,7 @@ async function getPayloadForViewer(viewerAccountId: string, payload: MessageEven
     return payload;
   }
 
-  const actor = await AuthAccountModel.getAccountById(payload.actorAccountId);
+  const actor = await getCachedAccount(payload.actorAccountId);
   if (!actor?.presenceHidden) {
     return payload;
   }
@@ -108,7 +133,7 @@ export function addMessageEventClient(accountId: string, response: Response) {
   });
   response.write(': connected\n\n');
   clients.forEach((_accountClients, onlineAccountId) => {
-    void AuthAccountModel.getAccountById(onlineAccountId).then((account) => {
+    void getCachedAccount(onlineAccountId).then((account) => {
     if (!account) {
       hiddenPresenceAccounts.add(onlineAccountId);
       presenceStatuses.delete(onlineAccountId);
@@ -135,7 +160,7 @@ export function addMessageEventClient(accountId: string, response: Response) {
   });
 
   const announceOnline = async () => {
-    const account = await AuthAccountModel.getAccountById(accountId);
+    const account = await getCachedAccount(accountId);
     if (!account) {
       hiddenPresenceAccounts.add(accountId);
       broadcastMessageEventToAll({
@@ -177,9 +202,6 @@ export function addMessageEventClient(accountId: string, response: Response) {
 
   const keepAlive = windowlessInterval(() => {
     response.write(': keep-alive\n\n');
-    void announceOnline().catch((error) => {
-      console.error('Failed to announce message presence:', error);
-    });
   }, 25000);
 
   response.on('close', () => {
@@ -204,7 +226,7 @@ export function addMessageEventClient(accountId: string, response: Response) {
 }
 
 export async function updateMessagePresence(accountId: string, status: MessagePresenceStatus) {
-  const account = await AuthAccountModel.getAccountById(accountId);
+  const account = await getCachedAccount(accountId);
   const normalizedStatus = normalizePresenceStatus(status);
   if (!account) {
     hiddenPresenceAccounts.add(accountId);

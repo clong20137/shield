@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
-import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetUrl, getMessageEventsUrl, handleAssetImageError, MileageSummary, mileageService, User } from '../services/api';
+import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, MileageSummary, mileageService, User } from '../services/api';
 import { RankBadge } from './RankBadge';
 
 interface UserDetailProps {
@@ -548,9 +548,9 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
             {(isOnline || isAway) && presenceTone.pulseClass && <span className={`pointer-events-none absolute -inset-1 rounded-full border shield-online-pulse ${presenceTone.pulseClass}`} />}
           {user.profilePictureUrl ? (
             <img
-              src={getAssetUrl(user.profilePictureUrl)}
+              src={getAssetThumbnailUrl(user.profilePictureUrl, 256)}
               alt={`${user.firstName} ${user.lastName}`}
-              onError={handleAssetImageError}
+              onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)}
               className={`relative rounded-full border-2 object-cover ${isFloatingProfile ? 'h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem]' : 'h-20 w-20 sm:h-20 sm:w-20'} ${profileRingClass}`}
             />
           ) : (
