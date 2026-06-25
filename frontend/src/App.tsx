@@ -8242,7 +8242,7 @@ function App() {
                       {currentUser && (
                         <Route
                           path="/messages"
-                          element={<MessageInboxPage currentUser={currentUser} onToast={showToast} />}
+                          element={<MessageInboxPage currentUser={currentUser} onToast={showToast} isBackgrounded={isAppBackgrounded} />}
                         />
                       )}
                       {currentUser && (
@@ -8458,7 +8458,7 @@ function App() {
                 </div>
                 <div className="min-h-0 flex-1">
                   <Suspense fallback={<PageLoader label="Loading messages..." />}>
-                    <MessageInboxPage currentUser={currentUser} onToast={showToast} isModalView targetRecipient={messageTargetUser} />
+                    <MessageInboxPage currentUser={currentUser} onToast={showToast} isModalView targetRecipient={messageTargetUser} isBackgrounded={isAppBackgrounded} />
                   </Suspense>
                 </div>
               </>

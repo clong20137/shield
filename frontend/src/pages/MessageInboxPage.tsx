@@ -15,6 +15,7 @@ interface MessageInboxPageProps {
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
   isModalView?: boolean;
   targetRecipient?: User | null;
+  isBackgrounded?: boolean;
 }
 
 interface MessageThread {
@@ -364,7 +365,7 @@ function parseAttachmentLine(value: string): { fileName: string; fileUrl: string
   }
 }
 
-function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRecipient = null }: MessageInboxPageProps) {
+function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRecipient = null, isBackgrounded = false }: MessageInboxPageProps) {
   const [inboxMessages, setInboxMessages] = useState<UserMessage[]>([]);
   const [sentMessages, setSentMessages] = useState<UserMessage[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
@@ -403,7 +404,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const [isCompactComposeOpen, setIsCompactComposeOpen] = useState(false);
   const [composeKeyboardInset, setComposeKeyboardInset] = useState(12);
   const [presenceByAccount, setPresenceByAccount] = useState<Record<string, { online: boolean; away: boolean; status?: 'active' | 'away' | 'busy'; lastSeenAt: string | null }>>({});
-  const [memberDirectory, setMemberDirectory] = useState<Record<string, ThreadMemberPreview>>({});
+  const [memberDirectory, setMemberDirectory] = useState<Record<string, ThreadMemberPreview>>(() => ({
+    [currentUser.id]: {
+      id: currentUser.id,
+      name: currentUser.displayName || `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email || 'You',
+      profilePictureUrl: currentUser.profilePictureUrl || '',
+    },
+  }));
   const [composePopoverPosition, setComposePopoverPosition] = useState({ right: 16, bottom: 88 });
   const typingStopTimerRef = useRef<number | null>(null);
   const lastTypingSentRef = useRef(0);
@@ -412,6 +419,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const replyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const groupImageInputRef = useRef<HTMLInputElement | null>(null);
   const messageImageInputRef = useRef<HTMLInputElement | null>(null);
+  const messageReloadTimerRef = useRef<number | null>(null);
   const focusReplyComposer = () => {
     window.setTimeout(() => replyTextareaRef.current?.focus(), 0);
   };
@@ -460,10 +468,23 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   };
 
   useEffect(() => {
+    if (isBackgrounded) {
+      return undefined;
+    }
+
     loadMessages(true);
     const eventsUrl = getMessageEventsUrl();
     const eventSource = new EventSource(eventsUrl, { withCredentials: true });
-    const handleRealtimeMessageUpdate = () => loadMessages(false);
+    const handleRealtimeMessageUpdate = () => {
+      if (messageReloadTimerRef.current) {
+        window.clearTimeout(messageReloadTimerRef.current);
+      }
+
+      messageReloadTimerRef.current = window.setTimeout(() => {
+        messageReloadTimerRef.current = null;
+        void loadMessages(false);
+      }, 250);
+    };
     const handleMessageUpdate = (event: MessageEvent<string>) => {
       try {
         const payload = JSON.parse(event.data) as { message?: UserMessage };
@@ -547,53 +568,24 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     window.addEventListener('shield:api-reconnected', handleRealtimeMessageUpdate);
 
     return () => {
+      if (messageReloadTimerRef.current) {
+        window.clearTimeout(messageReloadTimerRef.current);
+        messageReloadTimerRef.current = null;
+      }
       eventSource?.close();
       window.removeEventListener('shield:api-reconnected', handleRealtimeMessageUpdate);
     };
-  }, [currentUser.id]);
+  }, [currentUser.id, isBackgrounded]);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const loadMemberDirectory = async () => {
-      try {
-        const pageSize = 250;
-        const directory: Record<string, ThreadMemberPreview> = {
-          [currentUser.id]: {
-            id: currentUser.id,
-            name: currentUser.displayName || `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email || 'You',
-            profilePictureUrl: currentUser.profilePictureUrl || '',
-          },
-        };
-
-        for (let page = 1; page <= 4; page += 1) {
-          const response = await userService.getAll(page, pageSize);
-          response.data.data.forEach((user: User) => {
-            directory[user.id] = {
-              id: user.id,
-              name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Member',
-              profilePictureUrl: user.profilePictureUrl || '',
-            };
-          });
-
-          if (response.data.count < pageSize) {
-            break;
-          }
-        }
-
-        if (isMounted) {
-          setMemberDirectory(directory);
-        }
-      } catch (err) {
-        console.error('Failed to load message member directory:', err);
-      }
-    };
-
-    void loadMemberDirectory();
-
-    return () => {
-      isMounted = false;
-    };
+    setMemberDirectory((currentDirectory) => ({
+      ...currentDirectory,
+      [currentUser.id]: {
+        id: currentUser.id,
+        name: currentUser.displayName || `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email || 'You',
+        profilePictureUrl: currentUser.profilePictureUrl || '',
+      },
+    }));
   }, [currentUser.id, currentUser.displayName, currentUser.email, currentUser.firstName, currentUser.lastName, currentUser.profilePictureUrl]);
 
   useEffect(() => {
@@ -667,6 +659,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   }, [isComposeOpen, isCompactComposeOpen]);
 
   useEffect(() => {
+    if (isBackgrounded) {
+      return undefined;
+    }
+
     const timer = window.setInterval(() => {
       const now = Date.now();
       setTypingByThread((current) => {
@@ -676,7 +672,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     }, 1200);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [isBackgrounded]);
 
   useEffect(() => {
     if (!isComposeOpen || recipientQuery.trim().length < 2) {
@@ -829,6 +825,60 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const selectedThread = filteredThreads.find((thread) => thread.id === selectedThreadId) || null;
   const selectedThreadAcceptsMessages = selectedThread?.contactReceivesMessages !== false;
   const selectedTyping = selectedThreadId ? typingByThread[selectedThreadId] : null;
+  const selectedThreadParticipantKey = selectedThread?.participantIds.join('|') || '';
+
+  useEffect(() => {
+    if (!selectedThread || selectedThread.threadType === 'direct') {
+      return;
+    }
+
+    const visibleMissingIds = selectedThread.participantIds
+      .slice(0, 6)
+      .filter((id) => id && !memberDirectory[id]);
+
+    if (visibleMissingIds.length === 0) {
+      return;
+    }
+
+    let isCancelled = false;
+    void Promise.all(
+      visibleMissingIds.map(async (id) => {
+        try {
+          const response = await userService.getById(id);
+          const user = response.data as User;
+          return {
+            id: user.id,
+            name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Member',
+            profilePictureUrl: user.profilePictureUrl || '',
+          } satisfies ThreadMemberPreview;
+        } catch (err) {
+          console.error('Failed to load group member preview:', err);
+          return null;
+        }
+      }),
+    ).then((members) => {
+      if (isCancelled) {
+        return;
+      }
+
+      const loadedMembers = members.filter((member): member is ThreadMemberPreview => Boolean(member));
+      if (loadedMembers.length === 0) {
+        return;
+      }
+
+      setMemberDirectory((currentDirectory) => {
+        const nextDirectory = { ...currentDirectory };
+        loadedMembers.forEach((member) => {
+          nextDirectory[member.id] = member;
+        });
+        return nextDirectory;
+      });
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [memberDirectory, selectedThread, selectedThreadParticipantKey]);
 
   useEffect(() => {
     setIsEditingThreadTitle(false);
