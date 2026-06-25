@@ -1627,7 +1627,7 @@ function RecentConversationsDock({
         </button>
         {conversations.map((conversation) => {
           const typing = typingByConversation[conversation.id];
-          const previewText = typing ? `${typing.name} is typing...` : conversation.unreadPreview;
+          const previewText = typing ? `${typing.name} is typing...` : conversation.unreadPreview || conversation.subtitle || 'No preview';
           return (
             <div
               key={conversation.id}
@@ -1637,7 +1637,7 @@ function RecentConversationsDock({
               aria-hidden={isCollapsed}
               onContextMenu={(event) => openContextMenu(event, conversation)}
             >
-          {(typing || conversation.unreadPreview) && (
+          {(typing || previewText) && (
             <button
               type="button"
               onClick={() => onOpenConversation(conversation)}
@@ -1650,7 +1650,7 @@ function RecentConversationsDock({
                   <span className="block truncate text-xs font-black text-primary-500 dark:text-blue-100">{conversation.title}</span>
                   <span className="mt-0.5 flex items-center gap-1 truncate text-xs font-semibold text-gray-600 dark:text-gray-300">
                     {typing && (
-                      <span className="inline-flex items-center gap-0.5">
+              <span className="inline-flex items-center gap-0.5 py-0.5">
                         <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
                         <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse [animation-delay:120ms]" />
                         <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse [animation-delay:240ms]" />
@@ -1699,7 +1699,7 @@ function RecentConversationsDock({
                       </span>
                     )}
                     {typing && (
-                      <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-accent text-white dark:border-gray-900">
+                      <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-accent p-0.5 text-white dark:border-gray-900">
                         <span className="flex gap-0.5">
                           <span className="h-1 w-1 rounded-full bg-white animate-pulse" />
                           <span className="h-1 w-1 rounded-full bg-white animate-pulse [animation-delay:120ms]" />
