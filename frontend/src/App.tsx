@@ -1637,15 +1637,15 @@ function RecentConversationsDock({
               aria-hidden={isCollapsed}
               onContextMenu={(event) => openContextMenu(event, conversation)}
             >
-              {((conversation.unreadCount > 0 && conversation.unreadPreview) || typing) && (
-                <button
-                  type="button"
-                  onClick={() => onOpenConversation(conversation)}
-                  tabIndex={isCollapsed ? -1 : 0}
+          {(typing || conversation.unreadPreview) && (
+            <button
+              type="button"
+              onClick={() => onOpenConversation(conversation)}
+              tabIndex={isCollapsed ? -1 : 0}
                   className={`recent-message-preview-pop absolute right-14 w-64 rounded-lg border bg-white px-3 py-2 text-left shadow-xl transition hover:border-accent dark:bg-gray-900 ${
                     typing ? 'border-accent/40 dark:border-accent/40' : 'border-gray-200 dark:border-gray-800'
                   }`}
-                  aria-label={typing ? `${conversation.title} is typing` : `Open unread message from ${conversation.title}`}
+                  aria-label={typing ? `${conversation.title} is typing` : `Open latest message from ${conversation.title}`}
                 >
                   <span className="block truncate text-xs font-black text-primary-500 dark:text-blue-100">{conversation.title}</span>
                   <span className="mt-0.5 flex items-center gap-1 truncate text-xs font-semibold text-gray-600 dark:text-gray-300">
@@ -1703,6 +1703,7 @@ function RecentConversationsDock({
                         <span className="flex gap-0.5">
                           <span className="h-1 w-1 rounded-full bg-white animate-pulse" />
                           <span className="h-1 w-1 rounded-full bg-white animate-pulse [animation-delay:120ms]" />
+                          <span className="h-1 w-1 rounded-full bg-white animate-pulse [animation-delay:240ms]" />
                         </span>
                       </span>
                     )}
