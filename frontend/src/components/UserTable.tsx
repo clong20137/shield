@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
-import { Pencil, Trash2, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Pencil, Trash2, X } from 'lucide-react';
 import { getAssetThumbnailUrl, handleAssetThumbnailError, User } from '../services/api';
 import { RankBadge, isImportantRank } from './RankBadge';
+
+export type UserSortKey = 'lastName' | 'firstName' | 'peNumber' | 'rank' | 'district' | 'status';
+export type UserSortDirection = 'asc' | 'desc';
 
 interface UserTableProps {
   users: User[];
@@ -12,6 +15,9 @@ interface UserTableProps {
   canEdit?: boolean;
   selectedUserIds?: string[];
   onSelectionChange?: (userIds: string[]) => void;
+  sortKey?: UserSortKey | null;
+  sortDirection?: UserSortDirection;
+  onSortChange?: (key: UserSortKey) => void;
 }
 
 export const UserTable: React.FC<UserTableProps> = ({
@@ -23,6 +29,9 @@ export const UserTable: React.FC<UserTableProps> = ({
   canEdit = false,
   selectedUserIds = [],
   onSelectionChange,
+  sortKey = null,
+  sortDirection = 'asc',
+  onSortChange,
 }) => {
   const [userPendingDelete, setUserPendingDelete] = useState<User | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -40,6 +49,32 @@ export const UserTable: React.FC<UserTableProps> = ({
   const visibleUsers = virtualize ? users.slice(startIndex, startIndex + visibleCount) : users;
   const topSpacerHeight = virtualize ? startIndex * rowHeight : 0;
   const bottomSpacerHeight = virtualize ? Math.max(0, (users.length - startIndex - visibleUsers.length) * rowHeight) : 0;
+
+  useEffect(() => {
+    setScrollTop(0);
+  }, [users]);
+
+  const renderSortableHeader = (key: UserSortKey, label: string) => {
+    const active = sortKey === key;
+    const Icon = active ? (sortDirection === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
+
+    return (
+      <th
+        className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300"
+        aria-sort={active ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+      >
+        <button
+          type="button"
+          onClick={() => onSortChange?.(key)}
+          className="flex w-full items-center gap-1.5 text-left font-semibold text-white transition hover:text-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          aria-label={`Sort by ${label}${active ? ` ${sortDirection === 'asc' ? 'descending' : 'ascending'}` : ''}`}
+        >
+          <span>{label}</span>
+          <Icon size={14} className={active ? 'opacity-100' : 'opacity-70'} aria-hidden="true" />
+        </button>
+      </th>
+    );
+  };
 
   const toggleVisibleUsers = (checked: boolean) => {
     if (!onSelectionChange) {
@@ -102,12 +137,12 @@ export const UserTable: React.FC<UserTableProps> = ({
                 />
               </th>
               )}
-              <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Last Name</th>
-              <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">First Name</th>
-              <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">PE #</th>
-              <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Rank</th>
-              <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">District</th>
-              <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Status</th>
+              {renderSortableHeader('lastName', 'Last Name')}
+              {renderSortableHeader('firstName', 'First Name')}
+              {renderSortableHeader('peNumber', 'PE #')}
+              {renderSortableHeader('rank', 'Rank')}
+              {renderSortableHeader('district', 'District')}
+              {renderSortableHeader('status', 'Status')}
               {canEdit && <th className="px-4 py-3 text-left font-semibold border-b-2 border-gray-300">Actions</th>}
             </tr>
           </thead>

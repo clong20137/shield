@@ -6,7 +6,7 @@ import type { EmojiClickData } from 'emoji-picker-react';
 import { useSearchParams } from 'react-router-dom';
 import { AuthAccount, AuthRole, authService, getAssetUrl, handleAssetImageError, MediaLibraryItem, messageService, userService, User, UserFilters } from '../services/api';
 import { SearchBar } from '../components/SearchBar';
-import { UserTable } from '../components/UserTable';
+import { UserTable, UserSortDirection, UserSortKey } from '../components/UserTable';
 import { UserDetail } from '../components/UserDetail';
 import { FloatingWindow } from '../components/FloatingWindow';
 import { ProfilePictureMediaPicker } from '../components/ProfilePictureMediaPicker';
@@ -27,6 +27,11 @@ interface BulkUpdateForm {
   district: string;
   status: string;
   isActive: string;
+}
+
+interface UserSortState {
+  key: UserSortKey | null;
+  direction: UserSortDirection;
 }
 
 function formatPhoneNumber(value: string): string {
@@ -147,8 +152,49 @@ function getInitialProfileWindowPosition() {
   };
 }
 
+function getComparableUserText(value: unknown): string {
+  return String(value ?? '').trim().toLocaleLowerCase();
+}
+
+function getUserSortText(user: User, key: Exclude<UserSortKey, 'peNumber' | 'status'>): string {
+  return getComparableUserText(user[key]);
+}
+
+function comparePeNumber(firstUser: User, secondUser: User): number {
+  const firstPe = String(firstUser.peNumber ?? '').trim();
+  const secondPe = String(secondUser.peNumber ?? '').trim();
+  const firstNumber = Number.parseInt(firstPe, 10);
+  const secondNumber = Number.parseInt(secondPe, 10);
+  const firstIsNumeric = firstPe !== '' && !Number.isNaN(firstNumber);
+  const secondIsNumeric = secondPe !== '' && !Number.isNaN(secondNumber);
+
+  if (firstIsNumeric && secondIsNumeric && firstNumber !== secondNumber) {
+    return firstNumber - secondNumber;
+  }
+
+  return firstPe.localeCompare(secondPe, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function compareUsersBySort(firstUser: User, secondUser: User, key: UserSortKey): number {
+  if (key === 'peNumber') {
+    return comparePeNumber(firstUser, secondUser);
+  }
+
+  if (key === 'status') {
+    const firstStatus = firstUser.isActive ? 'active' : 'inactive';
+    const secondStatus = secondUser.isActive ? 'active' : 'inactive';
+    return firstStatus.localeCompare(secondStatus, undefined, { sensitivity: 'base' });
+  }
+
+  return getUserSortText(firstUser, key).localeCompare(getUserSortText(secondUser, key), undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  });
+}
+
 const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const [users, setUsers] = useState<User[]>([]);
+  const [userSort, setUserSort] = useState<UserSortState>({ key: null, direction: 'asc' });
   const [loading, setLoading] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -192,9 +238,19 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
   const canViewHiddenUsers = isAdministrator || currentUser?.permissions?.includes('users:view-hidden');
   const searchCheckboxClassName =
     'h-4 w-4 rounded border border-gray-300 bg-white text-accent accent-accent focus:ring-accent focus:ring-2 dark:border-gray-700 dark:bg-gray-900';
+  const sortedUsers = useMemo(() => {
+    if (!userSort.key) {
+      return users;
+    }
+
+    return [...users].sort((firstUser, secondUser) => {
+      const result = compareUsersBySort(firstUser, secondUser, userSort.key as UserSortKey);
+      return userSort.direction === 'asc' ? result : -result;
+    });
+  }, [userSort.direction, userSort.key, users]);
   const selectedUsers = useMemo(
-    () => users.filter((user) => selectedUserIds.includes(user.id)),
-    [selectedUserIds, users],
+    () => sortedUsers.filter((user) => selectedUserIds.includes(user.id)),
+    [selectedUserIds, sortedUsers],
   );
   const eligibleBulkMessageCount = useMemo(
     () => selectedUsers.filter((user) => user.id !== currentUser?.id && user.receivesMessages !== false).length,
@@ -278,6 +334,13 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
 
   const handleFilterChange = async (filters: UserFilters) => {
     await loadUsersPage(currentQuery, filters, 1, pageSize);
+  };
+
+  const handleUserSortChange = (key: UserSortKey) => {
+    setUserSort((currentSort) => ({
+      key,
+      direction: currentSort.key === key && currentSort.direction === 'asc' ? 'desc' : 'asc',
+    }));
   };
 
   const handleDelete = async (userId: string) => {
@@ -839,7 +902,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       )}
 
       <UserTable
-        users={users}
+        users={sortedUsers}
         loading={loading}
         onUserSelect={openSelectedUser}
         onEdit={openEditUser}
@@ -847,6 +910,9 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
         canEdit={isAdministrator}
         selectedUserIds={selectedUserIds}
         onSelectionChange={setSelectedUserIds}
+        sortKey={userSort.key}
+        sortDirection={userSort.direction}
+        onSortChange={handleUserSortChange}
       />
 
       {bulkActionMode === 'message' && (
