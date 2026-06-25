@@ -912,6 +912,20 @@
     font-size: 17.5px;
   }
 
+  html.app-scale-compact,
+  html.app-scale-comfortable,
+  html.app-scale-large {
+    transition: font-size 220ms ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html.app-scale-compact,
+    html.app-scale-comfortable,
+    html.app-scale-large {
+      transition: none;
+    }
+  }
+
   body {
     @apply font-sans text-gray-800 bg-gray-50 dark:bg-gray-950 dark:text-gray-100;
   }

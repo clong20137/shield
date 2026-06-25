@@ -35,8 +35,8 @@ const QUICK_LAUNCH_PICKER_CLOSE_MS = 500;
 const QUICK_LAUNCH_CONTEXT_MENU_WIDTH = 256;
 const QUICK_LAUNCH_CONTEXT_MENU_HEIGHT = 300;
 const QUICK_LAUNCH_CONTEXT_MENU_GUTTER = 12;
-const GLOBAL_CONTEXT_MENU_WIDTH = 220;
-const GLOBAL_CONTEXT_MENU_HEIGHT = 120;
+const GLOBAL_CONTEXT_MENU_WIDTH = 256;
+const GLOBAL_CONTEXT_MENU_HEIGHT = 172;
 const GLOBAL_CONTEXT_MENU_GUTTER = 12;
 const AWAY_PRESENCE_IDLE_MS = 5 * 60 * 1000;
 const MODAL_CLOSE_MS = 220;
@@ -8764,21 +8764,13 @@ function App() {
       return false;
     }
 
-    if (target.closest('[data-no-global-context-menu="true"]')) {
-      return false;
-    }
-
     if (target.closest('.quick-launch-context-menu, .quick-launch-picker, .recent-message-preview-pop, .recent-message-preview, .context-menu, .floating-window, .modal, .dialog')) {
       return false;
     }
 
     if (target.closest(
-      'button, a, input, textarea, select, option, label, summary, details, [role=\"button\"], [role=\"menuitem\"], [role=\"link\"], [role=\"textbox\"], [contenteditable=\"true\"], img',
+      'input, textarea, select, option, [role=\"textbox\"], [contenteditable=\"true\"], [data-native-context-menu=\"true\"]',
     )) {
-      return false;
-    }
-
-    if (target.closest('.shield-left-panel, [data-onboarding-target="pinned-profiles"]')) {
       return false;
     }
 
@@ -8787,7 +8779,7 @@ function App() {
 
   useEffect(() => {
     const openGlobalContextMenu = (event: MouseEvent) => {
-      if (!isAuthenticated || !currentUser || isAppLocked) {
+      if (!isAuthenticated || !currentUser || isAppLocked || event.defaultPrevented) {
         return;
       }
 
@@ -9003,10 +8995,22 @@ function App() {
         <div className="animate-app-enter flex h-[100dvh] overflow-hidden bg-gray-50 dark:bg-gray-950">
           {globalContextMenu && (
             <div
-              className="fixed z-[999] w-56 overflow-hidden rounded-xl border border-white/25 bg-white/95 p-1 shadow-[0_20px_55px_rgba(15,23,42,0.28)] ring-1 ring-black/5 backdrop-blur dark:border-gray-700 dark:bg-gray-900 dark:ring-white/10"
+              className="fixed z-[999] w-64 overflow-hidden rounded-xl border border-white/25 bg-white/95 p-1 shadow-[0_20px_55px_rgba(15,23,42,0.28)] ring-1 ring-black/5 backdrop-blur dark:border-gray-700 dark:bg-gray-900 dark:ring-white/10"
               style={{ left: globalContextMenu.x, top: globalContextMenu.y }}
               onClick={(event) => event.stopPropagation()}
             >
+              <button
+                type="button"
+                onClick={() => {
+                  setGlobalContextMenu(null);
+                  openAppPath('/search');
+                }}
+                className="group flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-black/5 dark:text-gray-100 dark:hover:bg-white/10"
+              >
+                <Search size={15} />
+                <span>Search Users</span>
+              </button>
+              <div className="mx-2 my-1 border-t border-gray-200 dark:border-gray-700" />
               <button
                 type="button"
                 onClick={() => setIsGlassTheme((value) => !value)}
@@ -9018,8 +9022,8 @@ function App() {
                 </span>
               </button>
               <div className="mx-2 my-1 border-t border-gray-200 dark:border-gray-700" />
-              <div className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5">
-                <span className="font-semibold text-sm text-gray-700 dark:text-gray-100">App Scale</span>
+              <div className="flex items-center justify-between gap-3 rounded-lg px-2.5 py-2.5">
+                <span className="whitespace-nowrap text-sm font-semibold text-gray-700 dark:text-gray-100">App Scale</span>
                 <div className="flex items-center gap-1">
                   <button
                     type="button"

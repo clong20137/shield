@@ -3267,9 +3267,9 @@ const DashboardPage: React.FC<{
     },
     {
       label: 'App Scale',
-      render: ({ onClose }: { onClose: () => void }) => (
+      render: () => (
         <div className="quick-launch-context-menu-item text-gray-700 dark:text-gray-200">
-          <span>App Scale</span>
+          <span className="whitespace-nowrap">App Scale</span>
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
@@ -3279,7 +3279,6 @@ const DashboardPage: React.FC<{
                 event.stopPropagation();
                 if (canDecreaseAppScale) {
                   decreaseAppScale();
-                  onClose();
                 }
               }}
               disabled={!canDecreaseAppScale}
@@ -3298,7 +3297,6 @@ const DashboardPage: React.FC<{
                 event.stopPropagation();
                 if (canIncreaseAppScale) {
                   increaseAppScale();
-                  onClose();
                 }
               }}
               disabled={!canIncreaseAppScale}
