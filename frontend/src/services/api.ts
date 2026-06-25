@@ -1250,6 +1250,9 @@ export const deviceService = {
 };
 
 export const messageService = {
+  resolveRecipient: (accountId: string) =>
+    api.get<{ account: AuthAccount }>(`/messages/recipient/${accountId}`),
+
   send: (message: Pick<UserMessage, 'senderAccountId' | 'recipientUserId' | 'subject' | 'body'>) =>
     api.post<UserMessage>('/messages', message),
 

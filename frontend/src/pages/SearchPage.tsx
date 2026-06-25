@@ -575,6 +575,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
     setIsSendingMessage(true);
 
     try {
+      await messageService.resolveRecipient(messageRecipient.id);
       await messageService.send({
         senderAccountId: currentUser.id,
         recipientUserId: messageRecipient.id,
@@ -587,7 +588,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       onToast('success', 'Message sent.');
     } catch (err) {
       console.error(err);
-      onToast('error', 'Failed to send message.');
+      onToast('error', getErrorMessage(err, 'Failed to send message.'));
     } finally {
       setIsSendingMessage(false);
     }

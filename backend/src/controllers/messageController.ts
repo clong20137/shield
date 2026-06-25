@@ -74,6 +74,34 @@ export class MessageController {
     }
   }
 
+  static async resolveRecipient(req: Request, res: Response) {
+    try {
+      const accountId = cleanString(req.params.accountId, 36);
+
+      if (!accountId) {
+        return res.status(400).json({ error: 'Recipient is required' });
+      }
+
+      const account = await AuthAccountModel.getAccountById(accountId);
+      if (!account) {
+        return res.status(404).json({ error: 'This user does not have an app login and cannot receive messages.' });
+      }
+
+      if (!account.isActive) {
+        return res.status(403).json({ error: 'This user account is inactive and cannot receive messages.' });
+      }
+
+      if (!account.receivesMessages) {
+        return res.status(403).json({ error: `${account.displayName || account.email} is not receiving messages.` });
+      }
+
+      res.json({ account });
+    } catch (error) {
+      console.error('Resolve message recipient error:', error);
+      res.status(500).json({ error: 'Failed to validate message recipient' });
+    }
+  }
+
   static async createMessage(req: Request, res: Response) {
     try {
       const senderAccountId = cleanString(req.body?.senderAccountId, 36);
@@ -124,7 +152,7 @@ export class MessageController {
         actorAccountId: senderAccountId,
       });
 
-      res.status(201).json(message);
+      res.status(201).json(enrichedMessage || message);
     } catch (error) {
       console.error('Create message error:', error);
       res.status(500).json({ error: 'Failed to send message' });

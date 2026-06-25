@@ -13,6 +13,7 @@ const messagePresenceLimiter = rateLimit({ keyPrefix: 'messages-presence', windo
 const messageMutationLimiter = rateLimit({ keyPrefix: 'messages-mutate', windowMs: 60 * 1000, max: 120, message: 'Too many message updates. Try again shortly.' });
 
 router.get('/events', MessageController.streamEvents);
+router.get('/recipient/:accountId', messageReadLimiter, requirePermission('messages:send'), MessageController.resolveRecipient);
 router.post('/presence', messagePresenceLimiter, requireAuthenticated(), MessageController.updatePresence);
 router.post('/', messageSendLimiter, requirePermission('messages:send'), requireSelfOrPermission((req) => req.body?.senderAccountId, 'roles:manage'), MessageController.createMessage);
 router.post('/group', messageSendLimiter, requirePermission('messages:send'), requireSelfOrPermission((req) => req.body?.senderAccountId, 'roles:manage'), MessageController.createGroupMessage);

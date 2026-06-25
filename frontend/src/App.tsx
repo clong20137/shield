@@ -7750,15 +7750,35 @@ function App() {
         return;
       }
 
-      setMessageTargetUser({ ...user });
-      setMessageTargetThreadId(null);
-      openMessagesModal();
+      if (user.id === currentUser?.id) {
+        showToast('error', 'You cannot message yourself.', { saveToNotifications: false });
+        return;
+      }
+
+      void messageService.resolveRecipient(user.id)
+        .then((response) => {
+          setMessageTargetUser({
+            ...user,
+            email: response.data.account.email || user.email,
+            firstName: response.data.account.firstName || user.firstName,
+            lastName: response.data.account.lastName || user.lastName,
+            profilePictureUrl: response.data.account.profilePictureUrl || user.profilePictureUrl,
+            district: response.data.account.district || user.district,
+            receivesMessages: response.data.account.receivesMessages,
+          });
+          setMessageTargetThreadId(null);
+          openMessagesModal();
+        })
+        .catch((error) => {
+          console.error('Failed to open message recipient:', error);
+          showToast('error', getErrorMessage(error, 'This user cannot receive messages.'), { saveToNotifications: false });
+        });
     };
 
     window.addEventListener('shield:open-message-thread', openMessageThread);
 
     return () => window.removeEventListener('shield:open-message-thread', openMessageThread);
-  }, [isMessagesModalOpen]);
+  }, [currentUser?.id, isMessagesModalOpen, showToast]);
 
   const toggleMessagesModal = () => {
     if (isMessagesModalOpen) {
