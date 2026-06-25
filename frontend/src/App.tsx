@@ -92,6 +92,7 @@ interface MessagePreferences {
   reminderAlarmSound: ReminderAlarmSound;
   useMilitaryTime: boolean;
   hideQuickLaunch: boolean;
+  hideRecentConversations: boolean;
   quickLaunchPlacement: QuickLaunchPlacement;
   quickLaunchSlotCount: number;
 }
@@ -131,6 +132,7 @@ const defaultMessagePreferences: MessagePreferences = {
   reminderAlarmSound: '',
   useMilitaryTime: true,
   hideQuickLaunch: false,
+  hideRecentConversations: false,
   quickLaunchPlacement: 'dock',
   quickLaunchSlotCount: QUICK_LAUNCH_DEFAULT_SLOT_COUNT,
 };
@@ -1434,69 +1436,63 @@ function buildRecentConversations(messages: UserMessage[], currentUserId: string
 function RecentConversationsDock({
   conversations,
   onOpenConversation,
-  onOpenMessages,
+  onCompose,
+  onHide,
 }: {
   conversations: RecentConversation[];
   onOpenConversation: (conversation: RecentConversation) => void;
-  onOpenMessages: () => void;
+  onCompose: () => void;
+  onHide: () => void;
 }) {
-  if (conversations.length === 0) {
-    return null;
-  }
-
   return (
-    <aside className="pointer-events-none fixed bottom-5 right-5 z-40 hidden w-72 flex-col items-end gap-2 md:flex" aria-label="Recent conversations">
-      <div className="pointer-events-auto overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+    <aside className="pointer-events-none fixed bottom-5 right-5 z-40 hidden flex-col items-end gap-2 md:flex" aria-label="Recent conversations">
+      <div className="pointer-events-auto flex flex-col items-center gap-2 rounded-full border border-gray-200 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
         <button
           type="button"
-          onClick={onOpenMessages}
-          className="flex w-full items-center justify-between gap-3 border-b border-gray-200 px-3 py-2 text-left text-sm font-bold text-gray-800 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-100 dark:hover:bg-gray-800"
+          onClick={onCompose}
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-white shadow-sm transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+          aria-label="Start new message"
+          title="New Message"
         >
-          <span className="inline-flex items-center gap-2">
-            <Mail size={15} />
-            Recent Conversations
-          </span>
-          <span className="text-xs font-semibold text-gray-400">Open</span>
+          <Plus size={22} />
         </button>
-        <div className="max-h-80 overflow-y-auto">
-          {conversations.map((conversation) => (
-            <button
-              key={conversation.id}
-              type="button"
-              onClick={() => onOpenConversation(conversation)}
-              className="group flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-gray-50 dark:hover:bg-gray-800"
-              aria-label={`Open conversation with ${conversation.title}`}
-            >
-              <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary-500 text-sm font-black text-white">
-                {conversation.imageUrl ? (
-                  <img
-                    src={getAssetThumbnailUrl(conversation.imageUrl, 96)}
-                    alt=""
-                    onError={(event) => handleAssetThumbnailError(event, conversation.imageUrl)}
-                    className="h-full w-full object-cover"
-                  />
-                ) : conversation.threadType !== 'direct' ? (
-                  <Users size={17} />
-                ) : (
-                  getInitials(conversation.title)
-                )}
-                {conversation.unreadCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-danger px-1 text-[10px] font-black text-white dark:border-gray-900">
-                    {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
-                  </span>
-                )}
+        {conversations.map((conversation) => (
+          <button
+            key={conversation.id}
+            type="button"
+            onClick={() => onOpenConversation(conversation)}
+            className="group relative flex h-12 w-12 items-center justify-center rounded-full bg-primary-500 text-sm font-black text-white shadow-sm ring-2 ring-white transition hover:-translate-x-1 hover:scale-105 hover:ring-accent dark:ring-gray-900"
+            aria-label={`Open conversation with ${conversation.title}`}
+            title={`${conversation.title}${conversation.subtitle ? ` - ${conversation.subtitle}` : ''}`}
+          >
+            {conversation.imageUrl ? (
+              <img
+                src={getAssetThumbnailUrl(conversation.imageUrl, 96)}
+                alt=""
+                onError={(event) => handleAssetThumbnailError(event, conversation.imageUrl)}
+                className="h-full w-full rounded-full object-cover"
+              />
+            ) : conversation.threadType !== 'direct' ? (
+              <Users size={19} />
+            ) : (
+              getInitials(conversation.title)
+            )}
+            {conversation.unreadCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-danger px-1 text-[10px] font-black text-white dark:border-gray-900">
+                {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
               </span>
-              <span className="min-w-0 flex-1">
-                <span className={`block truncate text-sm ${conversation.unreadCount > 0 ? 'font-black text-primary-500 dark:text-blue-100' : 'font-bold text-gray-800 dark:text-gray-100'}`}>
-                  {conversation.title}
-                </span>
-                <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
-                  {conversation.subtitle}
-                </span>
-              </span>
-            </button>
-          ))}
-        </div>
+            )}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={onHide}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition hover:border-danger hover:text-danger dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+          aria-label="Hide recent conversations"
+          title="Hide Recent Conversations"
+        >
+          <X size={16} />
+        </button>
       </div>
     </aside>
   );
@@ -5523,6 +5519,7 @@ function App() {
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [messageTargetUser, setMessageTargetUser] = useState<User | null>(null);
   const [messageTargetThreadId, setMessageTargetThreadId] = useState<string | null>(null);
+  const [messageComposeRequestKey, setMessageComposeRequestKey] = useState(0);
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
   const [isBugTrackerOpen, setIsBugTrackerOpen] = useState(false);
   const [isFirstLoginGuideOpen, setIsFirstLoginGuideOpen] = useState(false);
@@ -7298,7 +7295,7 @@ function App() {
     isAuthenticated &&
     !isAppLocked &&
     messagePreferences.receiveMessages &&
-    recentConversations.length > 0 &&
+    !messagePreferences.hideRecentConversations &&
     !isMessagesModalOpen &&
     !getAppRelativePathname().startsWith('/messages'),
   );
@@ -7521,6 +7518,13 @@ function App() {
   const openRecentConversation = (conversation: RecentConversation) => {
     setMessageTargetUser(null);
     setMessageTargetThreadId(conversation.id);
+    openMessagesModal();
+  };
+
+  const openNewMessageComposer = () => {
+    setMessageTargetUser(null);
+    setMessageTargetThreadId(null);
+    setMessageComposeRequestKey((key) => key + 1);
     openMessagesModal();
   };
 
@@ -8707,7 +8711,13 @@ function App() {
             <RecentConversationsDock
               conversations={recentConversations}
               onOpenConversation={openRecentConversation}
-              onOpenMessages={openMessagesModal}
+              onCompose={openNewMessageComposer}
+              onHide={() =>
+                setMessagePreferences((preferences) => ({
+                  ...preferences,
+                  hideRecentConversations: true,
+                }))
+              }
             />
           )}
           {isMessagesModalOpen && currentUser && (
@@ -8745,7 +8755,7 @@ function App() {
                 </div>
                 <div className="min-h-0 flex-1">
                   <Suspense fallback={<PageLoader label="Loading messages..." />}>
-                    <MessageInboxPage currentUser={currentUser} onToast={showToast} isModalView targetRecipient={messageTargetUser} targetThreadId={messageTargetThreadId} isBackgrounded={isAppBackgrounded} />
+                    <MessageInboxPage currentUser={currentUser} onToast={showToast} isModalView targetRecipient={messageTargetUser} targetThreadId={messageTargetThreadId} composeRequestKey={messageComposeRequestKey} isBackgrounded={isAppBackgrounded} />
                   </Suspense>
                 </div>
               </>
@@ -8866,6 +8876,12 @@ function App() {
                         setMessagePreferences((preferences) => ({
                           ...preferences,
                           useMilitaryTime,
+                        }))
+                      }
+                      onRecentConversationsHiddenChange={(hideRecentConversations) =>
+                        setMessagePreferences((preferences) => ({
+                          ...preferences,
+                          hideRecentConversations,
                         }))
                       }
                       onQuickLaunchHiddenChange={(hideQuickLaunch) =>

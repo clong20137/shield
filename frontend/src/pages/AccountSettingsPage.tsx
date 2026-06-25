@@ -20,6 +20,7 @@ interface AccountSettingsPageProps {
     reminderAlarmSound: string;
     useMilitaryTime: boolean;
     hideQuickLaunch: boolean;
+    hideRecentConversations: boolean;
     quickLaunchPlacement: 'dock' | 'sidebar';
     quickLaunchSlotCount: number;
   };
@@ -36,6 +37,7 @@ interface AccountSettingsPageProps {
   onPreviewMessageSound: (messageSound: string) => void;
   onReminderAlarmSoundSelect: (reminderAlarmSound: string) => void;
   onMilitaryTimeChange: (useMilitaryTime: boolean) => void;
+  onRecentConversationsHiddenChange: (hideRecentConversations: boolean) => void;
   onQuickLaunchHiddenChange: (hideQuickLaunch: boolean) => void;
   onQuickLaunchPlacementChange: (placement: 'dock' | 'sidebar') => void;
   onQuickLaunchSlotCountChange: (slotCount: number) => void;
@@ -92,6 +94,7 @@ export function AccountSettingsPage({
   onPreviewMessageSound,
   onReminderAlarmSoundSelect,
   onMilitaryTimeChange,
+  onRecentConversationsHiddenChange,
   onQuickLaunchHiddenChange,
   onQuickLaunchPlacementChange,
   onQuickLaunchSlotCountChange,
@@ -941,6 +944,13 @@ export function AccountSettingsPage({
               checked={messagePreferences.playMessageSound}
               disabled={!messagePreferences.receiveMessages}
               onChange={onMessageSoundChange}
+            />
+            <PreferenceToggle
+              title="Recent conversation bubbles"
+              description="Show floating profile bubbles for recent conversations in the bottom-right corner."
+              checked={!messagePreferences.hideRecentConversations}
+              disabled={!messagePreferences.receiveMessages}
+              onChange={(enabled) => onRecentConversationsHiddenChange(!enabled)}
             />
             <label className="block rounded border border-gray-200 p-4 dark:border-gray-800">
               <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Message sound</span>

@@ -16,6 +16,7 @@ interface MessageInboxPageProps {
   isModalView?: boolean;
   targetRecipient?: User | null;
   targetThreadId?: string | null;
+  composeRequestKey?: number;
   isBackgrounded?: boolean;
 }
 
@@ -366,7 +367,7 @@ function parseAttachmentLine(value: string): { fileName: string; fileUrl: string
   }
 }
 
-function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRecipient = null, targetThreadId = null, isBackgrounded = false }: MessageInboxPageProps) {
+function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRecipient = null, targetThreadId = null, composeRequestKey = 0, isBackgrounded = false }: MessageInboxPageProps) {
   const [inboxMessages, setInboxMessages] = useState<UserMessage[]>([]);
   const [sentMessages, setSentMessages] = useState<UserMessage[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
@@ -857,6 +858,23 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     setIsComposeOpen(false);
     setSearchTerm('');
   }, [draftGroupRecipients.length, draftRecipient, filteredThreads, isComposeOpen, searchTerm, selectedThreadId, targetThreadId]);
+
+  useEffect(() => {
+    if (composeRequestKey <= 0) {
+      return;
+    }
+
+    setSelectedThreadId(null);
+    setDraftRecipient(null);
+    setDraftGroupRecipients([]);
+    setDraftThreadTitle('');
+    setRecipientQuery('');
+    setRecipientResults([]);
+    setReplyBody('');
+    setReplyAttachments([]);
+    setSearchTerm('');
+    setIsComposeOpen(true);
+  }, [composeRequestKey]);
 
   useEffect(() => {
     if (!selectedThread || selectedThread.threadType === 'direct') {
