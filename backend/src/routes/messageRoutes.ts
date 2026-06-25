@@ -24,6 +24,7 @@ router.put('/thread/:threadId/image', messageMutationLimiter, requireAuthenticat
 router.get('/unread-count/:accountId', messageReadLimiter, requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), MessageController.getUnreadCount);
 router.get('/inbox/:accountId', messageReadLimiter, requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), MessageController.listInbox);
 router.get('/sent/:accountId', messageReadLimiter, requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), MessageController.listSent);
+router.get('/thread/:threadId/messages', messageReadLimiter, requireSelfOrPermission((req) => (typeof req.query.accountId === 'string' ? req.query.accountId : undefined), 'roles:manage'), MessageController.listThread);
 router.get('/user/:userId', messageReadLimiter, requireSelfOrPermission((req) => req.params.userId, 'roles:manage'), MessageController.listMessagesForUser);
 router.post('/typing', messageTypingLimiter, requireSelfOrPermission((req) => req.body?.senderAccountId, 'roles:manage'), MessageController.typing);
 router.put('/:id/read', messageMutationLimiter, requireSelfOrPermission((req) => req.body?.recipientUserId, 'roles:manage'), MessageController.markRead);

@@ -1252,12 +1252,14 @@ export const deviceService = {
     api.delete(`/devices/${id}`, { data: actor }),
 };
 
+const MESSAGE_REQUEST_OPTIONS = { timeout: 20000 };
+
 export const messageService = {
   resolveRecipient: (accountId: string) =>
-    api.get<{ account: AuthAccount }>(`/messages/recipient/${accountId}`),
+    api.get<{ account: AuthAccount }>(`/messages/recipient/${accountId}`, MESSAGE_REQUEST_OPTIONS),
 
   send: (message: Pick<UserMessage, 'senderAccountId' | 'recipientUserId' | 'subject' | 'body'>) =>
-    api.post<UserMessage>('/messages', message),
+    api.post<UserMessage>('/messages', message, MESSAGE_REQUEST_OPTIONS),
 
   sendGroup: (message: {
     senderAccountId: string;
@@ -1267,7 +1269,7 @@ export const messageService = {
     audienceType?: 'group' | 'district';
     threadId?: string;
     threadTitle?: string;
-  }) => api.post<{ threadId: string; groupMessageId: string; messages: UserMessage[] }>('/messages/group', message),
+  }) => api.post<{ threadId: string; groupMessageId: string; messages: UserMessage[] }>('/messages/group', message, MESSAGE_REQUEST_OPTIONS),
 
   uploadImage: (file: File) => {
     const formData = new FormData();
@@ -1291,16 +1293,22 @@ export const messageService = {
     api.put<{ threadId: string; threadTitle: string }>(`/messages/thread/${threadId}/title`, { threadTitle }),
 
   getForUser: (userId: string) =>
-    api.get<UserMessage[]>(`/messages/user/${userId}`),
+    api.get<UserMessage[]>(`/messages/user/${userId}`, MESSAGE_REQUEST_OPTIONS),
 
   getInbox: (accountId: string) =>
-    api.get<UserMessage[]>(`/messages/inbox/${accountId}`),
+    api.get<UserMessage[]>(`/messages/inbox/${accountId}`, MESSAGE_REQUEST_OPTIONS),
+
+  getThread: (threadId: string, accountId: string) =>
+    api.get<UserMessage[]>(`/messages/thread/${threadId}/messages`, {
+      ...MESSAGE_REQUEST_OPTIONS,
+      params: { accountId },
+    }),
 
   getUnreadCount: (accountId: string) =>
     api.get<{ unreadCount: number }>(`/messages/unread-count/${accountId}`),
 
   getSent: (accountId: string) =>
-    api.get<UserMessage[]>(`/messages/sent/${accountId}`),
+    api.get<UserMessage[]>(`/messages/sent/${accountId}`, MESSAGE_REQUEST_OPTIONS),
 
   markRead: (messageId: string, recipientUserId: string) =>
     api.put(`/messages/${messageId}/read`, { recipientUserId }),

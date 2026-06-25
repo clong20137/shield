@@ -533,12 +533,32 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     }
 
     try {
-      const [inboxResponse, sentResponse] = await Promise.all([
+      const [inboxResult, sentResult] = await Promise.allSettled([
         messageService.getInbox(currentUser.id),
         messageService.getSent(currentUser.id),
       ]);
-      setInboxMessages(inboxResponse.data);
-      setSentMessages(sentResponse.data);
+
+      if (inboxResult.status === 'fulfilled') {
+        setInboxMessages(inboxResult.value.data);
+      } else {
+        logMessageDiagnostic('Message inbox load failed', {
+          error: getDiagnosticErrorDetails(inboxResult.reason),
+          showLoading,
+        }, 'error');
+      }
+
+      if (sentResult.status === 'fulfilled') {
+        setSentMessages(sentResult.value.data);
+      } else {
+        logMessageDiagnostic('Message sent load failed', {
+          error: getDiagnosticErrorDetails(sentResult.reason),
+          showLoading,
+        }, 'error');
+      }
+
+      if (inboxResult.status === 'rejected' && sentResult.status === 'rejected') {
+        onToast('error', 'Failed to load messages.');
+      }
     } catch (err) {
       console.error(err);
       logMessageDiagnostic('Message load failed', {
@@ -556,6 +576,28 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         void loadMessages(false);
       }
     }
+  };
+
+  const mergeThreadMessages = (messages: UserMessage[]) => {
+    if (messages.length === 0) {
+      return;
+    }
+
+    setInboxMessages((currentMessages) => {
+      const nextMessages = new Map(currentMessages.map((message) => [message.id, message]));
+      messages
+        .filter((message) => message.recipientUserId === currentUser.id)
+        .forEach((message) => nextMessages.set(message.id, message));
+      return Array.from(nextMessages.values());
+    });
+
+    setSentMessages((currentMessages) => {
+      const nextMessages = new Map(currentMessages.map((message) => [message.id, message]));
+      messages
+        .filter((message) => message.senderAccountId === currentUser.id)
+        .forEach((message) => nextMessages.set(message.id, message));
+      return Array.from(nextMessages.values());
+    });
   };
 
   useEffect(() => {
@@ -943,10 +985,6 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       return;
     }
 
-    if (!filteredThreads.some((thread) => thread.id === targetThreadId)) {
-      return;
-    }
-
     appliedTargetThreadIdRef.current = targetThreadId;
     setSelectedThreadId(targetThreadId);
     setDraftRecipient(null);
@@ -954,7 +992,24 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     setDraftThreadTitle('');
     setIsComposeOpen(false);
     setSearchTerm('');
-  }, [filteredThreads, targetThreadId]);
+
+    if (filteredThreads.some((thread) => thread.id === targetThreadId)) {
+      return;
+    }
+
+    messageService.getThread(targetThreadId, currentUser.id)
+      .then((response) => {
+        mergeThreadMessages(response.data);
+      })
+      .catch((err) => {
+        console.error('Target message thread load failed:', err);
+        logMessageDiagnostic('Target message thread load failed', {
+          error: getDiagnosticErrorDetails(err),
+          targetThreadId,
+        }, 'error');
+        onToast('error', 'Failed to load that conversation.');
+      });
+  }, [currentUser.id, filteredThreads, targetThreadId]);
 
   useEffect(() => {
     if (composeRequestKey <= 0) {

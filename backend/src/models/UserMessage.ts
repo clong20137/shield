@@ -286,6 +286,68 @@ export class UserMessageModel {
     }
   }
 
+  static async listThread(accountId: string, threadId: string, limit = 250, offset = 0, options: { canViewIncognitoPresence?: boolean } = {}): Promise<UserMessage[]> {
+    const conn = await pool.getConnection();
+    try {
+      const senderLastSeenSql = visibleLastSeenExpression('s', Boolean(options.canViewIncognitoPresence));
+      const recipientLastSeenSql = visibleLastSeenExpression('r', Boolean(options.canViewIncognitoPresence));
+      const [rows] = await conn.query<UserMessageRow[]>(
+        `SELECT m.*,
+          COALESCE(s.displayName, CONCAT(s.firstName, ' ', s.lastName), s.email) as senderName,
+          s.email as senderEmail,
+          s.rank as senderRank,
+          s.profilePictureUrl as senderProfilePictureUrl,
+          ${senderLastSeenSql} as senderLastSeenAt,
+          s.receivesMessages as senderReceivesMessages,
+          COALESCE(r.displayName, CONCAT(r.firstName, ' ', r.lastName), r.email) as recipientName,
+          r.email as recipientEmail,
+          r.rank as recipientRank,
+          r.profilePictureUrl as recipientProfilePictureUrl,
+          ${recipientLastSeenSql} as recipientLastSeenAt,
+          r.receivesMessages as recipientReceivesMessages
+        FROM user_messages m
+        LEFT JOIN users s ON s.id = m.senderAccountId
+        LEFT JOIN users r ON r.id = m.recipientUserId
+        WHERE (
+          (
+            m.threadId = ?
+            AND (m.senderAccountId = ? OR m.recipientUserId = ?)
+            AND (
+              (m.senderAccountId = ? AND m.senderDeleted = 0)
+              OR (m.recipientUserId = ? AND m.recipientDeleted = 0 AND m.isArchived = 0)
+            )
+          )
+          OR (
+            COALESCE(m.threadType, 'direct') = 'direct'
+            AND (
+              (m.senderAccountId = ? AND m.recipientUserId = ? AND m.senderDeleted = 0)
+              OR (m.senderAccountId = ? AND m.recipientUserId = ? AND m.recipientDeleted = 0 AND m.isArchived = 0)
+            )
+          )
+        )
+        ORDER BY m.createdAt DESC
+        LIMIT ? OFFSET ?`,
+        [
+          threadId,
+          accountId,
+          accountId,
+          accountId,
+          accountId,
+          accountId,
+          threadId,
+          threadId,
+          accountId,
+          limit,
+          offset,
+        ]
+      );
+
+      return rows.map(toUserMessage);
+    } finally {
+      conn.release();
+    }
+  }
+
   static async getById(messageId: string, options: { canViewIncognitoPresence?: boolean } = {}): Promise<UserMessage | null> {
     const conn = await pool.getConnection();
     try {

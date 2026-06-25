@@ -540,6 +540,30 @@ export class MessageController {
     }
   }
 
+  static async listThread(req: Request, res: Response) {
+    try {
+      const accountId = cleanString(req.query.accountId, 36);
+      const threadId = cleanString(req.params.threadId, 36);
+      if (!accountId || !threadId) {
+        return res.status(400).json({ error: 'Account and thread are required' });
+      }
+
+      const pagination = parsePagination(req.query, { defaultPageSize: 250, maxPageSize: 500 });
+      const sessionAccount = await getSessionAccount(req);
+      const messages = await UserMessageModel.listThread(accountId, threadId, pagination.pageSize, pagination.offset, {
+        canViewIncognitoPresence: await canViewIncognitoPresence(sessionAccount),
+      });
+      res.json(messages);
+    } catch (error) {
+      console.error('List message thread error:', error);
+      logMessageControllerError(req, 'Message thread load failed', error, {
+        accountId: cleanString(req.query.accountId, 36),
+        threadId: req.params.threadId,
+      });
+      res.status(500).json({ error: 'Failed to load conversation' });
+    }
+  }
+
   static async markRead(req: Request, res: Response) {
     try {
       const recipientUserId = cleanString(req.body?.recipientUserId, 36);
