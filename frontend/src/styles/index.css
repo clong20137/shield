@@ -1321,149 +1321,19 @@
     filter: blur(0.08rem);
   }
 
-  .thanksgiving-sidebar-turkey {
+  .thanksgiving-sidebar-lottie {
     position: absolute;
     left: 50%;
-    bottom: 1.15rem;
-    width: 6.5rem;
-    height: 6.35rem;
+    bottom: 0.45rem;
+    width: 9.5rem;
+    height: 8.25rem;
     transform: translateX(-50%);
-    animation: thanksgiving-sidebar-bob 2.8s ease-in-out infinite;
     filter: drop-shadow(0 1rem 1.2rem rgba(67, 20, 7, 0.24));
-  }
-
-  .thanksgiving-sidebar-tail {
-    position: absolute;
-    left: 0.15rem;
-    top: 0.05rem;
-    width: 4.9rem;
-    height: 4.85rem;
-    border-radius: 5rem 5rem 1.35rem 1.35rem;
-    background:
-      conic-gradient(from 220deg at 50% 88%, #7c2d12 0 16deg, #d97706 16deg 38deg, #b91c1c 38deg 62deg, #fbbf24 62deg 86deg, #92400e 86deg 112deg, #a16207 112deg 140deg, transparent 140deg 360deg);
-    transform-origin: 68% 86%;
-    animation: thanksgiving-sidebar-tail 2.8s ease-in-out infinite;
-  }
-
-  .thanksgiving-sidebar-body {
-    position: absolute;
-    left: 2.45rem;
-    top: 2.25rem;
-    width: 2.9rem;
-    height: 3.1rem;
-    border-radius: 52% 52% 48% 48%;
-    background: linear-gradient(145deg, #92400e, #451a03);
-    box-shadow: inset 0 0.42rem 0.65rem rgba(255, 255, 255, 0.14);
-  }
-
-  .thanksgiving-sidebar-wing {
-    position: absolute;
-    left: 0.42rem;
-    top: 1.15rem;
-    width: 1.35rem;
-    height: 1.4rem;
-    border-radius: 1rem 1rem 1rem 0.35rem;
-    background: rgba(67, 20, 7, 0.36);
-    transform: rotate(-12deg);
-    animation: thanksgiving-sidebar-wing 2.8s ease-in-out infinite;
-  }
-
-  .thanksgiving-sidebar-head {
-    position: absolute;
-    right: -0.6rem;
-    top: 0.25rem;
-    width: 1.45rem;
-    height: 1.42rem;
-    border-radius: 50%;
-    background: #a16207;
-    animation: thanksgiving-sidebar-head 2.8s ease-in-out infinite;
-  }
-
-  .thanksgiving-sidebar-eye {
-    position: absolute;
-    right: 0.36rem;
-    top: 0.38rem;
-    width: 0.18rem;
-    height: 0.18rem;
-    border-radius: 999px;
-    background: #111827;
-  }
-
-  .thanksgiving-sidebar-beak {
-    position: absolute;
-    right: -0.35rem;
-    top: 0.57rem;
-    width: 0;
-    height: 0;
-    border-top: 0.2rem solid transparent;
-    border-bottom: 0.2rem solid transparent;
-    border-left: 0.45rem solid #f59e0b;
-  }
-
-  .thanksgiving-sidebar-leg {
-    position: absolute;
-    bottom: -0.42rem;
-    width: 0.17rem;
-    height: 0.58rem;
-    border-radius: 999px;
-    background: #f59e0b;
-  }
-
-  .thanksgiving-sidebar-leg-left {
-    left: 1.08rem;
-  }
-
-  .thanksgiving-sidebar-leg-right {
-    left: 1.72rem;
-  }
-
-  @keyframes thanksgiving-sidebar-bob {
-    0%,
-    100% {
-      transform: translateX(-50%) translateY(0);
-    }
-    50% {
-      transform: translateX(-50%) translateY(-0.35rem);
-    }
-  }
-
-  @keyframes thanksgiving-sidebar-tail {
-    0%,
-    100% {
-      transform: rotate(-5deg) scale(1);
-    }
-    50% {
-      transform: rotate(3deg) scale(1.03);
-    }
-  }
-
-  @keyframes thanksgiving-sidebar-wing {
-    0%,
-    100% {
-      transform: rotate(-12deg);
-    }
-    50% {
-      transform: rotate(-24deg);
-    }
-  }
-
-  @keyframes thanksgiving-sidebar-head {
-    0%,
-    100% {
-      transform: rotate(0deg);
-    }
-    50% {
-      transform: rotate(8deg);
-    }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .seasonal-snow-layer,
-    .seasonal-leaf-layer,
-    .thanksgiving-sidebar-turkey,
-    .thanksgiving-sidebar-tail,
-    .thanksgiving-sidebar-wing,
-    .thanksgiving-sidebar-head {
+    .seasonal-leaf-layer {
       animation: none !important;
     }
   }

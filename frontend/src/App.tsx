@@ -50,6 +50,7 @@ const DEFAULT_PRIMARY_COLOR = '#1a365d';
 const DEFAULT_SECONDARY_COLOR = '#9C865C';
 const DEFAULT_BRAND_LOGO = '/shield-splash-logo.png';
 const PATRIOTIC_BRAND_LOGO = '/theme-assets/america-250-logo.png';
+const THANKSGIVING_TURKEY_LOTTIE = '/theme-assets/cool-turkey.lottie';
 const MAX_SETUP_LOGO_SIZE_BYTES = 240 * 1024;
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/iu;
 const LOGIN_TRANSITION_MS = 560;
@@ -2390,21 +2391,20 @@ function SeasonalThemeEffects({ activeTheme }: { activeTheme: EffectiveSeasonalT
 }
 
 function ThanksgivingSidebarAnimation() {
+  useEffect(() => {
+    void import('@dotlottie/player-component');
+  }, []);
+
   return (
     <div className="thanksgiving-sidebar-animation" aria-hidden="true">
       <div className="thanksgiving-sidebar-ground" />
-      <div className="thanksgiving-sidebar-turkey">
-        <span className="thanksgiving-sidebar-tail" />
-        <span className="thanksgiving-sidebar-body">
-          <span className="thanksgiving-sidebar-wing" />
-          <span className="thanksgiving-sidebar-head">
-            <span className="thanksgiving-sidebar-eye" />
-            <span className="thanksgiving-sidebar-beak" />
-          </span>
-          <span className="thanksgiving-sidebar-leg thanksgiving-sidebar-leg-left" />
-          <span className="thanksgiving-sidebar-leg thanksgiving-sidebar-leg-right" />
-        </span>
-      </div>
+      <dotlottie-player
+        src={withAppBase(THANKSGIVING_TURKEY_LOTTIE)}
+        autoplay
+        loop
+        background="transparent"
+        class="thanksgiving-sidebar-lottie"
+      />
     </div>
   );
 }
