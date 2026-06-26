@@ -761,6 +761,14 @@ export interface DeviceRecord {
   updatedAt: string;
 }
 
+export interface DeviceListResponse {
+  data: DeviceRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export interface DeviceEvent {
   id: string;
   deviceId: string;
@@ -1241,8 +1249,8 @@ export const errorLogService = {
 };
 
 export const deviceService = {
-  getAll: () =>
-    api.get<DeviceRecord[]>('/devices'),
+  getAll: (params?: { q?: string; type?: string; status?: string; sortKey?: string; page?: number; pageSize?: number }) =>
+    api.get<DeviceListResponse>('/devices', { params }),
 
   getAssignedToMe: () =>
     api.get<DeviceRecord[]>('/devices/assigned/me'),

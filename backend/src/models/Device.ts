@@ -42,6 +42,9 @@ export interface DeviceEvent {
 
 interface DeviceRow extends RowDataPacket, Device {}
 interface DeviceEventRow extends RowDataPacket, DeviceEvent {}
+interface DeviceCountRow extends RowDataPacket {
+  total: number;
+}
 
 export type DeviceInput = Omit<Device, 'id' | 'createdAt' | 'updatedAt'>;
 
@@ -52,6 +55,18 @@ export interface DeviceEventInput {
   assignedTo?: string;
   status?: string;
   notes?: string;
+}
+
+export interface DeviceListFilters {
+  q?: string;
+  type?: string;
+  status?: string;
+  sortKey?: string;
+}
+
+export interface DeviceListResult {
+  data: Device[];
+  total: number;
 }
 
 const deviceColumns = [
@@ -108,15 +123,78 @@ function normalizeDeviceInput(device: DeviceInput): DeviceInput {
 }
 
 export class DeviceModel {
-  static async listDevices(limit = 250, offset = 0): Promise<Device[]> {
+  static async listDevices(limit = 250, offset = 0, filters: DeviceListFilters = {}): Promise<DeviceListResult> {
     const conn = await pool.getConnection();
     try {
+      const where: string[] = [];
+      const params: Array<string | number> = [];
+      const searchTerm = filters.q?.trim();
+
+      if (filters.type && filters.type !== 'All') {
+        where.push('`type` = ?');
+        params.push(filters.type);
+      }
+
+      if (filters.status && filters.status !== 'All') {
+        if (filters.status === 'Unassigned') {
+          where.push("COALESCE(`assignedTo`, '') = ''");
+        } else {
+          where.push('`status` = ?');
+          params.push(filters.status);
+        }
+      }
+
+      if (searchTerm) {
+        const likeTerm = `%${searchTerm.toLowerCase()}%`;
+        where.push(`(
+          LOWER(\`assetTag\`) LIKE ?
+          OR LOWER(\`makeModel\`) LIKE ?
+          OR LOWER(\`serialNumber\`) LIKE ?
+          OR LOWER(\`assignedTo\`) LIKE ?
+          OR LOWER(\`status\`) LIKE ?
+          OR LOWER(\`location\`) LIKE ?
+          OR LOWER(\`phoneNumber\`) LIKE ?
+          OR LOWER(\`imei\`) LIKE ?
+          OR LOWER(\`simNumber\`) LIKE ?
+          OR LOWER(\`radioId\`) LIKE ?
+          OR LOWER(\`hostname\`) LIKE ?
+          OR LOWER(\`routerId\`) LIKE ?
+        )`);
+        params.push(...Array.from({ length: 12 }, () => likeTerm));
+      }
+
+      const sortColumns: Record<string, string> = {
+        assetTag: '`assetTag`',
+        assignedTo: '`assignedTo`',
+        location: '`location`',
+        maintenanceDueDate: '`maintenanceDueDate`',
+        makeModel: '`makeModel`',
+        replacementDueDate: '`replacementDueDate`',
+        status: '`status`',
+        type: '`type`',
+        updatedAt: '`updatedAt`',
+      };
+      const sortColumn = sortColumns[filters.sortKey || ''] || '`updatedAt`';
+      const sortDirection = sortColumn === '`updatedAt`' ? 'DESC' : 'ASC';
+      const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+
+      const [countRows] = await conn.query<DeviceCountRow[]>(
+        `SELECT COUNT(*) as total FROM devices ${whereSql}`,
+        params,
+      );
       const [rows] = await conn.query<DeviceRow[]>(
-        `SELECT ${deviceColumns} FROM devices ORDER BY \`updatedAt\` DESC, \`assetTag\` LIMIT ? OFFSET ?`,
-        [limit, offset]
+        `SELECT ${deviceColumns}
+        FROM devices
+        ${whereSql}
+        ORDER BY ${sortColumn} ${sortDirection}, \`assetTag\`
+        LIMIT ? OFFSET ?`,
+        [...params, limit, offset]
       );
 
-      return rows;
+      return {
+        data: rows,
+        total: Number(countRows[0]?.total || 0),
+      };
     } finally {
       conn.release();
     }

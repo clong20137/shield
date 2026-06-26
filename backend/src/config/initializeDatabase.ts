@@ -802,6 +802,10 @@ export async function initializeDatabase() {
   await ensureColumn('devices', 'condition', "`condition` VARCHAR(50) NOT NULL DEFAULT 'Good'");
   await ensureIndex('devices', 'idx_devices_updated_asset', '`updatedAt`, `assetTag`');
   await ensureIndex('devices', 'idx_devices_assigned_updated', '`assignedTo`, `updatedAt`, `assetTag`');
+  await ensureIndex('devices', 'idx_devices_type_updated_asset', '`type`, `updatedAt`, `assetTag`');
+  await ensureIndex('devices', 'idx_devices_status_updated_asset', '`status`, `updatedAt`, `assetTag`');
+  await ensureIndex('devices', 'idx_devices_maintenance_asset', '`maintenanceDueDate`, `assetTag`');
+  await ensureIndex('devices', 'idx_devices_replacement_asset', '`replacementDueDate`, `assetTag`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS device_events (

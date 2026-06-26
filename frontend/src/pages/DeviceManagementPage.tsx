@@ -1,5 +1,5 @@
 import { ChangeEvent, FormEvent, MouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
+import type { IScannerControls } from '@zxing/browser';
 import { AlertTriangle, ArchiveX, Camera, CheckCircle2, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, QrCode, Radio, RefreshCw, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, deviceService, DeviceRecord } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
@@ -268,6 +268,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  const [totalDevices, setTotalDevices] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [pageContextMenu, setPageContextMenu] = useState<AppContextMenuPosition | null>(null);
   const [devicePendingDelete, setDevicePendingDelete] = useState<DeviceRecord | null>(null);
@@ -281,6 +283,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [cameraScanStatus, setCameraScanStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isFiltering, setIsFiltering] = useState(false);
   const [deviceTableScrollTop, setDeviceTableScrollTop] = useState(0);
   const isDeviceLoadInFlightRef = useRef(false);
   const isUserLoadInFlightRef = useRef(false);
@@ -318,12 +321,16 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const loadDevices = useCallback(async (showLoading = true) => {
     if (!currentUser) {
       setDevices([]);
+      setTotalDevices(0);
+      setTotalPages(1);
       setLoading(false);
       return;
     }
 
     if (!canManageDevices) {
       setDevices([]);
+      setTotalDevices(0);
+      setTotalPages(1);
       setLoading(false);
       setError('You do not have permission to manage devices.');
       return;
@@ -336,22 +343,39 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     isDeviceLoadInFlightRef.current = true;
     if (showLoading) {
       setLoading(true);
+    } else {
+      setIsFiltering(true);
     }
     setError(null);
     try {
-      const response = await deviceService.getAll();
-      setDevices(response.data);
+      const response = await deviceService.getAll({
+        q: query.trim() || undefined,
+        type: filter === 'All' ? undefined : filter,
+        status: statusFilter === 'All' ? undefined : statusFilter,
+        sortKey,
+        page,
+        pageSize,
+      });
+      setDevices(response.data.data);
+      setTotalDevices(response.data.total);
+      setTotalPages(response.data.totalPages);
+      if (response.data.page !== page) {
+        setPage(response.data.page);
+      }
     } catch (err) {
       console.error('Failed to load device inventory:', err);
       setError('Failed to load device inventory. Check that the backend is running.');
     } finally {
       isDeviceLoadInFlightRef.current = false;
       setLoading(false);
+      setIsFiltering(false);
     }
-  }, [canManageDevices, currentUser?.id]);
+  }, [canManageDevices, currentUser?.id, filter, page, pageSize, query, sortKey, statusFilter]);
 
   useEffect(() => {
-    void loadDevices(true);
+    const timer = window.setTimeout(() => {
+      void loadDevices(devices.length === 0);
+    }, query.trim() ? 220 : 0);
 
     const handleDeviceUpdate = () => {
       if (deviceRefreshTimerRef.current) {
@@ -365,6 +389,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
 
     window.addEventListener('shield:device-updated', handleDeviceUpdate);
     return () => {
+      window.clearTimeout(timer);
       window.removeEventListener('shield:device-updated', handleDeviceUpdate);
       if (deviceRefreshTimerRef.current) {
         window.clearTimeout(deviceRefreshTimerRef.current);
@@ -432,6 +457,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         return;
       }
 
+      const { BrowserMultiFormatReader } = await import('@zxing/browser');
       const reader = new BrowserMultiFormatReader();
       setIsCameraScanActive(true);
       setCameraScanStatus('Point the camera at a QR code or barcode.');
@@ -463,44 +489,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     }
   };
 
-  const filteredDevices = useMemo(() => {
-    const searchTerm = query.trim().toLowerCase();
-
-    return devices
-      .filter((device) => {
-        const matchesType = filter === 'All' || device.type === filter;
-        const matchesStatus = statusFilter === 'All'
-          || (statusFilter === 'Unassigned' ? !device.assignedTo : device.status === statusFilter);
-        const searchableText = [
-          device.assetTag,
-          device.makeModel,
-          device.serialNumber,
-          device.assignedTo,
-          device.status,
-          device.location,
-          device.phoneNumber,
-          device.imei,
-          device.simNumber,
-          device.radioId,
-          device.hostname,
-          device.routerId,
-        ]
-          .join(' ')
-          .toLowerCase();
-
-        return matchesType && matchesStatus && (!searchTerm || searchableText.includes(searchTerm));
-      })
-      .sort((a, b) => String(a[sortKey] || '').localeCompare(String(b[sortKey] || '')));
-  }, [devices, filter, query, sortKey, statusFilter]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [filter, pageSize, query, sortKey, statusFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredDevices.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const pageStartIndex = (safePage - 1) * pageSize;
-  const paginatedDevices = filteredDevices.slice(pageStartIndex, pageStartIndex + pageSize);
+  const paginatedDevices = devices;
   const shouldVirtualizeDeviceTable = paginatedDevices.length > 80;
   const deviceTableViewportHeight = shouldVirtualizeDeviceTable
     ? Math.min(DEVICE_TABLE_MAX_HEIGHT, paginatedDevices.length * DEVICE_TABLE_ROW_HEIGHT)
@@ -518,8 +509,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const deviceTableBottomSpacerHeight = shouldVirtualizeDeviceTable
     ? Math.max(0, (paginatedDevices.length - deviceTableStartIndex - visibleTableDevices.length) * DEVICE_TABLE_ROW_HEIGHT)
     : 0;
-  const pageStart = filteredDevices.length === 0 ? 0 : pageStartIndex + 1;
-  const pageEnd = Math.min(filteredDevices.length, pageStartIndex + pageSize);
+  const pageStart = totalDevices === 0 ? 0 : pageStartIndex + 1;
+  const pageEnd = Math.min(totalDevices, pageStartIndex + devices.length);
 
   useEffect(() => {
     setDeviceTableScrollTop(0);
@@ -531,12 +522,12 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     return orderedFilters.map((status) => ({
       status,
       count: status === 'All'
-        ? devices.length
+        ? totalDevices
         : status === 'Unassigned'
           ? devices.filter((device) => !device.assignedTo).length
           : devices.filter((device) => device.status === status).length,
     }));
-  }, [devices]);
+  }, [devices, totalDevices]);
 
   const saveDevice = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -641,12 +632,20 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     }
   };
 
-  const findScannedDevice = (value: string) => devices.find((device) => deviceMatchesScan(device, value));
+  const findScannedDevice = async (value: string) => {
+    const localMatch = devices.find((device) => deviceMatchesScan(device, value));
+    if (localMatch) {
+      return localMatch;
+    }
+
+    const response = await deviceService.getAll({ q: value, page: 1, pageSize: 5 });
+    return response.data.data.find((device) => deviceMatchesScan(device, value)) || null;
+  };
 
   const handleScannerSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const scannedDevice = findScannedDevice(scanValue);
+    const scannedDevice = await findScannedDevice(scanValue);
     if (!scannedDevice) {
       setScanFeedback('No device matched that scan. Try asset tag, serial, IMEI, ICCID, radio ID, hostname, router ID, or phone number.');
       return;
@@ -727,14 +726,14 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       'condition',
       'notes',
     ];
-    const rows = filteredDevices.map((device) =>
+    const rows = devices.map((device) =>
       headers.map((header) => escapeCsv(header === 'iccid' ? device.simNumber : device[header as keyof DeviceRecord])).join(','),
     );
     const blob = new Blob([[headers.join(','), ...rows].join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'shield-device-inventory.csv';
+    link.download = `shield-device-inventory-page-${safePage}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -822,7 +821,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="rounded bg-accent/10 px-4 py-2 text-sm font-bold text-accent">
-            {devices.length} total devices
+            {totalDevices} total devices
           </div>
         </div>
       </div>
@@ -915,16 +914,16 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           )}
 
           <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <select value={filter} onChange={(event) => setFilter(event.target.value as DeviceType | 'All')} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
+            <select value={filter} onChange={(event) => { setPage(1); setFilter(event.target.value as DeviceType | 'All'); }} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
               <option>All</option>
               {deviceTypes.map((type) => <option key={type}>{type}</option>)}
             </select>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as DeviceStatusFilter)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
+            <select value={statusFilter} onChange={(event) => { setPage(1); setStatusFilter(event.target.value as DeviceStatusFilter); }} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
               <option>All</option>
               <option>Unassigned</option>
               {deviceStatuses.map((status) => <option key={status}>{status}</option>)}
             </select>
-            <select value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
+            <select value={sortKey} onChange={(event) => { setPage(1); setSortKey(event.target.value as SortKey); }} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
               <option value="assetTag">Asset Tag</option>
               <option value="type">Type</option>
               <option value="status">Status</option>
@@ -932,7 +931,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               <option value="maintenanceDueDate">Maintenance Due</option>
               <option value="replacementDueDate">Replacement Due</option>
             </select>
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search inventory" className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
+            <input value={query} onChange={(event) => { setPage(1); setQuery(event.target.value); }} placeholder="Search inventory" className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
           </div>
         </div>
 
@@ -945,16 +944,18 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           </div>
         )}
 
-        {filteredDevices.length === 0 ? (
+        {devices.length === 0 ? (
           <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No devices match this view.</div>
         ) : (
           <>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-gray-950">
-            <span className="text-gray-500 dark:text-gray-400">Showing {pageStart}-{pageEnd} of {filteredDevices.length}</span>
+            <span className="text-gray-500 dark:text-gray-400">
+              Showing {pageStart}-{pageEnd} of {totalDevices}{isFiltering ? ' - Updating...' : ''}
+            </span>
             <div className="flex flex-wrap items-center gap-2">
               <select
                 value={pageSize}
-                onChange={(event) => setPageSize(Number(event.target.value))}
+                onChange={(event) => { setPage(1); setPageSize(Number(event.target.value)); }}
                 className="rounded border border-gray-300 bg-white px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
                 aria-label="Devices per page"
               >
@@ -1091,9 +1092,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               <span>Add Device</span>
             </button>
           )}
-          <button type="button" onClick={exportCsv} className="btn-secondary" title="Export CSV" aria-label="Export CSV">
+          <button type="button" onClick={exportCsv} className="btn-secondary" title="Export current page" aria-label="Export current page">
             <Download size={16} />
-            <span>Export</span>
+            <span>Export Page</span>
           </button>
           {canManageDevices && (
             <label className="btn-secondary cursor-pointer" title="Import CSV" aria-label="Import CSV">
@@ -1234,7 +1235,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             { label: 'Refresh Inventory', icon: RefreshCw, onSelect: () => void loadDevices(false), disabled: !canManageDevices },
             { label: 'Add Device', icon: Plus, onSelect: openAddDeviceModal, disabled: !canManageDevices },
             { label: 'Scan With Camera', icon: Camera, onSelect: () => void startCameraScanner(), disabled: !canManageDevices },
-            { label: 'Export CSV', icon: Download, onSelect: exportCsv, disabled: filteredDevices.length === 0 },
+            { label: 'Export Page', icon: Download, onSelect: exportCsv, disabled: devices.length === 0 },
             { label: 'Clear Filters', icon: X, onSelect: clearDeviceView },
           ]}
         />

@@ -133,8 +133,19 @@ export class DeviceController {
   static async listDevices(req: Request, res: Response) {
     try {
       const pagination = parsePagination(req.query, { defaultPageSize: 250, maxPageSize: 500 });
-      const devices = await DeviceModel.listDevices(pagination.pageSize, pagination.offset);
-      res.json(devices);
+      const result = await DeviceModel.listDevices(pagination.pageSize, pagination.offset, {
+        q: cleanString(req.query.q, 150),
+        type: cleanString(req.query.type, 50),
+        status: cleanString(req.query.status, 50),
+        sortKey: cleanString(req.query.sortKey, 50),
+      });
+      res.json({
+        data: result.data,
+        total: result.total,
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        totalPages: Math.max(1, Math.ceil(result.total / pagination.pageSize)),
+      });
     } catch (error) {
       console.error('Device list error:', error);
       res.status(500).json({ error: 'Failed to load devices' });
