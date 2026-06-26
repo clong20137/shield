@@ -1,5 +1,5 @@
 import { CSSProperties, FormEvent, ReactNode, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, BarChart3, Bell, Bug, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Download, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Minus, RefreshCw, Save, Search, Settings, Shield, UserCircle, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Bug, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Download, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Minus, Moon, RefreshCw, Save, Search, Settings, Shield, Sun, UserCircle, X } from 'lucide-react';
 import { BrowserRouter as Router, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
@@ -5969,6 +5969,25 @@ function App() {
                 <span>Search Users</span>
               </button>
               <div className="mx-2 my-1 border-t border-gray-200 dark:border-gray-700" />
+              <button
+                type="button"
+                onMouseDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  handleGlassThemeChange(!isGlassTheme);
+                }}
+                className="group flex w-full items-center justify-between rounded-lg px-2.5 py-2.5 text-sm transition hover:bg-black/5 dark:hover:bg-white/10"
+              >
+                <span className="flex items-center gap-2 font-semibold text-gray-700 dark:text-gray-100">
+                  {isGlassTheme ? <Sun size={15} /> : <Moon size={15} />}
+                  <span>Glass Mode</span>
+                </span>
+                <span className={`flex h-5 w-10 items-center rounded-full p-0.5 transition ${isGlassTheme ? 'justify-end bg-accent' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                  <span className="h-4 w-4 rounded-full bg-white shadow-sm" />
+                </span>
+              </button>
+              <div className="mx-2 my-1 border-t border-gray-200 dark:border-gray-700" />
               <div className="flex items-center justify-between gap-3 rounded-lg px-2.5 py-2.5">
                 <span className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-gray-700 dark:text-gray-100">
                   <Settings size={15} />
@@ -6174,6 +6193,17 @@ function App() {
                     unreadCount={messageUnreadCount}
                     onOpenMessages={toggleMessagesModal}
                   />
+                </IconButtonTooltip>
+                <IconButtonTooltip label={theme === 'light' ? 'Dark Mode' : 'Light Mode'}>
+                  <button
+                    data-onboarding-control="theme"
+                    type="button"
+                    onClick={() => handleThemeChange(theme === 'light' ? 'dark' : 'light')}
+                    className="header-action-button flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                    aria-label="Change theme"
+                  >
+                    {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+                  </button>
                 </IconButtonTooltip>
                 <div ref={accountMenuRef} className="relative">
                 <IconButtonTooltip label="Settings">
