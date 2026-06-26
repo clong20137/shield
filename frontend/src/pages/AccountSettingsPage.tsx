@@ -141,8 +141,12 @@ export function AccountSettingsPage({
   const assignedDevicesRefreshTimerRef = useRef<number | null>(null);
   const onToastRef = useRef(onToast);
   const getErrorMessageRef = useRef(getErrorMessage);
+  const hasAccountPermission = (permission: string) => account.role === 'administrator' || Boolean(account.permissions?.includes(permission));
   const canChangeCalendarPreference = account.role === 'administrator' || Boolean(account.permissions?.includes('calendar:manage'));
   const canUseIncognitoMode = account.role === 'administrator' || Boolean(account.permissions?.includes('presence:incognito'));
+  const canChangeReceiveMessages = hasAccountPermission('messages:receive');
+  const canChangeStartWithWindows = hasAccountPermission('desktop:start-with-windows');
+  const canChangeTrayMode = hasAccountPermission('desktop:minimize-to-tray');
 
   useEffect(() => {
     onToastRef.current = onToast;
@@ -930,6 +934,8 @@ export function AccountSettingsPage({
               title="Receive messages"
               description="Show message badges and message notifications."
               checked={messagePreferences.receiveMessages}
+              disabled={!canChangeReceiveMessages}
+              disabledReason="Permission required to change message receiving."
               onChange={onReceiveMessagesChange}
             />
             <PreferenceToggle
@@ -1061,6 +1067,8 @@ export function AccountSettingsPage({
                       title="Start with Windows"
                       description="Launch the app automatically when you sign in to this workstation."
                       checked={desktopPreferences.startWithWindows}
+                      disabled={!canChangeStartWithWindows}
+                      disabledReason="Permission required to change startup behavior."
                       onChange={onStartWithWindowsChange}
                       icon={<Power size={16} />}
                     />
@@ -1068,6 +1076,8 @@ export function AccountSettingsPage({
                       title="Minimize to system tray"
                       description="Keep the app running in the tray when the desktop window is closed."
                       checked={desktopPreferences.trayMode}
+                      disabled={!canChangeTrayMode}
+                      disabledReason="Permission required to change tray behavior."
                       onChange={onTrayModeChange}
                       icon={<Laptop size={16} />}
                     />
@@ -1306,6 +1316,7 @@ function PreferenceToggle({
   description,
   checked,
   disabled = false,
+  disabledReason,
   icon,
   onChange,
 }: {
@@ -1313,16 +1324,18 @@ function PreferenceToggle({
   description: string;
   checked: boolean;
   disabled?: boolean;
+  disabledReason?: string;
   icon?: ReactNode;
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800">
+    <label className={`flex items-center justify-between gap-4 rounded border border-gray-200 p-4 dark:border-gray-800 ${disabled ? 'opacity-70' : ''}`}>
       <span className="flex min-w-0 items-start gap-3">
         {icon && <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded bg-accent/10 text-accent">{icon}</span>}
         <span className="min-w-0">
           <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">{title}</span>
           <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">{description}</span>
+          {disabled && disabledReason && <span className="mt-1 block text-xs font-bold text-gray-400 dark:text-gray-500">{disabledReason}</span>}
         </span>
       </span>
       <input

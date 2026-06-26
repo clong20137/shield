@@ -38,7 +38,10 @@ const allowedPermissions = [
   'reports:cpar',
   'audit:view',
   'roles:manage',
+  'messages:receive',
   'messages:send',
+  'desktop:start-with-windows',
+  'desktop:minimize-to-tray',
   'alerts:send',
   'dashboard:manage',
   'dashboard:create',
@@ -1852,6 +1855,13 @@ export class AuthController {
 
       if (typeof receiveMessages !== 'boolean') {
         return res.status(400).json({ error: 'Message preference is required' });
+      }
+
+      if (sessionAccount.role !== 'administrator') {
+        const permissions = await AuthAccountModel.getPermissionsForAccount(sessionAccount.id);
+        if (!permissions.includes('messages:receive')) {
+          return res.status(403).json({ error: 'Receive messages permission required' });
+        }
       }
 
       const account = await AuthAccountModel.updateMessagePreferences(accountId, receiveMessages);

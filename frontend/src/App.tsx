@@ -3719,6 +3719,11 @@ function App() {
   }, []);
 
   const handleStartWithWindowsChange = async (startWithWindows: boolean) => {
+    if (!hasPermission('desktop:start-with-windows')) {
+      showToast('error', 'You do not have permission to change startup behavior.', { saveToNotifications: false });
+      return;
+    }
+
     if (!hasShieldDesktopFeature('setStartWithWindows')) {
       return;
     }
@@ -3736,6 +3741,11 @@ function App() {
   };
 
   const handleTrayModeChange = async (trayMode: boolean) => {
+    if (!hasPermission('desktop:minimize-to-tray')) {
+      showToast('error', 'You do not have permission to change tray behavior.', { saveToNotifications: false });
+      return;
+    }
+
     if (!hasShieldDesktopFeature('setTrayMode')) {
       return;
     }
@@ -4863,7 +4873,10 @@ function App() {
   };
 
   const isAdministrator = currentUser?.role === 'administrator';
-  const hasPermission = (permission: string) => Boolean(isAdministrator || currentUser?.permissions?.includes(permission));
+  function hasPermission(permission: string) {
+    return Boolean(isAdministrator || currentUser?.permissions?.includes(permission));
+  }
+
   const showCalendar = Boolean(currentUser);
   const canOpenAdminConsole = Boolean(currentUser && (
     isAdministrator ||
@@ -5313,6 +5326,11 @@ function App() {
   };
 
   const handleReceiveMessagesChange = async (receiveMessages: boolean) => {
+    if (!hasPermission('messages:receive')) {
+      showToast('error', 'You do not have permission to change message receiving.', { saveToNotifications: false });
+      return;
+    }
+
     const previousPreferences = messagePreferences;
     setMessagePreferences((preferences) => ({
       ...preferences,
