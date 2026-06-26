@@ -541,14 +541,10 @@ export function AccountSettingsPage({
           <div className="flex min-w-0 flex-col items-center gap-3 text-center sm:flex-row sm:gap-4 sm:text-left">
             <button
               type="button"
-              onClick={() => {
-                if (canChangeOwnProfilePicture) {
-                  setIsProfileMediaPickerOpen(true);
-                }
-              }}
-              className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white text-accent dark:border-gray-700 dark:bg-gray-900"
-              aria-label="Choose profile picture from media library"
-              title={canChangeOwnProfilePicture ? 'Choose from media library' : 'Profile picture changes are disabled for your account'}
+              onClick={() => setIsProfileMediaPickerOpen(true)}
+              className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white text-accent dark:border-gray-700 dark:bg-gray-900 ${canChangeOwnProfilePicture ? 'group' : 'pointer-events-none'}`}
+              aria-label={canChangeOwnProfilePicture ? 'Choose profile picture from media library' : 'Profile picture'}
+              title={canChangeOwnProfilePicture ? 'Choose from media library' : 'Profile picture'}
               disabled={isProfilePictureSaving || !canChangeOwnProfilePicture}
             >
               {account.profilePictureUrl ? (
@@ -563,34 +559,37 @@ export function AccountSettingsPage({
                   {getAccountInitials(account) || <UserCircle size={28} />}
                 </span>
               )}
-              <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-white opacity-0 transition group-hover:opacity-100">
-                <Image size={18} />
-              </span>
+              {canChangeOwnProfilePicture && (
+                <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-white opacity-0 transition group-hover:opacity-100">
+                  <Image size={18} />
+                </span>
+              )}
             </button>
-            <input
-              ref={profilePictureInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleProfilePictureChange}
-            />
+            {canChangeOwnProfilePicture && (
+              <input
+                ref={profilePictureInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleProfilePictureChange}
+              />
+            )}
             <div className="min-w-0">
               <h3 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">{account.displayName}</h3>
               <p className="truncate text-sm text-gray-500 dark:text-gray-400">
                 {isProfilePictureSaving ? 'Updating profile picture...' : account.email}
               </p>
-              <div className="mt-2 flex flex-wrap justify-center gap-2 sm:justify-start">
-                <button type="button" onClick={() => setIsProfileMediaPickerOpen(true)} className="btn-secondary py-1.5 text-xs" disabled={isProfilePictureSaving || !canChangeOwnProfilePicture} title={canChangeOwnProfilePicture ? 'Choose from media library' : 'Profile picture changes are disabled for your account'}>
-                  <Image size={14} />
-                  Media Library
-                </button>
-                <button type="button" onClick={() => profilePictureInputRef.current?.click()} className="btn-secondary py-1.5 text-xs" disabled={isProfilePictureSaving || !canChangeOwnProfilePicture} title={canChangeOwnProfilePicture ? 'Upload profile picture' : 'Profile picture changes are disabled for your account'}>
-                  <Camera size={14} />
-                  Upload
-                </button>
-              </div>
-              {!canChangeOwnProfilePicture && (
-                <p className="mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400">Profile picture changes are disabled for your account.</p>
+              {canChangeOwnProfilePicture && (
+                <div className="mt-2 flex flex-wrap justify-center gap-2 sm:justify-start">
+                  <button type="button" onClick={() => setIsProfileMediaPickerOpen(true)} className="btn-secondary py-1.5 text-xs" disabled={isProfilePictureSaving} title="Choose from media library">
+                    <Image size={14} />
+                    Media Library
+                  </button>
+                  <button type="button" onClick={() => profilePictureInputRef.current?.click()} className="btn-secondary py-1.5 text-xs" disabled={isProfilePictureSaving} title="Upload profile picture">
+                    <Camera size={14} />
+                    Upload
+                  </button>
+                </div>
               )}
             </div>
           </div>
