@@ -5,6 +5,7 @@ import { Camera, ChevronDown, Download, ExternalLink, EyeOff, Image, KeyRound, L
 import { AuthAccount, AuthSession, DeviceRecord, MediaLibraryItem, NotificationSound, TwoFactorSetupResponse, authService, deviceService, getAssetUrl, handleAssetImageError, performanceEvaluationService, userService } from '../services/api';
 import { ProfilePictureMediaPicker } from '../components/ProfilePictureMediaPicker';
 import { downloadPerformanceEvaluationPdf } from '../utils/performanceEvaluationPdf';
+import { getSeasonalThemeOption, SEASONAL_THEME_OPTIONS, type EffectiveSeasonalTheme, type SeasonalThemePreference } from '../theme/seasonalThemes';
 
 const appBasePath = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
 const desktopInstallerUrl = `${appBasePath}/downloads/Shield-Setup.exe`;
@@ -26,6 +27,8 @@ interface AccountSettingsPageProps {
   };
   appTheme: AppTheme;
   isGlassTheme: boolean;
+  seasonalTheme: SeasonalThemePreference;
+  activeSeasonalTheme: EffectiveSeasonalTheme;
   isDesktopApp: boolean;
   desktopPreferences: ShieldDesktopPreferences | null;
   desktopUpdateStatus: ShieldDesktopUpdateStatus | null;
@@ -47,6 +50,7 @@ interface AccountSettingsPageProps {
   onDefaultDutyHoursChange: (defaultDutyHours: string) => void;
   onAppThemeChange: (theme: AppTheme) => void;
   onGlassThemeChange: (isGlassTheme: boolean) => void;
+  onSeasonalThemeChange: (seasonalTheme: SeasonalThemePreference) => void;
   onStartWithWindowsChange: (startWithWindows: boolean) => void;
   onTrayModeChange: (trayMode: boolean) => void;
   onCheckForDesktopUpdates: () => void;
@@ -83,6 +87,8 @@ export function AccountSettingsPage({
   messagePreferences,
   appTheme,
   isGlassTheme,
+  seasonalTheme,
+  activeSeasonalTheme,
   isDesktopApp,
   desktopPreferences,
   desktopUpdateStatus,
@@ -104,6 +110,7 @@ export function AccountSettingsPage({
   onDefaultDutyHoursChange,
   onAppThemeChange,
   onGlassThemeChange,
+  onSeasonalThemeChange,
   onStartWithWindowsChange,
   onTrayModeChange,
   onCheckForDesktopUpdates,
@@ -147,6 +154,7 @@ export function AccountSettingsPage({
   const canChangeReceiveMessages = hasAccountPermission('messages:receive');
   const canChangeStartWithWindows = hasAccountPermission('desktop:start-with-windows');
   const canChangeTrayMode = hasAccountPermission('desktop:minimize-to-tray');
+  const activeSeasonalThemeLabel = getSeasonalThemeOption(activeSeasonalTheme).label;
 
   useEffect(() => {
     onToastRef.current = onToast;
@@ -927,6 +935,38 @@ export function AccountSettingsPage({
               checked={isGlassTheme}
               onChange={onGlassThemeChange}
             />
+            <div className="rounded border border-gray-200 p-4 dark:border-gray-800">
+              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Seasonal theme</span>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                Accent the app for holidays and seasons. Auto is currently using {activeSeasonalThemeLabel}.
+              </span>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {SEASONAL_THEME_OPTIONS.map((themeOption) => {
+                  const isSelected = seasonalTheme === themeOption.id;
+                  return (
+                    <button
+                      key={themeOption.id}
+                      type="button"
+                      onClick={() => onSeasonalThemeChange(themeOption.id)}
+                      className={`rounded border px-3 py-3 text-left transition ${
+                        isSelected
+                          ? 'border-accent bg-accent/10 text-accent'
+                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-accent dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200'
+                      }`}
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate text-sm font-black">{themeOption.label}</span>
+                        <span className="flex shrink-0 overflow-hidden rounded-full border border-white/60 shadow-sm dark:border-gray-700">
+                          <span className="h-4 w-4" style={{ backgroundColor: themeOption.primary || '#1a365d' }} />
+                          <span className="h-4 w-4" style={{ backgroundColor: themeOption.secondary || '#9C865C' }} />
+                        </span>
+                      </span>
+                      <span className="mt-1 block text-xs font-semibold opacity-75">{themeOption.description}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </PreferenceGroup>
 
           <PreferenceGroup title="Messaging" description="Control message availability, alerts, and sounds.">

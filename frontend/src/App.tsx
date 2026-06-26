@@ -11,6 +11,7 @@ import { FirstLoginGuide, WelcomeSplash } from './components/OnboardingGuide';
 import { BugTrackerModal } from './components/BugTrackerModal';
 import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, CalendarEntryPayload, calendarService, clearAuthToken, CompleteSetupPayload, errorLogService, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, notificationSoundService, NotificationSound, reminderService, RegistrationSettings, Reminder, SetupEnvironmentValues, SetupStatus, urgentAlertService, UrgentAlert, UserNotification, userService, User } from './services/api';
 import { useUnreadCounts } from './hooks/useUnreadCounts';
+import { getEffectiveSeasonalTheme, getSeasonalThemeOption, normalizeSeasonalTheme, SEASONAL_THEME_CLASSES, type SeasonalThemePreference } from './theme/seasonalThemes';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
@@ -30,6 +31,7 @@ const CalculatorModal = lazy(() => import('./components/app/CalculatorModal').th
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
 const GLASS_THEME_KEY = 'shield_glass_theme';
+const SEASONAL_THEME_KEY = 'shield_seasonal_theme';
 const MESSAGE_PREFERENCES_KEY = 'shield_message_preferences';
 const MILITARY_TIME_DEFAULT_APPLIED_KEY = 'shield_military_time_default_applied';
 const RECENT_CONVERSATIONS_DEFAULT_APPLIED_KEY = 'shield_recent_conversations_default_applied';
@@ -3121,6 +3123,13 @@ function App() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [theme, setTheme] = useState<AppTheme>('light');
   const [isGlassTheme, setIsGlassTheme] = useState(false);
+  const [seasonalTheme, setSeasonalTheme] = useState<SeasonalThemePreference>(() => {
+    try {
+      return normalizeSeasonalTheme(window.localStorage.getItem(SEASONAL_THEME_KEY));
+    } catch {
+      return 'auto';
+    }
+  });
   const [globalContextMenu, setGlobalContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [notifications, setNotifications] = useState<ToastMessage[]>([]);
   const [desktopPreferences, setDesktopPreferences] = useState<ShieldDesktopPreferences | null>(null);
@@ -3155,6 +3164,8 @@ function App() {
   const brandLogoDataUrl = setupStatus?.brandLogoDataUrl || '';
   const primaryColor = setupStatus?.primaryColor || DEFAULT_PRIMARY_COLOR;
   const secondaryColor = setupStatus?.secondaryColor || DEFAULT_SECONDARY_COLOR;
+  const activeSeasonalTheme = useMemo(() => getEffectiveSeasonalTheme(seasonalTheme), [seasonalTheme]);
+  const activeSeasonalThemeOption = useMemo(() => getSeasonalThemeOption(activeSeasonalTheme), [activeSeasonalTheme]);
   const [isApiConnectionLost, setIsApiConnectionLost] = useState(false);
   const [lastApiConnectedAt, setLastApiConnectedAt] = useState<number | null>(Date.now());
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -3337,9 +3348,9 @@ function App() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.style.setProperty('--app-primary', primaryColor);
-    document.documentElement.style.setProperty('--app-secondary', secondaryColor);
-  }, [primaryColor, secondaryColor]);
+    document.documentElement.style.setProperty('--app-primary', activeSeasonalThemeOption.primary || primaryColor);
+    document.documentElement.style.setProperty('--app-secondary', activeSeasonalThemeOption.secondary || secondaryColor);
+  }, [activeSeasonalThemeOption.primary, activeSeasonalThemeOption.secondary, primaryColor, secondaryColor]);
 
   useEffect(() => {
     if (!isAuthenticated || !currentUser || currentUser.presenceHidden) {
@@ -4303,6 +4314,14 @@ function App() {
     window.localStorage.setItem(THEME_KEY, theme);
     window.localStorage.setItem(GLASS_THEME_KEY, String(isGlassTheme));
   }, [isGlassTheme, theme]);
+
+  useEffect(() => {
+    document.documentElement.classList.remove(...SEASONAL_THEME_CLASSES);
+    if (activeSeasonalTheme !== 'default') {
+      document.documentElement.classList.add(`seasonal-theme-${activeSeasonalTheme}`);
+    }
+    window.localStorage.setItem(SEASONAL_THEME_KEY, seasonalTheme);
+  }, [activeSeasonalTheme, seasonalTheme]);
 
   useEffect(() => {
     const appScale = normalizeAppScale(currentUser?.appScale);
@@ -6527,6 +6546,8 @@ function App() {
                       messagePreferences={messagePreferences}
                       appTheme={theme}
                       isGlassTheme={isGlassTheme}
+                      seasonalTheme={seasonalTheme}
+                      activeSeasonalTheme={activeSeasonalTheme}
                       isDesktopApp={isShieldDesktopApp()}
                       desktopPreferences={desktopPreferences}
                       desktopUpdateStatus={desktopUpdateStatus}
@@ -6588,6 +6609,7 @@ function App() {
                       onDefaultDutyHoursChange={handleDefaultDutyHoursChange}
                       onAppThemeChange={setTheme}
                       onGlassThemeChange={setIsGlassTheme}
+                      onSeasonalThemeChange={setSeasonalTheme}
                       onStartWithWindowsChange={handleStartWithWindowsChange}
                       onTrayModeChange={handleTrayModeChange}
                       onCheckForDesktopUpdates={handleCheckForDesktopUpdates}

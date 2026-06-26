@@ -946,6 +946,94 @@
     color: rgb(17, 24, 39);
   }
 
+  html.seasonal-theme-christmas {
+    --seasonal-bg-light: linear-gradient(135deg, #f8fbf7 0%, #eef7ef 45%, #fff5f5 100%);
+    --seasonal-bg-dark: linear-gradient(135deg, #06160d 0%, #10251a 48%, #2a1014 100%);
+    --seasonal-panel-tint: rgba(20, 83, 45, 0.08);
+    --seasonal-border: rgba(185, 28, 28, 0.22);
+  }
+
+  html.seasonal-theme-summer {
+    --seasonal-bg-light: linear-gradient(135deg, #f0f9ff 0%, #ecfeff 48%, #fff7ed 100%);
+    --seasonal-bg-dark: linear-gradient(135deg, #082f49 0%, #164e63 48%, #422006 100%);
+    --seasonal-panel-tint: rgba(245, 158, 11, 0.1);
+    --seasonal-border: rgba(3, 105, 161, 0.24);
+  }
+
+  html.seasonal-theme-thanksgiving {
+    --seasonal-bg-light: linear-gradient(135deg, #fff7ed 0%, #fef3c7 48%, #ffedd5 100%);
+    --seasonal-bg-dark: linear-gradient(135deg, #1c1007 0%, #431407 48%, #3b1d08 100%);
+    --seasonal-panel-tint: rgba(194, 65, 12, 0.1);
+    --seasonal-border: rgba(120, 53, 15, 0.25);
+  }
+
+  html.seasonal-theme-fall {
+    --seasonal-bg-light: linear-gradient(135deg, #f7fee7 0%, #fff7ed 45%, #fef3c7 100%);
+    --seasonal-bg-dark: linear-gradient(135deg, #101907 0%, #2a1806 48%, #422006 100%);
+    --seasonal-panel-tint: rgba(180, 83, 9, 0.1);
+    --seasonal-border: rgba(54, 83, 20, 0.25);
+  }
+
+  html.seasonal-theme-spring {
+    --seasonal-bg-light: linear-gradient(135deg, #ecfdf5 0%, #fdf2f8 50%, #eff6ff 100%);
+    --seasonal-bg-dark: linear-gradient(135deg, #052e22 0%, #18230d 48%, #3b1130 100%);
+    --seasonal-panel-tint: rgba(219, 39, 119, 0.08);
+    --seasonal-border: rgba(4, 120, 87, 0.24);
+  }
+
+  html.seasonal-theme-winter {
+    --seasonal-bg-light: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 48%, #eef2ff 100%);
+    --seasonal-bg-dark: linear-gradient(135deg, #061021 0%, #0f3460 48%, #082f49 100%);
+    --seasonal-panel-tint: rgba(56, 189, 248, 0.08);
+    --seasonal-border: rgba(56, 189, 248, 0.24);
+  }
+
+  html.seasonal-theme-patriotic {
+    --seasonal-bg-light: linear-gradient(135deg, #eff6ff 0%, #f8fafc 48%, #fef2f2 100%);
+    --seasonal-bg-dark: linear-gradient(135deg, #07153c 0%, #111827 48%, #3f0b0b 100%);
+    --seasonal-panel-tint: rgba(220, 38, 38, 0.08);
+    --seasonal-border: rgba(30, 58, 138, 0.24);
+  }
+
+  html[class*='seasonal-theme-']:not(.dark) body {
+    background: var(--seasonal-bg-light) !important;
+  }
+
+  html[class*='seasonal-theme-'].dark body,
+  html[class*='seasonal-theme-'].glass.dark body {
+    background: var(--seasonal-bg-dark) !important;
+  }
+
+  html[class*='seasonal-theme-']:not(.glass) .animate-app-enter {
+    background: color-mix(in srgb, var(--app-primary) 5%, rgb(249, 250, 251)) !important;
+  }
+
+  html[class*='seasonal-theme-'].dark:not(.glass) .animate-app-enter {
+    background: color-mix(in srgb, var(--app-primary) 18%, rgb(3, 7, 18)) !important;
+  }
+
+  html[class*='seasonal-theme-'] .theme-polished-surface,
+  html[class*='seasonal-theme-'] .quick-launch-context-menu,
+  html[class*='seasonal-theme-'] .recent-message-preview-pop {
+    border-color: var(--seasonal-border) !important;
+    box-shadow:
+      0 18px 52px rgba(15, 23, 42, 0.12),
+      inset 0 1px 0 color-mix(in srgb, var(--app-secondary) 16%, transparent) !important;
+  }
+
+  html[class*='seasonal-theme-']:not(.glass) .shield-left-panel {
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--app-primary) 90%, black), var(--app-primary) 54%, color-mix(in srgb, var(--app-secondary) 40%, var(--app-primary))) !important;
+  }
+
+  html[class*='seasonal-theme-']:not(.glass) section[class~='bg-white'],
+  html[class*='seasonal-theme-']:not(.glass) article[class~='bg-white'],
+  html[class*='seasonal-theme-']:not(.glass) aside[class~='bg-white'],
+  html[class*='seasonal-theme-']:not(.glass) form[class~='bg-white'] {
+    border-color: var(--seasonal-border) !important;
+    background-image: linear-gradient(135deg, var(--seasonal-panel-tint), transparent 42%);
+  }
+
   html.glass body::before {
     content: '';
     position: fixed;
