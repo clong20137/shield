@@ -1,4 +1,4 @@
-import { ClipboardEvent, DragEvent, FormEvent, KeyboardEvent, MouseEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { ClipboardEvent, DragEvent, FormEvent, KeyboardEvent, MouseEvent, lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Building2, Check, CheckCheck, Download, Image as ImageIcon, Pencil, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Save, Send, Trash2, Users, X } from 'lucide-react';
 import type { EmojiClickData } from 'emoji-picker-react';
@@ -1662,13 +1662,19 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     });
   }, [memberDirectory, selectedThread]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!autoScrollToNewestRef.current || displayedMessages.length === 0) {
       return;
     }
 
-    latestMessageRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
-  }, [selectedThreadId, displayedMessages.length]);
+    const container = threadMessageContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    container.scrollTop = container.scrollHeight;
+    setThreadMessageScrollTop(container.scrollTop);
+  }, [selectedThreadId, displayedMessages.length, virtualDisplayedMessages.endIndex]);
 
   useEffect(() => {
     if (!selectedThread) {
