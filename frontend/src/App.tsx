@@ -2271,17 +2271,17 @@ function RecentMessageReplyPopover({
   return (
     <form
       onSubmit={sendReply}
-      className={`recent-message-preview-pop recent-message-preview-pop--arrow recent-message-preview-pop--modern absolute right-14 z-30 w-80 rounded-2xl p-3 text-left shadow-[0_22px_55px_rgba(15,23,42,0.28)] backdrop-blur-xl transition duration-500 ${sendState === 'closing' ? 'translate-x-2 scale-95 opacity-0' : 'translate-x-0 scale-100 opacity-100'}`}
+      className={`recent-message-preview-pop recent-message-preview-pop--arrow recent-message-preview-pop--modern absolute right-14 z-30 w-80 rounded-2xl text-left shadow-[0_22px_55px_rgba(15,23,42,0.28)] backdrop-blur-xl transition duration-500 ${sendState === 'closing' ? 'translate-x-2 scale-95 opacity-0' : 'translate-x-0 scale-100 opacity-100'} ${sendState === 'composing' ? 'p-3' : 'px-3 py-2'}`}
       aria-label="Quick reply"
     >
       {sendState !== 'composing' ? (
-        <div className="flex min-h-24 items-center justify-center gap-3 text-center">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-500 text-white shadow-lg shadow-green-900/20">
-            <CheckCircle2 size={22} />
+        <div className="flex items-center justify-center gap-2 text-center">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-500 text-white shadow-md shadow-green-900/20">
+            <CheckCircle2 size={18} />
           </span>
           <span>
             <span className="block text-sm font-black text-gray-900 dark:text-gray-100">Message Sent</span>
-            <span className="mt-0.5 block text-xs font-semibold text-gray-500 dark:text-gray-400">{conversation.title}</span>
+            <span className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400">{conversation.title}</span>
           </span>
         </div>
       ) : (
