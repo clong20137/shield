@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import type { EmojiClickData } from 'emoji-picker-react';
 import { Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Edit3, Eye, Flag, Heart, Image, LucideIcon, Megaphone, MessageSquare, PartyPopper, Pin, PinOff, Reply, Search, Send, ShieldCheck, Smile, ThumbsUp, Trash2, Upload, X } from 'lucide-react';
-import { RichPostEditor } from './DashboardPage';
+import { RichPostEditor } from '../components/RichPostEditor';
 import { UserDetail } from '../components/UserDetail';
 import { FormattedText } from '../components/FormattedText';
 import { MentionTextarea } from '../components/MentionTextarea';
