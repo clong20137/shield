@@ -578,11 +578,11 @@ function createShieldTrayIcon(count = desktopUnreadCount, status = desktopPresen
     drawPolygon(canvas, [[16, 10], [20, 12], [20, 15], [18.5, 19], [16, 21], [13.5, 19], [12, 15], [12, 12]], colorToRgba('#dc2626'));
     if (safeCount > 0) {
       const label = safeCount > 99 ? '99+' : String(safeCount);
-      drawRoundedRect(canvas, 1, 2, label.length > 2 ? 20 : 16, 11, 5, colorToRgba('#dc2626'));
-      drawPixelText(canvas, label, label.length > 2 ? 3 : 4, 4, 1, colorToRgba('#ffffff'));
+      drawRoundedRect(canvas, 0, 1, label.length > 2 ? 23 : 18, 13, 6, colorToRgba('#dc2626'));
+      drawPixelText(canvas, label, label.length > 2 ? 3 : 5, 5, 1, colorToRgba('#ffffff'));
     }
-    drawCircle(canvas, 25, 25, 6.7, colorToRgba('#ffffff'));
-    drawCircle(canvas, 25, 25, 4.9, presenceColor);
+    drawCircle(canvas, 24.5, 24.5, 7.5, colorToRgba('#ffffff'));
+    drawCircle(canvas, 24.5, 24.5, 5.7, presenceColor);
   });
 }
 
@@ -1114,15 +1114,15 @@ function createBadgeOverlay(count, status) {
   return createPngImage(64, 64, (canvas) => {
     if (safeCount > 0) {
       const label = safeCount > 99 ? '99+' : String(safeCount);
-      drawRoundedRect(canvas, 2, 9, label.length > 2 ? 44 : 36, 29, 14, colorToRgba('#dc2626'));
-      drawPixelText(canvas, label, label.length > 2 ? 9 : 12, 15, label.length > 2 ? 3 : 4, colorToRgba('#ffffff'));
-      drawCircle(canvas, 48, 48, 15, colorToRgba('#ffffff'));
-      drawCircle(canvas, 48, 48, 11, presenceColor);
+      drawRoundedRect(canvas, 1, 7, label.length > 2 ? 48 : 40, 32, 16, colorToRgba('#dc2626'));
+      drawPixelText(canvas, label, label.length > 2 ? 8 : 11, 15, label.length > 2 ? 3 : 4, colorToRgba('#ffffff'));
+      drawCircle(canvas, 47, 47, 17, colorToRgba('#ffffff'));
+      drawCircle(canvas, 47, 47, 13, presenceColor);
       return;
     }
 
-    drawCircle(canvas, 42, 42, 18, colorToRgba('#ffffff'));
-    drawCircle(canvas, 42, 42, 13, presenceColor);
+    drawCircle(canvas, 41, 41, 20, colorToRgba('#ffffff'));
+    drawCircle(canvas, 41, 41, 15, presenceColor);
   });
 }
 
