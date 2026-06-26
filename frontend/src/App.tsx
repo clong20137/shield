@@ -50,7 +50,7 @@ const DEFAULT_PRIMARY_COLOR = '#1a365d';
 const DEFAULT_SECONDARY_COLOR = '#9C865C';
 const DEFAULT_BRAND_LOGO = '/shield-splash-logo.png';
 const PATRIOTIC_BRAND_LOGO = '/theme-assets/america-250-logo.png';
-const THANKSGIVING_TURKEY_LOTTIE = '/theme-assets/cool-turkey.lottie';
+const THANKSGIVING_TURKEY_ANIMATION = '/theme-assets/cool-turkey.json';
 const MAX_SETUP_LOGO_SIZE_BYTES = 240 * 1024;
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/iu;
 const LOGIN_TRANSITION_MS = 560;
@@ -2398,7 +2398,7 @@ function ThanksgivingSidebarAnimation() {
   return (
     <div className="thanksgiving-sidebar-animation" aria-hidden="true">
       <dotlottie-player
-        src={withAppBase(THANKSGIVING_TURKEY_LOTTIE)}
+        src={withAppBase(THANKSGIVING_TURKEY_ANIMATION)}
         autoplay
         loop
         background="transparent"
