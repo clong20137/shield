@@ -144,7 +144,7 @@ export function AccountSettingsPage({
   const hasAccountPermission = (permission: string) => account.role === 'administrator' || Boolean(account.permissions?.includes(permission));
   const canChangeCalendarPreference = account.role === 'administrator' || Boolean(account.permissions?.includes('calendar:manage'));
   const canUseIncognitoMode = account.role === 'administrator' || Boolean(account.permissions?.includes('presence:incognito'));
-  const canChangeOwnProfilePicture = hasAccountPermission('account:profile-picture') || hasAccountPermission('users:profile-picture');
+  const canChangeOwnProfilePicture = hasAccountPermission('account:profile-picture');
   const canChangeReceiveMessages = hasAccountPermission('messages:receive');
   const canChangeStartWithWindows = hasAccountPermission('desktop:start-with-windows');
   const canChangeTrayMode = hasAccountPermission('desktop:minimize-to-tray');

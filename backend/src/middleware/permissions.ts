@@ -203,7 +203,7 @@ export function requireSelfPermissionOrPermission(
       const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
       const isSelfTarget = account.id === targetId;
       const hasRequiredPermission = isSelfTarget
-        ? permissions.includes(selfPermission) || permissions.includes(otherPermission)
+        ? permissions.includes(selfPermission)
         : permissions.includes(otherPermission);
 
       if (!hasRequiredPermission) {
@@ -215,7 +215,6 @@ export function requireSelfPermissionOrPermission(
           entityId: account.id,
           details: {
             permission: isSelfTarget ? selfPermission : otherPermission,
-            alternatePermission: isSelfTarget ? otherPermission : undefined,
             targetId,
             reason: 'permission_missing',
           },
