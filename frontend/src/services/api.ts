@@ -489,8 +489,6 @@ export interface RegistrationSettings {
 }
 
 export interface ThemeSettings {
-  theme: 'light' | 'dark';
-  isGlassTheme: boolean;
   seasonalTheme: 'auto' | 'default' | 'christmas' | 'summer' | 'thanksgiving' | 'fall' | 'spring' | 'winter' | 'patriotic';
 }
 

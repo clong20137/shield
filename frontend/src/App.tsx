@@ -239,18 +239,6 @@ function normalizeAppScale(value?: string | null): AppScale {
   return value === 'compact' || value === 'large' ? value : 'comfortable';
 }
 
-function normalizeThemeSetting(value: unknown): AppTheme {
-  return value === 'dark' ? 'dark' : 'light';
-}
-
-function normalizeThemeSettings(value: Partial<ThemeSettings>): ThemeSettings {
-  return {
-    theme: normalizeThemeSetting(value.theme),
-    isGlassTheme: value.isGlassTheme === true,
-    seasonalTheme: normalizeSeasonalTheme(value.seasonalTheme),
-  };
-}
-
 function normalizeDefaultDutyHours(value: unknown): string {
   const hours = Number(value);
   if (!Number.isFinite(hours)) {
@@ -3821,6 +3809,14 @@ function App() {
     }
   };
 
+  const handleThemeChange = (nextTheme: AppTheme) => {
+    setTheme(nextTheme);
+  };
+
+  const handleGlassThemeChange = (nextGlassTheme: boolean) => {
+    setIsGlassTheme(nextGlassTheme);
+  };
+
   const handleOpenDesktopDiagnostics = async () => {
     if (!hasShieldDesktopFeature('openDesktopLogs')) {
       showToast('info', `Install the latest ${appName} desktop app to access diagnostics logs.`, { saveToNotifications: false });
@@ -4385,10 +4381,7 @@ function App() {
   }, []);
 
   const applyThemeSettings = useCallback((settings: Partial<ThemeSettings>) => {
-    const normalizedSettings = normalizeThemeSettings(settings);
-    setTheme(normalizedSettings.theme);
-    setIsGlassTheme(normalizedSettings.isGlassTheme);
-    setSeasonalTheme(normalizedSettings.seasonalTheme);
+    setSeasonalTheme(normalizeSeasonalTheme(settings.seasonalTheme));
   }, []);
 
   const syncThemeSettings = useCallback(async () => {
@@ -5138,7 +5131,7 @@ function App() {
     eventSource.addEventListener('settings-updated', (event) => {
       try {
         const payload = JSON.parse((event as MessageEvent).data || '{}') as Partial<ThemeSettings>;
-        if (payload.theme || typeof payload.isGlassTheme === 'boolean' || payload.seasonalTheme) {
+        if (payload.seasonalTheme) {
           applyThemeSettings(payload);
         } else {
           void syncThemeSettings();
@@ -6590,6 +6583,8 @@ function App() {
                     <AccountSettingsPage
                       account={currentUser}
                       messagePreferences={messagePreferences}
+                      appTheme={theme}
+                      isGlassTheme={isGlassTheme}
                       isDesktopApp={isShieldDesktopApp()}
                       desktopPreferences={desktopPreferences}
                       desktopUpdateStatus={desktopUpdateStatus}
@@ -6649,6 +6644,8 @@ function App() {
                       onCalendarHiddenChange={handleCalendarHiddenChange}
                       onAppScaleChange={handleAppScaleChange}
                       onDefaultDutyHoursChange={handleDefaultDutyHoursChange}
+                      onAppThemeChange={handleThemeChange}
+                      onGlassThemeChange={handleGlassThemeChange}
                       onStartWithWindowsChange={handleStartWithWindowsChange}
                       onTrayModeChange={handleTrayModeChange}
                       onCheckForDesktopUpdates={handleCheckForDesktopUpdates}

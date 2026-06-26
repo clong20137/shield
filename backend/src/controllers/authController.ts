@@ -123,7 +123,6 @@ const DEFAULT_APP_NAME = 'Blueline';
 const DEFAULT_SITE_NAME = 'Blueline Workspace';
 const DEFAULT_PRIMARY_COLOR = '#1a365d';
 const DEFAULT_SECONDARY_COLOR = '#9C865C';
-const appThemes = ['light', 'dark'] as const;
 const seasonalThemes = ['auto', 'default', 'christmas', 'summer', 'thanksgiving', 'fall', 'spring', 'winter', 'patriotic'] as const;
 const setupFeatureKeys = [
   'dashboardWidgets',
@@ -156,11 +155,6 @@ function normalizeRegistrationMode(value: string): RegistrationMode {
   return registrationModes.includes(value as RegistrationMode) ? value as RegistrationMode : 'public';
 }
 
-function normalizeAppTheme(value: unknown): typeof appThemes[number] {
-  const cleanValue = cleanString(value, 20);
-  return appThemes.includes(cleanValue as typeof appThemes[number]) ? cleanValue as typeof appThemes[number] : 'light';
-}
-
 function normalizeSeasonalTheme(value: unknown): typeof seasonalThemes[number] {
   const cleanValue = cleanString(value, 40);
   return seasonalThemes.includes(cleanValue as typeof seasonalThemes[number]) ? cleanValue as typeof seasonalThemes[number] : 'auto';
@@ -168,8 +162,6 @@ function normalizeSeasonalTheme(value: unknown): typeof seasonalThemes[number] {
 
 async function getThemeSettingsPayload() {
   return {
-    theme: normalizeAppTheme(await SystemSettingModel.getString('theme', 'light')),
-    isGlassTheme: await SystemSettingModel.getString('isGlassTheme', 'false') === 'true',
     seasonalTheme: normalizeSeasonalTheme(await SystemSettingModel.getString('seasonalTheme', 'auto')),
   };
 }
@@ -1776,27 +1768,21 @@ export class AuthController {
         return res.status(403).json({ error: 'Administrator access required' });
       }
 
-      const { theme, isGlassTheme, seasonalTheme } = req.body as { theme?: unknown; isGlassTheme?: unknown; seasonalTheme?: unknown };
-      const cleanTheme = normalizeAppTheme(theme);
-      const cleanGlassTheme = isGlassTheme === true;
+      const { seasonalTheme } = req.body as { seasonalTheme?: unknown };
       const cleanSeasonalTheme = normalizeSeasonalTheme(seasonalTheme);
       const payload = {
-        theme: cleanTheme,
-        isGlassTheme: cleanGlassTheme,
         seasonalTheme: cleanSeasonalTheme,
       };
 
-      await SystemSettingModel.setString('theme', cleanTheme);
-      await SystemSettingModel.setString('isGlassTheme', cleanGlassTheme ? 'true' : 'false');
       await SystemSettingModel.setString('seasonalTheme', cleanSeasonalTheme);
 
       broadcastAppEvent({ type: 'settings-updated', ...payload });
       await AuditLogModel.create({
         actorId: account.id,
         actorName: account.displayName || account.email || null,
-        action: 'settings.theme_updated',
+        action: 'settings.seasonal_theme_updated',
         entityType: 'settings',
-        entityId: 'theme',
+        entityId: 'seasonalTheme',
         details: JSON.stringify(payload),
         ...requestAuditFields(req),
       });

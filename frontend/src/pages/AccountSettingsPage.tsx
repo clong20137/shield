@@ -8,6 +8,8 @@ import { downloadPerformanceEvaluationPdf } from '../utils/performanceEvaluation
 
 const appBasePath = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
 const desktopInstallerUrl = `${appBasePath}/downloads/Shield-Setup.exe`;
+type AppTheme = 'light' | 'dark';
+
 interface AccountSettingsPageProps {
   account: AuthAccount;
   messagePreferences: {
@@ -22,6 +24,8 @@ interface AccountSettingsPageProps {
     quickLaunchPlacement: 'dock' | 'sidebar';
     quickLaunchSlotCount: number;
   };
+  appTheme: AppTheme;
+  isGlassTheme: boolean;
   isDesktopApp: boolean;
   desktopPreferences: ShieldDesktopPreferences | null;
   desktopUpdateStatus: ShieldDesktopUpdateStatus | null;
@@ -41,6 +45,8 @@ interface AccountSettingsPageProps {
   onCalendarHiddenChange: (calendarHidden: boolean) => void;
   onAppScaleChange: (appScale: AuthAccount['appScale']) => void;
   onDefaultDutyHoursChange: (defaultDutyHours: string) => void;
+  onAppThemeChange: (theme: AppTheme) => void;
+  onGlassThemeChange: (isGlassTheme: boolean) => void;
   onStartWithWindowsChange: (startWithWindows: boolean) => void;
   onTrayModeChange: (trayMode: boolean) => void;
   onCheckForDesktopUpdates: () => void;
@@ -75,6 +81,8 @@ function isSecurePassword(password: string): boolean {
 export function AccountSettingsPage({
   account,
   messagePreferences,
+  appTheme,
+  isGlassTheme,
   isDesktopApp,
   desktopPreferences,
   desktopUpdateStatus,
@@ -94,6 +102,8 @@ export function AccountSettingsPage({
   onCalendarHiddenChange,
   onAppScaleChange,
   onDefaultDutyHoursChange,
+  onAppThemeChange,
+  onGlassThemeChange,
   onStartWithWindowsChange,
   onTrayModeChange,
   onCheckForDesktopUpdates,
@@ -885,6 +895,39 @@ export function AccountSettingsPage({
             <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Preferences</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Tune messaging, workspace layout, privacy, and guide options.</p>
           </div>
+
+          <PreferenceGroup title="Appearance" description="Choose how the workspace looks on this device. Seasonal accents are managed by admins.">
+            <div className="rounded border border-gray-200 p-4 dark:border-gray-800">
+              <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Base theme</span>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Choose the core light or dark workspace for your account on this device.</span>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {([
+                  ['light', 'Light', 'Clean bright workspace'],
+                  ['dark', 'Dark', 'Low-light workspace'],
+                ] as const).map(([themeValue, label, description]) => (
+                  <button
+                    key={themeValue}
+                    type="button"
+                    onClick={() => onAppThemeChange(themeValue)}
+                    className={`rounded border px-3 py-3 text-left transition ${
+                      appTheme === themeValue
+                        ? 'border-accent bg-accent/10 text-accent'
+                        : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-accent dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200'
+                    }`}
+                  >
+                    <span className="block text-sm font-black">{label}</span>
+                    <span className="mt-1 block text-xs font-semibold opacity-75">{description}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <PreferenceToggle
+              title="Glass mode"
+              description="Use translucent app surfaces with blur and depth in your selected light or dark theme."
+              checked={isGlassTheme}
+              onChange={onGlassThemeChange}
+            />
+          </PreferenceGroup>
 
           <PreferenceGroup title="Messaging" description="Control message availability, alerts, and sounds.">
             <PreferenceToggle

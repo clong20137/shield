@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ChevronLeft, ChevronRight, Mail, Moon, Pencil, Plus, Save, Search, ShieldCheck, ShieldAlert, Sparkles, Sun, X } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, Mail, Pencil, Plus, Save, Search, ShieldCheck, ShieldAlert, Sparkles, X } from 'lucide-react';
 import { AccessReviewResponse, AuthAccount, AuthInvite, AuthRole, RegistrationSettings, ThemeSettings, authService, reportService } from '../services/api';
 import { getEffectiveSeasonalTheme, getSeasonalThemeOption, SEASONAL_THEME_OPTIONS, type SeasonalThemePreference } from '../theme/seasonalThemes';
 
@@ -233,8 +233,6 @@ function PermissionsPage({
   const [latestInvite, setLatestInvite] = useState<AuthInvite | null>(null);
   const [isSavingRegistration, setIsSavingRegistration] = useState(false);
   const [themeSettings, setThemeSettings] = useState<ThemeSettings>({
-    theme: 'light',
-    isGlassTheme: false,
     seasonalTheme: 'auto',
   });
   const [isSavingTheme, setIsSavingTheme] = useState(false);
@@ -403,7 +401,7 @@ function PermissionsPage({
 
   const saveThemeSettings = async (nextSettings: ThemeSettings) => {
     if (account.role !== 'administrator') {
-      onToast('error', 'Only administrators can change the app theme.');
+      onToast('error', 'Only administrators can change the seasonal theme.');
       return;
     }
 
@@ -416,7 +414,7 @@ function PermissionsPage({
       const response = await authService.updateThemeSettings(nextSettings);
       setThemeSettings(response.data);
       window.dispatchEvent(new CustomEvent('shield:theme-settings-updated', { detail: response.data }));
-      onToast('success', 'Theme updated for everyone.');
+      onToast('success', 'Seasonal theme updated for everyone.');
     } catch (err) {
       setThemeSettings(previousSettings);
       const message = getErrorMessage(err, 'Failed to update theme settings.');
@@ -726,7 +724,7 @@ function PermissionsPage({
                 Theme Manager
               </h2>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Choose the global app theme. Changes update connected users automatically.
+                Choose the global seasonal theme. Changes update connected users automatically.
               </p>
             </div>
             <span className="rounded bg-white px-2.5 py-1 text-xs font-black uppercase tracking-[0.12em] text-gray-500 ring-1 ring-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-800">
@@ -734,52 +732,7 @@ function PermissionsPage({
             </span>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[260px_220px_minmax(0,280px)]">
-            <div>
-              <span className="mb-2 block text-sm font-bold text-gray-800 dark:text-gray-100">Base Theme</span>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { value: 'light' as const, label: 'Light', icon: Sun },
-                  { value: 'dark' as const, label: 'Dark', icon: Moon },
-                ].map((option) => {
-                  const Icon = option.icon;
-                  const isActive = themeSettings.theme === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      disabled={!canChangeTheme || isSavingTheme}
-                      onClick={() => void saveThemeSettings({ ...themeSettings, theme: option.value })}
-                      className={`flex items-center justify-center gap-2 rounded border px-3 py-2 text-sm font-bold transition ${
-                        isActive
-                          ? 'border-accent bg-accent text-white shadow-sm'
-                          : 'border-gray-200 bg-white text-gray-700 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                      } disabled:cursor-not-allowed disabled:opacity-60`}
-                    >
-                      <Icon size={16} />
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <span className="mb-2 block text-sm font-bold text-gray-800 dark:text-gray-100">Glass Mode</span>
-              <button
-                type="button"
-                disabled={!canChangeTheme || isSavingTheme}
-                onClick={() => void saveThemeSettings({ ...themeSettings, isGlassTheme: !themeSettings.isGlassTheme })}
-                className="flex w-full items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2 text-left text-sm font-bold text-gray-700 transition hover:border-accent dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <span>Glass effects</span>
-                <span className={`relative h-6 w-11 rounded-full transition ${themeSettings.isGlassTheme ? 'bg-accent' : 'bg-gray-300 dark:bg-gray-700'}`}>
-                  <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition ${themeSettings.isGlassTheme ? 'left-6' : 'left-1'}`} />
-                </span>
-              </button>
-            </div>
-
-            <div>
+          <div className="max-w-md">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Seasonal Theme</span>
                 {themeSettings.seasonalTheme === 'auto' && (
@@ -802,7 +755,6 @@ function PermissionsPage({
                 {getSeasonalThemeOption(themeSettings.seasonalTheme as SeasonalThemePreference).description}
               </p>
             </div>
-          </div>
         </div>
 
         <div className="mb-5">
