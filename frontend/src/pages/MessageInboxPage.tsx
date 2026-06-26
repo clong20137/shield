@@ -58,6 +58,9 @@ const THREAD_LIST_MESSAGE_PAGE_SIZE = 80;
 const THREAD_SEARCH_MESSAGE_BODY_SCAN_LIMIT = 12;
 const THREAD_LIST_ROW_HEIGHT = 92;
 const THREAD_LIST_OVERSCAN = 6;
+const THREAD_MESSAGE_ROW_ESTIMATE = 112;
+const THREAD_MESSAGE_OVERSCAN = 8;
+const THREAD_MESSAGE_VIRTUALIZE_THRESHOLD = 90;
 const messageReactionOptions = [
   { key: 'thumbsUp', label: 'Thumbs up', icon: '👍' },
   { key: 'check', label: 'Check', icon: '✅' },
@@ -452,6 +455,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const [isSending, setIsSending] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [threadSearchTerm, setThreadSearchTerm] = useState('');
+  const [deferredThreadSearchTerm, setDeferredThreadSearchTerm] = useState('');
   const [unreadDividerMessageId, setUnreadDividerMessageId] = useState<string | null>(null);
   const [pinnedThreadIds, setPinnedThreadIds] = useState<string[]>(() => {
     try {
@@ -489,6 +493,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const [threadMessageWindows, setThreadMessageWindows] = useState<Record<string, ThreadMessageWindowState>>({});
   const [threadListScrollTop, setThreadListScrollTop] = useState(0);
   const [threadListViewportHeight, setThreadListViewportHeight] = useState(0);
+  const [threadMessageScrollTop, setThreadMessageScrollTop] = useState(0);
+  const [threadMessageViewportHeight, setThreadMessageViewportHeight] = useState(0);
   const [memberDirectory, setMemberDirectory] = useState<Record<string, ThreadMemberPreview>>(() => ({
     [currentUser.id]: {
       id: currentUser.id,
@@ -514,6 +520,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const groupImageInputRef = useRef<HTMLInputElement | null>(null);
   const messageImageInputRef = useRef<HTMLInputElement | null>(null);
   const messageReloadTimerRef = useRef<number | null>(null);
+  const threadMessageScrollFrameRef = useRef<number | null>(null);
   const messageLoadInFlightRef = useRef(false);
   const messageLoadPendingRef = useRef(false);
   const appliedTargetThreadIdRef = useRef<string | null>(null);
@@ -584,13 +591,6 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const removeLocalSentMessage = (messageId: string) => {
     setSentMessages((messages) => messages.filter((message) => message.id !== messageId));
   };
-  const refreshMessagesQuietly = async () => {
-    try {
-      await loadMessages(false);
-    } catch (error) {
-      console.error('Failed to refresh messages after send:', error);
-    }
-  };
 
   useEffect(() => {
     if (!targetRecipient || targetRecipient.id === currentUser.id) {
@@ -632,6 +632,46 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     observer.observe(container);
     return () => observer.disconnect();
   }, [isLoading, isModalView]);
+
+  useEffect(() => {
+    const container = threadMessageContainerRef.current;
+    if (!container) {
+      return undefined;
+    }
+
+    const measureThreadMessages = () => setThreadMessageViewportHeight(container.clientHeight);
+    measureThreadMessages();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measureThreadMessages);
+      return () => window.removeEventListener('resize', measureThreadMessages);
+    }
+
+    const observer = new ResizeObserver(measureThreadMessages);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [selectedThreadId, isModalView]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDeferredThreadSearchTerm(threadSearchTerm), 180);
+    return () => window.clearTimeout(timer);
+  }, [threadSearchTerm]);
+
+  useEffect(() => {
+    setThreadMessageScrollTop(0);
+    if (threadMessageContainerRef.current) {
+      threadMessageContainerRef.current.scrollTop = 0;
+    }
+  }, [selectedThreadId, deferredThreadSearchTerm]);
+
+  useEffect(() => {
+    return () => {
+      if (threadMessageScrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(threadMessageScrollFrameRef.current);
+        threadMessageScrollFrameRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setThreadListScrollTop(0);
@@ -820,6 +860,30 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     });
   };
 
+  const updateMessageEverywhere = (updatedMessage: UserMessage) => {
+    const updateList = (messages: UserMessage[]) =>
+      messages.map((message) => (message.id === updatedMessage.id ? updatedMessage : message));
+
+    setInboxMessages(updateList);
+    setSentMessages(updateList);
+    setThreadMessageWindows((current) => {
+      let changed = false;
+      const next = Object.fromEntries(
+        Object.entries(current).map(([threadId, windowState]) => {
+          const nextMessages = updateList(windowState.messages);
+          if (nextMessages !== windowState.messages && nextMessages.some((message, index) => message !== windowState.messages[index])) {
+            changed = true;
+            return [threadId, { ...windowState, messages: nextMessages }];
+          }
+
+          return [threadId, windowState];
+        }),
+      );
+
+      return changed ? next : current;
+    });
+  };
+
   const getThreadMessagesWithWindow = (threadId: string, fallbackMessages: UserMessage[]) => {
     const windowState = threadMessageWindows[threadId];
     const sortedFallback = [...fallbackMessages].sort((a, b) => {
@@ -998,13 +1062,26 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       try {
         const payload = JSON.parse(event.data) as { message?: UserMessage };
         if (!payload.message) {
-          void loadMessages(false);
+          handleRealtimeMessageUpdate();
           return;
         }
         mergeThreadMessages([payload.message]);
       } catch (err) {
         console.error('Message update parse error:', err);
-        void loadMessages(false);
+        handleRealtimeMessageUpdate();
+      }
+    };
+    const handleMessageMutation = (event: MessageEvent<string>) => {
+      try {
+        const payload = JSON.parse(event.data) as { message?: UserMessage };
+        if (!payload.message) {
+          handleRealtimeMessageUpdate();
+          return;
+        }
+        updateMessageEverywhere(payload.message);
+      } catch (err) {
+        console.error('Message mutation parse error:', err);
+        handleRealtimeMessageUpdate();
       }
     };
     const handleTypingUpdate = (event: MessageEvent<string>) => {
@@ -1064,11 +1141,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       }
     };
     eventSource?.addEventListener('message-created', handleMessageUpdate);
-    eventSource?.addEventListener('message-read', handleRealtimeMessageUpdate);
-    eventSource?.addEventListener('message-reaction', handleMessageUpdate);
+    eventSource?.addEventListener('message-read', handleMessageMutation);
+    eventSource?.addEventListener('message-reaction', handleMessageMutation);
     eventSource?.addEventListener('message-typing', handleTypingUpdate);
-    eventSource?.addEventListener('message-archived', handleRealtimeMessageUpdate);
-    eventSource?.addEventListener('message-deleted', handleRealtimeMessageUpdate);
+    eventSource?.addEventListener('message-archived', handleMessageMutation);
+    eventSource?.addEventListener('message-deleted', handleMessageMutation);
     eventSource?.addEventListener('presence-updated', handlePresenceUpdate);
     eventSource?.addEventListener('error', (event) => {
       console.error('Message realtime connection error:', event);
@@ -1356,6 +1433,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const selectedTyping = selectedThreadId ? typingByThread[selectedThreadId] : null;
   const selectedThreadWindow = selectedThreadId ? threadMessageWindows[selectedThreadId] : null;
   const selectedThreadParticipantKey = selectedThread?.participantIds.join('|') || '';
+  const activeThreadSearchTerm = deferredThreadSearchTerm.trim().toLowerCase();
   const selectedDirectRecipientId = selectedThread?.threadType === 'direct'
     ? selectedThread.participantIds.find((id) => id && id !== currentUser.id) || selectedThread.id
     : '';
@@ -1479,7 +1557,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       return [];
     }
 
-    const term = threadSearchTerm.trim().toLowerCase();
+    const term = activeThreadSearchTerm;
     if (!term) {
       return selectedThreadMessages;
     }
@@ -1493,7 +1571,38 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         message.recipientEmail || '',
       ].join(' ').toLowerCase().includes(term),
     );
-  }, [selectedThreadMessages, threadSearchTerm]);
+  }, [activeThreadSearchTerm, selectedThreadMessages]);
+
+  const virtualDisplayedMessages = useMemo(() => {
+    const isSearching = activeThreadSearchTerm.length > 0;
+    const shouldVirtualize = !isSearching && displayedMessages.length > THREAD_MESSAGE_VIRTUALIZE_THRESHOLD;
+    if (!shouldVirtualize) {
+      return {
+        bottomSpacerHeight: 0,
+        endIndex: displayedMessages.length,
+        items: displayedMessages,
+        startIndex: 0,
+        topSpacerHeight: 0,
+      };
+    }
+
+    const viewportHeight = threadMessageViewportHeight || 720;
+    const visibleCount = Math.ceil(viewportHeight / THREAD_MESSAGE_ROW_ESTIMATE) + THREAD_MESSAGE_OVERSCAN * 2;
+    const useLatestWindow = autoScrollToNewestRef.current && threadMessageScrollTop <= THREAD_MESSAGE_ROW_ESTIMATE;
+    const rawStartIndex = useLatestWindow
+      ? displayedMessages.length - visibleCount
+      : Math.floor(threadMessageScrollTop / THREAD_MESSAGE_ROW_ESTIMATE) - THREAD_MESSAGE_OVERSCAN;
+    const startIndex = Math.max(0, Math.min(displayedMessages.length - 1, rawStartIndex));
+    const endIndex = Math.min(displayedMessages.length, startIndex + visibleCount);
+
+    return {
+      bottomSpacerHeight: Math.max(0, displayedMessages.length - endIndex) * THREAD_MESSAGE_ROW_ESTIMATE,
+      endIndex,
+      items: displayedMessages.slice(startIndex, endIndex),
+      startIndex,
+      topSpacerHeight: startIndex * THREAD_MESSAGE_ROW_ESTIMATE,
+    };
+  }, [activeThreadSearchTerm, displayedMessages, threadMessageScrollTop, threadMessageViewportHeight]);
 
   useEffect(() => {
     if (!selectedThreadId) {
@@ -1593,27 +1702,54 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           : message,
       ),
     );
-    window.dispatchEvent(new CustomEvent('shield:messages-updated'));
+    setThreadMessageWindows((current) => {
+      const unreadIds = new Set(unreadMessages.map((message) => message.id));
+      let changed = false;
+      const next = Object.fromEntries(
+        Object.entries(current).map(([threadId, windowState]) => {
+          const nextMessages = windowState.messages.map((message) => {
+            if (!unreadIds.has(message.id)) {
+              return message;
+            }
+            changed = true;
+            return { ...message, isRead: true };
+          });
+          return [threadId, { ...windowState, messages: nextMessages }];
+        }),
+      );
+
+      return changed ? next : current;
+    });
   }, [currentUser.id, selectedThread, selectedThreadMessages]);
 
   const handleThreadMessageScroll = () => {
-    if (!selectedThreadId) {
+    if (threadMessageScrollFrameRef.current !== null) {
       return;
     }
 
-    const threadWindow = threadMessageWindows[selectedThreadId];
-    if (!threadWindow || threadWindow.isLoading || !threadWindow.hasMore) {
-      return;
-    }
+    threadMessageScrollFrameRef.current = window.requestAnimationFrame(() => {
+      threadMessageScrollFrameRef.current = null;
+      const container = threadMessageContainerRef.current;
+      if (!container) {
+        return;
+      }
 
-    const container = threadMessageContainerRef.current;
-    if (!container) {
-      return;
-    }
+      setThreadMessageScrollTop(container.scrollTop);
+      autoScrollToNewestRef.current = container.scrollHeight - container.scrollTop - container.clientHeight < 180;
 
-    if (container.scrollTop <= 100) {
-      void loadThreadMessages(selectedThreadId, false);
-    }
+      if (!selectedThreadId || activeThreadSearchTerm) {
+        return;
+      }
+
+      const threadWindow = threadMessageWindows[selectedThreadId];
+      if (!threadWindow || threadWindow.isLoading || !threadWindow.hasMore) {
+        return;
+      }
+
+      if (container.scrollTop <= 100) {
+        void loadThreadMessages(selectedThreadId, false);
+      }
+    });
   };
 
   useEffect(() => {
@@ -1892,8 +2028,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     try {
       const response = await messageService.react(message.id, currentUser.id, nextReaction);
       const updatedMessage = response.data;
-      setInboxMessages((messages) => messages.map((item) => (item.id === updatedMessage.id ? updatedMessage : item)));
-      setSentMessages((messages) => messages.map((item) => (item.id === updatedMessage.id ? updatedMessage : item)));
+      updateMessageEverywhere(updatedMessage);
     } catch (err) {
       console.error('Failed to react to message:', err);
       onToast('error', 'Failed to update reaction.');
@@ -2026,6 +2161,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         recipientReceivesMessages: selectedThread.contactReceivesMessages,
       };
       mergeSentMessages([optimisticMessage]);
+      mergeThreadMessages([optimisticMessage]);
       setReplyBody('');
       setReplyAttachments([]);
       didClearDraft = true;
@@ -2044,6 +2180,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         setSelectedThreadId(response.data.threadId);
         removeLocalSentMessage(optimisticMessageId);
         mergeSentMessages(response.data.messages || []);
+        mergeThreadMessages(response.data.messages || []);
       } else {
         const response = await messageService.send({
           senderAccountId: currentUser.id,
@@ -2053,6 +2190,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         });
         removeLocalSentMessage(optimisticMessageId);
         mergeSentMessages([response.data]);
+        mergeThreadMessages([response.data]);
         setSelectedThreadId(directRecipientId);
       }
       if (typingStopTimerRef.current) {
@@ -2069,8 +2207,6 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       setDraftRecipient(null);
       setDraftGroupRecipients([]);
       setDraftThreadTitle('');
-      void refreshMessagesQuietly();
-      window.dispatchEvent(new CustomEvent('shield:messages-updated'));
     } catch (err) {
       console.error(err);
       logMessageDiagnostic('Message send request failed', {
@@ -2148,10 +2284,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     try {
       const response = await messageService.delete(message.id, currentUser.id);
       const updatedMessage = response.data;
-      setInboxMessages((messages) => messages.map((item) => (item.id === updatedMessage.id ? updatedMessage : item)));
-      setSentMessages((messages) => messages.map((item) => (item.id === updatedMessage.id ? updatedMessage : item)));
+      updateMessageEverywhere(updatedMessage);
       setMessagePendingDelete(null);
-      window.dispatchEvent(new CustomEvent('shield:messages-updated'));
       onToast('success', 'Message deleted.');
     } catch (err) {
       console.error(err);
@@ -2828,7 +2962,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                     No messages match this search.
                   </div>
                 )}
-                {selectedThreadMessages.length > 0 && !threadSearchTerm.trim() && selectedThreadWindow?.hasMore && (
+                {selectedThreadMessages.length > 0 && !activeThreadSearchTerm && selectedThreadWindow?.hasMore && (
                   <div className="flex justify-center">
                     <button
                       type="button"
@@ -2840,7 +2974,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                     </button>
                   </div>
                 )}
-                {displayedMessages.map((message, index) => {
+                {virtualDisplayedMessages.topSpacerHeight > 0 && (
+                  <div aria-hidden="true" style={{ height: virtualDisplayedMessages.topSpacerHeight }} />
+                )}
+                {virtualDisplayedMessages.items.map((message, virtualIndex) => {
+                  const index = virtualDisplayedMessages.startIndex + virtualIndex;
                   const isMine = message.senderAccountId === currentUser.id;
                   const previousMessage = displayedMessages[index - 1];
                   const myReaction = getMessageReactionForUser(message, currentUser.id);
@@ -2857,7 +2995,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                       ref={index === displayedMessages.length - 1 ? latestMessageRef : undefined}
                       className="[contain-intrinsic-size:96px] [content-visibility:auto]"
                     >
-                      {unreadDividerMessageId === message.id && !threadSearchTerm.trim() && (
+                      {unreadDividerMessageId === message.id && !activeThreadSearchTerm && (
                         <div className="my-3 flex items-center gap-3">
                           <span className="h-px flex-1 bg-accent/30" />
                           <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold uppercase text-accent">Unread</span>
@@ -2989,6 +3127,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                     </div>
                   );
                 })}
+                {virtualDisplayedMessages.bottomSpacerHeight > 0 && (
+                  <div aria-hidden="true" style={{ height: virtualDisplayedMessages.bottomSpacerHeight }} />
+                )}
                 {selectedTyping && (
                   <div className="flex justify-start">
                     <div className="rounded-[1.35rem] rounded-bl-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-500 shadow-sm dark:border-gray-800">
