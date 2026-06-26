@@ -1265,7 +1265,7 @@
     position: absolute;
     inset: -14rem -5rem 0;
     background-repeat: repeat;
-    opacity: 0.72;
+    opacity: 0.38;
     will-change: transform;
   }
 
@@ -1274,7 +1274,7 @@
       radial-gradient(ellipse 0.32rem 0.62rem at 35% 35%, rgba(180, 83, 9, 0.88) 0 58%, transparent 62%),
       radial-gradient(ellipse 0.38rem 0.68rem at 55% 45%, rgba(220, 38, 38, 0.76) 0 55%, transparent 59%),
       radial-gradient(ellipse 0.34rem 0.6rem at 50% 50%, rgba(234, 179, 8, 0.78) 0 56%, transparent 60%);
-    background-size: 8rem 9rem, 12rem 10rem, 10rem 12rem;
+    background-size: 10rem 11rem, 15rem 13rem, 13rem 15rem;
     background-position: 0 0, 4rem 2rem, 8rem 5rem;
     animation: seasonal-leaves-fall-near 16s linear infinite;
   }
@@ -1284,7 +1284,7 @@
       radial-gradient(ellipse 0.24rem 0.48rem at 45% 42%, rgba(146, 64, 14, 0.56) 0 56%, transparent 60%),
       radial-gradient(ellipse 0.26rem 0.5rem at 55% 48%, rgba(132, 204, 22, 0.42) 0 54%, transparent 58%),
       radial-gradient(ellipse 0.22rem 0.44rem at 50% 50%, rgba(202, 138, 4, 0.54) 0 55%, transparent 59%);
-    background-size: 14rem 13rem, 18rem 16rem, 16rem 18rem;
+    background-size: 18rem 17rem, 23rem 21rem, 21rem 24rem;
     background-position: 5rem 1rem, 11rem 7rem, 2rem 10rem;
     animation: seasonal-leaves-fall-far 28s linear infinite;
   }

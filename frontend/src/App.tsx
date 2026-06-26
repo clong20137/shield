@@ -2394,17 +2394,19 @@ function SeasonalThemeEffects({ activeTheme }: { activeTheme: EffectiveSeasonalT
   }
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[39] overflow-hidden" aria-hidden="true">
+    <>
       {showSnow && (
-        <>
+        <div className="pointer-events-none fixed inset-0 z-[39] overflow-hidden" aria-hidden="true">
           <div className="seasonal-snow-layer seasonal-snow-layer-near" />
           <div className="seasonal-snow-layer seasonal-snow-layer-far" />
-        </>
+        </div>
       )}
       {showFallEffects && (
         <>
-          <div className="seasonal-leaf-layer seasonal-leaf-layer-near" />
-          <div className="seasonal-leaf-layer seasonal-leaf-layer-far" />
+          <div className="pointer-events-none fixed inset-0 z-[1] overflow-hidden" aria-hidden="true">
+            <div className="seasonal-leaf-layer seasonal-leaf-layer-near" />
+            <div className="seasonal-leaf-layer seasonal-leaf-layer-far" />
+          </div>
           <div
             key={turkeyPeek.key}
             className={`seasonal-turkey-peek seasonal-turkey-peek-${turkeyPeek.side}`}
@@ -2420,7 +2422,7 @@ function SeasonalThemeEffects({ activeTheme }: { activeTheme: EffectiveSeasonalT
           </div>
         </>
       )}
-    </div>
+    </>
   );
 }
 
