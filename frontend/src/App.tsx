@@ -2363,15 +2363,63 @@ function ConfettiOverlay() {
 
 function SeasonalThemeEffects({ activeTheme }: { activeTheme: EffectiveSeasonalTheme }) {
   const showSnow = activeTheme === 'christmas' || activeTheme === 'winter';
+  const showFallEffects = activeTheme === 'fall';
+  const [turkeyPeek, setTurkeyPeek] = useState(() => ({
+    side: 'left' as 'left' | 'right' | 'top' | 'bottom',
+    offset: 24,
+    key: 0,
+  }));
 
-  if (!showSnow) {
+  useEffect(() => {
+    if (!showFallEffects) {
+      return undefined;
+    }
+
+    const sides = ['left', 'right', 'top', 'bottom'] as const;
+    const updateTurkeyPeek = () => {
+      setTurkeyPeek((current) => ({
+        side: sides[Math.floor(Math.random() * sides.length)],
+        offset: 12 + Math.floor(Math.random() * 68),
+        key: current.key + 1,
+      }));
+    };
+
+    updateTurkeyPeek();
+    const timer = window.setInterval(updateTurkeyPeek, 14000);
+    return () => window.clearInterval(timer);
+  }, [showFallEffects]);
+
+  if (!showSnow && !showFallEffects) {
     return null;
   }
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[39] overflow-hidden" aria-hidden="true">
-      <div className="seasonal-snow-layer seasonal-snow-layer-near" />
-      <div className="seasonal-snow-layer seasonal-snow-layer-far" />
+      {showSnow && (
+        <>
+          <div className="seasonal-snow-layer seasonal-snow-layer-near" />
+          <div className="seasonal-snow-layer seasonal-snow-layer-far" />
+        </>
+      )}
+      {showFallEffects && (
+        <>
+          <div className="seasonal-leaf-layer seasonal-leaf-layer-near" />
+          <div className="seasonal-leaf-layer seasonal-leaf-layer-far" />
+          <div
+            key={turkeyPeek.key}
+            className={`seasonal-turkey-peek seasonal-turkey-peek-${turkeyPeek.side}`}
+            style={{ '--turkey-offset': `${turkeyPeek.offset}%` } as CSSProperties}
+          >
+            <span className="seasonal-turkey-tail" />
+            <span className="seasonal-turkey-body">
+              <span className="seasonal-turkey-head">
+                <span className="seasonal-turkey-eye" />
+                <span className="seasonal-turkey-beak" />
+              </span>
+            </span>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -1261,8 +1261,219 @@
     }
   }
 
+  .seasonal-leaf-layer {
+    position: absolute;
+    inset: -14rem -5rem 0;
+    background-repeat: repeat;
+    opacity: 0.72;
+    will-change: transform;
+  }
+
+  .seasonal-leaf-layer-near {
+    background-image:
+      radial-gradient(ellipse 0.32rem 0.62rem at 35% 35%, rgba(180, 83, 9, 0.88) 0 58%, transparent 62%),
+      radial-gradient(ellipse 0.38rem 0.68rem at 55% 45%, rgba(220, 38, 38, 0.76) 0 55%, transparent 59%),
+      radial-gradient(ellipse 0.34rem 0.6rem at 50% 50%, rgba(234, 179, 8, 0.78) 0 56%, transparent 60%);
+    background-size: 8rem 9rem, 12rem 10rem, 10rem 12rem;
+    background-position: 0 0, 4rem 2rem, 8rem 5rem;
+    animation: seasonal-leaves-fall-near 16s linear infinite;
+  }
+
+  .seasonal-leaf-layer-far {
+    background-image:
+      radial-gradient(ellipse 0.24rem 0.48rem at 45% 42%, rgba(146, 64, 14, 0.56) 0 56%, transparent 60%),
+      radial-gradient(ellipse 0.26rem 0.5rem at 55% 48%, rgba(132, 204, 22, 0.42) 0 54%, transparent 58%),
+      radial-gradient(ellipse 0.22rem 0.44rem at 50% 50%, rgba(202, 138, 4, 0.54) 0 55%, transparent 59%);
+    background-size: 14rem 13rem, 18rem 16rem, 16rem 18rem;
+    background-position: 5rem 1rem, 11rem 7rem, 2rem 10rem;
+    animation: seasonal-leaves-fall-far 28s linear infinite;
+  }
+
+  @keyframes seasonal-leaves-fall-near {
+    to {
+      transform: translate3d(-4rem, 14rem, 0) rotate(8deg);
+    }
+  }
+
+  @keyframes seasonal-leaves-fall-far {
+    to {
+      transform: translate3d(3rem, 14rem, 0) rotate(-6deg);
+    }
+  }
+
+  .seasonal-turkey-peek {
+    --turkey-offset: 50%;
+    position: fixed;
+    z-index: 41;
+    width: 5.75rem;
+    height: 5.75rem;
+    opacity: 0;
+    filter: drop-shadow(0 1rem 1.5rem rgba(67, 20, 7, 0.25));
+    animation: seasonal-turkey-peek 5.8s ease-in-out both;
+    will-change: transform, opacity;
+  }
+
+  .seasonal-turkey-peek-left {
+    left: -4.2rem;
+    top: var(--turkey-offset);
+    transform: translateY(-50%);
+  }
+
+  .seasonal-turkey-peek-right {
+    right: -4.2rem;
+    top: var(--turkey-offset);
+    transform: translateY(-50%) scaleX(-1);
+  }
+
+  .seasonal-turkey-peek-top {
+    top: -4.4rem;
+    left: var(--turkey-offset);
+    transform: translateX(-50%) rotate(90deg);
+  }
+
+  .seasonal-turkey-peek-bottom {
+    bottom: -4.4rem;
+    left: var(--turkey-offset);
+    transform: translateX(-50%) rotate(-90deg);
+  }
+
+  .seasonal-turkey-tail {
+    position: absolute;
+    left: 0.3rem;
+    top: 0.55rem;
+    width: 4rem;
+    height: 4.25rem;
+    border-radius: 4rem 4rem 1.2rem 1.2rem;
+    background:
+      conic-gradient(from 220deg at 50% 88%, #92400e 0 18deg, #d97706 18deg 42deg, #b91c1c 42deg 68deg, #f59e0b 68deg 94deg, #854d0e 94deg 122deg, #92400e 122deg 146deg, transparent 146deg 360deg);
+    transform: rotate(-20deg);
+  }
+
+  .seasonal-turkey-body {
+    position: absolute;
+    left: 2rem;
+    top: 2.25rem;
+    width: 2.65rem;
+    height: 2.85rem;
+    border-radius: 50% 50% 48% 48%;
+    background: linear-gradient(145deg, #78350f, #451a03);
+    box-shadow: inset 0 0.35rem 0.6rem rgba(255, 255, 255, 0.12);
+  }
+
+  .seasonal-turkey-head {
+    position: absolute;
+    right: -0.55rem;
+    top: 0.35rem;
+    width: 1.4rem;
+    height: 1.35rem;
+    border-radius: 50%;
+    background: #854d0e;
+  }
+
+  .seasonal-turkey-eye {
+    position: absolute;
+    right: 0.35rem;
+    top: 0.35rem;
+    width: 0.18rem;
+    height: 0.18rem;
+    border-radius: 999px;
+    background: #111827;
+  }
+
+  .seasonal-turkey-beak {
+    position: absolute;
+    right: -0.35rem;
+    top: 0.53rem;
+    width: 0;
+    height: 0;
+    border-top: 0.2rem solid transparent;
+    border-bottom: 0.2rem solid transparent;
+    border-left: 0.45rem solid #f59e0b;
+  }
+
+  @keyframes seasonal-turkey-peek {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    16%,
+    72% {
+      opacity: 1;
+    }
+  }
+
+  .seasonal-turkey-peek-left {
+    animation-name: seasonal-turkey-peek-left;
+  }
+
+  .seasonal-turkey-peek-right {
+    animation-name: seasonal-turkey-peek-right;
+  }
+
+  .seasonal-turkey-peek-top {
+    animation-name: seasonal-turkey-peek-top;
+  }
+
+  .seasonal-turkey-peek-bottom {
+    animation-name: seasonal-turkey-peek-bottom;
+  }
+
+  @keyframes seasonal-turkey-peek-left {
+    0%,
+    100% {
+      opacity: 0;
+      transform: translate(-0.4rem, -50%);
+    }
+    16%,
+    72% {
+      opacity: 1;
+      transform: translate(2.65rem, -50%);
+    }
+  }
+
+  @keyframes seasonal-turkey-peek-right {
+    0%,
+    100% {
+      opacity: 0;
+      transform: translate(0.4rem, -50%) scaleX(-1);
+    }
+    16%,
+    72% {
+      opacity: 1;
+      transform: translate(-2.65rem, -50%) scaleX(-1);
+    }
+  }
+
+  @keyframes seasonal-turkey-peek-top {
+    0%,
+    100% {
+      opacity: 0;
+      transform: translate(-50%, -0.4rem) rotate(90deg);
+    }
+    16%,
+    72% {
+      opacity: 1;
+      transform: translate(-50%, 2.65rem) rotate(90deg);
+    }
+  }
+
+  @keyframes seasonal-turkey-peek-bottom {
+    0%,
+    100% {
+      opacity: 0;
+      transform: translate(-50%, 0.4rem) rotate(-90deg);
+    }
+    16%,
+    72% {
+      opacity: 1;
+      transform: translate(-50%, -2.65rem) rotate(-90deg);
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .seasonal-snow-layer {
+    .seasonal-snow-layer,
+    .seasonal-leaf-layer,
+    .seasonal-turkey-peek {
       animation: none !important;
     }
   }
