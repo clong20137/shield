@@ -488,6 +488,12 @@ export interface RegistrationSettings {
   sessionTimeoutMinutes: number;
 }
 
+export interface ThemeSettings {
+  theme: 'light' | 'dark';
+  isGlassTheme: boolean;
+  seasonalTheme: 'auto' | 'default' | 'christmas' | 'summer' | 'thanksgiving' | 'fall' | 'spring' | 'winter' | 'patriotic';
+}
+
 export interface NotificationSound {
   id: string;
   label: string;
@@ -1081,6 +1087,12 @@ export const authService = {
 
   updateRegistrationSettings: (settings: RegistrationSettings) =>
     api.put<RegistrationSettings>('/auth/registration-settings', settings),
+
+  getThemeSettings: () =>
+    api.get<ThemeSettings>('/auth/theme-settings'),
+
+  updateThemeSettings: (settings: ThemeSettings) =>
+    api.put<ThemeSettings>('/auth/theme-settings', settings),
 
   createInvite: (email: string, requesterId: string) =>
     api.post<AuthInvite>('/auth/invites', { email, requesterId }),

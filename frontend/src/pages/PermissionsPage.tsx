@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ChevronLeft, ChevronRight, Mail, Pencil, Plus, Save, Search, ShieldCheck, ShieldAlert, X } from 'lucide-react';
-import { AccessReviewResponse, AuthAccount, AuthInvite, AuthRole, RegistrationSettings, authService, reportService } from '../services/api';
+import { AlertTriangle, ChevronLeft, ChevronRight, Mail, Moon, Pencil, Plus, Save, Search, ShieldCheck, ShieldAlert, Sparkles, Sun, X } from 'lucide-react';
+import { AccessReviewResponse, AuthAccount, AuthInvite, AuthRole, RegistrationSettings, ThemeSettings, authService, reportService } from '../services/api';
+import { getEffectiveSeasonalTheme, getSeasonalThemeOption, SEASONAL_THEME_OPTIONS, type SeasonalThemePreference } from '../theme/seasonalThemes';
 
 const APP_BASE_PATH = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
 const DEFAULT_APP_BASE_URL = `${window.location.origin}${APP_BASE_PATH}`;
@@ -52,7 +53,6 @@ const permissionGroups = [
       { key: 'devices:manage', label: 'Manage devices' },
       { key: 'calendar:manage', label: 'Manage calendar' },
       { key: 'calendar:view-profiles', label: 'View profile calendars' },
-      { key: 'preferences:theme', label: 'Change app theme' },
       { key: 'messages:receive', label: 'Receive messages' },
       { key: 'messages:send', label: 'Send messages' },
       { key: 'desktop:start-with-windows', label: 'Use Start with Windows' },
@@ -232,6 +232,12 @@ function PermissionsPage({
   const [invites, setInvites] = useState<AuthInvite[]>([]);
   const [latestInvite, setLatestInvite] = useState<AuthInvite | null>(null);
   const [isSavingRegistration, setIsSavingRegistration] = useState(false);
+  const [themeSettings, setThemeSettings] = useState<ThemeSettings>({
+    theme: 'light',
+    isGlassTheme: false,
+    seasonalTheme: 'auto',
+  });
+  const [isSavingTheme, setIsSavingTheme] = useState(false);
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [accessReview, setAccessReview] = useState<AccessReviewResponse | null>(null);
   const [reviewPage, setReviewPage] = useState(1);
@@ -247,10 +253,12 @@ function PermissionsPage({
     try {
       const rolesResponse = await authService.getRoles(account.id);
       const registrationResponse = await authService.getRegistrationSettings();
+      const themeResponse = await authService.getThemeSettings();
       const invitesResponse = await authService.listInvites();
       const accessReviewResponse = await reportService.getAccessReview();
       setRoles(rolesResponse.data);
       setRegistrationSettings(registrationResponse.data);
+      setThemeSettings(themeResponse.data);
       try {
         window.localStorage.setItem(SESSION_TIMEOUT_KEY, String(registrationResponse.data.sessionTimeoutMinutes || 0));
       } catch {}
@@ -393,6 +401,32 @@ function PermissionsPage({
     }
   };
 
+  const saveThemeSettings = async (nextSettings: ThemeSettings) => {
+    if (account.role !== 'administrator') {
+      onToast('error', 'Only administrators can change the app theme.');
+      return;
+    }
+
+    const previousSettings = themeSettings;
+    setThemeSettings(nextSettings);
+    setIsSavingTheme(true);
+    setError(null);
+
+    try {
+      const response = await authService.updateThemeSettings(nextSettings);
+      setThemeSettings(response.data);
+      window.dispatchEvent(new CustomEvent('shield:theme-settings-updated', { detail: response.data }));
+      onToast('success', 'Theme updated for everyone.');
+    } catch (err) {
+      setThemeSettings(previousSettings);
+      const message = getErrorMessage(err, 'Failed to update theme settings.');
+      setError(message);
+      onToast('error', message);
+    } finally {
+      setIsSavingTheme(false);
+    }
+  };
+
   const handleLogoFileChange = (file: File | null) => {
     if (!file) {
       return;
@@ -460,6 +494,9 @@ function PermissionsPage({
   const reviewPageCount = Math.max(1, Math.ceil(flaggedAccounts.length / reviewPageSize));
   const currentReviewPage = Math.min(reviewPage, reviewPageCount);
   const visibleFlaggedAccounts = flaggedAccounts.slice((currentReviewPage - 1) * reviewPageSize, currentReviewPage * reviewPageSize);
+  const effectiveSeasonalTheme = getEffectiveSeasonalTheme(themeSettings.seasonalTheme as SeasonalThemePreference);
+  const effectiveSeasonalOption = getSeasonalThemeOption(effectiveSeasonalTheme);
+  const canChangeTheme = account.role === 'administrator';
 
   useEffect(() => {
     setReviewPage((page) => Math.min(page, reviewPageCount));
@@ -681,6 +718,99 @@ function PermissionsPage({
 
       {(section === 'all' || section === 'settings') && (
       <section className="mt-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+        <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-gray-100">
+                <Sparkles size={20} className="text-accent" />
+                Theme Manager
+              </h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Choose the global app theme. Changes update connected users automatically.
+              </p>
+            </div>
+            <span className="rounded bg-white px-2.5 py-1 text-xs font-black uppercase tracking-[0.12em] text-gray-500 ring-1 ring-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-800">
+              {isSavingTheme ? 'Saving' : 'Live'}
+            </span>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[260px_220px_minmax(0,1fr)]">
+            <div>
+              <span className="mb-2 block text-sm font-bold text-gray-800 dark:text-gray-100">Base Theme</span>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: 'light' as const, label: 'Light', icon: Sun },
+                  { value: 'dark' as const, label: 'Dark', icon: Moon },
+                ].map((option) => {
+                  const Icon = option.icon;
+                  const isActive = themeSettings.theme === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      disabled={!canChangeTheme || isSavingTheme}
+                      onClick={() => void saveThemeSettings({ ...themeSettings, theme: option.value })}
+                      className={`flex items-center justify-center gap-2 rounded border px-3 py-2 text-sm font-bold transition ${
+                        isActive
+                          ? 'border-accent bg-accent text-white shadow-sm'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                      } disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                      <Icon size={16} />
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <span className="mb-2 block text-sm font-bold text-gray-800 dark:text-gray-100">Glass Mode</span>
+              <button
+                type="button"
+                disabled={!canChangeTheme || isSavingTheme}
+                onClick={() => void saveThemeSettings({ ...themeSettings, isGlassTheme: !themeSettings.isGlassTheme })}
+                className="flex w-full items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2 text-left text-sm font-bold text-gray-700 transition hover:border-accent dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span>Glass effects</span>
+                <span className={`relative h-6 w-11 rounded-full transition ${themeSettings.isGlassTheme ? 'bg-accent' : 'bg-gray-300 dark:bg-gray-700'}`}>
+                  <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition ${themeSettings.isGlassTheme ? 'left-6' : 'left-1'}`} />
+                </span>
+              </button>
+            </div>
+
+            <div>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Seasonal Theme</span>
+                {themeSettings.seasonalTheme === 'auto' && (
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Auto: {effectiveSeasonalOption.label}</span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5">
+                {SEASONAL_THEME_OPTIONS.map((option) => {
+                  const isActive = themeSettings.seasonalTheme === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      disabled={!canChangeTheme || isSavingTheme}
+                      onClick={() => void saveThemeSettings({ ...themeSettings, seasonalTheme: option.id })}
+                      className={`rounded border px-3 py-2 text-left text-sm transition ${
+                        isActive
+                          ? 'border-accent bg-white text-accent shadow-sm dark:bg-gray-900'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                      } disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                      <span className="block font-bold">{option.label}</span>
+                      <span className="mt-0.5 block truncate text-xs text-gray-400">{option.description}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="mb-5">
           <h2>General Settings</h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">

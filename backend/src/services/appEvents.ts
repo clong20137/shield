@@ -28,6 +28,9 @@ interface AppEventPayload {
   appName?: string;
   siteName?: string;
   brandLogoDataUrl?: string;
+  theme?: string;
+  isGlassTheme?: boolean;
+  seasonalTheme?: string;
 }
 
 const globalClients = new Set<Response>();

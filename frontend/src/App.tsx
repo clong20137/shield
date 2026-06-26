@@ -1,5 +1,5 @@
 import { CSSProperties, FormEvent, ReactNode, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, BarChart3, Bell, Bug, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Download, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Minus, Moon, RefreshCw, Save, Search, Settings, Shield, Sun, UserCircle, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Bug, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Download, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Minus, RefreshCw, Save, Search, Settings, Shield, UserCircle, X } from 'lucide-react';
 import { BrowserRouter as Router, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
@@ -9,7 +9,7 @@ import { getQuickLaunchStorageKey, normalizeQuickLaunchSlotCount, QUICK_LAUNCH_D
 import { FloatingWindow } from './components/FloatingWindow';
 import { FirstLoginGuide, WelcomeSplash } from './components/OnboardingGuide';
 import { BugTrackerModal } from './components/BugTrackerModal';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, CalendarEntryPayload, calendarService, clearAuthToken, CompleteSetupPayload, errorLogService, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, notificationSoundService, NotificationSound, reminderService, RegistrationSettings, Reminder, SetupEnvironmentValues, SetupStatus, urgentAlertService, UrgentAlert, UserNotification, userService, User } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, CalendarEntryPayload, calendarService, clearAuthToken, CompleteSetupPayload, errorLogService, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, notificationSoundService, NotificationSound, reminderService, RegistrationSettings, Reminder, SetupEnvironmentValues, SetupStatus, ThemeSettings, urgentAlertService, UrgentAlert, UserNotification, userService, User } from './services/api';
 import { useUnreadCounts } from './hooks/useUnreadCounts';
 import { getEffectiveSeasonalTheme, getSeasonalThemeOption, normalizeSeasonalTheme, SEASONAL_THEME_CLASSES, type EffectiveSeasonalTheme, type SeasonalThemePreference } from './theme/seasonalThemes';
 
@@ -232,6 +232,18 @@ function loadMessagePreferences(): MessagePreferences {
 
 function normalizeAppScale(value?: string | null): AppScale {
   return value === 'compact' || value === 'large' ? value : 'comfortable';
+}
+
+function normalizeThemeSetting(value: unknown): AppTheme {
+  return value === 'dark' ? 'dark' : 'light';
+}
+
+function normalizeThemeSettings(value: Partial<ThemeSettings>): ThemeSettings {
+  return {
+    theme: normalizeThemeSetting(value.theme),
+    isGlassTheme: value.isGlassTheme === true,
+    seasonalTheme: normalizeSeasonalTheme(value.seasonalTheme),
+  };
 }
 
 function normalizeDefaultDutyHours(value: unknown): string {
@@ -3805,33 +3817,6 @@ function App() {
     }
   };
 
-  const handleThemeChange = (nextTheme: AppTheme | ((currentTheme: AppTheme) => AppTheme)) => {
-    if (!hasPermission('preferences:theme')) {
-      showToast('error', 'You do not have permission to change app themes.', { saveToNotifications: false });
-      return;
-    }
-
-    setTheme(nextTheme);
-  };
-
-  const handleGlassThemeChange = (nextGlassTheme: boolean | ((currentValue: boolean) => boolean)) => {
-    if (!hasPermission('preferences:theme')) {
-      showToast('error', 'You do not have permission to change app themes.', { saveToNotifications: false });
-      return;
-    }
-
-    setIsGlassTheme(nextGlassTheme);
-  };
-
-  const handleSeasonalThemeChange = (nextSeasonalTheme: SeasonalThemePreference) => {
-    if (!hasPermission('preferences:theme')) {
-      showToast('error', 'You do not have permission to change app themes.', { saveToNotifications: false });
-      return;
-    }
-
-    setSeasonalTheme(nextSeasonalTheme);
-  };
-
   const handleInstallDesktopUpdate = async () => {
     if (!hasShieldDesktopFeature('installUpdate')) {
       return;
@@ -3843,10 +3828,6 @@ function App() {
       console.error('Failed to restart and install update:', error);
       showToast('error', 'Failed to restart and install the desktop update.', { saveToNotifications: false });
     }
-  };
-
-  const getThemeToggleLabel = () => {
-    return theme === 'light' ? 'Dark Mode' : 'Light Mode';
   };
 
   const handleOpenDesktopDiagnostics = async () => {
@@ -4411,6 +4392,35 @@ function App() {
       console.error('Failed to sync setup status:', err);
     }
   }, []);
+
+  const applyThemeSettings = useCallback((settings: Partial<ThemeSettings>) => {
+    const normalizedSettings = normalizeThemeSettings(settings);
+    setTheme(normalizedSettings.theme);
+    setIsGlassTheme(normalizedSettings.isGlassTheme);
+    setSeasonalTheme(normalizedSettings.seasonalTheme);
+  }, []);
+
+  const syncThemeSettings = useCallback(async () => {
+    try {
+      const response = await authService.getThemeSettings();
+      applyThemeSettings(response.data);
+    } catch (err) {
+      console.error('Failed to sync theme settings:', err);
+    }
+  }, [applyThemeSettings]);
+
+  useEffect(() => {
+    void syncThemeSettings();
+  }, [syncThemeSettings]);
+
+  useEffect(() => {
+    const handleThemeSettingsUpdated = (event: Event) => {
+      applyThemeSettings((event as CustomEvent<Partial<ThemeSettings>>).detail || {});
+    };
+
+    window.addEventListener('shield:theme-settings-updated', handleThemeSettingsUpdated as EventListener);
+    return () => window.removeEventListener('shield:theme-settings-updated', handleThemeSettingsUpdated as EventListener);
+  }, [applyThemeSettings]);
 
   useEffect(() => {
     if (isSetupLoading) {
@@ -5135,6 +5145,16 @@ function App() {
     eventSource.addEventListener('mileage-updated', handleRealtimeAppUpdate('mileage-updated'));
     eventSource.addEventListener('performance-evaluation-updated', handleRealtimeAppUpdate('performance-evaluation-updated'));
     eventSource.addEventListener('settings-updated', (event) => {
+      try {
+        const payload = JSON.parse((event as MessageEvent).data || '{}') as Partial<ThemeSettings>;
+        if (payload.theme || typeof payload.isGlassTheme === 'boolean' || payload.seasonalTheme) {
+          applyThemeSettings(payload);
+        } else {
+          void syncThemeSettings();
+        }
+      } catch {
+        void syncThemeSettings();
+      }
       void loadNotificationSounds();
       void syncSetupStatus();
       handleRealtimeAppUpdate('settings-updated')(event);
@@ -5171,7 +5191,7 @@ function App() {
     });
 
     return () => eventSource.close();
-  }, [currentUser, handleForcedLogout, isAppBackgrounded, loadBugReports, loadNotificationSounds, loadUrgentAlerts, loadUserNotifications, syncSessionTimeoutFromSettings, syncSetupStatus]);
+  }, [applyThemeSettings, currentUser, handleForcedLogout, isAppBackgrounded, loadBugReports, loadNotificationSounds, loadUrgentAlerts, loadUserNotifications, syncSessionTimeoutFromSettings, syncSetupStatus, syncThemeSettings]);
 
   const closeModal = (modal: ClosingModal) => {
     setClosingModal(modal);
@@ -5965,21 +5985,6 @@ function App() {
                 <span>Search Users</span>
               </button>
               <div className="mx-2 my-1 border-t border-gray-200 dark:border-gray-700" />
-              <button
-                type="button"
-                onClick={() => handleGlassThemeChange((value) => !value)}
-                disabled={!hasPermission('preferences:theme')}
-                className="group flex w-full items-center justify-between rounded-lg px-2.5 py-2.5 text-sm transition hover:bg-black/5 dark:hover:bg-white/10"
-              >
-                <span className="flex items-center gap-2 font-semibold text-gray-700 dark:text-gray-100">
-                  {isGlassTheme ? <Sun size={15} /> : <Moon size={15} />}
-                  <span>Glass Mode</span>
-                </span>
-                <span className={`flex h-5 w-10 items-center rounded-full p-0.5 transition ${isGlassTheme ? 'justify-end bg-accent' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                  <span className="h-4 w-4 rounded-full bg-white shadow-sm" />
-                </span>
-              </button>
-              <div className="mx-2 my-1 border-t border-gray-200 dark:border-gray-700" />
               <div className="flex items-center justify-between gap-3 rounded-lg px-2.5 py-2.5">
                 <span className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-gray-700 dark:text-gray-100">
                   <Settings size={15} />
@@ -6185,18 +6190,6 @@ function App() {
                     unreadCount={messageUnreadCount}
                     onOpenMessages={toggleMessagesModal}
                   />
-                </IconButtonTooltip>
-                <IconButtonTooltip label={getThemeToggleLabel()}>
-                  <button
-                    data-onboarding-control="theme"
-                    type="button"
-                    onClick={() => handleThemeChange((value) => (value === 'light' ? 'dark' : 'light'))}
-                    disabled={!hasPermission('preferences:theme')}
-                    className="header-action-button flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
-                    aria-label="Change theme"
-                  >
-                    {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-                  </button>
                 </IconButtonTooltip>
                 <div ref={accountMenuRef} className="relative">
                 <IconButtonTooltip label="Settings">
@@ -6606,10 +6599,6 @@ function App() {
                     <AccountSettingsPage
                       account={currentUser}
                       messagePreferences={messagePreferences}
-                      appTheme={theme}
-                      isGlassTheme={isGlassTheme}
-                      seasonalTheme={seasonalTheme}
-                      activeSeasonalTheme={activeSeasonalTheme}
                       isDesktopApp={isShieldDesktopApp()}
                       desktopPreferences={desktopPreferences}
                       desktopUpdateStatus={desktopUpdateStatus}
@@ -6669,9 +6658,6 @@ function App() {
                       onCalendarHiddenChange={handleCalendarHiddenChange}
                       onAppScaleChange={handleAppScaleChange}
                       onDefaultDutyHoursChange={handleDefaultDutyHoursChange}
-                      onAppThemeChange={handleThemeChange}
-                      onGlassThemeChange={handleGlassThemeChange}
-                      onSeasonalThemeChange={handleSeasonalThemeChange}
                       onStartWithWindowsChange={handleStartWithWindowsChange}
                       onTrayModeChange={handleTrayModeChange}
                       onCheckForDesktopUpdates={handleCheckForDesktopUpdates}

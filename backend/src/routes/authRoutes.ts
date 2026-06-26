@@ -32,6 +32,8 @@ router.get('/session', AuthController.getSession);
 router.post('/logout', AuthController.logout);
 router.get('/registration-settings', AuthController.getRegistrationSettings);
 router.put('/registration-settings', requirePermission('roles:manage'), AuthController.updateRegistrationSettings);
+router.get('/theme-settings', AuthController.getThemeSettings);
+router.put('/theme-settings', AuthController.updateThemeSettings);
 router.get('/invites', requirePermission('roles:manage'), AuthController.listInvites);
 router.post('/invites', inviteLimiter, requirePermission('roles:manage'), AuthController.createInvite);
 router.get('/sessions', AuthController.listSessions);
