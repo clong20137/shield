@@ -256,6 +256,28 @@ function getInitialDeviceModalPosition() {
   };
 }
 
+function normalizeDeviceListResponse(
+  responseData: DeviceRecord[] | { data?: DeviceRecord[]; total?: number; totalPages?: number; page?: number },
+  fallbackPage: number,
+) {
+  if (Array.isArray(responseData)) {
+    return {
+      data: responseData,
+      page: fallbackPage,
+      total: responseData.length,
+      totalPages: Math.max(1, Math.ceil(responseData.length / Math.max(1, responseData.length))),
+    };
+  }
+
+  const data = Array.isArray(responseData.data) ? responseData.data : [];
+  return {
+    data,
+    page: typeof responseData.page === 'number' ? responseData.page : fallbackPage,
+    total: typeof responseData.total === 'number' ? responseData.total : data.length,
+    totalPages: typeof responseData.totalPages === 'number' ? responseData.totalPages : 1,
+  };
+}
+
 function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null }) {
   const [devices, setDevices] = useState<DeviceRecord[]>([]);
   const [registeredUsers, setRegisteredUsers] = useState<AuthAccount[]>([]);
@@ -356,11 +378,12 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         page,
         pageSize,
       });
-      setDevices(response.data.data);
-      setTotalDevices(response.data.total);
-      setTotalPages(response.data.totalPages);
-      if (response.data.page !== page) {
-        setPage(response.data.page);
+      const normalizedResponse = normalizeDeviceListResponse(response.data, page);
+      setDevices(normalizedResponse.data);
+      setTotalDevices(normalizedResponse.total);
+      setTotalPages(normalizedResponse.totalPages);
+      if (normalizedResponse.page !== page) {
+        setPage(normalizedResponse.page);
       }
     } catch (err) {
       console.error('Failed to load device inventory:', err);
@@ -639,7 +662,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     }
 
     const response = await deviceService.getAll({ q: value, page: 1, pageSize: 5 });
-    return response.data.data.find((device) => deviceMatchesScan(device, value)) || null;
+    const normalizedResponse = normalizeDeviceListResponse(response.data, 1);
+    return normalizedResponse.data.find((device) => deviceMatchesScan(device, value)) || null;
   };
 
   const handleScannerSubmit = async (event: FormEvent<HTMLFormElement>) => {
