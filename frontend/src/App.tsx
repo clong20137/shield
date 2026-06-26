@@ -5,6 +5,7 @@ import { BrowserRouter as Router, NavLink, Routes, Route, useLocation, useNaviga
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { FloatingWindow } from './components/FloatingWindow';
+import { MentionTextarea } from './components/MentionTextarea';
 import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, CalendarEntryPayload, calendarService, clearAuthToken, CompleteSetupPayload, errorLogService, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, notificationSoundService, NotificationSound, quickLaunchService, reminderService, RegistrationSettings, Reminder, SetupEnvironmentValues, SetupStatus, urgentAlertService, UrgentAlert, UserMessage, UserNotification, userService, User, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from './services/api';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
@@ -2297,15 +2298,16 @@ function RecentMessageReplyPopover({
         </div>
 
         <div className="flex items-end gap-2">
-          <textarea
+          <MentionTextarea
             ref={inputRef}
             value={body}
-            onChange={(event) => setBody(event.target.value.slice(0, 1200))}
+            onChange={(value) => setBody(value.slice(0, 1200))}
+            wrapperClassName="min-w-0 flex-1"
             onKeyDown={sendOnEnter}
             placeholder="Reply..."
             rows={2}
             maxLength={1200}
-            className="min-h-14 flex-1 resize-none rounded-xl border border-gray-300 bg-white/90 px-3 py-2 text-[16px] leading-5 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-gray-700 dark:bg-gray-900/90 sm:text-sm"
+            className="min-h-14 resize-none rounded-xl border border-gray-300 bg-white/90 px-3 py-2 text-[16px] leading-5 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-gray-700 dark:bg-gray-900/90 sm:text-sm"
           />
           <button
             type="submit"

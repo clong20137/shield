@@ -55,6 +55,7 @@ interface ThreadMessageWindowState {
 const PINNED_THREADS_KEY_PREFIX = 'shield_pinned_message_threads';
 const THREAD_MESSAGE_PAGE_SIZE = 40;
 const THREAD_LIST_MESSAGE_PAGE_SIZE = 80;
+const THREAD_SEARCH_MESSAGE_BODY_SCAN_LIMIT = 12;
 const messageReactionOptions = [
   { key: 'thumbsUp', label: 'Thumbs up', icon: '👍' },
   { key: 'check', label: 'Check', icon: '✅' },
@@ -1289,15 +1290,19 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     const term = searchTerm.trim().toLowerCase();
     if (!term) return visibleThreads;
 
-    return visibleThreads.filter((thread) =>
-      [
+    return visibleThreads.filter((thread) => {
+      const recentMessageBodies = thread.messages
+        .slice(Math.max(0, thread.messages.length - THREAD_SEARCH_MESSAGE_BODY_SCAN_LIMIT))
+        .map((message) => message.body);
+
+      return [
         thread.contactName,
         thread.contactEmail,
         thread.subject,
         thread.latestMessage?.body || '',
-        ...thread.messages.map((message) => message.body),
-      ].join(' ').toLowerCase().includes(term),
-    );
+        ...recentMessageBodies,
+      ].join(' ').toLowerCase().includes(term);
+    });
   }, [currentUser.id, draftGroupRecipients, draftRecipient, draftThreadTitle, searchTerm, threads]);
 
   const selectedThread = filteredThreads.find((thread) => thread.id === selectedThreadId) || null;
@@ -2790,7 +2795,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   const isDeleted = isDeletedMessage(message);
 
                   return (
-                    <div key={message.id} ref={index === displayedMessages.length - 1 ? latestMessageRef : undefined}>
+                    <div
+                      key={message.id}
+                      ref={index === displayedMessages.length - 1 ? latestMessageRef : undefined}
+                      className="[contain-intrinsic-size:96px] [content-visibility:auto]"
+                    >
                       {unreadDividerMessageId === message.id && !threadSearchTerm.trim() && (
                         <div className="my-3 flex items-center gap-3">
                           <span className="h-px flex-1 bg-accent/30" />
