@@ -4991,6 +4991,7 @@ function BugTrackerModal({
 
 interface OnboardingStep {
   target: string;
+  group: 'Workspace' | 'Tools' | 'Account';
   eyebrow: string;
   title: string;
   body: string;
@@ -5002,12 +5003,14 @@ interface OnboardingStep {
 const onboardingSteps: OnboardingStep[] = [
   {
     target: 'workspace',
+    group: 'Workspace',
     eyebrow: 'Start Here',
     title: 'Your daily workspace',
     body: 'The dashboard is the first stop for pinned people, your day, quick notes, updates, news, and the main work happening across the app.',
   },
   {
     target: 'workspace',
+    group: 'Workspace',
     eyebrow: 'Display Scale',
     title: 'Choose your workspace size',
     body: 'Pick the scale that feels best for your screen. You can change it later from Account Settings.',
@@ -5015,6 +5018,7 @@ const onboardingSteps: OnboardingStep[] = [
   },
   {
     target: 'my-day',
+    group: 'Workspace',
     eyebrow: 'Daily Hours',
     title: 'Set your usual shift length',
     body: 'Choose the duty hours you usually work. Trooper Daily shortcuts like Vacation Day and Sick Day will use this as their default.',
@@ -5022,54 +5026,63 @@ const onboardingSteps: OnboardingStep[] = [
   },
   {
     target: 'pinned-profiles',
+    group: 'Workspace',
     eyebrow: 'Pinned Profiles',
     title: 'Keep key people close',
     body: 'Pin frequently used profiles to the top of the dashboard. Use the arrows to move through more pinned users, and open a profile without leaving the dashboard.',
   },
   {
     target: 'my-day',
+    group: 'Workspace',
     eyebrow: 'My Day',
     title: 'See today at a glance',
     body: 'My Day combines today\'s calendar items, drafts, submitted entries, and due reminders so your daily workload is visible without opening another app.',
   },
   {
     target: 'quick-notes',
+    group: 'Workspace',
     eyebrow: 'Quick Notes',
     title: 'Capture working notes',
     body: 'Quick Notes is your private sticky-note board. Add notes, move them around, and the app saves the layout automatically.',
   },
   {
     target: 'dashboard-news',
+    group: 'Workspace',
     eyebrow: 'Updates & News',
     title: 'Read the latest posts',
     body: 'Updates and news rotate through the latest posts. Use Read More to open the full post, reactions, comments, and attachments.',
   },
   {
     target: 'global-search',
+    group: 'Tools',
     eyebrow: 'Search',
     title: 'Find users quickly',
     body: 'Search by name, email, PE number, badge, district, or other user details. Results appear live while you type.',
   },
   {
     target: 'profile-card',
+    group: 'Account',
     eyebrow: 'Profile',
     title: 'Open your profile',
     body: 'Click your profile picture to update your photo, review your account, change your password, or set up authenticator app MFA.',
   },
   {
     target: 'navigation',
+    group: 'Tools',
     eyebrow: 'Navigation',
     title: 'Move through the system',
     body: 'Use the left navigation for dashboard, devices, and reports based on your permissions. Calendar and reminders live in the sidebar widgets below.',
   },
   {
     target: 'sidebar-calendar',
+    group: 'Tools',
     eyebrow: 'Calendar',
     title: 'Open your calendar widget',
     body: 'Use the sidebar calendar widget to see today and upcoming calendar activity, then open the floating calendar app when you need the full view.',
   },
   {
     target: 'notifications',
+    group: 'Tools',
     eyebrow: 'Alerts',
     title: 'Check notifications',
     body: 'Open notifications for system alerts, bug updates, flagged comments, and other activity that needs attention.',
@@ -5077,6 +5090,7 @@ const onboardingSteps: OnboardingStep[] = [
   },
   {
     target: 'messages',
+    group: 'Tools',
     eyebrow: 'Messages',
     title: 'Open conversations',
     body: 'Use messages for real-time chats, unread message badges, group conversations, emojis, and attachments.',
@@ -5084,6 +5098,7 @@ const onboardingSteps: OnboardingStep[] = [
   },
   {
     target: 'theme',
+    group: 'Account',
     eyebrow: 'Theme',
     title: 'Switch light or dark mode',
     body: 'Toggle the application theme whenever you want a lighter or darker workspace.',
@@ -5091,6 +5106,7 @@ const onboardingSteps: OnboardingStep[] = [
   },
   {
     target: 'settings',
+    group: 'Account',
     eyebrow: 'Settings',
     title: 'Account and preferences',
     body: 'Open account settings, preferences, admin tools, and sign out from the account menu.',
@@ -5098,6 +5114,7 @@ const onboardingSteps: OnboardingStep[] = [
   },
   {
     target: 'quick-launch',
+    group: 'Tools',
     eyebrow: 'Quick Launch',
     title: 'Customize your dock',
     body: 'Use the dock on larger screens or the bottom navigation on mobile to jump between core tools. Badges show items like unread messages.',
@@ -5105,6 +5122,7 @@ const onboardingSteps: OnboardingStep[] = [
   },
   {
     target: 'quick-launch',
+    group: 'Tools',
     eyebrow: 'Hot Keys',
     title: 'Move faster from the keyboard',
     body: 'Use Ctrl+K to open the command palette, / to jump to user search, M for messages, C for calendar, D for dashboard, R for reports, A for Admin Console when permitted, U for Create User when permitted, = for calculator, and Esc to close the front window.',
@@ -5222,6 +5240,8 @@ function FirstLoginGuide({
     : Math.max(16, (window.innerHeight - tooltipHeightEstimate) / 2);
 
   const isLastStep = stepIndex === onboardingSteps.length - 1;
+  const completionPercent = ((stepIndex + 1) / onboardingSteps.length) * 100;
+  const stepGroups = Array.from(new Set(onboardingSteps.map((onboardingStep) => onboardingStep.group)));
 
   return (
     <div className="fixed inset-0 z-[90] pointer-events-auto">
@@ -5264,12 +5284,21 @@ function FirstLoginGuide({
 
       <div
         key={`tip-${animationKey}`}
-        className="pointer-events-auto fixed w-[calc(100vw-2rem)] max-w-[360px] rounded-lg border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-900"
+        className="pointer-events-auto fixed w-[calc(100vw-2rem)] max-w-[360px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900"
         style={{ left: tooltipLeft, top: tooltipTop, maxWidth: tooltipWidth }}
       >
+        <div className="h-1.5 bg-gray-100 dark:bg-gray-800">
+          <div className="h-full bg-accent transition-all duration-300 ease-out" style={{ width: `${completionPercent}%` }} />
+        </div>
+        <div className="p-5">
         <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">{step.eyebrow}</p>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">{step.eyebrow}</p>
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-gray-500 dark:bg-gray-800 dark:text-gray-300">
+                {step.group}
+              </span>
+            </div>
             <h2 className="mt-1 text-xl font-bold text-gray-900 dark:text-gray-100">{step.title}</h2>
           </div>
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-primary-500 text-white">
@@ -5347,9 +5376,39 @@ function FirstLoginGuide({
             />
           </div>
         )}
-        <p className="mt-3 text-xs text-gray-500 dark:text-gray-500">
-          Signed in as {account.displayName || account.email}
-        </p>
+        <div className="mt-4 flex items-center gap-1.5" aria-label={`Onboarding step ${stepIndex + 1} of ${onboardingSteps.length}`}>
+          {onboardingSteps.map((onboardingStep, index) => (
+            <button
+              key={`${onboardingStep.target}-${index}`}
+              type="button"
+              onClick={() => goToStep(index)}
+              className={`h-1.5 flex-1 rounded-full transition ${
+                index <= stepIndex
+                  ? 'bg-accent'
+                  : onboardingStep.group === step.group
+                    ? 'bg-accent/25'
+                    : 'bg-gray-200 dark:bg-gray-800'
+              }`}
+              aria-label={`Go to ${onboardingStep.title}`}
+              title={onboardingStep.title}
+            />
+          ))}
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {stepGroups.map((group) => (
+            <span
+              key={group}
+              className={`rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
+                group === step.group
+                  ? 'bg-accent/10 text-accent'
+                  : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500'
+              }`}
+            >
+              {group}
+            </span>
+          ))}
+        </div>
 
         <div className="mt-5 flex items-center justify-between gap-3">
           <span className="text-xs font-bold uppercase tracking-[0.16em] text-gray-400">
@@ -5357,7 +5416,7 @@ function FirstLoginGuide({
           </span>
           <div className="flex gap-2">
             <button type="button" onClick={onLater} className="rounded px-3 py-2 text-sm font-bold text-gray-500 hover:text-primary-500 dark:text-gray-400">
-              Later
+              Save for later
             </button>
             {stepIndex > 0 && (
               <button type="button" onClick={() => goToStep(stepIndex - 1)} className="btn-secondary px-3 py-2">
@@ -5369,9 +5428,10 @@ function FirstLoginGuide({
               onClick={() => (isLastStep ? onFinish() : goToStep(stepIndex + 1))}
               className="btn-primary px-4 py-2"
             >
-              {isLastStep ? 'Finish' : 'Next'}
+              {isLastStep ? 'Finish setup' : 'Next'}
             </button>
           </div>
+        </div>
         </div>
       </div>
     </div>
@@ -5390,8 +5450,8 @@ function WelcomeSplash({
   const welcomeName = account.displayName || account.email;
   const tourHighlights = [
     { label: 'Find people', detail: 'Search profiles, districts, and contact details.', Icon: Search },
-    { label: 'Work faster', detail: 'Open messages, calendar, and dock tools quickly.', Icon: CalendarDays },
-    { label: 'Report issues', detail: 'Send bugs and feedback during the beta.', Icon: Bug },
+    { label: 'Set your workspace', detail: 'Choose display scale, duty hours, and daily tools.', Icon: CalendarDays },
+    { label: 'Stay connected', detail: 'Review alerts, messages, and quick launch shortcuts.', Icon: Bell },
   ];
 
   return (
@@ -5424,9 +5484,9 @@ function WelcomeSplash({
                 </div>
               </div>
               <div className="relative rounded-lg border border-white/15 bg-white/10 p-4 backdrop-blur">
-                <p className="text-sm font-bold">Workspace is ready</p>
+                <p className="text-sm font-bold">Onboarding takes about two minutes</p>
                 <p className="mt-2 text-sm leading-6 text-blue-100">
-                  Your secure workspace is set up. The guide will walk you through the areas that matter first.
+                  We will highlight the important areas first, then save your preferences when you finish.
                 </p>
               </div>
             </div>
@@ -5438,10 +5498,10 @@ function WelcomeSplash({
               Welcome, {welcomeName}
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-gray-600 dark:text-gray-300">
-              Before you start working, take a quick guided tour of the dashboard, navigation, notifications, messages, settings, and quick launch dock.
+              Let us tune the workspace around how you work, then walk through the dashboard, messages, alerts, settings, and quick launch dock.
             </p>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-              This app is in beta. If something feels off, use Report a Bug so admins can review and track it.
+              You can pause at any time and replay the guide later from Account Settings.
             </p>
 
             <div className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-3">
