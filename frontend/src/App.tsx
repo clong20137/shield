@@ -11,7 +11,7 @@ import { FirstLoginGuide, WelcomeSplash } from './components/OnboardingGuide';
 import { BugTrackerModal } from './components/BugTrackerModal';
 import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, CalendarEntryPayload, calendarService, clearAuthToken, CompleteSetupPayload, errorLogService, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, notificationSoundService, NotificationSound, reminderService, RegistrationSettings, Reminder, SetupEnvironmentValues, SetupStatus, urgentAlertService, UrgentAlert, UserNotification, userService, User } from './services/api';
 import { useUnreadCounts } from './hooks/useUnreadCounts';
-import { getEffectiveSeasonalTheme, getSeasonalThemeOption, normalizeSeasonalTheme, SEASONAL_THEME_CLASSES, type SeasonalThemePreference } from './theme/seasonalThemes';
+import { getEffectiveSeasonalTheme, getSeasonalThemeOption, normalizeSeasonalTheme, SEASONAL_THEME_CLASSES, type EffectiveSeasonalTheme, type SeasonalThemePreference } from './theme/seasonalThemes';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
@@ -2350,6 +2350,38 @@ function ConfettiOverlay() {
           })}
         </span>
       ))}
+    </div>
+  );
+}
+
+function SeasonalThemeEffects({ activeTheme }: { activeTheme: EffectiveSeasonalTheme }) {
+  const showSnow = activeTheme === 'christmas' || activeTheme === 'winter';
+  const showEagle = activeTheme === 'patriotic';
+
+  if (!showSnow && !showEagle) {
+    return null;
+  }
+
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[39] overflow-hidden" aria-hidden="true">
+      {showSnow && (
+        <>
+          <div className="seasonal-snow-layer seasonal-snow-layer-near" />
+          <div className="seasonal-snow-layer seasonal-snow-layer-far" />
+        </>
+      )}
+      {showEagle && (
+        <div className="seasonal-eagle-flight">
+          <svg className="seasonal-eagle" viewBox="0 0 180 92" role="img" aria-label="Patriotic eagle">
+            <path className="seasonal-eagle-wing seasonal-eagle-wing-left" d="M83 39C55 15 29 11 5 21c26 7 42 22 58 42 8-9 15-16 20-24Z" />
+            <path className="seasonal-eagle-wing seasonal-eagle-wing-right" d="M96 39c28-24 54-28 78-18-26 7-42 22-58 42-8-9-15-16-20-24Z" />
+            <path className="seasonal-eagle-body" d="M61 57c18-25 42-25 59 0-13 12-45 12-59 0Z" />
+            <path className="seasonal-eagle-head" d="M87 24c11-9 29-5 36 8-13-2-23 1-29 11-7-3-10-10-7-19Z" />
+            <path className="seasonal-eagle-beak" d="M121 31l17 5-16 5c2-4 2-7-1-10Z" />
+            <path className="seasonal-eagle-tail" d="M82 67h33l-7 19-10-12-9 12-7-19Z" />
+          </svg>
+        </div>
+      )}
     </div>
   );
 }
@@ -5866,6 +5898,7 @@ function App() {
     <Router basename={ROUTER_BASENAME}>
       <ToastHost toasts={toasts} />
       {showConfetti && <ConfettiOverlay />}
+      <SeasonalThemeEffects activeTheme={activeSeasonalTheme} />
       {isDesktopUpdatePromptOpen && (
         <DesktopUpdatePrompt
           status={desktopUpdateStatus}

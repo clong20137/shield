@@ -947,8 +947,16 @@
   }
 
   html.seasonal-theme-christmas {
-    --seasonal-bg-light: linear-gradient(135deg, #f8fbf7 0%, #eef7ef 45%, #fff5f5 100%);
-    --seasonal-bg-dark: linear-gradient(135deg, #06160d 0%, #10251a 48%, #2a1014 100%);
+    --seasonal-bg-light:
+      radial-gradient(circle at 20% 18%, rgba(255, 255, 255, 0.9) 0 0.12rem, transparent 0.14rem),
+      radial-gradient(circle at 68% 28%, rgba(255, 255, 255, 0.78) 0 0.1rem, transparent 0.12rem),
+      radial-gradient(circle at 42% 72%, rgba(255, 255, 255, 0.82) 0 0.11rem, transparent 0.13rem),
+      linear-gradient(135deg, #f8fbf7 0%, #eef7ef 45%, #fff5f5 100%);
+    --seasonal-bg-dark:
+      radial-gradient(circle at 20% 18%, rgba(226, 232, 240, 0.56) 0 0.12rem, transparent 0.14rem),
+      radial-gradient(circle at 68% 28%, rgba(226, 232, 240, 0.42) 0 0.1rem, transparent 0.12rem),
+      radial-gradient(circle at 42% 72%, rgba(226, 232, 240, 0.5) 0 0.11rem, transparent 0.13rem),
+      linear-gradient(135deg, #06160d 0%, #10251a 48%, #2a1014 100%);
     --seasonal-panel-tint: rgba(20, 83, 45, 0.08);
     --seasonal-border: rgba(185, 28, 28, 0.22);
   }
@@ -982,8 +990,16 @@
   }
 
   html.seasonal-theme-winter {
-    --seasonal-bg-light: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 48%, #eef2ff 100%);
-    --seasonal-bg-dark: linear-gradient(135deg, #061021 0%, #0f3460 48%, #082f49 100%);
+    --seasonal-bg-light:
+      radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.95) 0 0.11rem, transparent 0.13rem),
+      radial-gradient(circle at 74% 30%, rgba(255, 255, 255, 0.8) 0 0.1rem, transparent 0.12rem),
+      radial-gradient(circle at 46% 80%, rgba(255, 255, 255, 0.88) 0 0.12rem, transparent 0.14rem),
+      linear-gradient(135deg, #f8fafc 0%, #e0f2fe 48%, #eef2ff 100%);
+    --seasonal-bg-dark:
+      radial-gradient(circle at 18% 22%, rgba(226, 232, 240, 0.6) 0 0.11rem, transparent 0.13rem),
+      radial-gradient(circle at 74% 30%, rgba(226, 232, 240, 0.44) 0 0.1rem, transparent 0.12rem),
+      radial-gradient(circle at 46% 80%, rgba(226, 232, 240, 0.52) 0 0.12rem, transparent 0.14rem),
+      linear-gradient(135deg, #061021 0%, #0f3460 48%, #082f49 100%);
     --seasonal-panel-tint: rgba(56, 189, 248, 0.08);
     --seasonal-border: rgba(56, 189, 248, 0.24);
   }
@@ -1032,8 +1048,7 @@
 
   html[class*='seasonal-theme-']:not(.glass) section[class~='bg-white'],
   html[class*='seasonal-theme-']:not(.glass) article[class~='bg-white'],
-  html[class*='seasonal-theme-']:not(.glass) aside[class~='bg-white'],
-  html[class*='seasonal-theme-']:not(.glass) form[class~='bg-white'] {
+  html[class*='seasonal-theme-']:not(.glass) aside[class~='bg-white'] {
     border-color: var(--seasonal-border) !important;
     background-image: linear-gradient(135deg, var(--seasonal-panel-tint), transparent 42%);
   }
@@ -1048,8 +1063,7 @@
   html.seasonal-theme-patriotic .recent-message-preview-pop,
   html.seasonal-theme-patriotic:not(.glass) section[class~='bg-white'],
   html.seasonal-theme-patriotic:not(.glass) article[class~='bg-white'],
-  html.seasonal-theme-patriotic:not(.glass) aside[class~='bg-white'],
-  html.seasonal-theme-patriotic:not(.glass) form[class~='bg-white'] {
+  html.seasonal-theme-patriotic:not(.glass) aside[class~='bg-white'] {
     border-color: rgba(37, 99, 235, 0.22) !important;
     background-image:
       linear-gradient(135deg, rgba(29, 78, 216, 0.09), transparent 36%),
@@ -1059,6 +1073,192 @@
   html.seasonal-theme-patriotic .header-action-button,
   html.seasonal-theme-patriotic .icon-close-button {
     border-color: rgba(37, 99, 235, 0.28) !important;
+  }
+
+  html.seasonal-theme-christmas .theme-polished-surface,
+  html.seasonal-theme-christmas .modal-window,
+  html.seasonal-theme-christmas .quick-launch-context-menu,
+  html.seasonal-theme-christmas .quick-launch-picker-enter,
+  html.seasonal-theme-christmas .floating-window,
+  html.seasonal-theme-christmas .glass-workspace-window,
+  html.seasonal-theme-christmas section[class~='bg-white'],
+  html.seasonal-theme-christmas article[class~='bg-white'],
+  html.seasonal-theme-christmas aside[class~='bg-white'],
+  html.seasonal-theme-winter .theme-polished-surface,
+  html.seasonal-theme-winter .modal-window,
+  html.seasonal-theme-winter .quick-launch-context-menu,
+  html.seasonal-theme-winter .quick-launch-picker-enter,
+  html.seasonal-theme-winter .floating-window,
+  html.seasonal-theme-winter .glass-workspace-window,
+  html.seasonal-theme-winter section[class~='bg-white'],
+  html.seasonal-theme-winter article[class~='bg-white'],
+  html.seasonal-theme-winter aside[class~='bg-white'] {
+    position: relative;
+    overflow: hidden;
+  }
+
+  html.seasonal-theme-christmas .theme-polished-surface::after,
+  html.seasonal-theme-christmas .modal-window::after,
+  html.seasonal-theme-christmas .quick-launch-context-menu::after,
+  html.seasonal-theme-christmas .quick-launch-picker-enter::after,
+  html.seasonal-theme-christmas .floating-window::after,
+  html.seasonal-theme-christmas .glass-workspace-window::after,
+  html.seasonal-theme-christmas section[class~='bg-white']::after,
+  html.seasonal-theme-christmas article[class~='bg-white']::after,
+  html.seasonal-theme-christmas aside[class~='bg-white']::after,
+  html.seasonal-theme-winter .theme-polished-surface::after,
+  html.seasonal-theme-winter .modal-window::after,
+  html.seasonal-theme-winter .quick-launch-context-menu::after,
+  html.seasonal-theme-winter .quick-launch-picker-enter::after,
+  html.seasonal-theme-winter .floating-window::after,
+  html.seasonal-theme-winter .glass-workspace-window::after,
+  html.seasonal-theme-winter section[class~='bg-white']::after,
+  html.seasonal-theme-winter article[class~='bg-white']::after,
+  html.seasonal-theme-winter aside[class~='bg-white']::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 0.45rem;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse at 8% 0, rgba(255, 255, 255, 0.98) 0 44%, transparent 46%),
+      radial-gradient(ellipse at 26% 0, rgba(255, 255, 255, 0.92) 0 36%, transparent 39%),
+      radial-gradient(ellipse at 48% 0, rgba(255, 255, 255, 0.96) 0 48%, transparent 50%),
+      radial-gradient(ellipse at 70% 0, rgba(255, 255, 255, 0.9) 0 34%, transparent 37%),
+      radial-gradient(ellipse at 92% 0, rgba(255, 255, 255, 0.98) 0 43%, transparent 45%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(226, 232, 240, 0.7));
+    opacity: 0.92;
+  }
+
+  .seasonal-snow-layer {
+    position: absolute;
+    inset: -12rem 0 0;
+    background-repeat: repeat;
+    opacity: 0.8;
+    will-change: transform;
+  }
+
+  .seasonal-snow-layer-near {
+    background-image:
+      radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 0.12rem, transparent 0.14rem),
+      radial-gradient(circle, rgba(255, 255, 255, 0.8) 0 0.09rem, transparent 0.11rem);
+    background-size: 7.25rem 7.25rem, 10rem 10rem;
+    background-position: 0 0, 3rem 4rem;
+    animation: seasonal-snow-fall 18s linear infinite;
+  }
+
+  .seasonal-snow-layer-far {
+    background-image:
+      radial-gradient(circle, rgba(226, 232, 240, 0.7) 0 0.08rem, transparent 0.1rem),
+      radial-gradient(circle, rgba(255, 255, 255, 0.58) 0 0.06rem, transparent 0.08rem);
+    background-size: 12rem 12rem, 16rem 16rem;
+    background-position: 4rem 2rem, 9rem 6rem;
+    animation: seasonal-snow-fall 34s linear infinite;
+  }
+
+  .seasonal-eagle-flight {
+    position: fixed;
+    right: clamp(7rem, 14vw, 17rem);
+    top: clamp(4.75rem, 9vh, 7.25rem);
+    width: clamp(5.5rem, 10vw, 8.5rem);
+    filter: drop-shadow(0 1rem 1.3rem rgba(15, 23, 42, 0.28));
+    transform-origin: center bottom;
+    animation: patriotic-eagle-land 5.2s cubic-bezier(0.18, 0.84, 0.22, 1) 420ms both;
+  }
+
+  .seasonal-eagle {
+    display: block;
+    width: 100%;
+  }
+
+  .seasonal-eagle-wing,
+  .seasonal-eagle-body {
+    fill: #1e3a8a;
+  }
+
+  .seasonal-eagle-head {
+    fill: #f8fafc;
+    stroke: rgba(30, 58, 138, 0.6);
+    stroke-width: 2;
+  }
+
+  .seasonal-eagle-beak {
+    fill: #facc15;
+  }
+
+  .seasonal-eagle-tail {
+    fill: #dc2626;
+  }
+
+  .seasonal-eagle-wing-left {
+    animation: patriotic-eagle-left-wing 780ms ease-in-out 6;
+    transform-origin: 85px 44px;
+  }
+
+  .seasonal-eagle-wing-right {
+    animation: patriotic-eagle-right-wing 780ms ease-in-out 6;
+    transform-origin: 95px 44px;
+  }
+
+  @keyframes seasonal-snow-fall {
+    to {
+      transform: translate3d(-2.5rem, 12rem, 0);
+    }
+  }
+
+  @keyframes patriotic-eagle-land {
+    0% {
+      opacity: 0;
+      transform: translate3d(-115vw, 18vh, 0) rotate(-11deg) scale(0.82);
+    }
+
+    18% {
+      opacity: 1;
+    }
+
+    58% {
+      transform: translate3d(-26vw, -1.5vh, 0) rotate(5deg) scale(1.05);
+    }
+
+    78% {
+      transform: translate3d(-3vw, 0.5vh, 0) rotate(-2deg) scale(0.98);
+    }
+
+    100% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+    }
+  }
+
+  @keyframes patriotic-eagle-left-wing {
+    0%,
+    100% {
+      transform: rotate(0deg);
+    }
+
+    50% {
+      transform: rotate(-10deg) translateY(-0.35rem);
+    }
+  }
+
+  @keyframes patriotic-eagle-right-wing {
+    0%,
+    100% {
+      transform: rotate(0deg);
+    }
+
+    50% {
+      transform: rotate(10deg) translateY(-0.35rem);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .seasonal-snow-layer,
+    .seasonal-eagle-flight,
+    .seasonal-eagle-wing-left,
+    .seasonal-eagle-wing-right {
+      animation: none !important;
+    }
   }
 
   html.glass body::before {
