@@ -2397,7 +2397,6 @@ function ThanksgivingSidebarAnimation() {
 
   return (
     <div className="thanksgiving-sidebar-animation" aria-hidden="true">
-      <div className="thanksgiving-sidebar-ground" />
       <dotlottie-player
         src={withAppBase(THANKSGIVING_TURKEY_LOTTIE)}
         autoplay

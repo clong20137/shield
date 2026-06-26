@@ -1303,32 +1303,17 @@
 
   .thanksgiving-sidebar-animation {
     position: relative;
-    height: 8.75rem;
-    overflow: hidden;
-    border-radius: 0.75rem;
-    background:
-      radial-gradient(circle at 20% 15%, rgba(254, 243, 199, 0.22), transparent 34%),
-      linear-gradient(180deg, rgba(255, 247, 237, 0.16), rgba(120, 53, 15, 0.18));
-    border: 1px solid rgba(254, 215, 170, 0.24);
-  }
-
-  .thanksgiving-sidebar-ground {
-    position: absolute;
-    inset: auto 1rem 0.8rem;
-    height: 0.5rem;
-    border-radius: 999px;
-    background: rgba(67, 20, 7, 0.26);
-    filter: blur(0.08rem);
+    height: 8rem;
+    overflow: visible;
   }
 
   .thanksgiving-sidebar-lottie {
     position: absolute;
     left: 50%;
-    bottom: 0.45rem;
-    width: 9.5rem;
-    height: 8.25rem;
+    bottom: -0.35rem;
+    width: 10rem;
+    height: 8.5rem;
     transform: translateX(-50%);
-    filter: drop-shadow(0 1rem 1.2rem rgba(67, 20, 7, 0.24));
   }
 
   @media (prefers-reduced-motion: reduce) {
