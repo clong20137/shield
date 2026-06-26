@@ -16,6 +16,9 @@ type ScanMode = 'lookup' | 'check-in' | 'check-out';
 const deviceTypes: DeviceType[] = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio', 'Cradlepoint'];
 const deviceStatuses: DeviceStatus[] = ['Available', 'Assigned', 'Maintenance', 'Damaged', 'Lost', 'Retired'];
 const deviceConditions = ['Excellent', 'Good', 'Fair', 'Poor', 'Damaged'];
+const DEVICE_TABLE_ROW_HEIGHT = 64;
+const DEVICE_TABLE_OVERSCAN = 8;
+const DEVICE_TABLE_MAX_HEIGHT = 620;
 
 const defaultDeviceForm: DeviceForm = {
   type: 'Cell Phone',
@@ -278,6 +281,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [cameraScanStatus, setCameraScanStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deviceTableScrollTop, setDeviceTableScrollTop] = useState(0);
   const isDeviceLoadInFlightRef = useRef(false);
   const isUserLoadInFlightRef = useRef(false);
   const hasLoadedRegisteredUsersRef = useRef(false);
@@ -497,8 +501,29 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const safePage = Math.min(page, totalPages);
   const pageStartIndex = (safePage - 1) * pageSize;
   const paginatedDevices = filteredDevices.slice(pageStartIndex, pageStartIndex + pageSize);
+  const shouldVirtualizeDeviceTable = paginatedDevices.length > 80;
+  const deviceTableViewportHeight = shouldVirtualizeDeviceTable
+    ? Math.min(DEVICE_TABLE_MAX_HEIGHT, paginatedDevices.length * DEVICE_TABLE_ROW_HEIGHT)
+    : undefined;
+  const deviceTableStartIndex = shouldVirtualizeDeviceTable
+    ? Math.max(0, Math.floor(deviceTableScrollTop / DEVICE_TABLE_ROW_HEIGHT) - DEVICE_TABLE_OVERSCAN)
+    : 0;
+  const deviceTableVisibleCount = shouldVirtualizeDeviceTable && deviceTableViewportHeight
+    ? Math.ceil(deviceTableViewportHeight / DEVICE_TABLE_ROW_HEIGHT) + DEVICE_TABLE_OVERSCAN * 2
+    : paginatedDevices.length;
+  const visibleTableDevices = shouldVirtualizeDeviceTable
+    ? paginatedDevices.slice(deviceTableStartIndex, deviceTableStartIndex + deviceTableVisibleCount)
+    : paginatedDevices;
+  const deviceTableTopSpacerHeight = shouldVirtualizeDeviceTable ? deviceTableStartIndex * DEVICE_TABLE_ROW_HEIGHT : 0;
+  const deviceTableBottomSpacerHeight = shouldVirtualizeDeviceTable
+    ? Math.max(0, (paginatedDevices.length - deviceTableStartIndex - visibleTableDevices.length) * DEVICE_TABLE_ROW_HEIGHT)
+    : 0;
   const pageStart = filteredDevices.length === 0 ? 0 : pageStartIndex + 1;
   const pageEnd = Math.min(filteredDevices.length, pageStartIndex + pageSize);
+
+  useEffect(() => {
+    setDeviceTableScrollTop(0);
+  }, [page, pageSize, filter, query, sortKey, statusFilter]);
 
   const statusCounts = useMemo(() => {
     const orderedFilters: DeviceStatusFilter[] = ['All', 'Assigned', 'Unassigned', 'Available', 'Maintenance', 'Damaged', 'Lost', 'Retired'];
@@ -989,9 +1014,17 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               );
             })}
           </div>
-          <div className="hidden overflow-x-auto lg:block">
+          <div
+            className="hidden overflow-auto lg:block"
+            style={deviceTableViewportHeight ? { maxHeight: deviceTableViewportHeight } : undefined}
+            onScroll={(event) => {
+              if (shouldVirtualizeDeviceTable) {
+                setDeviceTableScrollTop(event.currentTarget.scrollTop);
+              }
+            }}
+          >
             <table className="w-full min-w-[820px] border-collapse text-left">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-white dark:bg-gray-900">
                 <tr className="border-b border-gray-200 text-xs font-bold uppercase tracking-wide text-gray-500 dark:border-gray-800 dark:text-gray-400">
                   <th className="w-10 px-2 py-2"><input type="checkbox" checked={paginatedDevices.length > 0 && paginatedDevices.every((device) => selectedDevices.includes(device.id))} onChange={(event) => setSelectedDevices(event.target.checked ? Array.from(new Set([...selectedDevices, ...paginatedDevices.map((device) => device.id)])) : selectedDevices.filter((id) => !paginatedDevices.some((device) => device.id === id)))} /></th>
                   <th className="px-2 py-2">Device</th>
@@ -1002,7 +1035,12 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 </tr>
               </thead>
               <tbody>
-                {paginatedDevices.map((device) => {
+                {deviceTableTopSpacerHeight > 0 && (
+                  <tr aria-hidden="true">
+                    <td colSpan={6} style={{ height: deviceTableTopSpacerHeight, padding: 0, border: 0 }} />
+                  </tr>
+                )}
+                {visibleTableDevices.map((device) => {
                   const DeviceIcon = deviceIconMap[device.type];
                   return (
                     <tr
@@ -1036,6 +1074,11 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                     </tr>
                   );
                 })}
+                {deviceTableBottomSpacerHeight > 0 && (
+                  <tr aria-hidden="true">
+                    <td colSpan={6} style={{ height: deviceTableBottomSpacerHeight, padding: 0, border: 0 }} />
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
