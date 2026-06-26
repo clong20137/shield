@@ -1075,7 +1075,6 @@
     border-color: rgba(37, 99, 235, 0.28) !important;
   }
 
-  html.seasonal-theme-christmas .theme-polished-surface,
   html.seasonal-theme-christmas .modal-window,
   html.seasonal-theme-christmas .quick-launch-context-menu,
   html.seasonal-theme-christmas .quick-launch-picker-enter,
@@ -1084,7 +1083,6 @@
   html.seasonal-theme-christmas section[class~='bg-white'],
   html.seasonal-theme-christmas article[class~='bg-white'],
   html.seasonal-theme-christmas aside[class~='bg-white'],
-  html.seasonal-theme-winter .theme-polished-surface,
   html.seasonal-theme-winter .modal-window,
   html.seasonal-theme-winter .quick-launch-context-menu,
   html.seasonal-theme-winter .quick-launch-picker-enter,
@@ -1097,7 +1095,6 @@
     overflow: hidden;
   }
 
-  html.seasonal-theme-christmas .theme-polished-surface::after,
   html.seasonal-theme-christmas .modal-window::after,
   html.seasonal-theme-christmas .quick-launch-context-menu::after,
   html.seasonal-theme-christmas .quick-launch-picker-enter::after,
@@ -1106,7 +1103,6 @@
   html.seasonal-theme-christmas section[class~='bg-white']::after,
   html.seasonal-theme-christmas article[class~='bg-white']::after,
   html.seasonal-theme-christmas aside[class~='bg-white']::after,
-  html.seasonal-theme-winter .theme-polished-surface::after,
   html.seasonal-theme-winter .modal-window::after,
   html.seasonal-theme-winter .quick-launch-context-menu::after,
   html.seasonal-theme-winter .quick-launch-picker-enter::after,
@@ -1156,107 +1152,14 @@
     animation: seasonal-snow-fall 34s linear infinite;
   }
 
-  .seasonal-eagle-flight {
-    position: fixed;
-    right: clamp(7rem, 14vw, 17rem);
-    top: clamp(4.75rem, 9vh, 7.25rem);
-    width: clamp(5.5rem, 10vw, 8.5rem);
-    filter: drop-shadow(0 1rem 1.3rem rgba(15, 23, 42, 0.28));
-    transform-origin: center bottom;
-    animation: patriotic-eagle-land 5.2s cubic-bezier(0.18, 0.84, 0.22, 1) 420ms both;
-  }
-
-  .seasonal-eagle {
-    display: block;
-    width: 100%;
-  }
-
-  .seasonal-eagle-wing,
-  .seasonal-eagle-body {
-    fill: #1e3a8a;
-  }
-
-  .seasonal-eagle-head {
-    fill: #f8fafc;
-    stroke: rgba(30, 58, 138, 0.6);
-    stroke-width: 2;
-  }
-
-  .seasonal-eagle-beak {
-    fill: #facc15;
-  }
-
-  .seasonal-eagle-tail {
-    fill: #dc2626;
-  }
-
-  .seasonal-eagle-wing-left {
-    animation: patriotic-eagle-left-wing 780ms ease-in-out 6;
-    transform-origin: 85px 44px;
-  }
-
-  .seasonal-eagle-wing-right {
-    animation: patriotic-eagle-right-wing 780ms ease-in-out 6;
-    transform-origin: 95px 44px;
-  }
-
   @keyframes seasonal-snow-fall {
     to {
       transform: translate3d(-2.5rem, 12rem, 0);
     }
   }
 
-  @keyframes patriotic-eagle-land {
-    0% {
-      opacity: 0;
-      transform: translate3d(-115vw, 18vh, 0) rotate(-11deg) scale(0.82);
-    }
-
-    18% {
-      opacity: 1;
-    }
-
-    58% {
-      transform: translate3d(-26vw, -1.5vh, 0) rotate(5deg) scale(1.05);
-    }
-
-    78% {
-      transform: translate3d(-3vw, 0.5vh, 0) rotate(-2deg) scale(0.98);
-    }
-
-    100% {
-      opacity: 1;
-      transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
-    }
-  }
-
-  @keyframes patriotic-eagle-left-wing {
-    0%,
-    100% {
-      transform: rotate(0deg);
-    }
-
-    50% {
-      transform: rotate(-10deg) translateY(-0.35rem);
-    }
-  }
-
-  @keyframes patriotic-eagle-right-wing {
-    0%,
-    100% {
-      transform: rotate(0deg);
-    }
-
-    50% {
-      transform: rotate(10deg) translateY(-0.35rem);
-    }
-  }
-
   @media (prefers-reduced-motion: reduce) {
-    .seasonal-snow-layer,
-    .seasonal-eagle-flight,
-    .seasonal-eagle-wing-left,
-    .seasonal-eagle-wing-right {
+    .seasonal-snow-layer {
       animation: none !important;
     }
   }

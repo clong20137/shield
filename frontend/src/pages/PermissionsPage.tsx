@@ -734,7 +734,7 @@ function PermissionsPage({
             </span>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[260px_220px_minmax(0,1fr)]">
+          <div className="grid gap-4 xl:grid-cols-[260px_220px_minmax(0,280px)]">
             <div>
               <span className="mb-2 block text-sm font-bold text-gray-800 dark:text-gray-100">Base Theme</span>
               <div className="grid grid-cols-2 gap-2">
@@ -786,27 +786,21 @@ function PermissionsPage({
                   <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Auto: {effectiveSeasonalOption.label}</span>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5">
-                {SEASONAL_THEME_OPTIONS.map((option) => {
-                  const isActive = themeSettings.seasonalTheme === option.id;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      disabled={!canChangeTheme || isSavingTheme}
-                      onClick={() => void saveThemeSettings({ ...themeSettings, seasonalTheme: option.id })}
-                      className={`rounded border px-3 py-2 text-left text-sm transition ${
-                        isActive
-                          ? 'border-accent bg-white text-accent shadow-sm dark:bg-gray-900'
-                          : 'border-gray-200 bg-white text-gray-700 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                      } disabled:cursor-not-allowed disabled:opacity-60`}
-                    >
-                      <span className="block font-bold">{option.label}</span>
-                      <span className="mt-0.5 block truncate text-xs text-gray-400">{option.description}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <select
+                value={themeSettings.seasonalTheme}
+                disabled={!canChangeTheme || isSavingTheme}
+                onChange={(event) => void saveThemeSettings({ ...themeSettings, seasonalTheme: event.target.value as ThemeSettings['seasonalTheme'] })}
+                className="w-full rounded border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-700 transition hover:border-accent focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200"
+              >
+                {SEASONAL_THEME_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                {getSeasonalThemeOption(themeSettings.seasonalTheme as SeasonalThemePreference).description}
+              </p>
             </div>
           </div>
         </div>
