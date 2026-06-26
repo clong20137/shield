@@ -7,6 +7,7 @@
   --shield-motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --app-primary: #1a365d;
   --app-secondary: #9C865C;
+  --app-secondary-contrast: #111827;
   color-scheme: light;
 }
 
@@ -30,6 +31,11 @@
 .bg-accent,
 .hover\:bg-accent:hover {
   background-color: var(--app-secondary) !important;
+}
+
+.bg-secondary-500,
+.bg-accent {
+  color: var(--app-secondary-contrast) !important;
 }
 
 .bg-secondary-600,
@@ -959,6 +965,11 @@
       linear-gradient(135deg, #06160d 0%, #10251a 48%, #2a1014 100%);
     --seasonal-panel-tint: rgba(20, 83, 45, 0.08);
     --seasonal-border: rgba(185, 28, 28, 0.22);
+    --seasonal-text-light: #111827;
+    --seasonal-muted-light: #4b5563;
+    --seasonal-text-dark: #f8fafc;
+    --seasonal-muted-dark: #cbd5e1;
+    --app-secondary-contrast: #ffffff;
   }
 
   html.seasonal-theme-summer {
@@ -966,6 +977,11 @@
     --seasonal-bg-dark: linear-gradient(135deg, #082f49 0%, #164e63 48%, #422006 100%);
     --seasonal-panel-tint: rgba(245, 158, 11, 0.1);
     --seasonal-border: rgba(3, 105, 161, 0.24);
+    --seasonal-text-light: #0f172a;
+    --seasonal-muted-light: #475569;
+    --seasonal-text-dark: #f8fafc;
+    --seasonal-muted-dark: #cbd5e1;
+    --app-secondary-contrast: #111827;
   }
 
   html.seasonal-theme-thanksgiving {
@@ -973,6 +989,11 @@
     --seasonal-bg-dark: linear-gradient(135deg, #1c1007 0%, #431407 48%, #3b1d08 100%);
     --seasonal-panel-tint: rgba(194, 65, 12, 0.1);
     --seasonal-border: rgba(120, 53, 15, 0.25);
+    --seasonal-text-light: #1f2937;
+    --seasonal-muted-light: #4b5563;
+    --seasonal-text-dark: #fff7ed;
+    --seasonal-muted-dark: #fed7aa;
+    --app-secondary-contrast: #ffffff;
   }
 
   html.seasonal-theme-fall {
@@ -980,6 +1001,11 @@
     --seasonal-bg-dark: linear-gradient(135deg, #101907 0%, #2a1806 48%, #422006 100%);
     --seasonal-panel-tint: rgba(180, 83, 9, 0.1);
     --seasonal-border: rgba(54, 83, 20, 0.25);
+    --seasonal-text-light: #1f2937;
+    --seasonal-muted-light: #4b5563;
+    --seasonal-text-dark: #f7fee7;
+    --seasonal-muted-dark: #d9f99d;
+    --app-secondary-contrast: #ffffff;
   }
 
   html.seasonal-theme-spring {
@@ -987,6 +1013,11 @@
     --seasonal-bg-dark: linear-gradient(135deg, #052e22 0%, #18230d 48%, #3b1130 100%);
     --seasonal-panel-tint: rgba(219, 39, 119, 0.08);
     --seasonal-border: rgba(4, 120, 87, 0.24);
+    --seasonal-text-light: #0f172a;
+    --seasonal-muted-light: #475569;
+    --seasonal-text-dark: #ecfdf5;
+    --seasonal-muted-dark: #bbf7d0;
+    --app-secondary-contrast: #ffffff;
   }
 
   html.seasonal-theme-winter {
@@ -1002,6 +1033,11 @@
       linear-gradient(135deg, #061021 0%, #0f3460 48%, #082f49 100%);
     --seasonal-panel-tint: rgba(56, 189, 248, 0.08);
     --seasonal-border: rgba(56, 189, 248, 0.24);
+    --seasonal-text-light: #0f172a;
+    --seasonal-muted-light: #475569;
+    --seasonal-text-dark: #f8fafc;
+    --seasonal-muted-dark: #bae6fd;
+    --app-secondary-contrast: #111827;
   }
 
   html.seasonal-theme-patriotic {
@@ -1013,15 +1049,36 @@
       linear-gradient(135deg, #06133a 0%, #0f172a 45%, #450a0a 100%);
     --seasonal-panel-tint: rgba(29, 78, 216, 0.1);
     --seasonal-border: rgba(220, 38, 38, 0.28);
+    --seasonal-text-light: #0f172a;
+    --seasonal-muted-light: #475569;
+    --seasonal-text-dark: #f8fafc;
+    --seasonal-muted-dark: #cbd5e1;
+    --app-secondary-contrast: #ffffff;
   }
 
   html[class*='seasonal-theme-']:not(.dark) body {
     background: var(--seasonal-bg-light) !important;
+    color: var(--seasonal-text-light);
   }
 
   html[class*='seasonal-theme-'].dark body,
   html[class*='seasonal-theme-'].glass.dark body {
     background: var(--seasonal-bg-dark) !important;
+    color: var(--seasonal-text-dark);
+  }
+
+  html[class*='seasonal-theme-']:not(.dark) .text-gray-500,
+  html[class*='seasonal-theme-']:not(.dark) .text-gray-400,
+  html[class*='seasonal-theme-']:not(.dark) .dark\:text-gray-400,
+  html[class*='seasonal-theme-']:not(.dark) .dark\:text-gray-300 {
+    color: var(--seasonal-muted-light) !important;
+  }
+
+  html[class*='seasonal-theme-'].dark .text-gray-500,
+  html[class*='seasonal-theme-'].dark .text-gray-400,
+  html[class*='seasonal-theme-'].dark .dark\:text-gray-400,
+  html[class*='seasonal-theme-'].dark .dark\:text-gray-300 {
+    color: var(--seasonal-muted-dark) !important;
   }
 
   html[class*='seasonal-theme-']:not(.glass) .animate-app-enter {
@@ -1041,6 +1098,26 @@
       inset 0 1px 0 color-mix(in srgb, var(--app-secondary) 16%, transparent) !important;
   }
 
+  html[class*='seasonal-theme-']:not(.dark):not(.glass) .theme-polished-surface,
+  html[class*='seasonal-theme-']:not(.dark):not(.glass) .quick-launch-context-menu,
+  html[class*='seasonal-theme-']:not(.dark):not(.glass) .quick-launch-picker-enter,
+  html[class*='seasonal-theme-']:not(.dark):not(.glass) .recent-message-preview-pop,
+  html[class*='seasonal-theme-']:not(.dark):not(.glass) .modal-window,
+  html[class*='seasonal-theme-']:not(.dark):not(.glass) .floating-window,
+  html[class*='seasonal-theme-']:not(.dark):not(.glass) .glass-workspace-window {
+    color: var(--seasonal-text-light) !important;
+  }
+
+  html[class*='seasonal-theme-'].dark:not(.glass) .theme-polished-surface,
+  html[class*='seasonal-theme-'].dark:not(.glass) .quick-launch-context-menu,
+  html[class*='seasonal-theme-'].dark:not(.glass) .quick-launch-picker-enter,
+  html[class*='seasonal-theme-'].dark:not(.glass) .recent-message-preview-pop,
+  html[class*='seasonal-theme-'].dark:not(.glass) .modal-window,
+  html[class*='seasonal-theme-'].dark:not(.glass) .floating-window,
+  html[class*='seasonal-theme-'].dark:not(.glass) .glass-workspace-window {
+    color: var(--seasonal-text-dark) !important;
+  }
+
   html[class*='seasonal-theme-']:not(.glass) .shield-left-panel {
     background:
       linear-gradient(180deg, color-mix(in srgb, var(--app-primary) 90%, black), var(--app-primary) 54%, color-mix(in srgb, var(--app-secondary) 40%, var(--app-primary))) !important;
@@ -1051,6 +1128,13 @@
   html[class*='seasonal-theme-']:not(.glass) aside[class~='bg-white'] {
     border-color: var(--seasonal-border) !important;
     background-image: linear-gradient(135deg, var(--seasonal-panel-tint), transparent 42%);
+  }
+
+  html[class*='seasonal-theme-'].dark:not(.glass) section[class~='bg-white'],
+  html[class*='seasonal-theme-'].dark:not(.glass) article[class~='bg-white'],
+  html[class*='seasonal-theme-'].dark:not(.glass) aside[class~='bg-white'] {
+    background-color: rgba(15, 23, 42, 0.94) !important;
+    color: var(--seasonal-text-dark) !important;
   }
 
   html.seasonal-theme-patriotic .shield-left-panel {
@@ -1254,6 +1338,7 @@
 
   .btn-secondary {
     @apply btn bg-secondary-500 text-white hover:bg-secondary-600 hover:-translate-y-0.5 hover:shadow-lg;
+    color: var(--app-secondary-contrast) !important;
   }
 
   .btn-danger {
@@ -1275,7 +1360,7 @@
   .btn-secondary:not(:disabled):focus-visible,
   .btn-secondary:not(:disabled):active {
     background-color: color-mix(in srgb, var(--app-secondary) 84%, white) !important;
-    color: white !important;
+    color: var(--app-secondary-contrast) !important;
   }
 
   .btn-danger:not(:disabled):hover,
@@ -1434,6 +1519,60 @@
     color: rgb(248, 250, 252) !important;
   }
 
+  html.glass .theme-polished-surface .text-gray-900,
+  html.glass .theme-polished-surface .text-gray-800,
+  html.glass .theme-polished-surface .text-gray-700,
+  html.glass .modal-window .text-gray-900,
+  html.glass .modal-window .text-gray-800,
+  html.glass .modal-window .text-gray-700,
+  html.glass .floating-window .text-gray-900,
+  html.glass .floating-window .text-gray-800,
+  html.glass .floating-window .text-gray-700,
+  html.glass .recent-message-preview-pop .text-gray-900,
+  html.glass .recent-message-preview-pop .text-gray-800,
+  html.glass .recent-message-preview-pop .text-gray-700,
+  html.glass .quick-launch-context-menu .text-gray-900,
+  html.glass .quick-launch-context-menu .text-gray-800,
+  html.glass .quick-launch-context-menu .text-gray-700,
+  html.glass .quick-launch-picker-enter .text-gray-900,
+  html.glass .quick-launch-picker-enter .text-gray-800,
+  html.glass .quick-launch-picker-enter .text-gray-700 {
+    color: rgb(248, 250, 252) !important;
+  }
+
+  html.glass .theme-polished-surface .text-gray-600,
+  html.glass .theme-polished-surface .text-gray-500,
+  html.glass .theme-polished-surface .text-gray-400,
+  html.glass .modal-window .text-gray-600,
+  html.glass .modal-window .text-gray-500,
+  html.glass .modal-window .text-gray-400,
+  html.glass .floating-window .text-gray-600,
+  html.glass .floating-window .text-gray-500,
+  html.glass .floating-window .text-gray-400,
+  html.glass .recent-message-preview-pop .text-gray-600,
+  html.glass .recent-message-preview-pop .text-gray-500,
+  html.glass .recent-message-preview-pop .text-gray-400,
+  html.glass .quick-launch-context-menu .text-gray-600,
+  html.glass .quick-launch-context-menu .text-gray-500,
+  html.glass .quick-launch-context-menu .text-gray-400,
+  html.glass .quick-launch-picker-enter .text-gray-600,
+  html.glass .quick-launch-picker-enter .text-gray-500,
+  html.glass .quick-launch-picker-enter .text-gray-400 {
+    color: rgb(203, 213, 225) !important;
+  }
+
+  html.glass .theme-polished-surface .bg-gray-50,
+  html.glass .theme-polished-surface .bg-gray-100,
+  html.glass .modal-window .bg-gray-50,
+  html.glass .modal-window .bg-gray-100,
+  html.glass .floating-window .bg-gray-50,
+  html.glass .floating-window .bg-gray-100,
+  html.glass .recent-message-preview-pop .bg-gray-50,
+  html.glass .recent-message-preview-pop .bg-gray-100 {
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    background-color: rgba(30, 41, 59, 0.78) !important;
+  }
+
   html.glass input:not([type='checkbox']):not([type='radio']),
   html.glass textarea,
   html.glass select {
@@ -1579,6 +1718,60 @@
 
   html.glass:not(.dark) .theme-polished-surface .dark\:text-blue-100 {
     color: rgb(31, 41, 55) !important;
+  }
+
+  html.glass:not(.dark) .theme-polished-surface .text-gray-900,
+  html.glass:not(.dark) .theme-polished-surface .text-gray-800,
+  html.glass:not(.dark) .theme-polished-surface .text-gray-700,
+  html.glass:not(.dark) .modal-window .text-gray-900,
+  html.glass:not(.dark) .modal-window .text-gray-800,
+  html.glass:not(.dark) .modal-window .text-gray-700,
+  html.glass:not(.dark) .floating-window .text-gray-900,
+  html.glass:not(.dark) .floating-window .text-gray-800,
+  html.glass:not(.dark) .floating-window .text-gray-700,
+  html.glass:not(.dark) .recent-message-preview-pop .text-gray-900,
+  html.glass:not(.dark) .recent-message-preview-pop .text-gray-800,
+  html.glass:not(.dark) .recent-message-preview-pop .text-gray-700,
+  html.glass:not(.dark) .quick-launch-context-menu .text-gray-900,
+  html.glass:not(.dark) .quick-launch-context-menu .text-gray-800,
+  html.glass:not(.dark) .quick-launch-context-menu .text-gray-700,
+  html.glass:not(.dark) .quick-launch-picker-enter .text-gray-900,
+  html.glass:not(.dark) .quick-launch-picker-enter .text-gray-800,
+  html.glass:not(.dark) .quick-launch-picker-enter .text-gray-700 {
+    color: rgb(17, 24, 39) !important;
+  }
+
+  html.glass:not(.dark) .theme-polished-surface .text-gray-600,
+  html.glass:not(.dark) .theme-polished-surface .text-gray-500,
+  html.glass:not(.dark) .theme-polished-surface .text-gray-400,
+  html.glass:not(.dark) .modal-window .text-gray-600,
+  html.glass:not(.dark) .modal-window .text-gray-500,
+  html.glass:not(.dark) .modal-window .text-gray-400,
+  html.glass:not(.dark) .floating-window .text-gray-600,
+  html.glass:not(.dark) .floating-window .text-gray-500,
+  html.glass:not(.dark) .floating-window .text-gray-400,
+  html.glass:not(.dark) .recent-message-preview-pop .text-gray-600,
+  html.glass:not(.dark) .recent-message-preview-pop .text-gray-500,
+  html.glass:not(.dark) .recent-message-preview-pop .text-gray-400,
+  html.glass:not(.dark) .quick-launch-context-menu .text-gray-600,
+  html.glass:not(.dark) .quick-launch-context-menu .text-gray-500,
+  html.glass:not(.dark) .quick-launch-context-menu .text-gray-400,
+  html.glass:not(.dark) .quick-launch-picker-enter .text-gray-600,
+  html.glass:not(.dark) .quick-launch-picker-enter .text-gray-500,
+  html.glass:not(.dark) .quick-launch-picker-enter .text-gray-400 {
+    color: rgb(75, 85, 99) !important;
+  }
+
+  html.glass:not(.dark) .theme-polished-surface .bg-gray-50,
+  html.glass:not(.dark) .theme-polished-surface .bg-gray-100,
+  html.glass:not(.dark) .modal-window .bg-gray-50,
+  html.glass:not(.dark) .modal-window .bg-gray-100,
+  html.glass:not(.dark) .floating-window .bg-gray-50,
+  html.glass:not(.dark) .floating-window .bg-gray-100,
+  html.glass:not(.dark) .recent-message-preview-pop .bg-gray-50,
+  html.glass:not(.dark) .recent-message-preview-pop .bg-gray-100 {
+    border-color: rgba(15, 23, 42, 0.1) !important;
+    background-color: rgba(248, 250, 252, 0.88) !important;
   }
 
   html.glass:not(.dark) input:not([type='checkbox']):not([type='radio']),
