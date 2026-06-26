@@ -49,6 +49,7 @@ const DEFAULT_SITE_NAME = 'Blueline Workspace';
 const DEFAULT_PRIMARY_COLOR = '#1a365d';
 const DEFAULT_SECONDARY_COLOR = '#9C865C';
 const DEFAULT_BRAND_LOGO = '/shield-splash-logo.png';
+const PATRIOTIC_BRAND_LOGO = '/theme-assets/america-250-logo.png';
 const MAX_SETUP_LOGO_SIZE_BYTES = 240 * 1024;
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/iu;
 const LOGIN_TRANSITION_MS = 560;
@@ -60,8 +61,12 @@ function withAppBase(path: string): string {
   return `${APP_BASE_PATH}${normalizedPath}` || '/';
 }
 
-function getBrandLogoSrc(brandLogoDataUrl?: string): string {
-  return brandLogoDataUrl || withAppBase(DEFAULT_BRAND_LOGO);
+function getBrandLogoSrc(brandLogoDataUrl?: string, activeTheme?: EffectiveSeasonalTheme): string {
+  if (brandLogoDataUrl) {
+    return brandLogoDataUrl;
+  }
+
+  return withAppBase(activeTheme === 'patriotic' ? PATRIOTIC_BRAND_LOGO : DEFAULT_BRAND_LOGO);
 }
 
 function isHexColor(value: string): boolean {
@@ -306,6 +311,7 @@ function LoginSplash({
   appName = DEFAULT_APP_NAME,
   siteName = 'Agency Access Portal',
   brandLogoDataUrl = '',
+  brandLogoSrc,
   isExiting = false,
 }: {
   onLogin: (account: AuthAccount) => void;
@@ -313,6 +319,7 @@ function LoginSplash({
   appName?: string;
   siteName?: string;
   brandLogoDataUrl?: string;
+  brandLogoSrc?: string;
   isExiting?: boolean;
 }) {
   const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset'>('login');
@@ -525,7 +532,7 @@ function LoginSplash({
           <div className="max-w-3xl">
             <div className="mb-8 flex items-center gap-4">
               <span className="flex h-20 w-20 items-center justify-center rounded-2xl border border-white/15 bg-white/10 shadow-2xl backdrop-blur">
-                <img src={getBrandLogoSrc(brandLogoDataUrl)} alt="" className="h-16 w-16 object-contain" />
+                <img src={brandLogoSrc || getBrandLogoSrc(brandLogoDataUrl)} alt="" className="h-16 w-16 object-contain" />
               </span>
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.24em] text-accent">Secure Access</p>
@@ -562,7 +569,7 @@ function LoginSplash({
           <form ref={loginFormRef} onSubmit={handleSubmit} className="login-panel w-full max-w-md rounded-xl border border-white/15 bg-white/95 p-6 shadow-[0_28px_90px_rgba(0,0,0,0.35)] ring-1 ring-black/5 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-900/95 sm:p-8">
             <div className="mb-7">
               <div className="mb-5 flex items-center gap-3 lg:hidden">
-                <img src={getBrandLogoSrc(brandLogoDataUrl)} alt="" className="h-14 w-14 object-contain drop-shadow-lg" />
+                <img src={brandLogoSrc || getBrandLogoSrc(brandLogoDataUrl)} alt="" className="h-14 w-14 object-contain drop-shadow-lg" />
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.2em] text-accent">Secure Access</p>
                   <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">{appName}</p>
@@ -3193,6 +3200,7 @@ function App() {
   const secondaryColor = setupStatus?.secondaryColor || DEFAULT_SECONDARY_COLOR;
   const activeSeasonalTheme = useMemo(() => getEffectiveSeasonalTheme(seasonalTheme), [seasonalTheme]);
   const activeSeasonalThemeOption = useMemo(() => getSeasonalThemeOption(activeSeasonalTheme), [activeSeasonalTheme]);
+  const resolvedBrandLogoSrc = useMemo(() => getBrandLogoSrc(brandLogoDataUrl, activeSeasonalTheme), [activeSeasonalTheme, brandLogoDataUrl]);
   const [isApiConnectionLost, setIsApiConnectionLost] = useState(false);
   const [lastApiConnectedAt, setLastApiConnectedAt] = useState<number | null>(Date.now());
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -5915,7 +5923,7 @@ function App() {
           title={`Loading ${appName}`}
           detail={loadingDetail}
           steps={loadingSteps}
-          brandLogoSrc={getBrandLogoSrc(brandLogoDataUrl)}
+          brandLogoSrc={resolvedBrandLogoSrc}
           appName={appName}
         />
       ) : setupStatus?.setupRequired ? (
@@ -5945,7 +5953,7 @@ function App() {
       ) : setupStatus?.installed && getAppRelativePathname() === '/install' ? (
         <InstalledSetupClosedScreen appName={appName} siteName={siteName} />
       ) : !isAuthenticated ? (
-        <LoginSplash onLogin={handleLogin} onToast={showToast} appName={appName} siteName={siteName} brandLogoDataUrl={brandLogoDataUrl} isExiting={isLoginTransitioning} />
+        <LoginSplash onLogin={handleLogin} onToast={showToast} appName={appName} siteName={siteName} brandLogoDataUrl={brandLogoDataUrl} brandLogoSrc={resolvedBrandLogoSrc} isExiting={isLoginTransitioning} />
       ) : (
         <div className="animate-app-enter flex h-[100dvh] overflow-hidden bg-gray-50 dark:bg-gray-950">
           {globalContextMenu && (
@@ -6027,7 +6035,7 @@ function App() {
               {!isSidebarCollapsed && (
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center">
-                    <img src={getBrandLogoSrc(brandLogoDataUrl)} alt="" className="h-full w-full object-contain" />
+                    <img src={resolvedBrandLogoSrc} alt="" className="h-full w-full object-contain" />
                   </div>
                   <div>
                     <h1 className="text-xl font-bold tracking-wider text-white">{appName}</h1>
@@ -6037,7 +6045,7 @@ function App() {
               )}
               {isSidebarCollapsed && (
                 <div className="mx-auto flex h-10 w-10 items-center justify-center">
-                  <img src={getBrandLogoSrc(brandLogoDataUrl)} alt={appName} className="h-full w-full object-contain" />
+                  <img src={resolvedBrandLogoSrc} alt={appName} className="h-full w-full object-contain" />
                 </div>
               )}
             </div>
