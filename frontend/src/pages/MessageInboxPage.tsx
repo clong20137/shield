@@ -56,6 +56,8 @@ const PINNED_THREADS_KEY_PREFIX = 'shield_pinned_message_threads';
 const THREAD_MESSAGE_PAGE_SIZE = 40;
 const THREAD_LIST_MESSAGE_PAGE_SIZE = 80;
 const THREAD_SEARCH_MESSAGE_BODY_SCAN_LIMIT = 12;
+const THREAD_LIST_ROW_HEIGHT = 92;
+const THREAD_LIST_OVERSCAN = 6;
 const messageReactionOptions = [
   { key: 'thumbsUp', label: 'Thumbs up', icon: '👍' },
   { key: 'check', label: 'Check', icon: '✅' },
@@ -485,6 +487,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const [composeKeyboardInset, setComposeKeyboardInset] = useState(12);
   const [presenceByAccount, setPresenceByAccount] = useState<Record<string, { online: boolean; away: boolean; status?: 'active' | 'away' | 'busy'; lastSeenAt: string | null }>>({});
   const [threadMessageWindows, setThreadMessageWindows] = useState<Record<string, ThreadMessageWindowState>>({});
+  const [threadListScrollTop, setThreadListScrollTop] = useState(0);
+  const [threadListViewportHeight, setThreadListViewportHeight] = useState(0);
   const [memberDirectory, setMemberDirectory] = useState<Record<string, ThreadMemberPreview>>(() => ({
     [currentUser.id]: {
       id: currentUser.id,
@@ -497,6 +501,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const lastTypingSentRef = useRef(0);
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
   const composeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const threadListContainerRef = useRef<HTMLDivElement | null>(null);
   const threadMessageContainerRef = useRef<HTMLDivElement | null>(null);
   const replyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const threadLoadScrollStateRef = useRef<{
@@ -608,6 +613,32 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     setReplyAttachments([]);
     setSearchTerm('');
   }, [currentUser.id, targetRecipient?.id]);
+
+  useEffect(() => {
+    const container = threadListContainerRef.current;
+    if (!container) {
+      return undefined;
+    }
+
+    const measureThreadList = () => setThreadListViewportHeight(container.clientHeight);
+    measureThreadList();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measureThreadList);
+      return () => window.removeEventListener('resize', measureThreadList);
+    }
+
+    const observer = new ResizeObserver(measureThreadList);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [isLoading, isModalView]);
+
+  useEffect(() => {
+    setThreadListScrollTop(0);
+    if (threadListContainerRef.current) {
+      threadListContainerRef.current.scrollTop = 0;
+    }
+  }, [searchTerm]);
 
   const loadMessages = async (showLoading = false) => {
     if (messageLoadInFlightRef.current) {
@@ -1304,6 +1335,21 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       ].join(' ').toLowerCase().includes(term);
     });
   }, [currentUser.id, draftGroupRecipients, draftRecipient, draftThreadTitle, searchTerm, threads]);
+
+  const virtualThreadList = useMemo(() => {
+    const viewportHeight = threadListViewportHeight || 720;
+    const visibleCount = Math.ceil(viewportHeight / THREAD_LIST_ROW_HEIGHT) + THREAD_LIST_OVERSCAN * 2;
+    const startIndex = Math.max(0, Math.floor(threadListScrollTop / THREAD_LIST_ROW_HEIGHT) - THREAD_LIST_OVERSCAN);
+    const endIndex = Math.min(filteredThreads.length, startIndex + visibleCount);
+
+    return {
+      endIndex,
+      items: filteredThreads.slice(startIndex, endIndex),
+      offsetTop: startIndex * THREAD_LIST_ROW_HEIGHT,
+      startIndex,
+      totalHeight: filteredThreads.length * THREAD_LIST_ROW_HEIGHT,
+    };
+  }, [filteredThreads, threadListScrollTop, threadListViewportHeight]);
 
   const selectedThread = filteredThreads.find((thread) => thread.id === selectedThreadId) || null;
   const selectedThreadAcceptsMessages = selectedThread?.contactReceivesMessages !== false;
@@ -2246,16 +2292,26 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           ) : filteredThreads.length === 0 ? (
             <div className="empty-state">No conversations found.</div>
           ) : (
-            <div className="min-h-0 flex-1 divide-y divide-gray-100 overflow-y-auto pb-20 dark:divide-gray-800">
-              {filteredThreads.map((thread) => {
+            <div
+              ref={threadListContainerRef}
+              onScroll={(event) => setThreadListScrollTop(event.currentTarget.scrollTop)}
+              className="min-h-0 flex-1 overflow-y-auto pb-20"
+            >
+              <div className="relative divide-y divide-gray-100 dark:divide-gray-800" style={{ height: virtualThreadList.totalHeight }}>
+              {virtualThreadList.items.map((thread, virtualIndex) => {
                 const presence = getThreadPresence(thread);
                 const isPinned = pinnedThreadIds.includes(thread.id);
+                const rowIndex = virtualThreadList.startIndex + virtualIndex;
                 return (
                   <div
                     key={thread.id}
-                    className={`flex min-w-0 items-center gap-3 px-3 py-3 transition hover:bg-gray-50 dark:hover:bg-gray-800 sm:gap-2.5 sm:px-3 sm:py-3 ${
+                    className={`absolute left-0 right-0 flex min-w-0 items-center gap-3 px-3 py-3 transition hover:bg-gray-50 dark:hover:bg-gray-800 sm:gap-2.5 sm:px-3 sm:py-3 ${
                       selectedThreadId === thread.id ? 'bg-accent/10 ring-1 ring-inset ring-accent/10' : ''
                     }`}
+                    style={{
+                      height: THREAD_LIST_ROW_HEIGHT,
+                      top: rowIndex * THREAD_LIST_ROW_HEIGHT,
+                    }}
                   >
                     <button
                       type="button"
@@ -2349,6 +2405,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                   </div>
                 );
               })}
+              </div>
             </div>
           )}
           {isComposeOpen && createPortal((
