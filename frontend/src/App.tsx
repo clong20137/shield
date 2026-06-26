@@ -1689,7 +1689,7 @@ function RecentConversationsDock({
   onMarkRead: (conversation: RecentConversation) => void;
   onReply: (conversation: RecentConversation) => void;
   onQuickReplyClose: () => void;
-  onQuickReplySent: () => void;
+  onQuickReplySent: (conversation: RecentConversation) => void;
   onCompose: () => void;
   onToggleCollapsed: () => void;
   onToast: (type: ToastType, message: string, options?: { saveToNotifications?: boolean }) => void;
@@ -1793,7 +1793,7 @@ function RecentConversationsDock({
                   currentUser={currentUser}
                   conversation={conversation}
                   onClose={onQuickReplyClose}
-                  onSent={onQuickReplySent}
+                  onSent={() => onQuickReplySent(conversation)}
                   onToast={onToast}
                 />
               )}
@@ -2165,23 +2165,31 @@ function RecentMessageReplyPopover({
 }) {
   const [body, setBody] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [sentNotice, setSentNotice] = useState('');
+  const [sendState, setSendState] = useState<'composing' | 'sent' | 'closing'>('composing');
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const previewText = conversation.unreadPreview || conversation.subtitle || 'No preview available';
 
   useEffect(() => {
-    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0);
-    return () => window.clearTimeout(focusTimer);
-  }, [conversation.id]);
-
-  useEffect(() => {
-    if (!sentNotice) {
+    if (sendState !== 'composing') {
       return undefined;
     }
 
-    const timer = window.setTimeout(() => setSentNotice(''), 1800);
-    return () => window.clearTimeout(timer);
-  }, [sentNotice]);
+    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0);
+    return () => window.clearTimeout(focusTimer);
+  }, [conversation.id, sendState]);
+
+  useEffect(() => {
+    if (sendState !== 'sent') {
+      return undefined;
+    }
+
+    const closeStartTimer = window.setTimeout(() => setSendState('closing'), 1600);
+    const closeTimer = window.setTimeout(onClose, 2100);
+    return () => {
+      window.clearTimeout(closeStartTimer);
+      window.clearTimeout(closeTimer);
+    };
+  }, [onClose, sendState]);
 
   const sendReply = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2219,10 +2227,14 @@ function RecentMessageReplyPopover({
         });
       }
 
+      const unreadMessageIds = conversation.unreadMessageIds.filter(Boolean);
+      if (unreadMessageIds.length > 0) {
+        await Promise.all(unreadMessageIds.map((messageId) => messageService.markRead(messageId, currentUser.id)));
+      }
+
       onSent();
       setBody('');
-      setSentNotice('Sent');
-      window.setTimeout(() => inputRef.current?.focus(), 0);
+      setSendState('sent');
     } catch (error) {
       console.error('Recent message reply failed:', error);
       errorLogService.createClientLog({
@@ -2259,9 +2271,20 @@ function RecentMessageReplyPopover({
   return (
     <form
       onSubmit={sendReply}
-      className="recent-message-preview-pop recent-message-preview-pop--arrow recent-message-preview-pop--modern absolute right-14 z-30 w-80 rounded-2xl p-3 text-left shadow-[0_22px_55px_rgba(15,23,42,0.28)] backdrop-blur-xl"
+      className={`recent-message-preview-pop recent-message-preview-pop--arrow recent-message-preview-pop--modern absolute right-14 z-30 w-80 rounded-2xl p-3 text-left shadow-[0_22px_55px_rgba(15,23,42,0.28)] backdrop-blur-xl transition duration-500 ${sendState === 'closing' ? 'translate-x-2 scale-95 opacity-0' : 'translate-x-0 scale-100 opacity-100'}`}
       aria-label="Quick reply"
     >
+      {sendState !== 'composing' ? (
+        <div className="flex min-h-24 items-center justify-center gap-3 text-center">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-500 text-white shadow-lg shadow-green-900/20">
+            <CheckCircle2 size={22} />
+          </span>
+          <span>
+            <span className="block text-sm font-black text-gray-900 dark:text-gray-100">Message Sent</span>
+            <span className="mt-0.5 block text-xs font-semibold text-gray-500 dark:text-gray-400">{conversation.title}</span>
+          </span>
+        </div>
+      ) : (
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
@@ -2294,10 +2317,8 @@ function RecentMessageReplyPopover({
             <Send size={16} />
           </button>
         </div>
-        {sentNotice && (
-          <p className="text-right text-[11px] font-black uppercase tracking-wide text-accent">{sentNotice}</p>
-        )}
       </div>
+      )}
     </form>
   );
 }
@@ -9868,7 +9889,22 @@ function App() {
               onMarkRead={markRecentConversationRead}
               onReply={openRecentQuickReply}
               onQuickReplyClose={() => setQuickReplyConversation(null)}
-              onQuickReplySent={() => window.dispatchEvent(new CustomEvent('shield:messages-updated'))}
+              onQuickReplySent={(conversation) => {
+                setRecentConversations((previousConversations) =>
+                  previousConversations.map((recentConversation) =>
+                    recentConversation.id === conversation.id
+                      ? {
+                          ...recentConversation,
+                          unreadCount: 0,
+                          unreadPreview: '',
+                          unreadMessageIds: [],
+                        }
+                      : recentConversation,
+                  ),
+                );
+                setMessageUnreadCount((count) => Math.max(0, count - conversation.unreadCount));
+                window.dispatchEvent(new CustomEvent('shield:messages-updated'));
+              }}
               onCompose={openNewMessageComposer}
               onToggleCollapsed={() => setAreRecentConversationsCollapsed((collapsed) => !collapsed)}
               onToast={showToast}
