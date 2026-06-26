@@ -1139,7 +1139,10 @@
 
   html.seasonal-theme-patriotic .shield-left-panel {
     background:
-      linear-gradient(180deg, #1e3a8a 0%, #1d4ed8 52%, #991b1b 100%) !important;
+      linear-gradient(180deg, rgba(8, 20, 54, 0.48), rgba(9, 18, 43, 0.62)),
+      linear-gradient(132deg, rgba(255, 255, 255, 0.18) 0 12%, transparent 12% 21%, rgba(255, 255, 255, 0.14) 21% 32%, transparent 32% 100%),
+      linear-gradient(160deg, #0f2f76 0%, #1d4ed8 27%, #f8fafc 48%, #dc2626 68%, #7f1d1d 100%) !important;
+    border-right-color: rgba(255, 255, 255, 0.24) !important;
   }
 
   html.seasonal-theme-patriotic .theme-polished-surface,
