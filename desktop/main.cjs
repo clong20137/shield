@@ -578,11 +578,11 @@ function createShieldTrayIcon(count = desktopUnreadCount, status = desktopPresen
     drawPolygon(canvas, [[16, 10], [20, 12], [20, 15], [18.5, 19], [16, 21], [13.5, 19], [12, 15], [12, 12]], colorToRgba('#dc2626'));
     if (safeCount > 0) {
       const label = safeCount > 99 ? '99+' : String(safeCount);
-      drawRoundedRect(canvas, 0, 1, label.length > 2 ? 23 : 18, 13, 6, colorToRgba('#dc2626'));
-      drawPixelText(canvas, label, label.length > 2 ? 3 : 5, 5, 1, colorToRgba('#ffffff'));
+      drawCircle(canvas, 23, 8, label.length > 2 ? 8.4 : 7.2, colorToRgba('#dc2626'));
+      drawPixelText(canvas, label, label.length > 2 ? 16 : 19, 5, 1, colorToRgba('#ffffff'));
     }
-    drawCircle(canvas, 24.5, 24.5, 7.5, colorToRgba('#ffffff'));
-    drawCircle(canvas, 24.5, 24.5, 5.7, presenceColor);
+    drawCircle(canvas, 25, 25, 6.4, colorToRgba('#ffffff'));
+    drawCircle(canvas, 25, 25, 4.8, presenceColor);
   });
 }
 
@@ -1114,15 +1114,15 @@ function createBadgeOverlay(count, status) {
   return createPngImage(64, 64, (canvas) => {
     if (safeCount > 0) {
       const label = safeCount > 99 ? '99+' : String(safeCount);
-      drawRoundedRect(canvas, 1, 7, label.length > 2 ? 48 : 40, 32, 16, colorToRgba('#dc2626'));
-      drawPixelText(canvas, label, label.length > 2 ? 8 : 11, 15, label.length > 2 ? 3 : 4, colorToRgba('#ffffff'));
-      drawCircle(canvas, 47, 47, 17, colorToRgba('#ffffff'));
-      drawCircle(canvas, 47, 47, 13, presenceColor);
+      drawCircle(canvas, 44, 20, label.length > 2 ? 18 : 16, colorToRgba('#dc2626'));
+      drawPixelText(canvas, label, label.length > 2 ? 30 : 35, 12, label.length > 2 ? 3 : 4, colorToRgba('#ffffff'));
+      drawCircle(canvas, 48, 49, 13, colorToRgba('#ffffff'));
+      drawCircle(canvas, 48, 49, 9.5, presenceColor);
       return;
     }
 
-    drawCircle(canvas, 41, 41, 20, colorToRgba('#ffffff'));
-    drawCircle(canvas, 41, 41, 15, presenceColor);
+    drawCircle(canvas, 46, 46, 15, colorToRgba('#ffffff'));
+    drawCircle(canvas, 46, 46, 11, presenceColor);
   });
 }
 
