@@ -12,7 +12,7 @@ const mediaUpload = multer({
   },
 });
 
-router.get('/', requireAnyPermission(['media:view', 'media:upload', 'media:edit', 'media:delete', 'users:profile-picture', 'dashboard:create', 'dashboard:edit', 'dashboard:manage']), MediaController.list);
+router.get('/', requireAnyPermission(['media:view', 'media:upload', 'media:edit', 'media:delete', 'users:profile-picture', 'account:profile-picture', 'dashboard:create', 'dashboard:edit', 'dashboard:manage']), MediaController.list);
 router.post('/folders', requirePermission('media:edit'), MediaController.createFolder);
 router.put('/folders/:folder', requirePermission('media:edit'), MediaController.renameFolder);
 router.delete('/folders/:folder', requirePermission('media:delete'), MediaController.deleteFolder);

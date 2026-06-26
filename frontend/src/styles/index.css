@@ -1162,6 +1162,22 @@
     border-color: rgba(37, 99, 235, 0.28) !important;
   }
 
+  html.seasonal-theme-patriotic .btn-danger,
+  html.seasonal-theme-patriotic button[class*='bg-danger'],
+  html.seasonal-theme-patriotic button[class*='bg-red-'],
+  html.seasonal-theme-patriotic a[class*='bg-danger'],
+  html.seasonal-theme-patriotic a[class*='bg-red-'] {
+    color: #ffffff !important;
+  }
+
+  html.seasonal-theme-patriotic .btn-danger *,
+  html.seasonal-theme-patriotic button[class*='bg-danger'] *,
+  html.seasonal-theme-patriotic button[class*='bg-red-'] *,
+  html.seasonal-theme-patriotic a[class*='bg-danger'] *,
+  html.seasonal-theme-patriotic a[class*='bg-red-'] * {
+    color: #ffffff !important;
+  }
+
   html.seasonal-theme-christmas .modal-window,
   html.seasonal-theme-christmas .quick-launch-context-menu,
   html.seasonal-theme-christmas .quick-launch-picker-enter,

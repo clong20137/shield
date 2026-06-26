@@ -92,6 +92,11 @@ async function canUseFullMediaLibrary(accountId: string): Promise<boolean> {
   return ['media:view', 'media:upload', 'media:edit', 'media:delete', 'users:profile-picture'].some((permission) => permissions.includes(permission));
 }
 
+async function canUseProfilePictureMedia(accountId: string): Promise<boolean> {
+  const permissions = await AuthAccountModel.getPermissionsForAccount(accountId);
+  return permissions.includes('account:profile-picture');
+}
+
 async function canUseDashboardMedia(accountId: string): Promise<boolean> {
   const permissions = await AuthAccountModel.getPermissionsForAccount(accountId);
   return ['dashboard:create', 'dashboard:edit', 'dashboard:manage'].some((permission) => permissions.includes(permission));
@@ -124,9 +129,11 @@ export class MediaController {
       const page = Math.max(Number(req.query.page) || 1, 1);
       const limit = Math.min(Math.max(Number(req.query.limit) || 60, 12), 120);
       const hasFullMediaAccess = account.role === 'administrator' || await canUseFullMediaLibrary(account.id);
+      const hasProfilePictureMediaAccess = account.role === 'administrator' || await canUseProfilePictureMedia(account.id);
       const hasDashboardMediaAccess = account.role === 'administrator' || await canUseDashboardMedia(account.id);
+      const canReadSelectedProfilePictures = hasProfilePictureMediaAccess && (!selectedFolder || selectedFolder === 'profile-pictures');
 
-      if (!hasFullMediaAccess && (!hasDashboardMediaAccess || selectedFolder !== dashboardMediaFolder)) {
+      if (!hasFullMediaAccess && !canReadSelectedProfilePictures && (!hasDashboardMediaAccess || selectedFolder !== dashboardMediaFolder)) {
         return res.status(403).json({ error: 'Permission denied' });
       }
 
@@ -149,7 +156,19 @@ export class MediaController {
         protected: boolean;
       }> = [];
 
-      for (const folder of getFolderDefinitions()) {
+      const availableFolders = getFolderDefinitions().filter((folder) => {
+        if (hasFullMediaAccess) {
+          return true;
+        }
+
+        if (canReadSelectedProfilePictures) {
+          return folder.key === 'profile-pictures';
+        }
+
+        return hasDashboardMediaAccess && folder.key === dashboardMediaFolder;
+      });
+
+      for (const folder of availableFolders) {
         const folderPath = path.join(uploadsRoot, folder.key);
         let folderCount = 0;
         let folderSize = 0;

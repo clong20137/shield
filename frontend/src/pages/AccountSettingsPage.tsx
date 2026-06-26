@@ -144,6 +144,7 @@ export function AccountSettingsPage({
   const hasAccountPermission = (permission: string) => account.role === 'administrator' || Boolean(account.permissions?.includes(permission));
   const canChangeCalendarPreference = account.role === 'administrator' || Boolean(account.permissions?.includes('calendar:manage'));
   const canUseIncognitoMode = account.role === 'administrator' || Boolean(account.permissions?.includes('presence:incognito'));
+  const canChangeOwnProfilePicture = hasAccountPermission('account:profile-picture') || hasAccountPermission('users:profile-picture');
   const canChangeReceiveMessages = hasAccountPermission('messages:receive');
   const canChangeStartWithWindows = hasAccountPermission('desktop:start-with-windows');
   const canChangeTrayMode = hasAccountPermission('desktop:minimize-to-tray');
@@ -320,6 +321,12 @@ export function AccountSettingsPage({
     const file = event.target.files?.[0];
     if (!file) return;
 
+    if (!canChangeOwnProfilePicture) {
+      onToast('error', 'You do not have permission to change your profile picture.');
+      event.target.value = '';
+      return;
+    }
+
     setIsProfilePictureSaving(true);
 
     try {
@@ -335,6 +342,11 @@ export function AccountSettingsPage({
   };
 
   const selectProfilePictureFromMedia = async (item: MediaLibraryItem) => {
+    if (!canChangeOwnProfilePicture) {
+      onToast('error', 'You do not have permission to change your profile picture.');
+      return;
+    }
+
     setIsProfilePictureSaving(true);
 
     try {
@@ -517,7 +529,7 @@ export function AccountSettingsPage({
       {activeTab === 'general' && (
       <>
       <ProfilePictureMediaPicker
-        isOpen={isProfileMediaPickerOpen}
+        isOpen={isProfileMediaPickerOpen && canChangeOwnProfilePicture}
         isSaving={isProfilePictureSaving}
         onClose={() => setIsProfileMediaPickerOpen(false)}
         onSelect={selectProfilePictureFromMedia}
@@ -529,11 +541,15 @@ export function AccountSettingsPage({
           <div className="flex min-w-0 flex-col items-center gap-3 text-center sm:flex-row sm:gap-4 sm:text-left">
             <button
               type="button"
-              onClick={() => setIsProfileMediaPickerOpen(true)}
+              onClick={() => {
+                if (canChangeOwnProfilePicture) {
+                  setIsProfileMediaPickerOpen(true);
+                }
+              }}
               className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white text-accent dark:border-gray-700 dark:bg-gray-900"
               aria-label="Choose profile picture from media library"
-              title="Choose from media library"
-              disabled={isProfilePictureSaving}
+              title={canChangeOwnProfilePicture ? 'Choose from media library' : 'Profile picture changes are disabled for your account'}
+              disabled={isProfilePictureSaving || !canChangeOwnProfilePicture}
             >
               {account.profilePictureUrl ? (
                 <img
@@ -564,15 +580,18 @@ export function AccountSettingsPage({
                 {isProfilePictureSaving ? 'Updating profile picture...' : account.email}
               </p>
               <div className="mt-2 flex flex-wrap justify-center gap-2 sm:justify-start">
-                <button type="button" onClick={() => setIsProfileMediaPickerOpen(true)} className="btn-secondary py-1.5 text-xs" disabled={isProfilePictureSaving}>
+                <button type="button" onClick={() => setIsProfileMediaPickerOpen(true)} className="btn-secondary py-1.5 text-xs" disabled={isProfilePictureSaving || !canChangeOwnProfilePicture} title={canChangeOwnProfilePicture ? 'Choose from media library' : 'Profile picture changes are disabled for your account'}>
                   <Image size={14} />
                   Media Library
                 </button>
-                <button type="button" onClick={() => profilePictureInputRef.current?.click()} className="btn-secondary py-1.5 text-xs" disabled={isProfilePictureSaving}>
+                <button type="button" onClick={() => profilePictureInputRef.current?.click()} className="btn-secondary py-1.5 text-xs" disabled={isProfilePictureSaving || !canChangeOwnProfilePicture} title={canChangeOwnProfilePicture ? 'Upload profile picture' : 'Profile picture changes are disabled for your account'}>
                   <Camera size={14} />
                   Upload
                 </button>
               </div>
+              {!canChangeOwnProfilePicture && (
+                <p className="mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400">Profile picture changes are disabled for your account.</p>
+              )}
             </div>
           </div>
 

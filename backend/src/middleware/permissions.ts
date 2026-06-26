@@ -171,3 +171,62 @@ export function requireSelfOrPermission(getTargetId: (req: Request) => string | 
     }
   };
 }
+
+export function requireSelfPermissionOrPermission(
+  getTargetId: (req: Request) => string | undefined,
+  selfPermission: string,
+  otherPermission: string,
+) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const account = await getRequestAccount(req);
+      const targetId = getTargetId(req);
+
+      if (!account) {
+        void auditSecurityEvent({
+          req,
+          action: 'security.auth_required',
+          entityType: 'access-control',
+          details: { selfPermission, otherPermission, targetId, reason: 'missing_session' },
+        }).catch((error) => console.error('Security audit error:', error));
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      if (blockUntilPasswordChanged(req, res, account)) {
+        return;
+      }
+
+      if (account.role === 'administrator') {
+        return next();
+      }
+
+      const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
+      const isSelfTarget = account.id === targetId;
+      const hasRequiredPermission = isSelfTarget
+        ? permissions.includes(selfPermission) || permissions.includes(otherPermission)
+        : permissions.includes(otherPermission);
+
+      if (!hasRequiredPermission) {
+        void auditSecurityEvent({
+          req,
+          actor: account,
+          action: 'security.permission_denied',
+          entityType: 'access-control',
+          entityId: account.id,
+          details: {
+            permission: isSelfTarget ? selfPermission : otherPermission,
+            alternatePermission: isSelfTarget ? otherPermission : undefined,
+            targetId,
+            reason: 'permission_missing',
+          },
+        }).catch((error) => console.error('Security audit error:', error));
+        return res.status(403).json({ error: 'Permission denied' });
+      }
+
+      return next();
+    } catch (error) {
+      console.error('Permission check error:', error);
+      return res.status(500).json({ error: 'Failed to verify permissions' });
+    }
+  };
+}

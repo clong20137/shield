@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { UserController } from '../controllers/userController';
 import { profilePictureImportUpload, profilePictureUpload } from '../middleware/profileUpload';
-import { requirePermission, requireSelfOrPermission } from '../middleware/permissions';
+import { requirePermission, requireSelfOrPermission, requireSelfPermissionOrPermission } from '../middleware/permissions';
 import { rateLimit } from '../middleware/rateLimit';
 
 const router = Router();
@@ -34,9 +34,9 @@ router.post('/', userCreateLimiter, requirePermission('users:create'), UserContr
 router.post('/import', userImportLimiter, requirePermission('users:create'), spreadsheetUpload.single('spreadsheet'), UserController.importUsers);
 router.post('/profile-pictures/import', profilePictureImportLimiter, requirePermission('users:profile-picture'), profilePictureImportUpload.array('photos', 3000), UserController.importProfilePictures);
 router.post('/profile-pictures/repair-missing', requirePermission('users:profile-picture'), UserController.repairMissingProfilePictures);
-router.post('/:id/profile-picture', profilePictureLimiter, requireSelfOrPermission((req) => req.params.id, 'users:profile-picture'), profilePictureUpload.single('profilePicture'), UserController.uploadProfilePicture);
-router.put('/:id/profile-picture', profilePictureLimiter, requireSelfOrPermission((req) => req.params.id, 'users:profile-picture'), UserController.setProfilePicture);
-router.delete('/:id/profile-picture', profilePictureLimiter, requireSelfOrPermission((req) => req.params.id, 'users:profile-picture'), UserController.removeProfilePicture);
+router.post('/:id/profile-picture', profilePictureLimiter, requireSelfPermissionOrPermission((req) => req.params.id, 'account:profile-picture', 'users:profile-picture'), profilePictureUpload.single('profilePicture'), UserController.uploadProfilePicture);
+router.put('/:id/profile-picture', profilePictureLimiter, requireSelfPermissionOrPermission((req) => req.params.id, 'account:profile-picture', 'users:profile-picture'), UserController.setProfilePicture);
+router.delete('/:id/profile-picture', profilePictureLimiter, requireSelfPermissionOrPermission((req) => req.params.id, 'account:profile-picture', 'users:profile-picture'), UserController.removeProfilePicture);
 router.get('/:id', requirePermission('users:view'), UserController.getUserById);
 router.put('/:id', userMutationLimiter, requireSelfOrPermission((req) => req.params.id, 'users:edit'), UserController.updateUser);
 router.delete('/:id', userMutationLimiter, requirePermission('users:edit'), UserController.deleteUser);

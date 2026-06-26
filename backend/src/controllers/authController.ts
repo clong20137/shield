@@ -25,6 +25,7 @@ const allowedPermissions = [
   'users:edit',
   'users:view-hidden',
   'users:profile-picture',
+  'account:profile-picture',
   'presence:incognito',
   'presence:view-incognito',
   'media:view',
