@@ -1849,9 +1849,9 @@ function RecentConversationsDock({
                       getInitials(conversation.title)
                     )}
                     {presence && !typing && (
-                      <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-white dark:border-gray-900 dark:bg-gray-900">
-                        {presence.showPulse && <span className={`absolute inset-[-0.2rem] rounded-full border shield-online-pulse ${presence.pulseClass}`} />}
-                        <span className={`relative h-2.5 w-2.5 rounded-full ${presence.dotClass}`} />
+                      <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-white shadow-sm dark:border-gray-900 dark:bg-gray-900">
+                        {presence.showPulse && <span className={`absolute inset-[-0.24rem] rounded-full border shield-online-pulse ${presence.pulseClass}`} />}
+                        <span className={`relative h-3 w-3 rounded-full ${presence.dotClass}`} />
                       </span>
                     )}
                     {typing && (
@@ -1864,7 +1864,7 @@ function RecentConversationsDock({
                       </span>
                     )}
                     {conversation.unreadCount > 0 && (
-                      <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-danger px-1 text-[10px] font-black text-white dark:border-gray-900">
+                      <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border-2 border-white bg-danger px-1.5 text-[10px] font-black leading-none text-white shadow-[0_8px_18px_rgba(220,38,38,0.32)] dark:border-gray-900">
                         {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
                       </span>
                     )}
