@@ -1301,89 +1301,98 @@
     }
   }
 
-  .seasonal-turkey-peek {
-    --turkey-offset: 50%;
-    position: fixed;
-    z-index: 41;
-    width: 5.75rem;
-    height: 5.75rem;
-    opacity: 0;
-    filter: drop-shadow(0 1rem 1.5rem rgba(67, 20, 7, 0.25));
-    animation: seasonal-turkey-peek 5.8s ease-in-out both;
-    will-change: transform, opacity;
-  }
-
-  .seasonal-turkey-peek-left {
-    left: -4.2rem;
-    top: var(--turkey-offset);
-    transform: translateY(-50%);
-  }
-
-  .seasonal-turkey-peek-right {
-    right: -4.2rem;
-    top: var(--turkey-offset);
-    transform: translateY(-50%) scaleX(-1);
-  }
-
-  .seasonal-turkey-peek-top {
-    top: -4.4rem;
-    left: var(--turkey-offset);
-    transform: translateX(-50%) rotate(90deg);
-  }
-
-  .seasonal-turkey-peek-bottom {
-    bottom: -4.4rem;
-    left: var(--turkey-offset);
-    transform: translateX(-50%) rotate(-90deg);
-  }
-
-  .seasonal-turkey-tail {
-    position: absolute;
-    left: 0.3rem;
-    top: 0.55rem;
-    width: 4rem;
-    height: 4.25rem;
-    border-radius: 4rem 4rem 1.2rem 1.2rem;
+  .thanksgiving-sidebar-animation {
+    position: relative;
+    height: 8.75rem;
+    overflow: hidden;
+    border-radius: 0.75rem;
     background:
-      conic-gradient(from 220deg at 50% 88%, #92400e 0 18deg, #d97706 18deg 42deg, #b91c1c 42deg 68deg, #f59e0b 68deg 94deg, #854d0e 94deg 122deg, #92400e 122deg 146deg, transparent 146deg 360deg);
-    transform: rotate(-20deg);
+      radial-gradient(circle at 20% 15%, rgba(254, 243, 199, 0.22), transparent 34%),
+      linear-gradient(180deg, rgba(255, 247, 237, 0.16), rgba(120, 53, 15, 0.18));
+    border: 1px solid rgba(254, 215, 170, 0.24);
   }
 
-  .seasonal-turkey-body {
+  .thanksgiving-sidebar-ground {
     position: absolute;
-    left: 2rem;
+    inset: auto 1rem 0.8rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: rgba(67, 20, 7, 0.26);
+    filter: blur(0.08rem);
+  }
+
+  .thanksgiving-sidebar-turkey {
+    position: absolute;
+    left: 50%;
+    bottom: 1.15rem;
+    width: 6.5rem;
+    height: 6.35rem;
+    transform: translateX(-50%);
+    animation: thanksgiving-sidebar-bob 2.8s ease-in-out infinite;
+    filter: drop-shadow(0 1rem 1.2rem rgba(67, 20, 7, 0.24));
+  }
+
+  .thanksgiving-sidebar-tail {
+    position: absolute;
+    left: 0.15rem;
+    top: 0.05rem;
+    width: 4.9rem;
+    height: 4.85rem;
+    border-radius: 5rem 5rem 1.35rem 1.35rem;
+    background:
+      conic-gradient(from 220deg at 50% 88%, #7c2d12 0 16deg, #d97706 16deg 38deg, #b91c1c 38deg 62deg, #fbbf24 62deg 86deg, #92400e 86deg 112deg, #a16207 112deg 140deg, transparent 140deg 360deg);
+    transform-origin: 68% 86%;
+    animation: thanksgiving-sidebar-tail 2.8s ease-in-out infinite;
+  }
+
+  .thanksgiving-sidebar-body {
+    position: absolute;
+    left: 2.45rem;
     top: 2.25rem;
-    width: 2.65rem;
-    height: 2.85rem;
-    border-radius: 50% 50% 48% 48%;
-    background: linear-gradient(145deg, #78350f, #451a03);
-    box-shadow: inset 0 0.35rem 0.6rem rgba(255, 255, 255, 0.12);
+    width: 2.9rem;
+    height: 3.1rem;
+    border-radius: 52% 52% 48% 48%;
+    background: linear-gradient(145deg, #92400e, #451a03);
+    box-shadow: inset 0 0.42rem 0.65rem rgba(255, 255, 255, 0.14);
   }
 
-  .seasonal-turkey-head {
+  .thanksgiving-sidebar-wing {
     position: absolute;
-    right: -0.55rem;
-    top: 0.35rem;
-    width: 1.4rem;
-    height: 1.35rem;
+    left: 0.42rem;
+    top: 1.15rem;
+    width: 1.35rem;
+    height: 1.4rem;
+    border-radius: 1rem 1rem 1rem 0.35rem;
+    background: rgba(67, 20, 7, 0.36);
+    transform: rotate(-12deg);
+    animation: thanksgiving-sidebar-wing 2.8s ease-in-out infinite;
+  }
+
+  .thanksgiving-sidebar-head {
+    position: absolute;
+    right: -0.6rem;
+    top: 0.25rem;
+    width: 1.45rem;
+    height: 1.42rem;
     border-radius: 50%;
-    background: #854d0e;
+    background: #a16207;
+    animation: thanksgiving-sidebar-head 2.8s ease-in-out infinite;
   }
 
-  .seasonal-turkey-eye {
+  .thanksgiving-sidebar-eye {
     position: absolute;
-    right: 0.35rem;
-    top: 0.35rem;
+    right: 0.36rem;
+    top: 0.38rem;
     width: 0.18rem;
     height: 0.18rem;
     border-radius: 999px;
     background: #111827;
   }
 
-  .seasonal-turkey-beak {
+  .thanksgiving-sidebar-beak {
     position: absolute;
     right: -0.35rem;
-    top: 0.53rem;
+    top: 0.57rem;
     width: 0;
     height: 0;
     border-top: 0.2rem solid transparent;
@@ -1391,89 +1400,70 @@
     border-left: 0.45rem solid #f59e0b;
   }
 
-  @keyframes seasonal-turkey-peek {
+  .thanksgiving-sidebar-leg {
+    position: absolute;
+    bottom: -0.42rem;
+    width: 0.17rem;
+    height: 0.58rem;
+    border-radius: 999px;
+    background: #f59e0b;
+  }
+
+  .thanksgiving-sidebar-leg-left {
+    left: 1.08rem;
+  }
+
+  .thanksgiving-sidebar-leg-right {
+    left: 1.72rem;
+  }
+
+  @keyframes thanksgiving-sidebar-bob {
     0%,
     100% {
-      opacity: 0;
+      transform: translateX(-50%) translateY(0);
     }
-    16%,
-    72% {
-      opacity: 1;
+    50% {
+      transform: translateX(-50%) translateY(-0.35rem);
     }
   }
 
-  .seasonal-turkey-peek-left {
-    animation-name: seasonal-turkey-peek-left;
-  }
-
-  .seasonal-turkey-peek-right {
-    animation-name: seasonal-turkey-peek-right;
-  }
-
-  .seasonal-turkey-peek-top {
-    animation-name: seasonal-turkey-peek-top;
-  }
-
-  .seasonal-turkey-peek-bottom {
-    animation-name: seasonal-turkey-peek-bottom;
-  }
-
-  @keyframes seasonal-turkey-peek-left {
+  @keyframes thanksgiving-sidebar-tail {
     0%,
     100% {
-      opacity: 0;
-      transform: translate(-0.4rem, -50%);
+      transform: rotate(-5deg) scale(1);
     }
-    16%,
-    72% {
-      opacity: 1;
-      transform: translate(2.65rem, -50%);
+    50% {
+      transform: rotate(3deg) scale(1.03);
     }
   }
 
-  @keyframes seasonal-turkey-peek-right {
+  @keyframes thanksgiving-sidebar-wing {
     0%,
     100% {
-      opacity: 0;
-      transform: translate(0.4rem, -50%) scaleX(-1);
+      transform: rotate(-12deg);
     }
-    16%,
-    72% {
-      opacity: 1;
-      transform: translate(-2.65rem, -50%) scaleX(-1);
+    50% {
+      transform: rotate(-24deg);
     }
   }
 
-  @keyframes seasonal-turkey-peek-top {
+  @keyframes thanksgiving-sidebar-head {
     0%,
     100% {
-      opacity: 0;
-      transform: translate(-50%, -0.4rem) rotate(90deg);
+      transform: rotate(0deg);
     }
-    16%,
-    72% {
-      opacity: 1;
-      transform: translate(-50%, 2.65rem) rotate(90deg);
-    }
-  }
-
-  @keyframes seasonal-turkey-peek-bottom {
-    0%,
-    100% {
-      opacity: 0;
-      transform: translate(-50%, 0.4rem) rotate(-90deg);
-    }
-    16%,
-    72% {
-      opacity: 1;
-      transform: translate(-50%, -2.65rem) rotate(-90deg);
+    50% {
+      transform: rotate(8deg);
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .seasonal-snow-layer,
     .seasonal-leaf-layer,
-    .seasonal-turkey-peek {
+    .thanksgiving-sidebar-turkey,
+    .thanksgiving-sidebar-tail,
+    .thanksgiving-sidebar-wing,
+    .thanksgiving-sidebar-head {
       animation: none !important;
     }
   }

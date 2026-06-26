@@ -2364,30 +2364,6 @@ function ConfettiOverlay() {
 function SeasonalThemeEffects({ activeTheme }: { activeTheme: EffectiveSeasonalTheme }) {
   const showSnow = activeTheme === 'christmas' || activeTheme === 'winter';
   const showFallEffects = activeTheme === 'fall';
-  const [turkeyPeek, setTurkeyPeek] = useState(() => ({
-    side: 'left' as 'left' | 'right' | 'top' | 'bottom',
-    offset: 24,
-    key: 0,
-  }));
-
-  useEffect(() => {
-    if (!showFallEffects) {
-      return undefined;
-    }
-
-    const sides = ['left', 'right', 'top', 'bottom'] as const;
-    const updateTurkeyPeek = () => {
-      setTurkeyPeek((current) => ({
-        side: sides[Math.floor(Math.random() * sides.length)],
-        offset: 12 + Math.floor(Math.random() * 68),
-        key: current.key + 1,
-      }));
-    };
-
-    updateTurkeyPeek();
-    const timer = window.setInterval(updateTurkeyPeek, 14000);
-    return () => window.clearInterval(timer);
-  }, [showFallEffects]);
 
   if (!showSnow && !showFallEffects) {
     return null;
@@ -2407,22 +2383,29 @@ function SeasonalThemeEffects({ activeTheme }: { activeTheme: EffectiveSeasonalT
             <div className="seasonal-leaf-layer seasonal-leaf-layer-near" />
             <div className="seasonal-leaf-layer seasonal-leaf-layer-far" />
           </div>
-          <div
-            key={turkeyPeek.key}
-            className={`seasonal-turkey-peek seasonal-turkey-peek-${turkeyPeek.side}`}
-            style={{ '--turkey-offset': `${turkeyPeek.offset}%` } as CSSProperties}
-          >
-            <span className="seasonal-turkey-tail" />
-            <span className="seasonal-turkey-body">
-              <span className="seasonal-turkey-head">
-                <span className="seasonal-turkey-eye" />
-                <span className="seasonal-turkey-beak" />
-              </span>
-            </span>
-          </div>
         </>
       )}
     </>
+  );
+}
+
+function ThanksgivingSidebarAnimation() {
+  return (
+    <div className="thanksgiving-sidebar-animation" aria-hidden="true">
+      <div className="thanksgiving-sidebar-ground" />
+      <div className="thanksgiving-sidebar-turkey">
+        <span className="thanksgiving-sidebar-tail" />
+        <span className="thanksgiving-sidebar-body">
+          <span className="thanksgiving-sidebar-wing" />
+          <span className="thanksgiving-sidebar-head">
+            <span className="thanksgiving-sidebar-eye" />
+            <span className="thanksgiving-sidebar-beak" />
+          </span>
+          <span className="thanksgiving-sidebar-leg thanksgiving-sidebar-leg-left" />
+          <span className="thanksgiving-sidebar-leg thanksgiving-sidebar-leg-right" />
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -6217,6 +6200,11 @@ function App() {
                 </div>
               )}
             </div>
+            {activeSeasonalTheme === 'thanksgiving' && !isSidebarCollapsed && (
+              <div className="mt-auto shrink-0 px-4 pb-4 pt-3">
+                <ThanksgivingSidebarAnimation />
+              </div>
+            )}
             </div>
           </aside>
 
