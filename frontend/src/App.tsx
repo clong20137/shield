@@ -2165,6 +2165,7 @@ function RecentMessageReplyPopover({
 }) {
   const [body, setBody] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [sentNotice, setSentNotice] = useState('');
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const previewText = conversation.unreadPreview || conversation.subtitle || 'No preview available';
 
@@ -2172,6 +2173,15 @@ function RecentMessageReplyPopover({
     const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0);
     return () => window.clearTimeout(focusTimer);
   }, [conversation.id]);
+
+  useEffect(() => {
+    if (!sentNotice) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => setSentNotice(''), 1800);
+    return () => window.clearTimeout(timer);
+  }, [sentNotice]);
 
   const sendReply = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2210,8 +2220,9 @@ function RecentMessageReplyPopover({
       }
 
       onSent();
-      onToast('success', `Reply sent to ${conversation.title}.`, { saveToNotifications: false });
-      onClose();
+      setBody('');
+      setSentNotice('Sent');
+      window.setTimeout(() => inputRef.current?.focus(), 0);
     } catch (error) {
       console.error('Recent message reply failed:', error);
       errorLogService.createClientLog({
@@ -2283,6 +2294,9 @@ function RecentMessageReplyPopover({
             <Send size={16} />
           </button>
         </div>
+        {sentNotice && (
+          <p className="text-right text-[11px] font-black uppercase tracking-wide text-accent">{sentNotice}</p>
+        )}
       </div>
     </form>
   );
@@ -9032,13 +9046,11 @@ function App() {
 
     document.addEventListener('click', closeContextMenu);
     document.addEventListener('scroll', closeContextMenu, true);
-    window.addEventListener('resize', closeContextMenu);
     document.addEventListener('keydown', handleEscape);
 
     return () => {
       document.removeEventListener('click', closeContextMenu);
       document.removeEventListener('scroll', closeContextMenu, true);
-      window.removeEventListener('resize', closeContextMenu);
       document.removeEventListener('keydown', handleEscape);
     };
   }, [globalContextMenu]);
