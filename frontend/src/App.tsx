@@ -3773,6 +3773,33 @@ function App() {
     }
   };
 
+  const handleThemeChange = (nextTheme: AppTheme | ((currentTheme: AppTheme) => AppTheme)) => {
+    if (!hasPermission('preferences:theme')) {
+      showToast('error', 'You do not have permission to change app themes.', { saveToNotifications: false });
+      return;
+    }
+
+    setTheme(nextTheme);
+  };
+
+  const handleGlassThemeChange = (nextGlassTheme: boolean | ((currentValue: boolean) => boolean)) => {
+    if (!hasPermission('preferences:theme')) {
+      showToast('error', 'You do not have permission to change app themes.', { saveToNotifications: false });
+      return;
+    }
+
+    setIsGlassTheme(nextGlassTheme);
+  };
+
+  const handleSeasonalThemeChange = (nextSeasonalTheme: SeasonalThemePreference) => {
+    if (!hasPermission('preferences:theme')) {
+      showToast('error', 'You do not have permission to change app themes.', { saveToNotifications: false });
+      return;
+    }
+
+    setSeasonalTheme(nextSeasonalTheme);
+  };
+
   const handleInstallDesktopUpdate = async () => {
     if (!hasShieldDesktopFeature('installUpdate')) {
       return;
@@ -5907,7 +5934,8 @@ function App() {
               <div className="mx-2 my-1 border-t border-gray-200 dark:border-gray-700" />
               <button
                 type="button"
-                onClick={() => setIsGlassTheme((value) => !value)}
+                onClick={() => handleGlassThemeChange((value) => !value)}
+                disabled={!hasPermission('preferences:theme')}
                 className="group flex w-full items-center justify-between rounded-lg px-2.5 py-2.5 text-sm transition hover:bg-black/5 dark:hover:bg-white/10"
               >
                 <span className="flex items-center gap-2 font-semibold text-gray-700 dark:text-gray-100">
@@ -6129,8 +6157,9 @@ function App() {
                   <button
                     data-onboarding-control="theme"
                     type="button"
-                    onClick={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
-                    className="header-action-button flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
+                    onClick={() => handleThemeChange((value) => (value === 'light' ? 'dark' : 'light'))}
+                    disabled={!hasPermission('preferences:theme')}
+                    className="header-action-button flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-white text-primary-500 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-blue-100 dark:hover:bg-gray-700"
                     aria-label="Change theme"
                   >
                     {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
@@ -6607,9 +6636,9 @@ function App() {
                       onCalendarHiddenChange={handleCalendarHiddenChange}
                       onAppScaleChange={handleAppScaleChange}
                       onDefaultDutyHoursChange={handleDefaultDutyHoursChange}
-                      onAppThemeChange={setTheme}
-                      onGlassThemeChange={setIsGlassTheme}
-                      onSeasonalThemeChange={setSeasonalTheme}
+                      onAppThemeChange={handleThemeChange}
+                      onGlassThemeChange={handleGlassThemeChange}
+                      onSeasonalThemeChange={handleSeasonalThemeChange}
                       onStartWithWindowsChange={handleStartWithWindowsChange}
                       onTrayModeChange={handleTrayModeChange}
                       onCheckForDesktopUpdates={handleCheckForDesktopUpdates}

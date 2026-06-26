@@ -38,6 +38,7 @@ const allowedPermissions = [
   'reports:cpar',
   'audit:view',
   'roles:manage',
+  'preferences:theme',
   'messages:receive',
   'messages:send',
   'desktop:start-with-windows',

@@ -52,6 +52,7 @@ const permissionGroups = [
       { key: 'devices:manage', label: 'Manage devices' },
       { key: 'calendar:manage', label: 'Manage calendar' },
       { key: 'calendar:view-profiles', label: 'View profile calendars' },
+      { key: 'preferences:theme', label: 'Change app theme' },
       { key: 'messages:receive', label: 'Receive messages' },
       { key: 'messages:send', label: 'Send messages' },
       { key: 'desktop:start-with-windows', label: 'Use Start with Windows' },

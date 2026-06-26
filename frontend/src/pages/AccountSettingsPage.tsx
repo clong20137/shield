@@ -154,6 +154,7 @@ export function AccountSettingsPage({
   const canChangeReceiveMessages = hasAccountPermission('messages:receive');
   const canChangeStartWithWindows = hasAccountPermission('desktop:start-with-windows');
   const canChangeTrayMode = hasAccountPermission('desktop:minimize-to-tray');
+  const canChangeTheme = hasAccountPermission('preferences:theme');
   const activeSeasonalThemeLabel = getSeasonalThemeOption(activeSeasonalTheme).label;
 
   useEffect(() => {
@@ -917,10 +918,11 @@ export function AccountSettingsPage({
                     key={themeValue}
                     type="button"
                     onClick={() => onAppThemeChange(themeValue)}
+                    disabled={!canChangeTheme}
                     className={`rounded border px-3 py-3 text-left transition ${
                       appTheme === themeValue
                         ? 'border-accent bg-accent/10 text-accent'
-                        : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-accent dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200'
+                        : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-accent disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200'
                     }`}
                   >
                     <span className="block text-sm font-black">{label}</span>
@@ -933,6 +935,8 @@ export function AccountSettingsPage({
               title="Glass mode"
               description="Use translucent app surfaces with blur and depth in the selected light or dark theme."
               checked={isGlassTheme}
+              disabled={!canChangeTheme}
+              disabledReason="Permission required to change app themes."
               onChange={onGlassThemeChange}
             />
             <div className="rounded border border-gray-200 p-4 dark:border-gray-800">
@@ -948,10 +952,11 @@ export function AccountSettingsPage({
                       key={themeOption.id}
                       type="button"
                       onClick={() => onSeasonalThemeChange(themeOption.id)}
+                      disabled={!canChangeTheme}
                       className={`rounded border px-3 py-3 text-left transition ${
                         isSelected
                           ? 'border-accent bg-accent/10 text-accent'
-                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-accent dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200'
+                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-accent disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200'
                       }`}
                     >
                       <span className="flex items-center justify-between gap-2">
@@ -966,6 +971,9 @@ export function AccountSettingsPage({
                   );
                 })}
               </div>
+              {!canChangeTheme && (
+                <span className="mt-3 block text-xs font-bold text-gray-400 dark:text-gray-500">Permission required to change app themes.</span>
+              )}
             </div>
           </PreferenceGroup>
 

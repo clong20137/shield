@@ -28,7 +28,7 @@ export const SEASONAL_THEME_OPTIONS: SeasonalThemeOption[] = [
   { id: 'fall', label: 'Fall', description: 'Deep forest and copper seasonal colors.', primary: '#365314', secondary: '#b45309' },
   { id: 'spring', label: 'Spring', description: 'Fresh green with soft floral accents.', primary: '#047857', secondary: '#db2777' },
   { id: 'winter', label: 'Winter', description: 'Cool navy with icy blue highlights.', primary: '#0f3460', secondary: '#38bdf8' },
-  { id: 'patriotic', label: 'Patriotic', description: 'Navy and red for summer holiday weeks.', primary: '#1e3a8a', secondary: '#dc2626' },
+  { id: 'patriotic', label: 'Patriotic', description: 'Red, white, and blue for patriotic holiday periods.', primary: '#1d4ed8', secondary: '#dc2626' },
 ];
 
 export const SEASONAL_THEME_CLASSES = SEASONAL_THEME_OPTIONS
@@ -51,9 +51,14 @@ export function getEffectiveSeasonalTheme(preference: SeasonalThemePreference, d
   const month = date.getMonth() + 1;
   const day = date.getDate();
 
+  if (
+    (month === 5 && day >= 20) ||
+    month === 7 ||
+    (month === 9 && day <= 12) ||
+    (month === 11 && day >= 8 && day <= 14)
+  ) return 'patriotic';
   if (month === 12) return 'christmas';
   if (month === 11) return 'thanksgiving';
-  if ((month === 7 && day <= 7) || (month === 5 && day >= 24)) return 'patriotic';
   if (month >= 9 && month <= 10) return 'fall';
   if (month >= 6 && month <= 8) return 'summer';
   if (month >= 3 && month <= 5) return 'spring';
