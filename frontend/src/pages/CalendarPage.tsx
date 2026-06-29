@@ -934,17 +934,19 @@ function CalendarPage({
   onAccountUpdate,
   useMilitaryTime = false,
   isFloatingApp = false,
+  requestedDate = null,
 }: {
   currentUser: AuthAccount;
   onAccountUpdate?: (account: AuthAccount) => void;
   useMilitaryTime?: boolean;
   isFloatingApp?: boolean;
+  requestedDate?: string | null;
 }) {
   const location = useLocation();
   const requestedDailyDate = useMemo(() => {
-    const date = new URLSearchParams(location.search).get('date');
+    const date = requestedDate || new URLSearchParams(location.search).get('date');
     return isValidDateKey(date) ? date : null;
-  }, [location.search]);
+  }, [location.search, requestedDate]);
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);

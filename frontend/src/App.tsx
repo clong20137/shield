@@ -1333,12 +1333,14 @@ interface MobileNavigationProps {
   isAdministrator: boolean;
   unreadMessages: number;
   showCalendar: boolean;
+  onOpenCalendar: () => void;
 }
 
 function MobileNavigation({
   isAdministrator,
   unreadMessages,
   showCalendar,
+  onOpenCalendar,
 }: MobileNavigationProps) {
   const navItems = [
     { to: '/', label: 'Home', icon: LayoutDashboard },
@@ -1377,10 +1379,10 @@ function MobileNavigation({
           )}
         </NavLink>
         {showCalendar && (
-          <NavLink to="/calendar" className={linkClassName} aria-label="Open calendar">
+          <button type="button" onClick={onOpenCalendar} className={linkClassName({ isActive: false })} aria-label="Open calendar">
             <CalendarDays size={20} strokeWidth={2.4} />
             <span className="truncate">Calendar</span>
-          </NavLink>
+          </button>
         )}
       </div>
     </nav>
@@ -2021,7 +2023,7 @@ function GlobalKeyboardShortcuts({
 
   useEffect(() => {
     const focusUserSearch = () => {
-      navigate('/search');
+      startTransition(() => navigate('/search'));
       window.setTimeout(() => {
         window.dispatchEvent(new CustomEvent('shield:focus-user-search'));
       }, 80);
@@ -2074,25 +2076,25 @@ function GlobalKeyboardShortcuts({
 
       if (key === 'd') {
         event.preventDefault();
-        navigate('/');
+        startTransition(() => navigate('/'));
         return;
       }
 
       if (key === 'r') {
         event.preventDefault();
-        navigate('/reports');
+        startTransition(() => navigate('/reports'));
         return;
       }
 
       if (key === 'a' && canOpenAdminConsole) {
         event.preventDefault();
-        navigate(`/admin/${defaultAdminConsoleTab}`);
+        startTransition(() => navigate(`/admin/${defaultAdminConsoleTab}`));
         return;
       }
 
       if (key === 'u' && canCreateUsers) {
         event.preventDefault();
-        navigate('/admin/create-user');
+        startTransition(() => navigate('/admin/create-user'));
         return;
       }
 
@@ -3237,6 +3239,7 @@ function App() {
   const [isCompletingDueReminder, setIsCompletingDueReminder] = useState(false);
   const [activeFloatingApp, setActiveFloatingApp] = useState<FloatingAppId>('messages');
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [calendarModalRequestedDate, setCalendarModalRequestedDate] = useState<string | null>(null);
   const [messageTargetUser, setMessageTargetUser] = useState<User | null>(null);
   const [messageTargetThreadId, setMessageTargetThreadId] = useState<string | null>(null);
   const [messageComposeRequestKey] = useState(0);
@@ -5213,7 +5216,10 @@ function App() {
     setClosingModal(modal);
     window.setTimeout(() => {
       if (modal === 'messages') setIsMessagesModalOpen(false);
-      if (modal === 'calendar') setIsCalendarModalOpen(false);
+      if (modal === 'calendar') {
+        setIsCalendarModalOpen(false);
+        setCalendarModalRequestedDate(null);
+      }
       if (modal === 'calculator') setIsCalculatorOpen(false);
       if (modal === 'profile') setIsProfileModalOpen(false);
       if (modal === 'reportBug') setIsReportBugOpen(false);
@@ -5296,7 +5302,18 @@ function App() {
       return;
     }
 
-    const dateQuery = typeof targetDate === 'string' ? `?date=${encodeURIComponent(targetDate)}` : '';
+    const requestedDate = typeof targetDate === 'string' ? targetDate : null;
+    if (isShieldDesktopApp()) {
+      startTransition(() => {
+        setCalendarModalRequestedDate(requestedDate);
+        announceFloatingFocus('calendar');
+        setActiveFloatingApp('calendar');
+        setIsCalendarModalOpen(true);
+      });
+      return;
+    }
+
+    const dateQuery = requestedDate ? `?date=${encodeURIComponent(requestedDate)}` : '';
     const targetPath = `/calendar${dateQuery}`;
     if (`${getAppRelativePathname()}${window.location.search}` !== targetPath) {
       startTransition(() => {
@@ -6485,6 +6502,7 @@ function App() {
             isAdministrator={isAdministrator}
             unreadMessages={messageUnreadCount}
             showCalendar={showCalendar}
+            onOpenCalendar={openCalendarModal}
           />
           <GlobalKeyboardShortcuts
             canOpenAdminConsole={canOpenAdminConsole}
@@ -6611,7 +6629,7 @@ function App() {
                 </div>
                 <div className="min-h-0 flex-1">
                   <Suspense fallback={<PageLoader label="Loading calendar..." />}>
-                    <CalendarPage currentUser={currentUser} onAccountUpdate={handleAccountUpdate} useMilitaryTime={messagePreferences.useMilitaryTime} isFloatingApp />
+                    <CalendarPage currentUser={currentUser} onAccountUpdate={handleAccountUpdate} useMilitaryTime={messagePreferences.useMilitaryTime} isFloatingApp requestedDate={calendarModalRequestedDate} />
                   </Suspense>
                 </div>
               </>
