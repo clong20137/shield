@@ -35,6 +35,14 @@ const emptyForm = {
   supervisorComments: '',
 };
 
+const EVALUATION_PAGE_SIZE = 75;
+
+function mergeEvaluations(current: PerformanceEvaluation[], incoming: PerformanceEvaluation[]) {
+  const byId = new Map(current.map((evaluation) => [evaluation.id, evaluation]));
+  incoming.forEach((evaluation) => byId.set(evaluation.id, evaluation));
+  return Array.from(byId.values());
+}
+
 function formatDate(value: string | null): string {
   return value ? new Date(value).toLocaleString() : 'Not signed';
 }
@@ -212,6 +220,9 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage, com
   const [accounts, setAccounts] = useState<AuthAccount[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [evaluationPage, setEvaluationPage] = useState(1);
+  const [hasMoreEvaluations, setHasMoreEvaluations] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -252,7 +263,7 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage, com
 
   const selectedEvaluation = filteredEvaluations.find((evaluation) => evaluation.id === selectedId) || filteredEvaluations[0] || null;
 
-  const loadEvaluations = async (showLoading = false) => {
+  const loadEvaluations = async (showLoading = false, page = 1) => {
     if (evaluationLoadInFlightRef.current) {
       evaluationLoadPendingRef.current = true;
       return;
@@ -260,18 +271,22 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage, com
 
     evaluationLoadInFlightRef.current = true;
     if (showLoading) setIsLoading(true);
+    if (!showLoading && page > 1) setIsLoadingMore(true);
     try {
-      const response = await performanceEvaluationService.getAll();
-      setEvaluations(response.data);
+      const response = await performanceEvaluationService.getAll({ page, pageSize: EVALUATION_PAGE_SIZE });
+      setEvaluations((current) => (page === 1 ? response.data : mergeEvaluations(current, response.data)));
       setSelectedId((currentId) => currentId || response.data[0]?.id || null);
+      setEvaluationPage(page);
+      setHasMoreEvaluations(response.data.length === EVALUATION_PAGE_SIZE);
     } catch (error) {
       onToast('error', getErrorMessage(error, 'Failed to load evaluations.'));
     } finally {
       evaluationLoadInFlightRef.current = false;
       setIsLoading(false);
+      setIsLoadingMore(false);
       if (evaluationLoadPendingRef.current) {
         evaluationLoadPendingRef.current = false;
-        void loadEvaluations(false);
+        void loadEvaluations(false, 1);
       }
     }
   };
@@ -285,7 +300,7 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage, com
 
       evaluationRefreshTimerRef.current = window.setTimeout(() => {
         evaluationRefreshTimerRef.current = null;
-        void loadEvaluations(false);
+        void loadEvaluations(false, 1);
       }, 500);
     };
     window.addEventListener('shield:performance-evaluation-updated', handleUpdate);
@@ -385,6 +400,10 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage, com
 
   const downloadVisibleEvaluations = () => {
     downloadPerformanceEvaluationPdf(filteredEvaluations, 'shield-performance-evaluations-filtered.pdf');
+  };
+
+  const loadMoreEvaluations = () => {
+    void loadEvaluations(false, evaluationPage + 1);
   };
 
   return (
@@ -496,6 +515,16 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage, com
                 <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Supervisor: {evaluation.supervisorName}</p>
               </button>
             ))}
+            {hasMoreEvaluations && (
+              <button
+                type="button"
+                onClick={loadMoreEvaluations}
+                className="btn-secondary w-full"
+                disabled={isLoadingMore}
+              >
+                {isLoadingMore ? 'Loading...' : 'Load more'}
+              </button>
+            )}
           </section>
 
           {selectedEvaluation && (

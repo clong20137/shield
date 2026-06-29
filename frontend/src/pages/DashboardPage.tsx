@@ -2,7 +2,8 @@ import React, { lazy, Suspense, useCallback, useMemo, useRef, useState, useEffec
 import { createPortal } from 'react-dom';
 import { AlertCircle, Bell, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GripHorizontal, Heart, Image, LucideIcon, MapPinned, Megaphone, NotebookPen, PartyPopper, Pencil, Pin, PinOff, Plus, Save, Search, Send, ThumbsUp, Trash2, Upload, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authService, AuthAccount, calendarService, CalendarEntry, DashboardReaction, dashboardPostService, DashboardPost, dashboardSummaryService, DashboardSummary, districtFeedService, DistrictFeedPost, DistrictFeedPostCategory, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
+import { authService, AuthAccount, calendarService, CalendarEntry, DashboardReaction, dashboardPostService, DashboardPost, dashboardSummaryService, DashboardSummary, districtFeedService, DistrictFeedPost, DistrictFeedPostCategory, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, mediaService, MediaLibraryItem, pinnedProfileService, PinnedProfile, quickNoteService, reminderService, Reminder, userService, User } from '../services/api';
+import { subscribeMessageRealtime } from '../services/realtime';
 import { districtOptions } from '../constants/districts';
 import { UserDetail } from '../components/UserDetail';
 import { getPostBodyText } from '../components/RichPostEditor';
@@ -1346,10 +1347,9 @@ function PinnedProfilesWidget({
       return undefined;
     }
 
-    const eventSource = new EventSource(getMessageEventsUrl(), { withCredentials: true });
-    const handlePresenceUpdate = (event: MessageEvent) => {
+    const handlePresenceUpdate = (event: Event) => {
       try {
-        const payload = JSON.parse(event.data || '{}') as {
+        const payload = JSON.parse((event as MessageEvent).data || '{}') as {
           actorAccountId?: string;
           actorOnline?: boolean;
           actorAway?: boolean;
@@ -1375,14 +1375,14 @@ function PinnedProfilesWidget({
       }
     };
 
-    eventSource.addEventListener('presence-updated', handlePresenceUpdate);
-    eventSource.addEventListener('error', (event) => {
+    const unsubscribePresence = subscribeMessageRealtime('presence-updated', handlePresenceUpdate);
+    const unsubscribeError = subscribeMessageRealtime('error', (event) => {
       console.error('Pinned profile presence connection error:', event);
     });
 
     return () => {
-      eventSource.removeEventListener('presence-updated', handlePresenceUpdate);
-      eventSource.close();
+      unsubscribePresence();
+      unsubscribeError();
     };
   }, [currentUser?.id]);
 

@@ -2,7 +2,8 @@ import { FormEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMous
 import { CheckCheck, CheckCircle2, ChevronDown, MessageCircle, Plus, Search, Send, X } from 'lucide-react';
 import { MentionTextarea } from '../MentionTextarea';
 import type { ToastType } from '../ToastHost';
-import { AuthAccount, errorLogService, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, User, UserMessage, userService } from '../../services/api';
+import { AuthAccount, errorLogService, getAssetThumbnailUrl, getAssetUrl, handleAssetThumbnailError, messageService, User, UserMessage, userService } from '../../services/api';
+import { subscribeMessageRealtime } from '../../services/realtime';
 
 export interface RecentConversation {
   id: string;
@@ -32,6 +33,8 @@ interface RecentTypingState {
   name: string;
   expiresAt: number;
 }
+
+const RECENT_CONVERSATION_MESSAGE_PAGE_SIZE = 60;
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
@@ -1164,8 +1167,8 @@ export const RecentMessagesDockContainer = memo(function RecentMessagesDockConta
     const loadRecentConversations = async () => {
       try {
         const [inboxResult, sentResult] = await Promise.allSettled([
-          messageService.getInbox(currentUser.id),
-          messageService.getSent(currentUser.id),
+          messageService.getInbox(currentUser.id, RECENT_CONVERSATION_MESSAGE_PAGE_SIZE),
+          messageService.getSent(currentUser.id, RECENT_CONVERSATION_MESSAGE_PAGE_SIZE),
         ]);
         if (!isMounted) {
           return;
@@ -1197,10 +1200,9 @@ export const RecentMessagesDockContainer = memo(function RecentMessagesDockConta
     void loadRecentConversations();
     window.addEventListener('shield:messages-updated', queueRecentConversationLoad);
 
-    const eventSource = new EventSource(getMessageEventsUrl(), { withCredentials: true });
-    const handlePresenceUpdate = (event: MessageEvent) => {
+    const handlePresenceUpdate = (event: Event) => {
       try {
-        const payload = JSON.parse(event.data || '{}') as {
+        const payload = JSON.parse((event as MessageEvent).data || '{}') as {
           actorAccountId?: string;
           actorOnline?: boolean;
           actorAway?: boolean;
@@ -1225,9 +1227,9 @@ export const RecentMessagesDockContainer = memo(function RecentMessagesDockConta
         console.error('Failed to parse recent conversation presence update:', error);
       }
     };
-    const handleTypingUpdate = (event: MessageEvent) => {
+    const handleTypingUpdate = (event: Event) => {
       try {
-        const payload = JSON.parse(event.data || '{}') as {
+        const payload = JSON.parse((event as MessageEvent).data || '{}') as {
           actorAccountId?: string;
           typingThreadId?: string;
           typingName?: string;
@@ -1254,15 +1256,17 @@ export const RecentMessagesDockContainer = memo(function RecentMessagesDockConta
         console.error('Failed to parse recent conversation typing update:', error);
       }
     };
-    eventSource.addEventListener('message-created', queueRecentConversationLoad);
-    eventSource.addEventListener('message-read', queueRecentConversationLoad);
-    eventSource.addEventListener('message-archived', queueRecentConversationLoad);
-    eventSource.addEventListener('message-deleted', queueRecentConversationLoad);
-    eventSource.addEventListener('message-typing', handleTypingUpdate);
-    eventSource.addEventListener('presence-updated', handlePresenceUpdate);
-    eventSource.addEventListener('error', (event) => {
-      console.error('Recent conversations realtime connection error:', event);
-    });
+    const unsubscribeRealtime = [
+      subscribeMessageRealtime('message-created', queueRecentConversationLoad),
+      subscribeMessageRealtime('message-read', queueRecentConversationLoad),
+      subscribeMessageRealtime('message-archived', queueRecentConversationLoad),
+      subscribeMessageRealtime('message-deleted', queueRecentConversationLoad),
+      subscribeMessageRealtime('message-typing', handleTypingUpdate),
+      subscribeMessageRealtime('presence-updated', handlePresenceUpdate),
+      subscribeMessageRealtime('error', (event) => {
+        console.error('Recent conversations realtime connection error:', event);
+      }),
+    ];
 
     return () => {
       isMounted = false;
@@ -1270,9 +1274,7 @@ export const RecentMessagesDockContainer = memo(function RecentMessagesDockConta
       if (refreshTimer) {
         window.clearTimeout(refreshTimer);
       }
-      eventSource.removeEventListener('message-typing', handleTypingUpdate);
-      eventSource.removeEventListener('presence-updated', handlePresenceUpdate);
-      eventSource.close();
+      unsubscribeRealtime.forEach((unsubscribe) => unsubscribe());
     };
   }, [currentUser, isAppBackgrounded, isVisible]);
 

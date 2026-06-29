@@ -1581,8 +1581,8 @@ export const mileageService = {
 };
 
 export const performanceEvaluationService = {
-  getAll: () =>
-    api.get<PerformanceEvaluation[]>('/performance-evaluations'),
+  getAll: (params?: { page?: number; pageSize?: number }) =>
+    api.get<PerformanceEvaluation[]>('/performance-evaluations', { params }),
 
   create: (evaluation: CreatePerformanceEvaluationPayload) =>
     api.post<PerformanceEvaluation>('/performance-evaluations', evaluation),

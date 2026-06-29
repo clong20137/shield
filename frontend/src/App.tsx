@@ -10,7 +10,8 @@ import { getQuickLaunchStorageKey, normalizeQuickLaunchSlotCount, QUICK_LAUNCH_D
 import { FloatingWindow } from './components/FloatingWindow';
 import { FirstLoginGuide, WelcomeSplash } from './components/OnboardingGuide';
 import { BugTrackerModal } from './components/BugTrackerModal';
-import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, CalendarEntryPayload, calendarService, clearAuthToken, CompleteSetupPayload, errorLogService, getApiHealthUrl, getAppEventsUrl, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, notificationService, notificationSoundService, NotificationSound, reminderService, RegistrationSettings, Reminder, SetupEnvironmentValues, SetupStatus, ThemeSettings, urgentAlertService, UrgentAlert, UserNotification, userService, User } from './services/api';
+import { AuthAccount, authService, bugReportService, BugReport, BugReportPriority, BugReportStatus, CalendarEntry, CalendarEntryPayload, calendarService, clearAuthToken, CompleteSetupPayload, errorLogService, getApiHealthUrl, getAssetThumbnailUrl, getAssetUrl, handleAssetThumbnailError, messageService, notificationService, notificationSoundService, NotificationSound, reminderService, RegistrationSettings, Reminder, SetupEnvironmentValues, SetupStatus, ThemeSettings, urgentAlertService, UrgentAlert, UserNotification, userService, User } from './services/api';
+import { closeRealtimeConnections, subscribeAppRealtime, subscribeMessageRealtime } from './services/realtime';
 import { useUnreadCounts } from './hooks/useUnreadCounts';
 import { getEffectiveSeasonalTheme, getSeasonalThemeOption, normalizeSeasonalTheme, SEASONAL_THEME_CLASSES, type EffectiveSeasonalTheme, type SeasonalThemePreference } from './theme/seasonalThemes';
 
@@ -4668,16 +4669,16 @@ function App() {
       ? window.setInterval(() => void loadUnreadCount(), DESKTOP_UNREAD_FALLBACK_POLL_MS)
       : null;
 
-    const eventsUrl = getMessageEventsUrl();
-    const eventSource = new EventSource(eventsUrl, { withCredentials: true });
     const handleRealtimeMessageUpdate = () => queueUnreadCountLoad();
-    eventSource?.addEventListener('message-created', handleRealtimeMessageUpdate);
-    eventSource?.addEventListener('message-read', handleRealtimeMessageUpdate);
-    eventSource?.addEventListener('message-archived', handleRealtimeMessageUpdate);
-    eventSource?.addEventListener('message-deleted', handleRealtimeMessageUpdate);
-    eventSource?.addEventListener('error', (event) => {
-      console.error('Message realtime connection error:', event);
-    });
+    const unsubscribeRealtime = [
+      subscribeMessageRealtime('message-created', handleRealtimeMessageUpdate),
+      subscribeMessageRealtime('message-read', handleRealtimeMessageUpdate),
+      subscribeMessageRealtime('message-archived', handleRealtimeMessageUpdate),
+      subscribeMessageRealtime('message-deleted', handleRealtimeMessageUpdate),
+      subscribeMessageRealtime('error', (event) => {
+        console.error('Message realtime connection error:', event);
+      }),
+    ];
 
     return () => {
       isMounted = false;
@@ -4689,7 +4690,7 @@ function App() {
       if (desktopUnreadFallbackInterval) {
         window.clearInterval(desktopUnreadFallbackInterval);
       }
-      eventSource?.close();
+      unsubscribeRealtime.forEach((unsubscribe) => unsubscribe());
     };
   }, [appName, currentUser, getCustomNotificationSoundUrl, messagePreferences.receiveMessages, messagePreferences.playMessageSound, messagePreferences.messageSound, messagePreferences.browserNotifications]);
 
@@ -4737,6 +4738,7 @@ function App() {
     } catch {
       // Local sign out should still complete if the server is unreachable.
     }
+    closeRealtimeConnections();
     clearLoginTransitionTimer();
     clearAuthToken();
     window.localStorage.removeItem(SESSION_KEY);
@@ -5031,9 +5033,6 @@ function App() {
       return;
     }
 
-    const eventsUrl = getAppEventsUrl();
-    const eventSource = new EventSource(eventsUrl, { withCredentials: true });
-
     const dispatchAppUpdate = (name: string, detail?: Record<string, unknown>) => {
       window.dispatchEvent(new CustomEvent(`shield:${name}`, { detail }));
     };
@@ -5060,10 +5059,6 @@ function App() {
       }
     };
 
-    eventSource.addEventListener('notification-created', handleNotificationUpdate);
-    eventSource.addEventListener('notification-updated', handleNotificationUpdate);
-    eventSource.addEventListener('urgent-alert-created', handleUrgentAlertUpdate);
-    eventSource.addEventListener('urgent-alert-updated', handleUrgentAlertUpdate);
     const handleRealtimeAppUpdate = (name: string) => (event: Event) => {
       try {
         dispatchAppUpdate(name, JSON.parse((event as MessageEvent).data || '{}') as Record<string, unknown>);
@@ -5072,16 +5067,17 @@ function App() {
       }
     };
 
-    eventSource.addEventListener('audit-updated', handleRealtimeAppUpdate('audit-updated'));
-    eventSource.addEventListener('bug-updated', handleBugUpdate);
-    eventSource.addEventListener('calendar-updated', handleRealtimeAppUpdate('calendar-updated'));
-    eventSource.addEventListener('dashboard-updated', handleRealtimeAppUpdate('dashboard-updated'));
-    eventSource.addEventListener('device-updated', handleRealtimeAppUpdate('device-updated'));
-    eventSource.addEventListener('error-updated', handleRealtimeAppUpdate('error-updated'));
-    eventSource.addEventListener('media-updated', handleRealtimeAppUpdate('media-updated'));
-    eventSource.addEventListener('mileage-updated', handleRealtimeAppUpdate('mileage-updated'));
-    eventSource.addEventListener('performance-evaluation-updated', handleRealtimeAppUpdate('performance-evaluation-updated'));
-    eventSource.addEventListener('settings-updated', (event) => {
+    const auditUpdatedHandler = handleRealtimeAppUpdate('audit-updated');
+    const calendarUpdatedHandler = handleRealtimeAppUpdate('calendar-updated');
+    const dashboardUpdatedHandler = handleRealtimeAppUpdate('dashboard-updated');
+    const deviceUpdatedHandler = handleRealtimeAppUpdate('device-updated');
+    const errorUpdatedHandler = handleRealtimeAppUpdate('error-updated');
+    const mediaUpdatedHandler = handleRealtimeAppUpdate('media-updated');
+    const mileageUpdatedHandler = handleRealtimeAppUpdate('mileage-updated');
+    const performanceEvaluationUpdatedHandler = handleRealtimeAppUpdate('performance-evaluation-updated');
+    const quickLaunchUpdatedHandler = handleRealtimeAppUpdate('quick-launch-updated');
+    const reminderUpdatedHandler = handleRealtimeAppUpdate('reminder-updated');
+    const settingsUpdatedHandler = (event: Event) => {
       try {
         const payload = JSON.parse((event as MessageEvent).data || '{}') as Partial<ThemeSettings>;
         if (payload.seasonalTheme) {
@@ -5095,16 +5091,14 @@ function App() {
       void loadNotificationSounds();
       void syncSetupStatus();
       handleRealtimeAppUpdate('settings-updated')(event);
-    });
-    eventSource.addEventListener('permission-updated', (event) => {
+    };
+    const permissionUpdatedHandler = (event: Event) => {
       void syncSessionTimeoutFromSettings();
       void syncCurrentAccount();
       handleRealtimeAppUpdate('permission-updated')(event);
-    });
-    eventSource.addEventListener('quick-launch-updated', handleRealtimeAppUpdate('quick-launch-updated'));
-    eventSource.addEventListener('reminder-updated', handleRealtimeAppUpdate('reminder-updated'));
-    eventSource.addEventListener('session-revoked', () => handleForcedLogout('Your account has been deactivated. Please contact an administrator.'));
-    eventSource.addEventListener('user-updated', (event) => {
+    };
+    const sessionRevokedHandler = () => handleForcedLogout('Your account has been deactivated. Please contact an administrator.');
+    const userUpdatedHandler = (event: Event) => {
       let payload: { entityId?: string } = {};
       try {
         payload = JSON.parse((event as MessageEvent).data || '{}') as { entityId?: string };
@@ -5116,18 +5110,44 @@ function App() {
         void syncCurrentAccount();
       }
       dispatchAppUpdate('user-updated', payload);
-    });
-    eventSource.addEventListener('open', () => {
+    };
+    const openHandler = () => {
       window.dispatchEvent(new CustomEvent('shield:api-connection-restored'));
-    });
-    eventSource.addEventListener('error', async (event) => {
+    };
+    const errorHandler = async (event: Event) => {
       console.error('Application realtime connection error:', event);
       if (!(await checkApiHealth())) {
         window.dispatchEvent(new CustomEvent('shield:api-connection-lost'));
       }
-    });
+    };
 
-    return () => eventSource.close();
+    const unsubscribeRealtime = [
+      subscribeAppRealtime('notification-created', handleNotificationUpdate),
+      subscribeAppRealtime('notification-updated', handleNotificationUpdate),
+      subscribeAppRealtime('urgent-alert-created', handleUrgentAlertUpdate),
+      subscribeAppRealtime('urgent-alert-updated', handleUrgentAlertUpdate),
+      subscribeAppRealtime('audit-updated', auditUpdatedHandler),
+      subscribeAppRealtime('bug-updated', handleBugUpdate),
+      subscribeAppRealtime('calendar-updated', calendarUpdatedHandler),
+      subscribeAppRealtime('dashboard-updated', dashboardUpdatedHandler),
+      subscribeAppRealtime('device-updated', deviceUpdatedHandler),
+      subscribeAppRealtime('error-updated', errorUpdatedHandler),
+      subscribeAppRealtime('media-updated', mediaUpdatedHandler),
+      subscribeAppRealtime('mileage-updated', mileageUpdatedHandler),
+      subscribeAppRealtime('performance-evaluation-updated', performanceEvaluationUpdatedHandler),
+      subscribeAppRealtime('settings-updated', settingsUpdatedHandler),
+      subscribeAppRealtime('permission-updated', permissionUpdatedHandler),
+      subscribeAppRealtime('quick-launch-updated', quickLaunchUpdatedHandler),
+      subscribeAppRealtime('reminder-updated', reminderUpdatedHandler),
+      subscribeAppRealtime('session-revoked', sessionRevokedHandler),
+      subscribeAppRealtime('user-updated', userUpdatedHandler),
+      subscribeAppRealtime('open', openHandler),
+      subscribeAppRealtime('error', errorHandler),
+    ];
+
+    return () => {
+      unsubscribeRealtime.forEach((unsubscribe) => unsubscribe());
+    };
   }, [applyThemeSettings, currentUser, handleForcedLogout, loadBugReports, loadNotificationSounds, loadUrgentAlerts, loadUserNotifications, syncSessionTimeoutFromSettings, syncSetupStatus, syncThemeSettings]);
 
   const closeModal = (modal: ClosingModal) => {

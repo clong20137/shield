@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
-import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetThumbnailUrl, getMessageEventsUrl, handleAssetThumbnailError, MileageSummary, mileageService, User } from '../services/api';
+import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetThumbnailUrl, handleAssetThumbnailError, MileageSummary, mileageService, User } from '../services/api';
+import { subscribeMessageRealtime } from '../services/realtime';
 import { RankBadge } from './RankBadge';
 
 interface UserDetailProps {
@@ -338,10 +339,9 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   useEffect(() => {
     setRealtimePresence(null);
     let isMounted = true;
-    const eventSource = new EventSource(getMessageEventsUrl(), { withCredentials: true });
-    const handlePresenceUpdate = (event: MessageEvent) => {
+    const handlePresenceUpdate = (event: Event) => {
       try {
-        const payload = JSON.parse(event.data || '{}') as {
+        const payload = JSON.parse((event as MessageEvent).data || '{}') as {
           actorAccountId?: string;
           actorOnline?: boolean;
           actorAway?: boolean;
@@ -364,15 +364,15 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
       }
     };
 
-    eventSource.addEventListener('presence-updated', handlePresenceUpdate);
-    eventSource.addEventListener('error', (event) => {
+    const unsubscribePresence = subscribeMessageRealtime('presence-updated', handlePresenceUpdate);
+    const unsubscribeError = subscribeMessageRealtime('error', (event) => {
       console.error('Profile presence connection error:', event);
     });
 
     return () => {
       isMounted = false;
-      eventSource.removeEventListener('presence-updated', handlePresenceUpdate);
-      eventSource.close();
+      unsubscribePresence();
+      unsubscribeError();
     };
   }, [user.id]);
 
