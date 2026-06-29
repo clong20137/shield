@@ -4178,7 +4178,7 @@ function CalendarPage({
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setEntryPendingDelete(null)} className="daily-delete-cancel btn-secondary" aria-label="Cancel delete" title="Cancel">
+              <button type="button" onClick={() => setEntryPendingDelete(null)} className="btn-secondary" aria-label="Cancel delete" title="Cancel">
                 Cancel
               </button>
               <button type="button" onClick={() => deleteEntry(entryPendingDelete)} className="btn-danger" disabled={deletingEntryId === entryPendingDelete.id} aria-label="Delete entry" title={deletingEntryId === entryPendingDelete.id ? 'Deleting' : 'Delete'}>
