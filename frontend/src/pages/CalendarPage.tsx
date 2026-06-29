@@ -4163,16 +4163,22 @@ function CalendarPage({
       )}
 
       {entryPendingDelete && (
-        <div className="modal-backdrop fixed inset-0 z-[140] flex items-end justify-center bg-black/45 sm:items-center">
-          <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
-            <div className="mb-4">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Entry</h2>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                Delete {entryPendingDelete.dutyHours} hours for {entryPendingDelete.districtWorked} on {getReadableDate(entryPendingDelete.date)}?
-              </p>
+        <div className="daily-delete-backdrop modal-backdrop fixed inset-0 z-[140] flex items-end justify-center bg-slate-950/25 sm:items-center">
+          <div className="daily-delete-modal modal-window w-full max-w-md rounded-xl border border-red-100 bg-white p-5 shadow-2xl dark:border-red-950/50 dark:bg-gray-950 sm:p-6">
+            <div className="mb-5 flex items-start gap-3">
+              <div className="daily-delete-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-red-50 text-danger dark:bg-red-950/40">
+                <Trash2 size={20} strokeWidth={2.4} />
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-wide text-danger">Trooper Daily</p>
+                <h2 className="mt-1 text-xl font-bold text-gray-900 dark:text-gray-100">Delete Entry</h2>
+                <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                  Delete <span className="font-bold text-gray-900 dark:text-white">{entryPendingDelete.dutyHours} hours</span> for {entryPendingDelete.districtWorked} on {getReadableDate(entryPendingDelete.date)}?
+                </p>
+              </div>
             </div>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setEntryPendingDelete(null)} className="btn-secondary" aria-label="Cancel delete" title="Cancel">
+              <button type="button" onClick={() => setEntryPendingDelete(null)} className="daily-delete-cancel btn-secondary" aria-label="Cancel delete" title="Cancel">
                 Cancel
               </button>
               <button type="button" onClick={() => deleteEntry(entryPendingDelete)} className="btn-danger" disabled={deletingEntryId === entryPendingDelete.id} aria-label="Delete entry" title={deletingEntryId === entryPendingDelete.id ? 'Deleting' : 'Delete'}>
