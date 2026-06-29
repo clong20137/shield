@@ -94,6 +94,7 @@ const APP_SCALE_LABELS: Record<AppScale, string> = {
   comfortable: 'Comfortable',
   large: 'Large',
 };
+const APP_SCALE_TRANSITION_MS = 640;
 
 interface MessagePreferences {
   receiveMessages: boolean;
@@ -3113,6 +3114,7 @@ function App() {
   });
   const inactivityTimerRef = useRef<number | null>(null);
   const loginTransitionTimerRef = useRef<number | null>(null);
+  const appScaleTransitionTimerRef = useRef<number | null>(null);
   const sessionTimeoutNotificationShownRef = useRef(false);
   const lastActivityRef = useRef<number>(Date.now());
   const desktopSessionActivityReportRef = useRef<number>(0);
@@ -4300,6 +4302,13 @@ function App() {
     document.documentElement.classList.add(`app-scale-${appScale}`);
   }, [currentUser?.appScale]);
 
+  useEffect(() => () => {
+    if (appScaleTransitionTimerRef.current) {
+      window.clearTimeout(appScaleTransitionTimerRef.current);
+    }
+    document.documentElement.classList.remove('app-scale-transitioning');
+  }, []);
+
   useEffect(() => {
     window.localStorage.setItem(MESSAGE_PREFERENCES_KEY, JSON.stringify(messagePreferences));
   }, [messagePreferences]);
@@ -5453,11 +5462,27 @@ function App() {
     }
   };
 
+  const beginAppScaleTransition = () => {
+    document.documentElement.classList.add('app-scale-transitioning');
+    if (appScaleTransitionTimerRef.current) {
+      window.clearTimeout(appScaleTransitionTimerRef.current);
+    }
+    appScaleTransitionTimerRef.current = window.setTimeout(() => {
+      document.documentElement.classList.remove('app-scale-transitioning');
+      appScaleTransitionTimerRef.current = null;
+    }, APP_SCALE_TRANSITION_MS);
+  };
+
   const handleAppScaleChange = async (appScale: AppScale) => {
     if (!currentUser) {
       return;
     }
 
+    if (normalizeAppScale(currentUser.appScale) === appScale) {
+      return;
+    }
+
+    beginAppScaleTransition();
     const previousUser = currentUser;
     handleAccountUpdate({ ...currentUser, appScale });
 

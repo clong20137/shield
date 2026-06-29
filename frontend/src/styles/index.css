@@ -951,13 +951,61 @@
   html.app-scale-compact,
   html.app-scale-comfortable,
   html.app-scale-large {
-    transition: font-size 220ms ease;
+    transition: font-size 520ms var(--shield-motion-ease);
+    text-size-adjust: 100%;
+  }
+
+  html.app-scale-transitioning {
+    overflow-anchor: none;
+  }
+
+  html.app-scale-transitioning body,
+  html.app-scale-transitioning main,
+  html.app-scale-transitioning aside,
+  html.app-scale-transitioning header,
+  html.app-scale-transitioning nav,
+  html.app-scale-transitioning section,
+  html.app-scale-transitioning article,
+  html.app-scale-transitioning form,
+  html.app-scale-transitioning button,
+  html.app-scale-transitioning input,
+  html.app-scale-transitioning textarea,
+  html.app-scale-transitioning select,
+  html.app-scale-transitioning table,
+  html.app-scale-transitioning th,
+  html.app-scale-transitioning td,
+  html.app-scale-transitioning div,
+  html.app-scale-transitioning span,
+  html.app-scale-transitioning p,
+  html.app-scale-transitioning h1,
+  html.app-scale-transitioning h2,
+  html.app-scale-transitioning h3,
+  html.app-scale-transitioning h4,
+  html.app-scale-transitioning h5,
+  html.app-scale-transitioning h6,
+  html.app-scale-transitioning svg,
+  html.app-scale-transitioning img {
+    transition-property: font-size, line-height, letter-spacing, padding, margin, gap, width, height, min-width, min-height, max-width, max-height, flex-basis, grid-template-columns, grid-template-rows, border-radius, border-width, inset, top, right, bottom, left, transform;
+    transition-duration: 520ms;
+    transition-timing-function: var(--shield-motion-ease);
+  }
+
+  html.app-scale-transitioning .theme-polished-surface,
+  html.app-scale-transitioning .modal-window,
+  html.app-scale-transitioning .floating-window,
+  html.app-scale-transitioning .glass-workspace-window,
+  html.app-scale-transitioning .quick-launch-sidebar-grid,
+  html.app-scale-transitioning .recent-messages-dock,
+  html.app-scale-transitioning .shield-left-panel {
+    will-change: width, height, padding, margin, font-size, transform;
   }
 
   @media (prefers-reduced-motion: reduce) {
     html.app-scale-compact,
     html.app-scale-comfortable,
-    html.app-scale-large {
+    html.app-scale-large,
+    html.app-scale-transitioning,
+    html.app-scale-transitioning * {
       transition: none;
     }
   }
