@@ -2,6 +2,7 @@ import { CSSProperties, FormEvent, ReactNode, lazy, startTransition, Suspense, u
 import { AlertTriangle, BarChart3, Bell, Bug, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Download, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Minus, Moon, RefreshCw, Save, Search, Settings, Shield, Sun, UserCircle, X } from 'lucide-react';
 import { BrowserRouter as Router, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
+import CalendarPage from './pages/CalendarPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { NotificationCenterMenu } from './components/notifications/NotificationCenterMenu';
 import { ShieldLoading, ConnectionLostOverlay } from './components/app/LoadingShell';
@@ -21,7 +22,6 @@ const AccountSettingsPage = lazy(() => import('./pages/AccountSettingsPage').the
 const AdminConsolePage = lazy(() => import('./pages/AdminConsolePage'));
 const DeviceManagementPage = lazy(() => import('./pages/DeviceManagementPage'));
 const MessageInboxPage = lazy(() => import('./pages/MessageInboxPage'));
-const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const PerformanceEvaluationsPage = lazy(() => import('./pages/PerformanceEvaluationsPage'));
 const RecentMessagesDockContainer = lazy(() => import('./components/messages/RecentMessagesDock').then((module) => ({ default: module.RecentMessagesDockContainer })));
 const QuickLaunchTray = lazy(() => import('./components/quick-launch/QuickLaunchTray').then((module) => ({ default: module.QuickLaunchTray })));
