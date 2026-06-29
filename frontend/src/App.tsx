@@ -6516,26 +6516,28 @@ function App() {
             onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
             onLock={lockApp}
           />
-          <GlobalCommandPalette
-            isOpen={isCommandPaletteOpen}
-            isAdministrator={isAdministrator}
-            canOpenAdminConsole={canOpenAdminConsole}
-            showCalendar={showCalendar}
-            defaultAdminConsoleTab={getDefaultAdminConsoleTab()}
-            permissions={currentUser?.permissions || []}
-            onOpenChange={setIsCommandPaletteOpen}
-            onOpenMessages={openMessagesModal}
-            onOpenCalendar={openCalendarModal}
-            onOpenCalculator={openCalculator}
-            onOpenProfile={() => {
-              openProfileSettings();
-              setIsAccountMenuOpen(false);
-            }}
-            onReportBug={() => {
-              setIsReportBugOpen(true);
-              setIsAccountMenuOpen(false);
-            }}
-          />
+          <Suspense fallback={null}>
+            <GlobalCommandPalette
+              isOpen={isCommandPaletteOpen}
+              isAdministrator={isAdministrator}
+              canOpenAdminConsole={canOpenAdminConsole}
+              showCalendar={showCalendar}
+              defaultAdminConsoleTab={getDefaultAdminConsoleTab()}
+              permissions={currentUser?.permissions || []}
+              onOpenChange={setIsCommandPaletteOpen}
+              onOpenMessages={openMessagesModal}
+              onOpenCalendar={openCalendarModal}
+              onOpenCalculator={openCalculator}
+              onOpenProfile={() => {
+                openProfileSettings();
+                setIsAccountMenuOpen(false);
+              }}
+              onReportBug={() => {
+                setIsReportBugOpen(true);
+                setIsAccountMenuOpen(false);
+              }}
+            />
+          </Suspense>
           {shouldShowRecentConversations && (
             <Suspense fallback={null}>
               <RecentMessagesDockContainer
@@ -6753,15 +6755,17 @@ function App() {
             </FloatingWindow>
           )}
           {isCalculatorOpen && (
-            <CalculatorModal
-              isClosing={closingModal === 'calculator'}
-              onClose={() => closeModal('calculator')}
-              onFocus={() => {
-                announceFloatingFocus('calculator');
-                setActiveFloatingApp('calculator');
-              }}
-              zIndex={activeFloatingApp === 'calculator' ? 95 : 55}
-            />
+            <Suspense fallback={null}>
+              <CalculatorModal
+                isClosing={closingModal === 'calculator'}
+                onClose={() => closeModal('calculator')}
+                onFocus={() => {
+                  announceFloatingFocus('calculator');
+                  setActiveFloatingApp('calculator');
+                }}
+                zIndex={activeFloatingApp === 'calculator' ? 95 : 55}
+              />
+            </Suspense>
           )}
           {isReportBugOpen && (
             <div className={getModalBackdropClass(closingModal === 'reportBug')}>
