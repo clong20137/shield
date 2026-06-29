@@ -1,5 +1,5 @@
-import { FormEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, memo, useEffect, useRef, useState } from 'react';
-import { CheckCircle2, ChevronDown, Plus, Search, Send, Users, X } from 'lucide-react';
+import { FormEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, SyntheticEvent, memo, useEffect, useRef, useState } from 'react';
+import { CheckCheck, CheckCircle2, ChevronDown, MessageCircle, Plus, Search, Send, X } from 'lucide-react';
 import { MentionTextarea } from '../MentionTextarea';
 import type { ToastType } from '../ToastHost';
 import { AuthAccount, errorLogService, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetThumbnailError, messageService, User, UserMessage, userService } from '../../services/api';
@@ -13,6 +13,7 @@ export interface RecentConversation {
   directParticipantId: string;
   directLastSeenAt: string | null;
   threadParticipantIds: string[];
+  threadParticipantNames: string[];
   latestMessage?: UserMessage;
   unreadPreview: string;
   unreadCount: number;
@@ -127,6 +128,12 @@ function getRecentConversationParticipantIds(message: UserMessage, currentUserId
   return [getRecentConversationDirectParticipantId(message, currentUserId)].filter(Boolean);
 }
 
+function getRecentConversationParticipantNames(message: UserMessage, currentUserId: string): string[] {
+  return parseRecentConversationList(message.threadParticipantNames)
+    .filter((name) => name && name !== 'You' && name !== currentUserId)
+    .slice(0, 5);
+}
+
 function getRecentConversationDirectLastSeenAt(message: UserMessage, currentUserId: string): string | null {
   if (message.threadType && message.threadType !== 'direct') {
     return null;
@@ -169,6 +176,7 @@ function buildRecentConversations(messages: UserMessage[], currentUserId: string
       directParticipantId: getRecentConversationDirectParticipantId(message, currentUserId),
       directLastSeenAt: getRecentConversationDirectLastSeenAt(message, currentUserId),
       threadParticipantIds: getRecentConversationParticipantIds(message, currentUserId),
+      threadParticipantNames: getRecentConversationParticipantNames(message, currentUserId),
       latestMessage: message,
       unreadPreview: unreadIncrement > 0 ? subtitle : existingConversation?.unreadPreview || '',
       unreadCount: (existingConversation?.unreadCount || 0) + unreadIncrement,
@@ -320,6 +328,57 @@ function getRecentConversationActivityText(
     : presence.label;
 }
 
+function RecentConversationAvatar({
+  conversation,
+  imageLoadFailed,
+  onImageError,
+}: {
+  conversation: RecentConversation;
+  imageLoadFailed: boolean;
+  onImageError: (event: SyntheticEvent<HTMLImageElement>) => void;
+}) {
+  if (conversation.threadType !== 'direct') {
+    const stackNames = conversation.threadParticipantNames.length > 0
+      ? conversation.threadParticipantNames
+      : conversation.title.split(/,|\s+and\s+/u).map((name) => name.trim()).filter(Boolean);
+    const fallbackItems = stackNames.length > 0 ? stackNames : ['Group'];
+    const items = [
+      ...(conversation.imageUrl && !imageLoadFailed ? [{ type: 'image' as const, value: conversation.imageUrl, label: conversation.title }] : []),
+      ...fallbackItems.map((name) => ({ type: 'initials' as const, value: getInitials(name), label: name })),
+    ].slice(0, 3);
+
+    return (
+      <span className="recent-group-avatar-stack" aria-hidden="true">
+        {items.map((item, index) => (
+          <span key={`${item.type}-${item.value}-${index}`} className="recent-group-avatar-item">
+            {item.type === 'image' ? (
+              <img src={getAssetThumbnailUrl(item.value, 96)} alt="" onError={onImageError} className="h-full w-full rounded-full object-cover" />
+            ) : (
+              item.value
+            )}
+          </span>
+        ))}
+        {conversation.threadParticipantIds.length > 3 && (
+          <span className="recent-group-avatar-count">+{Math.min(conversation.threadParticipantIds.length - 3, 9)}</span>
+        )}
+      </span>
+    );
+  }
+
+  if (conversation.imageUrl && !imageLoadFailed) {
+    return (
+      <img
+        src={getAssetThumbnailUrl(conversation.imageUrl, 96)}
+        alt=""
+        onError={onImageError}
+        className="h-full w-full rounded-full object-cover"
+      />
+    );
+  }
+
+  return <>{getInitials(conversation.title)}</>;
+}
+
 function RecentConversationsDock({
   conversations,
   isCollapsed,
@@ -353,6 +412,9 @@ function RecentConversationsDock({
 }) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; conversation: RecentConversation } | null>(null);
   const [conversationImageLoadFailed, setConversationImageLoadFailed] = useState<Record<string, boolean>>({});
+  const [previewExpiresByConversation, setPreviewExpiresByConversation] = useState<Record<string, number>>({});
+  const [previewNow, setPreviewNow] = useState(() => Date.now());
+  const previewSignatureRef = useRef<Record<string, string>>({});
 
   const openContextMenu = (event: ReactMouseEvent, conversation: RecentConversation) => {
     event.preventDefault();
@@ -377,6 +439,30 @@ function RecentConversationsDock({
       window.removeEventListener('scroll', closeContextMenu, true);
     };
   }, [contextMenu]);
+
+  useEffect(() => {
+    const nextSignatures: Record<string, string> = {};
+    const nextExpirations: Record<string, number> = {};
+    const now = Date.now();
+
+    conversations.forEach((conversation) => {
+      const signature = `${conversation.unreadCount}:${conversation.latestMessage?.id || ''}`;
+      nextSignatures[conversation.id] = signature;
+      if (conversation.unreadCount > 0) {
+        nextExpirations[conversation.id] = previewSignatureRef.current[conversation.id] === signature
+          ? previewExpiresByConversation[conversation.id] || now + 6500
+          : now + 6500;
+      }
+    });
+
+    previewSignatureRef.current = nextSignatures;
+    setPreviewExpiresByConversation(nextExpirations);
+  }, [conversations]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setPreviewNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   return (
     <aside
@@ -406,7 +492,10 @@ function RecentConversationsDock({
           const typing = typingByConversation[conversation.id];
           const previewText = conversation.unreadPreview || conversation.subtitle || 'New message';
           const isQuickReplyOpen = quickReplyConversationId === conversation.id;
-          const shouldShowPreview = conversation.unreadCount > 0 && !isQuickReplyOpen;
+          const shouldShowPreview = conversation.unreadCount > 0
+            && !typing
+            && !isQuickReplyOpen
+            && (previewExpiresByConversation[conversation.id] || 0) > previewNow;
           const presence = conversation.threadType === 'direct'
             ? getRecentConversationPresence(conversation, presenceByAccount)
             : null;
@@ -468,6 +557,7 @@ function RecentConversationsDock({
                   const conversationAvatarErrorKey = `${conversation.id}:${conversation.imageUrl || ''}`;
 
                 return (
+                  <>
                   <button
                     type="button"
                     onClick={() => onOpenConversation(conversation)}
@@ -477,15 +567,14 @@ function RecentConversationsDock({
                     aria-label={`Open conversation with ${conversation.title}${typing ? ', typing' : presence ? `, ${presence.label}` : ''}`}
                     title={`${conversation.title}${typing ? ' - typing' : presence ? ` - ${presence.label}` : ''}${conversation.subtitle ? ` - ${conversation.subtitle}` : ''}`}
                   >
-                    {conversation.imageUrl && !conversationImageLoadFailed[conversationAvatarErrorKey] ? (
-                      <img
-                        src={getAssetThumbnailUrl(conversation.imageUrl, 96)}
-                        alt=""
-                        onError={(event) => {
+                    <RecentConversationAvatar
+                      conversation={conversation}
+                      imageLoadFailed={Boolean(conversationImageLoadFailed[conversationAvatarErrorKey])}
+                      onImageError={(event) => {
                           const image = event.currentTarget;
                           const fallbackUrl = getAssetUrl(conversation.imageUrl);
 
-                          if (fallbackUrl && image.src !== fallbackUrl) {
+                          if (conversation.threadType === 'direct' && fallbackUrl && image.src !== fallbackUrl) {
                             image.src = fallbackUrl;
                             return;
                           }
@@ -500,14 +589,8 @@ function RecentConversationsDock({
                               [conversationAvatarErrorKey]: true,
                             };
                           });
-                        }}
-                        className="h-full w-full rounded-full object-cover"
-                      />
-                    ) : conversation.threadType !== 'direct' ? (
-                      <Users size={19} />
-                    ) : (
-                      getInitials(conversation.title)
-                    )}
+                      }}
+                    />
                     {presence && !typing && (
                       <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-white dark:border-gray-900 dark:bg-gray-900">
                         {presence.showPulse && <span className={`absolute inset-[-0.2rem] rounded-full border shield-online-pulse ${presence.pulseClass}`} />}
@@ -529,6 +612,48 @@ function RecentConversationsDock({
                       </span>
                     )}
                   </button>
+                  {!isCollapsed && (
+                    <div className="recent-hover-action-ring pointer-events-none absolute inset-0 z-30">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onReply(conversation);
+                        }}
+                        className="recent-hover-action recent-hover-action-reply"
+                        aria-label={`Quick reply to ${conversation.title}`}
+                        title="Quick reply"
+                      >
+                        <MessageCircle size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpenConversation(conversation);
+                        }}
+                        className="recent-hover-action recent-hover-action-open"
+                        aria-label={`Open ${conversation.title}`}
+                        title="Open"
+                      >
+                        <Search size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={conversation.unreadCount === 0}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onMarkRead(conversation);
+                        }}
+                        className="recent-hover-action recent-hover-action-read"
+                        aria-label={`Mark ${conversation.title} read`}
+                        title="Mark read"
+                      >
+                        <CheckCheck size={13} />
+                      </button>
+                    </div>
+                  )}
+                  </>
                 );
               })()}
             </div>
@@ -915,6 +1040,12 @@ function RecentMessageReplyPopover({
   };
 
   const sendOnEnter = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+
     if (event.key !== 'Enter' || event.shiftKey) {
       return;
     }

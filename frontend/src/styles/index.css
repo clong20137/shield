@@ -3443,6 +3443,148 @@
     margin-left: -0.75rem;
   }
 
+  .recent-group-avatar-stack {
+    position: relative;
+    display: grid;
+    height: 100%;
+    width: 100%;
+    place-items: center;
+  }
+
+  .recent-group-avatar-item {
+    position: absolute;
+    display: flex;
+    height: 1.78rem;
+    width: 1.78rem;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 9999px;
+    border: 2px solid rgb(255, 255, 255);
+    background: color-mix(in srgb, var(--app-primary) 82%, var(--app-secondary));
+    color: rgb(255, 255, 255);
+    font-size: 0.62rem;
+    font-weight: 900;
+    line-height: 1;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.2);
+    transform: translateY(-0.1rem);
+    transition: transform var(--shield-motion-duration) var(--shield-motion-ease), box-shadow var(--shield-motion-duration) var(--shield-motion-ease);
+  }
+
+  .recent-group-avatar-item:nth-child(1) {
+    z-index: 3;
+    transform: translateX(-0.68rem) translateY(0.22rem);
+  }
+
+  .recent-group-avatar-item:nth-child(2) {
+    z-index: 2;
+    transform: translateY(-0.28rem);
+  }
+
+  .recent-group-avatar-item:nth-child(3) {
+    z-index: 1;
+    transform: translateX(0.68rem) translateY(0.22rem);
+  }
+
+  .recent-group-avatar-count {
+    position: absolute;
+    bottom: -0.12rem;
+    right: -0.18rem;
+    z-index: 4;
+    display: flex;
+    height: 1rem;
+    min-width: 1rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    border: 2px solid rgb(255, 255, 255);
+    background: rgb(15, 23, 42);
+    padding-inline: 0.18rem;
+    color: rgb(255, 255, 255);
+    font-size: 0.55rem;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .recent-hover-action-ring {
+    opacity: 0;
+    transform: scale(0.86);
+    transition: opacity var(--shield-motion-duration) var(--shield-motion-ease), transform var(--shield-motion-duration) var(--shield-motion-ease);
+  }
+
+  .group\/recent:hover .recent-hover-action-ring,
+  .group\/recent:focus-within .recent-hover-action-ring {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .recent-hover-action {
+    pointer-events: auto;
+    position: absolute;
+    display: flex;
+    height: 1.65rem;
+    width: 1.65rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--app-primary);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
+    opacity: 0;
+    transform: translate(0, 0) scale(0.72);
+    transition:
+      color var(--shield-motion-duration) var(--shield-motion-ease),
+      background-color var(--shield-motion-duration) var(--shield-motion-ease),
+      border-color var(--shield-motion-duration) var(--shield-motion-ease),
+      box-shadow var(--shield-motion-duration) var(--shield-motion-ease),
+      opacity var(--shield-motion-duration) var(--shield-motion-ease),
+      transform var(--shield-motion-duration) var(--shield-motion-ease);
+  }
+
+  .recent-hover-action:hover,
+  .recent-hover-action:focus-visible {
+    background: var(--app-secondary);
+    color: rgb(255, 255, 255);
+    transform: translate(var(--recent-action-x, 0), var(--recent-action-y, 0)) scale(1.08) !important;
+  }
+
+  .recent-hover-action:disabled {
+    cursor: not-allowed;
+    opacity: 0.45 !important;
+    filter: grayscale(0.35);
+  }
+
+  .group\/recent:hover .recent-hover-action,
+  .group\/recent:focus-within .recent-hover-action {
+    opacity: 1;
+    transform: translate(var(--recent-action-x, 0), var(--recent-action-y, 0)) scale(1);
+  }
+
+  .recent-hover-action-reply {
+    --recent-action-x: -2.15rem;
+    --recent-action-y: -1.85rem;
+    right: 0.35rem;
+    top: 0.35rem;
+  }
+
+  .recent-hover-action-open {
+    --recent-action-x: -2.75rem;
+    --recent-action-y: 0;
+    right: 0.35rem;
+    top: 50%;
+    margin-top: -0.825rem;
+    transition-delay: 35ms;
+  }
+
+  .recent-hover-action-read {
+    --recent-action-x: -2.15rem;
+    --recent-action-y: 1.85rem;
+    right: 0.35rem;
+    bottom: 0.35rem;
+    transition-delay: 70ms;
+  }
+
   .message-member-stack-collapsed:hover .message-member-avatar + .message-member-avatar,
   .message-member-stack-collapsed:focus-within .message-member-avatar + .message-member-avatar {
     margin-left: 0.125rem;
