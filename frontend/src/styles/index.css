@@ -1762,6 +1762,7 @@
     background-color: rgba(255, 255, 255, 0.92) !important;
   }
 
+  html.glass .my-day-mileage-summary,
   html.glass:not(.dark) .my-day-mileage-summary {
     border-color: rgba(255, 255, 255, 0.16) !important;
     background-color: rgba(255, 255, 255, 0.1) !important;
@@ -1771,10 +1772,16 @@
     -webkit-backdrop-filter: none !important;
   }
 
+  html.glass .my-day-mileage-summary .text-white,
   html.glass:not(.dark) .my-day-mileage-summary .text-blue-100,
   html.glass:not(.dark) .my-day-mileage-summary .text-white,
   html.glass:not(.dark) .my-day-mileage-summary [class*='text-blue-100'] {
     color: rgb(255, 255, 255) !important;
+  }
+
+  html.glass.dark .my-day-mileage-summary .dark\:text-gray-400,
+  html.glass.dark .my-day-mileage-summary [class*='dark:text-gray-400'] {
+    color: rgb(156, 163, 175) !important;
   }
 
   html.glass:not(.dark) .glass-workspace-window section[class~='bg-white'],
@@ -2752,6 +2759,41 @@
     background: rgba(255, 255, 255, 0.12);
   }
 
+  .shield-sidebar-shell {
+    transition-property: width, min-width, max-width, background-color, box-shadow;
+    transition-duration: 420ms;
+    transition-timing-function: var(--shield-motion-ease);
+    will-change: width;
+  }
+
+  .shield-sidebar-section,
+  .shield-left-panel nav,
+  .shield-left-panel .shrink-0,
+  .shield-left-panel img,
+  .shield-left-panel [class*='h-12'],
+  .shield-left-panel [class*='w-12'],
+  .shield-left-panel [class*='h-10'],
+  .shield-left-panel [class*='w-10'] {
+    transition-property: padding, gap, width, height, margin, opacity, transform, background-color, color, border-color, box-shadow;
+    transition-duration: 420ms;
+    transition-timing-function: var(--shield-motion-ease);
+  }
+
+  .shield-sidebar-collapsed .shield-sidebar {
+    scrollbar-width: none;
+  }
+
+  .shield-sidebar-collapsed .shield-sidebar::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  .sidebar-search-static {
+    transition-property: width, height, background-color, border-color, box-shadow, transform, opacity;
+    transition-duration: 420ms;
+    transition-timing-function: var(--shield-motion-ease);
+  }
+
   .sidebar-search-input,
   .sidebar-search-input:focus {
     border-color: rgba(255, 255, 255, 0.1) !important;
@@ -2767,6 +2809,36 @@
   .shield-left-panel .sidebar-search-icon {
     color: rgb(219, 234, 254) !important;
     opacity: 1 !important;
+  }
+
+  html.glass .shield-left-panel .sidebar-search-static:not(form),
+  html.glass .shield-left-panel .sidebar-search-static:not(form):hover,
+  html.glass .shield-left-panel .sidebar-search-static:not(form):focus-visible {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: rgb(255, 255, 255) !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  html.glass .shield-left-panel .sidebar-search-input,
+  html.glass .shield-left-panel .sidebar-search-input:focus {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: rgb(255, 255, 255) !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  html.glass .shield-left-panel .sidebar-search-input::placeholder {
+    color: rgb(219, 234, 254) !important;
+    opacity: 1 !important;
+  }
+
+  html.glass .shield-left-panel .sidebar-search-icon {
+    color: rgb(219, 234, 254) !important;
   }
 
   html.glass .shield-left-panel .global-search-results {

@@ -1309,7 +1309,7 @@ function SidebarLink({ to, label, compact, icon: Icon }: SidebarLinkProps) {
       to={to}
       className={({ isActive }) =>
         [
-          'flex h-10 items-center rounded px-3 text-sm font-semibold transition',
+          'flex h-10 items-center rounded px-3 text-sm font-semibold transition-all duration-300 ease-out',
           compact ? 'justify-center' : 'justify-start',
           isActive ? 'bg-white text-primary-500 shadow' : 'text-blue-50 hover:bg-white/10',
         ].join(' ')
@@ -1871,7 +1871,7 @@ function GlobalSearch({ compact }: { compact: boolean }) {
         data-onboarding-target="global-search"
         type="button"
         onClick={() => navigate('/search')}
-        className="mx-auto flex h-11 w-11 items-center justify-center rounded bg-white/10 text-white hover:bg-white/20"
+        className="sidebar-search-static mx-auto flex h-11 w-11 items-center justify-center rounded bg-white/10 text-white hover:bg-white/20"
         title="Search"
       >
         <Search size={20} />
@@ -1880,7 +1880,7 @@ function GlobalSearch({ compact }: { compact: boolean }) {
   }
 
   return (
-    <form data-onboarding-target="global-search" onSubmit={handleSubmit} className="relative flex gap-2">
+    <form data-onboarding-target="global-search" onSubmit={handleSubmit} className="sidebar-search-static relative flex gap-2">
       <div className="relative min-w-0 flex-1">
         <Search className="sidebar-search-icon pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-blue-100" size={18} />
         <input
@@ -5967,7 +5967,7 @@ function App() {
               </div>
             </div>
           )}
-          <aside className={`shield-left-panel relative z-50 hidden h-[100dvh] shrink-0 overflow-visible bg-primary-500 text-white shadow-xl transition-all duration-200 md:block ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
+          <aside className={`shield-left-panel shield-sidebar-shell relative z-50 hidden h-[100dvh] shrink-0 overflow-visible bg-primary-500 text-white shadow-xl md:block ${isSidebarCollapsed ? 'shield-sidebar-collapsed w-20' : 'w-72'}`}>
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed((value) => !value)}
@@ -6000,11 +6000,11 @@ function App() {
               )}
             </div>
 
-            <div className={isSidebarCollapsed ? 'px-3 pb-2 pt-3' : 'px-4 pb-2 pt-3'}>
+            <div className={`shield-sidebar-section ${isSidebarCollapsed ? 'px-3 pb-2 pt-3' : 'px-4 pb-2 pt-3'}`}>
               <GlobalSearch compact={isSidebarCollapsed} />
             </div>
 
-            <div className={isSidebarCollapsed ? 'px-3 py-2' : 'px-4 py-2'}>
+            <div className={`shield-sidebar-section ${isSidebarCollapsed ? 'px-3 py-2' : 'px-4 py-2'}`}>
               <button
                 data-onboarding-target="profile-card"
                 type="button"
