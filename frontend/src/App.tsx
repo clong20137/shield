@@ -1,4 +1,4 @@
-import { CSSProperties, FormEvent, ReactNode, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, FormEvent, ReactNode, lazy, startTransition, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, BarChart3, Bell, Bug, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Download, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Minus, Moon, RefreshCw, Save, Search, Settings, Shield, Sun, UserCircle, X } from 'lucide-react';
 import { BrowserRouter as Router, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
@@ -5299,8 +5299,10 @@ function App() {
     const dateQuery = typeof targetDate === 'string' ? `?date=${encodeURIComponent(targetDate)}` : '';
     const targetPath = `/calendar${dateQuery}`;
     if (`${getAppRelativePathname()}${window.location.search}` !== targetPath) {
-      window.history.pushState({}, document.title, withAppBase(targetPath));
-      window.dispatchEvent(new PopStateEvent('popstate'));
+      startTransition(() => {
+        window.history.pushState({}, document.title, withAppBase(targetPath));
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      });
     }
   };
 
@@ -5335,8 +5337,10 @@ function App() {
   };
 
   const openAppPath = (path: string) => {
-    window.history.pushState({}, document.title, withAppBase(path));
-    window.dispatchEvent(new PopStateEvent('popstate'));
+    startTransition(() => {
+      window.history.pushState({}, document.title, withAppBase(path));
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
   };
 
   useEffect(() => {
@@ -5931,7 +5935,7 @@ function App() {
   })();
 
   return (
-    <Router basename={ROUTER_BASENAME}>
+    <Router basename={ROUTER_BASENAME} future={{ v7_startTransition: true }}>
       <ToastHost toasts={toasts} />
       {showConfetti && <ConfettiOverlay />}
       <SeasonalThemeEffects activeTheme={activeSeasonalTheme} />
