@@ -6598,7 +6598,7 @@ function App() {
           {shouldShowForcedPasswordModal && currentUser && (
             <ForcePasswordChange account={currentUser} onChanged={handleAccountUpdate} onLogout={handleLogout} onToast={showToast} appName={appName} />
           )}
-          {isApiConnectionLost && <ConnectionLostOverlay lastConnectedAt={lastApiConnectedAt} appName={appName} />}
+          {isApiConnectionLost && <ConnectionLostOverlay lastConnectedAt={lastApiConnectedAt} appName={appName} brandLogoSrc={resolvedBrandLogoSrc} />}
           {isAppLocked && currentUser && (
             <LockScreen
               account={currentUser}

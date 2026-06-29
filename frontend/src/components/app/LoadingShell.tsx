@@ -1,5 +1,3 @@
-import { Shield } from 'lucide-react';
-
 function formatConnectionTime(value: number | null): string {
   return value ? new Date(value).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Unknown';
 }
@@ -63,21 +61,32 @@ export function ShieldLoading({
   );
 }
 
-export function ConnectionLostOverlay({ lastConnectedAt, appName }: { lastConnectedAt: number | null; appName: string }) {
+export function ConnectionLostOverlay({
+  lastConnectedAt,
+  appName,
+  brandLogoSrc,
+}: {
+  lastConnectedAt: number | null;
+  appName: string;
+  brandLogoSrc?: string;
+}) {
   return (
-    <div className="fixed inset-0 z-[260] flex items-center justify-center bg-gray-950/72 px-4 backdrop-blur-[2px]">
-      <div className="w-full max-w-sm rounded-lg border border-white/10 bg-white p-6 text-center shadow-[0_28px_80px_rgba(15,23,42,0.45)] dark:bg-gray-950">
-        <div className="shield-loader mx-auto mb-4">
-          <Shield size={70} />
+    <div className="fixed inset-0 z-[260] flex items-center justify-center bg-gray-950/68 px-4 backdrop-blur-md">
+      <div className="reconnect-panel w-full max-w-sm rounded-2xl border border-white/15 bg-white/96 p-6 text-center shadow-[0_32px_90px_rgba(2,6,23,0.48)] dark:bg-gray-950/95">
+        <div className="reconnect-logo-pulse mx-auto mb-5" aria-hidden="true">
+          <span className="reconnect-logo-ring reconnect-logo-ring-one" />
+          <span className="reconnect-logo-ring reconnect-logo-ring-two" />
+          <img src={brandLogoSrc || '/shield-splash-logo.png'} alt="" />
         </div>
-        <p className="text-sm font-bold uppercase tracking-[0.22em] text-danger">Connection Lost</p>
-        <h2 className="mt-2 text-2xl font-bold text-primary-500 dark:text-blue-100">Reconnecting...</h2>
-        <p className="mt-3 text-sm leading-6 text-gray-500 dark:text-gray-400">
-          {appName} cannot reach the API right now. Your session is being kept open while we try again.
+        <p className="text-xs font-black uppercase tracking-[0.24em] text-accent">Reconnecting</p>
+        <h2 className="mt-2 text-2xl font-black text-gray-950 dark:text-white">Keeping {appName} ready</h2>
+        <p className="mx-auto mt-3 max-w-xs text-sm font-medium leading-6 text-gray-500 dark:text-gray-300">
+          We lost contact with the server for a moment. Your session is still open while we restore the connection.
         </p>
-        <p className="mt-4 rounded bg-gray-50 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-500 dark:bg-gray-900 dark:text-gray-400">
-          Last connected {formatConnectionTime(lastConnectedAt)}
-        </p>
+        <div className="mx-auto mt-5 flex w-fit items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.12em] text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+          <span className="h-2 w-2 rounded-full bg-accent shadow-[0_0_0_4px_rgba(156,134,92,0.14)]" />
+          <span>Last connected {formatConnectionTime(lastConnectedAt)}</span>
+        </div>
       </div>
     </div>
   );
