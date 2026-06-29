@@ -1732,6 +1732,21 @@
     background-color: rgba(255, 255, 255, 0.92) !important;
   }
 
+  html.glass:not(.dark) .my-day-mileage-summary {
+    border-color: rgba(255, 255, 255, 0.16) !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: rgb(255, 255, 255) !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  html.glass:not(.dark) .my-day-mileage-summary .text-blue-100,
+  html.glass:not(.dark) .my-day-mileage-summary .text-white,
+  html.glass:not(.dark) .my-day-mileage-summary [class*='text-blue-100'] {
+    color: rgb(255, 255, 255) !important;
+  }
+
   html.glass:not(.dark) .glass-workspace-window section[class~='bg-white'],
   html.glass:not(.dark) .glass-workspace-window article[class~='bg-white'],
   html.glass:not(.dark) .glass-workspace-window div[class~='bg-white'],

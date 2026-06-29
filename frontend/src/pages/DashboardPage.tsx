@@ -1758,7 +1758,7 @@ function MyDayWidget({
             </div>
           </div>
         </div>
-        <div className="mt-4 rounded border border-white/15 bg-white/10 p-3">
+        <div className="my-day-mileage-summary mt-4 rounded border border-white/15 bg-white/10 p-3">
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs font-bold uppercase tracking-wide text-blue-100 dark:text-gray-400">Miles reported this week</span>
             <span className="text-2xl font-black text-white">{weeklyMiles.toLocaleString(undefined, { maximumFractionDigits: 1 })}</span>

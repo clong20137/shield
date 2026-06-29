@@ -91,8 +91,8 @@ function isSecurePassword(password: string): boolean {
   return password.length >= 12 && /[A-Z]/u.test(password) && /[a-z]/u.test(password) && /\d/u.test(password) && /[^A-Za-z0-9]/u.test(password);
 }
 
-type ClosingModal = 'messages' | 'calendar' | 'calculator' | 'profile' | 'reportBug' | 'bugTracker';
-type FloatingAppId = 'messages' | 'calendar' | 'calculator' | 'profile';
+type ClosingModal = 'messages' | 'calculator' | 'profile' | 'reportBug' | 'bugTracker';
+type FloatingAppId = 'messages' | 'calculator' | 'profile';
 type AppScale = AuthAccount['appScale'];
 const APP_SCALE_SEQUENCE: AppScale[] = ['compact', 'comfortable', 'large'];
 const APP_SCALE_LABELS: Record<AppScale, string> = {
@@ -1333,14 +1333,12 @@ interface MobileNavigationProps {
   isAdministrator: boolean;
   unreadMessages: number;
   showCalendar: boolean;
-  onOpenCalendar: () => void;
 }
 
 function MobileNavigation({
   isAdministrator,
   unreadMessages,
   showCalendar,
-  onOpenCalendar,
 }: MobileNavigationProps) {
   const navItems = [
     { to: '/', label: 'Home', icon: LayoutDashboard },
@@ -1379,10 +1377,10 @@ function MobileNavigation({
           )}
         </NavLink>
         {showCalendar && (
-          <button type="button" onClick={onOpenCalendar} className={linkClassName({ isActive: false })} aria-label="Open calendar">
+          <NavLink to="/calendar" className={linkClassName} aria-label="Open calendar">
             <CalendarDays size={20} strokeWidth={2.4} />
             <span className="truncate">Calendar</span>
-          </button>
+          </NavLink>
         )}
       </div>
     </nav>
@@ -2161,10 +2159,6 @@ function getInitialFloatingModalPosition(maxWidth: number, yRatio = 0.08) {
 
 function getInitialMessagesModalPosition() {
   return getInitialFloatingModalPosition(900, 0.08);
-}
-
-function getInitialCalendarModalPosition() {
-  return getInitialFloatingModalPosition(1120, 0.03);
 }
 
 function getModalBackdropClass(isClosing: boolean, tint = 'bg-black/50') {
@@ -3238,8 +3232,6 @@ function App() {
   const [dueReminderPopup, setDueReminderPopup] = useState<Reminder[]>([]);
   const [isCompletingDueReminder, setIsCompletingDueReminder] = useState(false);
   const [activeFloatingApp, setActiveFloatingApp] = useState<FloatingAppId>('messages');
-  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
-  const [calendarModalRequestedDate, setCalendarModalRequestedDate] = useState<string | null>(null);
   const [messageTargetUser, setMessageTargetUser] = useState<User | null>(null);
   const [messageTargetThreadId, setMessageTargetThreadId] = useState<string | null>(null);
   const [messageComposeRequestKey] = useState(0);
@@ -5216,10 +5208,6 @@ function App() {
     setClosingModal(modal);
     window.setTimeout(() => {
       if (modal === 'messages') setIsMessagesModalOpen(false);
-      if (modal === 'calendar') {
-        setIsCalendarModalOpen(false);
-        setCalendarModalRequestedDate(null);
-      }
       if (modal === 'calculator') setIsCalculatorOpen(false);
       if (modal === 'profile') setIsProfileModalOpen(false);
       if (modal === 'reportBug') setIsReportBugOpen(false);
@@ -5303,16 +5291,6 @@ function App() {
     }
 
     const requestedDate = typeof targetDate === 'string' ? targetDate : null;
-    if (isShieldDesktopApp()) {
-      startTransition(() => {
-        setCalendarModalRequestedDate(requestedDate);
-        announceFloatingFocus('calendar');
-        setActiveFloatingApp('calendar');
-        setIsCalendarModalOpen(true);
-      });
-      return;
-    }
-
     const dateQuery = requestedDate ? `?date=${encodeURIComponent(requestedDate)}` : '';
     const targetPath = `/calendar${dateQuery}`;
     if (`${getAppRelativePathname()}${window.location.search}` !== targetPath) {
@@ -5324,11 +5302,6 @@ function App() {
   };
 
   const toggleCalendarModal = () => {
-    if (isCalendarModalOpen) {
-      closeModal('calendar');
-      return;
-    }
-
     openCalendarModal();
   };
 
@@ -5405,11 +5378,6 @@ function App() {
       return true;
     }
 
-    if (activeFloatingApp === 'calendar' && isCalendarModalOpen) {
-      closeModal('calendar');
-      return true;
-    }
-
     if (activeFloatingApp === 'messages' && isMessagesModalOpen) {
       closeModal('messages');
       return true;
@@ -5422,11 +5390,6 @@ function App() {
 
     if (isCalculatorOpen) {
       closeModal('calculator');
-      return true;
-    }
-
-    if (isCalendarModalOpen) {
-      closeModal('calendar');
       return true;
     }
 
@@ -5767,7 +5730,7 @@ function App() {
     document.addEventListener('keydown', handleEscape);
 
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [activeFloatingApp, isAccountMenuOpen, isBugTrackerOpen, isCalculatorOpen, isCalendarModalOpen, isCommandPaletteOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isProfileModalOpen, isReportBugOpen]);
+  }, [activeFloatingApp, isAccountMenuOpen, isBugTrackerOpen, isCalculatorOpen, isCommandPaletteOpen, isFirstLoginGuideOpen, isMessagesModalOpen, isNotificationsOpen, isProfileModalOpen, isReportBugOpen]);
 
   const shouldShowGlobalContextMenu = useCallback((target: EventTarget | null): boolean => {
     if (!(target instanceof Element)) {
@@ -6190,7 +6153,6 @@ function App() {
                       badgeCounts={{ messages: messageUnreadCount }}
                       activeModalApps={[
                         ...(isMessagesModalOpen ? (['messages'] as const) : []),
-                        ...(isCalendarModalOpen ? (['calendar'] as const) : []),
                         ...(isCalculatorOpen ? (['calculator'] as const) : []),
                       ]}
                       storageKey={getQuickLaunchStorageKey(currentUser?.id || 'anonymous')}
@@ -6468,7 +6430,6 @@ function App() {
                     badgeCounts={{ messages: messageUnreadCount }}
                     activeModalApps={[
                       ...(isMessagesModalOpen ? (['messages'] as const) : []),
-                      ...(isCalendarModalOpen ? (['calendar'] as const) : []),
                       ...(isCalculatorOpen ? (['calculator'] as const) : []),
                     ]}
                     storageKey={getQuickLaunchStorageKey(currentUser?.id || 'anonymous')}
@@ -6502,7 +6463,6 @@ function App() {
             isAdministrator={isAdministrator}
             unreadMessages={messageUnreadCount}
             showCalendar={showCalendar}
-            onOpenCalendar={openCalendarModal}
           />
           <GlobalKeyboardShortcuts
             canOpenAdminConsole={canOpenAdminConsole}
@@ -6590,48 +6550,6 @@ function App() {
                 <div className="min-h-0 flex-1">
                   <Suspense fallback={<PageLoader label="Loading messages..." />}>
                     <MessageInboxPage currentUser={currentUser} onToast={showToast} isModalView targetRecipient={messageTargetUser} targetThreadId={messageTargetThreadId} composeRequestKey={messageComposeRequestKey} isBackgrounded={false} />
-                  </Suspense>
-                </div>
-              </>
-              )}
-            </FloatingWindow>
-          )}
-          {isCalendarModalOpen && currentUser && showCalendar && (
-            <FloatingWindow
-              className="glass-workspace-window pointer-events-auto fixed inset-x-0 top-0 bottom-[calc(env(safe-area-inset-bottom)+5.4rem)] flex min-h-0 w-full min-w-0 max-w-none resize-none flex-col overflow-hidden rounded-none bg-white p-3 shadow-2xl dark:bg-gray-900 md:inset-auto md:h-[82dvh] md:max-h-[calc(100dvh-1rem)] md:min-h-[min(480px,calc(100dvh-1rem))] md:w-[min(1120px,calc(100vw-1rem))] md:min-w-[min(420px,calc(100vw-1rem))] md:max-w-[calc(100vw-1rem)] md:resize md:rounded-lg md:p-4"
-              fallbackSize={{ width: Math.min(window.innerWidth - 16, 1120), height: Math.min(window.innerHeight - 16, 780) }}
-              initialPosition={getInitialCalendarModalPosition}
-              isClosing={closingModal === 'calendar'}
-              onFocus={() => {
-                announceFloatingFocus('calendar');
-                setActiveFloatingApp('calendar');
-              }}
-              zIndex={activeFloatingApp === 'calendar' ? 95 : 55}
-            >
-              {({ dragHandleProps, isDragging }) => (
-              <>
-                <div
-                  {...dragHandleProps}
-                  className={`mb-3 flex select-none items-start justify-between gap-4 border-b border-gray-200 pb-3 dark:border-gray-800 md:touch-none md:cursor-grab ${isDragging ? 'md:cursor-grabbing' : ''}`}
-                >
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Calendar</h2>
-                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 md:hidden">Schedule, daily entries, and reminders.</p>
-                    <p className="mt-0.5 hidden text-xs text-gray-500 dark:text-gray-400 md:block">Drag to move. Resize from the corner.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={() => closeModal('calendar')}
-                    className="icon-close-button"
-                    aria-label="Close calendar"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-                <div className="min-h-0 flex-1">
-                  <Suspense fallback={<PageLoader label="Loading calendar..." />}>
-                    <CalendarPage currentUser={currentUser} onAccountUpdate={handleAccountUpdate} useMilitaryTime={messagePreferences.useMilitaryTime} isFloatingApp requestedDate={calendarModalRequestedDate} />
                   </Suspense>
                 </div>
               </>
