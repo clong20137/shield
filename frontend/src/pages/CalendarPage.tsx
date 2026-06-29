@@ -2954,81 +2954,81 @@ function CalendarPage({
 
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         {calendarView === 'month' && (
-        <>
-        <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 sm:gap-2 sm:text-xs">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-            <div key={day}>{day}</div>
-          ))}
-        </div>
+        <div className="calendar-month-board mx-auto w-full">
+          <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 sm:gap-2 sm:text-xs">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+              <div key={day}>{day}</div>
+            ))}
+          </div>
 
-        <div className="mt-2 grid grid-cols-7 gap-1 sm:gap-2">
-          {calendarCells.map((date, index) => {
-            if (!date) {
-              return <div key={`empty-${index}`} className="min-h-14 rounded border border-transparent sm:min-h-24" />;
-            }
+          <div className="mt-2 grid grid-cols-7 gap-1 sm:gap-2">
+            {calendarCells.map((date, index) => {
+              if (!date) {
+                return <div key={`empty-${index}`} className="min-h-14 rounded border border-transparent sm:aspect-square sm:min-h-0" />;
+              }
 
-            const dateKey = formatDateKey(date);
-            const dayEntries = visibleEntries.filter((entry) => entry.date === dateKey);
-            const isToday = dateKey === todayKey;
+              const dateKey = formatDateKey(date);
+              const dayEntries = visibleEntries.filter((entry) => entry.date === dateKey);
+              const isToday = dateKey === todayKey;
 
-            return (
-              <button
-                key={dateKey}
-                type="button"
-                onClick={() => openDay(dateKey)}
-                onContextMenu={(event) => openDailyStripContextMenu(event, dateKey, dayEntries[0])}
-                className={`min-h-14 rounded border bg-gray-50 p-1 text-left transition hover:border-accent hover:bg-accent/5 dark:bg-gray-950 sm:min-h-24 sm:p-2 ${
-                  isToday
-                    ? 'border-accent ring-2 ring-accent/20'
-                    : 'border-gray-200 dark:border-gray-800'
-                }`}
-              >
-                <div className="mb-1 flex items-center justify-between sm:mb-2">
-                  <span className="text-xs font-bold text-gray-800 dark:text-gray-100 sm:text-sm">{date.getDate()}</span>
-                  {dayEntries.length > 0 && (
-                    <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-bold text-accent sm:px-2 sm:text-xs">
-                      {dayEntries.length}
-                    </span>
-                  )}
-                </div>
-                <div className="hidden space-y-1 sm:block">
-                  {dayEntries.slice(0, 3).map((entry) => {
-                    const reviewLabel = getDailyReviewLabel(entry);
-                    return (
-                      <div
-                        key={entry.id}
-                        className="truncate rounded px-2 py-1 text-xs font-semibold text-white"
-                        style={{ backgroundColor: entry.color }}
-                        title={`${entry.dutyHours} hours - ${entry.districtWorked}${reviewLabel ? ` - ${reviewLabel}` : ''}`}
-                      >
-                        {entry.submissionStatus === 'Draft' ? 'Draft - ' : ''}{entry.dutyHours}h {entry.districtWorked}
-                        {entry.submissionStatus === 'Submitted' && getDailyReviewStatus(entry) === 'Approved' && (
-                          <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1 py-0.5 text-[9px] uppercase">
-                            <BadgeCheck size={10} />
-                            Approved
-                          </span>
-                        )}
+              return (
+                <button
+                  key={dateKey}
+                  type="button"
+                  onClick={() => openDay(dateKey)}
+                  onContextMenu={(event) => openDailyStripContextMenu(event, dateKey, dayEntries[0])}
+                  className={`min-h-14 rounded border bg-gray-50 p-1 text-left transition hover:border-accent hover:bg-accent/5 dark:bg-gray-950 sm:aspect-square sm:min-h-0 sm:p-2 ${
+                    isToday
+                      ? 'border-accent ring-2 ring-accent/20'
+                      : 'border-gray-200 dark:border-gray-800'
+                  }`}
+                >
+                  <div className="mb-1 flex items-center justify-between sm:mb-2">
+                    <span className="text-xs font-bold text-gray-800 dark:text-gray-100 sm:text-sm">{date.getDate()}</span>
+                    {dayEntries.length > 0 && (
+                      <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-bold text-accent sm:px-2 sm:text-xs">
+                        {dayEntries.length}
+                      </span>
+                    )}
+                  </div>
+                  <div className="hidden space-y-1 sm:block">
+                    {dayEntries.slice(0, 3).map((entry) => {
+                      const reviewLabel = getDailyReviewLabel(entry);
+                      return (
+                        <div
+                          key={entry.id}
+                          className="truncate rounded px-2 py-1 text-xs font-semibold text-white"
+                          style={{ backgroundColor: entry.color }}
+                          title={`${entry.dutyHours} hours - ${entry.districtWorked}${reviewLabel ? ` - ${reviewLabel}` : ''}`}
+                        >
+                          {entry.submissionStatus === 'Draft' ? 'Draft - ' : ''}{entry.dutyHours}h {entry.districtWorked}
+                          {entry.submissionStatus === 'Submitted' && getDailyReviewStatus(entry) === 'Approved' && (
+                            <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1 py-0.5 text-[9px] uppercase">
+                              <BadgeCheck size={10} />
+                              Approved
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {dayEntries.length > 3 && (
+                      <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                        +{dayEntries.length - 3} more
                       </div>
-                    );
-                  })}
-                  {dayEntries.length > 3 && (
-                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                      +{dayEntries.length - 3} more
+                    )}
+                  </div>
+                  {dayEntries.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1 sm:hidden">
+                      {dayEntries.slice(0, 4).map((entry) => (
+                        <span key={entry.id} className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                      ))}
                     </div>
                   )}
-                </div>
-                {dayEntries.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1 sm:hidden">
-                    {dayEntries.slice(0, 4).map((entry) => (
-                      <span key={entry.id} className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: entry.color }} />
-                    ))}
-                  </div>
-                )}
-              </button>
-            );
-          })}
+                </button>
+              );
+            })}
+          </div>
         </div>
-        </>
         )}
 
         {calendarView === 'week' && (

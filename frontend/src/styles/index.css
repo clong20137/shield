@@ -3473,6 +3473,16 @@
     animation: modal-backdrop-enter var(--shield-motion-duration) var(--shield-motion-ease) both;
   }
 
+  .calendar-month-board {
+    max-width: min(100%, max(52rem, calc((100dvh - 15rem) * 7 / 6)));
+  }
+
+  @media (max-width: 639px) {
+    .calendar-month-board {
+      max-width: 100%;
+    }
+  }
+
   .modal-window {
     max-width: calc(100vw - 0.75rem);
     max-height: calc(100dvh - 0.75rem);
