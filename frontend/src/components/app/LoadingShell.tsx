@@ -79,9 +79,9 @@ export function ConnectionLostOverlay({
           <img src={brandLogoSrc || '/shield-splash-logo.png'} alt="" />
         </div>
         <p className="text-xs font-black uppercase tracking-[0.24em] text-accent">Reconnecting</p>
-        <h2 className="mt-2 text-2xl font-black text-gray-950 dark:text-white">Keeping {appName} ready</h2>
+        <h2 className="mt-2 text-2xl font-black text-gray-950 dark:text-white">We lost connection</h2>
         <p className="mx-auto mt-3 max-w-xs text-sm font-medium leading-6 text-gray-500 dark:text-gray-300">
-          We lost contact with the server for a moment. Your session is still open while we restore the connection.
+          {appName} has lost connection to the API server. Please wait while we establish connection again.
         </p>
         <div className="mx-auto mt-5 flex w-fit items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.12em] text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
           <span className="h-2 w-2 rounded-full bg-accent shadow-[0_0_0_4px_rgba(156,134,92,0.14)]" />
