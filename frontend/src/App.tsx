@@ -5128,7 +5128,7 @@ function App() {
     });
 
     return () => eventSource.close();
-  }, [applyThemeSettings, currentUser, handleForcedLogout, isAppBackgrounded, loadBugReports, loadNotificationSounds, loadUrgentAlerts, loadUserNotifications, syncSessionTimeoutFromSettings, syncSetupStatus, syncThemeSettings]);
+  }, [applyThemeSettings, currentUser, handleForcedLogout, loadBugReports, loadNotificationSounds, loadUrgentAlerts, loadUserNotifications, syncSessionTimeoutFromSettings, syncSetupStatus, syncThemeSettings]);
 
   const closeModal = (modal: ClosingModal) => {
     setClosingModal(modal);

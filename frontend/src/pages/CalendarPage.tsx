@@ -2478,18 +2478,31 @@ function CalendarPage({
     return () => document.removeEventListener('keydown', handleDeletedDailyUndoShortcut);
   }, [currentUser.id, isRestoringDeletedDaily, selectedDate]);
 
-  const visibleEntries = entries.filter((entry) => {
+  const visibleEntries = useMemo(() => entries.filter((entry) => {
     const matchesDistrict = !districtFilter || entry.districtWorked === districtFilter;
     const matchesStatus = !statusFilter || entry.specialStatus === statusFilter;
     return matchesDistrict && matchesStatus;
-  });
+  }), [districtFilter, entries, statusFilter]);
+
+  const visibleEntriesByDate = useMemo(() => {
+    const groupedEntries = new Map<string, CalendarEntry[]>();
+    visibleEntries.forEach((entry) => {
+      const dateEntries = groupedEntries.get(entry.date);
+      if (dateEntries) {
+        dateEntries.push(entry);
+      } else {
+        groupedEntries.set(entry.date, [entry]);
+      }
+    });
+    return groupedEntries;
+  }, [visibleEntries]);
 
   const editingEntry = editingEntryId ? entries.find((entry) => entry.id === editingEntryId) : null;
 
-  const monthStart = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
-  const daysInMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
+  const monthStart = useMemo(() => new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1), [calendarMonth]);
+  const daysInMonth = useMemo(() => new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate(), [calendarMonth]);
   const leadingEmptyDays = monthStart.getDay();
-  const calendarCells = Array.from({ length: 42 }, (_, index) => {
+  const calendarCells = useMemo(() => Array.from({ length: 42 }, (_, index) => {
     const dayNumber = index - leadingEmptyDays + 1;
 
     if (dayNumber < 1 || dayNumber > daysInMonth) {
@@ -2497,19 +2510,26 @@ function CalendarPage({
     }
 
     return new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), dayNumber);
-  });
+  }), [calendarMonth, daysInMonth, leadingEmptyDays]);
   const todayKey = formatDateKey(new Date());
   const monthKey = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}`;
-  const monthEntries = visibleEntries.filter((entry) => entry.date.startsWith(monthKey));
-  const weekStart = startOfWeek(calendarFocusDate);
-  const weekDates = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
-  const weekDateKeys = weekDates.map(formatDateKey);
+  const monthEntries = useMemo(() => visibleEntries.filter((entry) => entry.date.startsWith(monthKey)), [monthKey, visibleEntries]);
+  const weekStart = useMemo(() => startOfWeek(calendarFocusDate), [calendarFocusDate]);
+  const weekDates = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)), [weekStart]);
+  const weekDateKeys = useMemo(() => weekDates.map(formatDateKey), [weekDates]);
+  const weekDateKeySet = useMemo(() => new Set(weekDateKeys), [weekDateKeys]);
   const focusDateKey = formatDateKey(calendarFocusDate);
-  const activeViewEntries = calendarView === 'month'
-    ? monthEntries
-    : calendarView === 'week'
-      ? visibleEntries.filter((entry) => weekDateKeys.includes(entry.date))
-      : visibleEntries.filter((entry) => entry.date === focusDateKey);
+  const activeViewEntries = useMemo(() => {
+    if (calendarView === 'month') {
+      return monthEntries;
+    }
+
+    if (calendarView === 'week') {
+      return visibleEntries.filter((entry) => weekDateKeySet.has(entry.date));
+    }
+
+    return visibleEntriesByDate.get(focusDateKey) || [];
+  }, [calendarView, focusDateKey, monthEntries, visibleEntries, visibleEntriesByDate, weekDateKeySet]);
   const activeViewDutyHours = activeViewEntries.reduce((total, entry) => total + (Number(entry.dutyHours) || 0), 0);
   const activeViewLabel = calendarView === 'month'
     ? getMonthLabel(calendarMonth)
@@ -2968,7 +2988,7 @@ function CalendarPage({
               }
 
               const dateKey = formatDateKey(date);
-              const dayEntries = visibleEntries.filter((entry) => entry.date === dateKey);
+              const dayEntries = visibleEntriesByDate.get(dateKey) || [];
               const isToday = dateKey === todayKey;
 
               return (
@@ -3035,7 +3055,7 @@ function CalendarPage({
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-7">
             {weekDates.map((date) => {
               const dateKey = formatDateKey(date);
-              const dayEntries = visibleEntries.filter((entry) => entry.date === dateKey);
+              const dayEntries = visibleEntriesByDate.get(dateKey) || [];
               const isToday = dateKey === todayKey;
 
               return (

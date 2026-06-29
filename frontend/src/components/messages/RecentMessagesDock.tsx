@@ -441,28 +441,40 @@ function RecentConversationsDock({
   }, [contextMenu]);
 
   useEffect(() => {
-    const nextSignatures: Record<string, string> = {};
-    const nextExpirations: Record<string, number> = {};
-    const now = Date.now();
+    setPreviewExpiresByConversation((currentExpirations) => {
+      const nextSignatures: Record<string, string> = {};
+      const nextExpirations: Record<string, number> = {};
+      const now = Date.now();
 
-    conversations.forEach((conversation) => {
-      const signature = `${conversation.unreadCount}:${conversation.latestMessage?.id || ''}`;
-      nextSignatures[conversation.id] = signature;
-      if (conversation.unreadCount > 0) {
-        nextExpirations[conversation.id] = previewSignatureRef.current[conversation.id] === signature
-          ? previewExpiresByConversation[conversation.id] || now + 6500
-          : now + 6500;
-      }
+      conversations.forEach((conversation) => {
+        const signature = `${conversation.unreadCount}:${conversation.latestMessage?.id || ''}`;
+        nextSignatures[conversation.id] = signature;
+        if (conversation.unreadCount > 0) {
+          nextExpirations[conversation.id] = previewSignatureRef.current[conversation.id] === signature
+            ? currentExpirations[conversation.id] || now + 6500
+            : now + 6500;
+        }
+      });
+
+      previewSignatureRef.current = nextSignatures;
+      setPreviewNow(now);
+      return nextExpirations;
     });
-
-    previewSignatureRef.current = nextSignatures;
-    setPreviewExpiresByConversation(nextExpirations);
   }, [conversations]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setPreviewNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
+    const now = Date.now();
+    const nextExpiry = Object.values(previewExpiresByConversation)
+      .filter((expiry) => expiry > now)
+      .sort((first, second) => first - second)[0];
+
+    if (!nextExpiry) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => setPreviewNow(Date.now()), Math.max(50, nextExpiry - now + 50));
+    return () => window.clearTimeout(timer);
+  }, [previewExpiresByConversation, previewNow]);
 
   return (
     <aside
