@@ -866,7 +866,7 @@ export function QuickLaunchTray({
 
       {contextMenu && (
         <div
-          className="quick-launch-context-menu pointer-events-auto fixed z-[70] w-64 overflow-hidden rounded border border-gray-200 bg-white p-1 text-sm shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+          className={`quick-launch-context-menu ${isSidebarPlacement ? 'quick-launch-sidebar-popup' : ''} pointer-events-auto fixed z-[70] w-64 overflow-hidden rounded border border-gray-200 bg-white p-1 text-sm shadow-2xl dark:border-gray-700 dark:bg-gray-900`}
           style={{
             left: Math.max(
               QUICK_LAUNCH_CONTEXT_MENU_GUTTER,
@@ -943,7 +943,7 @@ export function QuickLaunchTray({
       {editingSlot !== null && (
         <div
           ref={pickerRef}
-          className={`quick-launch-picker-enter ${isPickerClosing ? 'quick-launch-picker-exit' : ''} pointer-events-auto fixed z-[75] max-h-[min(34rem,calc(100dvh-2rem))] overflow-y-auto rounded-lg border border-accent/30 bg-white p-3 text-gray-900 shadow-[0_24px_70px_rgba(15,23,42,0.28)] ring-1 ring-accent/10 dark:border-accent/40 dark:bg-gray-900 dark:text-gray-100`}
+          className={`quick-launch-picker-enter ${isPickerClosing ? 'quick-launch-picker-exit' : ''} ${isSidebarPlacement ? 'quick-launch-sidebar-popup' : ''} pointer-events-auto fixed z-[75] max-h-[min(34rem,calc(100dvh-2rem))] overflow-y-auto rounded-lg border border-accent/30 bg-white p-3 text-gray-900 shadow-[0_24px_70px_rgba(15,23,42,0.28)] ring-1 ring-accent/10 dark:border-accent/40 dark:bg-gray-900 dark:text-gray-100`}
           style={{
             left: pickerPosition?.left ?? QUICK_LAUNCH_PICKER_GUTTER,
             top: pickerPosition?.top ?? window.innerHeight - 120,
