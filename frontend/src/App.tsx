@@ -1,11 +1,11 @@
 import { CSSProperties, FormEvent, ReactNode, lazy, startTransition, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, BarChart3, Bell, Bug, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Download, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Minus, Moon, RefreshCw, Save, Search, Settings, Shield, Sun, UserCircle, X } from 'lucide-react';
-import { BrowserRouter as Router, NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, NavLink, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
-import CalendarPage from './pages/CalendarPage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
 import { NotificationCenterMenu } from './components/notifications/NotificationCenterMenu';
 import { ShieldLoading, ConnectionLostOverlay } from './components/app/LoadingShell';
+import { AppRoutes } from './components/app/AppRoutes';
 import { getQuickLaunchStorageKey, normalizeQuickLaunchSlotCount, QUICK_LAUNCH_DEFAULT_SLOT_COUNT, type QuickLaunchPlacement } from './components/quick-launch/quickLaunchCore';
 import { FloatingWindow } from './components/FloatingWindow';
 import { FirstLoginGuide, WelcomeSplash } from './components/OnboardingGuide';
@@ -14,19 +14,14 @@ import { AuthAccount, authService, bugReportService, BugReport, BugReportPriorit
 import { useUnreadCounts } from './hooks/useUnreadCounts';
 import { getEffectiveSeasonalTheme, getSeasonalThemeOption, normalizeSeasonalTheme, SEASONAL_THEME_CLASSES, type EffectiveSeasonalTheme, type SeasonalThemePreference } from './theme/seasonalThemes';
 
-const SearchPage = lazy(() => import('./pages/SearchPage'));
-const ReportsPage = lazy(() => import('./pages/ReportsPage'));
-const DashboardPage = lazy(() => import('./pages/DashboardPage'));
-const DashboardPostPage = lazy(() => import('./pages/DashboardPostPage'));
 const AccountSettingsPage = lazy(() => import('./pages/AccountSettingsPage').then((module) => ({ default: module.AccountSettingsPage })));
-const AdminConsolePage = lazy(() => import('./pages/AdminConsolePage'));
-const DeviceManagementPage = lazy(() => import('./pages/DeviceManagementPage'));
 const MessageInboxPage = lazy(() => import('./pages/MessageInboxPage'));
-const PerformanceEvaluationsPage = lazy(() => import('./pages/PerformanceEvaluationsPage'));
 const RecentMessagesDockContainer = lazy(() => import('./components/messages/RecentMessagesDock').then((module) => ({ default: module.RecentMessagesDockContainer })));
 const QuickLaunchTray = lazy(() => import('./components/quick-launch/QuickLaunchTray').then((module) => ({ default: module.QuickLaunchTray })));
 const GlobalCommandPalette = lazy(() => import('./components/app/GlobalCommandPalette').then((module) => ({ default: module.GlobalCommandPalette })));
 const CalculatorModal = lazy(() => import('./components/app/CalculatorModal').then((module) => ({ default: module.CalculatorModal })));
+const SeasonalThemeEffects = lazy(() => import('./components/theme/SeasonalThemeEffects').then((module) => ({ default: module.SeasonalThemeEffects })));
+const ThanksgivingSidebarAnimation = lazy(() => import('./components/theme/SeasonalThemeEffects').then((module) => ({ default: module.ThanksgivingSidebarAnimation })));
 
 const SESSION_KEY = 'shield_session';
 const THEME_KEY = 'shield_theme';
@@ -50,7 +45,6 @@ const DEFAULT_PRIMARY_COLOR = '#1a365d';
 const DEFAULT_SECONDARY_COLOR = '#9C865C';
 const DEFAULT_BRAND_LOGO = '/shield-splash-logo.png';
 const PATRIOTIC_BRAND_LOGO = '/theme-assets/america-250-logo.png';
-const THANKSGIVING_TURKEY_ANIMATION = '/theme-assets/cool-turkey.json';
 const MAX_SETUP_LOGO_SIZE_BYTES = 240 * 1024;
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/iu;
 const LOGIN_TRANSITION_MS = 560;
@@ -2110,41 +2104,10 @@ function GlobalKeyboardShortcuts({
   return null;
 }
 
-function NotFoundPage() {
-  return (
-    <div className="flex min-h-[calc(100vh-12rem)] items-center justify-center">
-      <section className="w-full max-w-xl rounded-lg border border-gray-200 bg-white p-8 text-center shadow dark:border-gray-800 dark:bg-gray-900">
-        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 text-accent">
-          <Search size={28} />
-        </div>
-        <p className="text-sm font-bold uppercase tracking-[0.18em] text-accent">404</p>
-        <h1 className="mt-2 text-3xl font-bold text-primary-500 dark:text-blue-100">Page Not Found</h1>
-        <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-gray-500 dark:text-gray-400">
-          This page does not exist, or it may have moved.
-        </p>
-        <NavLink to="/" className="btn-primary mt-6 inline-flex">
-          Back to Dashboard
-        </NavLink>
-      </section>
-    </div>
-  );
-}
-
 function PageLoader({ label = 'Loading...' }: { label?: string }) {
   return (
     <div className="page-loader-enter flex min-h-48 items-center justify-center">
       <div className="loading min-w-56">{label}</div>
-    </div>
-  );
-}
-
-function RouteTransition({ children }: { children: React.ReactNode }) {
-  const location = useLocation();
-  const isAdminWorkspaceRoute = /^\/(admin|audit|permissions|users\/create)(\/|$)/u.test(location.pathname);
-
-  return (
-    <div key={isAdminWorkspaceRoute ? 'admin-workspace' : location.pathname} className={isAdminWorkspaceRoute ? undefined : 'page-route-enter'}>
-      {children}
     </div>
   );
 }
@@ -2354,52 +2317,6 @@ function ConfettiOverlay() {
           })}
         </span>
       ))}
-    </div>
-  );
-}
-
-function SeasonalThemeEffects({ activeTheme }: { activeTheme: EffectiveSeasonalTheme }) {
-  const showSnow = activeTheme === 'christmas' || activeTheme === 'winter';
-  const showFallEffects = activeTheme === 'fall';
-
-  if (!showSnow && !showFallEffects) {
-    return null;
-  }
-
-  return (
-    <>
-      {showSnow && (
-        <div className="pointer-events-none fixed inset-0 z-[39] overflow-hidden" aria-hidden="true">
-          <div className="seasonal-snow-layer seasonal-snow-layer-near" />
-          <div className="seasonal-snow-layer seasonal-snow-layer-far" />
-        </div>
-      )}
-      {showFallEffects && (
-        <>
-          <div className="pointer-events-none fixed inset-0 z-[1] overflow-hidden" aria-hidden="true">
-            <div className="seasonal-leaf-layer seasonal-leaf-layer-near" />
-            <div className="seasonal-leaf-layer seasonal-leaf-layer-far" />
-          </div>
-        </>
-      )}
-    </>
-  );
-}
-
-function ThanksgivingSidebarAnimation() {
-  useEffect(() => {
-    void import('@dotlottie/player-component');
-  }, []);
-
-  return (
-    <div className="thanksgiving-sidebar-animation" aria-hidden="true">
-      <dotlottie-player
-        src={withAppBase(THANKSGIVING_TURKEY_ANIMATION)}
-        autoplay
-        loop
-        background="transparent"
-        class="thanksgiving-sidebar-lottie"
-      />
     </div>
   );
 }
@@ -5913,12 +5830,17 @@ function App() {
 
     return steps;
   })();
+  const shouldRenderSeasonalEffects = activeSeasonalTheme === 'christmas' || activeSeasonalTheme === 'winter' || activeSeasonalTheme === 'fall';
 
   return (
     <Router basename={ROUTER_BASENAME} future={{ v7_startTransition: true }}>
       <ToastHost toasts={toasts} />
       {showConfetti && <ConfettiOverlay />}
-      <SeasonalThemeEffects activeTheme={activeSeasonalTheme} />
+      {shouldRenderSeasonalEffects && (
+        <Suspense fallback={null}>
+          <SeasonalThemeEffects activeTheme={activeSeasonalTheme} />
+        </Suspense>
+      )}
       {isDesktopUpdatePromptOpen && (
         <DesktopUpdatePrompt
           status={desktopUpdateStatus}
@@ -6184,7 +6106,9 @@ function App() {
             </div>
             {activeSeasonalTheme === 'thanksgiving' && !isSidebarCollapsed && (
               <div className="mt-auto shrink-0 px-4 pb-4 pt-3">
-                <ThanksgivingSidebarAnimation />
+                <Suspense fallback={null}>
+                  <ThanksgivingSidebarAnimation />
+                </Suspense>
               </div>
             )}
             </div>
@@ -6292,134 +6216,20 @@ function App() {
 
             <main className="min-w-0 flex-1 overflow-y-auto px-3 pb-28 pt-4 dark:bg-gray-950 sm:px-6 sm:pb-48 sm:pt-5 md:pb-48">
               <div data-onboarding-target="workspace" className="min-h-[calc(100dvh-12rem)] min-w-0">
-                <Suspense fallback={<PageLoader label="Loading page..." />}>
-                  <RouteTransition>
-                    <Routes>
-                      <Route
-                        path="/"
-                        element={(
-                          <DashboardPage
-                            currentUser={currentUser}
-                            isAppBackgrounded={isAppBackgrounded}
-                          />
-                        )}
-                      />
-                      {currentUser && (
-                        <Route path="/updates/new" element={<DashboardPostPage currentUser={currentUser} onToast={showToast} isCreateMode />} />
-                      )}
-                      {currentUser && (
-                        <Route path="/updates/:postId/edit" element={<DashboardPostPage currentUser={currentUser} onToast={showToast} isEditMode />} />
-                      )}
-                      {currentUser && <Route path="/updates/:postId" element={<DashboardPostPage currentUser={currentUser} onToast={showToast} />} />}
-                      {currentUser && (
-                        <Route
-                          path="/messages"
-                          element={<MessageInboxPage currentUser={currentUser} onToast={showToast} isBackgrounded={isAppBackgrounded} />}
-                        />
-                      )}
-                      {currentUser && (
-                        <Route
-                          path="/calendar"
-                          element={<CalendarPage currentUser={currentUser} onAccountUpdate={handleAccountUpdate} useMilitaryTime={messagePreferences.useMilitaryTime} />}
-                        />
-                      )}
-                      <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
-                      {currentUser && (
-                        <Route
-                          path="/evaluations"
-                          element={<PerformanceEvaluationsPage currentUser={currentUser} onToast={showToast} getErrorMessage={getErrorMessage} />}
-                        />
-                      )}
-                      <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={showToast} />} />
-                      {currentUser && canOpenAdminConsole && (
-                        <Route
-                          path="/admin"
-                          element={
-                            <AdminConsolePage
-                              account={currentUser}
-                              initialTab={getDefaultAdminConsoleTab()}
-                              onAccountUpdate={handleAccountUpdate}
-                              onToast={showToast}
-                              getErrorMessage={getErrorMessage}
-                              onUserCreated={() => openAppPath('/admin/permissions')}
-                              bugReports={bugReports}
-                              onBugStatusChange={updateBugStatus}
-                            />
-                          }
-                        />
-                      )}
-                      {currentUser && canOpenAdminConsole && (
-                        <Route
-                          path="/admin/:tab"
-                          element={
-                            <AdminConsolePage
-                              account={currentUser}
-                              onAccountUpdate={handleAccountUpdate}
-                              onToast={showToast}
-                              getErrorMessage={getErrorMessage}
-                              onUserCreated={() => openAppPath('/admin/permissions')}
-                              bugReports={bugReports}
-                              onBugStatusChange={updateBugStatus}
-                            />
-                          }
-                        />
-                      )}
-                      {currentUser && canOpenAdminConsole && hasPermission('admin:create-user') && hasPermission('users:create') && (
-                        <Route
-                          path="/users/create"
-                          element={
-                            <AdminConsolePage
-                              account={currentUser}
-                              initialTab="create-user"
-                              onAccountUpdate={handleAccountUpdate}
-                              onToast={showToast}
-                              getErrorMessage={getErrorMessage}
-                              onUserCreated={() => openAppPath('/admin/permissions')}
-                              bugReports={bugReports}
-                              onBugStatusChange={updateBugStatus}
-                            />
-                          }
-                        />
-                      )}
-                      <Route path="/reports" element={<ReportsPage currentUser={currentUser} onToast={showToast} getErrorMessage={getErrorMessage} />} />
-                      {currentUser && canOpenAdminConsole && hasPermission('admin:audit') && hasPermission('audit:view') && (
-                        <Route
-                          path="/audit"
-                          element={
-                            <AdminConsolePage
-                              account={currentUser}
-                              initialTab="audit"
-                              onAccountUpdate={handleAccountUpdate}
-                              onToast={showToast}
-                              getErrorMessage={getErrorMessage}
-                              onUserCreated={() => openAppPath('/admin/permissions')}
-                              bugReports={bugReports}
-                              onBugStatusChange={updateBugStatus}
-                            />
-                          }
-                        />
-                      )}
-                      {currentUser && canOpenAdminConsole && hasPermission('admin:permissions') && hasPermission('roles:manage') && (
-                        <Route
-                          path="/permissions"
-                          element={
-                            <AdminConsolePage
-                              account={currentUser}
-                              initialTab="permissions"
-                              onAccountUpdate={handleAccountUpdate}
-                              onToast={showToast}
-                              getErrorMessage={getErrorMessage}
-                              onUserCreated={() => openAppPath('/admin/permissions')}
-                              bugReports={bugReports}
-                              onBugStatusChange={updateBugStatus}
-                            />
-                          }
-                        />
-                      )}
-                      <Route path="*" element={<NotFoundPage />} />
-                    </Routes>
-                  </RouteTransition>
-                </Suspense>
+                <AppRoutes
+                  currentUser={currentUser}
+                  isAppBackgrounded={isAppBackgrounded}
+                  canOpenAdminConsole={canOpenAdminConsole}
+                  useMilitaryTime={messagePreferences.useMilitaryTime}
+                  bugReports={bugReports}
+                  hasPermission={hasPermission}
+                  getDefaultAdminConsoleTab={getDefaultAdminConsoleTab}
+                  onAccountUpdate={handleAccountUpdate}
+                  onToast={showToast}
+                  getErrorMessage={getErrorMessage}
+                  openAppPath={openAppPath}
+                  onBugStatusChange={updateBugStatus}
+                />
               </div>
               {!messagePreferences.hideQuickLaunch && messagePreferences.quickLaunchPlacement === 'dock' && (
                 <Suspense fallback={null}>
