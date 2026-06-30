@@ -71,6 +71,16 @@ const messageReactionOptions = [
   { key: 'eyes', label: 'Eyes', icon: '👀' },
 ] as const;
 
+function compareMessagesAscending(a: UserMessage, b: UserMessage): number {
+  const createdDiff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  return createdDiff === 0 ? a.id.localeCompare(b.id) : createdDiff;
+}
+
+function compareMessagesDescending(a: UserMessage, b: UserMessage): number {
+  const createdDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  return createdDiff === 0 ? b.id.localeCompare(a.id) : createdDiff;
+}
+
 function formatMessageTime(value: string): string {
   const date = new Date(value);
   const now = new Date();
@@ -845,9 +855,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
             acc.push(message);
           }
           return acc;
-        }, [...currentWindow.messages]).sort((a, b) => {
-          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        });
+        }, [...currentWindow.messages]).sort(compareMessagesAscending);
 
         if (nextMessages.length !== currentWindow.messages.length || nextMessages.some((message, index) => message.id !== currentWindow.messages[index]?.id)) {
           next[threadId] = {
@@ -888,9 +896,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
   const getThreadMessagesWithWindow = (threadId: string, fallbackMessages: UserMessage[]) => {
     const windowState = threadMessageWindows[threadId];
-    const sortedFallback = [...fallbackMessages].sort((a, b) => {
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    });
+    const sortedFallback = [...fallbackMessages].sort(compareMessagesAscending);
 
     if (!windowState || windowState.messages.length === 0) {
       if (sortedFallback.length === 0) {
@@ -905,9 +911,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       byId.set(message.id, message);
     });
 
-    return Array.from(byId.values()).sort((a, b) => {
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    });
+    return Array.from(byId.values()).sort(compareMessagesAscending);
   };
 
   const loadThreadMessages = async (threadId: string, reset = false) => {
@@ -956,11 +960,19 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     }));
 
     try {
-      const response = await messageService.getThread(threadId, currentUser.id, nextPage, THREAD_MESSAGE_PAGE_SIZE);
+      const cursorMessage = isLoadOlder
+        ? [...currentWindow.messages].sort(compareMessagesAscending)[0]
+        : null;
+      const response = await messageService.getThread(
+        threadId,
+        currentUser.id,
+        nextPage,
+        THREAD_MESSAGE_PAGE_SIZE,
+        cursorMessage?.createdAt,
+        cursorMessage?.id,
+      );
       const fetchedMessages = response.data;
-      const sortedFetchedMessages = [...fetchedMessages].sort((a, b) => {
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      });
+      const sortedFetchedMessages = [...fetchedMessages].sort(compareMessagesAscending);
 
       if (!isLoadOlder) {
         mergeThreadMessages(fetchedMessages, true);
@@ -973,9 +985,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         const nextMessages = [
           ...(reset ? [] : existingMessages),
           ...sortedFetchedMessages.filter((message) => !existingMessageIds.has(message.id)),
-        ].sort((a, b) => {
-          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        });
+        ].sort(compareMessagesAscending);
 
         return {
           ...current,
@@ -1299,9 +1309,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
   const threads = useMemo<MessageThread[]>(() => {
     const threadMap = new Map<string, MessageThread>();
-    const combinedMessages = [...inboxMessages, ...sentMessages].sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-    );
+    const combinedMessages = [...inboxMessages, ...sentMessages].sort(compareMessagesAscending);
 
     combinedMessages.forEach((message) => {
       const id = getThreadId(message, currentUser.id);
@@ -1353,7 +1361,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         return aPinned ? -1 : 1;
       }
 
-      return new Date(b.latestMessage?.createdAt || 0).getTime() - new Date(a.latestMessage?.createdAt || 0).getTime();
+      return compareMessagesDescending(
+        a.latestMessage || a.messages[a.messages.length - 1],
+        b.latestMessage || b.messages[b.messages.length - 1],
+      );
     });
   }, [currentUser.id, inboxMessages, pinnedThreadIds, sentMessages]);
 

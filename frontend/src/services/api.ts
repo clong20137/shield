@@ -1349,10 +1349,10 @@ export const messageService = {
       params: pageSize ? { pageSize } : undefined,
     }),
 
-  getThread: (threadId: string, accountId: string, page = 1, pageSize = 250) =>
+  getThread: (threadId: string, accountId: string, page = 1, pageSize = 40, beforeCreatedAt?: string, beforeMessageId?: string) =>
     api.get<UserMessage[]>(`/messages/thread/${threadId}/messages`, {
       ...MESSAGE_REQUEST_OPTIONS,
-      params: { accountId, page, pageSize },
+      params: { accountId, page, pageSize, beforeCreatedAt, beforeMessageId },
     }),
 
   getUnreadCount: (accountId: string) =>

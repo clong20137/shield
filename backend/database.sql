@@ -88,7 +88,12 @@ CREATE TABLE IF NOT EXISTS user_messages (
   INDEX `idx_messages_recipient` (`recipientUserId`),
   INDEX `idx_messages_sender_created` (`senderAccountId`, `createdAt`),
   INDEX `idx_messages_recipient_read_created` (`recipientUserId`, `isRead`, `createdAt`),
-  INDEX `idx_messages_group_thread_created` (`threadId`, `createdAt`)
+  INDEX `idx_messages_group_thread_created` (`threadId`, `createdAt`),
+  INDEX `idx_messages_inbox_cursor` (`recipientUserId`, `recipientDeleted`, `isArchived`, `createdAt`, `id`),
+  INDEX `idx_messages_sent_cursor` (`senderAccountId`, `senderDeleted`, `createdAt`, `id`),
+  INDEX `idx_messages_direct_out_cursor` (`senderAccountId`, `recipientUserId`, `senderDeleted`, `createdAt`, `id`),
+  INDEX `idx_messages_direct_in_cursor` (`recipientUserId`, `senderAccountId`, `recipientDeleted`, `isArchived`, `createdAt`, `id`),
+  INDEX `idx_messages_group_participant_cursor` (`threadId`, `senderAccountId`, `recipientUserId`, `createdAt`, `id`)
 );
 
 CREATE TABLE IF NOT EXISTS devices (

@@ -73,6 +73,15 @@ function normalizeMessageSubject(value?: string | null): string {
   return subject && subject.toLowerCase() !== 'message' ? subject : '';
 }
 
+function parseMessageCursorDate(value: unknown): Date | undefined {
+  if (typeof value !== 'string' || !value.trim()) {
+    return undefined;
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
 function getRecentConversationId(message: UserMessage, currentUserId: string): string {
   if (message.threadType && message.threadType !== 'direct' && message.threadId) {
     return message.threadId;
@@ -633,7 +642,7 @@ export class MessageController {
         return res.status(400).json({ error: 'Account is required' });
       }
 
-      const pagination = parsePagination(req.query, { defaultPageSize: 250, maxPageSize: 500 });
+      const pagination = parsePagination(req.query, { defaultPageSize: 80, maxPageSize: 120 });
       const messages = await UserMessageModel.listMessagesForUser(accountId, pagination.pageSize, pagination.offset);
       res.json(messages);
     } catch (error) {
@@ -649,7 +658,7 @@ export class MessageController {
         return res.status(400).json({ error: 'Account is required' });
       }
 
-      const pagination = parsePagination(req.query, { defaultPageSize: 250, maxPageSize: 500 });
+      const pagination = parsePagination(req.query, { defaultPageSize: 80, maxPageSize: 120 });
       const sessionAccount = await getSessionAccount(req);
       const messages = await UserMessageModel.listInbox(accountId, pagination.pageSize, pagination.offset, {
         canViewIncognitoPresence: await canViewIncognitoPresence(sessionAccount),
@@ -711,7 +720,7 @@ export class MessageController {
         return res.status(400).json({ error: 'Account is required' });
       }
 
-      const pagination = parsePagination(req.query, { defaultPageSize: 250, maxPageSize: 500 });
+      const pagination = parsePagination(req.query, { defaultPageSize: 80, maxPageSize: 120 });
       const sessionAccount = await getSessionAccount(req);
       const messages = await UserMessageModel.listSent(accountId, pagination.pageSize, pagination.offset, {
         canViewIncognitoPresence: await canViewIncognitoPresence(sessionAccount),
@@ -732,10 +741,12 @@ export class MessageController {
         return res.status(400).json({ error: 'Account and thread are required' });
       }
 
-      const pagination = parsePagination(req.query, { defaultPageSize: 250, maxPageSize: 500 });
+      const pagination = parsePagination(req.query, { defaultPageSize: 40, maxPageSize: 80 });
       const sessionAccount = await getSessionAccount(req);
       const messages = await UserMessageModel.listThread(accountId, threadId, pagination.pageSize, pagination.offset, {
         canViewIncognitoPresence: await canViewIncognitoPresence(sessionAccount),
+        beforeCreatedAt: parseMessageCursorDate(req.query.beforeCreatedAt),
+        beforeMessageId: cleanString(req.query.beforeMessageId, 36) || undefined,
       });
       res.json(messages);
     } catch (error) {

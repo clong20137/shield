@@ -48,6 +48,15 @@ export interface MessageThreadInfo {
   threadImageUrl: string | null;
 }
 
+interface MessageListOptions {
+  canViewIncognitoPresence?: boolean;
+}
+
+interface MessageThreadListOptions extends MessageListOptions {
+  beforeCreatedAt?: Date;
+  beforeMessageId?: string;
+}
+
 interface UserMessageRow extends RowDataPacket {
   id: string;
   senderAccountId: string;
@@ -196,7 +205,7 @@ export class UserMessageModel {
     }
   }
 
-  static async listInbox(accountId: string, limit = 250, offset = 0, options: { canViewIncognitoPresence?: boolean } = {}): Promise<UserMessage[]> {
+  static async listInbox(accountId: string, limit = 80, offset = 0, options: MessageListOptions = {}): Promise<UserMessage[]> {
     const conn = await pool.getConnection();
     try {
       const senderLastSeenSql = visibleLastSeenExpression('s', Boolean(options.canViewIncognitoPresence));
@@ -251,7 +260,7 @@ export class UserMessageModel {
     }
   }
 
-  static async listSent(accountId: string, limit = 250, offset = 0, options: { canViewIncognitoPresence?: boolean } = {}): Promise<UserMessage[]> {
+  static async listSent(accountId: string, limit = 80, offset = 0, options: MessageListOptions = {}): Promise<UserMessage[]> {
     const conn = await pool.getConnection();
     try {
       const senderLastSeenSql = visibleLastSeenExpression('s', Boolean(options.canViewIncognitoPresence));
@@ -286,11 +295,17 @@ export class UserMessageModel {
     }
   }
 
-  static async listThread(accountId: string, threadId: string, limit = 250, offset = 0, options: { canViewIncognitoPresence?: boolean } = {}): Promise<UserMessage[]> {
+  static async listThread(accountId: string, threadId: string, limit = 40, offset = 0, options: MessageThreadListOptions = {}): Promise<UserMessage[]> {
     const conn = await pool.getConnection();
     try {
       const senderLastSeenSql = visibleLastSeenExpression('s', Boolean(options.canViewIncognitoPresence));
       const recipientLastSeenSql = visibleLastSeenExpression('r', Boolean(options.canViewIncognitoPresence));
+      const hasCursor = Boolean(options.beforeCreatedAt && options.beforeMessageId);
+      const cursorSql = hasCursor ? ' AND (m.createdAt < ? OR (m.createdAt = ? AND m.id < ?))' : '';
+      const cursorParams = hasCursor
+        ? [options.beforeCreatedAt, options.beforeCreatedAt, options.beforeMessageId]
+        : [];
+      const effectiveOffset = hasCursor ? 0 : offset;
       const selectMessageSql = `SELECT m.*,
           COALESCE(s.displayName, CONCAT(s.firstName, ' ', s.lastName), s.email) as senderName,
           s.email as senderEmail,
@@ -315,26 +330,42 @@ export class UserMessageModel {
             (m.senderAccountId = ? AND m.senderDeleted = 0)
             OR (m.recipientUserId = ? AND m.recipientDeleted = 0 AND m.isArchived = 0)
           )
-        ORDER BY m.createdAt DESC
+          ${cursorSql}
+        ORDER BY m.createdAt DESC, m.id DESC
         LIMIT ? OFFSET ?`,
-        [threadId, accountId, accountId, accountId, accountId, limit, offset]
+        [threadId, accountId, accountId, accountId, accountId, ...cursorParams, limit, effectiveOffset]
       );
-      const [directRows] = await conn.query<UserMessageRow[]>(
+      const [directSentRows] = await conn.query<UserMessageRow[]>(
         `${selectMessageSql}
         WHERE COALESCE(m.threadType, 'direct') = 'direct'
-          AND (
-            (m.senderAccountId = ? AND m.recipientUserId = ? AND m.senderDeleted = 0)
-            OR (m.senderAccountId = ? AND m.recipientUserId = ? AND m.recipientDeleted = 0 AND m.isArchived = 0)
-          )
-        ORDER BY m.createdAt DESC
+          AND m.senderAccountId = ?
+          AND m.recipientUserId = ?
+          AND m.senderDeleted = 0
+          ${cursorSql}
+        ORDER BY m.createdAt DESC, m.id DESC
         LIMIT ? OFFSET ?`,
-        [accountId, threadId, threadId, accountId, limit, offset]
+        [accountId, threadId, ...cursorParams, limit, effectiveOffset]
+      );
+      const [directInboxRows] = await conn.query<UserMessageRow[]>(
+        `${selectMessageSql}
+        WHERE COALESCE(m.threadType, 'direct') = 'direct'
+          AND m.senderAccountId = ?
+          AND m.recipientUserId = ?
+          AND m.recipientDeleted = 0
+          AND m.isArchived = 0
+          ${cursorSql}
+        ORDER BY m.createdAt DESC, m.id DESC
+        LIMIT ? OFFSET ?`,
+        [threadId, accountId, ...cursorParams, limit, effectiveOffset]
       );
 
       const rowsById = new Map<string, UserMessageRow>();
-      [...groupRows, ...directRows].forEach((row) => rowsById.set(row.id, row));
+      [...groupRows, ...directSentRows, ...directInboxRows].forEach((row) => rowsById.set(row.id, row));
       return Array.from(rowsById.values())
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .sort((a, b) => {
+          const createdDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          return createdDiff === 0 ? b.id.localeCompare(a.id) : createdDiff;
+        })
         .slice(0, limit)
         .map(toUserMessage);
     } finally {
