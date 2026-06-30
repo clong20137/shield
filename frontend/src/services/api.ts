@@ -723,6 +723,34 @@ export interface TrooperDailyReportEntry {
   };
 }
 
+export interface TrooperDailyAnalyticsGroup {
+  label: string;
+  count: number;
+  hours: number;
+}
+
+export interface TrooperDailyAnalyticsActivity {
+  key: string;
+  label: string;
+  value: number;
+}
+
+export interface TrooperDailyAnalyticsResponse {
+  generatedAt: string;
+  scope: 'all' | 'limited';
+  totals: {
+    totalReports: number;
+    totalHours: number;
+    averageHours: number;
+    uniqueTroopers: number;
+  };
+  byDistrict: TrooperDailyAnalyticsGroup[];
+  bySpecialStatus: TrooperDailyAnalyticsGroup[];
+  byReviewStatus: TrooperDailyAnalyticsGroup[];
+  trend: TrooperDailyAnalyticsGroup[];
+  activityTotals: TrooperDailyAnalyticsActivity[];
+}
+
 export interface AuditLog {
   id: string;
   actorId: string | null;
@@ -1285,6 +1313,9 @@ export const reportService = {
 
   getTrooperDailies: (filters?: { q?: string; from?: string; to?: string; district?: string; page?: number; pageSize?: number }) =>
     api.get<{ count: number; total: number; page: number; pageSize: number; totalPages: number; scope: 'all' | 'own' | 'supervised'; data: TrooperDailyReportEntry[] }>('/reports/trooper-dailies', { params: filters }),
+
+  getTrooperDailyAnalytics: (filters?: { q?: string; from?: string; to?: string; district?: string }) =>
+    api.get<TrooperDailyAnalyticsResponse>('/reports/trooper-dailies/analytics', { params: filters }),
 
   reviewTrooperDaily: (id: string, status: 'Approved' | 'Returned', notes: string) =>
     api.put<TrooperDailyReportEntry>(`/reports/trooper-dailies/${id}/review`, { status, notes }),

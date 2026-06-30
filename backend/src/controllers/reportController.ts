@@ -53,6 +53,25 @@ interface CountRow extends RowDataPacket {
   total: number;
 }
 
+interface TrooperDailyAnalyticsGroupRow extends RowDataPacket {
+  label: string | null;
+  count: number;
+  hours: number | string;
+}
+
+interface TrooperDailyAnalyticsTrendRow extends RowDataPacket {
+  label: string;
+  count: number;
+  hours: number | string;
+}
+
+interface TrooperDailyAnalyticsTotalsRow extends RowDataPacket {
+  totalReports: number;
+  totalHours: number | string;
+  averageHours: number | string;
+  uniqueTroopers: number;
+}
+
 interface AccessReviewSummaryRow extends RowDataPacket {
   totalAccounts: number;
   activeAccounts: number;
@@ -89,6 +108,26 @@ interface PermissionDistributionRow extends RowDataPacket {
 }
 
 const reviewStatuses = ['Approved', 'Returned'] as const;
+const trooperDailyAnalyticsFields = [
+  ['regularDutyHours', 'Regular Duty Hours'],
+  ['patrolHours', 'Patrol Hours'],
+  ['crashInvestHours', 'Crash Investigation Hours'],
+  ['trafficCourtHours', 'Traffic Court Hours'],
+  ['incidentReportHours', 'Incident Report Hours'],
+  ['criminalInvestHours', 'Criminal Investigation Hours'],
+  ['criminalCourtHours', 'Criminal Court Hours'],
+  ['regularDutyMiles', 'Regular Duty Miles'],
+  ['policeServices', 'Police Services'],
+  ['crashesInvestigated', 'Crashes Investigated'],
+  ['crashCitations', 'Crash Citations'],
+  ['seatBeltCitations', 'Seat Belt Citations'],
+  ['owiDefendants', 'OWI Defendants'],
+  ['totalCriminalArrests', 'Criminal Arrests'],
+  ['totalFelonyArrests', 'Felony Arrests'],
+  ['gunsSeized', 'Guns Seized'],
+  ['totalDrugArrests', 'Drug Arrests'],
+  ['totalDrugDefendants', 'Drug Defendants'],
+] as const;
 const privilegedPermissions = new Set([
   'roles:manage',
   'audit:view',
@@ -156,6 +195,79 @@ async function canViewHiddenUsers(req: Request): Promise<boolean> {
 
   const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
   return permissions.includes('users:view-hidden');
+}
+
+async function buildTrooperDailyReportScope(req: Request) {
+  const account = await getSessionAccount(req);
+  if (!account) {
+    return { error: 'Sign in required' as const };
+  }
+
+  const permissions = account.role === 'administrator' ? ['reports:trooper-dailies'] : await AuthAccountModel.getPermissionsForAccount(account.id);
+  const canViewAllReports = account.role === 'administrator' || permissions.includes('reports:trooper-dailies');
+  const supervisorNames = Array.from(new Set([
+    account.displayName,
+    `${account.firstName || ''} ${account.lastName || ''}`.trim(),
+    account.email,
+  ]
+    .map((value) => value?.trim().toLowerCase())
+    .filter((value): value is string => Boolean(value))));
+  const { q, from, to, district } = req.query;
+  const params: Array<string | number> = [];
+  const whereParts = ["ce.`category` = 'Trooper Daily'", "COALESCE(ce.`submissionStatus`, 'Submitted') = 'Submitted'"];
+
+  if (!canViewAllReports) {
+    if (supervisorNames.length > 0) {
+      whereParts.push(`(ce.\`ownerAccountId\` = ? OR LOWER(COALESCE(u.\`supervisor\`, '')) IN (${supervisorNames.map(() => '?').join(', ')}))`);
+      params.push(account.id, ...supervisorNames);
+    } else {
+      whereParts.push('ce.`ownerAccountId` = ?');
+      params.push(account.id);
+    }
+  }
+
+  if (typeof q === 'string' && q.trim()) {
+    const search = `%${q.trim().toLowerCase()}%`;
+    whereParts.push(`
+      (
+        LOWER(u.\`firstName\`) LIKE ?
+        OR LOWER(u.\`lastName\`) LIKE ?
+        OR LOWER(u.\`email\`) LIKE ?
+        OR LOWER(u.\`peNumber\`) LIKE ?
+        OR LOWER(u.\`badgeNumber\`) LIKE ?
+        OR LOWER(u.\`rank\`) LIKE ?
+        OR LOWER(u.\`district\`) LIKE ?
+        OR LOWER(ce.\`districtWorked\`) LIKE ?
+      )
+    `);
+    params.push(search, search, search, search, search, search, search, search);
+  }
+
+  if (typeof from === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(from)) {
+    whereParts.push('ce.`entryDate` >= ?');
+    params.push(from);
+  }
+
+  if (typeof to === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(to)) {
+    whereParts.push('ce.`entryDate` <= ?');
+    params.push(to);
+  }
+
+  if (typeof district === 'string' && district.trim()) {
+    whereParts.push('ce.`districtWorked` = ?');
+    params.push(district.trim());
+  }
+
+  return {
+    account,
+    canViewAllReports,
+    fromClause: `
+      FROM calendar_entries ce
+      LEFT JOIN users u ON u.\`id\` = ce.\`ownerAccountId\`
+      WHERE ${whereParts.join(' AND ')}
+    `,
+    params,
+  };
 }
 
 export class ReportController {
@@ -292,73 +404,16 @@ export class ReportController {
       if (!account) {
         return res.status(401).json({ error: 'Sign in required' });
       }
-
-      const permissions = account.role === 'administrator' ? ['reports:trooper-dailies'] : await AuthAccountModel.getPermissionsForAccount(account.id);
-      const canViewAllReports = account.role === 'administrator' || permissions.includes('reports:trooper-dailies');
-      const supervisorNames = Array.from(new Set([
-        account.displayName,
-        `${account.firstName || ''} ${account.lastName || ''}`.trim(),
-        account.email,
-      ]
-        .map((value) => value?.trim().toLowerCase())
-        .filter((value): value is string => Boolean(value))));
-      const { q, from, to, district } = req.query;
+      const scope = await buildTrooperDailyReportScope(req);
+      if ('error' in scope) {
+        return res.status(401).json({ error: scope.error });
+      }
       const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
       const pageSize = Math.min(100, Math.max(10, Number.parseInt(String(req.query.pageSize || '25'), 10) || 25));
       const offset = (page - 1) * pageSize;
-      const params: Array<string | number> = [];
-      const whereParts = ["ce.`category` = 'Trooper Daily'", "COALESCE(ce.`submissionStatus`, 'Submitted') = 'Submitted'"];
-
-      if (!canViewAllReports) {
-        if (supervisorNames.length > 0) {
-          whereParts.push(`(ce.\`ownerAccountId\` = ? OR LOWER(COALESCE(u.\`supervisor\`, '')) IN (${supervisorNames.map(() => '?').join(', ')}))`);
-          params.push(account.id, ...supervisorNames);
-        } else {
-          whereParts.push('ce.`ownerAccountId` = ?');
-          params.push(account.id);
-        }
-      }
-
-      if (typeof q === 'string' && q.trim()) {
-        const search = `%${q.trim().toLowerCase()}%`;
-        whereParts.push(`
-          (
-            LOWER(u.\`firstName\`) LIKE ?
-            OR LOWER(u.\`lastName\`) LIKE ?
-            OR LOWER(u.\`email\`) LIKE ?
-            OR LOWER(u.\`peNumber\`) LIKE ?
-            OR LOWER(u.\`badgeNumber\`) LIKE ?
-            OR LOWER(u.\`rank\`) LIKE ?
-            OR LOWER(u.\`district\`) LIKE ?
-            OR LOWER(ce.\`districtWorked\`) LIKE ?
-          )
-        `);
-        params.push(search, search, search, search, search, search, search, search);
-      }
-
-      if (typeof from === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(from)) {
-        whereParts.push('ce.`entryDate` >= ?');
-        params.push(from);
-      }
-
-      if (typeof to === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(to)) {
-        whereParts.push('ce.`entryDate` <= ?');
-        params.push(to);
-      }
-
-      if (typeof district === 'string' && district.trim()) {
-        whereParts.push('ce.`districtWorked` = ?');
-        params.push(district.trim());
-      }
-
-      const fromClause = `
-        FROM calendar_entries ce
-        LEFT JOIN users u ON u.\`id\` = ce.\`ownerAccountId\`
-        WHERE ${whereParts.join(' AND ')}
-      `;
       const [countRows] = await conn.query<CountRow[]>(
-        `SELECT COUNT(*) as total ${fromClause}`,
-        params
+        `SELECT COUNT(*) as total ${scope.fromClause}`,
+        scope.params
       );
       const total = Number(countRows[0]?.total) || 0;
       const query = `
@@ -371,12 +426,12 @@ export class ReportController {
           u.\`badgeNumber\`,
           u.\`rank\`,
           u.\`district\`
-        ${fromClause}
+        ${scope.fromClause}
         ORDER BY ce.\`entryDate\` DESC, ce.\`updatedAt\` DESC, u.\`lastName\`, u.\`firstName\`
         LIMIT ? OFFSET ?
       `;
 
-      const [rows] = await conn.query<TrooperDailyReportRow[]>(query, [...params, pageSize, offset]);
+      const [rows] = await conn.query<TrooperDailyReportRow[]>(query, [...scope.params, pageSize, offset]);
       const data = rows.map((row) => ({
         id: row.id,
         ownerAccountId: row.ownerAccountId,
@@ -404,11 +459,111 @@ export class ReportController {
         },
       }));
 
-      const supervisorScope = !canViewAllReports && data.some((entry) => entry.ownerAccountId !== account.id);
-      res.json({ count: data.length, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)), scope: canViewAllReports ? 'all' : supervisorScope ? 'supervised' : 'own', data });
+      const supervisorScope = !scope.canViewAllReports && data.some((entry) => entry.ownerAccountId !== account.id);
+      res.json({ count: data.length, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)), scope: scope.canViewAllReports ? 'all' : supervisorScope ? 'supervised' : 'own', data });
     } catch (error) {
       console.error('Trooper daily report error:', error);
       res.status(500).json({ error: 'Failed to load Trooper Daily reports' });
+    } finally {
+      conn?.release();
+    }
+  }
+
+  static async getTrooperDailyAnalytics(req: Request, res: Response) {
+    let conn;
+    try {
+      conn = await pool.getConnection();
+      const scope = await buildTrooperDailyReportScope(req);
+      if ('error' in scope) {
+        return res.status(401).json({ error: scope.error });
+      }
+
+      const [totalRows] = await conn.query<TrooperDailyAnalyticsTotalsRow[]>(
+        `SELECT
+          COUNT(*) AS totalReports,
+          COALESCE(SUM(ce.\`dutyHours\`), 0) AS totalHours,
+          COALESCE(AVG(ce.\`dutyHours\`), 0) AS averageHours,
+          COUNT(DISTINCT ce.\`ownerAccountId\`) AS uniqueTroopers
+        ${scope.fromClause}`,
+        scope.params,
+      );
+
+      const [districtRows] = await conn.query<TrooperDailyAnalyticsGroupRow[]>(
+        `SELECT COALESCE(NULLIF(ce.\`districtWorked\`, ''), 'No District') AS label,
+          COUNT(*) AS count,
+          COALESCE(SUM(ce.\`dutyHours\`), 0) AS hours
+        ${scope.fromClause}
+        GROUP BY label
+        ORDER BY hours DESC, count DESC
+        LIMIT 12`,
+        scope.params,
+      );
+
+      const [specialStatusRows] = await conn.query<TrooperDailyAnalyticsGroupRow[]>(
+        `SELECT COALESCE(NULLIF(ce.\`specialStatus\`, ''), 'None') AS label,
+          COUNT(*) AS count,
+          COALESCE(SUM(ce.\`dutyHours\`), 0) AS hours
+        ${scope.fromClause}
+        GROUP BY label
+        ORDER BY count DESC, hours DESC`,
+        scope.params,
+      );
+
+      const [reviewRows] = await conn.query<TrooperDailyAnalyticsGroupRow[]>(
+        `SELECT COALESCE(NULLIF(ce.\`reviewStatus\`, ''), 'Pending') AS label,
+          COUNT(*) AS count,
+          COALESCE(SUM(ce.\`dutyHours\`), 0) AS hours
+        ${scope.fromClause}
+        GROUP BY label
+        ORDER BY count DESC`,
+        scope.params,
+      );
+
+      const [trendRows] = await conn.query<TrooperDailyAnalyticsTrendRow[]>(
+        `SELECT *
+        FROM (
+          SELECT DATE_FORMAT(ce.\`entryDate\`, '%Y-%m') AS label,
+            COUNT(*) AS count,
+            COALESCE(SUM(ce.\`dutyHours\`), 0) AS hours
+          ${scope.fromClause}
+          GROUP BY label
+          ORDER BY label DESC
+          LIMIT 18
+        ) monthlyTrend
+        ORDER BY label ASC`,
+        scope.params,
+      );
+
+      const activitySelect = trooperDailyAnalyticsFields.map(([key]) =>
+        `COALESCE(SUM(CAST(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(ce.\`details\`, '$.${key}')), ''), '0') AS DECIMAL(14,2))), 0) AS \`${key}\``
+      ).join(',\n');
+      const [activityRows] = await conn.query<RowDataPacket[]>(
+        `SELECT ${activitySelect} ${scope.fromClause}`,
+        scope.params,
+      );
+      const activityTotals = activityRows[0] || {};
+
+      res.json({
+        generatedAt: new Date().toISOString(),
+        scope: scope.canViewAllReports ? 'all' : 'limited',
+        totals: {
+          totalReports: Number(totalRows[0]?.totalReports) || 0,
+          totalHours: Number(totalRows[0]?.totalHours) || 0,
+          averageHours: Number(totalRows[0]?.averageHours) || 0,
+          uniqueTroopers: Number(totalRows[0]?.uniqueTroopers) || 0,
+        },
+        byDistrict: districtRows.map((row) => ({ label: row.label || 'No District', count: Number(row.count) || 0, hours: Number(row.hours) || 0 })),
+        bySpecialStatus: specialStatusRows.map((row) => ({ label: row.label || 'None', count: Number(row.count) || 0, hours: Number(row.hours) || 0 })),
+        byReviewStatus: reviewRows.map((row) => ({ label: row.label || 'Pending', count: Number(row.count) || 0, hours: Number(row.hours) || 0 })),
+        trend: trendRows.map((row) => ({ label: row.label, count: Number(row.count) || 0, hours: Number(row.hours) || 0 })),
+        activityTotals: trooperDailyAnalyticsFields
+          .map(([key, label]) => ({ key, label, value: Number(activityTotals[key]) || 0 }))
+          .filter((item) => item.value > 0)
+          .sort((a, b) => b.value - a.value),
+      });
+    } catch (error) {
+      console.error('Trooper daily analytics error:', error);
+      res.status(500).json({ error: 'Failed to load Trooper Daily analytics' });
     } finally {
       conn?.release();
     }

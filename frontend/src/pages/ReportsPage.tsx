@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, ChevronLeft, ChevronRight, Download, FileText, RotateCcw, Search, Table, X } from 'lucide-react';
-import { AuthAccount, reportService, TrooperDailyReportEntry } from '../services/api';
+import { Activity, BarChart3, CheckCircle2, ChevronLeft, ChevronRight, Clock, Download, FileText, RotateCcw, Search, Table, Users, X } from 'lucide-react';
+import { AuthAccount, reportService, TrooperDailyAnalyticsGroup, TrooperDailyReportEntry, TrooperDailyAnalyticsResponse } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import PerformanceEvaluationsPage from './PerformanceEvaluationsPage';
 import { downloadTrooperDailiesCsv, downloadTrooperDailiesPdf, downloadTrooperDailiesXls } from '../utils/trooperDailyExport';
@@ -151,6 +151,53 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function formatMetric(value: number, maximumFractionDigits = 0): string {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(value);
+}
+
+function formatAnalyticsLabel(label: string): string {
+  if (/^\d{4}-\d{2}$/u.test(label)) {
+    const date = new Date(`${label}-01T00:00:00`);
+    return date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+  }
+
+  return label;
+}
+
+const AnalyticsBarList: React.FC<{
+  items: Array<TrooperDailyAnalyticsGroup | { label: string; value: number }>;
+  valueKey?: 'count' | 'hours' | 'value';
+  valueLabel?: string;
+  emptyText: string;
+}> = ({ items, valueKey = 'count', valueLabel = '', emptyText }) => {
+  const maxValue = Math.max(1, ...items.map((item) => Number(item[valueKey as keyof typeof item]) || 0));
+
+  if (items.length === 0) {
+    return <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">{emptyText}</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.slice(0, 8).map((item) => {
+        const value = Number(item[valueKey as keyof typeof item]) || 0;
+        return (
+          <div key={item.label}>
+            <div className="mb-1 flex items-center justify-between gap-3 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              <span className="truncate">{formatAnalyticsLabel(item.label)}</span>
+              <span className="shrink-0 text-gray-800 dark:text-gray-100">
+                {formatMetric(value, valueKey === 'hours' ? 1 : 0)}{valueLabel}
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+              <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${Math.max(5, (value / maxValue) * 100)}%` }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 const ReportsPage: React.FC<{
   currentUser: AuthAccount | null;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
@@ -168,6 +215,9 @@ const ReportsPage: React.FC<{
   const [dailyTotalPages, setDailyTotalPages] = useState(1);
   const [dailyScope, setDailyScope] = useState<'all' | 'own' | 'supervised'>('own');
   const [dailyLoading, setDailyLoading] = useState(true);
+  const [dailyAnalytics, setDailyAnalytics] = useState<TrooperDailyAnalyticsResponse | null>(null);
+  const [dailyAnalyticsLoading, setDailyAnalyticsLoading] = useState(true);
+  const [dailyAnalyticsError, setDailyAnalyticsError] = useState<string | null>(null);
   const [dailyExportFormat, setDailyExportFormat] = useState<DailyExportFormat>('csv');
   const [isSelectedDailyExportMenuOpen, setIsSelectedDailyExportMenuOpen] = useState(false);
   const [rowDailyExportFormats, setRowDailyExportFormats] = useState<Record<string, DailyExportFormat>>({});
@@ -180,6 +230,37 @@ const ReportsPage: React.FC<{
   const dailyLoadInFlightRef = useRef(false);
   const dailyLoadPendingRef = useRef(false);
   const canReviewTrooperDailies = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('reports:trooper-dailies'));
+
+  const loadTrooperDailyAnalytics = async (
+    showLoading = true,
+    filters = {
+      q: dailySearch,
+      from: dailyFrom,
+      to: dailyTo,
+      district: dailyDistrict,
+    },
+  ) => {
+    if (showLoading) {
+      setDailyAnalyticsLoading(true);
+    }
+    setDailyAnalyticsError(null);
+
+    try {
+      const response = await reportService.getTrooperDailyAnalytics({
+        q: filters.q.trim() || undefined,
+        from: filters.from || undefined,
+        to: filters.to || undefined,
+        district: filters.district || undefined,
+      });
+      setDailyAnalytics(response.data);
+    } catch (err) {
+      const message = getErrorMessage(err, 'Failed to load Trooper Daily analytics.');
+      setDailyAnalyticsError(message);
+      console.error(err);
+    } finally {
+      setDailyAnalyticsLoading(false);
+    }
+  };
 
   const loadTrooperDailies = async (
     showLoading = true,
@@ -234,6 +315,7 @@ const ReportsPage: React.FC<{
   useEffect(() => {
     if (selectedReportType === 'trooper-daily') {
       void loadTrooperDailies();
+      void loadTrooperDailyAnalytics();
     }
     const handleReportsUpdate = () => {
       if (selectedReportType !== 'trooper-daily') {
@@ -247,6 +329,7 @@ const ReportsPage: React.FC<{
       dailyRefreshTimerRef.current = window.setTimeout(() => {
         dailyRefreshTimerRef.current = null;
         void loadTrooperDailies(false);
+        void loadTrooperDailyAnalytics(false);
       }, 500);
     };
 
@@ -274,6 +357,12 @@ const ReportsPage: React.FC<{
       page: 1,
       pageSize: dailyPageSize,
     });
+    void loadTrooperDailyAnalytics(true, {
+      q: dailySearch,
+      from: dailyFrom,
+      to: dailyTo,
+      district: dailyDistrict,
+    });
   };
 
   const clearTrooperDailyFilters = () => {
@@ -282,6 +371,7 @@ const ReportsPage: React.FC<{
     setDailyTo('');
     setDailyDistrict('');
     void loadTrooperDailies(true, { q: '', from: '', to: '', district: '', page: 1, pageSize: dailyPageSize });
+    void loadTrooperDailyAnalytics(true, { q: '', from: '', to: '', district: '' });
   };
 
   const goToDailyPage = (page: number) => {
@@ -494,6 +584,76 @@ const ReportsPage: React.FC<{
             </button>
           </div>
         </form>
+
+        <section className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/60">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-gray-100">
+                <BarChart3 size={20} className="text-accent" /> Live Trooper Daily Analytics
+              </h3>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Graphs update with the current search, district, and date filters.
+              </p>
+            </div>
+            {dailyAnalytics?.generatedAt && (
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-bold uppercase text-gray-500 shadow-sm dark:bg-gray-900 dark:text-gray-400">
+                Updated {new Date(dailyAnalytics.generatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
+
+          {dailyAnalyticsError && <div className="error mb-4">{dailyAnalyticsError}</div>}
+          {dailyAnalyticsLoading ? (
+            <div className="loading">Loading Trooper Daily analytics...</div>
+          ) : dailyAnalytics ? (
+            <>
+              <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  { label: 'Reports', value: formatMetric(dailyAnalytics.totals.totalReports), icon: FileText },
+                  { label: 'Total Hours', value: formatMetric(dailyAnalytics.totals.totalHours, 1), icon: Clock },
+                  { label: 'Avg Hours', value: formatMetric(dailyAnalytics.totals.averageHours, 1), icon: Activity },
+                  { label: 'Troopers', value: formatMetric(dailyAnalytics.totals.uniqueTroopers), icon: Users },
+                ].map((metric) => {
+                  const MetricIcon = metric.icon;
+                  return (
+                    <div key={metric.label} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                        <MetricIcon size={18} />
+                      </div>
+                      <p className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{metric.label}</p>
+                      <p className="mt-1 text-2xl font-black text-gray-900 dark:text-gray-50">{metric.value}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                  <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Monthly Report Trend</h4>
+                  <AnalyticsBarList items={dailyAnalytics.trend} valueKey="count" emptyText="No monthly trend data yet." />
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                  <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Hours by District</h4>
+                  <AnalyticsBarList items={dailyAnalytics.byDistrict} valueKey="hours" valueLabel=" hrs" emptyText="No district hour data yet." />
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                  <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Review Status</h4>
+                  <AnalyticsBarList items={dailyAnalytics.byReviewStatus} valueKey="count" emptyText="No review status data yet." />
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                  <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Duty Status</h4>
+                  <AnalyticsBarList items={dailyAnalytics.bySpecialStatus} valueKey="count" emptyText="No duty status data yet." />
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                  <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Top Activity Totals</h4>
+                  <AnalyticsBarList items={dailyAnalytics.activityTotals.map((item) => ({ label: item.label, value: item.value }))} valueKey="value" emptyText="No activity totals yet." />
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No analytics available yet.</p>
+          )}
+        </section>
 
         {dailyError && <div className="error">{dailyError}</div>}
         {dailyLoading ? (
