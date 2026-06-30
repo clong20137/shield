@@ -27,7 +27,7 @@ For development, copy `config.example.json` to `config.json` and set the interna
 }
 ```
 
-Before building an agency installer, create `desktop/config.json` with the production Shield URL. The installer will include it when `npm run dist` is run. Set `updateUrl` to the IIS folder that will host `Shield-Setup.exe`, `Shield-Setup.exe.blockmap`, and `latest.yml`.
+Before building an agency installer, create `desktop/config.json` with the production Shield URL. The installer will include it when a desktop build is run. Set `updateUrl` to the IIS folder that will host `Shield-Setup.exe`, `Shield-Setup.exe.blockmap`, and `latest.yml`.
 
 You can also launch with:
 
@@ -38,18 +38,28 @@ npm start
 
 ## Build a Windows Installer
 
+For local unsigned testing:
+
+```powershell
+cd desktop
+npm install
+npm run dist
+```
+
+For the signed production installer:
+
 ```powershell
 cd desktop
 npm install
 $env:SHIELD_UPDATE_URL="https://your-shield-server.example.gov/downloads/"
 $env:CSC_LINK="C:\path\to\code-signing-certificate.pfx"
 $env:CSC_KEY_PASSWORD="certificate-password"
-npm run dist
+npm run dist:production
 ```
 
 The installer will be created in `desktop/release/`.
 
-`npm run dist` is the production build path. It blocks builds that still point to the example domain, do not have `desktop/config.json`, do not have `SHIELD_UPDATE_URL`, or do not have a Windows signing certificate configured. For local unsigned testing, use `npm run dist:unsigned`.
+`npm run dist` creates an unsigned local installer and does not require `SHIELD_UPDATE_URL`. `npm run dist:production` is the guarded production build path. It blocks builds that still point to the example domain, do not have `desktop/config.json`, do not have `SHIELD_UPDATE_URL`, or do not have a Windows signing certificate configured.
 
 If the desktop app opens to a blank navy screen or an error screen, press `Ctrl+Shift+I` inside the desktop window to open diagnostics. Most load issues mean `config.json` is still pointing to the example URL or the installed computer cannot reach the configured Shield URL.
 
@@ -69,9 +79,21 @@ C:\inetpub\wwwroot\shield\downloads\Shield-Setup.exe
 
 ## Portable Build
 
+For a local unsigned portable app:
+
 ```powershell
 cd desktop
 npm run dist:portable
+```
+
+For a signed production portable app:
+
+```powershell
+cd desktop
+$env:SHIELD_UPDATE_URL="https://your-shield-server.example.gov/downloads/"
+$env:CSC_LINK="C:\path\to\code-signing-certificate.pfx"
+$env:CSC_KEY_PASSWORD="certificate-password"
+npm run dist:portable:production
 ```
 
 ## Security Notes
