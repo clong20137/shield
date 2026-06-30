@@ -41,10 +41,15 @@ npm start
 ```powershell
 cd desktop
 npm install
+$env:SHIELD_UPDATE_URL="https://your-shield-server.example.gov/downloads/"
+$env:CSC_LINK="C:\path\to\code-signing-certificate.pfx"
+$env:CSC_KEY_PASSWORD="certificate-password"
 npm run dist
 ```
 
 The installer will be created in `desktop/release/`.
+
+`npm run dist` is the production build path. It blocks builds that still point to the example domain, do not have `desktop/config.json`, do not have `SHIELD_UPDATE_URL`, or do not have a Windows signing certificate configured. For local unsigned testing, use `npm run dist:unsigned`.
 
 If the desktop app opens to a blank navy screen or an error screen, press `Ctrl+Shift+I` inside the desktop window to open diagnostics. Most load issues mean `config.json` is still pointing to the example URL or the installed computer cannot reach the configured Shield URL.
 

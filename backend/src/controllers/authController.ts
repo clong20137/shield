@@ -17,7 +17,7 @@ import { cleanMultiline, cleanString, isOneOf, isStrongPassword, isValidEmail, n
 
 const DEFAULT_LOGIN_WARNING_MESSAGE = 'This is a Indiana State Police computer application system that is for Official use only. This system is subject to monitoring. Therefore, no expectation of privacy is to be assumed. Individuals found performing unauthorized activities may be subject to disciplinary action including criminal prosecution.';
 const SESSION_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-const ADMIN_TEMPORARY_PASSWORD = 'ISP08isp!';
+const temporaryPasswordAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 
 const allowedPermissions = [
   'users:view',
@@ -69,6 +69,11 @@ function isDuplicateEmailError(error: unknown): boolean {
     'code' in error &&
     (error as { code?: string }).code === 'ER_DUP_ENTRY'
   );
+}
+
+function generateTemporaryPassword(): string {
+  const randomPart = Array.from(crypto.randomBytes(16), (byte) => temporaryPasswordAlphabet[byte % temporaryPasswordAlphabet.length]).join('');
+  return `Sh1eld!${randomPart}`;
 }
 
 async function canManageRoles(account?: { id: string; role: string } | null): Promise<boolean> {
@@ -1400,7 +1405,8 @@ export class AuthController {
         return res.status(400).json({ error: 'Account is required' });
       }
 
-      const account = await AuthAccountModel.resetPasswordByAdmin(cleanAccountId, ADMIN_TEMPORARY_PASSWORD);
+      const temporaryPassword = generateTemporaryPassword();
+      const account = await AuthAccountModel.resetPasswordByAdmin(cleanAccountId, temporaryPassword);
       if (!account) {
         return res.status(404).json({ error: 'Account not found' });
       }
@@ -1429,7 +1435,7 @@ export class AuthController {
 
       res.json({
         account: await withPermissions(account),
-        temporaryPassword: ADMIN_TEMPORARY_PASSWORD,
+        temporaryPassword,
         message: 'Password reset successfully',
       });
     } catch (error) {

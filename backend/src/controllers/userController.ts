@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import * as XLSX from 'xlsx';
@@ -17,7 +18,7 @@ const employmentTypes = ['Civilian', 'Police', 'Recruit', 'MC Inspector', 'Inact
 const userStatuses = ['Active', 'TDY', 'Military Leave', 'Disability', 'Limited Duty', 'Training', 'Administrative Duty', 'Inactive'] as const;
 const sexOptions = ['Male', 'Female'] as const;
 const maritalStatuses = ['Single', 'Married', 'Divorced', 'Widowed'] as const;
-const DEFAULT_IMPORT_PASSWORD = 'Blueline2026!Temp';
+const temporaryPasswordAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 const selfEditableFields = new Set([
   'profilePictureUrl',
   'personalPhoneNumber',
@@ -46,6 +47,11 @@ function isDuplicateUserError(error: unknown): boolean {
     'code' in error &&
     (error as { code?: string }).code === 'ER_DUP_ENTRY'
   );
+}
+
+function generateTemporaryPassword(): string {
+  const randomPart = Array.from(crypto.randomBytes(16), (byte) => temporaryPasswordAlphabet[byte % temporaryPasswordAlphabet.length]).join('');
+  return `Sh1eld!${randomPart}`;
 }
 
 function getDuplicateUserMessage(error: unknown): string {
@@ -214,7 +220,6 @@ function mapImportRow(row: ImportRow) {
     emergencyContactPhone: '',
     role: 'user',
     receivesMessages: true,
-    password: DEFAULT_IMPORT_PASSWORD,
   };
 }
 
@@ -542,7 +547,7 @@ export class UserController {
       }, {}));
 
       const actor = await getSessionAccount(req);
-      const createdUsers: Array<Pick<User, 'id' | 'firstName' | 'lastName' | 'email' | 'peNumber'>> = [];
+      const createdUsers: Array<Pick<User, 'id' | 'firstName' | 'lastName' | 'email' | 'peNumber'> & { temporaryPassword: string }> = [];
       const skippedRows: Array<{ rowNumber: number; reason: string }> = [];
       const seenEmails = new Set<string>();
       const seenPeNumbers = new Set<string>();
@@ -575,13 +580,18 @@ export class UserController {
         }
 
         try {
-          const createdUser = await UserModel.createUser(importUser);
+          const temporaryPassword = generateTemporaryPassword();
+          const createdUser = await UserModel.createUser({
+            ...importUser,
+            password: temporaryPassword,
+          });
           createdUsers.push({
             id: createdUser.id,
             firstName: createdUser.firstName,
             lastName: createdUser.lastName,
             email: createdUser.email,
             peNumber: createdUser.peNumber,
+            temporaryPassword,
           });
           seenEmails.add(normalizedEmail);
           if (normalizedPeNumber) {
@@ -611,7 +621,7 @@ export class UserController {
           totalRows: rows.length,
           createdCount: createdUsers.length,
           skippedCount: skippedRows.length,
-          defaultPasswordAssigned: true,
+          temporaryPasswordsGenerated: createdUsers.length,
           mustChangePassword: true,
           hasCompletedOnboarding: false,
         }),
@@ -624,7 +634,6 @@ export class UserController {
         skippedCount: skippedRows.length,
         createdUsers,
         skippedRows,
-        defaultPassword: DEFAULT_IMPORT_PASSWORD,
       });
     } catch (error) {
       console.error('Import users error:', error);

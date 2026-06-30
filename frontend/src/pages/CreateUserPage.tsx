@@ -244,7 +244,7 @@ function CreateUserPage({ onToast, isModalView = false, onCreated }: CreateUserP
         createdCount: response.data.createdCount,
         skippedRows: response.data.skippedRows,
       });
-      onToast('success', `${response.data.createdCount} account${response.data.createdCount === 1 ? '' : 's'} imported\nDefault password: ${response.data.defaultPassword}`);
+      onToast('success', `${response.data.createdCount} account${response.data.createdCount === 1 ? '' : 's'} imported\nTemporary passwords were generated for the new accounts.`);
     } catch (err) {
       console.error(err);
       onToast('error', getImportErrorMessage(err, 'Failed to import spreadsheet.'));

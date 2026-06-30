@@ -9,7 +9,10 @@
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",
+    "predist": "node build/validate-production-config.cjs",
     "dist": "electron-builder --win nsis",
+    "dist:unsigned": "electron-builder --win nsis -c.win.signAndEditExecutable=false",
+    "predist:portable": "node build/validate-production-config.cjs",
     "dist:portable": "electron-builder --win portable"
   },
   "devDependencies": {
@@ -36,11 +39,11 @@
     "publish": [
       {
         "provider": "generic",
-        "url": "https://shield.example.gov/downloads/"
+        "url": "${env.SHIELD_UPDATE_URL}"
       }
     ],
     "win": {
-      "signAndEditExecutable": false,
+      "signAndEditExecutable": true,
       "icon": "build/icon.ico",
       "target": [
         {

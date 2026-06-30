@@ -542,7 +542,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       return;
     }
 
-    const confirmed = window.confirm(`Reset ${editingUser.firstName} ${editingUser.lastName}'s password to ISP08isp! and require a password change on next sign-in?`);
+    const confirmed = window.confirm(`Generate a temporary password for ${editingUser.firstName} ${editingUser.lastName} and require a password change on next sign-in?`);
     if (!confirmed) {
       return;
     }

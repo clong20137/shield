@@ -327,8 +327,7 @@ export interface UserImportResponse {
   totalRows: number;
   createdCount: number;
   skippedCount: number;
-  defaultPassword: string;
-  createdUsers: Array<Pick<User, 'id' | 'firstName' | 'lastName' | 'email' | 'peNumber'>>;
+  createdUsers: Array<Pick<User, 'id' | 'firstName' | 'lastName' | 'email' | 'peNumber'> & { temporaryPassword: string }>;
   skippedRows: Array<{ rowNumber: number; reason: string }>;
 }
 
