@@ -631,17 +631,18 @@ function createShieldTrayIcon(count = desktopUnreadCount, status = desktopPresen
   const presenceColor = colorToRgba(getPresenceDotColor(status || 'active'));
 
   return createPngImage(32, 32, (canvas) => {
-    drawRoundedRect(canvas, 1, 1, 30, 30, 7, colorToRgba('#0f172a'));
+    drawRoundedRect(canvas, 0, 0, 32, 32, 8, presenceColor);
+    drawRoundedRect(canvas, 2, 2, 28, 28, 6, colorToRgba('#0f172a'));
     drawPolygon(canvas, [[16, 4], [25, 7.5], [25, 15], [22, 23], [16, 28], [10, 23], [7, 15], [7, 7.5]], colorToRgba('#2563eb'));
     drawPolygon(canvas, [[16, 7], [22, 9.5], [22, 14.5], [20, 20.5], [16, 24], [12, 20.5], [10, 14.5], [10, 9.5]], colorToRgba('#e5e7eb'));
     drawPolygon(canvas, [[16, 10], [20, 12], [20, 15], [18.5, 19], [16, 21], [13.5, 19], [12, 15], [12, 12]], colorToRgba('#dc2626'));
     if (safeCount > 0) {
       const label = safeCount > 99 ? '99+' : String(safeCount);
-      drawCircle(canvas, 23, 8, label.length > 2 ? 8.4 : 7.2, colorToRgba('#dc2626'));
-      drawPixelText(canvas, label, label.length > 2 ? 16 : 19, 5, 1, colorToRgba('#ffffff'));
+      const radius = label.length > 2 ? 8.4 : 7.1;
+      drawCircle(canvas, 24.5, 7.5, radius + 1.2, colorToRgba('#ffffff'));
+      drawCircle(canvas, 24.5, 7.5, radius, colorToRgba('#dc2626'));
+      drawPixelText(canvas, label, label.length > 2 ? 17 : 21, 4.5, 1, colorToRgba('#ffffff'));
     }
-    drawCircle(canvas, 25, 25, 6.4, colorToRgba('#ffffff'));
-    drawCircle(canvas, 25, 25, 4.8, presenceColor);
   });
 }
 
@@ -1171,17 +1172,19 @@ function createBadgeOverlay(count, status) {
   const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0;
 
   return createPngImage(64, 64, (canvas) => {
+    drawRoundedRect(canvas, 2, 2, 60, 60, 14, presenceColor);
+    drawRoundedRect(canvas, 7, 7, 50, 50, 11, colorToRgba('#0f172a'));
+    drawPolygon(canvas, [[32, 10], [49, 16], [49, 31], [43, 47], [32, 56], [21, 47], [15, 31], [15, 16]], colorToRgba('#2563eb'));
+    drawPolygon(canvas, [[32, 16], [43, 21], [43, 30], [39, 42], [32, 49], [25, 42], [21, 30], [21, 21]], colorToRgba('#e5e7eb'));
+    drawPolygon(canvas, [[32, 22], [39, 26], [39, 32], [36, 40], [32, 44], [28, 40], [25, 32], [25, 26]], colorToRgba('#dc2626'));
+
     if (safeCount > 0) {
       const label = safeCount > 99 ? '99+' : String(safeCount);
-      drawCircle(canvas, 44, 20, label.length > 2 ? 18 : 16, colorToRgba('#dc2626'));
-      drawPixelText(canvas, label, label.length > 2 ? 30 : 35, 12, label.length > 2 ? 3 : 4, colorToRgba('#ffffff'));
-      drawCircle(canvas, 48, 49, 13, colorToRgba('#ffffff'));
-      drawCircle(canvas, 48, 49, 9.5, presenceColor);
-      return;
+      const radius = label.length > 2 ? 16.5 : 14;
+      drawCircle(canvas, 49, 15, radius + 2, colorToRgba('#ffffff'));
+      drawCircle(canvas, 49, 15, radius, colorToRgba('#dc2626'));
+      drawPixelText(canvas, label, label.length > 2 ? 36 : 43, 8, label.length > 2 ? 3 : 4, colorToRgba('#ffffff'));
     }
-
-    drawCircle(canvas, 46, 46, 15, colorToRgba('#ffffff'));
-    drawCircle(canvas, 46, 46, 11, presenceColor);
   });
 }
 
