@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CalendarDays, ExternalLink, Flag, Plus, Search, Shield, X } from 'lucide-react';
 import { getAssetThumbnailUrl, handleAssetThumbnailError, User, userService } from '../services/api';
 import { UserDetail } from '../components/UserDetail';
@@ -303,32 +304,34 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
           </p>
         </section>
       ) : (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
           {users.map((user) => (
             <article
               key={user.id}
-              className="group overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900 dark:hover:border-blue-300/60"
+              className="memorial-card group overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
             >
               <button type="button" onClick={() => setSelectedUser(user)} className="block w-full text-left">
-                <div className="flex items-start gap-4 p-4">
-                  <div className="relative shrink-0">
-                    <span className="absolute -inset-1 rounded-full border border-yellow-300/60" />
+                <div className="memorial-card-photo-wrap relative overflow-hidden bg-gradient-to-br from-gray-950 via-primary-500 to-gray-900">
+                  <span className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-1 bg-gradient-to-r from-transparent via-yellow-200/80 to-transparent" />
+                  <span className="memorial-card-halo pointer-events-none absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-full border border-yellow-200/25" />
+                  <div className="relative z-[2] flex justify-center px-5 pb-4 pt-6">
                     {user.profilePictureUrl ? (
                       <img
-                        src={getAssetThumbnailUrl(user.profilePictureUrl, 160)}
+                        src={getAssetThumbnailUrl(user.profilePictureUrl, 420)}
                         alt={`${user.firstName} ${user.lastName}`}
                         onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)}
-                        className="relative h-20 w-20 rounded-full border-2 border-white bg-gray-100 object-cover shadow dark:border-gray-950 dark:bg-gray-800"
+                        className="memorial-card-photo h-52 w-52 rounded-full border-4 border-white/90 bg-gray-100 object-cover shadow-2xl dark:border-gray-950 dark:bg-gray-800 sm:h-60 sm:w-60"
                       />
                     ) : (
-                      <div className="relative flex h-20 w-20 items-center justify-center rounded-full border-2 border-white bg-primary-500 text-xl font-black text-white shadow dark:border-gray-950">
+                      <div className="memorial-card-photo flex h-52 w-52 items-center justify-center rounded-full border-4 border-white/90 bg-primary-500 text-5xl font-black text-white shadow-2xl dark:border-gray-950 sm:h-60 sm:w-60">
                         {getInitials(user)}
                       </div>
                     )}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="truncate text-lg font-black text-gray-900 dark:text-gray-100">
+                </div>
+                <div className="p-4 text-center">
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <h2 className="text-xl font-black text-gray-900 dark:text-gray-100">
                         {user.rank ? `${user.rank} ` : ''}{user.firstName} {user.lastName}
                       </h2>
                       <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-yellow-800 dark:bg-yellow-300/15 dark:text-yellow-100">
@@ -336,15 +339,14 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
                         EOW
                       </span>
                     </div>
-                    <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-primary-500 dark:text-blue-100">
+                    <p className="mt-2 flex items-center justify-center gap-1.5 text-sm font-bold text-primary-500 dark:text-blue-100">
                       <CalendarDays size={14} />
                       {formatMemorialDate(user.endOfWatchDate)}
                     </p>
-                    <p className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">{getServiceLabel(user)}</p>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{getServiceLabel(user)}</p>
                     {user.memorialSummary && (
-                      <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-600 dark:text-gray-300">{user.memorialSummary}</p>
+                      <p className="mx-auto mt-3 line-clamp-3 max-w-md text-sm leading-6 text-gray-600 dark:text-gray-300">{user.memorialSummary}</p>
                     )}
-                  </div>
                 </div>
               </button>
               {(user.memorialExternalUrl || canEdit) && (
@@ -378,7 +380,7 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
         </div>
       )}
 
-      {selectedUser && (
+      {selectedUser && createPortal(
         <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/55 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true">
           <div className="relative h-[100dvh] w-full max-w-5xl sm:h-auto">
             <UserDetail
@@ -390,12 +392,13 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
               onToast={onToast}
             />
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
-      {isAddModalOpen && canEdit && (
-        <div className="fixed inset-0 z-[92] flex items-end justify-center bg-black/55 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true">
-          <form onSubmit={addSelectedMemorial} className="max-h-[96dvh] w-full overflow-y-auto rounded-t-lg bg-white shadow-2xl dark:bg-gray-900 sm:max-w-3xl sm:rounded-lg">
+      {isAddModalOpen && canEdit && createPortal(
+        <div className="fixed inset-0 z-[92] flex items-center justify-center bg-black/55 p-3 backdrop-blur-sm sm:p-4" role="dialog" aria-modal="true">
+          <form onSubmit={addSelectedMemorial} className="modal-window flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-lg bg-white shadow-2xl dark:bg-gray-900 sm:max-w-3xl">
             <div className="flex items-start justify-between gap-3 border-b border-gray-200 bg-gradient-to-br from-gray-950 via-primary-500 to-gray-900 px-5 py-4 text-white dark:border-gray-800">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-yellow-100">Memorial</p>
@@ -405,7 +408,7 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
                 <X size={18} />
               </button>
             </div>
-            <div className="grid grid-cols-1 gap-4 p-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
               {memorialModalMode === 'add' && (
               <section className="min-w-0">
                 <label className="relative block">
@@ -480,7 +483,8 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
               </button>
             </div>
           </form>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
