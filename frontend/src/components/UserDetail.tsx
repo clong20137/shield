@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
-import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetThumbnailUrl, handleAssetThumbnailError, MileageSummary, mileageService, User } from '../services/api';
+import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, MileageSummary, mileageService, User } from '../services/api';
 import { subscribeMessageRealtime } from '../services/realtime';
 import { getLastOnlineLabel, getPresenceSnapshot, normalizePresenceStatus, PresenceDisplayStatus, PresenceState } from '../utils/presence';
 import { RankBadge } from './RankBadge';
@@ -200,6 +200,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [presenceTick, setPresenceTick] = useState(0);
   const [realtimePresence, setRealtimePresence] = useState<PresenceState | null>(null);
+  const [isPhotoPreviewOpen, setIsPhotoPreviewOpen] = useState(false);
   const isDeviceLoadInFlightRef = useRef(false);
   const deviceRefreshTimerRef = useRef<number | null>(null);
   const deviceLoadRequestIdRef = useRef(0);
@@ -265,6 +266,25 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
     const timer = window.setInterval(() => setPresenceTick((current) => current + 1), 60000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    setIsPhotoPreviewOpen(false);
+  }, [user.id, user.profilePictureUrl]);
+
+  useEffect(() => {
+    if (!isPhotoPreviewOpen) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsPhotoPreviewOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPhotoPreviewOpen]);
 
   useEffect(() => {
     setRealtimePresence(null);
@@ -459,6 +479,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const lastOnlineLabel = useMemo(() => getLastOnlineLabel(presenceSnapshot), [presenceSnapshot]);
   const presenceTone = getPresenceTone(presenceSnapshot.displayStatus);
   const profileRingClass = presenceTone.ringClass;
+  const fullProfilePhotoUrl = user.profilePictureUrl ? getAssetUrl(user.profilePictureUrl) : '';
 
   return (
     <div className={`user-detail-panel flex flex-col overflow-hidden rounded-none bg-white shadow-xl dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:rounded-lg ${isFloatingProfile ? 'h-full max-h-full' : 'h-[100dvh] sm:h-auto sm:max-h-[92dvh]'}`}>
@@ -471,12 +492,21 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           <div className="relative shrink-0">
             {presenceSnapshot.showPulse && presenceTone.pulseClass && <span className={`pointer-events-none absolute -inset-1 rounded-full border shield-online-pulse ${presenceTone.pulseClass}`} />}
           {user.profilePictureUrl ? (
-            <img
-              src={getAssetThumbnailUrl(user.profilePictureUrl, 256)}
-              alt={`${user.firstName} ${user.lastName}`}
-              onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)}
-              className={`relative rounded-full border-2 object-cover ${isFloatingProfile ? 'h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem]' : 'h-20 w-20 sm:h-20 sm:w-20'} ${profileRingClass}`}
-            />
+            <button
+              type="button"
+              onClick={() => setIsPhotoPreviewOpen(true)}
+              className="group relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-primary-500"
+              aria-label={`View larger photo of ${user.firstName} ${user.lastName}`}
+              title="View Photo"
+            >
+              <img
+                src={getAssetThumbnailUrl(user.profilePictureUrl, 256)}
+                alt={`${user.firstName} ${user.lastName}`}
+                onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)}
+                className={`relative rounded-full border-2 object-cover transition group-hover:brightness-110 ${isFloatingProfile ? 'h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem]' : 'h-20 w-20 sm:h-20 sm:w-20'} ${profileRingClass}`}
+              />
+              <span className="pointer-events-none absolute inset-0 rounded-full bg-black/0 transition group-hover:bg-black/10" />
+            </button>
           ) : (
             <div className={`relative flex items-center justify-center rounded-full border-2 bg-white font-bold text-primary-500 ${isFloatingProfile ? 'h-16 w-16 text-xl sm:h-[4.5rem] sm:w-[4.5rem]' : 'h-20 w-20 text-2xl sm:h-20 sm:w-20'} ${profileRingClass}`}>
               {getInitials(user)}
@@ -775,6 +805,42 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           <DetailRow label="Specialty Certifications" value={user.specialtyCertifications} />
         </DetailSection>}
       </div>
+      {isPhotoPreviewOpen && fullProfilePhotoUrl && (
+        <div
+          className="modal-backdrop fixed inset-0 z-[95] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+          onClick={() => setIsPhotoPreviewOpen(false)}
+          role="presentation"
+        >
+          <div
+            className="modal-window relative flex max-h-[92dvh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl dark:bg-gray-950"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+              <div className="min-w-0">
+                <h2 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">{user.firstName} {user.lastName}</h2>
+                <p className="truncate text-sm text-gray-500 dark:text-gray-400">{user.rank || 'Profile photo'}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPhotoPreviewOpen(false)}
+                className="icon-close-button h-9 w-9"
+                aria-label="Close photo preview"
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex min-h-0 flex-1 items-center justify-center bg-gray-950 p-3 sm:p-5">
+              <img
+                src={fullProfilePhotoUrl}
+                alt={`${user.firstName} ${user.lastName}`}
+                onError={handleAssetImageError}
+                className="max-h-[78dvh] max-w-full rounded object-contain shadow-2xl"
+              />
+            </div>
+          </div>
+        </div>
+      )}
       {editingDevice && (
         <div className="modal-backdrop fixed inset-0 z-[80] flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
           <form onSubmit={saveDeviceEdit} className="modal-window max-h-[96dvh] w-full overflow-y-auto rounded-t-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:max-w-2xl sm:rounded-lg sm:p-5">
