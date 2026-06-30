@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, ExternalLink, Flag, Search, Shield, X } from 'lucide-react';
 import { getAssetThumbnailUrl, handleAssetThumbnailError, User, userService } from '../services/api';
 import { UserDetail } from '../components/UserDetail';
@@ -39,7 +39,14 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const onToastRef = useRef(onToast);
+  const loadRequestIdRef = useRef(0);
+  const lastErrorToastKeyRef = useRef('');
   const canEdit = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('users:edit'));
+
+  useEffect(() => {
+    onToastRef.current = onToast;
+  }, [onToast]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 220);
@@ -47,6 +54,9 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
   }, [query]);
 
   const loadMemorials = useCallback(async (nextPage = 1) => {
+    const requestId = loadRequestIdRef.current + 1;
+    loadRequestIdRef.current = requestId;
+
     if (nextPage === 1) {
       setIsLoading(true);
     } else {
@@ -55,21 +65,37 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
 
     try {
       const response = await userService.searchPaged(debouncedQuery, { memorial: 'true' }, nextPage, 24);
+      if (requestId !== loadRequestIdRef.current) {
+        return;
+      }
+
+      lastErrorToastKeyRef.current = '';
       setUsers((current) => (nextPage === 1 ? response.data.data : [...current, ...response.data.data]));
       setPage(response.data.page);
       setHasMore(response.data.hasMore === true);
     } catch (error) {
       console.error('Failed to load memorial profiles:', error);
-      onToast('error', 'Failed to load memorial profiles.');
+      const errorToastKey = `${debouncedQuery || '__all__'}:${nextPage}`;
+      if (lastErrorToastKeyRef.current !== errorToastKey) {
+        lastErrorToastKeyRef.current = errorToastKey;
+        onToastRef.current('error', 'Failed to load memorial profiles.');
+      }
+
+      if (requestId !== loadRequestIdRef.current) {
+        return;
+      }
+
       if (nextPage === 1) {
         setUsers([]);
         setHasMore(false);
       }
     } finally {
-      setIsLoading(false);
-      setIsLoadingMore(false);
+      if (requestId === loadRequestIdRef.current) {
+        setIsLoading(false);
+        setIsLoadingMore(false);
+      }
     }
-  }, [debouncedQuery, onToast]);
+  }, [debouncedQuery]);
 
   useEffect(() => {
     void loadMemorials(1);
