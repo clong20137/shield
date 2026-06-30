@@ -11,6 +11,7 @@ const allowedAppIds = new Set([
   'devices',
   'calculator',
   'search',
+  'memorial',
   'reports',
   'create-user',
   'audit',

@@ -48,6 +48,7 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [memorialModalMode, setMemorialModalMode] = useState<'add' | 'edit'>('add');
   const [isSearchingAddUsers, setIsSearchingAddUsers] = useState(false);
   const [isAddingMemorial, setIsAddingMemorial] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -154,6 +155,7 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
   }, [addQuery, isAddModalOpen]);
 
   const openAddMemorial = () => {
+    setMemorialModalMode('add');
     setAddQuery('');
     setAddResults([]);
     setSelectedAddUser(null);
@@ -163,6 +165,14 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
       memorialExternalUrl: '',
       memorialSummary: '',
     });
+    setIsAddModalOpen(true);
+  };
+
+  const openEditMemorial = (user: User) => {
+    setMemorialModalMode('edit');
+    setAddQuery('');
+    setAddResults([]);
+    selectAddUser(user);
     setIsAddModalOpen(true);
   };
 
@@ -184,20 +194,31 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
 
     setIsAddingMemorial(true);
     try {
-      await userService.update(selectedAddUser.id, {
+      const response = await userService.update(selectedAddUser.id, {
         isMemorial: true,
         endOfWatchDate: addForm.endOfWatchDate,
         serviceYears: addForm.serviceYears,
         memorialExternalUrl: addForm.memorialExternalUrl,
         memorialSummary: addForm.memorialSummary,
       });
-      onToastRef.current('success', `${selectedAddUser.firstName} ${selectedAddUser.lastName} added to the memorial.`);
+      const updatedUser = response.data as User;
+      setUsers((currentUsers) => {
+        const exists = currentUsers.some((user) => user.id === updatedUser.id);
+        if (exists) {
+          return currentUsers.map((user) => (user.id === updatedUser.id ? updatedUser : user));
+        }
+        return [updatedUser, ...currentUsers];
+      });
+      setSelectedUser((currentUser) => (currentUser?.id === updatedUser.id ? updatedUser : currentUser));
+      onToastRef.current('success', `${selectedAddUser.firstName} ${selectedAddUser.lastName} ${memorialModalMode === 'edit' ? 'updated' : 'added to the memorial'}.`);
       window.dispatchEvent(new CustomEvent('shield:user-updated', { detail: { userId: selectedAddUser.id } }));
       setIsAddModalOpen(false);
-      await loadMemorials(1);
+      if (memorialModalMode === 'add') {
+        await loadMemorials(1);
+      }
     } catch (error) {
       console.error('Failed to add memorial profile:', error);
-      onToastRef.current('error', 'Failed to add trooper to the memorial.');
+      onToastRef.current('error', memorialModalMode === 'edit' ? 'Failed to update memorial profile.' : 'Failed to add trooper to the memorial.');
     } finally {
       setIsAddingMemorial(false);
     }
@@ -326,17 +347,22 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
                   </div>
                 </div>
               </button>
-              {user.memorialExternalUrl && (
-                <div className="border-t border-gray-100 px-4 py-3 dark:border-gray-800">
+              {(user.memorialExternalUrl || canEdit) && (
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-4 py-3 dark:border-gray-800">
                   <a
                     href={user.memorialExternalUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-2 text-sm font-bold text-primary-500 hover:text-primary-600 dark:text-blue-100"
+                    className={`inline-flex items-center gap-2 text-sm font-bold text-primary-500 hover:text-primary-600 dark:text-blue-100 ${user.memorialExternalUrl ? '' : 'pointer-events-none invisible'}`}
                   >
                     <ExternalLink size={15} />
                     Memorial Link
                   </a>
+                  {canEdit && (
+                    <button type="button" onClick={() => openEditMemorial(user)} className="btn-secondary h-8 px-3 text-xs">
+                      Edit
+                    </button>
+                  )}
                 </div>
               )}
             </article>
@@ -355,18 +381,10 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
       {selectedUser && (
         <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/55 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true">
           <div className="relative h-[100dvh] w-full max-w-5xl sm:h-auto">
-            <button
-              type="button"
-              onClick={() => setSelectedUser(null)}
-              className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white backdrop-blur hover:bg-white/20"
-              aria-label="Close memorial profile"
-              title="Close"
-            >
-              <X size={18} />
-            </button>
             <UserDetail
               user={selectedUser}
               onClose={() => setSelectedUser(null)}
+              onEdit={canEdit ? openEditMemorial : undefined}
               currentUser={currentUser}
               canEdit={canEdit}
               onToast={onToast}
@@ -381,13 +399,14 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
             <div className="flex items-start justify-between gap-3 border-b border-gray-200 bg-gradient-to-br from-gray-950 via-primary-500 to-gray-900 px-5 py-4 text-white dark:border-gray-800">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-yellow-100">Memorial</p>
-                <h2 className="mt-1 text-xl font-black text-white">Add Fallen Trooper</h2>
+                <h2 className="mt-1 text-xl font-black text-white">{memorialModalMode === 'edit' ? 'Edit Fallen Trooper' : 'Add Fallen Trooper'}</h2>
               </div>
               <button type="button" onClick={() => setIsAddModalOpen(false)} className="flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white hover:bg-white/20" aria-label="Close add memorial" title="Close">
                 <X size={18} />
               </button>
             </div>
             <div className="grid grid-cols-1 gap-4 p-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+              {memorialModalMode === 'add' && (
               <section className="min-w-0">
                 <label className="relative block">
                   <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -425,7 +444,8 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
                   )}
                 </div>
               </section>
-              <section className="min-w-0 space-y-3">
+              )}
+              <section className={`min-w-0 space-y-3 ${memorialModalMode === 'edit' ? 'lg:col-span-2' : ''}`}>
                 {selectedAddUser ? (
                   <div className="rounded border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-600/40 dark:bg-yellow-300/10">
                     <p className="text-xs font-black uppercase tracking-wide text-yellow-800 dark:text-yellow-100">Selected</p>
@@ -456,7 +476,7 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
               <button type="button" onClick={() => setIsAddModalOpen(false)} className="btn-secondary" disabled={isAddingMemorial}>Cancel</button>
               <button type="submit" className="btn-primary" disabled={!selectedAddUser || isAddingMemorial}>
                 <Plus size={16} />
-                <span>{isAddingMemorial ? 'Adding' : 'Add to Memorial'}</span>
+                <span>{isAddingMemorial ? 'Saving' : memorialModalMode === 'edit' ? 'Save Memorial' : 'Add to Memorial'}</span>
               </button>
             </div>
           </form>
