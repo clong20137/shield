@@ -821,6 +821,22 @@ export interface UserMessage {
   recipientReceivesMessages?: boolean;
 }
 
+export interface UserRecentConversation {
+  id: string;
+  title: string;
+  subtitle: string;
+  imageUrl: string;
+  threadType: string;
+  directParticipantId: string;
+  directLastSeenAt: string | null;
+  threadParticipantIds: string[];
+  threadParticipantNames: string[];
+  latestMessage?: UserMessage;
+  unreadPreview: string;
+  unreadCount: number;
+  unreadMessageIds: string[];
+}
+
 export interface DashboardPost {
   id: string;
   title: string;
@@ -1341,6 +1357,12 @@ export const messageService = {
 
   getUnreadCount: (accountId: string) =>
     api.get<{ unreadCount: number }>(`/messages/unread-count/${accountId}`),
+
+  getRecentConversations: (accountId: string, limit = 5) =>
+    api.get<UserRecentConversation[]>(`/messages/recent/${accountId}`, {
+      ...MESSAGE_REQUEST_OPTIONS,
+      params: { limit },
+    }),
 
   getSent: (accountId: string, pageSize?: number) =>
     api.get<UserMessage[]>(`/messages/sent/${accountId}`, {

@@ -27,7 +27,7 @@ interface RecentTypingState {
   expiresAt: number;
 }
 
-const RECENT_CONVERSATION_MESSAGE_PAGE_SIZE = 60;
+const RECENT_CONVERSATION_LIMIT = 5;
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
@@ -1134,23 +1134,28 @@ export const RecentMessagesDockContainer = memo(function RecentMessagesDockConta
 
     const loadRecentConversations = async () => {
       try {
-        const [inboxResult, sentResult] = await Promise.allSettled([
-          messageService.getInbox(currentUser.id, RECENT_CONVERSATION_MESSAGE_PAGE_SIZE),
-          messageService.getSent(currentUser.id, RECENT_CONVERSATION_MESSAGE_PAGE_SIZE),
-        ]);
+        const response = await messageService.getRecentConversations(currentUser.id, RECENT_CONVERSATION_LIMIT);
         if (!isMounted) {
           return;
         }
 
-        const inboxMessages = inboxResult.status === 'fulfilled' ? inboxResult.value.data : [];
-        const sentMessages = sentResult.status === 'fulfilled' ? sentResult.value.data : [];
-        if (inboxResult.status === 'rejected' && sentResult.status === 'rejected') {
-          throw inboxResult.reason;
-        }
-
-        setConversations(buildRecentConversations([...inboxMessages, ...sentMessages], currentUser.id));
+        setConversations(response.data);
       } catch (error) {
         console.error('Failed to load recent conversations:', error);
+        try {
+          const [inboxResult, sentResult] = await Promise.allSettled([
+            messageService.getInbox(currentUser.id, 60),
+            messageService.getSent(currentUser.id, 60),
+          ]);
+          if (!isMounted) {
+            return;
+          }
+          const inboxMessages = inboxResult.status === 'fulfilled' ? inboxResult.value.data : [];
+          const sentMessages = sentResult.status === 'fulfilled' ? sentResult.value.data : [];
+          setConversations(buildRecentConversations([...inboxMessages, ...sentMessages], currentUser.id));
+        } catch (fallbackError) {
+          console.error('Failed to load fallback recent conversations:', fallbackError);
+        }
       }
     };
 

@@ -2,7 +2,9 @@ import { ClipboardEvent, DragEvent, FormEvent, KeyboardEvent, MouseEvent, lazy, 
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Building2, Check, CheckCheck, Download, Image as ImageIcon, Pencil, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Save, Send, Trash2, Users, X } from 'lucide-react';
 import type { EmojiClickData } from 'emoji-picker-react';
-import { AuthAccount, errorLogService, getAssetThumbnailUrl, getAssetUrl, getMessageEventsUrl, handleAssetImageError, handleAssetThumbnailError, messageService, userService, User, UserMessage } from '../services/api';
+import { AuthAccount, errorLogService, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, messageService, userService, User, UserMessage } from '../services/api';
+import { subscribeMessageRealtime } from '../services/realtime';
+import { normalizePresenceStatus } from '../utils/presence';
 import { AppContextMenu } from '../components/AppContextMenu';
 import { RankBadge } from '../components/RankBadge';
 import { MentionText } from '../components/MentionText';
@@ -1046,8 +1048,6 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     }
 
     loadMessages(true);
-    const eventsUrl = getMessageEventsUrl();
-    const eventSource = new EventSource(eventsUrl, { withCredentials: true });
     const handleRealtimeMessageUpdate = () => {
       if (messageReloadTimerRef.current) {
         window.clearTimeout(messageReloadTimerRef.current);
@@ -1058,9 +1058,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         void loadMessages(false);
       }, 250);
     };
-    const handleMessageUpdate = (event: MessageEvent<string>) => {
+    const handleMessageUpdate = (event: Event) => {
       try {
-        const payload = JSON.parse(event.data) as { message?: UserMessage };
+        const payload = JSON.parse((event as MessageEvent<string>).data) as { message?: UserMessage };
         if (!payload.message) {
           handleRealtimeMessageUpdate();
           return;
@@ -1071,9 +1071,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         handleRealtimeMessageUpdate();
       }
     };
-    const handleMessageMutation = (event: MessageEvent<string>) => {
+    const handleMessageMutation = (event: Event) => {
       try {
-        const payload = JSON.parse(event.data) as { message?: UserMessage };
+        const payload = JSON.parse((event as MessageEvent<string>).data) as { message?: UserMessage };
         if (!payload.message) {
           handleRealtimeMessageUpdate();
           return;
@@ -1084,9 +1084,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         handleRealtimeMessageUpdate();
       }
     };
-    const handleTypingUpdate = (event: MessageEvent<string>) => {
+    const handleTypingUpdate = (event: Event) => {
       try {
-        const payload = JSON.parse(event.data) as {
+        const payload = JSON.parse((event as MessageEvent<string>).data) as {
           actorAccountId?: string;
           typingThreadId?: string;
           typingName?: string;
@@ -1112,13 +1112,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         console.error('Typing update parse error:', err);
       }
     };
-    const handlePresenceUpdate = (event: MessageEvent<string>) => {
+    const handlePresenceUpdate = (event: Event) => {
       try {
-        const payload = JSON.parse(event.data) as {
+        const payload = JSON.parse((event as MessageEvent<string>).data) as {
           actorAccountId?: string;
           actorOnline?: boolean;
           actorAway?: boolean;
-          actorStatus?: 'active' | 'away' | 'busy';
+          actorStatus?: string;
           actorLastSeenAt?: string;
         };
         if (!payload.actorAccountId) {
@@ -1131,7 +1131,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           [payload.actorAccountId as string]: {
             online: payload.actorOnline === true,
             away: payload.actorAway === true,
-            status: payload.actorStatus,
+            status: normalizePresenceStatus(payload.actorStatus),
             lastSeenAt: payload.actorLastSeenAt || null,
           },
         }));
@@ -1140,16 +1140,18 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         loadMessages(false);
       }
     };
-    eventSource?.addEventListener('message-created', handleMessageUpdate);
-    eventSource?.addEventListener('message-read', handleMessageMutation);
-    eventSource?.addEventListener('message-reaction', handleMessageMutation);
-    eventSource?.addEventListener('message-typing', handleTypingUpdate);
-    eventSource?.addEventListener('message-archived', handleMessageMutation);
-    eventSource?.addEventListener('message-deleted', handleMessageMutation);
-    eventSource?.addEventListener('presence-updated', handlePresenceUpdate);
-    eventSource?.addEventListener('error', (event) => {
-      console.error('Message realtime connection error:', event);
-    });
+    const unsubscribeRealtime = [
+      subscribeMessageRealtime('message-created', handleMessageUpdate),
+      subscribeMessageRealtime('message-read', handleMessageMutation),
+      subscribeMessageRealtime('message-reaction', handleMessageMutation),
+      subscribeMessageRealtime('message-typing', handleTypingUpdate),
+      subscribeMessageRealtime('message-archived', handleMessageMutation),
+      subscribeMessageRealtime('message-deleted', handleMessageMutation),
+      subscribeMessageRealtime('presence-updated', handlePresenceUpdate),
+      subscribeMessageRealtime('error', (event) => {
+        console.error('Message realtime connection error:', event);
+      }),
+    ];
     window.addEventListener('shield:messages-updated', handleRealtimeMessageUpdate);
     window.addEventListener('shield:api-reconnected', handleRealtimeMessageUpdate);
 
@@ -1158,7 +1160,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         window.clearTimeout(messageReloadTimerRef.current);
         messageReloadTimerRef.current = null;
       }
-      eventSource?.close();
+      unsubscribeRealtime.forEach((unsubscribe) => unsubscribe());
       window.removeEventListener('shield:messages-updated', handleRealtimeMessageUpdate);
       window.removeEventListener('shield:api-reconnected', handleRealtimeMessageUpdate);
     };
@@ -2380,7 +2382,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const mobileBackClass = listBreakpoint === 'md' ? 'md:hidden' : 'xl:hidden';
 
   return (
-    <div className={isModalView ? 'relative flex h-full min-h-0 flex-col' : 'relative'}>
+    <div data-no-global-context-menu="true" className={isModalView ? 'relative flex h-full min-h-0 flex-col' : 'relative'}>
       {!isModalView && (
       <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
         <div>

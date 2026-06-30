@@ -3,7 +3,7 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { ErrorLogModel } from '../models/ErrorLog';
-import { UserMessageModel } from '../models/UserMessage';
+import { UserMessage, UserMessageModel } from '../models/UserMessage';
 import { addMessageEventClient, broadcastMessageEvent, MessagePresenceStatus, updateMessagePresence } from '../services/messageEvents';
 import { notifyMentions } from '../services/mentionService';
 import { cleanMultiline, cleanString } from '../utils/validation';
@@ -13,6 +13,22 @@ import { isSafeMessageImage } from '../middleware/messageUpload';
 import { createImageThumbnails } from '../services/imageThumbnails';
 
 const systemMessagePrefix = '::system::';
+
+interface RecentConversation {
+  id: string;
+  title: string;
+  subtitle: string;
+  imageUrl: string;
+  threadType: string;
+  directParticipantId: string;
+  directLastSeenAt: Date | null;
+  threadParticipantIds: string[];
+  threadParticipantNames: string[];
+  latestMessage?: UserMessage;
+  unreadPreview: string;
+  unreadCount: number;
+  unreadMessageIds: string[];
+}
 
 function normalizePresenceStatus(status?: MessagePresenceStatus): MessagePresenceStatus {
   return status === 'active' || status === 'away' || status === 'busy' ? status : 'active';
@@ -37,6 +53,142 @@ function getSystemMessageBody(message: string): string {
 
 function getMessageAttachmentUrl(filename: string): string {
   return `/uploads/messages/${filename}`;
+}
+
+function parseMessageList(value?: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeMessageSubject(value?: string | null): string {
+  const subject = value?.trim();
+  return subject && subject.toLowerCase() !== 'message' ? subject : '';
+}
+
+function getRecentConversationId(message: UserMessage, currentUserId: string): string {
+  if (message.threadType && message.threadType !== 'direct' && message.threadId) {
+    return message.threadId;
+  }
+
+  return message.senderAccountId === currentUserId ? message.recipientUserId : message.senderAccountId;
+}
+
+function getRecentConversationTitle(message: UserMessage, currentUserId: string): string {
+  if (message.threadType && message.threadType !== 'direct') {
+    const participantNames = parseMessageList(message.threadParticipantNames).filter((name) => name !== 'You');
+    return message.threadTitle || participantNames.join(', ') || (message.threadType === 'district' ? 'District Message' : 'Group Message');
+  }
+
+  if (message.senderAccountId === currentUserId) {
+    return message.recipientName || message.recipientEmail || 'Recipient';
+  }
+
+  return message.senderName || message.senderEmail || 'Sender';
+}
+
+function getRecentConversationImage(message: UserMessage, currentUserId: string): string {
+  if (message.threadType && message.threadType !== 'direct') {
+    return message.threadImageUrl || '';
+  }
+
+  return message.senderAccountId === currentUserId
+    ? message.recipientProfilePictureUrl || ''
+    : message.senderProfilePictureUrl || '';
+}
+
+function getRecentConversationDirectParticipantId(message: UserMessage, currentUserId: string): string {
+  if (message.threadType && message.threadType !== 'direct') {
+    return '';
+  }
+
+  return message.senderAccountId === currentUserId ? message.recipientUserId : message.senderAccountId;
+}
+
+function getRecentConversationParticipantIds(message: UserMessage, currentUserId: string): string[] {
+  const ids = parseMessageList(message.threadParticipantIds)
+    .filter((id) => id && id !== currentUserId);
+
+  if (ids.length > 0) {
+    return Array.from(new Set(ids));
+  }
+
+  return [getRecentConversationDirectParticipantId(message, currentUserId)].filter(Boolean);
+}
+
+function getRecentConversationParticipantNames(message: UserMessage, currentUserId: string): string[] {
+  return parseMessageList(message.threadParticipantNames)
+    .filter((name) => name && name !== 'You' && name !== currentUserId)
+    .slice(0, 5);
+}
+
+function getRecentConversationDirectLastSeenAt(message: UserMessage, currentUserId: string): Date | null {
+  if (message.threadType && message.threadType !== 'direct') {
+    return null;
+  }
+
+  return message.senderAccountId === currentUserId
+    ? message.recipientLastSeenAt || null
+    : message.senderLastSeenAt || null;
+}
+
+function getRecentConversationSubtitle(message: UserMessage, currentUserId: string): string {
+  const prefix = message.senderAccountId === currentUserId ? 'You: ' : '';
+  const deletedText = message.isDeleted ? 'Message deleted' : '';
+  const bodyText = deletedText || message.body || normalizeMessageSubject(message.subject) || 'No preview';
+  return `${prefix}${bodyText}`.replace(/\s+/gu, ' ').trim();
+}
+
+function buildRecentConversations(messages: UserMessage[], currentUserId: string, limit: number): RecentConversation[] {
+  const threadMap = new Map<string, RecentConversation>();
+  const sortedMessages = [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  sortedMessages.forEach((message) => {
+    const id = getRecentConversationId(message, currentUserId);
+    if (!id) {
+      return;
+    }
+
+    const existingConversation = threadMap.get(id);
+    const unreadIncrement = message.recipientUserId === currentUserId && !message.isRead ? 1 : 0;
+    const subtitle = getRecentConversationSubtitle(message, currentUserId);
+    const unreadMessageIds = unreadIncrement > 0
+      ? [...(existingConversation?.unreadMessageIds || []), message.id]
+      : existingConversation?.unreadMessageIds || [];
+
+    threadMap.set(id, {
+      id,
+      title: getRecentConversationTitle(message, currentUserId),
+      subtitle,
+      imageUrl: getRecentConversationImage(message, currentUserId),
+      threadType: message.threadType || 'direct',
+      directParticipantId: getRecentConversationDirectParticipantId(message, currentUserId),
+      directLastSeenAt: getRecentConversationDirectLastSeenAt(message, currentUserId),
+      threadParticipantIds: getRecentConversationParticipantIds(message, currentUserId),
+      threadParticipantNames: getRecentConversationParticipantNames(message, currentUserId),
+      latestMessage: message,
+      unreadPreview: unreadIncrement > 0 ? subtitle : existingConversation?.unreadPreview || '',
+      unreadCount: (existingConversation?.unreadCount || 0) + unreadIncrement,
+      unreadMessageIds,
+    });
+  });
+
+  return Array.from(threadMap.values())
+    .sort((a, b) => {
+      if (a.unreadCount !== b.unreadCount) {
+        return b.unreadCount - a.unreadCount;
+      }
+
+      return new Date(b.latestMessage?.createdAt || 0).getTime() - new Date(a.latestMessage?.createdAt || 0).getTime();
+    })
+    .slice(0, limit);
 }
 
 function getMessageErrorContext(req: Request, extra: Record<string, unknown> = {}): string {
@@ -522,6 +674,33 @@ export class MessageController {
     } catch (error) {
       console.error('Get unread message count error:', error);
       res.status(500).json({ error: 'Failed to load unread count' });
+    }
+  }
+
+  static async listRecentConversations(req: Request, res: Response) {
+    try {
+      const accountId = cleanString(req.params.accountId, 36);
+      if (!accountId) {
+        return res.status(400).json({ error: 'Account is required' });
+      }
+
+      const requestedLimit = Number.parseInt(String(req.query.limit || '5'), 10);
+      const limit = Math.min(10, Math.max(1, Number.isFinite(requestedLimit) ? requestedLimit : 5));
+      const sourceLimit = Math.max(60, limit * 24);
+      const sessionAccount = await getSessionAccount(req);
+      const presenceOptions = {
+        canViewIncognitoPresence: await canViewIncognitoPresence(sessionAccount),
+      };
+      const [inboxMessages, sentMessages] = await Promise.all([
+        UserMessageModel.listInbox(accountId, sourceLimit, 0, presenceOptions),
+        UserMessageModel.listSent(accountId, sourceLimit, 0, presenceOptions),
+      ]);
+
+      res.json(buildRecentConversations([...inboxMessages, ...sentMessages], accountId, limit));
+    } catch (error) {
+      console.error('List recent conversations error:', error);
+      logMessageControllerError(req, 'Recent conversations load failed', error, { accountId: req.params.accountId });
+      res.status(500).json({ error: 'Failed to load recent conversations' });
     }
   }
 

@@ -22,6 +22,7 @@ router.post('/attachments', messageMutationLimiter, requirePermission('messages:
 router.put('/thread/:threadId/title', messageMutationLimiter, requireAuthenticated(), MessageController.updateThreadTitle);
 router.put('/thread/:threadId/image', messageMutationLimiter, requireAuthenticated(), messageImageUpload.single('image'), MessageController.updateThreadImage);
 router.get('/unread-count/:accountId', messageReadLimiter, requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), MessageController.getUnreadCount);
+router.get('/recent/:accountId', messageReadLimiter, requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), MessageController.listRecentConversations);
 router.get('/inbox/:accountId', messageReadLimiter, requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), MessageController.listInbox);
 router.get('/sent/:accountId', messageReadLimiter, requireSelfOrPermission((req) => req.params.accountId, 'roles:manage'), MessageController.listSent);
 router.get('/thread/:threadId/messages', messageReadLimiter, requireSelfOrPermission((req) => (typeof req.query.accountId === 'string' ? req.query.accountId : undefined), 'roles:manage'), MessageController.listThread);
