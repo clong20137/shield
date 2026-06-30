@@ -563,10 +563,13 @@ const ReportsPage: React.FC<{
   const selectedDailyUserName = selectedDaily
     ? `${selectedDaily.user.firstName || ''} ${selectedDaily.user.lastName || ''}`.trim() || selectedDaily.user.email || 'Unknown'
     : '';
-  const visibleFieldTrends = dailyAnalytics?.fieldTrends.filter((trend) => trend.total > 0) || [];
-  const selectedTrend = dailyAnalytics?.fieldTrends.find((trend) => trend.key === selectedAnalyticsMetric)
+  const dailyFieldTrends = Array.isArray(dailyAnalytics?.fieldTrends) ? dailyAnalytics.fieldTrends : [];
+  const dailyActivitySections = Array.isArray(dailyAnalytics?.activitySections) ? dailyAnalytics.activitySections : [];
+  const dailyReportTrend = Array.isArray(dailyAnalytics?.trend) ? dailyAnalytics.trend : [];
+  const visibleFieldTrends = dailyFieldTrends.filter((trend) => trend.total > 0);
+  const selectedTrend = dailyFieldTrends.find((trend) => trend.key === selectedAnalyticsMetric)
     || visibleFieldTrends[0]
-    || dailyAnalytics?.fieldTrends[0]
+    || dailyFieldTrends[0]
     || null;
   const trendsBySection = visibleFieldTrends.reduce<Record<string, TrooperDailyAnalyticsFieldTrend[]>>((groups, trend) => {
     groups[trend.section] = [...(groups[trend.section] || []), trend];
@@ -691,7 +694,7 @@ const ReportsPage: React.FC<{
                 <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                   <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Monthly Report Trend</h4>
                   <div className="h-56">
-                    <AnalyticsLineChart points={dailyAnalytics.trend.map((point) => ({ label: point.label, value: point.count }))} />
+                    <AnalyticsLineChart points={dailyReportTrend.map((point) => ({ label: point.label, value: point.count }))} />
                   </div>
                 </div>
                 <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
@@ -705,7 +708,7 @@ const ReportsPage: React.FC<{
                       onChange={(event) => setSelectedAnalyticsMetric(event.target.value)}
                       className="max-w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
                     >
-                      {dailyAnalytics.fieldTrends.map((trend) => (
+                      {dailyFieldTrends.map((trend) => (
                         <option key={trend.key} value={trend.key}>{trend.label}</option>
                       ))}
                     </select>
@@ -729,7 +732,7 @@ const ReportsPage: React.FC<{
               <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">All Trooper Daily Data Totals</h4>
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
-                  {dailyAnalytics.activitySections.map((section) => (
+                  {dailyActivitySections.map((section) => (
                     <section key={section.title} className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
                       <h5 className="mb-3 text-xs font-black uppercase tracking-wide text-gray-600 dark:text-gray-300">{section.title}</h5>
                       <div className="space-y-2">
