@@ -33,7 +33,7 @@ const MILITARY_TIME_DEFAULT_APPLIED_KEY = 'shield_military_time_default_applied'
 const RECENT_CONVERSATIONS_DEFAULT_APPLIED_KEY = 'shield_recent_conversations_default_applied';
 const SESSION_TIMEOUT_KEY = 'shield_session_timeout_minutes';
 const GLOBAL_CONTEXT_MENU_WIDTH = 256;
-const GLOBAL_CONTEXT_MENU_HEIGHT = 172;
+const GLOBAL_CONTEXT_MENU_HEIGHT = 220;
 const GLOBAL_CONTEXT_MENU_GUTTER = 12;
 const AWAY_PRESENCE_IDLE_MS = 5 * 60 * 1000;
 const MODAL_CLOSE_MS = 220;
@@ -96,6 +96,7 @@ const APP_SCALE_LABELS: Record<AppScale, string> = {
   large: 'Large',
 };
 const APP_SCALE_TRANSITION_MS = 260;
+const APP_SCALE_SAVE_DEBOUNCE_MS = 450;
 
 interface MessagePreferences {
   receiveMessages: boolean;
@@ -234,6 +235,13 @@ function loadMessagePreferences(): MessagePreferences {
 
 function normalizeAppScale(value?: string | null): AppScale {
   return value === 'compact' || value === 'large' ? value : 'comfortable';
+}
+
+function clampGlobalContextMenuPosition(position: { x: number; y: number }) {
+  return {
+    x: Math.min(Math.max(GLOBAL_CONTEXT_MENU_GUTTER, position.x), Math.max(GLOBAL_CONTEXT_MENU_GUTTER, window.innerWidth - GLOBAL_CONTEXT_MENU_WIDTH - GLOBAL_CONTEXT_MENU_GUTTER)),
+    y: Math.min(Math.max(GLOBAL_CONTEXT_MENU_GUTTER, position.y), Math.max(GLOBAL_CONTEXT_MENU_GUTTER, window.innerHeight - GLOBAL_CONTEXT_MENU_HEIGHT - GLOBAL_CONTEXT_MENU_GUTTER)),
+  };
 }
 
 function normalizeDefaultDutyHours(value: unknown): string {
@@ -3116,6 +3124,8 @@ function App() {
   const inactivityTimerRef = useRef<number | null>(null);
   const loginTransitionTimerRef = useRef<number | null>(null);
   const appScaleTransitionTimerRef = useRef<number | null>(null);
+  const appScaleSaveTimerRef = useRef<number | null>(null);
+  const appScaleSaveRequestRef = useRef(0);
   const sessionTimeoutNotificationShownRef = useRef(false);
   const lastActivityRef = useRef<number>(Date.now());
   const desktopSessionActivityReportRef = useRef<number>(0);
@@ -4301,11 +4311,25 @@ function App() {
     const appScale = normalizeAppScale(currentUser?.appScale);
     document.documentElement.classList.remove('app-scale-compact', 'app-scale-comfortable', 'app-scale-large');
     document.documentElement.classList.add(`app-scale-${appScale}`);
-  }, [currentUser?.appScale]);
+    if (globalContextMenu) {
+      window.requestAnimationFrame(() => {
+        setGlobalContextMenu((position) => {
+          if (!position) {
+            return position;
+          }
+          const nextPosition = clampGlobalContextMenuPosition(position);
+          return nextPosition.x === position.x && nextPosition.y === position.y ? position : nextPosition;
+        });
+      });
+    }
+  }, [currentUser?.appScale, globalContextMenu]);
 
   useEffect(() => () => {
     if (appScaleTransitionTimerRef.current) {
       window.clearTimeout(appScaleTransitionTimerRef.current);
+    }
+    if (appScaleSaveTimerRef.current) {
+      window.clearTimeout(appScaleSaveTimerRef.current);
     }
     document.documentElement.classList.remove('app-scale-transitioning');
   }, []);
@@ -5493,7 +5517,36 @@ function App() {
     }, APP_SCALE_TRANSITION_MS);
   };
 
-  const handleAppScaleChange = async (appScale: AppScale) => {
+  const scheduleAppScalePreferenceSave = (account: AuthAccount, appScale: AppScale, rollbackUser: AuthAccount) => {
+    if (appScaleSaveTimerRef.current) {
+      window.clearTimeout(appScaleSaveTimerRef.current);
+    }
+
+    const requestId = appScaleSaveRequestRef.current + 1;
+    appScaleSaveRequestRef.current = requestId;
+    appScaleSaveTimerRef.current = window.setTimeout(() => {
+      appScaleSaveTimerRef.current = null;
+      authService.updateAppScalePreference(account.id, appScale)
+        .then((response) => {
+          if (appScaleSaveRequestRef.current !== requestId) {
+            return;
+          }
+          if (response.data.account) {
+            handleAccountUpdate(response.data.account);
+          }
+        })
+        .catch((err) => {
+          if (appScaleSaveRequestRef.current !== requestId) {
+            return;
+          }
+          console.error(err);
+          handleAccountUpdate(rollbackUser);
+          showToast('error', 'Failed to update app scale preference.');
+        });
+    }, APP_SCALE_SAVE_DEBOUNCE_MS);
+  };
+
+  const handleAppScaleChange = (appScale: AppScale) => {
     if (!currentUser) {
       return;
     }
@@ -5505,17 +5558,7 @@ function App() {
     beginAppScaleTransition();
     const previousUser = currentUser;
     handleAccountUpdate({ ...currentUser, appScale });
-
-    try {
-      const response = await authService.updateAppScalePreference(currentUser.id, appScale);
-      if (response.data.account) {
-        handleAccountUpdate(response.data.account);
-      }
-    } catch (err) {
-      console.error(err);
-      handleAccountUpdate(previousUser);
-      showToast('error', 'Failed to update app scale preference.');
-    }
+    scheduleAppScalePreferenceSave(currentUser, appScale, previousUser);
   };
 
   const handleDefaultDutyHoursChange = async (value: string) => {
@@ -5729,19 +5772,7 @@ function App() {
 
       event.preventDefault();
 
-      const menuWidth = GLOBAL_CONTEXT_MENU_WIDTH;
-      const menuHeight = GLOBAL_CONTEXT_MENU_HEIGHT;
-
-      setGlobalContextMenu({
-        x: Math.min(
-          window.innerWidth - menuWidth - GLOBAL_CONTEXT_MENU_GUTTER,
-          Math.max(GLOBAL_CONTEXT_MENU_GUTTER, event.clientX),
-        ),
-        y: Math.min(
-          window.innerHeight - menuHeight - GLOBAL_CONTEXT_MENU_GUTTER,
-          Math.max(GLOBAL_CONTEXT_MENU_GUTTER, event.clientY),
-        ),
-      });
+      setGlobalContextMenu(clampGlobalContextMenuPosition({ x: event.clientX, y: event.clientY }));
     };
 
     document.addEventListener('contextmenu', openGlobalContextMenu);
