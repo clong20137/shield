@@ -4414,6 +4414,80 @@ input.global-search-input.global-search-input {
   padding-right: 0.75rem !important;
 }
 
+.shield-left-panel input.global-search-input.sidebar-search-input,
+.shield-left-panel input.global-search-input.sidebar-search-input:focus,
+html.glass .shield-left-panel input.global-search-input.sidebar-search-input,
+html.glass .shield-left-panel input.global-search-input.sidebar-search-input:focus,
+html.glass:not(.dark) .shield-left-panel input.global-search-input.sidebar-search-input,
+html.glass:not(.dark) .shield-left-panel input.global-search-input.sidebar-search-input:focus {
+  min-height: 2.75rem !important;
+  padding-left: 3.25rem !important;
+  padding-right: 0.75rem !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: rgb(255, 255, 255) !important;
+  box-shadow: none !important;
+  outline: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.shield-left-panel input.global-search-input.sidebar-search-input::placeholder,
+html.glass .shield-left-panel input.global-search-input.sidebar-search-input::placeholder,
+html.glass:not(.dark) .shield-left-panel input.global-search-input.sidebar-search-input::placeholder {
+  color: rgb(219, 234, 254) !important;
+  opacity: 1 !important;
+}
+
+.shield-left-panel .sidebar-search-static,
+html.glass .shield-left-panel .sidebar-search-static,
+html.glass:not(.dark) .shield-left-panel .sidebar-search-static {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+section.my-day-widget,
+html.glass section.my-day-widget,
+html.glass:not(.dark) section.my-day-widget {
+  border-color: rgb(229, 231, 235) !important;
+  background: rgb(255, 255, 255) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1), 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.dark section.my-day-widget,
+html.dark.glass section.my-day-widget {
+  border-color: rgb(31, 41, 55) !important;
+  background: rgb(17, 24, 39) !important;
+  box-shadow: none !important;
+}
+
+html.glass section.my-day-widget > div:first-child,
+html.glass:not(.dark) section.my-day-widget > div:first-child {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: var(--app-primary) !important;
+  color: rgb(255, 255, 255) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.dark.glass section.my-day-widget > div:first-child {
+  background: rgb(3, 7, 18) !important;
+}
+
+html.glass section.my-day-widget .my-day-mileage-summary,
+html.glass:not(.dark) section.my-day-widget .my-day-mileage-summary,
+html.dark.glass section.my-day-widget .my-day-mileage-summary {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: rgb(255, 255, 255) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 input.pinned-profile-search-input.pinned-profile-search-input {
   padding-left: 2.75rem !important;
   padding-right: 0.75rem !important;
