@@ -1,6 +1,6 @@
 {
   "name": "shield-desktop",
-  "version": "1.0.23",
+  "version": "1.0.24",
   "description": "Desktop shell for Shield",
   "main": "main.cjs",
   "private": true,
@@ -10,9 +10,12 @@
     "start": "electron .",
     "pack": "electron-builder --dir",
     "dist": "electron-builder --win nsis --publish never -c.win.signAndEditExecutable=false",
+    "postdist": "node build/write-latest-yml.cjs",
     "dist:unsigned": "electron-builder --win nsis --publish never -c.win.signAndEditExecutable=false",
+    "postdist:unsigned": "node build/write-latest-yml.cjs",
     "predist:production": "node build/validate-production-config.cjs",
     "dist:production": "electron-builder --win nsis -c.publish.provider=generic -c.publish.url=${env.SHIELD_UPDATE_URL}",
+    "postdist:production": "node build/write-latest-yml.cjs",
     "dist:portable": "electron-builder --win portable --publish never -c.win.signAndEditExecutable=false",
     "predist:portable:production": "node build/validate-production-config.cjs",
     "dist:portable:production": "electron-builder --win portable -c.publish.provider=generic -c.publish.url=${env.SHIELD_UPDATE_URL}"

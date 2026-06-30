@@ -71,6 +71,8 @@ Shield-Setup.exe.blockmap
 latest.yml
 ```
 
+The `latest.yml` file is refreshed after each Windows installer build. Deploy it with the matching installer and blockmap every time, otherwise installed desktop apps will not detect the new version.
+
 For the IIS path discussed for Shield, that would be:
 
 ```text
