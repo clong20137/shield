@@ -1,7 +1,7 @@
 import { CSSProperties, FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AlertTriangle, BarChart3, CalendarDays, Calculator, ClipboardList, ExternalLink, Laptop, LayoutDashboard, Link, LockKeyhole, LucideIcon, Mail, Pencil, Plus, Search, Trash2, UserPlus, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, CalendarDays, Calculator, ClipboardList, ExternalLink, Flag, Laptop, LayoutDashboard, Link, LockKeyhole, LucideIcon, Mail, Pencil, Plus, Search, Trash2, UserPlus, X } from 'lucide-react';
 import { quickLaunchService, type QuickLaunchExternalSlot as ApiQuickLaunchExternalSlot, type QuickLaunchSlot as ApiQuickLaunchSlot } from '../../services/api';
 import { QUICK_LAUNCH_DEFAULT_SLOT_COUNT, QUICK_LAUNCH_MAX_SLOT_COUNT, QUICK_LAUNCH_MIN_SLOT_COUNT, normalizeQuickLaunchSlotCount, type QuickLaunchAppId, type QuickLaunchPlacement } from './quickLaunchCore';
 
@@ -31,6 +31,7 @@ const quickLaunchApps: QuickLaunchApp[] = [
   { id: 'devices', label: 'Devices', path: '/devices', requiredPermission: 'devices:manage', icon: Laptop },
   { id: 'calculator', label: 'Calculator', icon: Calculator },
   { id: 'search', label: 'Search Users', path: '/search', icon: Search },
+  { id: 'memorial', label: 'Memorial', path: '/memorial', icon: Flag },
   { id: 'reports', label: 'Reports', path: '/reports', icon: BarChart3 },
   { id: 'create-user', label: 'Create User', path: '/users/create', requiredPermission: 'admin:create-user', icon: UserPlus },
   { id: 'audit', label: 'Audit Log', path: '/audit', requiredPermission: 'admin:audit', icon: ClipboardList },
