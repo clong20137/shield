@@ -5907,6 +5907,16 @@ function App() {
     return steps;
   })();
   const shouldRenderSeasonalEffects = activeSeasonalTheme === 'christmas' || activeSeasonalTheme === 'winter' || activeSeasonalTheme === 'fall';
+  const sidebarVersionLabel = desktopPreferences?.appVersion
+    ? `Desktop v${desktopPreferences.appVersion}`
+    : import.meta.env.VITE_APP_VERSION
+      ? `Web v${import.meta.env.VITE_APP_VERSION}`
+      : 'Web app';
+  const sidebarCompactVersionLabel = desktopPreferences?.appVersion
+    ? `v${desktopPreferences.appVersion}`
+    : import.meta.env.VITE_APP_VERSION
+      ? `v${import.meta.env.VITE_APP_VERSION}`
+      : 'Web';
 
   return (
     <Router basename={ROUTER_BASENAME} future={{ v7_startTransition: true }}>
@@ -6180,13 +6190,21 @@ function App() {
                 </div>
               )}
             </div>
-            {activeSeasonalTheme === 'thanksgiving' && !isSidebarCollapsed && (
-              <div className="mt-auto shrink-0 px-4 pb-4 pt-3">
-                <Suspense fallback={null}>
-                  <ThanksgivingSidebarAnimation />
-                </Suspense>
+            <div className={`mt-auto shrink-0 ${isSidebarCollapsed ? 'px-3 pb-3 pt-2' : 'px-4 pb-4 pt-3'}`}>
+              {activeSeasonalTheme === 'thanksgiving' && !isSidebarCollapsed && (
+                <div className="pb-3">
+                  <Suspense fallback={null}>
+                    <ThanksgivingSidebarAnimation />
+                  </Suspense>
+                </div>
+              )}
+              <div
+                className={`border-t border-white/10 pt-2 text-blue-100/80 ${isSidebarCollapsed ? 'text-center text-[10px] font-bold' : 'text-xs font-semibold'}`}
+                title={sidebarVersionLabel}
+              >
+                {isSidebarCollapsed ? sidebarCompactVersionLabel : sidebarVersionLabel}
               </div>
-            )}
+            </div>
             </div>
           </aside>
 

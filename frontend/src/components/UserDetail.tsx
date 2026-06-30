@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Download, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetFullImageUrl, getAssetThumbnailUrl, handleAssetImageError, handleAssetThumbnailError, MileageSummary, mileageService, User } from '../services/api';
 import { subscribeMessageRealtime } from '../services/realtime';
 import { getLastOnlineLabel, getPresenceSnapshot, normalizePresenceStatus, PresenceDisplayStatus, PresenceState } from '../utils/presence';
@@ -67,6 +67,18 @@ function DetailSection({ title, children }: { title: string; children: React.Rea
 
 function getInitials(user: User): string {
   return `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U';
+}
+
+function getProfilePhotoFileName(user: User, contentType?: string | null): string {
+  const baseName = `${user.firstName || 'profile'}-${user.lastName || 'photo'}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^-|-$/gu, '') || 'profile-photo';
+  const extensionFromUrl = user.profilePictureUrl?.split('?')[0]?.match(/\.([a-z0-9]+)$/iu)?.[1];
+  const extensionFromType = contentType?.split('/')[1]?.replace('jpeg', 'jpg');
+  const extension = extensionFromType || extensionFromUrl || 'jpg';
+
+  return `${baseName}.${extension}`;
 }
 
 type ProfileTab = 'personal' | 'identification' | 'employment' | 'contact' | 'devices' | 'calendar' | 'additional';
@@ -468,6 +480,33 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
     }
   };
 
+  const downloadProfilePhoto = async () => {
+    if (!fullProfilePhotoUrl) {
+      return;
+    }
+
+    try {
+      const response = await fetch(fullProfilePhotoUrl, { credentials: 'include' });
+      if (!response.ok) {
+        throw new Error(`Download failed with ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = getProfilePhotoFileName(user, blob.type);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
+      onToast?.('success', 'Profile photo downloaded.');
+    } catch (error) {
+      console.error('Failed to download profile photo:', error);
+      onToast?.('error', 'Could not download profile photo.');
+    }
+  };
+
   const mileage = mileageSummary?.mileage || 0;
   const milestone = mileageSummary?.milestone || 0;
   const nextAchievement = mileageSummary?.nextAchievement || null;
@@ -820,15 +859,26 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
                 <h2 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">{user.firstName} {user.lastName}</h2>
                 <p className="truncate text-sm text-gray-500 dark:text-gray-400">{user.rank || 'Profile photo'}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsPhotoPreviewOpen(false)}
-                className="icon-close-button h-9 w-9"
-                aria-label="Close photo preview"
-                title="Close"
-              >
-                <X size={18} />
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void downloadProfilePhoto()}
+                  className="btn-secondary h-9 px-3"
+                  aria-label="Download profile photo"
+                  title="Download Photo"
+                >
+                  <Download size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPhotoPreviewOpen(false)}
+                  className="icon-close-button h-9 w-9"
+                  aria-label="Close photo preview"
+                  title="Close"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
             <div className="flex min-h-0 flex-1 items-center justify-center bg-gray-950 p-3 sm:p-5">
               <img

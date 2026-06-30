@@ -1167,23 +1167,16 @@ function stopWebAppUpdateChecks() {
   }
 }
 
-function createBadgeOverlay(count, status) {
-  const presenceColor = colorToRgba(getPresenceDotColor(status || 'active'));
+function createBadgeOverlay(count) {
   const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0;
 
   return createPngImage(64, 64, (canvas) => {
-    drawRoundedRect(canvas, 2, 2, 60, 60, 14, presenceColor);
-    drawRoundedRect(canvas, 7, 7, 50, 50, 11, colorToRgba('#0f172a'));
-    drawPolygon(canvas, [[32, 10], [49, 16], [49, 31], [43, 47], [32, 56], [21, 47], [15, 31], [15, 16]], colorToRgba('#2563eb'));
-    drawPolygon(canvas, [[32, 16], [43, 21], [43, 30], [39, 42], [32, 49], [25, 42], [21, 30], [21, 21]], colorToRgba('#e5e7eb'));
-    drawPolygon(canvas, [[32, 22], [39, 26], [39, 32], [36, 40], [32, 44], [28, 40], [25, 32], [25, 26]], colorToRgba('#dc2626'));
-
     if (safeCount > 0) {
       const label = safeCount > 99 ? '99+' : String(safeCount);
-      const radius = label.length > 2 ? 16.5 : 14;
-      drawCircle(canvas, 49, 15, radius + 2, colorToRgba('#ffffff'));
-      drawCircle(canvas, 49, 15, radius, colorToRgba('#dc2626'));
-      drawPixelText(canvas, label, label.length > 2 ? 36 : 43, 8, label.length > 2 ? 3 : 4, colorToRgba('#ffffff'));
+      const radius = label.length > 2 ? 24 : 21;
+      drawCircle(canvas, 32, 32, radius + 3, colorToRgba('#ffffff'));
+      drawCircle(canvas, 32, 32, radius, colorToRgba('#dc2626'));
+      drawPixelText(canvas, label, label.length > 2 ? 15 : 24, label.length > 2 ? 23 : 20, label.length > 2 ? 4 : 5, colorToRgba('#ffffff'));
     }
   });
 }
@@ -1215,8 +1208,13 @@ function updateUnreadBadge(count) {
   }
 
   if (process.platform === 'win32') {
-    const overlay = createBadgeOverlay(safeCount, desktopPresenceStatus);
     const statusLabel = getPresenceStatusLabel(desktopPresenceStatus);
+    if (safeCount <= 0) {
+      mainWindow.setOverlayIcon(null, statusLabel);
+      return;
+    }
+
+    const overlay = createBadgeOverlay(safeCount);
     const overlayToolTip = safeCount > 0
       ? `${safeCount} unread item${safeCount === 1 ? '' : 's'} (${statusLabel})`
       : `${statusLabel}`;
