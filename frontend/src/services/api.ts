@@ -326,6 +326,7 @@ export interface UserFilters {
   rank?: string;
   district?: string;
   active?: string;
+  memorial?: string;
   employmentType?: string;
   status?: string;
   sex?: string;

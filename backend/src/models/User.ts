@@ -333,6 +333,10 @@ export class UserModel {
         conditions.push('`isActive` = ?');
         params.push(filters.isActive ? 1 : 0);
       }
+      if (filters?.isMemorial !== undefined) {
+        conditions.push('COALESCE(`isMemorial`, 0) = ?');
+        params.push(filters.isMemorial ? 1 : 0);
+      }
       if (filters?.employmentType) {
         conditions.push('`employmentType` = ?');
         params.push(filters.employmentType);
@@ -368,7 +372,9 @@ export class UserModel {
 
       query += searchRankSql
         ? ` ORDER BY ${searchRankSql}, \`lastName\`, \`firstName\` LIMIT ? OFFSET ?`
-        : ' ORDER BY `lastName`, `firstName` LIMIT ? OFFSET ?';
+        : filters?.isMemorial
+          ? ' ORDER BY COALESCE(`endOfWatchDate`, `updatedAt`) DESC, `lastName`, `firstName` LIMIT ? OFFSET ?'
+          : ' ORDER BY `lastName`, `firstName` LIMIT ? OFFSET ?';
 
       const [rows] = await conn.query(query, [...params, ...orderParams, options.limit ?? 100, options.offset ?? 0]);
       return UserModel.toPublicUsers(rows as User[], options);

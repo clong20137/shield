@@ -1,5 +1,5 @@
 import { CSSProperties, FormEvent, ReactNode, lazy, startTransition, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, BarChart3, Bell, Bug, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Download, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Minus, Moon, RefreshCw, Save, Search, Settings, Shield, Sun, UserCircle, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Bug, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Download, Flag, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Minus, Moon, RefreshCw, Save, Search, Settings, Shield, Sun, UserCircle, X } from 'lucide-react';
 import { BrowserRouter as Router, NavLink, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
@@ -6125,6 +6125,7 @@ function App() {
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
               {isAdministrator && <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />}
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
+              <SidebarLink to="/memorial" label="Memorial" compact={isSidebarCollapsed} icon={Flag} />
             </nav>
 
             <div className={`shrink-0 border-t border-white/10 pt-2 ${isSidebarCollapsed ? 'px-3' : 'px-4'}`}>

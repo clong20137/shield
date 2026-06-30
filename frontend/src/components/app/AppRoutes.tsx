@@ -14,6 +14,7 @@ const DeviceManagementPage = lazy(() => import('../../pages/DeviceManagementPage
 const MessageInboxPage = lazy(() => import('../../pages/MessageInboxPage'));
 const CalendarPage = lazy(() => import('../../pages/CalendarPage'));
 const PerformanceEvaluationsPage = lazy(() => import('../../pages/PerformanceEvaluationsPage'));
+const MemorialPage = lazy(() => import('../../pages/MemorialPage'));
 
 type ShowToast = (type: ToastType, message: string, options?: { saveToNotifications?: boolean }) => void;
 type GetErrorMessage = (error: unknown, fallback: string) => string;
@@ -124,6 +125,7 @@ export function AppRoutes({
             />
           )}
           <Route path="/search" element={<SearchPage currentUser={currentUser} onToast={onToast} />} />
+          {currentUser && <Route path="/memorial" element={<MemorialPage currentUser={currentUser} onToast={onToast} />} />}
           {currentUser && canOpenAdminConsole && (
             <Route
               path="/admin"

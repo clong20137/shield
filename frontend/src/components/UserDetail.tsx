@@ -528,7 +528,9 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   );
   const lastOnlineLabel = useMemo(() => getLastOnlineLabel(presenceSnapshot), [presenceSnapshot]);
   const presenceTone = getPresenceTone(presenceSnapshot.displayStatus);
-  const profileRingClass = presenceTone.ringClass;
+  const profileRingClass = isMemorialProfile
+    ? 'border-yellow-200 shadow-[0_0_0_3px_rgba(250,204,21,0.18)]'
+    : presenceTone.ringClass;
   const fullProfilePhotoUrl = user.profilePictureUrl ? getAssetFullImageUrl(user.profilePictureUrl) : '';
 
   return (
@@ -625,23 +627,41 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           </div>
         </div>
           <div className="flex w-full items-start gap-3 lg:ml-auto lg:w-auto">
-            <div className={`min-w-0 flex-1 rounded border border-white/15 bg-white/10 lg:max-w-xs ${isFloatingProfile ? 'p-2.5 lg:min-w-52' : 'p-3 lg:min-w-52'}`}>
-              <div className="mb-1.5 flex items-center justify-between gap-3 text-sm font-bold text-white">
-                <span className="inline-flex items-center gap-2">
-                  <Gauge size={15} />
-                  Mileage
-                </span>
-                <span>{mileage.toLocaleString()} mi</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-white/20">
-                <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${mileagePercent}%` }} />
-              </div>
-              {Boolean(milestone > 0) && (
+            {isMemorialProfile ? (
+              <div className={`min-w-0 flex-1 rounded border border-yellow-200/25 bg-yellow-300/10 lg:max-w-xs ${isFloatingProfile ? 'p-2.5 lg:min-w-52' : 'p-3 lg:min-w-52'}`}>
+                <div className="mb-1.5 flex items-center justify-between gap-3 text-sm font-bold text-yellow-100">
+                  <span className="inline-flex items-center gap-2">
+                    <Flag size={15} />
+                    Legacy
+                  </span>
+                  <span>{user.serviceYears || user.rank || 'Honor'}</span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-white/20">
+                  <div className="h-full w-full rounded-full bg-yellow-300" />
+                </div>
                 <p className="mt-1 text-xs font-semibold text-blue-100">
-                  {mileagePercent}% of {nextAchievement?.title || `${milestone.toLocaleString()} mi milestone`}
+                  End of Watch {formatMemorialDate(user.endOfWatchDate)}
                 </p>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className={`min-w-0 flex-1 rounded border border-white/15 bg-white/10 lg:max-w-xs ${isFloatingProfile ? 'p-2.5 lg:min-w-52' : 'p-3 lg:min-w-52'}`}>
+                <div className="mb-1.5 flex items-center justify-between gap-3 text-sm font-bold text-white">
+                  <span className="inline-flex items-center gap-2">
+                    <Gauge size={15} />
+                    Mileage
+                  </span>
+                  <span>{mileage.toLocaleString()} mi</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-white/20">
+                  <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${mileagePercent}%` }} />
+                </div>
+                {Boolean(milestone > 0) && (
+                  <p className="mt-1 text-xs font-semibold text-blue-100">
+                    {mileagePercent}% of {nextAchievement?.title || `${milestone.toLocaleString()} mi milestone`}
+                  </p>
+                )}
+              </div>
+            )}
           <button
             className="icon-close-button border-white/20 bg-white/10 text-white hover:bg-white/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
             onClick={onClose}
@@ -670,7 +690,11 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
       <div className={`user-detail-body min-h-0 flex-1 overflow-y-auto bg-gray-50 px-3 dark:bg-gray-950 sm:bg-transparent sm:px-5 sm:dark:bg-transparent ${isFloatingProfile ? 'py-3 sm:py-4' : 'py-4 sm:py-6'}`}>
         {activeTab === 'memorial' && isMemorialProfile && (
           <DetailSection title="Memorial">
-            <div className="mb-4 rounded-lg border border-yellow-200 bg-gradient-to-br from-gray-950 to-primary-500 p-4 text-white shadow-sm dark:border-yellow-600/50">
+            <div className="mb-4 overflow-hidden rounded-lg border border-yellow-200 bg-gradient-to-br from-gray-950 to-primary-500 text-white shadow-sm dark:border-yellow-600/50">
+              <div className="border-b border-white/10 bg-white/5 px-4 py-2 text-center text-[10px] font-black uppercase tracking-[0.24em] text-yellow-100">
+                Dedicated to those who gave all
+              </div>
+              <div className="p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-yellow-100">
@@ -700,6 +724,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
                   View Memorial Link
                 </a>
               )}
+              </div>
             </div>
             <DetailRow label="End of Watch" value={formatMemorialDate(user.endOfWatchDate)} />
             <DetailRow label="Service Years" value={user.serviceYears} />

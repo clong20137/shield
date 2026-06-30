@@ -183,6 +183,7 @@ export async function initializeDatabase() {
   await ensureIndex('users', 'idx_users_rank', '`rank`');
   await ensureIndex('users', 'idx_users_name', '`lastName`, `firstName`');
   await ensureIndex('users', 'idx_users_active_district', '`isActive`, `district`');
+  await ensureIndex('users', 'idx_users_memorial_watch', '`isMemorial`, `endOfWatchDate`, `lastName`, `firstName`');
   await ensureIndex('users', 'idx_users_hidden_filters_name', '`isHidden`, `district`, `rank`, `isActive`, `lastName`, `firstName`');
   await ensureIndex('users', 'idx_users_people_soft', '`peopleSoftId`');
   await ensureIndex('users', 'idx_users_radio', '`radioNumber`');

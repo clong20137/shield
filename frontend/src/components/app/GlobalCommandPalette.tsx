@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, Bug, Calculator, CalendarDays, ClipboardList, Command, Laptop, LayoutDashboard, LockKeyhole, LucideIcon, Mail, Search, Shield, UserCircle, UserPlus, X } from 'lucide-react';
+import { BarChart3, Bug, Calculator, CalendarDays, ClipboardList, Command, Flag, Laptop, LayoutDashboard, LockKeyhole, LucideIcon, Mail, Search, Shield, UserCircle, UserPlus, X } from 'lucide-react';
 import type { AdminConsoleTab } from '../../pages/AdminConsolePage';
 
 function isEditableKeyboardTarget(target: EventTarget | null): boolean {
@@ -128,6 +128,14 @@ export function GlobalCommandPalette({
         keywords: ['people', 'profile', 'personnel', 'employee'],
         icon: Search,
         action: () => navigate('/search'),
+      },
+      {
+        id: 'memorial',
+        label: 'Memorial',
+        detail: 'Honor fallen troopers.',
+        keywords: ['fallen', 'trooper', 'eow', 'remember'],
+        icon: Flag,
+        action: () => navigate('/memorial'),
       },
       {
         id: 'reports',

@@ -409,7 +409,7 @@ export class UserController {
 
   static async searchUsers(req: Request, res: Response) {
     try {
-      const { q, rank, district, active, employmentType, status, sex, supervisor, badgeNumber, radioNumber, peNumber } = req.query;
+      const { q, rank, district, active, memorial, employmentType, status, sex, supervisor, badgeNumber, radioNumber, peNumber } = req.query;
 
       if (q !== undefined && typeof q !== 'string') {
         return res.status(400).json({ error: 'Search term must be a string' });
@@ -419,6 +419,7 @@ export class UserController {
       if (typeof rank === 'string' && rank) filters.rank = rank;
       if (typeof district === 'string' && district) filters.district = district;
       if (typeof active === 'string' && active) filters.isActive = active === 'true';
+      if (typeof memorial === 'string' && memorial) filters.isMemorial = memorial === 'true';
       if (typeof employmentType === 'string' && employmentType) {
         filters.employmentType = employmentType;
       }
