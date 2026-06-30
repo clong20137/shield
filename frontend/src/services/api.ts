@@ -194,6 +194,21 @@ export function getAssetThumbnailUrl(value?: string | null, width = 96): string 
   return `${API_BASE_URL}/uploads/${thumbnailPath}`;
 }
 
+export function getAssetFullImageUrl(value?: string | null): string {
+  const assetUrl = getAssetUrl(value);
+  if (!assetUrl) {
+    return '';
+  }
+
+  const normalizedValue = (value || '').trim().replace(/\\/gu, '/');
+  if (!normalizedValue.includes('/thumbs/') || !/-\d+\.webp(?:[?#].*)?$/iu.test(normalizedValue)) {
+    return assetUrl;
+  }
+
+  const separator = assetUrl.includes('?') ? '&' : '?';
+  return `${assetUrl}${separator}full=1`;
+}
+
 export function handleAssetImageError(event: { currentTarget: HTMLImageElement }) {
   const image = event.currentTarget;
   const currentSource = image.currentSrc || image.src;

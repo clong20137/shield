@@ -81,7 +81,7 @@ function isPathInside(parentPath: string, childPath: string): boolean {
   return Boolean(relativePath) && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
 }
 
-async function generateMissingUploadThumbnail(req: Request, _res: Response, next: express.NextFunction) {
+async function generateMissingUploadThumbnail(req: Request, res: Response, next: express.NextFunction) {
   if (!['GET', 'HEAD'].includes(req.method)) {
     return next();
   }
@@ -104,17 +104,21 @@ async function generateMissingUploadThumbnail(req: Request, _res: Response, next
     return next();
   }
 
-  const thumbnailPath = path.join(originalDirectory, 'thumbs', `${originalBaseName}-${width}.webp`);
-  if (isPathInside(uploadsRoot, thumbnailPath) && fs.existsSync(thumbnailPath)) {
-    return next();
-  }
-
   const allowedExtensions = ['.jpg', '.jpeg', '.jfif', '.png', '.gif', '.webp'];
   const originalPath = allowedExtensions
     .map((extension) => path.join(originalDirectory, `${originalBaseName}${extension}`))
     .find((candidatePath) => isPathInside(uploadsRoot, candidatePath) && fs.existsSync(candidatePath));
 
   if (!originalPath) {
+    return next();
+  }
+
+  if (req.query.full === '1') {
+    return res.sendFile(originalPath);
+  }
+
+  const thumbnailPath = path.join(originalDirectory, 'thumbs', `${originalBaseName}-${width}.webp`);
+  if (isPathInside(uploadsRoot, thumbnailPath) && fs.existsSync(thumbnailPath)) {
     return next();
   }
 

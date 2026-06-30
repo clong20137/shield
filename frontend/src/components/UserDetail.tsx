@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
-import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, MileageSummary, mileageService, User } from '../services/api';
+import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetFullImageUrl, getAssetThumbnailUrl, handleAssetImageError, handleAssetThumbnailError, MileageSummary, mileageService, User } from '../services/api';
 import { subscribeMessageRealtime } from '../services/realtime';
 import { getLastOnlineLabel, getPresenceSnapshot, normalizePresenceStatus, PresenceDisplayStatus, PresenceState } from '../utils/presence';
 import { RankBadge } from './RankBadge';
@@ -479,7 +479,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const lastOnlineLabel = useMemo(() => getLastOnlineLabel(presenceSnapshot), [presenceSnapshot]);
   const presenceTone = getPresenceTone(presenceSnapshot.displayStatus);
   const profileRingClass = presenceTone.ringClass;
-  const fullProfilePhotoUrl = user.profilePictureUrl ? getAssetUrl(user.profilePictureUrl) : '';
+  const fullProfilePhotoUrl = user.profilePictureUrl ? getAssetFullImageUrl(user.profilePictureUrl) : '';
 
   return (
     <div className={`user-detail-panel flex flex-col overflow-hidden rounded-none bg-white shadow-xl dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:rounded-lg ${isFloatingProfile ? 'h-full max-h-full' : 'h-[100dvh] sm:h-auto sm:max-h-[92dvh]'}`}>
