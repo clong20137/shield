@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Download, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Download, ExternalLink, Flag, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetFullImageUrl, getAssetThumbnailUrl, handleAssetImageError, handleAssetThumbnailError, MileageSummary, mileageService, User } from '../services/api';
 import { subscribeMessageRealtime } from '../services/realtime';
 import { getLastOnlineLabel, getPresenceSnapshot, normalizePresenceStatus, PresenceDisplayStatus, PresenceState } from '../utils/presence';
@@ -81,7 +81,7 @@ function getProfilePhotoFileName(user: User, contentType?: string | null): strin
   return `${baseName}.${extension}`;
 }
 
-type ProfileTab = 'personal' | 'identification' | 'employment' | 'contact' | 'devices' | 'calendar' | 'additional';
+type ProfileTab = 'memorial' | 'personal' | 'identification' | 'employment' | 'contact' | 'devices' | 'calendar' | 'additional';
 
 function getPresenceTone(displayStatus: PresenceDisplayStatus) {
   if (displayStatus === 'busy') {
@@ -151,6 +151,14 @@ function formatCalendarDate(value: string): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function formatMemorialDate(value?: string | null): string {
+  if (!value) {
+    return 'N/A';
+  }
+
+  return formatCalendarDate(value.slice(0, 10));
+}
+
 function formatCalendarMonth(value: Date): string {
   return value.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 }
@@ -213,6 +221,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const [presenceTick, setPresenceTick] = useState(0);
   const [realtimePresence, setRealtimePresence] = useState<PresenceState | null>(null);
   const [isPhotoPreviewOpen, setIsPhotoPreviewOpen] = useState(false);
+  const isMemorialProfile = user.isMemorial === true;
   const isDeviceLoadInFlightRef = useRef(false);
   const deviceRefreshTimerRef = useRef<number | null>(null);
   const deviceLoadRequestIdRef = useRef(0);
@@ -226,6 +235,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
     ),
   );
   const tabs: Array<[ProfileTab, string]> = [
+    ...(isMemorialProfile ? [['memorial', 'Memorial'] as [ProfileTab, string]] : []),
     ['personal', 'Personal'],
     ['identification', 'Identification'],
     ['employment', 'Employment'],
@@ -281,7 +291,8 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
 
   useEffect(() => {
     setIsPhotoPreviewOpen(false);
-  }, [user.id, user.profilePictureUrl]);
+    setActiveTab(user.isMemorial ? 'memorial' : 'personal');
+  }, [user.id, user.profilePictureUrl, user.isMemorial]);
 
   useEffect(() => {
     if (!isPhotoPreviewOpen) {
@@ -524,12 +535,12 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
     <div className={`user-detail-panel flex flex-col overflow-hidden rounded-none bg-white shadow-xl dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800 sm:rounded-lg ${isFloatingProfile ? 'h-full max-h-full' : 'h-[100dvh] sm:h-auto sm:max-h-[92dvh]'}`}>
       <div
         onPointerDown={onHeaderPointerDown}
-        className={`shrink-0 select-none bg-primary-500 px-4 text-white sm:px-5 ${isFloatingProfile ? 'py-3 sm:py-3 md:cursor-grab' : 'py-4 sm:py-5'}`}
+        className={`shrink-0 select-none px-4 text-white sm:px-5 ${isMemorialProfile ? 'bg-gradient-to-br from-gray-950 via-primary-500 to-gray-900' : 'bg-primary-500'} ${isFloatingProfile ? 'py-3 sm:py-3 md:cursor-grab' : 'py-4 sm:py-5'}`}
       >
         <div className={`flex flex-col lg:flex-row lg:items-start lg:justify-between ${isFloatingProfile ? 'gap-3' : 'gap-4'}`}>
           <div className={`flex min-w-0 flex-col items-center text-center sm:flex-row sm:items-center sm:text-left ${isFloatingProfile ? 'gap-3' : 'gap-3 sm:gap-4'}`}>
           <div className="relative shrink-0">
-            {presenceSnapshot.showPulse && presenceTone.pulseClass && <span className={`pointer-events-none absolute -inset-1 rounded-full border shield-online-pulse ${presenceTone.pulseClass}`} />}
+            {!isMemorialProfile && presenceSnapshot.showPulse && presenceTone.pulseClass && <span className={`pointer-events-none absolute -inset-1 rounded-full border shield-online-pulse ${presenceTone.pulseClass}`} />}
           {user.profilePictureUrl ? (
             <button
               type="button"
@@ -555,6 +566,12 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           <div>
             <div className={`flex flex-col items-center sm:flex-row sm:flex-wrap sm:items-center ${isFloatingProfile ? 'gap-2' : 'gap-3 sm:gap-2'}`}>
               <h2 className={`m-0 font-bold text-white ${isFloatingProfile ? 'text-xl sm:text-xl' : 'text-xl sm:text-2xl'}`}>{user.firstName} {user.lastName}</h2>
+              {isMemorialProfile && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-200/40 bg-yellow-300/15 px-2 py-1 text-xs font-bold uppercase tracking-wide text-yellow-100">
+                  <Flag size={13} />
+                  End of Watch
+                </span>
+              )}
               {user.isHidden && (
                 <span className="rounded-full border border-amber-200/40 bg-amber-300/15 px-2 py-1 text-xs font-bold uppercase tracking-wide text-amber-100">
                   Hidden
@@ -577,9 +594,11 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
                 >
                   <Phone size={16} />
                 </a>
-                <button className="flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => onMessage?.(user)} aria-label="Send message" title="Send Message" type="button">
-                  <Send size={16} />
-                </button>
+                {!isMemorialProfile && (
+                  <button className="flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => onMessage?.(user)} aria-label="Send message" title="Send Message" type="button">
+                    <Send size={16} />
+                  </button>
+                )}
                 {canEdit && onEdit && (
                   <button className="flex h-9 w-9 items-center justify-center rounded border border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => onEdit?.(user)} aria-label="Edit user" title="Edit User" type="button">
                     <Pencil size={16} />
@@ -592,10 +611,17 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
             </div>
             <p className={`${isFloatingProfile ? 'mt-1.5' : 'mt-2'} max-w-full truncate text-sm text-blue-100`}>{user.email || 'No email on file'}</p>
             <p className="mt-0.5 text-sm text-blue-100">PE {user.peNumber || 'N/A'} - {user.district || 'No district'}</p>
-            <p className={`mt-1 inline-flex items-center gap-1.5 text-xs font-semibold ${presenceTone.textClass}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${presenceTone.dotClass}`} />
-              {lastOnlineLabel}
-            </p>
+            {isMemorialProfile ? (
+              <p className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-yellow-100">
+                <Flag size={13} />
+                End of Watch {formatMemorialDate(user.endOfWatchDate)}
+              </p>
+            ) : (
+              <p className={`mt-1 inline-flex items-center gap-1.5 text-xs font-semibold ${presenceTone.textClass}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${presenceTone.dotClass}`} />
+                {lastOnlineLabel}
+              </p>
+            )}
           </div>
         </div>
           <div className="flex w-full items-start gap-3 lg:ml-auto lg:w-auto">
@@ -642,6 +668,48 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
       </div>
 
       <div className={`user-detail-body min-h-0 flex-1 overflow-y-auto bg-gray-50 px-3 dark:bg-gray-950 sm:bg-transparent sm:px-5 sm:dark:bg-transparent ${isFloatingProfile ? 'py-3 sm:py-4' : 'py-4 sm:py-6'}`}>
+        {activeTab === 'memorial' && isMemorialProfile && (
+          <DetailSection title="Memorial">
+            <div className="mb-4 rounded-lg border border-yellow-200 bg-gradient-to-br from-gray-950 to-primary-500 p-4 text-white shadow-sm dark:border-yellow-600/50">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-yellow-100">
+                    <Flag size={15} />
+                    Remembered With Honor
+                  </p>
+                  <h3 className="mt-2 text-2xl font-bold text-white">{user.rank ? `${user.rank} ` : ''}{user.firstName} {user.lastName}</h3>
+                  <p className="mt-1 text-sm font-semibold text-blue-100">End of Watch {formatMemorialDate(user.endOfWatchDate)}</p>
+                </div>
+                {user.serviceYears && (
+                  <div className="rounded border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-yellow-100">
+                    {user.serviceYears}
+                  </div>
+                )}
+              </div>
+              {user.memorialSummary && (
+                <p className="mt-4 whitespace-pre-line text-sm leading-6 text-blue-50">{user.memorialSummary}</p>
+              )}
+              {user.memorialExternalUrl && (
+                <a
+                  href={user.memorialExternalUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-4 inline-flex items-center gap-2 rounded border border-yellow-200/40 bg-yellow-300/15 px-3 py-2 text-sm font-bold text-yellow-100 hover:bg-yellow-300/25"
+                >
+                  <ExternalLink size={15} />
+                  View Memorial Link
+                </a>
+              )}
+            </div>
+            <DetailRow label="End of Watch" value={formatMemorialDate(user.endOfWatchDate)} />
+            <DetailRow label="Service Years" value={user.serviceYears} />
+            <DetailRow label="Rank" value={user.rank} />
+            <DetailRow label="Badge Number" value={user.badgeNumber} />
+            <DetailRow label="District" value={user.district} />
+            <DetailRow label="Assigned To" value={user.assignedTo} />
+          </DetailSection>
+        )}
+
         {activeTab === 'personal' && <DetailSection title="Personal Information">
           <DetailRow label="Name" value={`${user.firstName} ${user.lastName}`} />
           <DetailRow label="Email" value={user.email} copyValue={user.email} onCopy={copyProfileValue} isCopied={copiedField === 'Email'} />

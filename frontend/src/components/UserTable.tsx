@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Flag, Pencil, Trash2, X } from 'lucide-react';
 import { getAssetThumbnailUrl, handleAssetThumbnailError, User } from '../services/api';
 import { RankBadge, isImportantRank } from './RankBadge';
 
@@ -184,7 +184,15 @@ export const UserTable: React.FC<UserTableProps> = ({
                       onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)}
                       className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-700"
                     />
-                    <span className="truncate font-semibold">{user.lastName}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold">{user.lastName}</span>
+                      {user.isMemorial && (
+                        <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-yellow-700 dark:text-yellow-300">
+                          <Flag size={11} />
+                          Memorial
+                        </span>
+                      )}
+                    </span>
                   </div>
                 </td>
                 <td className="px-4 py-3">{user.firstName}</td>

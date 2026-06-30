@@ -80,6 +80,11 @@ const userUpdateFields = [
   'emergencyContactRelationship',
   'emergencyContactPhone',
   'receivesMessages',
+  'isMemorial',
+  'endOfWatchDate',
+  'memorialSummary',
+  'serviceYears',
+  'memorialExternalUrl',
 ] as const satisfies readonly (keyof User)[];
 
 const defaultBulkUpdateForm: BulkUpdateForm = {
@@ -1203,6 +1208,38 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
                       className={searchCheckboxClassName}
                     />
                   </label>
+                )}
+                <label className="flex items-center justify-between gap-4 rounded border border-yellow-300 bg-yellow-50 px-3 py-2 dark:border-yellow-700/70 dark:bg-yellow-950/30">
+                  <span>
+                    <span className="block text-sm font-semibold text-gray-800 dark:text-gray-100">Memorial profile</span>
+                    <span className="mt-1 block text-xs text-gray-600 dark:text-gray-300">Honor a fallen trooper with End of Watch details and a memorial tab.</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={editForm.isMemorial === true}
+                    onChange={(event) => updateEditField('isMemorial', event.target.checked)}
+                    className={searchCheckboxClassName}
+                  />
+                </label>
+                {editForm.isMemorial === true && (
+                  <>
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">End of Watch</span>
+                      <input type="date" value={String(editForm.endOfWatchDate || '')} onChange={(event) => updateEditField('endOfWatchDate', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Service Years</span>
+                      <input value={String(editForm.serviceYears || '')} placeholder="1998-2026" onChange={(event) => updateEditField('serviceYears', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                    </label>
+                    <label className="block md:col-span-2 xl:col-span-3">
+                      <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Memorial Link</span>
+                      <input value={String(editForm.memorialExternalUrl || '')} placeholder="https://..." onChange={(event) => updateEditField('memorialExternalUrl', event.target.value)} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                    </label>
+                    <label className="block md:col-span-2 xl:col-span-3">
+                      <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Memorial Summary</span>
+                      <textarea value={String(editForm.memorialSummary || '')} onChange={(event) => updateEditField('memorialSummary', event.target.value)} className="min-h-28 w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                    </label>
+                  </>
                 )}
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Role</span>

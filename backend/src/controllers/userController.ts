@@ -97,6 +97,8 @@ function safeUserDetails(user: User) {
     badgeNumber: user.badgeNumber,
     isActive: user.isActive,
     isHidden: user.isHidden,
+    isMemorial: user.isMemorial,
+    endOfWatchDate: user.endOfWatchDate,
   };
 }
 
@@ -220,6 +222,11 @@ function mapImportRow(row: ImportRow) {
     emergencyContactPhone: '',
     role: 'user',
     receivesMessages: true,
+    isMemorial: false,
+    endOfWatchDate: null,
+    memorialSummary: '',
+    serviceYears: '',
+    memorialExternalUrl: '',
   };
 }
 
@@ -307,6 +314,11 @@ function validateUserPayload(body: Record<string, unknown>, isCreate: boolean): 
   setCleanString('emergencyContactRelationship', 100);
   if (isCreate || has('emergencyContactPhone')) cleaned.emergencyContactPhone = emergencyContactPhone;
   if (isCreate || has('receivesMessages')) cleaned.receivesMessages = body.receivesMessages !== false;
+  if (isCreate || has('isMemorial')) cleaned.isMemorial = body.isMemorial === true;
+  if (isCreate || has('endOfWatchDate')) cleaned.endOfWatchDate = cleanString(body.endOfWatchDate, 20);
+  setCleanMultiline('memorialSummary', 4000);
+  setCleanString('serviceYears', 80);
+  setCleanString('memorialExternalUrl', 500);
 
   return {
     value: cleaned,

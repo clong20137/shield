@@ -41,6 +41,11 @@ export interface User {
   receivesMessages: boolean;
   calendarHidden?: boolean;
   presenceHidden?: boolean;
+  isMemorial?: boolean;
+  endOfWatchDate?: string | null;
+  memorialSummary?: string;
+  serviceYears?: string;
+  memorialExternalUrl?: string;
   lastSeenAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -92,6 +97,11 @@ export class UserModel {
     'emergencyContactRelationship',
     'emergencyContactPhone',
     'receivesMessages',
+    'isMemorial',
+    'endOfWatchDate',
+    'memorialSummary',
+    'serviceYears',
+    'memorialExternalUrl',
   ] as const;
 
   private static readonly columnNames: Record<typeof UserModel.editableFields[number], string> = {
@@ -126,6 +136,11 @@ export class UserModel {
     emergencyContactRelationship: '`emergencyContactRelationship`',
     emergencyContactPhone: '`emergencyContactPhone`',
     receivesMessages: '`receivesMessages`',
+    isMemorial: '`isMemorial`',
+    endOfWatchDate: '`endOfWatchDate`',
+    memorialSummary: '`memorialSummary`',
+    serviceYears: '`serviceYears`',
+    memorialExternalUrl: '`memorialExternalUrl`',
   };
 
   private static blankToNull(value: string): string | null {
@@ -155,8 +170,12 @@ export class UserModel {
       return typeof value === 'string' ? UserModel.blankToNull(value) : null;
     }
 
-    if (key === 'isActive' || key === 'isHidden' || key === 'receivesMessages') {
+    if (key === 'isActive' || key === 'isHidden' || key === 'receivesMessages' || key === 'isMemorial') {
       return value === false ? false : true;
+    }
+
+    if (key === 'endOfWatchDate') {
+      return typeof value === 'string' && value.trim() ? value.trim() : null;
     }
 
     if (UserModel.encryptedFields.has(key)) {

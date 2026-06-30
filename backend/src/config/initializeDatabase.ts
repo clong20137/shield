@@ -87,6 +87,11 @@ export async function initializeDatabase() {
       \`lastSsoLoginAt\` DATETIME,
       \`receivesMessages\` BOOLEAN DEFAULT 1,
       \`presenceHidden\` BOOLEAN DEFAULT 0,
+      \`isMemorial\` BOOLEAN DEFAULT 0,
+      \`endOfWatchDate\` DATE,
+      \`memorialSummary\` TEXT,
+      \`serviceYears\` VARCHAR(80),
+      \`memorialExternalUrl\` VARCHAR(500),
       \`defaultDutyHours\` DECIMAL(5,2) NOT NULL DEFAULT 8.00,
       \`isHidden\` BOOLEAN DEFAULT 0,
       \`hasCompletedOnboarding\` BOOLEAN DEFAULT 0,
@@ -144,6 +149,11 @@ export async function initializeDatabase() {
   await ensureColumn('users', 'lastSsoLoginAt', '`lastSsoLoginAt` DATETIME');
   await ensureColumn('users', 'receivesMessages', '`receivesMessages` BOOLEAN DEFAULT 1');
   await ensureColumn('users', 'presenceHidden', '`presenceHidden` BOOLEAN DEFAULT 0');
+  await ensureColumn('users', 'isMemorial', '`isMemorial` BOOLEAN DEFAULT 0');
+  await ensureColumn('users', 'endOfWatchDate', '`endOfWatchDate` DATE');
+  await ensureColumn('users', 'memorialSummary', '`memorialSummary` TEXT');
+  await ensureColumn('users', 'serviceYears', '`serviceYears` VARCHAR(80)');
+  await ensureColumn('users', 'memorialExternalUrl', '`memorialExternalUrl` VARCHAR(500)');
   await ensureColumn('users', 'calendarHidden', '`calendarHidden` BOOLEAN DEFAULT 0');
   await ensureColumn('users', 'appScale', "`appScale` VARCHAR(20) NOT NULL DEFAULT 'comfortable'");
   await ensureColumn('users', 'defaultDutyHours', '`defaultDutyHours` DECIMAL(5,2) NOT NULL DEFAULT 8.00');

@@ -274,6 +274,11 @@ export interface User {
   receivesMessages: boolean;
   presenceHidden?: boolean;
   calendarHidden?: boolean;
+  isMemorial?: boolean;
+  endOfWatchDate?: string | null;
+  memorialSummary?: string;
+  serviceYears?: string;
+  memorialExternalUrl?: string;
   lastSeenAt?: string | null;
   createdAt: string;
   updatedAt: string;
