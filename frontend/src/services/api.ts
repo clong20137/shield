@@ -344,6 +344,33 @@ export interface UserListResponse {
   hasMore?: boolean;
 }
 
+export interface MemorialProfile {
+  id: string;
+  linkedUserId?: string | null;
+  firstName: string;
+  lastName: string;
+  rank?: string | null;
+  district?: string | null;
+  appointedDate?: string | null;
+  deceasedDate?: string | null;
+  photoUrl?: string | null;
+  serviceYears?: string | null;
+  memorialSummary?: string | null;
+  memorialExternalUrl?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface MemorialProfileListResponse {
+  data: MemorialProfile[];
+  page: number;
+  limit: number;
+  count: number;
+  hasMore?: boolean;
+}
+
+export type MemorialProfilePayload = Omit<MemorialProfile, 'id' | 'createdAt' | 'updatedAt'>;
+
 export interface UserImportResponse {
   totalRows: number;
   createdCount: number;
@@ -1215,6 +1242,26 @@ export const userService = {
   
   delete: (id: string) =>
     api.delete(`/users/${id}`),
+};
+
+export const memorialProfileService = {
+  list: (searchTerm: string = '', page: number = 1, limit: number = 24) =>
+    api.get<MemorialProfileListResponse>('/memorial-profiles', { params: { q: searchTerm, page, limit } }),
+
+  create: (payload: MemorialProfilePayload) =>
+    api.post<MemorialProfile>('/memorial-profiles', payload),
+
+  update: (id: string, payload: MemorialProfilePayload) =>
+    api.put<MemorialProfile>(`/memorial-profiles/${id}`, payload),
+
+  delete: (id: string) =>
+    api.delete<{ deleted: boolean }>(`/memorial-profiles/${id}`),
+
+  uploadPhoto: (file: File) => {
+    const formData = new FormData();
+    formData.append('photo', file);
+    return api.post<{ photoUrl: string }>('/memorial-profiles/photo', formData);
+  },
 };
 
 export const reportService = {

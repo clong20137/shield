@@ -29,6 +29,7 @@ import pinnedProfileRoutes from './routes/pinnedProfileRoutes';
 import quickNoteRoutes from './routes/quickNoteRoutes';
 import urgentAlertRoutes from './routes/urgentAlertRoutes';
 import mediaRoutes from './routes/mediaRoutes';
+import memorialProfileRoutes from './routes/memorialProfileRoutes';
 import { startSecurityCleanupJob } from './services/securityCleanup';
 import { requireAuthenticated } from './middleware/authSession';
 import { rateLimit } from './middleware/rateLimit';
@@ -243,6 +244,7 @@ app.use('/api/pinned-profiles', pinnedProfileRoutes);
 app.use('/api/quick-notes', quickNoteRoutes);
 app.use('/api/urgent-alerts', urgentAlertRoutes);
 app.use('/api/media', mediaRoutes);
+app.use('/api/memorial-profiles', memorialProfileRoutes);
 
 const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
 app.use(express.static(frontendDistPath));

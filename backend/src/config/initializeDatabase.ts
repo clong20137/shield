@@ -191,6 +191,65 @@ export async function initializeDatabase() {
   await ensureIndex('users', 'idx_users_personal_phone_hash', '`personalPhoneNumberHash`');
   await ensureIndex('users', 'idx_users_emergency_phone_hash', '`emergencyContactPhoneHash`');
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS memorial_profiles (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`linkedUserId\` VARCHAR(36),
+      \`firstName\` VARCHAR(100) NOT NULL,
+      \`lastName\` VARCHAR(100) NOT NULL,
+      \`rank\` VARCHAR(100),
+      \`district\` VARCHAR(100),
+      \`appointedDate\` DATE,
+      \`deceasedDate\` DATE,
+      \`photoUrl\` TEXT,
+      \`serviceYears\` VARCHAR(80),
+      \`memorialSummary\` TEXT,
+      \`memorialExternalUrl\` VARCHAR(500),
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY \`idx_memorial_profiles_linked_user\` (\`linkedUserId\`),
+      INDEX \`idx_memorial_profiles_deceased\` (\`deceasedDate\`, \`lastName\`, \`firstName\`),
+      INDEX \`idx_memorial_profiles_name\` (\`lastName\`, \`firstName\`)
+    )
+  `);
+
+  await ensureColumn('memorial_profiles', 'linkedUserId', '`linkedUserId` VARCHAR(36)');
+  await ensureColumn('memorial_profiles', 'firstName', '`firstName` VARCHAR(100) NOT NULL');
+  await ensureColumn('memorial_profiles', 'lastName', '`lastName` VARCHAR(100) NOT NULL');
+  await ensureColumn('memorial_profiles', 'rank', '`rank` VARCHAR(100)');
+  await ensureColumn('memorial_profiles', 'district', '`district` VARCHAR(100)');
+  await ensureColumn('memorial_profiles', 'appointedDate', '`appointedDate` DATE');
+  await ensureColumn('memorial_profiles', 'deceasedDate', '`deceasedDate` DATE');
+  await ensureColumn('memorial_profiles', 'photoUrl', '`photoUrl` TEXT');
+  await ensureColumn('memorial_profiles', 'serviceYears', '`serviceYears` VARCHAR(80)');
+  await ensureColumn('memorial_profiles', 'memorialSummary', '`memorialSummary` TEXT');
+  await ensureColumn('memorial_profiles', 'memorialExternalUrl', '`memorialExternalUrl` VARCHAR(500)');
+  await ensureIndex('memorial_profiles', 'idx_memorial_profiles_deceased', '`deceasedDate`, `lastName`, `firstName`');
+  await ensureIndex('memorial_profiles', 'idx_memorial_profiles_name', '`lastName`, `firstName`');
+
+  await pool.query(`
+    INSERT IGNORE INTO memorial_profiles (
+      \`id\`, \`linkedUserId\`, \`firstName\`, \`lastName\`, \`rank\`, \`district\`, \`deceasedDate\`,
+      \`photoUrl\`, \`serviceYears\`, \`memorialSummary\`, \`memorialExternalUrl\`, \`createdAt\`, \`updatedAt\`
+    )
+    SELECT
+      CONCAT('mem-user-', u.\`id\`),
+      u.\`id\`,
+      COALESCE(NULLIF(u.\`firstName\`, ''), 'Unknown'),
+      COALESCE(NULLIF(u.\`lastName\`, ''), 'Trooper'),
+      u.\`rank\`,
+      u.\`district\`,
+      u.\`endOfWatchDate\`,
+      u.\`profilePictureUrl\`,
+      u.\`serviceYears\`,
+      u.\`memorialSummary\`,
+      u.\`memorialExternalUrl\`,
+      u.\`createdAt\`,
+      u.\`updatedAt\`
+    FROM users u
+    WHERE COALESCE(u.\`isMemorial\`, 0) = 1
+  `);
+
   if (await tableExists('auth_accounts')) {
     await ensureColumn('auth_accounts', 'twoFactorSecret', '`twoFactorSecret` VARCHAR(64)');
     await ensureColumn('auth_accounts', 'twoFactorEnabled', '`twoFactorEnabled` BOOLEAN DEFAULT 0');

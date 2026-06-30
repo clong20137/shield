@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CalendarDays, ExternalLink, Flag, Plus, Search, Shield, X } from 'lucide-react';
-import { getAssetThumbnailUrl, handleAssetThumbnailError, User, userService } from '../services/api';
+import { CalendarDays, ExternalLink, Flag, Plus, Search, Shield, Trash2, Upload, X } from 'lucide-react';
+import { getAssetThumbnailUrl, handleAssetThumbnailError, MemorialProfile, memorialProfileService, User, userService } from '../services/api';
 import { UserDetail } from '../components/UserDetail';
 import type { AuthAccount } from '../services/api';
 
@@ -10,8 +10,8 @@ interface MemorialPageProps {
   onToast: (type: 'success' | 'error', message: string) => void;
 }
 
-function getInitials(user: User): string {
-  return `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U';
+function getInitials(profile: Pick<MemorialProfile, 'firstName' | 'lastName'>): string {
+  return `${profile.firstName?.[0] || ''}${profile.lastName?.[0] || ''}`.toUpperCase() || 'U';
 }
 
 function formatMemorialDate(value?: string | null): string {
@@ -27,23 +27,34 @@ function formatMemorialDate(value?: string | null): string {
   return date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
-function getServiceLabel(user: User): string {
-  return user.serviceYears || [user.rank, user.district].filter(Boolean).join(' - ') || 'Indiana State Police';
+function getServiceLabel(profile: MemorialProfile): string {
+  return profile.serviceYears || [profile.rank, profile.district].filter(Boolean).join(' - ') || 'Indiana State Police';
+}
+
+function getEmptyMemorialForm() {
+  return {
+    linkedUserId: '',
+    firstName: '',
+    lastName: '',
+    rank: '',
+    district: '',
+    appointedDate: '',
+    deceasedDate: '',
+    photoUrl: '',
+    serviceYears: '',
+    memorialExternalUrl: '',
+    memorialSummary: '',
+  };
 }
 
 const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [users, setUsers] = useState<User[]>([]);
+  const [memorials, setMemorials] = useState<MemorialProfile[]>([]);
   const [addQuery, setAddQuery] = useState('');
   const [addResults, setAddResults] = useState<User[]>([]);
   const [selectedAddUser, setSelectedAddUser] = useState<User | null>(null);
-  const [addForm, setAddForm] = useState({
-    endOfWatchDate: '',
-    serviceYears: '',
-    memorialExternalUrl: '',
-    memorialSummary: '',
-  });
+  const [addForm, setAddForm] = useState(getEmptyMemorialForm);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,7 +63,10 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
   const [memorialModalMode, setMemorialModalMode] = useState<'add' | 'edit'>('add');
   const [isSearchingAddUsers, setIsSearchingAddUsers] = useState(false);
   const [isAddingMemorial, setIsAddingMemorial] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [editingMemorial, setEditingMemorial] = useState<MemorialProfile | null>(null);
+  const [deletePendingMemorial, setDeletePendingMemorial] = useState<MemorialProfile | null>(null);
   const onToastRef = useRef(onToast);
   const loadRequestIdRef = useRef(0);
   const addSearchRequestIdRef = useRef(0);
@@ -79,13 +93,13 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
     }
 
     try {
-      const response = await userService.searchPaged(debouncedQuery, { memorial: 'true' }, nextPage, 24);
+      const response = await memorialProfileService.list(debouncedQuery, nextPage, 24);
       if (requestId !== loadRequestIdRef.current) {
         return;
       }
 
       lastErrorToastKeyRef.current = '';
-      setUsers((current) => (nextPage === 1 ? response.data.data : [...current, ...response.data.data]));
+      setMemorials((current) => (nextPage === 1 ? response.data.data : [...current, ...response.data.data]));
       setPage(response.data.page);
       setHasMore(response.data.hasMore === true);
     } catch (error) {
@@ -101,7 +115,7 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
       }
 
       if (nextPage === 1) {
-        setUsers([]);
+        setMemorials([]);
         setHasMore(false);
       }
     } finally {
@@ -160,59 +174,103 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
     setAddQuery('');
     setAddResults([]);
     setSelectedAddUser(null);
-    setAddForm({
-      endOfWatchDate: '',
-      serviceYears: '',
-      memorialExternalUrl: '',
-      memorialSummary: '',
-    });
+    setEditingMemorial(null);
+    setAddForm(getEmptyMemorialForm());
     setIsAddModalOpen(true);
   };
 
-  const openEditMemorial = (user: User) => {
+  const openEditMemorial = (profile: MemorialProfile) => {
     setMemorialModalMode('edit');
     setAddQuery('');
     setAddResults([]);
-    selectAddUser(user);
+    setAddResults([]);
+    setSelectedAddUser(null);
+    setEditingMemorial(profile);
+    setAddForm({
+      linkedUserId: profile.linkedUserId || '',
+      firstName: profile.firstName || '',
+      lastName: profile.lastName || '',
+      rank: profile.rank || '',
+      district: profile.district || '',
+      appointedDate: profile.appointedDate?.slice(0, 10) || '',
+      deceasedDate: profile.deceasedDate?.slice(0, 10) || '',
+      photoUrl: profile.photoUrl || '',
+      serviceYears: profile.serviceYears || '',
+      memorialExternalUrl: profile.memorialExternalUrl || '',
+      memorialSummary: profile.memorialSummary || '',
+    });
     setIsAddModalOpen(true);
   };
 
   const selectAddUser = (user: User) => {
     setSelectedAddUser(user);
     setAddForm({
-      endOfWatchDate: user.endOfWatchDate?.slice(0, 10) || '',
+      linkedUserId: user.id,
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      rank: user.rank || '',
+      district: user.district || '',
+      appointedDate: '',
+      deceasedDate: user.endOfWatchDate?.slice(0, 10) || '',
+      photoUrl: user.profilePictureUrl || '',
       serviceYears: user.serviceYears || '',
       memorialExternalUrl: user.memorialExternalUrl || '',
       memorialSummary: user.memorialSummary || '',
     });
   };
 
+  const uploadMemorialPhoto = async (file: File | null) => {
+    if (!file) {
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    try {
+      const response = await memorialProfileService.uploadPhoto(file);
+      setAddForm((form) => ({ ...form, photoUrl: response.data.photoUrl }));
+      onToastRef.current('success', 'Memorial photo uploaded.');
+    } catch (error) {
+      console.error('Failed to upload memorial photo:', error);
+      onToastRef.current('error', 'Failed to upload memorial photo.');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
   const addSelectedMemorial = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selectedAddUser || !canEdit) {
+    if (!canEdit || !addForm.firstName.trim() || !addForm.lastName.trim()) {
       return;
     }
 
     setIsAddingMemorial(true);
     try {
-      const response = await userService.update(selectedAddUser.id, {
-        isMemorial: true,
-        endOfWatchDate: addForm.endOfWatchDate,
+      const payload = {
+        linkedUserId: addForm.linkedUserId || null,
+        firstName: addForm.firstName,
+        lastName: addForm.lastName,
+        rank: addForm.rank,
+        district: addForm.district,
+        appointedDate: addForm.appointedDate,
+        deceasedDate: addForm.deceasedDate,
+        photoUrl: addForm.photoUrl,
         serviceYears: addForm.serviceYears,
         memorialExternalUrl: addForm.memorialExternalUrl,
         memorialSummary: addForm.memorialSummary,
-      });
-      const updatedUser = response.data as User;
-      setUsers((currentUsers) => {
-        const exists = currentUsers.some((user) => user.id === updatedUser.id);
+      };
+      const response = memorialModalMode === 'edit' && editingMemorial
+        ? await memorialProfileService.update(editingMemorial.id, payload)
+        : await memorialProfileService.create(payload);
+      const updatedProfile = response.data;
+      setMemorials((currentProfiles) => {
+        const exists = currentProfiles.some((profile) => profile.id === updatedProfile.id);
         if (exists) {
-          return currentUsers.map((user) => (user.id === updatedUser.id ? updatedUser : user));
+          return currentProfiles.map((profile) => (profile.id === updatedProfile.id ? updatedProfile : profile));
         }
-        return [updatedUser, ...currentUsers];
+        return [updatedProfile, ...currentProfiles];
       });
-      setSelectedUser((currentUser) => (currentUser?.id === updatedUser.id ? updatedUser : currentUser));
-      onToastRef.current('success', `${selectedAddUser.firstName} ${selectedAddUser.lastName} ${memorialModalMode === 'edit' ? 'updated' : 'added to the memorial'}.`);
-      window.dispatchEvent(new CustomEvent('shield:user-updated', { detail: { userId: selectedAddUser.id } }));
+      onToastRef.current('success', `${addForm.firstName} ${addForm.lastName} ${memorialModalMode === 'edit' ? 'updated' : 'added to the memorial'}.`);
+      window.dispatchEvent(new CustomEvent('shield:user-updated', { detail: { userId: updatedProfile.linkedUserId || null } }));
       setIsAddModalOpen(false);
       if (memorialModalMode === 'add') {
         await loadMemorials(1);
@@ -225,15 +283,32 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
     }
   };
 
+  const deleteMemorial = async () => {
+    if (!deletePendingMemorial) {
+      return;
+    }
+
+    try {
+      await memorialProfileService.delete(deletePendingMemorial.id);
+      setMemorials((currentProfiles) => currentProfiles.filter((profile) => profile.id !== deletePendingMemorial.id));
+      setSelectedUser(null);
+      setDeletePendingMemorial(null);
+      onToastRef.current('success', 'Memorial profile deleted.');
+    } catch (error) {
+      console.error('Failed to delete memorial profile:', error);
+      onToastRef.current('error', 'Failed to delete memorial profile.');
+    }
+  };
+
   const stats = useMemo(() => {
-    const withEndOfWatch = users.filter((user) => user.endOfWatchDate).length;
-    const districts = new Set(users.map((user) => user.district).filter(Boolean));
+    const withEndOfWatch = memorials.filter((profile) => profile.deceasedDate).length;
+    const districts = new Set(memorials.map((profile) => profile.district).filter(Boolean));
     return {
-      loaded: users.length,
+      loaded: memorials.length,
       withEndOfWatch,
       districts: districts.size,
     };
-  }, [users]);
+  }, [memorials]);
 
   return (
     <div className="space-y-6">
@@ -293,7 +368,7 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
 
       {isLoading ? (
         <div className="loading min-h-40">Loading memorial profiles...</div>
-      ) : users.length === 0 ? (
+      ) : memorials.length === 0 ? (
         <section className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center dark:border-gray-700 dark:bg-gray-900">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-500/10 text-primary-500 dark:text-blue-100">
             <Shield size={26} />
@@ -305,26 +380,43 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
         </section>
       ) : (
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
-          {users.map((user) => (
+          {memorials.map((profile) => (
             <article
-              key={user.id}
+              key={profile.id}
               className="memorial-card group overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
             >
-              <button type="button" onClick={() => setSelectedUser(user)} className="block w-full text-left">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!profile.linkedUserId) {
+                    if (canEdit) openEditMemorial(profile);
+                    return;
+                  }
+
+                  try {
+                    const response = await userService.getById(profile.linkedUserId);
+                    setSelectedUser(response.data);
+                  } catch (error) {
+                    console.error('Failed to open linked memorial profile:', error);
+                    onToastRef.current('error', 'Failed to open linked profile.');
+                  }
+                }}
+                className="block w-full text-left"
+              >
                 <div className="memorial-card-photo-wrap relative overflow-hidden bg-gradient-to-br from-gray-950 via-primary-500 to-gray-900">
                   <span className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-1 bg-gradient-to-r from-transparent via-yellow-200/80 to-transparent" />
                   <span className="memorial-card-halo pointer-events-none absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-full border border-yellow-200/25" />
                   <div className="relative z-[2] flex justify-center px-5 pb-4 pt-6">
-                    {user.profilePictureUrl ? (
+                    {profile.photoUrl ? (
                       <img
-                        src={getAssetThumbnailUrl(user.profilePictureUrl, 420)}
-                        alt={`${user.firstName} ${user.lastName}`}
-                        onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)}
+                        src={getAssetThumbnailUrl(profile.photoUrl, 420)}
+                        alt={`${profile.firstName} ${profile.lastName}`}
+                        onError={(event) => handleAssetThumbnailError(event, profile.photoUrl)}
                         className="memorial-card-photo h-52 w-52 rounded-full border-4 border-white/90 bg-gray-100 object-cover shadow-2xl dark:border-gray-950 dark:bg-gray-800 sm:h-60 sm:w-60"
                       />
                     ) : (
                       <div className="memorial-card-photo flex h-52 w-52 items-center justify-center rounded-full border-4 border-white/90 bg-primary-500 text-5xl font-black text-white shadow-2xl dark:border-gray-950 sm:h-60 sm:w-60">
-                        {getInitials(user)}
+                        {getInitials(profile)}
                       </div>
                     )}
                   </div>
@@ -332,7 +424,7 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
                 <div className="p-4 text-center">
                     <div className="flex flex-wrap items-center justify-center gap-2">
                       <h2 className="text-xl font-black text-gray-900 dark:text-gray-100">
-                        {user.rank ? `${user.rank} ` : ''}{user.firstName} {user.lastName}
+                        {profile.rank ? `${profile.rank} ` : ''}{profile.firstName} {profile.lastName}
                       </h2>
                       <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-yellow-800 dark:bg-yellow-300/15 dark:text-yellow-100">
                         <Flag size={11} />
@@ -341,29 +433,37 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
                     </div>
                     <p className="mt-2 flex items-center justify-center gap-1.5 text-sm font-bold text-primary-500 dark:text-blue-100">
                       <CalendarDays size={14} />
-                      {formatMemorialDate(user.endOfWatchDate)}
+                      {formatMemorialDate(profile.deceasedDate)}
                     </p>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{getServiceLabel(user)}</p>
-                    {user.memorialSummary && (
-                      <p className="mx-auto mt-3 line-clamp-3 max-w-md text-sm leading-6 text-gray-600 dark:text-gray-300">{user.memorialSummary}</p>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{getServiceLabel(profile)}</p>
+                    {profile.appointedDate && (
+                      <p className="mt-1 text-xs font-bold uppercase tracking-wide text-gray-400">Appointed {formatMemorialDate(profile.appointedDate)}</p>
+                    )}
+                    {profile.memorialSummary && (
+                      <p className="mx-auto mt-3 line-clamp-3 max-w-md text-sm leading-6 text-gray-600 dark:text-gray-300">{profile.memorialSummary}</p>
                     )}
                 </div>
               </button>
-              {(user.memorialExternalUrl || canEdit) && (
+              {(profile.memorialExternalUrl || canEdit) && (
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-4 py-3 dark:border-gray-800">
                   <a
-                    href={user.memorialExternalUrl}
+                    href={profile.memorialExternalUrl || undefined}
                     target="_blank"
                     rel="noreferrer"
-                    className={`inline-flex items-center gap-2 text-sm font-bold text-primary-500 hover:text-primary-600 dark:text-blue-100 ${user.memorialExternalUrl ? '' : 'pointer-events-none invisible'}`}
+                    className={`inline-flex items-center gap-2 text-sm font-bold text-primary-500 hover:text-primary-600 dark:text-blue-100 ${profile.memorialExternalUrl ? '' : 'pointer-events-none invisible'}`}
                   >
                     <ExternalLink size={15} />
                     Memorial Link
                   </a>
                   {canEdit && (
-                    <button type="button" onClick={() => openEditMemorial(user)} className="btn-secondary h-8 px-3 text-xs">
+                    <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => openEditMemorial(profile)} className="btn-secondary h-8 px-3 text-xs">
                       Edit
                     </button>
+                    <button type="button" onClick={() => setDeletePendingMemorial(profile)} className="btn-secondary h-8 px-3 text-xs text-red-700 dark:text-red-200">
+                      <Trash2 size={13} />
+                    </button>
+                    </div>
                   )}
                 </div>
               )}
@@ -386,7 +486,12 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
             <UserDetail
               user={selectedUser}
               onClose={() => setSelectedUser(null)}
-              onEdit={canEdit ? openEditMemorial : undefined}
+              onEdit={canEdit ? (user) => {
+                const profile = memorials.find((item) => item.linkedUserId === user.id);
+                if (profile) {
+                  openEditMemorial(profile);
+                }
+              } : undefined}
               currentUser={currentUser}
               canEdit={canEdit}
               onToast={onToast}
@@ -449,22 +554,58 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
               </section>
               )}
               <section className={`min-w-0 space-y-3 ${memorialModalMode === 'edit' ? 'lg:col-span-2' : ''}`}>
-                {selectedAddUser ? (
+                {selectedAddUser || memorialModalMode === 'edit' ? (
                   <div className="rounded border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-600/40 dark:bg-yellow-300/10">
-                    <p className="text-xs font-black uppercase tracking-wide text-yellow-800 dark:text-yellow-100">Selected</p>
-                    <p className="mt-1 font-black text-gray-900 dark:text-gray-100">{selectedAddUser.rank ? `${selectedAddUser.rank} ` : ''}{selectedAddUser.firstName} {selectedAddUser.lastName}</p>
+                    <p className="text-xs font-black uppercase tracking-wide text-yellow-800 dark:text-yellow-100">{addForm.linkedUserId ? 'Linked Shield Account' : 'Standalone Memorial'}</p>
+                    <p className="mt-1 font-black text-gray-900 dark:text-gray-100">{addForm.rank ? `${addForm.rank} ` : ''}{addForm.firstName || 'First'} {addForm.lastName || 'Last'}</p>
                   </div>
                 ) : (
-                  <div className="rounded border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">Select a trooper to add memorial details.</div>
+                  <div className="rounded border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">Select a Shield user or enter a standalone memorial profile.</div>
                 )}
-                <label>
-                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">End of Watch</span>
-                  <input type="date" value={addForm.endOfWatchDate} onChange={(event) => setAddForm((form) => ({ ...form, endOfWatchDate: event.target.value }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
-                </label>
-                <label>
-                  <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Service Years</span>
-                  <input value={addForm.serviceYears} placeholder="1998-2026" onChange={(event) => setAddForm((form) => ({ ...form, serviceYears: event.target.value }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
-                </label>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">First Name</span>
+                    <input value={addForm.firstName} onChange={(event) => setAddForm((form) => ({ ...form, firstName: event.target.value }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Last Name</span>
+                    <input value={addForm.lastName} onChange={(event) => setAddForm((form) => ({ ...form, lastName: event.target.value }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Rank</span>
+                    <input value={addForm.rank} onChange={(event) => setAddForm((form) => ({ ...form, rank: event.target.value }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">District</span>
+                    <input value={addForm.district} onChange={(event) => setAddForm((form) => ({ ...form, district: event.target.value }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Appointed</span>
+                    <input type="date" value={addForm.appointedDate} onChange={(event) => setAddForm((form) => ({ ...form, appointedDate: event.target.value }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Deceased</span>
+                    <input type="date" value={addForm.deceasedDate} onChange={(event) => setAddForm((form) => ({ ...form, deceasedDate: event.target.value }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                  <label className="sm:col-span-2">
+                    <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Service Years</span>
+                    <input value={addForm.serviceYears} placeholder="1998-2026" onChange={(event) => setAddForm((form) => ({ ...form, serviceYears: event.target.value }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
+                  </label>
+                </div>
+                <div className="rounded border border-gray-200 p-3 dark:border-gray-800">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    {addForm.photoUrl ? (
+                      <img src={getAssetThumbnailUrl(addForm.photoUrl, 160)} alt="Memorial" onError={(event) => handleAssetThumbnailError(event, addForm.photoUrl)} className="h-24 w-24 rounded-full object-cover" />
+                    ) : (
+                      <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary-500 text-2xl font-black text-white">{getInitials(addForm)}</div>
+                    )}
+                    <label className="btn-secondary cursor-pointer">
+                      <Upload size={16} />
+                      <span>{isUploadingPhoto ? 'Uploading' : 'Upload Photo'}</span>
+                      <input type="file" accept="image/*" className="hidden" disabled={isUploadingPhoto} onChange={(event) => void uploadMemorialPhoto(event.target.files?.[0] || null)} />
+                    </label>
+                  </div>
+                </div>
                 <label>
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Memorial Link</span>
                   <input value={addForm.memorialExternalUrl} placeholder="https://..." onChange={(event) => setAddForm((form) => ({ ...form, memorialExternalUrl: event.target.value }))} className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950" />
@@ -477,12 +618,37 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
             </div>
             <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-4 dark:border-gray-800">
               <button type="button" onClick={() => setIsAddModalOpen(false)} className="btn-secondary" disabled={isAddingMemorial}>Cancel</button>
-              <button type="submit" className="btn-primary" disabled={!selectedAddUser || isAddingMemorial}>
+              <button type="submit" className="btn-primary" disabled={!addForm.firstName.trim() || !addForm.lastName.trim() || isAddingMemorial}>
                 <Plus size={16} />
                 <span>{isAddingMemorial ? 'Saving' : memorialModalMode === 'edit' ? 'Save Memorial' : 'Add to Memorial'}</span>
               </button>
             </div>
           </form>
+        </div>,
+        document.body,
+      )}
+
+      {deletePendingMemorial && createPortal(
+        <div className="fixed inset-0 z-[94] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+          <div className="modal-window w-full max-w-md rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200">
+                <Trash2 size={20} />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-lg font-black text-gray-900 dark:text-gray-100">Delete Memorial</h2>
+                <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                  Remove {deletePendingMemorial.firstName} {deletePendingMemorial.lastName} from the memorial wall?
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-800">
+              <button type="button" onClick={() => setDeletePendingMemorial(null)} className="btn-secondary">Cancel</button>
+              <button type="button" onClick={() => void deleteMemorial()} className="rounded bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-700">
+                Delete
+              </button>
+            </div>
+          </div>
         </div>,
         document.body,
       )}
