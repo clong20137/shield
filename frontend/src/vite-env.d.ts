@@ -79,6 +79,48 @@ interface ShieldDesktopWindowVisibility {
   minimized: boolean;
 }
 
+interface ShieldDesktopDiagnostics {
+  appVersion: string;
+  platform: string;
+  arch: string;
+  uptimeSeconds: number;
+  url: string;
+  memory: {
+    mainRssBytes: number;
+    mainHeapUsedBytes: number;
+    rendererWorkingSetBytes: number;
+    rendererPeakWorkingSetBytes: number;
+  };
+  window: {
+    visible: boolean;
+    minimized: boolean;
+    focused: boolean;
+  };
+  update: {
+    configured: boolean;
+    downloaded: boolean;
+    checking: boolean;
+    startupInProgress: boolean;
+    status: ShieldDesktopUpdateStatus | null;
+  };
+  session: {
+    authenticated: boolean;
+    timedOut: boolean;
+    timeoutMinutes: number;
+    lastActivityAgeSeconds: number;
+  };
+  unreadCount: number;
+  presenceStatus: ShieldDesktopIdleStatus['status'];
+  logs: {
+    path: string;
+    recentCount: number;
+    maxEntries: number;
+  };
+  crashes: {
+    pendingCount: number;
+  };
+}
+
 interface Window {
   shieldDesktop?: {
     platform: string;
@@ -113,6 +155,7 @@ interface Window {
       entries: ShieldDesktopLog[];
       maxEntries: number;
     }>;
+    getDesktopDiagnostics?: () => Promise<ShieldDesktopDiagnostics>;
     openDesktopLogs?: () => Promise<{ ok: boolean; message?: string }>;
   };
 }

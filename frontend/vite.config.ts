@@ -25,6 +25,14 @@ export default defineConfig(({ command }) => ({
             return 'vendor-xlsx';
           }
 
+          if (id.includes('@zxing')) {
+            return 'vendor-scanner';
+          }
+
+          if (id.includes('qrcode')) {
+            return 'vendor-qrcode';
+          }
+
           if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
             return 'vendor-react';
           }

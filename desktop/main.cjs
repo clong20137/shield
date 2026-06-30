@@ -518,6 +518,65 @@ function ensureDefaultDesktopPreferences() {
   }
 }
 
+function getRendererMemorySnapshot() {
+  const rendererMetric = app.getAppMetrics()
+    .find((metric) => metric.type === 'Tab' || metric.type === 'Renderer');
+  const memory = rendererMetric?.memory || {};
+
+  return {
+    workingSetBytes: Number(memory.workingSetSize || 0) * 1024,
+    peakWorkingSetBytes: Number(memory.peakWorkingSetSize || 0) * 1024
+  };
+}
+
+function getDesktopDiagnosticsSnapshot() {
+  const mainMemory = process.memoryUsage();
+  const rendererMemory = getRendererMemorySnapshot();
+  const now = Date.now();
+
+  return {
+    appVersion: app.getVersion(),
+    platform: process.platform,
+    arch: process.arch,
+    uptimeSeconds: Math.round(process.uptime()),
+    url: mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.getURL() : '',
+    memory: {
+      mainRssBytes: mainMemory.rss,
+      mainHeapUsedBytes: mainMemory.heapUsed,
+      rendererWorkingSetBytes: rendererMemory.workingSetBytes,
+      rendererPeakWorkingSetBytes: rendererMemory.peakWorkingSetBytes
+    },
+    window: {
+      visible: Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()),
+      minimized: Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isMinimized()),
+      focused: Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused())
+    },
+    update: {
+      configured: Boolean(desktopConfig?.updateUrl),
+      downloaded: isUpdateDownloaded,
+      checking: isDesktopUpdateCheckRunning,
+      startupInProgress: isStartupDesktopUpdateInProgress,
+      status: lastDesktopUpdateStatus
+    },
+    session: {
+      authenticated: desktopSessionAuthenticated,
+      timedOut: desktopSessionTimedOut,
+      timeoutMinutes: desktopSessionTimeoutMinutes,
+      lastActivityAgeSeconds: Math.max(0, Math.round((now - desktopSessionLastActivityAt) / 1000))
+    },
+    unreadCount: desktopUnreadCount,
+    presenceStatus: desktopPresenceStatus,
+    logs: {
+      path: getDesktopLogPath(),
+      recentCount: pendingDesktopLogs.length,
+      maxEntries: maxDesktopLogEntries
+    },
+    crashes: {
+      pendingCount: pendingCrashReports.length
+    }
+  };
+}
+
 function saveDesktopPreferences(preferences) {
   const nextPreferences = {
     ...getDesktopPreferences(),
@@ -1676,6 +1735,8 @@ ipcMain.handle('shield:get-desktop-logs', () => ({
   entries: [...pendingDesktopLogs],
   maxEntries: maxDesktopLogEntries
 }));
+
+ipcMain.handle('shield:get-desktop-diagnostics', () => getDesktopDiagnosticsSnapshot());
 
 ipcMain.handle('shield:open-desktop-logs', async () => {
   try {

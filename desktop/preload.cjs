@@ -57,5 +57,6 @@ contextBridge.exposeInMainWorld('shieldDesktop', {
   },
   notifyQuitSignOutComplete: () => ipcRenderer.invoke('shield:quit-signout-complete'),
   getDesktopLogs: () => ipcRenderer.invoke('shield:get-desktop-logs'),
+  getDesktopDiagnostics: () => ipcRenderer.invoke('shield:get-desktop-diagnostics'),
   openDesktopLogs: () => ipcRenderer.invoke('shield:open-desktop-logs')
 });

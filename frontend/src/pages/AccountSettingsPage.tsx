@@ -1,4 +1,3 @@
-import QRCode from 'qrcode';
 import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Camera, ChevronDown, Download, ExternalLink, EyeOff, Image, KeyRound, Laptop, LogOut, Power, QrCode, RefreshCw, Save, ShieldCheck, Smartphone, UserCircle, Volume2, X } from 'lucide-react';
@@ -78,6 +77,34 @@ function isSecurePassword(password: string): boolean {
   return password.length >= 12 && /[A-Z]/u.test(password) && /[a-z]/u.test(password) && /\d/u.test(password) && /[^A-Za-z0-9]/u.test(password);
 }
 
+function formatBytes(value?: number): string {
+  if (!value || value <= 0) {
+    return '0 MB';
+  }
+
+  return `${Math.round(value / 1024 / 1024)} MB`;
+}
+
+function formatUptime(seconds?: number): string {
+  if (!seconds || seconds <= 0) {
+    return '0m';
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return hours > 0 ? `${hours}h ${remainingMinutes}m` : `${minutes}m`;
+}
+
+function DiagnosticsRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-gray-100 py-2 text-xs last:border-b-0 dark:border-gray-800">
+      <span className="font-bold uppercase tracking-[0.12em] text-gray-400">{label}</span>
+      <span className="min-w-0 text-right font-semibold text-gray-700 dark:text-gray-200">{value}</span>
+    </div>
+  );
+}
+
 export function AccountSettingsPage({
   account,
   messagePreferences,
@@ -131,6 +158,8 @@ export function AccountSettingsPage({
   const [isSessionsLoading, setIsSessionsLoading] = useState(false);
   const [isAssignedDevicesLoading, setIsAssignedDevicesLoading] = useState(false);
   const [isRevokingSessions, setIsRevokingSessions] = useState(false);
+  const [desktopDiagnostics, setDesktopDiagnostics] = useState<ShieldDesktopDiagnostics | null>(null);
+  const [isDesktopDiagnosticsLoading, setIsDesktopDiagnosticsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'devices' | 'reports' | 'preferences'>('general');
   const [isProfileMediaPickerOpen, setIsProfileMediaPickerOpen] = useState(false);
   const [evaluationCount, setEvaluationCount] = useState<number | null>(null);
@@ -166,11 +195,12 @@ export function AccountSettingsPage({
       return;
     }
 
-    QRCode.toDataURL(twoFactorSetup.otpauthUrl, {
-      errorCorrectionLevel: 'M',
-      margin: 2,
-      width: 220,
-    })
+    import('qrcode')
+      .then(({ default: QRCode }) => QRCode.toDataURL(twoFactorSetup.otpauthUrl, {
+        errorCorrectionLevel: 'M',
+        margin: 2,
+        width: 220,
+      }))
       .then((dataUrl) => {
         if (isMounted) {
           setQrCodeDataUrl(dataUrl);
@@ -186,6 +216,24 @@ export function AccountSettingsPage({
       isMounted = false;
     };
   }, [onToast, twoFactorSetup]);
+
+  const refreshDesktopDiagnostics = async () => {
+    if (typeof window.shieldDesktop?.getDesktopDiagnostics !== 'function') {
+      onToast('info', 'Desktop diagnostics are not available in this version.');
+      return;
+    }
+
+    setIsDesktopDiagnosticsLoading(true);
+    try {
+      const diagnostics = await window.shieldDesktop.getDesktopDiagnostics();
+      setDesktopDiagnostics(diagnostics);
+    } catch (error) {
+      console.error('Failed to load desktop diagnostics:', error);
+      onToast('error', 'Failed to load desktop diagnostics.');
+    } finally {
+      setIsDesktopDiagnosticsLoading(false);
+    }
+  };
 
   const loadSessions = async () => {
     setIsSessionsLoading(true);
@@ -1146,17 +1194,41 @@ export function AccountSettingsPage({
                 </div>
                 <div className="rounded border border-gray-200 p-4 dark:border-gray-800">
                   <span className="block text-sm font-bold text-gray-800 dark:text-gray-100">Desktop diagnostics</span>
-                  <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Open recent desktop logs for diagnostics and support.</span>
-                  <button
-                    type="button"
-                    onClick={onOpenDesktopDiagnostics}
-                    className="mt-3 btn-secondary justify-center"
-                    aria-label="Open desktop diagnostics log"
-                    title="Open desktop diagnostics log"
-                  >
-                    <RefreshCw size={16} />
-                    <span>View diagnostics log</span>
-                  </button>
+                  <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">View runtime health and recent desktop logs.</span>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={refreshDesktopDiagnostics}
+                      disabled={isDesktopDiagnosticsLoading}
+                      className="btn-secondary justify-center disabled:pointer-events-none disabled:opacity-50"
+                      aria-label="Refresh desktop diagnostics"
+                      title="Refresh desktop diagnostics"
+                    >
+                      <RefreshCw size={16} className={isDesktopDiagnosticsLoading ? 'animate-spin' : ''} />
+                      <span>Refresh Snapshot</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onOpenDesktopDiagnostics}
+                      className="btn-secondary justify-center"
+                      aria-label="Open desktop diagnostics log"
+                      title="Open desktop diagnostics log"
+                    >
+                      <Download size={16} />
+                      <span>Open Log</span>
+                    </button>
+                  </div>
+                  {desktopDiagnostics && (
+                    <div className="mt-4 rounded border border-gray-100 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-950">
+                      <DiagnosticsRow label="App" value={`${desktopDiagnostics.appVersion} on ${desktopDiagnostics.platform}`} />
+                      <DiagnosticsRow label="Uptime" value={formatUptime(desktopDiagnostics.uptimeSeconds)} />
+                      <DiagnosticsRow label="Memory" value={`${formatBytes(desktopDiagnostics.memory.mainRssBytes)} main / ${formatBytes(desktopDiagnostics.memory.rendererWorkingSetBytes)} renderer`} />
+                      <DiagnosticsRow label="Activity" value={`${desktopDiagnostics.unreadCount} unread, ${desktopDiagnostics.presenceStatus}`} />
+                      <DiagnosticsRow label="Window" value={`${desktopDiagnostics.window.visible ? 'Visible' : 'Hidden'}${desktopDiagnostics.window.minimized ? ', minimized' : ''}`} />
+                      <DiagnosticsRow label="Updates" value={desktopDiagnostics.update.configured ? desktopDiagnostics.update.status?.type || 'Ready' : 'Not configured'} />
+                      <DiagnosticsRow label="Logs" value={`${desktopDiagnostics.logs.recentCount}/${desktopDiagnostics.logs.maxEntries} entries, ${desktopDiagnostics.crashes.pendingCount} crash reports`} />
+                    </div>
+                  )}
                 </div>
               </>
             )}
