@@ -7,6 +7,7 @@ import { subscribeMessageRealtime } from '../services/realtime';
 import { districtOptions } from '../constants/districts';
 import { UserDetail } from '../components/UserDetail';
 import { getPostBodyText } from '../components/RichPostEditor';
+import { getPresenceSnapshot, normalizePresenceStatus, PresenceState } from '../utils/presence';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 type DashboardPostForm = Pick<DashboardPost, 'title' | 'body' | 'category' | 'imageUrl' | 'allowComments'>;
@@ -1191,70 +1192,37 @@ function getInitials(firstName?: string, lastName?: string, email?: string): str
   return parts.length > 1 ? `${parts[0][0]}${parts[1][0]}`.toUpperCase() : source.slice(0, 2).toUpperCase();
 }
 
-function isProfileOnline(lastSeenAt?: string | null): boolean {
-  if (!lastSeenAt) {
-    return false;
-  }
-
-  const value = new Date(lastSeenAt).getTime();
-  return !Number.isNaN(value) && Date.now() - value < 2 * 60 * 1000;
-}
-
-function isProfileAway(lastSeenAt?: string | null): boolean {
-  if (!lastSeenAt) {
-    return false;
-  }
-
-  const value = new Date(lastSeenAt).getTime();
-  if (Number.isNaN(value)) {
-    return false;
-  }
-
-  const diff = Date.now() - value;
-  return diff >= 2 * 60 * 1000 && diff < 5 * 60 * 1000;
-}
-
-type PinnedPresenceStatus = 'active' | 'away' | 'busy';
-type PinnedPresenceState = {
-  online: boolean;
-  away: boolean;
-  status: PinnedPresenceStatus;
-  lastSeenAt: string | null;
-};
-
-function getPinnedPresence(profile: Pick<PinnedProfile, 'id' | 'lastSeenAt'>, presenceByAccount: Record<string, PinnedPresenceState>) {
+function getPinnedPresence(profile: Pick<PinnedProfile, 'id' | 'lastSeenAt'>, presenceByAccount: Record<string, PresenceState>) {
   const realtime = presenceByAccount[profile.id];
-  const online = realtime ? realtime.online : isProfileOnline(profile.lastSeenAt);
-  const away = realtime ? realtime.away : !online && isProfileAway(profile.lastSeenAt);
-  const status = realtime?.status || (away ? 'away' : online ? 'active' : 'active');
+  const presence = getPresenceSnapshot(realtime, profile.lastSeenAt);
 
-  if (realtime && status === 'busy') {
+  if (presence.displayStatus === 'busy') {
     return {
       label: 'Busy',
       dotClass: 'bg-red-500',
       ringClass: 'border-red-300/70 shadow-[0_0_0_1px_rgba(239,68,68,0.18)]',
       pulseClass: 'border-red-300/50',
-      showPulse: true,
+      showPulse: presence.showPulse,
     };
   }
 
-  if ((realtime && status === 'away') || away) {
+  if (presence.displayStatus === 'away') {
     return {
       label: 'Away',
       dotClass: 'bg-amber-400',
       ringClass: 'border-amber-300/70 shadow-[0_0_0_1px_rgba(251,191,36,0.2)]',
       pulseClass: 'border-amber-300/70',
-      showPulse: true,
+      showPulse: presence.showPulse,
     };
   }
 
-  if (online) {
+  if (presence.displayStatus === 'active') {
     return {
       label: 'Active',
       dotClass: 'bg-green-500',
       ringClass: 'border-green-400/45 shadow-[0_0_0_1px_rgba(34,197,94,0.12)]',
       pulseClass: 'border-green-400/45',
-      showPulse: true,
+      showPulse: presence.showPulse,
     };
   }
 
@@ -1300,7 +1268,7 @@ function PinnedProfilesWidget({
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [presenceByAccount, setPresenceByAccount] = useState<Record<string, PinnedPresenceState>>({});
+  const [presenceByAccount, setPresenceByAccount] = useState<Record<string, PresenceState>>({});
   const pinnedRailRef = useRef<HTMLDivElement | null>(null);
   const pinSearchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -1353,7 +1321,7 @@ function PinnedProfilesWidget({
           actorAccountId?: string;
           actorOnline?: boolean;
           actorAway?: boolean;
-          actorStatus?: PinnedPresenceStatus;
+          actorStatus?: string;
           actorLastSeenAt?: string | null;
         };
 
@@ -1366,7 +1334,7 @@ function PinnedProfilesWidget({
           [payload.actorAccountId as string]: {
             online: payload.actorOnline === true,
             away: payload.actorAway === true,
-            status: payload.actorStatus || 'active',
+            status: normalizePresenceStatus(payload.actorStatus),
             lastSeenAt: payload.actorLastSeenAt || null,
           },
         }));

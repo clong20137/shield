@@ -4,6 +4,7 @@ import { MentionTextarea } from '../MentionTextarea';
 import type { ToastType } from '../ToastHost';
 import { AuthAccount, errorLogService, getAssetThumbnailUrl, getAssetUrl, handleAssetThumbnailError, messageService, User, UserMessage, userService } from '../../services/api';
 import { subscribeMessageRealtime } from '../../services/realtime';
+import { getPresenceSnapshot, normalizePresenceStatus, PresenceState } from '../../utils/presence';
 
 export interface RecentConversation {
   id: string;
@@ -19,14 +20,6 @@ export interface RecentConversation {
   unreadPreview: string;
   unreadCount: number;
   unreadMessageIds: string[];
-}
-
-type RecentPresenceStatus = 'active' | 'away' | 'busy';
-interface RecentPresenceState {
-  online: boolean;
-  away: boolean;
-  status: RecentPresenceStatus;
-  lastSeenAt: string | null;
 }
 
 interface RecentTypingState {
@@ -199,65 +192,40 @@ function buildRecentConversations(messages: UserMessage[], currentUserId: string
     .slice(0, 5);
 }
 
-function isRecentConversationOnline(lastSeenAt?: string | null): boolean {
-  if (!lastSeenAt) {
-    return false;
-  }
-
-  const value = new Date(lastSeenAt).getTime();
-  return !Number.isNaN(value) && Date.now() - value < 2 * 60 * 1000;
-}
-
-function isRecentConversationAway(lastSeenAt?: string | null): boolean {
-  if (!lastSeenAt) {
-    return false;
-  }
-
-  const value = new Date(lastSeenAt).getTime();
-  if (Number.isNaN(value)) {
-    return false;
-  }
-
-  const diff = Date.now() - value;
-  return diff >= 2 * 60 * 1000 && diff < 5 * 60 * 1000;
-}
-
 function getRecentConversationPresence(
   conversation: RecentConversation,
-  presenceByAccount: Record<string, RecentPresenceState>,
+  presenceByAccount: Record<string, PresenceState>,
 ) {
   const realtime = conversation.directParticipantId ? presenceByAccount[conversation.directParticipantId] : null;
-  const online = realtime ? realtime.online : isRecentConversationOnline(conversation.directLastSeenAt);
-  const away = realtime ? realtime.away : !online && isRecentConversationAway(conversation.directLastSeenAt);
-  const status = realtime?.status || (away ? 'away' : online ? 'active' : 'active');
+  const presence = getPresenceSnapshot(realtime, conversation.directLastSeenAt);
 
-  if (realtime && status === 'busy') {
+  if (presence.displayStatus === 'busy') {
     return {
       label: 'Busy',
       dotClass: 'bg-red-500',
       ringClass: 'ring-red-300/70 shadow-[0_0_0_1px_rgba(239,68,68,0.18)]',
       pulseClass: 'border-red-300/50',
-      showPulse: true,
+      showPulse: presence.showPulse,
     };
   }
 
-  if ((realtime && status === 'away') || away) {
+  if (presence.displayStatus === 'away') {
     return {
       label: 'Away',
       dotClass: 'bg-amber-400',
       ringClass: 'ring-amber-300/80 shadow-[0_0_0_1px_rgba(251,191,36,0.2)]',
       pulseClass: 'border-amber-300/70',
-      showPulse: true,
+      showPulse: presence.showPulse,
     };
   }
 
-  if (online) {
+  if (presence.displayStatus === 'active') {
     return {
       label: 'Active',
       dotClass: 'bg-green-500',
       ringClass: 'ring-green-400/60 shadow-[0_0_0_1px_rgba(34,197,94,0.12)]',
       pulseClass: 'border-green-400/45',
-      showPulse: true,
+      showPulse: presence.showPulse,
     };
   }
 
@@ -402,7 +370,7 @@ function RecentConversationsDock({
   isCollapsed: boolean;
   currentUser: AuthAccount | null;
   quickReplyConversationId: string | null;
-  presenceByAccount: Record<string, RecentPresenceState>;
+  presenceByAccount: Record<string, PresenceState>;
   typingByConversation: Record<string, RecentTypingState>;
   onOpenConversation: (conversation: RecentConversation) => void;
   onMarkRead: (conversation: RecentConversation) => void;
@@ -1146,7 +1114,7 @@ export const RecentMessagesDockContainer = memo(function RecentMessagesDockConta
 }: RecentMessagesDockContainerProps) {
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [conversations, setConversations] = useState<RecentConversation[]>([]);
-  const [presenceByAccount, setPresenceByAccount] = useState<Record<string, RecentPresenceState>>({});
+  const [presenceByAccount, setPresenceByAccount] = useState<Record<string, PresenceState>>({});
   const [typingByConversation, setTypingByConversation] = useState<Record<string, RecentTypingState>>({});
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [quickReplyConversation, setQuickReplyConversation] = useState<RecentConversation | null>(null);
@@ -1206,7 +1174,7 @@ export const RecentMessagesDockContainer = memo(function RecentMessagesDockConta
           actorAccountId?: string;
           actorOnline?: boolean;
           actorAway?: boolean;
-          actorStatus?: RecentPresenceStatus;
+          actorStatus?: string;
           actorLastSeenAt?: string | null;
         };
 
@@ -1219,7 +1187,7 @@ export const RecentMessagesDockContainer = memo(function RecentMessagesDockConta
           [payload.actorAccountId as string]: {
             online: payload.actorOnline === true,
             away: payload.actorAway === true,
-            status: payload.actorStatus || 'active',
+            status: normalizePresenceStatus(payload.actorStatus),
             lastSeenAt: payload.actorLastSeenAt || null,
           },
         }));

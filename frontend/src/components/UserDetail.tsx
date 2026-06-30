@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetThumbnailUrl, handleAssetThumbnailError, MileageSummary, mileageService, User } from '../services/api';
 import { subscribeMessageRealtime } from '../services/realtime';
+import { getLastOnlineLabel, getPresenceSnapshot, normalizePresenceStatus, PresenceDisplayStatus, PresenceState } from '../utils/presence';
 import { RankBadge } from './RankBadge';
 
 interface UserDetailProps {
@@ -68,81 +69,10 @@ function getInitials(user: User): string {
   return `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U';
 }
 
-function isUserOnline(lastSeenAt?: string | null): boolean {
-  if (!lastSeenAt) {
-    return false;
-  }
-
-  const value = new Date(lastSeenAt).getTime();
-  if (Number.isNaN(value)) {
-    return false;
-  }
-
-  return Date.now() - value < 2 * 60 * 1000;
-}
-
-function isUserAway(lastSeenAt?: string | null): boolean {
-  if (!lastSeenAt) {
-    return false;
-  }
-
-  const value = new Date(lastSeenAt).getTime();
-  if (Number.isNaN(value)) {
-    return false;
-  }
-
-  const diffMs = Date.now() - value;
-  return diffMs >= 2 * 60 * 1000 && diffMs < 5 * 60 * 1000;
-}
-
-function getLastOnlineLabel(lastSeenAt?: string | null): string {
-  if (!lastSeenAt) {
-    return 'Last online: Never';
-  }
-
-  const value = new Date(lastSeenAt).getTime();
-  if (Number.isNaN(value)) {
-    return 'Last online: Unknown';
-  }
-
-  const diffMs = Date.now() - value;
-  if (diffMs < 2 * 60 * 1000) {
-    return 'Online now';
-  }
-
-  if (diffMs < 5 * 60 * 1000) {
-    return 'Away';
-  }
-
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 60) {
-    return `Last online ${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `Last online ${hours} hour${hours === 1 ? '' : 's'} ago`;
-  }
-
-  const days = Math.floor(hours / 24);
-  if (days < 7) {
-    return `Last online ${days} day${days === 1 ? '' : 's'} ago`;
-  }
-
-  return `Last online ${new Date(lastSeenAt).toLocaleString()}`;
-}
-
 type ProfileTab = 'personal' | 'identification' | 'employment' | 'contact' | 'devices' | 'calendar' | 'additional';
-type ProfilePresenceStatus = 'active' | 'away' | 'busy';
-type ProfilePresenceState = {
-  online: boolean;
-  away: boolean;
-  status: ProfilePresenceStatus;
-  lastSeenAt: string | null;
-};
 
-function getPresenceTone(status: ProfilePresenceStatus, isOnline: boolean, isAway: boolean) {
-  if (status === 'busy') {
+function getPresenceTone(displayStatus: PresenceDisplayStatus) {
+  if (displayStatus === 'busy') {
     return {
       label: 'Busy',
       textClass: 'text-red-100',
@@ -152,7 +82,7 @@ function getPresenceTone(status: ProfilePresenceStatus, isOnline: boolean, isAwa
     };
   }
 
-  if (status === 'away' || isAway) {
+  if (displayStatus === 'away') {
     return {
       label: 'Away',
       textClass: 'text-amber-100',
@@ -162,7 +92,7 @@ function getPresenceTone(status: ProfilePresenceStatus, isOnline: boolean, isAwa
     };
   }
 
-  if (isOnline) {
+  if (displayStatus === 'active') {
     return {
       label: 'Active',
       textClass: 'text-green-100/90',
@@ -269,7 +199,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const [deviceError, setDeviceError] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [presenceTick, setPresenceTick] = useState(0);
-  const [realtimePresence, setRealtimePresence] = useState<ProfilePresenceState | null>(null);
+  const [realtimePresence, setRealtimePresence] = useState<PresenceState | null>(null);
   const isDeviceLoadInFlightRef = useRef(false);
   const deviceRefreshTimerRef = useRef<number | null>(null);
   const deviceLoadRequestIdRef = useRef(0);
@@ -345,7 +275,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           actorAccountId?: string;
           actorOnline?: boolean;
           actorAway?: boolean;
-          actorStatus?: ProfilePresenceStatus;
+          actorStatus?: string;
           actorLastSeenAt?: string | null;
         };
 
@@ -356,7 +286,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
         setRealtimePresence({
           online: payload.actorOnline === true,
           away: payload.actorAway === true,
-          status: payload.actorStatus || 'active',
+          status: normalizePresenceStatus(payload.actorStatus),
           lastSeenAt: payload.actorLastSeenAt || null,
         });
       } catch (error) {
@@ -522,18 +452,12 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const milestone = mileageSummary?.milestone || 0;
   const nextAchievement = mileageSummary?.nextAchievement || null;
   const mileagePercent = milestone > 0 ? Math.min(100, Math.round((mileage / milestone) * 100)) : 0;
-  const effectiveLastSeenAt = realtimePresence?.lastSeenAt ?? user.lastSeenAt;
-  const isOnline = realtimePresence ? realtimePresence.online : isUserOnline(effectiveLastSeenAt);
-  const isAway = realtimePresence ? realtimePresence.away : !isOnline && isUserAway(effectiveLastSeenAt);
-  const presenceStatus = realtimePresence?.status || (isAway ? 'away' : 'active');
-  const lastOnlineLabel = useMemo(() => {
-    if (realtimePresence?.online) {
-      return getPresenceTone(presenceStatus, isOnline, isAway).label;
-    }
-
-    return getLastOnlineLabel(effectiveLastSeenAt);
-  }, [effectiveLastSeenAt, isAway, isOnline, presenceStatus, presenceTick, realtimePresence?.online]);
-  const presenceTone = getPresenceTone(presenceStatus, isOnline, isAway);
+  const presenceSnapshot = useMemo(
+    () => getPresenceSnapshot(realtimePresence, user.lastSeenAt),
+    [presenceTick, realtimePresence, user.lastSeenAt],
+  );
+  const lastOnlineLabel = useMemo(() => getLastOnlineLabel(presenceSnapshot), [presenceSnapshot]);
+  const presenceTone = getPresenceTone(presenceSnapshot.displayStatus);
   const profileRingClass = presenceTone.ringClass;
 
   return (
@@ -545,7 +469,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
         <div className={`flex flex-col lg:flex-row lg:items-start lg:justify-between ${isFloatingProfile ? 'gap-3' : 'gap-4'}`}>
           <div className={`flex min-w-0 flex-col items-center text-center sm:flex-row sm:items-center sm:text-left ${isFloatingProfile ? 'gap-3' : 'gap-3 sm:gap-4'}`}>
           <div className="relative shrink-0">
-            {(isOnline || isAway) && presenceTone.pulseClass && <span className={`pointer-events-none absolute -inset-1 rounded-full border shield-online-pulse ${presenceTone.pulseClass}`} />}
+            {presenceSnapshot.showPulse && presenceTone.pulseClass && <span className={`pointer-events-none absolute -inset-1 rounded-full border shield-online-pulse ${presenceTone.pulseClass}`} />}
           {user.profilePictureUrl ? (
             <img
               src={getAssetThumbnailUrl(user.profilePictureUrl, 256)}
