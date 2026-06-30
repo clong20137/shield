@@ -2963,6 +2963,29 @@
     opacity: 1 !important;
   }
 
+  .shield-left-panel .global-search-results {
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    background: rgb(43, 67, 103) !important;
+    color: rgb(255, 255, 255) !important;
+    box-shadow: 0 22px 50px rgba(2, 6, 23, 0.36) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .shield-left-panel .global-search-results button {
+    min-height: 3.25rem;
+    color: rgb(255, 255, 255) !important;
+  }
+
+  .shield-left-panel .global-search-results button:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+  }
+
+  .shield-left-panel .global-search-results .text-gray-500,
+  .shield-left-panel .global-search-results .dark\:text-gray-400 {
+    color: rgb(203, 213, 225) !important;
+  }
+
   html.glass .shield-left-panel .sidebar-search-static:not(form),
   html.glass .shield-left-panel .sidebar-search-static:not(form):hover,
   html.glass .shield-left-panel .sidebar-search-static:not(form):focus-visible {
@@ -2995,13 +3018,11 @@
 
   html.glass .shield-left-panel .global-search-results {
     border-color: rgba(255, 255, 255, 0.18) !important;
-    background: rgba(15, 23, 42, 0.94) !important;
+    background: rgb(43, 67, 103) !important;
     color: rgb(248, 250, 252) !important;
-    box-shadow:
-      0 22px 50px rgba(2, 6, 23, 0.42),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
-    backdrop-filter: blur(18px) saturate(1.12);
-    -webkit-backdrop-filter: blur(18px) saturate(1.12);
+    box-shadow: 0 22px 50px rgba(2, 6, 23, 0.36) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
   html.glass .shield-left-panel .global-search-results button:hover {
@@ -3014,21 +3035,63 @@
   }
 
   html.glass:not(.dark) .shield-left-panel .global-search-results {
-    border-color: rgba(15, 23, 42, 0.16) !important;
-    background: rgba(255, 255, 255, 0.96) !important;
-    color: rgb(17, 24, 39) !important;
-    box-shadow:
-      0 22px 50px rgba(15, 23, 42, 0.22),
-      inset 0 1px 0 rgba(255, 255, 255, 0.82) !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    background: rgb(43, 67, 103) !important;
+    color: rgb(255, 255, 255) !important;
+    box-shadow: 0 22px 50px rgba(2, 6, 23, 0.36) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
   html.glass:not(.dark) .shield-left-panel .global-search-results button:hover {
-    background-color: rgba(15, 23, 42, 0.06) !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
   }
 
   html.glass:not(.dark) .shield-left-panel .global-search-results .text-gray-500,
   html.glass:not(.dark) .shield-left-panel .global-search-results .dark\:text-gray-400 {
-    color: rgb(75, 85, 99) !important;
+    color: rgb(203, 213, 225) !important;
+  }
+
+  .user-detail-tab.user-detail-tab-active,
+  .dark .user-detail-tab.user-detail-tab-active,
+  html.glass .user-detail-tab.user-detail-tab-active,
+  html.glass.dark .user-detail-tab.user-detail-tab-active {
+    background-color: rgb(255, 255, 255) !important;
+    color: var(--app-primary) !important;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18) !important;
+  }
+
+  html.glass .my-day-widget,
+  html.glass:not(.dark) .my-day-widget {
+    border-color: rgb(229, 231, 235) !important;
+    background-color: rgb(255, 255, 255) !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1), 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  html.glass.dark .my-day-widget {
+    border-color: rgb(31, 41, 55) !important;
+    background-color: rgb(17, 24, 39) !important;
+    box-shadow: none !important;
+  }
+
+  html.glass .my-day-widget .my-day-mileage-summary,
+  html.glass:not(.dark) .my-day-widget .my-day-mileage-summary,
+  html.glass.dark .my-day-widget .my-day-mileage-summary {
+    border-color: rgba(255, 255, 255, 0.16) !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: rgb(255, 255, 255) !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  html.glass .my-day-widget .my-day-mileage-summary .text-blue-100,
+  html.glass .my-day-widget .my-day-mileage-summary .text-white,
+  html.glass .my-day-widget .my-day-mileage-summary [class*='text-blue-100'],
+  html.glass.dark .my-day-widget .my-day-mileage-summary .dark\:text-gray-400 {
+    color: rgb(255, 255, 255) !important;
   }
 
   .dark .shield-left-panel {

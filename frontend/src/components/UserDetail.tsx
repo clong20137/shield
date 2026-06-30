@@ -640,7 +640,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`shrink-0 rounded text-sm font-bold transition ${isFloatingProfile ? 'px-3 py-1.5' : 'px-3 py-2'} ${activeTab === tab ? 'bg-white text-primary-500' : 'bg-white/10 text-white hover:bg-white/20'}`}
+              className={`user-detail-tab shrink-0 rounded text-sm font-bold transition ${isFloatingProfile ? 'px-3 py-1.5' : 'px-3 py-2'} ${activeTab === tab ? 'user-detail-tab-active bg-white text-primary-500' : 'bg-white/10 text-white hover:bg-white/20'}`}
             >
               {label}
             </button>

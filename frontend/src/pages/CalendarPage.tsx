@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BadgeCheck, CalendarClock, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, DollarSign, Eye, EyeOff, FileText, Gavel, ListChecks, LucideIcon, MapPin, Palette, Pill, Plus, RefreshCw, Save, ShieldAlert, Sparkles, Timer, Trash2, Truck, X } from 'lucide-react';
+import { BadgeCheck, CalendarClock, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, DollarSign, Eye, EyeOff, FileText, Gavel, ListChecks, LucideIcon, MapPin, Palette, Pill, Plus, Save, ShieldAlert, Sparkles, Timer, Trash2, Truck, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { AuthAccount, CalendarEntry, CalendarShortcut, authService, calendarService } from '../services/api';
 import { districtOptions } from '../constants/districts';
@@ -3999,7 +3999,6 @@ function CalendarPage({
           position={pageContextMenu}
           onClose={() => setPageContextMenu(null)}
           actions={[
-            { label: 'Refresh Calendar', icon: RefreshCw, onSelect: () => void loadCalendarEntries(false) },
             { label: 'Go To Today', icon: CalendarClock, onSelect: goToToday },
             { label: 'Create Today Daily', icon: Plus, onSelect: () => openDay(todayKey) },
             { label: 'Previous Period', icon: ChevronLeft, onSelect: () => changeCalendarPeriod(-1), shortcut: 'Left' },

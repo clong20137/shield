@@ -1745,7 +1745,7 @@ function MyDayWidget({
   };
 
   return (
-    <section data-onboarding-target="my-day" className="relative flex h-full min-h-[24rem] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
+    <section data-onboarding-target="my-day" className="my-day-widget relative flex h-full min-h-[24rem] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
       <div className="border-b border-white/10 bg-primary-500 px-4 py-4 text-white dark:bg-gray-950 sm:px-5">
         <div className="flex items-start gap-3">
           <div className="flex min-w-0 items-start gap-3">
