@@ -95,7 +95,7 @@ const APP_SCALE_LABELS: Record<AppScale, string> = {
   comfortable: 'Comfortable',
   large: 'Large',
 };
-const APP_SCALE_TRANSITION_MS = 640;
+const APP_SCALE_TRANSITION_MS = 260;
 
 interface MessagePreferences {
   receiveMessages: boolean;
