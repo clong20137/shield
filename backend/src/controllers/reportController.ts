@@ -72,6 +72,10 @@ interface TrooperDailyAnalyticsTotalsRow extends RowDataPacket {
   uniqueTroopers: number;
 }
 
+interface TrooperDailyAnalyticsMonthlyRow extends RowDataPacket {
+  label: string;
+}
+
 interface AccessReviewSummaryRow extends RowDataPacket {
   totalAccounts: number;
   activeAccounts: number;
@@ -110,24 +114,98 @@ interface PermissionDistributionRow extends RowDataPacket {
 const reviewStatuses = ['Approved', 'Returned'] as const;
 const trooperDailyAnalyticsFields = [
   ['regularDutyHours', 'Regular Duty Hours'],
+  ['regularDaysOff', 'Regular Days Off'],
+  ['compHoursUsed', 'Comp Hours Used'],
+  ['personalLeaveHours', 'Personal Leave Hours'],
+  ['vacationHours', 'Vacation Hours'],
+  ['holidayHours', 'Holiday Hours'],
+  ['compOtHoursEarned', 'Comp/OT Hours Earned'],
+  ['injuryIllnessHours', 'Injury/Illness Hours'],
   ['patrolHours', 'Patrol Hours'],
   ['crashInvestHours', 'Crash Investigation Hours'],
   ['trafficCourtHours', 'Traffic Court Hours'],
   ['incidentReportHours', 'Incident Report Hours'],
   ['criminalInvestHours', 'Criminal Investigation Hours'],
   ['criminalCourtHours', 'Criminal Court Hours'],
+  ['mealBreakHours', 'Meal Break Hours'],
   ['regularDutyMiles', 'Regular Duty Miles'],
   ['policeServices', 'Police Services'],
+  ['suspensions', 'Suspensions'],
   ['crashesInvestigated', 'Crashes Investigated'],
   ['crashCitations', 'Crash Citations'],
   ['seatBeltCitations', 'Seat Belt Citations'],
+  ['childRestraintCitations', 'Child Restraint Citations'],
+  ['under10kTruckCitations', 'Under 10K Truck Citations'],
   ['owiDefendants', 'OWI Defendants'],
-  ['totalCriminalArrests', 'Criminal Arrests'],
-  ['totalFelonyArrests', 'Felony Arrests'],
+  ['pbt', 'PBT'],
+  ['certifiedBreathTests', 'Certified Breath Tests'],
+  ['refusals', 'Refusals'],
+  ['owiMisdemeanors', 'OWI Misdemeanors'],
+  ['owiFelonies', 'OWI Felonies'],
+  ['owiControlledSubstances', 'OWI Controlled Substances'],
+  ['underAgeOwi', 'Under Age OWI'],
+  ['dreTests', 'DRE Tests'],
+  ['sfstTests', 'SFST Tests'],
+  ['openContainers', 'Open Containers'],
+  ['otherOwiViolations', 'Other OWI Violations'],
+  ['movingCitations', 'Moving Citations'],
+  ['nonMovingCitations', 'Non Moving Citations'],
+  ['warnings', 'Warnings'],
+  ['trucksInspected', 'Trucks Inspected'],
+  ['outOfServices', 'Out of Services'],
+  ['mcsapViolations', 'MCSAP Violations'],
+  ['trucksMeasured', 'Trucks Measured'],
+  ['inspectionOutOfServices', 'Inspection Out of Services'],
+  ['owGrossCitations', 'OW Gross Citations'],
+  ['owAxleCitations', 'OW Axle Citations'],
+  ['owBridgeCitations', 'OW Bridge Citations'],
+  ['portWeighed', 'Port Weighed'],
+  ['owLoadAdjustments', 'OW Load Adjustments'],
+  ['owVehicleOffLoaded', 'OW Vehicle Off Loaded'],
+  ['criminalDefendants', 'Criminal Defendants'],
+  ['totalCriminalArrests', 'Total Criminal Arrests'],
+  ['totalFelonyArrests', 'Total Felony Arrests'],
+  ['criminalActivityReports', 'Criminal Activity Reports'],
+  ['stolenVehiclesRecovered', 'Stolen Vehicles Recovered'],
   ['gunsSeized', 'Guns Seized'],
-  ['totalDrugArrests', 'Drug Arrests'],
-  ['totalDrugDefendants', 'Drug Defendants'],
+  ['amountUscSeized', 'Amount of USC Seized'],
+  ['htiInteractions', 'HTI Interactions'],
+  ['htiArrests', 'HTI Arrests'],
+  ['htiRescues', 'HTI Rescues'],
+  ['heroinArrests', 'Heroin Arrests'],
+  ['heroinGramsFound', 'Heroin Found (grams)'],
+  ['heroinDefendants', 'Heroin Defendants'],
+  ['cocaineArrests', 'Cocaine Arrests'],
+  ['cocaineGramsFound', 'Cocaine Found (grams)'],
+  ['cocaineDefendants', 'Cocaine Defendants'],
+  ['marijuanaArrests', 'Marijuana Arrests'],
+  ['marijuanaGramsFound', 'Marijuana Found (grams)'],
+  ['marijuanaDefendants', 'Marijuana Defendants'],
+  ['totalPlantsSeized', 'Total Plants Seized'],
+  ['totalWeightSeizedGrams', 'Total Weight Seized (grams)'],
+  ['methamphetamineArrests', 'Methamphetamine Arrests'],
+  ['methamphetamineGramsFound', 'Methamphetamine Found (grams)'],
+  ['methamphetamineDefendants', 'Methamphetamine Defendants'],
+  ['prescriptionArrests', 'Prescription Arrests'],
+  ['prescriptionDefendants', 'Prescription Defendants'],
+  ['otherDrugArrests', 'Other Drug Arrests'],
+  ['otherDrugDefendants', 'Other Drug Defendants'],
+  ['totalDrugArrests', 'Total Drug Arrests'],
+  ['totalDrugDefendants', 'Total Drug Defendants'],
 ] as const;
+const trooperDailyAnalyticsSections = [
+  { title: 'Attendance Hours', keys: ['regularDutyHours', 'regularDaysOff', 'compHoursUsed', 'personalLeaveHours', 'vacationHours', 'holidayHours', 'compOtHoursEarned', 'injuryIllnessHours'] },
+  { title: 'Duty Hours', keys: ['patrolHours', 'crashInvestHours', 'trafficCourtHours', 'incidentReportHours', 'criminalInvestHours', 'criminalCourtHours', 'mealBreakHours'] },
+  { title: 'Traffic Activity', keys: ['regularDutyMiles', 'policeServices', 'suspensions', 'crashesInvestigated', 'crashCitations', 'seatBeltCitations', 'childRestraintCitations', 'under10kTruckCitations'] },
+  { title: 'OWI Offense Activity', keys: ['owiDefendants', 'pbt', 'certifiedBreathTests', 'refusals', 'owiMisdemeanors', 'owiFelonies', 'owiControlledSubstances', 'underAgeOwi', 'dreTests', 'sfstTests', 'openContainers', 'otherOwiViolations'] },
+  { title: '10K Truck Activity', keys: ['movingCitations', 'nonMovingCitations', 'warnings', 'trucksInspected', 'outOfServices', 'mcsapViolations'] },
+  { title: 'Level 1-3 Inspections', keys: ['trucksMeasured', 'inspectionOutOfServices', 'owGrossCitations', 'owAxleCitations', 'owBridgeCitations', 'portWeighed', 'owLoadAdjustments', 'owVehicleOffLoaded'] },
+  { title: 'Criminal Activity', keys: ['criminalDefendants', 'totalCriminalArrests', 'totalFelonyArrests', 'criminalActivityReports', 'stolenVehiclesRecovered', 'gunsSeized', 'amountUscSeized', 'htiInteractions', 'htiArrests', 'htiRescues'] },
+  { title: 'Drug Activity', keys: ['heroinArrests', 'heroinGramsFound', 'heroinDefendants', 'cocaineArrests', 'cocaineGramsFound', 'cocaineDefendants', 'marijuanaArrests', 'marijuanaGramsFound', 'marijuanaDefendants', 'totalPlantsSeized', 'totalWeightSeizedGrams', 'methamphetamineArrests', 'methamphetamineGramsFound', 'methamphetamineDefendants', 'prescriptionArrests', 'prescriptionDefendants', 'otherDrugArrests', 'otherDrugDefendants', 'totalDrugArrests', 'totalDrugDefendants'] },
+] as const;
+const trooperDailyAnalyticsFieldSections = new Map<string, string>(
+  trooperDailyAnalyticsSections.flatMap((section) => section.keys.map((key) => [key, section.title] as const)),
+);
 const privilegedPermissions = new Set([
   'roles:manage',
   'audit:view',
@@ -542,6 +620,19 @@ export class ReportController {
         scope.params,
       );
       const activityTotals = activityRows[0] || {};
+      const [fieldTrendRows] = await conn.query<TrooperDailyAnalyticsMonthlyRow[]>(
+        `SELECT *
+        FROM (
+          SELECT DATE_FORMAT(ce.\`entryDate\`, '%Y-%m') AS label,
+            ${activitySelect}
+          ${scope.fromClause}
+          GROUP BY label
+          ORDER BY label DESC
+          LIMIT 18
+        ) monthlyFieldTrend
+        ORDER BY label ASC`,
+        scope.params,
+      );
 
       res.json({
         generatedAt: new Date().toISOString(),
@@ -557,9 +648,30 @@ export class ReportController {
         byReviewStatus: reviewRows.map((row) => ({ label: row.label || 'Pending', count: Number(row.count) || 0, hours: Number(row.hours) || 0 })),
         trend: trendRows.map((row) => ({ label: row.label, count: Number(row.count) || 0, hours: Number(row.hours) || 0 })),
         activityTotals: trooperDailyAnalyticsFields
-          .map(([key, label]) => ({ key, label, value: Number(activityTotals[key]) || 0 }))
+          .map(([key, label]) => ({ key, label, section: trooperDailyAnalyticsFieldSections.get(key) || 'Other', value: Number(activityTotals[key]) || 0 }))
           .filter((item) => item.value > 0)
           .sort((a, b) => b.value - a.value),
+        activitySections: trooperDailyAnalyticsSections.map((section) => ({
+          title: section.title,
+          totals: section.keys
+            .map((key) => {
+              const field = trooperDailyAnalyticsFields.find(([fieldKey]) => fieldKey === key);
+              return {
+                key,
+                label: field?.[1] || key,
+                value: Number(activityTotals[key]) || 0,
+              };
+            })
+            .filter((item) => item.value > 0)
+            .sort((a, b) => b.value - a.value),
+        })).filter((section) => section.totals.length > 0),
+        fieldTrends: trooperDailyAnalyticsFields.map(([key, label]) => ({
+          key,
+          label,
+          section: trooperDailyAnalyticsFieldSections.get(key) || 'Other',
+          total: Number(activityTotals[key]) || 0,
+          points: fieldTrendRows.map((row) => ({ label: row.label, value: Number(row[key]) || 0 })),
+        })),
       });
     } catch (error) {
       console.error('Trooper daily analytics error:', error);

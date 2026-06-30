@@ -732,7 +732,26 @@ export interface TrooperDailyAnalyticsGroup {
 export interface TrooperDailyAnalyticsActivity {
   key: string;
   label: string;
+  section?: string;
   value: number;
+}
+
+export interface TrooperDailyAnalyticsPoint {
+  label: string;
+  value: number;
+}
+
+export interface TrooperDailyAnalyticsFieldTrend {
+  key: string;
+  label: string;
+  section: string;
+  total: number;
+  points: TrooperDailyAnalyticsPoint[];
+}
+
+export interface TrooperDailyAnalyticsSection {
+  title: string;
+  totals: TrooperDailyAnalyticsActivity[];
 }
 
 export interface TrooperDailyAnalyticsResponse {
@@ -749,6 +768,8 @@ export interface TrooperDailyAnalyticsResponse {
   byReviewStatus: TrooperDailyAnalyticsGroup[];
   trend: TrooperDailyAnalyticsGroup[];
   activityTotals: TrooperDailyAnalyticsActivity[];
+  activitySections: TrooperDailyAnalyticsSection[];
+  fieldTrends: TrooperDailyAnalyticsFieldTrend[];
 }
 
 export interface AuditLog {

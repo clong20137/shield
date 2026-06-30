@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Activity, BarChart3, CheckCircle2, ChevronLeft, ChevronRight, Clock, Download, FileText, RotateCcw, Search, Table, Users, X } from 'lucide-react';
-import { AuthAccount, reportService, TrooperDailyAnalyticsGroup, TrooperDailyReportEntry, TrooperDailyAnalyticsResponse } from '../services/api';
+import { AuthAccount, reportService, TrooperDailyAnalyticsFieldTrend, TrooperDailyReportEntry, TrooperDailyAnalyticsResponse } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import PerformanceEvaluationsPage from './PerformanceEvaluationsPage';
 import { downloadTrooperDailiesCsv, downloadTrooperDailiesPdf, downloadTrooperDailiesXls } from '../utils/trooperDailyExport';
@@ -117,14 +117,18 @@ const trooperDailySections = [
     title: 'Drug Activity',
     fields: [
       ['heroinArrests', 'Heroin Arrests'],
+      ['heroinGramsFound', 'Heroin Found (grams)'],
       ['heroinDefendants', 'Heroin Defendants'],
       ['cocaineArrests', 'Cocaine Arrests'],
+      ['cocaineGramsFound', 'Cocaine Found (grams)'],
       ['cocaineDefendants', 'Cocaine Defendants'],
       ['marijuanaArrests', 'Marijuana Arrests'],
+      ['marijuanaGramsFound', 'Marijuana Found (grams)'],
       ['marijuanaDefendants', 'Marijuana Defendants'],
       ['totalPlantsSeized', 'Total Plants Seized'],
       ['totalWeightSeizedGrams', 'Total Weight Seized(in Grams)'],
       ['methamphetamineArrests', 'Methamphetamine Arrests'],
+      ['methamphetamineGramsFound', 'Methamphetamine Found (grams)'],
       ['methamphetamineDefendants', 'Methamphetamine Defendants'],
       ['prescriptionArrests', 'Prescription Arrests'],
       ['prescriptionDefendants', 'Prescription Defendants'],
@@ -164,39 +168,85 @@ function formatAnalyticsLabel(label: string): string {
   return label;
 }
 
-const AnalyticsBarList: React.FC<{
-  items: Array<TrooperDailyAnalyticsGroup | { label: string; value: number }>;
-  valueKey?: 'count' | 'hours' | 'value';
+const AnalyticsLineChart: React.FC<{
+  points: Array<{ label: string; value: number }>;
+  color?: string;
+  height?: number;
   valueLabel?: string;
-  emptyText: string;
-}> = ({ items, valueKey = 'count', valueLabel = '', emptyText }) => {
-  const maxValue = Math.max(1, ...items.map((item) => Number(item[valueKey as keyof typeof item]) || 0));
+}> = ({ points, color = 'rgb(157 134 92)', height = 172, valueLabel = '' }) => {
+  const width = 640;
+  const padding = { top: 14, right: 18, bottom: 32, left: 42 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+  const values = points.map((point) => Number(point.value) || 0);
+  const maxValue = Math.max(1, ...values);
+  const minValue = Math.min(0, ...values);
+  const range = Math.max(1, maxValue - minValue);
+  const coordinates = points.map((point, index) => {
+    const x = padding.left + (points.length <= 1 ? chartWidth : (index / (points.length - 1)) * chartWidth);
+    const y = padding.top + chartHeight - (((Number(point.value) || 0) - minValue) / range) * chartHeight;
+    return { ...point, x, y };
+  });
+  const path = coordinates.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
+  const fillPath = coordinates.length > 0
+    ? `${path} L ${coordinates[coordinates.length - 1].x.toFixed(2)} ${padding.top + chartHeight} L ${coordinates[0].x.toFixed(2)} ${padding.top + chartHeight} Z`
+    : '';
+  const ticks = [maxValue, (maxValue + minValue) / 2, minValue];
+  const labelIndexes = coordinates.length <= 6
+    ? coordinates.map((_, index) => index)
+    : [0, Math.floor((coordinates.length - 1) / 2), coordinates.length - 1];
 
-  if (items.length === 0) {
-    return <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">{emptyText}</p>;
+  if (points.length === 0) {
+    return <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No chart data yet.</p>;
   }
 
   return (
-    <div className="space-y-3">
-      {items.slice(0, 8).map((item) => {
-        const value = Number(item[valueKey as keyof typeof item]) || 0;
+    <svg viewBox={`0 0 ${width} ${height}`} role="img" className="h-full min-h-[150px] w-full overflow-visible">
+      {ticks.map((tick) => {
+        const y = padding.top + chartHeight - ((tick - minValue) / range) * chartHeight;
         return (
-          <div key={item.label}>
-            <div className="mb-1 flex items-center justify-between gap-3 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              <span className="truncate">{formatAnalyticsLabel(item.label)}</span>
-              <span className="shrink-0 text-gray-800 dark:text-gray-100">
-                {formatMetric(value, valueKey === 'hours' ? 1 : 0)}{valueLabel}
-              </span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
-              <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${Math.max(5, (value / maxValue) * 100)}%` }} />
-            </div>
-          </div>
+          <g key={tick}>
+            <line x1={padding.left} x2={padding.left + chartWidth} y1={y} y2={y} stroke="currentColor" strokeOpacity="0.12" />
+            <text x={padding.left - 8} y={y + 4} textAnchor="end" className="fill-gray-500 text-[11px] dark:fill-gray-400">
+              {formatMetric(tick, tick % 1 === 0 ? 0 : 1)}
+            </text>
+          </g>
         );
       })}
-    </div>
+      {fillPath && <path d={fillPath} fill={color} opacity="0.12" />}
+      <path d={path} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      {coordinates.map((point) => (
+        <g key={`${point.label}-${point.x}`}>
+          <circle cx={point.x} cy={point.y} r="4" fill={color} stroke="white" strokeWidth="2" />
+          <title>{`${formatAnalyticsLabel(point.label)}: ${formatMetric(Number(point.value) || 0, 1)}${valueLabel}`}</title>
+        </g>
+      ))}
+      {labelIndexes.map((index) => {
+        const point = coordinates[index];
+        return (
+          <text key={`${point.label}-label`} x={point.x} y={height - 9} textAnchor={index === 0 ? 'start' : index === coordinates.length - 1 ? 'end' : 'middle'} className="fill-gray-500 text-[11px] dark:fill-gray-400">
+            {formatAnalyticsLabel(point.label)}
+          </text>
+        );
+      })}
+    </svg>
   );
 };
+
+const MetricTrendCard: React.FC<{ trend: TrooperDailyAnalyticsFieldTrend }> = ({ trend }) => (
+  <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+    <div className="mb-2 flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-black text-gray-900 dark:text-gray-100">{trend.label}</p>
+        <p className="mt-0.5 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{trend.section}</p>
+      </div>
+      <span className="shrink-0 rounded-full bg-accent/10 px-2 py-1 text-xs font-black text-accent">{formatMetric(trend.total, 1)}</span>
+    </div>
+    <div className="h-36">
+      <AnalyticsLineChart points={trend.points} height={142} />
+    </div>
+  </div>
+);
 
 const ReportsPage: React.FC<{
   currentUser: AuthAccount | null;
@@ -218,6 +268,7 @@ const ReportsPage: React.FC<{
   const [dailyAnalytics, setDailyAnalytics] = useState<TrooperDailyAnalyticsResponse | null>(null);
   const [dailyAnalyticsLoading, setDailyAnalyticsLoading] = useState(true);
   const [dailyAnalyticsError, setDailyAnalyticsError] = useState<string | null>(null);
+  const [selectedAnalyticsMetric, setSelectedAnalyticsMetric] = useState('marijuanaGramsFound');
   const [dailyExportFormat, setDailyExportFormat] = useState<DailyExportFormat>('csv');
   const [isSelectedDailyExportMenuOpen, setIsSelectedDailyExportMenuOpen] = useState(false);
   const [rowDailyExportFormats, setRowDailyExportFormats] = useState<Record<string, DailyExportFormat>>({});
@@ -512,6 +563,15 @@ const ReportsPage: React.FC<{
   const selectedDailyUserName = selectedDaily
     ? `${selectedDaily.user.firstName || ''} ${selectedDaily.user.lastName || ''}`.trim() || selectedDaily.user.email || 'Unknown'
     : '';
+  const visibleFieldTrends = dailyAnalytics?.fieldTrends.filter((trend) => trend.total > 0) || [];
+  const selectedTrend = dailyAnalytics?.fieldTrends.find((trend) => trend.key === selectedAnalyticsMetric)
+    || visibleFieldTrends[0]
+    || dailyAnalytics?.fieldTrends[0]
+    || null;
+  const trendsBySection = visibleFieldTrends.reduce<Record<string, TrooperDailyAnalyticsFieldTrend[]>>((groups, trend) => {
+    groups[trend.section] = [...(groups[trend.section] || []), trend];
+    return groups;
+  }, {});
 
   return (
     <div>
@@ -627,27 +687,85 @@ const ReportsPage: React.FC<{
                 })}
               </div>
 
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <div className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
                 <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                   <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Monthly Report Trend</h4>
-                  <AnalyticsBarList items={dailyAnalytics.trend} valueKey="count" emptyText="No monthly trend data yet." />
+                  <div className="h-56">
+                    <AnalyticsLineChart points={dailyAnalytics.trend.map((point) => ({ label: point.label, value: point.count }))} />
+                  </div>
                 </div>
                 <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                  <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Hours by District</h4>
-                  <AnalyticsBarList items={dailyAnalytics.byDistrict} valueKey="hours" valueLabel=" hrs" emptyText="No district hour data yet." />
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Focused Metric Trend</h4>
+                      <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Pick any Trooper Daily field for a live line graph.</p>
+                    </div>
+                    <select
+                      value={selectedTrend?.key || selectedAnalyticsMetric}
+                      onChange={(event) => setSelectedAnalyticsMetric(event.target.value)}
+                      className="max-w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
+                    >
+                      {dailyAnalytics.fieldTrends.map((trend) => (
+                        <option key={trend.key} value={trend.key}>{trend.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {selectedTrend ? (
+                    <>
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{selectedTrend.label}</p>
+                        <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-black text-accent">Total {formatMetric(selectedTrend.total, 1)}</span>
+                      </div>
+                      <div className="h-48">
+                        <AnalyticsLineChart points={selectedTrend.points} />
+                      </div>
+                    </>
+                  ) : (
+                    <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No metric trend data yet.</p>
+                  )}
                 </div>
-                <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                  <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Review Status</h4>
-                  <AnalyticsBarList items={dailyAnalytics.byReviewStatus} valueKey="count" emptyText="No review status data yet." />
+              </div>
+
+              <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">All Trooper Daily Data Totals</h4>
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+                  {dailyAnalytics.activitySections.map((section) => (
+                    <section key={section.title} className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                      <h5 className="mb-3 text-xs font-black uppercase tracking-wide text-gray-600 dark:text-gray-300">{section.title}</h5>
+                      <div className="space-y-2">
+                        {section.totals.slice(0, 10).map((item) => (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => setSelectedAnalyticsMetric(item.key)}
+                            className="flex w-full items-center justify-between gap-3 rounded border border-transparent px-2 py-1.5 text-left text-sm font-semibold text-gray-700 transition hover:border-accent/30 hover:bg-white dark:text-gray-200 dark:hover:bg-gray-900"
+                          >
+                            <span className="truncate">{item.label}</span>
+                            <span className="shrink-0 font-black text-gray-950 dark:text-white">{formatMetric(item.value, 1)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
                 </div>
-                <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                  <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Duty Status</h4>
-                  <AnalyticsBarList items={dailyAnalytics.bySpecialStatus} valueKey="count" emptyText="No duty status data yet." />
-                </div>
-                <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                  <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Top Activity Totals</h4>
-                  <AnalyticsBarList items={dailyAnalytics.activityTotals.map((item) => ({ label: item.label, value: item.value }))} valueKey="value" emptyText="No activity totals yet." />
-                </div>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Metric Line Graphs</h4>
+                {visibleFieldTrends.length === 0 ? (
+                  <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No Trooper Daily field data yet.</p>
+                ) : (
+                  <div className="space-y-5">
+                    {Object.entries(trendsBySection).map(([section, trends]) => (
+                      <section key={section}>
+                        <h5 className="mb-3 text-xs font-black uppercase tracking-wide text-gray-500 dark:text-gray-400">{section}</h5>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+                          {trends.map((trend) => <MetricTrendCard key={trend.key} trend={trend} />)}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           ) : (
