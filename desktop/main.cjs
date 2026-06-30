@@ -626,6 +626,22 @@ function getDefaultUpdateUrl(appUrl) {
   }
 }
 
+function writeRuntimeUpdateConfig(updateUrl) {
+  const updateConfigPath = path.join(app.getPath('userData'), 'app-update.yml');
+  fs.mkdirSync(path.dirname(updateConfigPath), { recursive: true });
+  fs.writeFileSync(
+    updateConfigPath,
+    [
+      'provider: generic',
+      `url: ${updateUrl}`,
+      'updaterCacheDirName: shield-desktop-updater',
+      ''
+    ].join('\n'),
+    'utf8'
+  );
+  return updateConfigPath;
+}
+
 function createShieldTrayIcon(count = desktopUnreadCount, status = desktopPresenceStatus) {
   const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0;
   const presenceColor = colorToRgba(getPresenceDotColor(status || 'active'));
@@ -1331,6 +1347,13 @@ function configureAutoUpdates(config) {
   }
 
   appendDesktopLog('desktop-updates-enabled', { updateUrl: config.updateUrl });
+  try {
+    autoUpdater.updateConfigPath = writeRuntimeUpdateConfig(config.updateUrl);
+    appendDesktopLog('desktop-update-config-ready', { path: autoUpdater.updateConfigPath });
+  } catch (error) {
+    appendDesktopLog('desktop-update-config-write-failed', { message: error.message });
+  }
+
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.setFeedURL({
