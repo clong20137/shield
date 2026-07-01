@@ -186,7 +186,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                     />
                     <span className="min-w-0">
                       <span className="block truncate font-semibold">{user.lastName}</span>
-                      {user.isMemorial && (
+                      {Boolean(user.isMemorial) && (
                         <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-yellow-700 dark:text-yellow-300">
                           <Flag size={11} />
                           Memorial

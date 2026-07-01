@@ -320,7 +320,7 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
                 <button
                   type="button"
                   onClick={openAddMemorial}
-                  className="inline-flex items-center justify-center gap-2 rounded border border-yellow-200/40 bg-yellow-300/15 px-3 py-2 text-sm font-black text-yellow-100 transition hover:bg-yellow-300/25"
+                  className="btn-primary"
                 >
                   <Plus size={16} />
                   Add Trooper
@@ -330,13 +330,14 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
           </div>
         </div>
         <div className="border-t border-gray-200 p-4 dark:border-gray-800 sm:p-5">
-          <label className="relative block">
-            <Search size={18} className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <label className="relative block min-w-0">
+            <Search size={18} className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-gray-400" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search memorial profiles"
-              className="h-14 w-full rounded border border-gray-300 bg-white py-3 pl-16 pr-4 text-sm font-semibold text-gray-900 outline-none transition placeholder:text-gray-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-400"
+              className="h-11 w-full rounded border border-gray-300 bg-white py-2 pr-3 text-sm font-semibold text-gray-900 outline-none transition placeholder:text-gray-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-400"
+              style={{ paddingLeft: '3rem' }}
             />
           </label>
         </div>

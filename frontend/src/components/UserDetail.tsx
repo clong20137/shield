@@ -221,7 +221,8 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   const [presenceTick, setPresenceTick] = useState(0);
   const [realtimePresence, setRealtimePresence] = useState<PresenceState | null>(null);
   const [isPhotoPreviewOpen, setIsPhotoPreviewOpen] = useState(false);
-  const isMemorialProfile = user.isMemorial === true;
+  const isMemorialProfile = Boolean(user.isMemorial);
+  const isHiddenProfile = Boolean(user.isHidden);
   const isDeviceLoadInFlightRef = useRef(false);
   const deviceRefreshTimerRef = useRef<number | null>(null);
   const deviceLoadRequestIdRef = useRef(0);
@@ -291,8 +292,8 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
 
   useEffect(() => {
     setIsPhotoPreviewOpen(false);
-    setActiveTab(user.isMemorial ? 'memorial' : 'personal');
-  }, [user.id, user.profilePictureUrl, user.isMemorial]);
+    setActiveTab(isMemorialProfile ? 'memorial' : 'personal');
+  }, [user.id, user.profilePictureUrl, isMemorialProfile]);
 
   useEffect(() => {
     if (!isPhotoPreviewOpen) {
@@ -574,7 +575,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
                   End of Watch
                 </span>
               )}
-              {user.isHidden && (
+              {isHiddenProfile && (
                 <span className="rounded-full border border-amber-200/40 bg-amber-300/15 px-2 py-1 text-xs font-bold uppercase tracking-wide text-amber-100">
                   Hidden
                 </span>
@@ -765,7 +766,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
           <DetailRow label="Assigned To" value={user.assignedTo} />
           <DetailRow label="Supervisor" value={user.supervisor} />
           <DetailRow label="Active" value={user.isActive} />
-          {user.isHidden && <DetailRow label="Hidden" value={user.isHidden} />}
+          {isHiddenProfile && <DetailRow label="Hidden" value={isHiddenProfile} />}
           <DetailRow label="Type Details" value={user.typeDetails} />
         </DetailSection>}
 
