@@ -38,12 +38,14 @@ SESSION_COOKIE_SAMESITE=lax
 TRUST_PROXY=true
 
 # Email / password reset
-SMTP_HOST=smtp.your-provider.com
+SMTP_HOST=smtp.office365.com
 SMTP_PORT=587
-SMTP_USER=your_smtp_user
-SMTP_PASSWORD=your_smtp_password
-SMTP_FROM=shield@yourdomain.com
+SMTP_USER=passwordresetshield@outlook.com
+SMTP_PASSWORD=your_outlook_password_or_app_password
+SMTP_FROM=passwordresetshield@outlook.com
 SMTP_SECURE=false
+SMTP_STARTTLS=true
+SMTP_HELO=shield.local
 SETUP_ENV_LOCKED=true
 ```
 

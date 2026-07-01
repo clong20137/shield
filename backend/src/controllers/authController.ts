@@ -19,6 +19,7 @@ const DEFAULT_LOGIN_WARNING_MESSAGE = 'This is a Indiana State Police computer a
 const SESSION_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const temporaryPasswordAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 
+// Keep this list as the server-side source of truth for assignable permissions; UI role editors should not invent new flags.
 const allowedPermissions = [
   'users:view',
   'users:create',
@@ -116,6 +117,7 @@ async function canViewHiddenUsers(account?: { id: string; role: string } | null)
 }
 
 async function withPermissions<T extends { id: string; role: string }>(account: T): Promise<T & { permissions: string[] }> {
+  // Administrators receive the full permission surface even if the roles table has not caught up during an upgrade.
   const permissions = account.role === 'administrator'
     ? [...allowedPermissions]
     : await AuthAccountModel.getPermissionsForAccount(account.id);
@@ -264,6 +266,7 @@ async function canWriteSetupEnvironment(): Promise<boolean> {
   }
 
   try {
+    // A locked env can still be changed during first-run setup before any account exists.
     return await AuthAccountModel.countAccounts() === 0;
   } catch {
     return false;
@@ -347,6 +350,7 @@ function getMicrosoftSsoConfig(req?: Request) {
 
 function createSsoState(returnTo: string): string {
   const secret = process.env.SSO_STATE_SECRET || process.env.JWT_SECRET || process.env.MICROSOFT_CLIENT_SECRET || 'shield-sso-state';
+  // State carries only the local return path; the HMAC prevents tampering with the post-login destination.
   const payload = Buffer.from(JSON.stringify({
     nonce: Math.random().toString(36).slice(2),
     returnTo,
@@ -403,6 +407,7 @@ function shouldUseSecureSessionCookie(req: Request): boolean {
     return configuredSecureCookie === 'true';
   }
 
+  // Default to secure cookies in production while still allowing local HTTP setup and testing.
   return process.env.NODE_ENV === 'production' || req.secure;
 }
 

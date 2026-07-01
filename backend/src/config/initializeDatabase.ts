@@ -1,5 +1,6 @@
 import pool from './database';
 
+// Startup migrations are intentionally idempotent so deployed installs can upgrade in place without a separate migration runner.
 async function ensureColumn(table: string, column: string, definition: string) {
   const [rows] = await pool.query(
     `
@@ -70,6 +71,7 @@ async function tableExists(table: string): Promise<boolean> {
 }
 
 export async function initializeDatabase() {
+  // The users table now owns both personnel profile data and login account fields; older auth_accounts data is folded in below.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       \`id\` VARCHAR(36) PRIMARY KEY,
@@ -251,6 +253,7 @@ export async function initializeDatabase() {
   `);
 
   if (await tableExists('auth_accounts')) {
+    // Legacy installs created credentials in auth_accounts. Merge them into users once, then drop the old table.
     await ensureColumn('auth_accounts', 'twoFactorSecret', '`twoFactorSecret` VARCHAR(64)');
     await ensureColumn('auth_accounts', 'twoFactorEnabled', '`twoFactorEnabled` BOOLEAN DEFAULT 0');
     await ensureColumn('auth_accounts', 'twoFactorRecoveryCodes', '`twoFactorRecoveryCodes` TEXT');
@@ -331,6 +334,7 @@ export async function initializeDatabase() {
     )
   `);
 
+  // Seed roles are kept current on startup so new permission flags become available after an update.
   await pool.query(`
     INSERT IGNORE INTO roles (\`id\`, \`name\`, \`permissions\`)
     VALUES

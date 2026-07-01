@@ -52,6 +52,7 @@ const LOGIN_TRANSITION_MS = 560;
 const DESKTOP_UNREAD_FALLBACK_POLL_MS = 12 * 1000;
 type AppTheme = 'light' | 'dark';
 
+// Vite may serve the app from a nested IIS/application path; keep all asset and router paths rooted to that deployed base.
 function withAppBase(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${APP_BASE_PATH}${normalizedPath}` || '/';
@@ -174,6 +175,7 @@ function showDesktopNotification(title: string, options?: { body?: string; tag?:
 }
 
 function showSystemNotification(title: string, options?: NotificationOptions & { appPath?: string }) {
+  // Prefer Electron notifications when the desktop shell is present so clicks can route back into the app.
   if (showDesktopNotification(title, {
     body: options?.body,
     tag: options?.tag,
@@ -4293,6 +4295,7 @@ function App() {
   }, []);
 
   useEffect(() => {
+    // Theme classes live on <html> so Tailwind dark variants and app-wide polished surfaces update together.
     document.documentElement.classList.toggle('dark', theme === 'dark');
     document.documentElement.classList.toggle('glass', isGlassTheme);
     window.localStorage.setItem(THEME_KEY, theme);
@@ -4300,6 +4303,7 @@ function App() {
   }, [isGlassTheme, theme]);
 
   useEffect(() => {
+    // Seasonal themes are mutually exclusive root classes; remove all known classes before applying the active one.
     document.documentElement.classList.remove(...SEASONAL_THEME_CLASSES);
     if (activeSeasonalTheme !== 'default') {
       document.documentElement.classList.add(`seasonal-theme-${activeSeasonalTheme}`);
@@ -4409,6 +4413,7 @@ function App() {
       })
       .catch((error) => {
         if (isNetworkConnectionError(error)) {
+          // Keep the shell usable during short outages by restoring the last known account until health checks recover.
           try {
             const cachedSession = window.localStorage.getItem(SESSION_KEY);
             if (cachedSession) {
@@ -4925,6 +4930,7 @@ function App() {
 
   const isAdministrator = currentUser?.role === 'administrator';
   function hasPermission(permission: string) {
+    // Administrators are treated as having the full permission surface even if their stored role payload is stale.
     return Boolean(isAdministrator || currentUser?.permissions?.includes(permission));
   }
 
@@ -5000,6 +5006,7 @@ function App() {
 
     const submitPendingCrashReports = async () => {
       try {
+        // Desktop crash reports are persisted by Electron before React loads; submit once per id after login.
         const payload = await window.shieldDesktop?.getCrashReports?.();
         const reports = payload?.reports || [];
         if (reports.length === 0 || isCancelled) {
@@ -5117,6 +5124,7 @@ function App() {
       handleRealtimeAppUpdate('settings-updated')(event);
     };
     const permissionUpdatedHandler = (event: Event) => {
+      // Permission changes can alter route access, session timeout, and visible controls without a full reload.
       void syncSessionTimeoutFromSettings();
       void syncCurrentAccount();
       handleRealtimeAppUpdate('permission-updated')(event);

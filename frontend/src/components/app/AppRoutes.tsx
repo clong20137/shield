@@ -67,6 +67,7 @@ function RouteTransition({ children }: { children: React.ReactNode }) {
   const isAdminWorkspaceRoute = /^\/(admin|audit|permissions|users\/create)(\/|$)/u.test(location.pathname);
 
   return (
+    // Keep admin subroutes under one transition key so tab-like admin navigation does not replay full page animations.
     <div key={isAdminWorkspaceRoute ? 'admin-workspace' : location.pathname} className={isAdminWorkspaceRoute ? undefined : 'page-route-enter'}>
       {children}
     </div>
@@ -136,6 +137,7 @@ export function AppRoutes({
             <Route path="/admin/:tab" element={<AdminConsolePage {...adminConsoleProps} />} />
           )}
           {currentUser && canOpenAdminConsole && hasPermission('admin:create-user') && hasPermission('users:create') && (
+            // Top-level admin shortcuts still require both workspace access and the specific action permission.
             <Route
               path="/users/create"
               element={<AdminConsolePage {...adminConsoleProps} initialTab="create-user" />}
