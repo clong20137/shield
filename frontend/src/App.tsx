@@ -3670,7 +3670,7 @@ function App() {
 
     return window.shieldDesktop?.onWebAppUpdateStatus?.((status) => {
       if (status.type === 'reloading') {
-        showToast('info', `${appName} web updates were found. Refreshing desktop view...`, { saveToNotifications: false });
+        showToast('info', `${appName} is updating. The app will refresh in a moment.`, { saveToNotifications: false });
       }
     });
   }, []);
