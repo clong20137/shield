@@ -1333,7 +1333,7 @@ export const reportService = {
     api.get('/reports/detailed', { params: filters }),
 
   getTrooperDailies: (filters?: { q?: string; from?: string; to?: string; district?: string; page?: number; pageSize?: number }) =>
-    api.get<{ count: number; total: number; page: number; pageSize: number; totalPages: number; scope: 'all' | 'own' | 'supervised'; data: TrooperDailyReportEntry[] }>('/reports/trooper-dailies', { params: filters }),
+    api.get<{ count: number; total: number; page: number; pageSize: number; totalPages: number; scope: 'all' | 'own'; data: TrooperDailyReportEntry[] }>('/reports/trooper-dailies', { params: filters }),
 
   getTrooperDailyAnalytics: (filters?: { q?: string; from?: string; to?: string; district?: string }) =>
     api.get<TrooperDailyAnalyticsResponse>('/reports/trooper-dailies/analytics', { params: filters }),

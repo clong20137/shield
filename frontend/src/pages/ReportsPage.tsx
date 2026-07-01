@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Activity, BarChart3, CheckCircle2, ChevronLeft, ChevronRight, Clock, Download, FileText, RotateCcw, Search, Table, Users, X } from 'lucide-react';
-import { AuthAccount, reportService, TrooperDailyAnalyticsFieldTrend, TrooperDailyReportEntry, TrooperDailyAnalyticsResponse } from '../services/api';
+import { AuthAccount, reportService, TrooperDailyReportEntry, TrooperDailyAnalyticsResponse } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import PerformanceEvaluationsPage from './PerformanceEvaluationsPage';
 import { downloadTrooperDailiesCsv, downloadTrooperDailiesPdf, downloadTrooperDailiesXls } from '../utils/trooperDailyExport';
@@ -141,6 +141,16 @@ const trooperDailySections = [
 ] as const;
 
 type DailyExportFormat = 'csv' | 'pdf' | 'xls';
+type DailyAnalyticsRange = '1d' | '7d' | '1m' | '3m' | '6m' | '1y' | 'custom';
+
+const dailyAnalyticsRanges: Array<{ value: DailyAnalyticsRange; label: string }> = [
+  { value: '1d', label: '1 Day' },
+  { value: '7d', label: '7 Days' },
+  { value: '1m', label: '1 Month' },
+  { value: '3m', label: '3 Months' },
+  { value: '6m', label: '6 Months' },
+  { value: '1y', label: '1 Year' },
+];
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (
@@ -166,6 +176,34 @@ function formatAnalyticsLabel(label: string): string {
   }
 
   return label;
+}
+
+function formatDateInput(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getRangeDates(range: DailyAnalyticsRange) {
+  const to = new Date();
+  const from = new Date(to);
+
+  if (range === '1d') {
+    from.setDate(to.getDate());
+  } else if (range === '7d') {
+    from.setDate(to.getDate() - 6);
+  } else if (range === '1m') {
+    from.setMonth(to.getMonth() - 1);
+  } else if (range === '3m') {
+    from.setMonth(to.getMonth() - 3);
+  } else if (range === '6m') {
+    from.setMonth(to.getMonth() - 6);
+  } else if (range === '1y') {
+    from.setFullYear(to.getFullYear() - 1);
+  }
+
+  return { from: formatDateInput(from), to: formatDateInput(to) };
 }
 
 const AnalyticsLineChart: React.FC<{
@@ -233,42 +271,29 @@ const AnalyticsLineChart: React.FC<{
   );
 };
 
-const MetricTrendCard: React.FC<{ trend: TrooperDailyAnalyticsFieldTrend }> = ({ trend }) => (
-  <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-    <div className="mb-2 flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-black text-gray-900 dark:text-gray-100">{trend.label}</p>
-        <p className="mt-0.5 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{trend.section}</p>
-      </div>
-      <span className="shrink-0 rounded-full bg-accent/10 px-2 py-1 text-xs font-black text-accent">{formatMetric(trend.total, 1)}</span>
-    </div>
-    <div className="h-36">
-      <AnalyticsLineChart points={trend.points} height={142} />
-    </div>
-  </div>
-);
-
 const ReportsPage: React.FC<{
   currentUser: AuthAccount | null;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
   getErrorMessage: (error: unknown, fallback: string) => string;
 }> = ({ currentUser, onToast, getErrorMessage: getAppErrorMessage }) => {
+  const initialAnalyticsDatesRef = useRef(getRangeDates('1m'));
   const [selectedReportType, setSelectedReportType] = useState<'trooper-daily' | 'cpar'>('trooper-daily');
   const [trooperDailies, setTrooperDailies] = useState<TrooperDailyReportEntry[]>([]);
   const [dailySearch, setDailySearch] = useState('');
-  const [dailyFrom, setDailyFrom] = useState('');
-  const [dailyTo, setDailyTo] = useState('');
+  const [dailyFrom, setDailyFrom] = useState(initialAnalyticsDatesRef.current.from);
+  const [dailyTo, setDailyTo] = useState(initialAnalyticsDatesRef.current.to);
   const [dailyDistrict, setDailyDistrict] = useState('');
   const [dailyPage, setDailyPage] = useState(1);
   const [dailyPageSize, setDailyPageSize] = useState(25);
   const [dailyTotal, setDailyTotal] = useState(0);
   const [dailyTotalPages, setDailyTotalPages] = useState(1);
-  const [dailyScope, setDailyScope] = useState<'all' | 'own' | 'supervised'>('own');
+  const [dailyScope, setDailyScope] = useState<'all' | 'own'>('own');
   const [dailyLoading, setDailyLoading] = useState(true);
   const [dailyAnalytics, setDailyAnalytics] = useState<TrooperDailyAnalyticsResponse | null>(null);
   const [dailyAnalyticsLoading, setDailyAnalyticsLoading] = useState(true);
   const [dailyAnalyticsError, setDailyAnalyticsError] = useState<string | null>(null);
   const [selectedAnalyticsMetric, setSelectedAnalyticsMetric] = useState('marijuanaGramsFound');
+  const [dailyAnalyticsRange, setDailyAnalyticsRange] = useState<DailyAnalyticsRange>('1m');
   const [dailyExportFormat, setDailyExportFormat] = useState<DailyExportFormat>('csv');
   const [isSelectedDailyExportMenuOpen, setIsSelectedDailyExportMenuOpen] = useState(false);
   const [rowDailyExportFormats, setRowDailyExportFormats] = useState<Record<string, DailyExportFormat>>({});
@@ -421,8 +446,24 @@ const ReportsPage: React.FC<{
     setDailyFrom('');
     setDailyTo('');
     setDailyDistrict('');
+    setDailyAnalyticsRange('custom');
     void loadTrooperDailies(true, { q: '', from: '', to: '', district: '', page: 1, pageSize: dailyPageSize });
     void loadTrooperDailyAnalytics(true, { q: '', from: '', to: '', district: '' });
+  };
+
+  const applyDailyAnalyticsRange = (range: DailyAnalyticsRange) => {
+    const dates = getRangeDates(range);
+    setDailyAnalyticsRange(range);
+    setDailyFrom(dates.from);
+    setDailyTo(dates.to);
+    const filters = {
+      q: dailySearch,
+      from: dates.from,
+      to: dates.to,
+      district: dailyDistrict,
+    };
+    void loadTrooperDailies(true, { ...filters, page: 1, pageSize: dailyPageSize });
+    void loadTrooperDailyAnalytics(true, filters);
   };
 
   const goToDailyPage = (page: number) => {
@@ -565,16 +606,11 @@ const ReportsPage: React.FC<{
     : '';
   const dailyFieldTrends = Array.isArray(dailyAnalytics?.fieldTrends) ? dailyAnalytics.fieldTrends : [];
   const dailyActivitySections = Array.isArray(dailyAnalytics?.activitySections) ? dailyAnalytics.activitySections : [];
-  const dailyReportTrend = Array.isArray(dailyAnalytics?.trend) ? dailyAnalytics.trend : [];
   const visibleFieldTrends = dailyFieldTrends.filter((trend) => trend.total > 0);
   const selectedTrend = dailyFieldTrends.find((trend) => trend.key === selectedAnalyticsMetric)
     || visibleFieldTrends[0]
     || dailyFieldTrends[0]
     || null;
-  const trendsBySection = visibleFieldTrends.reduce<Record<string, TrooperDailyAnalyticsFieldTrend[]>>((groups, trend) => {
-    groups[trend.section] = [...(groups[trend.section] || []), trend];
-    return groups;
-  }, {});
 
   return (
     <div>
@@ -602,9 +638,7 @@ const ReportsPage: React.FC<{
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {dailyScope === 'all'
                 ? 'Search submitted Trooper Dailies by user, email, PE number, badge, rank, or district.'
-                : dailyScope === 'supervised'
-                  ? 'Search your Trooper Dailies and reports for users assigned to you.'
-                  : `Search your submitted Trooper Dailies${currentUser?.displayName ? `, ${currentUser.displayName}` : ''}.`}
+                : `Search your submitted Trooper Dailies${currentUser?.displayName ? `, ${currentUser.displayName}` : ''}.`}
             </p>
           </div>
           <span className="rounded bg-accent/10 px-3 py-1 text-sm font-bold text-accent">
@@ -619,8 +653,24 @@ const ReportsPage: React.FC<{
             placeholder="Name, email, PE, badge, rank, district..."
             className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
           />
-          <input type="date" value={dailyFrom} onChange={(event) => setDailyFrom(event.target.value)} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
-          <input type="date" value={dailyTo} onChange={(event) => setDailyTo(event.target.value)} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
+          <input
+            type="date"
+            value={dailyFrom}
+            onChange={(event) => {
+              setDailyAnalyticsRange('custom');
+              setDailyFrom(event.target.value);
+            }}
+            className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+          />
+          <input
+            type="date"
+            value={dailyTo}
+            onChange={(event) => {
+              setDailyAnalyticsRange('custom');
+              setDailyTo(event.target.value);
+            }}
+            className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+          />
           <select value={dailyDistrict} onChange={(event) => setDailyDistrict(event.target.value)} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
             <option value="">All Districts</option>
             {districtOptions.map((district) => <option key={district}>{district}</option>)}
@@ -690,43 +740,56 @@ const ReportsPage: React.FC<{
                 })}
               </div>
 
-              <div className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                  <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Monthly Report Trend</h4>
-                  <div className="h-56">
-                    <AnalyticsLineChart points={dailyReportTrend.map((point) => ({ label: point.label, value: point.count }))} />
+              <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Trooper Daily Graph</h4>
+                    <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Select one report field and a date range.</p>
                   </div>
+                  <select
+                    value={selectedTrend?.key || selectedAnalyticsMetric}
+                    onChange={(event) => setSelectedAnalyticsMetric(event.target.value)}
+                    className="max-w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
+                  >
+                    {dailyFieldTrends.map((trend) => (
+                      <option key={trend.key} value={trend.key}>{trend.label}</option>
+                    ))}
+                  </select>
                 </div>
-                <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h4 className="text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Focused Metric Trend</h4>
-                      <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Pick any Trooper Daily field for a live line graph.</p>
-                    </div>
-                    <select
-                      value={selectedTrend?.key || selectedAnalyticsMetric}
-                      onChange={(event) => setSelectedAnalyticsMetric(event.target.value)}
-                      className="max-w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
+
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {dailyAnalyticsRanges.map((range) => (
+                    <button
+                      key={range.value}
+                      type="button"
+                      onClick={() => applyDailyAnalyticsRange(range.value)}
+                      className={`rounded border px-3 py-2 text-xs font-black uppercase tracking-wide transition ${
+                        dailyAnalyticsRange === range.value
+                          ? 'border-accent bg-accent text-white'
+                          : 'border-gray-300 bg-white text-gray-700 hover:border-accent/60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
+                      }`}
                     >
-                      {dailyFieldTrends.map((trend) => (
-                        <option key={trend.key} value={trend.key}>{trend.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  {selectedTrend ? (
-                    <>
-                      <div className="mb-2 flex items-center justify-between gap-3">
-                        <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{selectedTrend.label}</p>
-                        <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-black text-accent">Total {formatMetric(selectedTrend.total, 1)}</span>
-                      </div>
-                      <div className="h-48">
-                        <AnalyticsLineChart points={selectedTrend.points} />
-                      </div>
-                    </>
-                  ) : (
-                    <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No metric trend data yet.</p>
-                  )}
+                      {range.label}
+                    </button>
+                  ))}
                 </div>
+
+                {selectedTrend ? (
+                  <>
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-base font-black text-gray-900 dark:text-gray-100">{selectedTrend.label}</p>
+                        <p className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{selectedTrend.section}</p>
+                      </div>
+                      <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-black text-accent">Total {formatMetric(selectedTrend.total, 1)}</span>
+                    </div>
+                    <div className="h-72">
+                      <AnalyticsLineChart points={selectedTrend.points} height={260} />
+                    </div>
+                  </>
+                ) : (
+                  <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No graph data yet.</p>
+                )}
               </div>
 
               <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
@@ -751,24 +814,6 @@ const ReportsPage: React.FC<{
                     </section>
                   ))}
                 </div>
-              </div>
-
-              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Metric Line Graphs</h4>
-                {visibleFieldTrends.length === 0 ? (
-                  <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No Trooper Daily field data yet.</p>
-                ) : (
-                  <div className="space-y-5">
-                    {Object.entries(trendsBySection).map(([section, trends]) => (
-                      <section key={section}>
-                        <h5 className="mb-3 text-xs font-black uppercase tracking-wide text-gray-500 dark:text-gray-400">{section}</h5>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
-                          {trends.map((trend) => <MetricTrendCard key={trend.key} trend={trend} />)}
-                        </div>
-                      </section>
-                    ))}
-                  </div>
-                )}
               </div>
             </>
           ) : (
