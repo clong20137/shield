@@ -360,7 +360,7 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search memorial profiles"
-              className="w-full rounded border border-gray-300 bg-white py-3 pl-10 pr-3 text-sm font-semibold text-gray-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+              className="w-full rounded border border-gray-300 bg-white py-3 pl-12 pr-3 text-sm font-semibold text-gray-900 outline-none transition placeholder:text-gray-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-400"
             />
           </label>
         </div>
