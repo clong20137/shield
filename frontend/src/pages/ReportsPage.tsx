@@ -166,6 +166,10 @@ const trooperDailyTabs: Array<{ value: TrooperDailyTab; label: string }> = [
   { value: 'exports', label: 'Exports' },
 ];
 
+const trooperDailyFieldSections = new Map<string, string>(
+  trooperDailySections.flatMap((section) => section.fields.map(([key]) => [key, section.title] as const)),
+);
+
 function getErrorMessage(error: unknown, fallback: string): string {
   if (
     typeof error === 'object' &&
@@ -865,6 +869,19 @@ const ReportsPage: React.FC<{
       ...(dailyCompareMode !== 'none' && compareSelectedTrend ? [{ name: compareSeriesName, points: compareSelectedTrend.points, color: 'rgb(37 99 235)' }] : []),
     ]
     : [];
+  const groupedFieldTrends = dailyFieldTrends.reduce<Record<string, typeof dailyFieldTrends>>((groups, trend) => {
+    const section = trooperDailyFieldSections.get(trend.key) || trend.section || 'Other';
+    groups[section] = [...(groups[section] || []), trend];
+    return groups;
+  }, {});
+  const activeGraphChips = [
+    selectedTrend ? `Metric: ${selectedTrend.label}` : '',
+    `Range: ${dailyAnalyticsRanges.find((range) => range.value === dailyAnalyticsRange)?.label || 'Custom'}`,
+    analyticsSearch.trim() ? `Search: ${analyticsSearch.trim()}` : '',
+    analyticsDistrict ? `District: ${analyticsDistrict}` : 'Overall',
+    dailyCompareMode !== 'none' ? `Compare: ${compareSeriesName}` : '',
+    `Type: ${dailyGraphTypes.find((type) => type.value === dailyGraphType)?.label || 'Line'}`,
+  ].filter(Boolean);
 
   const exportAnalyticsChart = async () => {
     const svg = analyticsChartRef.current?.querySelector('svg');
@@ -1085,8 +1102,12 @@ const ReportsPage: React.FC<{
                       onChange={(event) => setSelectedAnalyticsMetric(event.target.value)}
                       className="max-w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
                     >
-                      {dailyFieldTrends.map((trend) => (
-                        <option key={trend.key} value={trend.key}>{trend.label}</option>
+                      {Object.entries(groupedFieldTrends).map(([section, trends]) => (
+                        <optgroup key={section} label={section}>
+                          {trends.map((trend) => (
+                            <option key={trend.key} value={trend.key}>{trend.label}</option>
+                          ))}
+                        </optgroup>
                       ))}
                     </select>
                   </div>
@@ -1125,6 +1146,14 @@ const ReportsPage: React.FC<{
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {activeGraphChips.map((chip) => (
+                    <span key={chip} className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                      {chip}
+                    </span>
+                  ))}
                 </div>
 
                 <details className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
@@ -1230,7 +1259,14 @@ const ReportsPage: React.FC<{
                     </div>
                   </>
                 ) : (
-                  <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No graph data yet.</p>
+                  <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300">
+                    <p className="font-black text-gray-900 dark:text-gray-100">No graph data for this view yet.</p>
+                    <p className="mt-1">Try a wider date range, switch to Overall, choose another district, or select a different metric.</p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button type="button" onClick={() => applyDailyAnalyticsRange('1y')} className="btn-secondary">1 Year</button>
+                      <button type="button" onClick={clearTrooperDailyAnalyticsFilters} className="btn-secondary">Overall</button>
+                    </div>
+                  </div>
                 )}
               </div>
 
