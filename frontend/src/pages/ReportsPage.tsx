@@ -294,6 +294,7 @@ const AnalyticsChart: React.FC<{
                   rx="3"
                   fill={item.color}
                   opacity={seriesIndex === 0 ? 0.9 : 0.65}
+                  className="cursor-pointer"
                   onMouseEnter={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: x + barWidth / 2, y: point.y, color: item.color })}
                   onMouseMove={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: x + barWidth / 2, y: point.y, color: item.color })}
                 />
@@ -319,6 +320,7 @@ const AnalyticsChart: React.FC<{
                     fill={item.color}
                     stroke="white"
                     strokeWidth="2"
+                    className="cursor-pointer"
                     onMouseEnter={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: point.x, y: point.y, color: item.color })}
                     onMouseMove={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: point.x, y: point.y, color: item.color })}
                   />
@@ -342,9 +344,9 @@ const AnalyticsChart: React.FC<{
         <div
           className="pointer-events-none absolute z-10 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-xl dark:border-gray-700 dark:bg-gray-950"
           style={{
-            left: `${Math.min(82, Math.max(8, (hoveredPoint.x / width) * 100))}%`,
-            top: `${Math.min(72, Math.max(8, (hoveredPoint.y / height) * 100))}%`,
-            transform: 'translate(-50%, -110%)',
+            left: `${(hoveredPoint.x / width) * 100}%`,
+            top: `${(hoveredPoint.y / height) * 100}%`,
+            transform: 'translate(-50%, calc(-100% - 10px))',
           }}
         >
           <div className="mb-1 flex items-center gap-2 font-black text-gray-900 dark:text-gray-100">
