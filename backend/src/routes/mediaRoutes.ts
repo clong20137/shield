@@ -17,6 +17,7 @@ router.post('/folders', requirePermission('media:edit'), MediaController.createF
 router.put('/folders/:folder', requirePermission('media:edit'), MediaController.renameFolder);
 router.delete('/folders/:folder', requirePermission('media:delete'), MediaController.deleteFolder);
 router.post('/images', requireAnyPermission(['media:upload', 'dashboard:create', 'dashboard:edit', 'dashboard:manage']), mediaUpload.array('images', 300), MediaController.uploadImages);
+router.delete('/profile-pictures', requirePermission('media:delete'), MediaController.deleteAllProfilePictures);
 router.put('/images/:folder/:fileName', requirePermission('media:edit'), MediaController.renameImage);
 router.delete('/images/:folder/:fileName', requirePermission('media:delete'), MediaController.deleteImage);
 

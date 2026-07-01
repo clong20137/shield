@@ -59,6 +59,7 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
   const [isUploading, setIsUploading] = useState(false);
   const [isImportingProfilePhotos, setIsImportingProfilePhotos] = useState(false);
   const [isRepairingProfilePhotos, setIsRepairingProfilePhotos] = useState(false);
+  const [isDeletingProfilePhotos, setIsDeletingProfilePhotos] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
@@ -76,6 +77,7 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
   const canUploadMedia = hasPermission(account, 'media:upload');
   const canEditMedia = hasPermission(account, 'media:edit');
   const canDeleteMedia = hasPermission(account, 'media:delete');
+  const isProfilePicturesFolder = activeFolder === 'profile-pictures';
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -320,6 +322,32 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
     }
   };
 
+  const deleteAllProfilePictures = async () => {
+    const profileFolder = folders.find((folder) => folder.key === 'profile-pictures');
+    const profilePhotoCount = profileFolder?.count || 0;
+    if (profilePhotoCount === 0) {
+      onToast('info', 'There are no profile pictures to delete.');
+      return;
+    }
+
+    const confirmation = window.prompt(`This will delete ${profilePhotoCount} profile picture file${profilePhotoCount === 1 ? '' : 's'} and clear matching user profile photo links. Type DELETE PROFILE PICTURES to continue.`);
+    if (confirmation !== 'DELETE PROFILE PICTURES') {
+      return;
+    }
+
+    setIsDeletingProfilePhotos(true);
+    try {
+      const response = await mediaService.deleteAllProfilePictures();
+      setSelectedItem(null);
+      onToast('success', `Deleted ${response.data.deletedCount} profile picture file${response.data.deletedCount === 1 ? '' : 's'} and cleared ${response.data.clearedUserCount} user link${response.data.clearedUserCount === 1 ? '' : 's'}.`);
+      await loadMedia();
+    } catch (err) {
+      onToast('error', getErrorMessage(err, 'Failed to delete profile pictures.'));
+    } finally {
+      setIsDeletingProfilePhotos(false);
+    }
+  };
+
   if (!canViewMedia) {
     return <div className="empty-state">You do not have permission to view the media library.</div>;
   }
@@ -411,6 +439,12 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
                   {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
                 />
               </>
+            )}
+            {activeFolderDetails && isProfilePicturesFolder && canDeleteMedia && (
+              <button type="button" onClick={() => void deleteAllProfilePictures()} className="btn-danger" disabled={isDeletingProfilePhotos || isImportingProfilePhotos} aria-label="Delete all profile pictures" title={isDeletingProfilePhotos ? 'Deleting profile pictures' : 'Delete all profile pictures'}>
+                <Trash2 size={16} />
+                {isDeletingProfilePhotos ? 'Deleting' : 'Delete All'}
+              </button>
             )}
             {activeFolderDetails && (
               <button type="button" onClick={closeFolder} className="btn-secondary">

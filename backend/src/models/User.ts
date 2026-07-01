@@ -447,6 +447,26 @@ export class UserModel {
     }
   }
 
+  static async clearProfilePicturesByUrls(profilePictureUrls: string[]): Promise<number> {
+    const uniqueUrls = [...new Set(profilePictureUrls.filter(Boolean))];
+    if (uniqueUrls.length === 0) {
+      return 0;
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>(
+        `UPDATE users
+         SET \`profilePictureUrl\` = NULL, \`updatedAt\` = ?
+         WHERE \`profilePictureUrl\` IN (?)`,
+        [new Date(), uniqueUrls]
+      );
+      return result.affectedRows;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async findByImportIdentity(email: string, peNumber: string): Promise<User | null> {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedPeNumber = peNumber.trim().toLowerCase();

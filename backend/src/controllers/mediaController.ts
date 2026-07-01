@@ -4,6 +4,7 @@ import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { AuditLogModel } from '../models/AuditLog';
 import { AuthAccountModel } from '../models/AuthAccount';
+import { UserModel } from '../models/User';
 import { getSessionAccount } from '../middleware/authSession';
 import { isSafeUploadedImage } from '../middleware/profileUpload';
 import { broadcastAppEvent } from '../services/appEvents';
@@ -16,6 +17,7 @@ const mediaFolders = [
 ] as const;
 const protectedFolders = new Set<string>(mediaFolders.map((folder) => folder.key));
 const dashboardMediaFolder = 'dashboard-posts';
+const profilePicturesFolder = 'profile-pictures';
 
 function getUploadsRoot(): string {
   return path.resolve(process.cwd(), 'uploads');
@@ -113,6 +115,13 @@ function getThumbnailUrl(relativePath: string, width: number): string {
   const dotIndex = fileName.lastIndexOf('.');
   const baseName = dotIndex > 0 ? fileName.slice(0, dotIndex) : fileName;
   return `/uploads/${[...parts, 'thumbs', `${baseName}-${width}.webp`].join('/')}`;
+}
+
+async function deleteImageFileAndThumbnails(filePath: string) {
+  const parsed = path.parse(filePath);
+  const thumbDirectory = path.join(path.dirname(filePath), 'thumbs');
+  await fs.promises.rm(filePath, { force: true });
+  await Promise.all([96, 256, 480].map((width) => fs.promises.rm(path.join(thumbDirectory, `${parsed.name}-${width}.webp`), { force: true })));
 }
 
 export class MediaController {
@@ -459,10 +468,7 @@ export class MediaController {
         return res.status(404).json({ error: 'Image not found' });
       }
 
-      const parsed = path.parse(filePath);
-      const thumbDirectory = path.join(path.dirname(filePath), 'thumbs');
-      await fs.promises.rm(filePath, { force: true });
-      await Promise.all([96, 256, 480].map((width) => fs.promises.rm(path.join(thumbDirectory, `${parsed.name}-${width}.webp`), { force: true })));
+      await deleteImageFileAndThumbnails(filePath);
       const actor = await getSessionAccount(req);
       await AuditLogModel.create({
         actorId: actor?.id || null,
@@ -478,6 +484,52 @@ export class MediaController {
     } catch (error) {
       console.error('Delete media image error:', error);
       res.status(500).json({ error: 'Failed to delete media image' });
+    }
+  }
+
+  static async deleteAllProfilePictures(req: Request, res: Response) {
+    try {
+      const folderPath = getSafeFolderPath(profilePicturesFolder);
+      if (!folderPath) {
+        return res.status(500).json({ error: 'Profile picture folder is unavailable' });
+      }
+
+      const uploadsRoot = getUploadsRoot();
+      const deletedUrls: string[] = [];
+      let deletedCount = 0;
+
+      if (fs.existsSync(folderPath)) {
+        for (const fileName of fs.readdirSync(folderPath)) {
+          const filePath = path.join(folderPath, fileName);
+          const stat = fs.statSync(filePath);
+          if (!stat.isFile() || !allowedImageExtensions.has(path.extname(fileName).toLowerCase())) {
+            continue;
+          }
+
+          const relativePath = path.relative(uploadsRoot, filePath);
+          deletedUrls.push(getUploadUrl(relativePath));
+          await deleteImageFileAndThumbnails(filePath);
+          deletedCount += 1;
+        }
+      }
+
+      const clearedUserCount = await UserModel.clearProfilePicturesByUrls(deletedUrls);
+      const actor = await getSessionAccount(req);
+      await AuditLogModel.create({
+        actorId: actor?.id || null,
+        actorName: actor?.displayName || actor?.email || null,
+        action: 'media.profile_pictures_deleted',
+        entityType: 'media-folder',
+        entityId: profilePicturesFolder,
+        details: JSON.stringify({ folder: profilePicturesFolder, deletedCount, clearedUserCount }),
+        ...requestAuditFields(req),
+      });
+      broadcastAppEvent({ type: 'media-updated', entityId: profilePicturesFolder });
+      broadcastAppEvent({ type: 'user-updated' });
+      res.json({ deletedCount, clearedUserCount });
+    } catch (error) {
+      console.error('Delete all profile pictures error:', error);
+      res.status(500).json({ error: 'Failed to delete profile pictures' });
     }
   }
 }
