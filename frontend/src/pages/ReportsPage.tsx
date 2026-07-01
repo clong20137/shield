@@ -280,8 +280,8 @@ const ReportsPage: React.FC<{
   const [selectedReportType, setSelectedReportType] = useState<'trooper-daily' | 'cpar'>('trooper-daily');
   const [trooperDailies, setTrooperDailies] = useState<TrooperDailyReportEntry[]>([]);
   const [dailySearch, setDailySearch] = useState('');
-  const [dailyFrom, setDailyFrom] = useState(initialAnalyticsDatesRef.current.from);
-  const [dailyTo, setDailyTo] = useState(initialAnalyticsDatesRef.current.to);
+  const [dailyFrom, setDailyFrom] = useState('');
+  const [dailyTo, setDailyTo] = useState('');
   const [dailyDistrict, setDailyDistrict] = useState('');
   const [dailyPage, setDailyPage] = useState(1);
   const [dailyPageSize, setDailyPageSize] = useState(25);
@@ -294,6 +294,10 @@ const ReportsPage: React.FC<{
   const [dailyAnalyticsError, setDailyAnalyticsError] = useState<string | null>(null);
   const [selectedAnalyticsMetric, setSelectedAnalyticsMetric] = useState('marijuanaGramsFound');
   const [dailyAnalyticsRange, setDailyAnalyticsRange] = useState<DailyAnalyticsRange>('1m');
+  const [analyticsSearch, setAnalyticsSearch] = useState('');
+  const [analyticsDistrict, setAnalyticsDistrict] = useState('');
+  const [analyticsFrom, setAnalyticsFrom] = useState(initialAnalyticsDatesRef.current.from);
+  const [analyticsTo, setAnalyticsTo] = useState(initialAnalyticsDatesRef.current.to);
   const [dailyExportFormat, setDailyExportFormat] = useState<DailyExportFormat>('csv');
   const [isSelectedDailyExportMenuOpen, setIsSelectedDailyExportMenuOpen] = useState(false);
   const [rowDailyExportFormats, setRowDailyExportFormats] = useState<Record<string, DailyExportFormat>>({});
@@ -310,10 +314,10 @@ const ReportsPage: React.FC<{
   const loadTrooperDailyAnalytics = async (
     showLoading = true,
     filters = {
-      q: dailySearch,
-      from: dailyFrom,
-      to: dailyTo,
-      district: dailyDistrict,
+      q: analyticsSearch,
+      from: analyticsFrom,
+      to: analyticsTo,
+      district: analyticsDistrict,
     },
   ) => {
     if (showLoading) {
@@ -433,12 +437,6 @@ const ReportsPage: React.FC<{
       page: 1,
       pageSize: dailyPageSize,
     });
-    void loadTrooperDailyAnalytics(true, {
-      q: dailySearch,
-      from: dailyFrom,
-      to: dailyTo,
-      district: dailyDistrict,
-    });
   };
 
   const clearTrooperDailyFilters = () => {
@@ -446,24 +444,43 @@ const ReportsPage: React.FC<{
     setDailyFrom('');
     setDailyTo('');
     setDailyDistrict('');
-    setDailyAnalyticsRange('custom');
     void loadTrooperDailies(true, { q: '', from: '', to: '', district: '', page: 1, pageSize: dailyPageSize });
-    void loadTrooperDailyAnalytics(true, { q: '', from: '', to: '', district: '' });
   };
 
   const applyDailyAnalyticsRange = (range: DailyAnalyticsRange) => {
     const dates = getRangeDates(range);
     setDailyAnalyticsRange(range);
-    setDailyFrom(dates.from);
-    setDailyTo(dates.to);
+    setAnalyticsFrom(dates.from);
+    setAnalyticsTo(dates.to);
     const filters = {
-      q: dailySearch,
+      q: analyticsSearch,
       from: dates.from,
       to: dates.to,
-      district: dailyDistrict,
+      district: analyticsDistrict,
     };
-    void loadTrooperDailies(true, { ...filters, page: 1, pageSize: dailyPageSize });
     void loadTrooperDailyAnalytics(true, filters);
+  };
+
+  const searchTrooperDailyAnalytics = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void loadTrooperDailyAnalytics(true, {
+      q: analyticsSearch,
+      from: analyticsFrom,
+      to: analyticsTo,
+      district: analyticsDistrict,
+    });
+  };
+
+  const clearTrooperDailyAnalyticsFilters = () => {
+    const dates = getRangeDates(dailyAnalyticsRange === 'custom' ? '1m' : dailyAnalyticsRange);
+    setAnalyticsSearch('');
+    setAnalyticsDistrict('');
+    setAnalyticsFrom(dates.from);
+    setAnalyticsTo(dates.to);
+    if (dailyAnalyticsRange === 'custom') {
+      setDailyAnalyticsRange('1m');
+    }
+    void loadTrooperDailyAnalytics(true, { q: '', from: dates.from, to: dates.to, district: '' });
   };
 
   const goToDailyPage = (page: number) => {
@@ -656,19 +673,13 @@ const ReportsPage: React.FC<{
           <input
             type="date"
             value={dailyFrom}
-            onChange={(event) => {
-              setDailyAnalyticsRange('custom');
-              setDailyFrom(event.target.value);
-            }}
+            onChange={(event) => setDailyFrom(event.target.value)}
             className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
           />
           <input
             type="date"
             value={dailyTo}
-            onChange={(event) => {
-              setDailyAnalyticsRange('custom');
-              setDailyTo(event.target.value);
-            }}
+            onChange={(event) => setDailyTo(event.target.value)}
             className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
           />
           <select value={dailyDistrict} onChange={(event) => setDailyDistrict(event.target.value)} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
@@ -705,18 +716,46 @@ const ReportsPage: React.FC<{
                 <BarChart3 size={20} className="text-accent" /> Live Trooper Daily Analytics
               </h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Graphs update with the current search, district, and date filters.
+                View overall data, search a user, or narrow the graph to a district.
               </p>
             </div>
             {dailyAnalytics?.generatedAt && (
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-bold uppercase text-gray-500 shadow-sm dark:bg-gray-900 dark:text-gray-400">
-                Updated {new Date(dailyAnalytics.generatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                {dailyAnalyticsLoading && (
+                  <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold uppercase text-accent">Updating</span>
+                )}
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-bold uppercase text-gray-500 shadow-sm dark:bg-gray-900 dark:text-gray-400">
+                  Updated {new Date(dailyAnalytics.generatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                </span>
+              </div>
             )}
           </div>
 
+          <form onSubmit={searchTrooperDailyAnalytics} className="mb-4 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]">
+            <input
+              value={analyticsSearch}
+              onChange={(event) => setAnalyticsSearch(event.target.value)}
+              placeholder="Search user, email, PE, badge, rank..."
+              className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+            />
+            <select
+              value={analyticsDistrict}
+              onChange={(event) => setAnalyticsDistrict(event.target.value)}
+              className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+            >
+              <option value="">All Districts</option>
+              {districtOptions.map((district) => <option key={district}>{district}</option>)}
+            </select>
+            <button type="submit" className="btn-primary" aria-label="Search analytics" title="Search Analytics">
+              <Search size={16} />
+            </button>
+            <button type="button" onClick={clearTrooperDailyAnalyticsFilters} className="btn-secondary" aria-label="Show overall analytics" title="Overall Data">
+              Overall
+            </button>
+          </form>
+
           {dailyAnalyticsError && <div className="error mb-4">{dailyAnalyticsError}</div>}
-          {dailyAnalyticsLoading ? (
+          {dailyAnalyticsLoading && !dailyAnalytics ? (
             <div className="loading">Loading Trooper Daily analytics...</div>
           ) : dailyAnalytics ? (
             <>
