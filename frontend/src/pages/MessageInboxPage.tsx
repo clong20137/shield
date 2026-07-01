@@ -202,6 +202,22 @@ function getThreadType(message: UserMessage): string {
   return message.threadType || 'direct';
 }
 
+function getVisualMessageKey(message: UserMessage): string {
+  return getThreadType(message) !== 'direct' && message.groupMessageId
+    ? `group:${message.groupMessageId}`
+    : `message:${message.id}`;
+}
+
+function collapseVisualThreadMessages(messages: UserMessage[]): UserMessage[] {
+  const byVisualKey = new Map<string, UserMessage>();
+
+  [...messages].sort(compareMessagesAscending).forEach((message) => {
+    byVisualKey.set(getVisualMessageKey(message), message);
+  });
+
+  return Array.from(byVisualKey.values()).sort(compareMessagesAscending);
+}
+
 function getParticipantIds(message: UserMessage): string[] {
   const parsedIds = parseThreadList(message.threadParticipantIds);
   if (parsedIds.length > 0) {
@@ -844,7 +860,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           return;
         }
 
-        const nextMessages = [...currentWindow.messages, ...newMessages].reduce((acc, message) => {
+        const mergedMessages = [...currentWindow.messages, ...newMessages].reduce((acc, message) => {
           const existingLocalMessage = acc.find((existingMessage) =>
             existingMessage.id.startsWith('local-') &&
             message.id !== existingMessage.id &&
@@ -867,6 +883,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           }
           return acc;
         }, [...currentWindow.messages]).sort(compareMessagesAscending);
+        const nextMessages = collapseVisualThreadMessages(mergedMessages);
 
         if (nextMessages.length !== currentWindow.messages.length || nextMessages.some((message, index) => message.id !== currentWindow.messages[index]?.id)) {
           next[threadId] = {
@@ -922,7 +939,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       byId.set(message.id, message);
     });
 
-    return Array.from(byId.values()).sort(compareMessagesAscending);
+    return collapseVisualThreadMessages(Array.from(byId.values()));
   };
 
   const loadThreadMessages = async (threadId: string, reset = false) => {
@@ -993,10 +1010,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         const currentWindowState = current[threadId];
         const existingMessages = currentWindowState?.messages ?? [];
         const existingMessageIds = new Set(existingMessages.map((message) => message.id));
-        const nextMessages = [
+        const nextMessages = collapseVisualThreadMessages([
           ...(reset ? [] : existingMessages),
           ...sortedFetchedMessages.filter((message) => !existingMessageIds.has(message.id)),
-        ].sort(compareMessagesAscending);
+        ]);
 
         return {
           ...current,
