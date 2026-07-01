@@ -285,6 +285,15 @@ function getInitials(name: string): string {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
+function getMessageSenderDisplayName(message: UserMessage, thread: MessageThread, currentUserId: string): string {
+  if (message.senderAccountId === currentUserId) {
+    return 'You';
+  }
+
+  const participantIndex = thread.participantIds.findIndex((id) => id === message.senderAccountId);
+  return message.senderName || message.senderEmail || thread.participantNames[participantIndex] || 'Sender';
+}
+
 function getDeliveryLabel(message: UserMessage): string {
   return message.isRead ? 'Read' : 'Delivered';
 }
@@ -670,11 +679,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   }, [threadSearchTerm]);
 
   useEffect(() => {
-    setThreadMessageScrollTop(0);
-    if (threadMessageContainerRef.current) {
-      threadMessageContainerRef.current.scrollTop = 0;
+    if (deferredThreadSearchTerm.trim()) {
+      setThreadMessageScrollTop(0);
+      if (threadMessageContainerRef.current) {
+        threadMessageContainerRef.current.scrollTop = 0;
+      }
     }
-  }, [selectedThreadId, deferredThreadSearchTerm]);
+  }, [deferredThreadSearchTerm]);
 
   useEffect(() => {
     return () => {
@@ -1601,7 +1612,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
     const viewportHeight = threadMessageViewportHeight || 720;
     const visibleCount = Math.ceil(viewportHeight / THREAD_MESSAGE_ROW_ESTIMATE) + THREAD_MESSAGE_OVERSCAN * 2;
-    const useLatestWindow = autoScrollToNewestRef.current && threadMessageScrollTop <= THREAD_MESSAGE_ROW_ESTIMATE;
+    const useLatestWindow = autoScrollToNewestRef.current;
     const rawStartIndex = useLatestWindow
       ? displayedMessages.length - visibleCount
       : Math.floor(threadMessageScrollTop / THREAD_MESSAGE_ROW_ESTIMATE) - THREAD_MESSAGE_OVERSCAN;
@@ -1622,6 +1633,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       return;
     }
 
+    autoScrollToNewestRef.current = true;
+    setThreadMessageScrollTop(0);
     void loadThreadMessages(selectedThreadId, true).catch((err) => {
       console.error('Thread message load failed:', err);
       logMessageDiagnostic('Thread message load failed', {
@@ -1685,8 +1698,23 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       return;
     }
 
-    container.scrollTop = container.scrollHeight;
-    setThreadMessageScrollTop(container.scrollTop);
+    let frame = 0;
+    const scrollToBottom = () => {
+      const activeContainer = threadMessageContainerRef.current;
+      if (!activeContainer) {
+        return;
+      }
+
+      activeContainer.scrollTop = activeContainer.scrollHeight;
+      setThreadMessageScrollTop(activeContainer.scrollTop);
+
+      if (frame < 2) {
+        frame += 1;
+        window.requestAnimationFrame(scrollToBottom);
+      }
+    };
+
+    window.requestAnimationFrame(scrollToBottom);
   }, [selectedThreadId, displayedMessages.length, virtualDisplayedMessages.endIndex]);
 
   useEffect(() => {
@@ -2999,6 +3027,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                 {virtualDisplayedMessages.items.map((message, virtualIndex) => {
                   const index = virtualDisplayedMessages.startIndex + virtualIndex;
                   const isMine = message.senderAccountId === currentUser.id;
+                  const isGroupThread = selectedThread.threadType !== 'direct';
+                  const senderDisplayName = getMessageSenderDisplayName(message, selectedThread, currentUser.id);
                   const previousMessage = displayedMessages[index - 1];
                   const myReaction = getMessageReactionForUser(message, currentUser.id);
                   const reactionIcons = getMessageReactionIcons(message, currentUser.id);
@@ -3041,6 +3071,11 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                       ) : (
                       <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                         <div className={`group flex min-w-0 max-w-[86%] flex-col sm:max-w-[78%] ${isMine ? 'items-end text-right' : 'items-start text-left'}`}>
+                          {isGroupThread && !isMine && (
+                            <div className="mb-1 max-w-full truncate px-1 text-xs font-black text-primary-500 dark:text-blue-200">
+                              {senderDisplayName}
+                            </div>
+                          )}
                           <div className={`wrap-anywhere relative inline-block w-fit max-w-full rounded-[1.25rem] px-3.5 py-2.5 shadow-sm sm:rounded-[1.35rem] sm:px-4 ${
                             isDeleted
                               ? 'border border-dashed border-gray-300 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
