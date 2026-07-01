@@ -18,6 +18,39 @@
         box-sizing: border-box;
       }
 
+      @keyframes portal-card-enter {
+        0% {
+          opacity: 0;
+          transform: translateY(22px) scale(0.985);
+        }
+
+        100% {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      @keyframes app-mark-float {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+
+        50% {
+          transform: translateY(-8px);
+        }
+      }
+
+      @keyframes app-image-sheen {
+        0% {
+          transform: translateX(-120%) rotate(16deg);
+        }
+
+        100% {
+          transform: translateX(160%) rotate(16deg);
+        }
+      }
+
       body {
         min-height: 100vh;
         margin: 0;
@@ -120,11 +153,28 @@
         background: rgba(248, 250, 252, 0.96);
         box-shadow: 0 28px 90px rgba(0, 0, 0, 0.34);
         color: #0f172a;
+        animation: portal-card-enter 560ms cubic-bezier(0.18, 0.95, 0.24, 1) both;
+        transition:
+          border-color 180ms ease,
+          box-shadow 180ms ease,
+          transform 180ms ease;
+      }
+
+      .app-card:nth-child(2) {
+        animation-delay: 90ms;
+      }
+
+      .app-card:hover {
+        border-color: rgba(215, 197, 154, 0.72);
+        box-shadow: 0 34px 110px rgba(0, 0, 0, 0.42);
+        transform: translateY(-5px);
       }
 
       .app-image {
+        position: relative;
         display: grid;
         min-height: 275px;
+        overflow: hidden;
         place-items: center;
         border-bottom: 1px solid #e2e8f0;
         background:
@@ -133,15 +183,37 @@
         background-size: 100% 100%, 42px 42px;
       }
 
+      .app-image::after {
+        position: absolute;
+        top: -24%;
+        bottom: -24%;
+        width: 96px;
+        background: rgba(255, 255, 255, 0.12);
+        box-shadow: 0 0 44px rgba(255, 255, 255, 0.12);
+        content: "";
+        filter: blur(1px);
+        transform: translateX(-120%) rotate(16deg);
+      }
+
+      .app-card:hover .app-image::after {
+        animation: app-image-sheen 920ms ease;
+      }
+
       .app-image img {
         width: min(54%, 220px);
         max-height: 220px;
         object-fit: contain;
         filter: drop-shadow(0 22px 44px rgba(0, 0, 0, 0.34));
+        animation: app-mark-float 4.8s ease-in-out infinite;
+        transition: transform 180ms ease;
+      }
+
+      .app-card:hover .app-image img,
+      .app-card:hover .fleet-monogram {
+        transform: scale(1.04);
       }
 
       .fleet-image {
-        position: relative;
         background:
           linear-gradient(135deg, rgba(8, 20, 33, 0.98), rgba(37, 99, 235, 0.76)),
           linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 1px, transparent 1px 100%);
@@ -160,6 +232,8 @@
         font-size: clamp(4rem, 9vw, 7rem);
         font-weight: 950;
         box-shadow: 0 22px 54px rgba(0, 0, 0, 0.3);
+        animation: app-mark-float 5.2s ease-in-out infinite;
+        transition: transform 180ms ease;
       }
 
       .app-body {
@@ -195,10 +269,24 @@
         min-height: 50px;
         align-items: center;
         justify-content: center;
+        gap: 9px;
         border-radius: 8px;
         font-weight: 900;
         text-align: center;
         text-decoration: none;
+        transition:
+          background 160ms ease,
+          box-shadow 160ms ease,
+          color 160ms ease,
+          transform 160ms ease;
+      }
+
+      .launch-button svg,
+      .download-link svg {
+        width: 18px;
+        height: 18px;
+        flex: 0 0 auto;
+        stroke-width: 2.4;
       }
 
       .launch-button {
@@ -209,16 +297,19 @@
 
       .launch-button:hover {
         background: #102948;
+        transform: translateY(-1px);
       }
 
       .download-link {
-        border: 1px solid rgba(156, 134, 92, 0.45);
-        background: rgba(156, 134, 92, 0.1);
-        color: var(--gold);
+        border: 1px solid #8c774e;
+        background: var(--gold);
+        color: white;
+        box-shadow: 0 14px 28px rgba(156, 134, 92, 0.25);
       }
 
       .download-link:hover {
-        background: rgba(156, 134, 92, 0.16);
+        background: #806d49;
+        transform: translateY(-1px);
       }
 
       .launch-button:focus,
@@ -281,9 +372,20 @@
                 <p class="app-text">Personnel workspace and daily operations tools.</p>
               </div>
               <div class="actions">
-                <a class="launch-button" href="shield://open">Launch</a>
+                <a class="launch-button" href="shield://open">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path d="M5 12h14" />
+                    <path d="m13 6 6 6-6 6" />
+                  </svg>
+                  <span>Launch</span>
+                </a>
                 <a class="download-link" href="/shield/downloads/Shield-Setup.exe" download>
-                  Download
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path d="M12 3v12" />
+                    <path d="m7 10 5 5 5-5" />
+                    <path d="M5 21h14" />
+                  </svg>
+                  <span>Download</span>
                 </a>
               </div>
             </div>
@@ -299,8 +401,21 @@
                 <p class="app-text">Vehicle assignments, maintenance, mileage, and equipment.</p>
               </div>
               <div class="actions">
-                <a class="launch-button" href="/fleet/">Launch</a>
-                <a class="download-link" href="/fleet/">Open Web</a>
+                <a class="launch-button" href="/fleet/">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path d="M5 12h14" />
+                    <path d="m13 6 6 6-6 6" />
+                  </svg>
+                  <span>Launch</span>
+                </a>
+                <a class="download-link" href="/fleet/">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path d="M15 3h6v6" />
+                    <path d="M10 14 21 3" />
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  </svg>
+                  <span>Open Web</span>
+                </a>
               </div>
             </div>
           </article>
