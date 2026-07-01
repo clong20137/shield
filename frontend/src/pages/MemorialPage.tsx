@@ -436,7 +436,7 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
                     <button type="button" onClick={() => openEditMemorial(profile)} className="btn-secondary h-8 px-3 text-xs">
                       Edit
                     </button>
-                    <button type="button" onClick={() => setDeletePendingMemorial(profile)} className="btn-secondary h-8 px-3 text-xs text-red-700 dark:text-red-200">
+                    <button type="button" onClick={() => setDeletePendingMemorial(profile)} className="btn-danger h-8 px-3 text-xs" aria-label={`Delete ${profile.firstName} ${profile.lastName}`} title="Delete">
                       <Trash2 size={13} />
                     </button>
                     </div>
@@ -620,7 +620,7 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
             </div>
             <div className="mt-5 flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-800">
               <button type="button" onClick={() => setDeletePendingMemorial(null)} className="btn-secondary">Cancel</button>
-              <button type="button" onClick={() => void deleteMemorial()} className="rounded bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-700">
+              <button type="button" onClick={() => void deleteMemorial()} className="btn-danger">
                 Delete
               </button>
             </div>
