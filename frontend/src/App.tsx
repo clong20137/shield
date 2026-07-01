@@ -517,73 +517,117 @@ function LoginSplash({
   const canRegister =
     registrationSettings?.mode === 'public' ||
     (registrationSettings?.mode === 'invite-only' && Boolean(inviteToken));
+  const accessHighlights: Array<{ label: string; detail: string; Icon: LucideIcon }> = [
+    { label: 'Personnel', detail: 'Profiles and agency lookup', Icon: Search },
+    { label: 'Operations', detail: 'Calendar, reminders, and daily flow', Icon: CalendarDays },
+    { label: 'Comms', detail: 'Messages and alerts in one workspace', Icon: Bell },
+  ];
+  const sessionModeLabel =
+    mode === 'register'
+      ? 'Account Setup'
+      : mode === 'forgot'
+        ? 'Password Recovery'
+        : mode === 'reset'
+          ? 'Credential Reset'
+          : requiresTwoFactor
+            ? 'MFA Verification'
+            : 'Authorized Access';
 
   return (
-    <div className={`login-shell relative min-h-screen overflow-hidden bg-gray-950 text-gray-900 dark:text-gray-100 ${isExiting ? 'animate-login-exit pointer-events-none' : 'animate-login-enter'}`}>
+    <div className={`login-shell relative min-h-screen overflow-hidden bg-primary-500 text-gray-900 dark:text-gray-100 ${isExiting ? 'animate-login-exit pointer-events-none' : 'animate-login-enter'}`}>
       <div className="login-moving-grid" aria-hidden="true" />
       <div className="login-scan-band" aria-hidden="true" />
-      <div className="relative z-10 grid min-h-screen grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(27rem,31rem)]">
-        <section className="hidden min-h-screen items-center px-8 py-12 text-white lg:flex lg:px-16">
-          <div className="max-w-3xl">
-            <div className="mb-8 flex items-center gap-4">
-              <span className="flex h-20 w-20 items-center justify-center rounded-2xl border border-white/15 bg-white/10 shadow-2xl backdrop-blur">
-                <img src={brandLogoSrc || getBrandLogoSrc(brandLogoDataUrl)} alt="" className="h-16 w-16 object-contain" />
-              </span>
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.24em] text-accent">Secure Access</p>
-                <p className="mt-1 text-sm font-semibold text-blue-100">{siteName}</p>
-              </div>
+      <div className="relative z-10 flex min-h-screen flex-col">
+        <header className="flex items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10 shadow-lg backdrop-blur">
+              <img src={brandLogoSrc || getBrandLogoSrc(brandLogoDataUrl)} alt="" className="h-10 w-10 object-contain" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-lg font-black text-white">{appName}</p>
+              <p className="truncate text-xs font-semibold uppercase tracking-[0.18em] text-accent">{siteName}</p>
             </div>
-            <h1 className="mb-5 text-6xl font-black leading-none text-white">
-              {appName}
-            </h1>
-            <p className="max-w-2xl text-xl leading-8 text-blue-50">
-              A secured workspace for personnel lookup, reporting, messages, calendar workflows, and daily operations.
-            </p>
-            {mode === 'login' && !isShieldDesktopApp() && (
-              <div className="mt-8 inline-block rounded-lg border border-accent/30 bg-accent/10 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.18)]">
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Recommended</p>
-                <p className="mt-1 max-w-xl text-sm text-blue-50">
-                  Install the desktop app for faster access, offline startup, and native notifications.
-                </p>
-                <a
-                  href={withAppBase('/downloads/Shield-Setup.exe')}
-                  download
-                  className="btn-secondary mt-3 inline-flex items-center gap-2"
-                  aria-label="Download desktop application"
-                >
-                  <Download size={16} />
-                  <span>Download App</span>
-                </a>
-              </div>
-            )}
           </div>
-        </section>
+          <div className="hidden items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-blue-50 backdrop-blur sm:flex">
+            <LockKeyhole size={14} className="text-accent" />
+            <span>{sessionModeLabel}</span>
+          </div>
+        </header>
 
-        <section className="flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:bg-white/6 lg:backdrop-blur-xl">
-          <form ref={loginFormRef} onSubmit={handleSubmit} className="login-panel w-full max-w-md rounded-xl border border-white/15 bg-white/95 p-6 shadow-[0_28px_90px_rgba(0,0,0,0.35)] ring-1 ring-black/5 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-900/95 sm:p-8">
-            <div className="mb-7">
-              <div className="mb-5 flex items-center gap-3 lg:hidden">
-                <img src={brandLogoSrc || getBrandLogoSrc(brandLogoDataUrl)} alt="" className="h-14 w-14 object-contain drop-shadow-lg" />
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-accent">Secure Access</p>
-                  <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">{appName}</p>
-                </div>
+        <main className="grid flex-1 grid-cols-1 items-center gap-8 px-5 pb-8 pt-2 sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(25rem,29rem)] lg:px-12">
+          <section className="mx-auto w-full max-w-4xl text-white">
+            <div className="max-w-3xl">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-xs font-black uppercase tracking-[0.16em] text-accent">
+                <Shield size={16} />
+                Secure Agency Workspace
               </div>
-              <h2 className="mb-2 text-3xl font-black text-primary-500 dark:text-blue-100">
-                {mode === 'register' ? 'Create login' : mode === 'forgot' ? 'Reset password' : mode === 'reset' ? 'Set new password' : 'Sign in'}
-              </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-                {mode === 'register'
-                  ? inviteToken
-                    ? 'Create your login from this secure invite.'
-                    : 'Create an email and password login.'
-                  : mode === 'forgot'
-                    ? 'Enter your email and we will send a secure reset link.'
-                    : mode === 'reset'
-                      ? `Choose a new password for your ${appName} login.`
-                      : 'Use your email and password to continue.'}
+              <h1 className="max-w-3xl text-4xl font-black leading-tight text-white sm:text-5xl lg:text-6xl">
+                Start your shift with the tools that matter.
+              </h1>
+              <p className="mt-5 max-w-2xl text-base leading-7 text-blue-50 sm:text-lg">
+                {appName} brings personnel search, operational updates, messages, calendars, and reports into one controlled workspace.
               </p>
+
+              <div className="mt-8 grid max-w-3xl grid-cols-1 gap-3 sm:grid-cols-3">
+                {accessHighlights.map(({ label, detail, Icon }) => (
+                  <div key={label} className="rounded-lg border border-white/15 bg-white/10 p-4 backdrop-blur">
+                    <Icon size={20} className="text-accent" />
+                    <p className="mt-3 text-sm font-black text-white">{label}</p>
+                    <p className="mt-1 text-xs leading-5 text-blue-100">{detail}</p>
+                  </div>
+                ))}
+              </div>
+
+              {mode === 'login' && !isShieldDesktopApp() && (
+                <div className="mt-6 flex max-w-3xl flex-col gap-3 rounded-lg border border-white/15 bg-white/10 p-4 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-black text-white">Desktop app available</p>
+                    <p className="mt-1 text-sm text-blue-100">Use the installed app for faster access and native notifications.</p>
+                  </div>
+                  <a
+                    href={withAppBase('/downloads/Shield-Setup.exe')}
+                    download
+                    className="btn-secondary inline-flex shrink-0 items-center justify-center gap-2"
+                    aria-label="Download desktop application"
+                  >
+                    <Download size={16} />
+                    <span>Download App</span>
+                  </a>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="mx-auto flex w-full max-w-md items-center justify-center">
+          <form ref={loginFormRef} onSubmit={handleSubmit} className="login-panel w-full rounded-lg border bg-white/95 p-6 shadow-[0_28px_90px_rgba(0,0,0,0.35)] ring-1 ring-black/5 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-900/95 sm:p-8">
+            <div className="mb-7">
+              <div className="mb-5 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-accent">{sessionModeLabel}</p>
+                  <p className="mt-1 text-sm font-semibold text-gray-500 dark:text-gray-400">{appName}</p>
+                </div>
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-950">
+                  <img src={brandLogoSrc || getBrandLogoSrc(brandLogoDataUrl)} alt="" className="h-10 w-10 object-contain" />
+                </span>
+              </div>
+              <div>
+                <h2 className="mb-2 text-3xl font-black text-primary-500 dark:text-blue-100">
+                  {mode === 'register' ? 'Create login' : mode === 'forgot' ? 'Reset password' : mode === 'reset' ? 'Set new password' : requiresTwoFactor ? 'Verify MFA' : 'Sign in'}
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {mode === 'register'
+                    ? inviteToken
+                      ? 'Create your login from this secure invite.'
+                      : 'Create an email and password login.'
+                    : mode === 'forgot'
+                      ? 'Enter your email and we will send a secure reset link.'
+                      : mode === 'reset'
+                        ? `Choose a new password for your ${appName} login.`
+                        : requiresTwoFactor
+                          ? 'Enter your MFA code to complete sign in.'
+                          : 'Use your agency email and password to continue.'}
+                </p>
+              </div>
             </div>
 
             {error && <div className="error">{error}</div>}
@@ -735,7 +779,8 @@ function LoginSplash({
               </button>
             )}
           </form>
-        </section>
+          </section>
+        </main>
       </div>
       {isLoginWarningOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
