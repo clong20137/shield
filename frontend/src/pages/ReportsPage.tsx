@@ -145,6 +145,17 @@ type DailyAnalyticsRange = '1d' | '7d' | '1m' | '3m' | '6m' | '1y' | 'custom';
 type DailyGraphType = 'line' | 'bar';
 type DailyCompareMode = 'none' | 'user' | 'district';
 type TrooperDailyTab = 'graph' | 'table' | 'exports';
+type DailyCompareItem = {
+  id: string;
+  type: 'user' | 'district';
+  label: string;
+  query?: string;
+  district?: string;
+  color: string;
+  analytics?: TrooperDailyAnalyticsResponse;
+  loading?: boolean;
+  error?: string | null;
+};
 
 const dailyAnalyticsRanges: Array<{ value: DailyAnalyticsRange; label: string }> = [
   { value: '1d', label: '1 Day' },
@@ -158,6 +169,15 @@ const dailyAnalyticsRanges: Array<{ value: DailyAnalyticsRange; label: string }>
 const dailyGraphTypes: Array<{ value: DailyGraphType; label: string }> = [
   { value: 'line', label: 'Line' },
   { value: 'bar', label: 'Bar' },
+];
+
+const compareSeriesColors = [
+  'rgb(37 99 235)',
+  'rgb(220 38 38)',
+  'rgb(22 163 74)',
+  'rgb(147 51 234)',
+  'rgb(234 88 12)',
+  'rgb(8 145 178)',
 ];
 
 const trooperDailyTabs: Array<{ value: TrooperDailyTab; label: string }> = [
@@ -390,14 +410,14 @@ const ReportsPage: React.FC<{
   const [analyticsFrom, setAnalyticsFrom] = useState(initialAnalyticsDatesRef.current.from);
   const [analyticsTo, setAnalyticsTo] = useState(initialAnalyticsDatesRef.current.to);
   const [dailyGraphType, setDailyGraphType] = useState<DailyGraphType>('line');
-  const [dailyCompareMode, setDailyCompareMode] = useState<DailyCompareMode>('none');
+  const [dailyCompareMode, setDailyCompareMode] = useState<DailyCompareMode>('user');
   const [compareSearch, setCompareSearch] = useState('');
-  const [selectedCompareUserQuery, setSelectedCompareUserQuery] = useState('');
   const [compareUserResults, setCompareUserResults] = useState<User[]>([]);
   const [isCompareUserSearchOpen, setIsCompareUserSearchOpen] = useState(false);
   const [compareUserSearchLoading, setCompareUserSearchLoading] = useState(false);
-  const [compareDistrict, setCompareDistrict] = useState('');
-  const [compareAnalytics, setCompareAnalytics] = useState<TrooperDailyAnalyticsResponse | null>(null);
+  const [compareDistrictSearch, setCompareDistrictSearch] = useState('');
+  const [isCompareDistrictSearchOpen, setIsCompareDistrictSearchOpen] = useState(false);
+  const [compareItems, setCompareItems] = useState<DailyCompareItem[]>([]);
   const [compareAnalyticsLoading, setCompareAnalyticsLoading] = useState(false);
   const [compareAnalyticsError, setCompareAnalyticsError] = useState<string | null>(null);
   const [dailyExportFormat, setDailyExportFormat] = useState<DailyExportFormat>('csv');
@@ -445,54 +465,48 @@ const ReportsPage: React.FC<{
     }
   };
 
-  const getCompareFilters = (
-    mode = dailyCompareMode,
+  const loadCompareItemAnalytics = async (
+    item: DailyCompareItem,
     from = analyticsFrom,
     to = analyticsTo,
-    search = compareSearch,
-    district = compareDistrict,
-  ) => {
-    if (mode === 'user') {
-      return { q: selectedCompareUserQuery || search, from, to, district: '' };
+  ): Promise<DailyCompareItem> => {
+    try {
+      const response = await reportService.getTrooperDailyAnalytics({
+        q: item.type === 'user' ? item.query || item.label : undefined,
+        from: from || undefined,
+        to: to || undefined,
+        district: item.type === 'district' ? item.district || item.label : undefined,
+      });
+      return { ...item, analytics: response.data, loading: false, error: null };
+    } catch (err) {
+      const message = getErrorMessage(err, `Failed to load ${item.label} comparison.`);
+      console.error(err);
+      return { ...item, loading: false, error: message };
     }
-
-    if (mode === 'district') {
-      return { q: '', from, to, district };
-    }
-
-    return null;
   };
 
-  const loadCompareAnalytics = async (
+  const reloadCompareItems = async (
+    items = compareItems,
+    from = analyticsFrom,
+    to = analyticsTo,
     showLoading = true,
-    filters = getCompareFilters(),
   ) => {
-    if (!filters) {
-      setCompareAnalytics(null);
+    if (items.length === 0) {
       setCompareAnalyticsError(null);
       return;
     }
 
     if (showLoading) {
       setCompareAnalyticsLoading(true);
+      setCompareItems((current) => current.map((item) => ({ ...item, loading: true, error: null })));
     }
     setCompareAnalyticsError(null);
 
-    try {
-      const response = await reportService.getTrooperDailyAnalytics({
-        q: filters.q.trim() || undefined,
-        from: filters.from || undefined,
-        to: filters.to || undefined,
-        district: filters.district || undefined,
-      });
-      setCompareAnalytics(response.data);
-    } catch (err) {
-      const message = getErrorMessage(err, 'Failed to load comparison analytics.');
-      setCompareAnalyticsError(message);
-      console.error(err);
-    } finally {
-      setCompareAnalyticsLoading(false);
-    }
+    const updatedItems = await Promise.all(items.map((item) => loadCompareItemAnalytics(item, from, to)));
+    setCompareItems(updatedItems);
+    const firstError = updatedItems.find((item) => item.error)?.error || null;
+    setCompareAnalyticsError(firstError);
+    setCompareAnalyticsLoading(false);
   };
 
   const loadTrooperDailies = async (
@@ -563,7 +577,7 @@ const ReportsPage: React.FC<{
         dailyRefreshTimerRef.current = null;
         void loadTrooperDailies(false);
         void loadTrooperDailyAnalytics(false);
-        void loadCompareAnalytics(false);
+        void reloadCompareItems(compareItems, analyticsFrom, analyticsTo, false);
       }, 500);
     };
 
@@ -579,7 +593,7 @@ const ReportsPage: React.FC<{
         dailyRefreshTimerRef.current = null;
       }
     };
-  }, [selectedReportType]);
+  }, [selectedReportType, compareItems, analyticsFrom, analyticsTo]);
 
   useEffect(() => {
     if (dailyCompareMode !== 'user') {
@@ -656,7 +670,7 @@ const ReportsPage: React.FC<{
       district: analyticsDistrict,
     };
     void loadTrooperDailyAnalytics(true, filters);
-    void loadCompareAnalytics(true, getCompareFilters(dailyCompareMode, dates.from, dates.to));
+    void reloadCompareItems(compareItems, dates.from, dates.to);
   };
 
   const searchTrooperDailyAnalytics = (event: React.FormEvent<HTMLFormElement>) => {
@@ -667,7 +681,7 @@ const ReportsPage: React.FC<{
       to: analyticsTo,
       district: analyticsDistrict,
     });
-    void loadCompareAnalytics(true);
+    void reloadCompareItems();
   };
 
   const clearTrooperDailyAnalyticsFilters = () => {
@@ -680,32 +694,65 @@ const ReportsPage: React.FC<{
       setDailyAnalyticsRange('1m');
     }
     void loadTrooperDailyAnalytics(true, { q: '', from: dates.from, to: dates.to, district: '' });
-    void loadCompareAnalytics(true, getCompareFilters(dailyCompareMode, dates.from, dates.to));
-  };
-
-  const changeCompareMode = (mode: DailyCompareMode) => {
-    setDailyCompareMode(mode);
-    if (mode === 'none') {
-      setCompareAnalytics(null);
-      setCompareAnalyticsError(null);
-      setSelectedCompareUserQuery('');
-      return;
-    }
-    void loadCompareAnalytics(true, getCompareFilters(mode));
+    void reloadCompareItems(compareItems, dates.from, dates.to);
   };
 
   const refreshCompareAnalytics = () => {
-    void loadCompareAnalytics(true);
+    void reloadCompareItems();
+  };
+
+  const addCompareItem = async (item: Omit<DailyCompareItem, 'color' | 'loading' | 'error'>) => {
+    const id = item.id;
+    const alreadyAdded = compareItems.some((compareItem) => compareItem.id === id);
+    if (alreadyAdded) {
+      onToast('info', `${item.label} is already on the graph.`);
+      return;
+    }
+
+    const nextItem: DailyCompareItem = {
+      ...item,
+      color: compareSeriesColors[compareItems.length % compareSeriesColors.length],
+      loading: true,
+      error: null,
+    };
+    setCompareItems((current) => [...current, nextItem]);
+    setCompareAnalyticsLoading(true);
+    const loadedItem = await loadCompareItemAnalytics(nextItem);
+    setCompareItems((current) => current.map((compareItem) => (compareItem.id === loadedItem.id ? loadedItem : compareItem)));
+    setCompareAnalyticsLoading(false);
+    if (loadedItem.error) {
+      setCompareAnalyticsError(loadedItem.error);
+      onToast('error', loadedItem.error);
+    }
+  };
+
+  const removeCompareItem = (id: string) => {
+    setCompareItems((current) => current.filter((item) => item.id !== id));
   };
 
   const selectCompareUser = (user: User) => {
     const label = formatUserOption(user);
     const query = user.email || user.peNumber || user.badgeNumber || label;
-    setCompareSearch(label);
-    setSelectedCompareUserQuery(query);
+    void addCompareItem({
+      id: `user:${user.id || query}`,
+      type: 'user',
+      label,
+      query,
+    });
+    setCompareSearch('');
     setCompareUserResults([]);
     setIsCompareUserSearchOpen(false);
-    void loadCompareAnalytics(true, { q: query, from: analyticsFrom, to: analyticsTo, district: '' });
+  };
+
+  const selectCompareDistrict = (district: string) => {
+    void addCompareItem({
+      id: `district:${district}`,
+      type: 'district',
+      label: district,
+      district,
+    });
+    setCompareDistrictSearch('');
+    setIsCompareDistrictSearchOpen(false);
   };
 
   const goToDailyPage = (page: number) => {
@@ -848,27 +895,29 @@ const ReportsPage: React.FC<{
     : '';
   const dailyFieldTrends = Array.isArray(dailyAnalytics?.fieldTrends) ? dailyAnalytics.fieldTrends : [];
   const dailyActivitySections = Array.isArray(dailyAnalytics?.activitySections) ? dailyAnalytics.activitySections : [];
-  const compareFieldTrends = Array.isArray(compareAnalytics?.fieldTrends) ? compareAnalytics.fieldTrends : [];
   const visibleFieldTrends = dailyFieldTrends.filter((trend) => trend.total > 0);
   const selectedTrend = dailyFieldTrends.find((trend) => trend.key === selectedAnalyticsMetric)
     || visibleFieldTrends[0]
     || dailyFieldTrends[0]
     || null;
-  const compareSelectedTrend = compareFieldTrends.find((trend) => trend.key === selectedTrend?.key);
   const primarySeriesName = analyticsSearch.trim()
     ? analyticsSearch.trim()
     : analyticsDistrict
       ? analyticsDistrict
       : 'Overall';
-  const compareSeriesName = dailyCompareMode === 'user'
-    ? compareSearch.trim() || 'Compare User'
-    : dailyCompareMode === 'district'
-      ? compareDistrict || 'Compare District'
-      : '';
+  const compareDistrictMatches = compareDistrictSearch.trim()
+    ? districtOptions.filter((district) => district.toLowerCase().includes(compareDistrictSearch.trim().toLowerCase())).slice(0, 8)
+    : districtOptions.slice(0, 8);
+  const compareTrendSeries = selectedTrend
+    ? compareItems.flatMap((item) => {
+      const compareTrend = item.analytics?.fieldTrends?.find((trend) => trend.key === selectedTrend.key);
+      return compareTrend ? [{ name: item.label, points: compareTrend.points, color: item.color }] : [];
+    })
+    : [];
   const chartSeries = selectedTrend
     ? [
       { name: primarySeriesName, points: selectedTrend.points, color: 'rgb(157 134 92)' },
-      ...(dailyCompareMode !== 'none' && compareSelectedTrend ? [{ name: compareSeriesName, points: compareSelectedTrend.points, color: 'rgb(37 99 235)' }] : []),
+      ...compareTrendSeries,
     ]
     : [];
   const groupedFieldTrends = dailyFieldTrends.reduce<Record<string, typeof dailyFieldTrends>>((groups, trend) => {
@@ -881,7 +930,7 @@ const ReportsPage: React.FC<{
     `Range: ${dailyAnalyticsRanges.find((range) => range.value === dailyAnalyticsRange)?.label || 'Custom'}`,
     analyticsSearch.trim() ? `Search: ${analyticsSearch.trim()}` : '',
     analyticsDistrict ? `District: ${analyticsDistrict}` : 'Overall',
-    dailyCompareMode !== 'none' ? `Compare: ${compareSeriesName}` : '',
+    compareItems.length > 0 ? `Compare: ${compareItems.length}` : '',
     `Type: ${dailyGraphTypes.find((type) => type.value === dailyGraphType)?.label || 'Line'}`,
   ].filter(Boolean);
 
@@ -1158,83 +1207,139 @@ const ReportsPage: React.FC<{
                   ))}
                 </div>
 
-                <details className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
-                  <summary className="cursor-pointer text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Advanced</summary>
-                  <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto_auto]">
-                  <select
-                    value={dailyCompareMode}
-                    onChange={(event) => changeCompareMode(event.target.value as DailyCompareMode)}
-                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-900"
-                    aria-label="Compare graph mode"
-                  >
-                    <option value="none">No Compare</option>
-                    <option value="user">Compare User</option>
-                    <option value="district">Compare District</option>
-                  </select>
-                  {dailyCompareMode === 'user' ? (
-                    <div className="relative">
-                      <input
-                        value={compareSearch}
-                        onChange={(event) => {
-                          setCompareSearch(event.target.value);
-                          setSelectedCompareUserQuery('');
-                          setIsCompareUserSearchOpen(true);
-                        }}
-                        onFocus={() => {
-                          if (compareUserResults.length > 0) {
-                            setIsCompareUserSearchOpen(true);
-                          }
-                        }}
-                        placeholder="Start typing a user name..."
-                        className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-                      />
-                      {isCompareUserSearchOpen && (compareUserResults.length > 0 || compareUserSearchLoading) && (
-                        <div className="absolute left-0 right-0 top-11 z-30 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-950">
-                          {compareUserSearchLoading ? (
-                            <div className="px-3 py-2 text-sm font-semibold text-gray-500 dark:text-gray-400">Searching users...</div>
-                          ) : (
-                            compareUserResults.map((user) => (
-                              <button
-                                key={user.id}
-                                type="button"
-                                onClick={() => selectCompareUser(user)}
-                                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-900"
-                              >
-                                <span className="min-w-0">
-                                  <span className="block truncate text-sm font-black text-gray-900 dark:text-gray-100">{formatUserOption(user)}</span>
-                                  <span className="block truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
-                                    {user.rank || 'No rank'}{user.district ? ` - ${user.district}` : ''}{user.peNumber ? ` - PE ${user.peNumber}` : ''}
-                                  </span>
-                                </span>
-                                <span className="shrink-0 text-xs font-bold text-accent">{user.badgeNumber || user.email || ''}</span>
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      )}
+                <section className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h5 className="text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Compare</h5>
+                      <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Add users or districts to the same graph.</p>
                     </div>
-                  ) : dailyCompareMode === 'district' ? (
+                    <div className="flex gap-2">
+                      <button type="button" onClick={refreshCompareAnalytics} disabled={compareItems.length === 0 || compareAnalyticsLoading} className="btn-secondary" aria-label="Refresh comparisons" title="Refresh Compare">
+                        {compareAnalyticsLoading ? 'Loading' : 'Refresh'}
+                      </button>
+                      <button type="button" onClick={exportAnalyticsChart} className="btn-secondary" aria-label="Download graph" title="Download Graph">
+                        <Download size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,0.7fr)_minmax(0,1.4fr)]">
                     <select
-                      value={compareDistrict}
-                      onChange={(event) => setCompareDistrict(event.target.value)}
-                      className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                      value={dailyCompareMode}
+                      onChange={(event) => {
+                        setDailyCompareMode(event.target.value as DailyCompareMode);
+                        setCompareSearch('');
+                        setCompareDistrictSearch('');
+                        setIsCompareUserSearchOpen(false);
+                        setIsCompareDistrictSearchOpen(false);
+                      }}
+                      className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-900"
+                      aria-label="Compare graph mode"
                     >
-                      <option value="">Choose district</option>
-                      {districtOptions.map((district) => <option key={district}>{district}</option>)}
+                      <option value="user">Compare Users</option>
+                      <option value="district">Compare Districts</option>
                     </select>
-                  ) : (
-                    <div className="rounded border border-dashed border-gray-300 px-3 py-2 text-sm font-semibold text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                      Compare another user or district on the same graph.
+
+                    {dailyCompareMode === 'user' ? (
+                      <div className="relative">
+                        <input
+                          value={compareSearch}
+                          onChange={(event) => {
+                            setCompareSearch(event.target.value);
+                            setIsCompareUserSearchOpen(true);
+                          }}
+                          onFocus={() => {
+                            if (compareUserResults.length > 0) {
+                              setIsCompareUserSearchOpen(true);
+                            }
+                          }}
+                          placeholder="Type a user name, email, PE, or badge..."
+                          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                        />
+                        {isCompareUserSearchOpen && (compareUserResults.length > 0 || compareUserSearchLoading) && (
+                          <div className="absolute left-0 right-0 top-11 z-30 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-950">
+                            {compareUserSearchLoading ? (
+                              <div className="px-3 py-2 text-sm font-semibold text-gray-500 dark:text-gray-400">Searching users...</div>
+                            ) : (
+                              compareUserResults.map((user) => (
+                                <button
+                                  key={user.id}
+                                  type="button"
+                                  onClick={() => selectCompareUser(user)}
+                                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-900"
+                                >
+                                  <span className="min-w-0">
+                                    <span className="block truncate text-sm font-black text-gray-900 dark:text-gray-100">{formatUserOption(user)}</span>
+                                    <span className="block truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
+                                      {user.rank || 'No rank'}{user.district ? ` - ${user.district}` : ''}{user.peNumber ? ` - PE ${user.peNumber}` : ''}
+                                    </span>
+                                  </span>
+                                  <span className="shrink-0 text-xs font-bold text-accent">{user.badgeNumber || user.email || ''}</span>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <input
+                          value={compareDistrictSearch}
+                          onChange={(event) => {
+                            setCompareDistrictSearch(event.target.value);
+                            setIsCompareDistrictSearchOpen(true);
+                          }}
+                          onFocus={() => setIsCompareDistrictSearchOpen(true)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              const exactDistrict = districtOptions.find((district) => district.toLowerCase() === compareDistrictSearch.trim().toLowerCase());
+                              if (exactDistrict) {
+                                selectCompareDistrict(exactDistrict);
+                              }
+                            }
+                          }}
+                          placeholder="Type a district..."
+                          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                        />
+                        {isCompareDistrictSearchOpen && (
+                          <div className="absolute left-0 right-0 top-11 z-30 max-h-64 overflow-auto rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-950">
+                            {compareDistrictMatches.length > 0 ? (
+                              compareDistrictMatches.map((district) => (
+                                <button
+                                  key={district}
+                                  type="button"
+                                  onClick={() => selectCompareDistrict(district)}
+                                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-bold text-gray-800 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-900"
+                                >
+                                  {district}
+                                  <span className="text-xs font-black uppercase text-accent">Add</span>
+                                </button>
+                              ))
+                            ) : (
+                              <div className="px-3 py-2 text-sm font-semibold text-gray-500 dark:text-gray-400">No districts found.</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {compareItems.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {compareItems.map((item) => (
+                        <span key={item.id} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-black text-gray-700 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                          {item.label}
+                          {item.loading && <span className="font-bold text-gray-400">loading</span>}
+                          <button type="button" onClick={() => removeCompareItem(item.id)} className="text-gray-400 transition hover:text-red-600" aria-label={`Remove ${item.label}`}>
+                            <X size={14} />
+                          </button>
+                        </span>
+                      ))}
                     </div>
                   )}
-                  <button type="button" onClick={refreshCompareAnalytics} disabled={dailyCompareMode === 'none' || compareAnalyticsLoading} className="btn-secondary" aria-label="Refresh comparison" title="Refresh Compare">
-                    {compareAnalyticsLoading ? 'Loading' : 'Compare'}
-                  </button>
-                  <button type="button" onClick={exportAnalyticsChart} className="btn-secondary" aria-label="Download graph" title="Download Graph">
-                    <Download size={16} />
-                  </button>
-                  </div>
-                </details>
+                </section>
                 {compareAnalyticsError && <div className="error mb-4">{compareAnalyticsError}</div>}
 
                 {selectedTrend ? (
@@ -1246,7 +1351,7 @@ const ReportsPage: React.FC<{
                       </div>
                       <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-black text-accent">Total {formatMetric(selectedTrend.total, 1)}</span>
                     </div>
-                    {dailyCompareMode !== 'none' && compareSelectedTrend && (
+                    {chartSeries.length > 1 && (
                       <div className="mb-3 flex flex-wrap gap-3 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                         {chartSeries.map((item) => (
                           <span key={item.name} className="flex items-center gap-2">
