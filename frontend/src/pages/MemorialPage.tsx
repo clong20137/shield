@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CalendarDays, ExternalLink, Flag, Plus, Search, Shield, Trash2, Upload, X } from 'lucide-react';
 import { getAssetThumbnailUrl, handleAssetThumbnailError, MemorialProfile, memorialProfileService, User, userService } from '../services/api';
@@ -300,16 +300,6 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
     }
   };
 
-  const stats = useMemo(() => {
-    const withEndOfWatch = memorials.filter((profile) => profile.deceasedDate).length;
-    const districts = new Set(memorials.map((profile) => profile.district).filter(Boolean));
-    return {
-      loaded: memorials.length,
-      withEndOfWatch,
-      districts: districts.size,
-    };
-  }, [memorials]);
-
   return (
     <div className="space-y-6">
       <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
@@ -325,21 +315,7 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
                 A dedicated place to honor service, sacrifice, and legacy.
               </p>
             </div>
-            <div className="flex flex-col gap-3 sm:min-w-[360px]">
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="rounded border border-white/15 bg-white/10 p-3">
-                  <p className="text-2xl font-black">{stats.loaded}</p>
-                  <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-blue-100">Shown</p>
-                </div>
-                <div className="rounded border border-white/15 bg-white/10 p-3">
-                  <p className="text-2xl font-black">{stats.withEndOfWatch}</p>
-                  <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-blue-100">EOW</p>
-                </div>
-                <div className="rounded border border-white/15 bg-white/10 p-3">
-                  <p className="text-2xl font-black">{stats.districts}</p>
-                  <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-blue-100">Districts</p>
-                </div>
-              </div>
+            <div className="flex flex-col items-start gap-3 lg:items-end">
               {canEdit && (
                 <button
                   type="button"
@@ -355,12 +331,12 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
         </div>
         <div className="border-t border-gray-200 p-4 dark:border-gray-800 sm:p-5">
           <label className="relative block">
-            <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={18} className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search memorial profiles"
-              className="w-full rounded border border-gray-300 bg-white py-3 pl-12 pr-3 text-sm font-semibold text-gray-900 outline-none transition placeholder:text-gray-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-400"
+              className="h-14 w-full rounded border border-gray-300 bg-white py-3 pl-16 pr-4 text-sm font-semibold text-gray-900 outline-none transition placeholder:text-gray-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-400"
             />
           </label>
         </div>

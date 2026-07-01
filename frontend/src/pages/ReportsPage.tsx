@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Activity, BarChart3, CheckCircle2, ChevronLeft, ChevronRight, Clock, Download, FileText, RotateCcw, Search, Table, Users, X } from 'lucide-react';
+import { Activity, BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock, Download, FileText, RotateCcw, Search, Table, Users, X } from 'lucide-react';
 import { AuthAccount, reportService, TrooperDailyReportEntry, TrooperDailyAnalyticsResponse, User, userService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import PerformanceEvaluationsPage from './PerformanceEvaluationsPage';
@@ -141,7 +141,7 @@ const trooperDailySections = [
 ] as const;
 
 type DailyExportFormat = 'csv' | 'pdf' | 'xls';
-type DailyAnalyticsExportFormat = 'csv' | 'pdf';
+type DailyAnalyticsExportFormat = 'csv' | 'pdf' | 'png';
 type DailyAnalyticsRange = '1d' | '7d' | '1m' | '3m' | '6m' | '1y' | 'custom';
 type DailyGraphType = 'line' | 'bar';
 type DailyCompareMode = 'none' | 'user' | 'district';
@@ -557,7 +557,7 @@ const ReportsPage: React.FC<{
   const [compareAnalyticsLoading, setCompareAnalyticsLoading] = useState(false);
   const [compareAnalyticsError, setCompareAnalyticsError] = useState<string | null>(null);
   const [dailyExportFormat, setDailyExportFormat] = useState<DailyExportFormat>('csv');
-  const [dailyAnalyticsExportFormat, setDailyAnalyticsExportFormat] = useState<DailyAnalyticsExportFormat>('csv');
+  const [isDailyAnalyticsExportMenuOpen, setIsDailyAnalyticsExportMenuOpen] = useState(false);
   const [isSelectedDailyExportMenuOpen, setIsSelectedDailyExportMenuOpen] = useState(false);
   const [rowDailyExportFormats, setRowDailyExportFormats] = useState<Record<string, DailyExportFormat>>({});
   const [dailyExporting, setDailyExporting] = useState(false);
@@ -1093,7 +1093,59 @@ const ReportsPage: React.FC<{
     `Type: ${dailyGraphTypes.find((type) => type.value === dailyGraphType)?.label || 'Line'}`,
   ].filter(Boolean);
 
-  const exportAnalyticsReport = (format: DailyAnalyticsExportFormat = dailyAnalyticsExportFormat) => {
+  const exportAnalyticsPng = () => {
+    const svg = analyticsChartRef.current?.querySelector('svg');
+    if (!svg) {
+      onToast('error', 'No graph is available to export.');
+      return;
+    }
+
+    const clonedSvg = svg.cloneNode(true) as SVGElement;
+    clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    const svgText = new XMLSerializer().serializeToString(clonedSvg);
+    const image = new Image();
+    const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1280;
+      canvas.height = 520;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        URL.revokeObjectURL(url);
+        onToast('error', 'Unable to export this graph.');
+        return;
+      }
+
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      const metric = selectedTrend?.label || 'trooper-daily-graph';
+      downloadReportBlob(
+        Uint8Array.from(atob(canvas.toDataURL('image/png').split(',')[1]), (char) => char.charCodeAt(0)),
+        'image/png',
+        `${cleanReportFilePart(metric)}.png`,
+      );
+      onToast('success', 'Graph PNG export ready.');
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      onToast('error', 'Unable to export this graph.');
+    };
+
+    image.src = url;
+  };
+
+  const exportAnalyticsReport = (format: DailyAnalyticsExportFormat) => {
+    setIsDailyAnalyticsExportMenuOpen(false);
+    if (format === 'png') {
+      exportAnalyticsPng();
+      return;
+    }
+
     if (!selectedTrend || chartSeries.length === 0) {
       onToast('error', 'No graph data is available to export.');
       return;
@@ -1126,6 +1178,40 @@ const ReportsPage: React.FC<{
 
     onToast('success', `Graph ${format.toUpperCase()} export ready.`);
   };
+
+  const renderAnalyticsExportDropdown = () => (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsDailyAnalyticsExportMenuOpen((open) => !open)}
+        className="btn-secondary"
+        aria-haspopup="menu"
+        aria-expanded={isDailyAnalyticsExportMenuOpen}
+      >
+        <Download size={16} /> Export <ChevronDown size={14} />
+      </button>
+      {isDailyAnalyticsExportMenuOpen && (
+        <div className="absolute right-0 top-11 z-40 min-w-36 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-950">
+          {[
+            { format: 'csv' as const, label: 'CSV' },
+            { format: 'pdf' as const, label: 'PDF' },
+            { format: 'png' as const, label: 'PNG' },
+          ].map((option) => (
+            <button
+              key={option.format}
+              type="button"
+              onClick={() => exportAnalyticsReport(option.format)}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-bold text-gray-700 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-900"
+              role="menuitem"
+            >
+              <Download size={14} />
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div>
@@ -1374,18 +1460,7 @@ const ReportsPage: React.FC<{
                           <button type="button" onClick={refreshCompareAnalytics} disabled={compareItems.length === 0 || compareAnalyticsLoading} className="btn-secondary" aria-label="Refresh comparisons" title="Refresh Compare">
                             {compareAnalyticsLoading ? 'Loading' : 'Refresh'}
                           </button>
-                          <select
-                            value={dailyAnalyticsExportFormat}
-                            onChange={(event) => setDailyAnalyticsExportFormat(event.target.value as DailyAnalyticsExportFormat)}
-                            className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-bold dark:border-gray-700 dark:bg-gray-900"
-                            aria-label="Graph export format"
-                          >
-                            <option value="csv">CSV</option>
-                            <option value="pdf">PDF</option>
-                          </select>
-                          <button type="button" onClick={() => exportAnalyticsReport()} className="btn-secondary" aria-label="Export graph data" title="Export Graph Data">
-                            <Download size={16} /> Export
-                          </button>
+                          {renderAnalyticsExportDropdown()}
                         </div>
                       </div>
 
@@ -1510,20 +1585,7 @@ const ReportsPage: React.FC<{
                   </>
                 ) : (
                   <div className="mb-4 flex justify-end">
-                    <div className="flex flex-wrap gap-2">
-                      <select
-                        value={dailyAnalyticsExportFormat}
-                        onChange={(event) => setDailyAnalyticsExportFormat(event.target.value as DailyAnalyticsExportFormat)}
-                        className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-bold dark:border-gray-700 dark:bg-gray-900"
-                        aria-label="Graph export format"
-                      >
-                        <option value="csv">CSV</option>
-                        <option value="pdf">PDF</option>
-                      </select>
-                      <button type="button" onClick={() => exportAnalyticsReport()} className="btn-secondary" aria-label="Export graph data" title="Export Graph Data">
-                        <Download size={16} /> Export
-                      </button>
-                    </div>
+                    {renderAnalyticsExportDropdown()}
                   </div>
                 )}
 
