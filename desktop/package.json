@@ -30,6 +30,14 @@
     "afterPack": "build/after-pack.cjs",
     "appId": "com.shield.desktop",
     "productName": "Shield",
+    "protocols": [
+      {
+        "name": "Shield Desktop Launcher",
+        "schemes": [
+          "shield"
+        ]
+      }
+    ],
     "directories": {
       "output": "release"
     },

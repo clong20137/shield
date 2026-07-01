@@ -35,16 +35,8 @@
       main {
         display: grid;
         min-height: 100vh;
-        grid-template-rows: auto 1fr auto;
-        padding: 28px;
-      }
-
-      .topbar,
-      .footer {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 18px;
+        grid-template-rows: auto 1fr;
+        padding: 30px;
       }
 
       .brand {
@@ -54,23 +46,19 @@
         gap: 14px;
       }
 
-      .logo,
-      .app-mark {
+      .brand-logo {
         display: grid;
-        flex: 0 0 auto;
-        place-items: center;
-        border-radius: 10px;
-      }
-
-      .logo {
         width: 54px;
         height: 54px;
+        flex: 0 0 auto;
+        place-items: center;
         border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 10px;
         background: rgba(255, 255, 255, 0.1);
         box-shadow: 0 18px 50px rgba(0, 0, 0, 0.24);
       }
 
-      .logo img {
+      .brand-logo img {
         width: 42px;
         height: 42px;
         object-fit: contain;
@@ -83,9 +71,8 @@
         line-height: 1.1;
       }
 
-      .brand-subtitle,
-      .system-badge,
-      .footer {
+      .brand-subtitle {
+        margin: 4px 0 0;
         color: #bfdbfe;
         font-size: 0.76rem;
         font-weight: 800;
@@ -93,163 +80,124 @@
         text-transform: uppercase;
       }
 
-      .system-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 10px 13px;
-        border: 1px solid rgba(255, 255, 255, 0.16);
-        border-radius: 10px;
-        background: rgba(255, 255, 255, 0.1);
-      }
-
-      .system-badge::before {
-        width: 8px;
-        height: 8px;
-        border-radius: 999px;
-        background: var(--gold-light);
-        content: "";
-      }
-
       .portal {
         display: grid;
-        width: min(100%, 1180px);
-        gap: 34px;
+        width: min(100%, 1160px);
+        gap: 32px;
         align-self: center;
         justify-self: center;
-        padding: 44px 0;
+        padding: 44px 0 24px;
       }
 
-      .eyebrow {
-        display: inline-flex;
-        margin: 0 0 18px;
-        padding: 9px 12px;
-        border: 1px solid rgba(156, 134, 92, 0.42);
-        border-radius: 10px;
-        background: rgba(156, 134, 92, 0.14);
-        color: var(--gold-light);
-        font-size: 0.74rem;
-        font-weight: 900;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-      }
-
-      h1 {
-        max-width: 760px;
+      .portal-title {
         margin: 0;
-        font-size: clamp(3rem, 6vw, 5.8rem);
+        font-size: clamp(2.8rem, 5.8vw, 5.6rem);
         font-weight: 950;
         letter-spacing: 0;
-        line-height: 0.92;
+        line-height: 0.94;
       }
 
-      .lead {
+      .portal-lead {
         max-width: 700px;
-        margin: 24px 0 0;
+        margin: 18px 0 0;
         color: #dbeafe;
-        font-size: clamp(1.05rem, 2vw, 1.28rem);
-        line-height: 1.65;
+        font-size: clamp(1.02rem, 2vw, 1.22rem);
+        line-height: 1.6;
       }
 
       .app-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 18px;
+        gap: 22px;
       }
 
       .app-card {
         display: grid;
-        min-height: 302px;
-        align-content: space-between;
-        gap: 24px;
-        border: 1px solid rgba(255, 255, 255, 0.22);
-        border-radius: 10px;
-        background:
-          linear-gradient(rgba(248, 250, 252, 0.96), rgba(248, 250, 252, 0.96)) padding-box,
-          linear-gradient(135deg, rgba(255, 255, 255, 0.75), rgba(156, 134, 92, 0.42), rgba(37, 99, 235, 0.28)) border-box;
+        min-height: 470px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        background: rgba(248, 250, 252, 0.96);
         box-shadow: 0 28px 90px rgba(0, 0, 0, 0.34);
         color: #0f172a;
+      }
+
+      .app-image {
+        display: grid;
+        min-height: 275px;
+        place-items: center;
+        border-bottom: 1px solid #e2e8f0;
+        background:
+          linear-gradient(135deg, rgba(26, 54, 93, 0.96), rgba(16, 41, 72, 0.96)),
+          linear-gradient(90deg, rgba(156, 134, 92, 0.2) 0 1px, transparent 1px 100%);
+        background-size: 100% 100%, 42px 42px;
+      }
+
+      .app-image img {
+        width: min(54%, 220px);
+        max-height: 220px;
+        object-fit: contain;
+        filter: drop-shadow(0 22px 44px rgba(0, 0, 0, 0.34));
+      }
+
+      .fleet-image {
+        position: relative;
+        background:
+          linear-gradient(135deg, rgba(8, 20, 33, 0.98), rgba(37, 99, 235, 0.76)),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 1px, transparent 1px 100%);
+        background-size: 100% 100%, 42px 42px;
+      }
+
+      .fleet-monogram {
+        display: grid;
+        width: min(54%, 220px);
+        aspect-ratio: 1;
+        place-items: center;
+        border: 2px solid rgba(215, 197, 154, 0.58);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.12);
+        color: white;
+        font-size: clamp(4rem, 9vw, 7rem);
+        font-weight: 950;
+        box-shadow: 0 22px 54px rgba(0, 0, 0, 0.3);
+      }
+
+      .app-body {
+        display: grid;
+        gap: 18px;
         padding: 24px;
       }
 
-      .app-card.fleet {
-        background:
-          linear-gradient(rgba(248, 250, 252, 0.96), rgba(248, 250, 252, 0.96)) padding-box,
-          linear-gradient(135deg, rgba(255, 255, 255, 0.75), rgba(37, 99, 235, 0.34), rgba(156, 134, 92, 0.34)) border-box;
-      }
-
-      .app-card-top {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 16px;
-      }
-
-      .app-mark {
-        width: 58px;
-        height: 58px;
-        border: 1px solid #dbe3ef;
-        background: #f8fafc;
-        color: var(--navy);
-        font-size: 1.18rem;
-        font-weight: 950;
-      }
-
-      .app-mark img {
-        width: 46px;
-        height: 46px;
-        object-fit: contain;
-      }
-
-      .app-status {
-        border: 1px solid #dbe3ef;
-        border-radius: 999px;
-        padding: 7px 10px;
-        color: #475569;
-        font-size: 0.7rem;
-        font-weight: 900;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-      }
-
-      .panel-label {
+      .app-name {
         margin: 0;
-        color: var(--gold);
-        font-size: 0.75rem;
-        font-weight: 950;
-        letter-spacing: 0.15em;
-        text-transform: uppercase;
-      }
-
-      .panel-title {
-        margin: 10px 0 0;
         color: var(--navy);
-        font-size: 1.9rem;
+        font-size: 2rem;
         font-weight: 950;
-        line-height: 1.08;
+        line-height: 1;
       }
 
-      .panel-text {
-        margin: 16px 0 0;
+      .app-text {
+        margin: 0;
         color: #475569;
         font-size: 0.98rem;
-        line-height: 1.65;
+        line-height: 1.6;
       }
 
       .actions {
         display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 12px;
       }
 
       .launch-button,
-      .secondary-link,
       .download-link {
         display: inline-flex;
-        min-height: 48px;
+        min-height: 50px;
         align-items: center;
         justify-content: center;
         border-radius: 8px;
         font-weight: 900;
+        text-align: center;
         text-decoration: none;
       }
 
@@ -263,18 +211,8 @@
         background: #102948;
       }
 
-      .secondary-link {
-        border: 1px solid #cbd5e1;
-        color: var(--navy);
-      }
-
-      .secondary-link:hover {
-        border-color: var(--gold);
-        color: var(--gold);
-      }
-
       .download-link {
-        border: 1px solid rgba(156, 134, 92, 0.42);
+        border: 1px solid rgba(156, 134, 92, 0.45);
         background: rgba(156, 134, 92, 0.1);
         color: var(--gold);
       }
@@ -284,33 +222,18 @@
       }
 
       .launch-button:focus,
-      .secondary-link:focus,
       .download-link:focus {
         outline: 3px solid rgba(37, 99, 235, 0.35);
         outline-offset: 3px;
       }
 
-      .footer {
-        letter-spacing: 0.08em;
-      }
-
-      @media (max-width: 840px) {
+      @media (max-width: 860px) {
         main {
           padding: 20px;
         }
 
-        .topbar,
-        .footer {
-          align-items: flex-start;
-          flex-direction: column;
-        }
-
-        .system-badge {
-          display: none;
-        }
-
         .portal {
-          padding: 42px 0;
+          padding: 38px 0 16px;
         }
 
         .app-grid {
@@ -320,83 +243,69 @@
         .app-card {
           min-height: 0;
         }
+
+        .actions {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
   </head>
   <body>
     <main>
-      <header class="topbar" aria-label="ISP app portal header">
-        <div class="brand">
-          <span class="logo">
-            <img src="/shield/shield-splash-logo.png" alt="" />
-          </span>
-          <div>
-            <p class="brand-title">ISP App Portal</p>
-            <p class="brand-subtitle">Indiana State Police</p>
-          </div>
+      <header class="brand" aria-label="ISP app portal">
+        <span class="brand-logo">
+          <img src="/shield/shield-splash-logo.png" alt="" />
+        </span>
+        <div>
+          <p class="brand-title">ISP App Portal</p>
+          <p class="brand-subtitle">Indiana State Police</p>
         </div>
-        <div class="system-badge">Authorized Access</div>
       </header>
 
       <section class="portal">
         <div>
-          <p class="eyebrow">Application Launcher</p>
-          <h1>Select an internal app.</h1>
-          <p class="lead">
-            Open SHIELD today, launch the Fleet route when that app is deployed, or
-            download the SHIELD desktop installer for workstation access.
+          <h1 class="portal-title">Select an app.</h1>
+          <p class="portal-lead">
+            Launch an installed desktop app or open a web-based agency workspace.
           </p>
         </div>
 
         <div class="app-grid" aria-label="Application launcher">
           <article class="app-card">
-            <div class="app-card-top">
-              <span class="app-mark">
-                <img src="/shield/shield-splash-logo.png" alt="" />
-              </span>
-              <span class="app-status">Available</span>
+            <div class="app-image">
+              <img src="/shield/shield-splash-logo.png" alt="SHIELD" />
             </div>
-            <div>
-              <p class="panel-label">Personnel Workspace</p>
-              <h2 class="panel-title">SHIELD</h2>
-              <p class="panel-text">
-                Profiles, messaging, reports, calendars, media, alerts, and
-                administrative tools for daily agency operations.
-              </p>
-            </div>
-            <div class="actions">
-              <a class="launch-button" href="/shield/">Open SHIELD</a>
-              <a class="download-link" href="/shield/downloads/Shield-Setup.exe" download>
-                Download SHIELD Desktop App
-              </a>
+            <div class="app-body">
+              <div>
+                <h2 class="app-name">SHIELD</h2>
+                <p class="app-text">Personnel workspace and daily operations tools.</p>
+              </div>
+              <div class="actions">
+                <a class="launch-button" href="shield://open">Launch</a>
+                <a class="download-link" href="/shield/downloads/Shield-Setup.exe" download>
+                  Download
+                </a>
+              </div>
             </div>
           </article>
 
-          <article class="app-card fleet">
-            <div class="app-card-top">
-              <span class="app-mark">FL</span>
-              <span class="app-status">Route Ready</span>
+          <article class="app-card">
+            <div class="app-image fleet-image">
+              <span class="fleet-monogram">FL</span>
             </div>
-            <div>
-              <p class="panel-label">Vehicle Operations</p>
-              <h2 class="panel-title">Fleet</h2>
-              <p class="panel-text">
-                Future fleet workspace for vehicle assignments, maintenance,
-                mileage, equipment, inspections, and service tracking.
-              </p>
-            </div>
-            <div class="actions">
-              <a class="launch-button" href="/fleet/">Open Fleet</a>
-              <a class="secondary-link" href="/health">Check API Health</a>
+            <div class="app-body">
+              <div>
+                <h2 class="app-name">Fleet</h2>
+                <p class="app-text">Vehicle assignments, maintenance, mileage, and equipment.</p>
+              </div>
+              <div class="actions">
+                <a class="launch-button" href="/fleet/">Launch</a>
+                <a class="download-link" href="/fleet/">Open Web</a>
+              </div>
             </div>
           </article>
         </div>
       </section>
-
-      <footer class="footer">
-        <span>Root IIS App Portal</span>
-        <span>Apps: /shield/ and /fleet/</span>
-      </footer>
     </main>
   </body>
 </html>

@@ -1606,7 +1606,19 @@ function createMainWindow() {
 app.setAppUserModelId('com.shield.desktop');
 
 if (hasSingleInstanceLock) {
-  app.on('second-instance', () => {
+  app.setAsDefaultProtocolClient('shield');
+
+  app.on('second-instance', (_event, argv) => {
+    const launchUrl = argv.find((value) => typeof value === 'string' && value.startsWith('shield://'));
+    if (launchUrl) {
+      appendDesktopLog('protocol-launch', { url: launchUrl });
+    }
+    showMainWindow();
+  });
+
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    appendDesktopLog('protocol-launch', { url });
     showMainWindow();
   });
 
