@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Activity, BarChart3, CheckCircle2, ChevronLeft, ChevronRight, Clock, Download, FileText, RotateCcw, Search, Table, Users, X } from 'lucide-react';
-import { AuthAccount, reportService, TrooperDailyReportEntry, TrooperDailyAnalyticsResponse } from '../services/api';
+import { AuthAccount, reportService, TrooperDailyReportEntry, TrooperDailyAnalyticsResponse, User, userService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import PerformanceEvaluationsPage from './PerformanceEvaluationsPage';
 import { downloadTrooperDailiesCsv, downloadTrooperDailiesPdf, downloadTrooperDailiesXls } from '../utils/trooperDailyExport';
@@ -213,6 +213,10 @@ function getRangeDates(range: DailyAnalyticsRange) {
   return { from: formatDateInput(from), to: formatDateInput(to) };
 }
 
+function formatUserOption(user: User): string {
+  return `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || user.id;
+}
+
 const AnalyticsChart: React.FC<{
   series: Array<{ name: string; points: Array<{ label: string; value: number }>; color: string }>;
   graphType: DailyGraphType;
@@ -374,6 +378,10 @@ const ReportsPage: React.FC<{
   const [dailyGraphType, setDailyGraphType] = useState<DailyGraphType>('line');
   const [dailyCompareMode, setDailyCompareMode] = useState<DailyCompareMode>('none');
   const [compareSearch, setCompareSearch] = useState('');
+  const [selectedCompareUserQuery, setSelectedCompareUserQuery] = useState('');
+  const [compareUserResults, setCompareUserResults] = useState<User[]>([]);
+  const [isCompareUserSearchOpen, setIsCompareUserSearchOpen] = useState(false);
+  const [compareUserSearchLoading, setCompareUserSearchLoading] = useState(false);
   const [compareDistrict, setCompareDistrict] = useState('');
   const [compareAnalytics, setCompareAnalytics] = useState<TrooperDailyAnalyticsResponse | null>(null);
   const [compareAnalyticsLoading, setCompareAnalyticsLoading] = useState(false);
@@ -431,7 +439,7 @@ const ReportsPage: React.FC<{
     district = compareDistrict,
   ) => {
     if (mode === 'user') {
-      return { q: search, from, to, district: '' };
+      return { q: selectedCompareUserQuery || search, from, to, district: '' };
     }
 
     if (mode === 'district') {
@@ -559,6 +567,49 @@ const ReportsPage: React.FC<{
     };
   }, [selectedReportType]);
 
+  useEffect(() => {
+    if (dailyCompareMode !== 'user') {
+      setCompareUserResults([]);
+      setIsCompareUserSearchOpen(false);
+      setCompareUserSearchLoading(false);
+      return;
+    }
+
+    const query = compareSearch.trim();
+    if (query.length < 2) {
+      setCompareUserResults([]);
+      setIsCompareUserSearchOpen(false);
+      setCompareUserSearchLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setCompareUserSearchLoading(true);
+    const timer = window.setTimeout(() => {
+      userService.search(query)
+        .then((response) => {
+          if (cancelled) return;
+          setCompareUserResults(Array.isArray(response.data) ? response.data.slice(0, 6) : []);
+          setIsCompareUserSearchOpen(true);
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          console.error(error);
+          setCompareUserResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setCompareUserSearchLoading(false);
+          }
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [compareSearch, dailyCompareMode]);
+
   const searchTrooperDailies = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     void loadTrooperDailies(true, {
@@ -623,6 +674,7 @@ const ReportsPage: React.FC<{
     if (mode === 'none') {
       setCompareAnalytics(null);
       setCompareAnalyticsError(null);
+      setSelectedCompareUserQuery('');
       return;
     }
     void loadCompareAnalytics(true, getCompareFilters(mode));
@@ -630,6 +682,16 @@ const ReportsPage: React.FC<{
 
   const refreshCompareAnalytics = () => {
     void loadCompareAnalytics(true);
+  };
+
+  const selectCompareUser = (user: User) => {
+    const label = formatUserOption(user);
+    const query = user.email || user.peNumber || user.badgeNumber || label;
+    setCompareSearch(label);
+    setSelectedCompareUserQuery(query);
+    setCompareUserResults([]);
+    setIsCompareUserSearchOpen(false);
+    void loadCompareAnalytics(true, { q: query, from: analyticsFrom, to: analyticsTo, district: '' });
   };
 
   const goToDailyPage = (page: number) => {
@@ -970,7 +1032,7 @@ const ReportsPage: React.FC<{
             <div className="loading">Loading Trooper Daily analytics...</div>
           ) : dailyAnalytics ? (
             <>
-              <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="mb-4 grid grid-cols-2 gap-2 xl:grid-cols-4">
                 {[
                   { label: 'Reports', value: formatMetric(dailyAnalytics.totals.totalReports), icon: FileText },
                   { label: 'Total Hours', value: formatMetric(dailyAnalytics.totals.totalHours, 1), icon: Clock },
@@ -979,12 +1041,14 @@ const ReportsPage: React.FC<{
                 ].map((metric) => {
                   const MetricIcon = metric.icon;
                   return (
-                    <div key={metric.label} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                    <div key={metric.label} className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
                         <MetricIcon size={18} />
                       </div>
-                      <p className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{metric.label}</p>
-                      <p className="mt-1 text-2xl font-black text-gray-900 dark:text-gray-50">{metric.value}</p>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{metric.label}</p>
+                        <p className="truncate text-lg font-black text-gray-900 dark:text-gray-50">{metric.value}</p>
+                      </div>
                     </div>
                   );
                 })}
@@ -1059,12 +1123,47 @@ const ReportsPage: React.FC<{
                     <option value="district">Compare District</option>
                   </select>
                   {dailyCompareMode === 'user' ? (
-                    <input
-                      value={compareSearch}
-                      onChange={(event) => setCompareSearch(event.target.value)}
-                      placeholder="Compare user, email, PE, badge..."
-                      className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-                    />
+                    <div className="relative">
+                      <input
+                        value={compareSearch}
+                        onChange={(event) => {
+                          setCompareSearch(event.target.value);
+                          setSelectedCompareUserQuery('');
+                          setIsCompareUserSearchOpen(true);
+                        }}
+                        onFocus={() => {
+                          if (compareUserResults.length > 0) {
+                            setIsCompareUserSearchOpen(true);
+                          }
+                        }}
+                        placeholder="Start typing a user name..."
+                        className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                      />
+                      {isCompareUserSearchOpen && (compareUserResults.length > 0 || compareUserSearchLoading) && (
+                        <div className="absolute left-0 right-0 top-11 z-30 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-950">
+                          {compareUserSearchLoading ? (
+                            <div className="px-3 py-2 text-sm font-semibold text-gray-500 dark:text-gray-400">Searching users...</div>
+                          ) : (
+                            compareUserResults.map((user) => (
+                              <button
+                                key={user.id}
+                                type="button"
+                                onClick={() => selectCompareUser(user)}
+                                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-900"
+                              >
+                                <span className="min-w-0">
+                                  <span className="block truncate text-sm font-black text-gray-900 dark:text-gray-100">{formatUserOption(user)}</span>
+                                  <span className="block truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
+                                    {user.rank || 'No rank'}{user.district ? ` - ${user.district}` : ''}{user.peNumber ? ` - PE ${user.peNumber}` : ''}
+                                  </span>
+                                </span>
+                                <span className="shrink-0 text-xs font-bold text-accent">{user.badgeNumber || user.email || ''}</span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
                   ) : dailyCompareMode === 'district' ? (
                     <select
                       value={compareDistrict}
@@ -1113,9 +1212,9 @@ const ReportsPage: React.FC<{
                 )}
               </div>
 
-              <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">All Trooper Daily Data Totals</h4>
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+              <details className="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <summary className="cursor-pointer text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Metric Shortcuts</summary>
+                <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
                   {dailyActivitySections.map((section) => (
                     <section key={section.title} className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
                       <h5 className="mb-3 text-xs font-black uppercase tracking-wide text-gray-600 dark:text-gray-300">{section.title}</h5>
@@ -1135,7 +1234,7 @@ const ReportsPage: React.FC<{
                     </section>
                   ))}
                 </div>
-              </div>
+              </details>
             </>
           ) : (
             <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No analytics available yet.</p>
