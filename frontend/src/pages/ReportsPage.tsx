@@ -317,7 +317,10 @@ const AnalyticsChart: React.FC<{
                   className="cursor-pointer"
                   onMouseEnter={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: x + barWidth / 2, y: point.y, color: item.color })}
                   onMouseMove={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: x + barWidth / 2, y: point.y, color: item.color })}
-                />
+                >
+                  <animate attributeName="y" from={padding.top + chartHeight} to={point.y} dur="420ms" fill="freeze" />
+                  <animate attributeName="height" from="1" to={Math.max(1, barHeight)} dur="420ms" fill="freeze" />
+                </rect>
               );
             });
           })
@@ -329,8 +332,24 @@ const AnalyticsChart: React.FC<{
               : '';
             return (
               <g key={item.name}>
-                {fillPath && <path d={fillPath} fill={item.color} opacity="0.08" />}
-                <path d={path} fill="none" stroke={item.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                {fillPath && (
+                  <path d={fillPath} fill={item.color} opacity="0.08">
+                    <animate attributeName="opacity" from="0" to="0.08" dur="500ms" fill="freeze" />
+                  </path>
+                )}
+                <path
+                  d={path}
+                  fill="none"
+                  stroke={item.color}
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  pathLength="100"
+                  strokeDasharray="100"
+                  strokeDashoffset="100"
+                >
+                  <animate attributeName="stroke-dashoffset" from="100" to="0" dur="520ms" fill="freeze" />
+                </path>
                 {item.coordinates.map((point) => (
                   <circle
                     key={`${item.name}-${point.label}-${point.x}`}
@@ -340,10 +359,14 @@ const AnalyticsChart: React.FC<{
                     fill={item.color}
                     stroke="white"
                     strokeWidth="2"
+                    opacity="0"
                     className="cursor-pointer"
                     onMouseEnter={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: point.x, y: point.y, color: item.color })}
                     onMouseMove={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: point.x, y: point.y, color: item.color })}
-                  />
+                  >
+                    <animate attributeName="opacity" from="0" to="1" dur="240ms" begin="260ms" fill="freeze" />
+                    <animate attributeName="r" from="2" to="4" dur="240ms" begin="260ms" fill="freeze" />
+                  </circle>
                 ))}
               </g>
             );
@@ -432,7 +455,8 @@ const ReportsPage: React.FC<{
   const dailyLoadInFlightRef = useRef(false);
   const dailyLoadPendingRef = useRef(false);
   const analyticsChartRef = useRef<HTMLDivElement | null>(null);
-  const canReviewTrooperDailies = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('reports:trooper-dailies'));
+  const canViewAllTrooperDailies = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('reports:trooper-dailies'));
+  const canReviewTrooperDailies = canViewAllTrooperDailies;
 
   const loadTrooperDailyAnalytics = async (
     showLoading = true,
@@ -450,10 +474,10 @@ const ReportsPage: React.FC<{
 
     try {
       const response = await reportService.getTrooperDailyAnalytics({
-        q: filters.q.trim() || undefined,
+        q: canViewAllTrooperDailies ? filters.q.trim() || undefined : undefined,
         from: filters.from || undefined,
         to: filters.to || undefined,
-        district: filters.district || undefined,
+        district: canViewAllTrooperDailies ? filters.district || undefined : undefined,
       });
       setDailyAnalytics(response.data);
     } catch (err) {
@@ -470,6 +494,10 @@ const ReportsPage: React.FC<{
     from = analyticsFrom,
     to = analyticsTo,
   ): Promise<DailyCompareItem> => {
+    if (!canViewAllTrooperDailies) {
+      return { ...item, loading: false, error: null };
+    }
+
     try {
       const response = await reportService.getTrooperDailyAnalytics({
         q: item.type === 'user' ? item.query || item.label : undefined,
@@ -491,7 +519,7 @@ const ReportsPage: React.FC<{
     to = analyticsTo,
     showLoading = true,
   ) => {
-    if (items.length === 0) {
+    if (!canViewAllTrooperDailies || items.length === 0) {
       setCompareAnalyticsError(null);
       return;
     }
@@ -558,6 +586,19 @@ const ReportsPage: React.FC<{
       }
     }
   };
+
+  useEffect(() => {
+    if (!canViewAllTrooperDailies) {
+      setAnalyticsSearch('');
+      setAnalyticsDistrict('');
+      setCompareItems([]);
+      setCompareSearch('');
+      setCompareDistrictSearch('');
+      setCompareAnalyticsError(null);
+      setIsCompareUserSearchOpen(false);
+      setIsCompareDistrictSearchOpen(false);
+    }
+  }, [canViewAllTrooperDailies]);
 
   useEffect(() => {
     if (selectedReportType === 'trooper-daily') {
@@ -641,10 +682,10 @@ const ReportsPage: React.FC<{
   const searchTrooperDailies = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     void loadTrooperDailies(true, {
-      q: dailySearch,
+      q: canViewAllTrooperDailies ? dailySearch : '',
       from: dailyFrom,
       to: dailyTo,
-      district: dailyDistrict,
+      district: canViewAllTrooperDailies ? dailyDistrict : '',
       page: 1,
       pageSize: dailyPageSize,
     });
@@ -702,6 +743,10 @@ const ReportsPage: React.FC<{
   };
 
   const addCompareItem = async (item: Omit<DailyCompareItem, 'color' | 'loading' | 'error'>) => {
+    if (!canViewAllTrooperDailies) {
+      return;
+    }
+
     const id = item.id;
     const alreadyAdded = compareItems.some((compareItem) => compareItem.id === id);
     if (alreadyAdded) {
@@ -1035,13 +1080,15 @@ const ReportsPage: React.FC<{
             <h3 className="text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Report Table Filters</h3>
             <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">These filters only affect the report entries table.</p>
           </div>
-          <form onSubmit={searchTrooperDailies} className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))_auto_auto]">
-          <input
-            value={dailySearch}
-            onChange={(event) => setDailySearch(event.target.value)}
-            placeholder="Name, email, PE, badge, rank, district..."
-            className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-          />
+          <form onSubmit={searchTrooperDailies} className={`grid grid-cols-1 gap-3 ${canViewAllTrooperDailies ? 'xl:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))_auto_auto]' : 'xl:grid-cols-[repeat(2,minmax(0,1fr))_auto_auto]'}`}>
+          {canViewAllTrooperDailies && (
+            <input
+              value={dailySearch}
+              onChange={(event) => setDailySearch(event.target.value)}
+              placeholder="Name, email, PE, badge, rank, district..."
+              className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+            />
+          )}
           <input
             type="date"
             value={dailyFrom}
@@ -1054,10 +1101,12 @@ const ReportsPage: React.FC<{
             onChange={(event) => setDailyTo(event.target.value)}
             className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
           />
-          <select value={dailyDistrict} onChange={(event) => setDailyDistrict(event.target.value)} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
-            <option value="">All Districts</option>
-            {districtOptions.map((district) => <option key={district}>{district}</option>)}
-          </select>
+          {canViewAllTrooperDailies && (
+            <select value={dailyDistrict} onChange={(event) => setDailyDistrict(event.target.value)} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
+              <option value="">All Districts</option>
+              {districtOptions.map((district) => <option key={district}>{district}</option>)}
+            </select>
+          )}
           <button type="submit" className="btn-primary" aria-label="Search Trooper Daily reports" title="Search">
             <Search size={16} />
           </button>
@@ -1076,7 +1125,7 @@ const ReportsPage: React.FC<{
                 <BarChart3 size={20} className="text-accent" /> Live Trooper Daily Analytics
               </h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                View overall data, search a user, or narrow the graph to a district.
+                {canViewAllTrooperDailies ? 'View overall data, search a user, or narrow the graph to a district.' : 'View your submitted Trooper Daily analytics.'}
               </p>
             </div>
             {dailyAnalytics?.generatedAt && (
@@ -1091,28 +1140,30 @@ const ReportsPage: React.FC<{
             )}
           </div>
 
-          <form onSubmit={searchTrooperDailyAnalytics} className="mb-4 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]">
-            <input
-              value={analyticsSearch}
-              onChange={(event) => setAnalyticsSearch(event.target.value)}
-              placeholder="Search user, email, PE, badge, rank..."
-              className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-            />
-            <select
-              value={analyticsDistrict}
-              onChange={(event) => setAnalyticsDistrict(event.target.value)}
-              className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-            >
-              <option value="">All Districts</option>
-              {districtOptions.map((district) => <option key={district}>{district}</option>)}
-            </select>
-            <button type="submit" className="btn-primary" aria-label="Search analytics" title="Search Analytics">
-              <Search size={16} />
-            </button>
-            <button type="button" onClick={clearTrooperDailyAnalyticsFilters} className="btn-secondary" aria-label="Show overall analytics" title="Overall Data">
-              Overall
-            </button>
-          </form>
+          {canViewAllTrooperDailies && (
+            <form onSubmit={searchTrooperDailyAnalytics} className="mb-4 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]">
+              <input
+                value={analyticsSearch}
+                onChange={(event) => setAnalyticsSearch(event.target.value)}
+                placeholder="Search user, email, PE, badge, rank..."
+                className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+              />
+              <select
+                value={analyticsDistrict}
+                onChange={(event) => setAnalyticsDistrict(event.target.value)}
+                className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+              >
+                <option value="">All Districts</option>
+                {districtOptions.map((district) => <option key={district}>{district}</option>)}
+              </select>
+              <button type="submit" className="btn-primary" aria-label="Search analytics" title="Search Analytics">
+                <Search size={16} />
+              </button>
+              <button type="button" onClick={clearTrooperDailyAnalyticsFilters} className="btn-secondary" aria-label="Show overall analytics" title="Overall Data">
+                Overall
+              </button>
+            </form>
+          )}
 
           {dailyAnalyticsError && <div className="error mb-4">{dailyAnalyticsError}</div>}
           {dailyAnalyticsLoading && !dailyAnalytics ? (
@@ -1124,7 +1175,7 @@ const ReportsPage: React.FC<{
                   { label: 'Reports', value: formatMetric(dailyAnalytics.totals.totalReports), icon: FileText },
                   { label: 'Total Hours', value: formatMetric(dailyAnalytics.totals.totalHours, 1), icon: Clock },
                   { label: 'Avg Hours', value: formatMetric(dailyAnalytics.totals.averageHours, 1), icon: Activity },
-                  { label: 'Troopers', value: formatMetric(dailyAnalytics.totals.uniqueTroopers), icon: Users },
+                  ...(canViewAllTrooperDailies ? [{ label: 'Troopers', value: formatMetric(dailyAnalytics.totals.uniqueTroopers), icon: Users }] : []),
                 ].map((metric) => {
                   const MetricIcon = metric.icon;
                   return (
@@ -1207,140 +1258,150 @@ const ReportsPage: React.FC<{
                   ))}
                 </div>
 
-                <section className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h5 className="text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Compare</h5>
-                      <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Add users or districts to the same graph.</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={refreshCompareAnalytics} disabled={compareItems.length === 0 || compareAnalyticsLoading} className="btn-secondary" aria-label="Refresh comparisons" title="Refresh Compare">
-                        {compareAnalyticsLoading ? 'Loading' : 'Refresh'}
-                      </button>
-                      <button type="button" onClick={exportAnalyticsChart} className="btn-secondary" aria-label="Download graph" title="Download Graph">
-                        <Download size={16} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,0.7fr)_minmax(0,1.4fr)]">
-                    <select
-                      value={dailyCompareMode}
-                      onChange={(event) => {
-                        setDailyCompareMode(event.target.value as DailyCompareMode);
-                        setCompareSearch('');
-                        setCompareDistrictSearch('');
-                        setIsCompareUserSearchOpen(false);
-                        setIsCompareDistrictSearchOpen(false);
-                      }}
-                      className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-900"
-                      aria-label="Compare graph mode"
-                    >
-                      <option value="user">Compare Users</option>
-                      <option value="district">Compare Districts</option>
-                    </select>
-
-                    {dailyCompareMode === 'user' ? (
-                      <div className="relative">
-                        <input
-                          value={compareSearch}
-                          onChange={(event) => {
-                            setCompareSearch(event.target.value);
-                            setIsCompareUserSearchOpen(true);
-                          }}
-                          onFocus={() => {
-                            if (compareUserResults.length > 0) {
-                              setIsCompareUserSearchOpen(true);
-                            }
-                          }}
-                          placeholder="Type a user name, email, PE, or badge..."
-                          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-                        />
-                        {isCompareUserSearchOpen && (compareUserResults.length > 0 || compareUserSearchLoading) && (
-                          <div className="absolute left-0 right-0 top-11 z-30 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-950">
-                            {compareUserSearchLoading ? (
-                              <div className="px-3 py-2 text-sm font-semibold text-gray-500 dark:text-gray-400">Searching users...</div>
-                            ) : (
-                              compareUserResults.map((user) => (
-                                <button
-                                  key={user.id}
-                                  type="button"
-                                  onClick={() => selectCompareUser(user)}
-                                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-900"
-                                >
-                                  <span className="min-w-0">
-                                    <span className="block truncate text-sm font-black text-gray-900 dark:text-gray-100">{formatUserOption(user)}</span>
-                                    <span className="block truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
-                                      {user.rank || 'No rank'}{user.district ? ` - ${user.district}` : ''}{user.peNumber ? ` - PE ${user.peNumber}` : ''}
-                                    </span>
-                                  </span>
-                                  <span className="shrink-0 text-xs font-bold text-accent">{user.badgeNumber || user.email || ''}</span>
-                                </button>
-                              ))
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="relative">
-                        <input
-                          value={compareDistrictSearch}
-                          onChange={(event) => {
-                            setCompareDistrictSearch(event.target.value);
-                            setIsCompareDistrictSearchOpen(true);
-                          }}
-                          onFocus={() => setIsCompareDistrictSearchOpen(true)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                              event.preventDefault();
-                              const exactDistrict = districtOptions.find((district) => district.toLowerCase() === compareDistrictSearch.trim().toLowerCase());
-                              if (exactDistrict) {
-                                selectCompareDistrict(exactDistrict);
-                              }
-                            }
-                          }}
-                          placeholder="Type a district..."
-                          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-                        />
-                        {isCompareDistrictSearchOpen && (
-                          <div className="absolute left-0 right-0 top-11 z-30 max-h-64 overflow-auto rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-950">
-                            {compareDistrictMatches.length > 0 ? (
-                              compareDistrictMatches.map((district) => (
-                                <button
-                                  key={district}
-                                  type="button"
-                                  onClick={() => selectCompareDistrict(district)}
-                                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-bold text-gray-800 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-900"
-                                >
-                                  {district}
-                                  <span className="text-xs font-black uppercase text-accent">Add</span>
-                                </button>
-                              ))
-                            ) : (
-                              <div className="px-3 py-2 text-sm font-semibold text-gray-500 dark:text-gray-400">No districts found.</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {compareItems.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {compareItems.map((item) => (
-                        <span key={item.id} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-black text-gray-700 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
-                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                          {item.label}
-                          {item.loading && <span className="font-bold text-gray-400">loading</span>}
-                          <button type="button" onClick={() => removeCompareItem(item.id)} className="text-gray-400 transition hover:text-red-600" aria-label={`Remove ${item.label}`}>
-                            <X size={14} />
+                {canViewAllTrooperDailies ? (
+                  <>
+                    <section className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h5 className="text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Compare</h5>
+                          <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Add users or districts to the same graph.</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button type="button" onClick={refreshCompareAnalytics} disabled={compareItems.length === 0 || compareAnalyticsLoading} className="btn-secondary" aria-label="Refresh comparisons" title="Refresh Compare">
+                            {compareAnalyticsLoading ? 'Loading' : 'Refresh'}
                           </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </section>
-                {compareAnalyticsError && <div className="error mb-4">{compareAnalyticsError}</div>}
+                          <button type="button" onClick={exportAnalyticsChart} className="btn-secondary" aria-label="Download graph" title="Download Graph">
+                            <Download size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,0.7fr)_minmax(0,1.4fr)]">
+                        <select
+                          value={dailyCompareMode}
+                          onChange={(event) => {
+                            setDailyCompareMode(event.target.value as DailyCompareMode);
+                            setCompareSearch('');
+                            setCompareDistrictSearch('');
+                            setIsCompareUserSearchOpen(false);
+                            setIsCompareDistrictSearchOpen(false);
+                          }}
+                          className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-900"
+                          aria-label="Compare graph mode"
+                        >
+                          <option value="user">Compare Users</option>
+                          <option value="district">Compare Districts</option>
+                        </select>
+
+                        {dailyCompareMode === 'user' ? (
+                          <div className="relative">
+                            <input
+                              value={compareSearch}
+                              onChange={(event) => {
+                                setCompareSearch(event.target.value);
+                                setIsCompareUserSearchOpen(true);
+                              }}
+                              onFocus={() => {
+                                if (compareUserResults.length > 0) {
+                                  setIsCompareUserSearchOpen(true);
+                                }
+                              }}
+                              placeholder="Type a user name, email, PE, or badge..."
+                              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                            />
+                            {isCompareUserSearchOpen && (compareUserResults.length > 0 || compareUserSearchLoading) && (
+                              <div className="absolute left-0 right-0 top-11 z-30 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-950">
+                                {compareUserSearchLoading ? (
+                                  <div className="px-3 py-2 text-sm font-semibold text-gray-500 dark:text-gray-400">Searching users...</div>
+                                ) : (
+                                  compareUserResults.map((user) => (
+                                    <button
+                                      key={user.id}
+                                      type="button"
+                                      onClick={() => selectCompareUser(user)}
+                                      className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-900"
+                                    >
+                                      <span className="min-w-0">
+                                        <span className="block truncate text-sm font-black text-gray-900 dark:text-gray-100">{formatUserOption(user)}</span>
+                                        <span className="block truncate text-xs font-semibold text-gray-500 dark:text-gray-400">
+                                          {user.rank || 'No rank'}{user.district ? ` - ${user.district}` : ''}{user.peNumber ? ` - PE ${user.peNumber}` : ''}
+                                        </span>
+                                      </span>
+                                      <span className="shrink-0 text-xs font-bold text-accent">{user.badgeNumber || user.email || ''}</span>
+                                    </button>
+                                  ))
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <input
+                              value={compareDistrictSearch}
+                              onChange={(event) => {
+                                setCompareDistrictSearch(event.target.value);
+                                setIsCompareDistrictSearchOpen(true);
+                              }}
+                              onFocus={() => setIsCompareDistrictSearchOpen(true)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                  event.preventDefault();
+                                  const exactDistrict = districtOptions.find((district) => district.toLowerCase() === compareDistrictSearch.trim().toLowerCase());
+                                  if (exactDistrict) {
+                                    selectCompareDistrict(exactDistrict);
+                                  }
+                                }
+                              }}
+                              placeholder="Type a district..."
+                              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                            />
+                            {isCompareDistrictSearchOpen && (
+                              <div className="absolute left-0 right-0 top-11 z-30 max-h-64 overflow-auto rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-950">
+                                {compareDistrictMatches.length > 0 ? (
+                                  compareDistrictMatches.map((district) => (
+                                    <button
+                                      key={district}
+                                      type="button"
+                                      onClick={() => selectCompareDistrict(district)}
+                                      className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-bold text-gray-800 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-900"
+                                    >
+                                      {district}
+                                      <span className="text-xs font-black uppercase text-accent">Add</span>
+                                    </button>
+                                  ))
+                                ) : (
+                                  <div className="px-3 py-2 text-sm font-semibold text-gray-500 dark:text-gray-400">No districts found.</div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {compareItems.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {compareItems.map((item) => (
+                            <span key={item.id} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-black text-gray-700 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                              {item.label}
+                              {item.loading && <span className="font-bold text-gray-400">loading</span>}
+                              <button type="button" onClick={() => removeCompareItem(item.id)} className="text-gray-400 transition hover:text-red-600" aria-label={`Remove ${item.label}`}>
+                                <X size={14} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                    {compareAnalyticsError && <div className="error mb-4">{compareAnalyticsError}</div>}
+                  </>
+                ) : (
+                  <div className="mb-4 flex justify-end">
+                    <button type="button" onClick={exportAnalyticsChart} className="btn-secondary" aria-label="Download graph" title="Download Graph">
+                      <Download size={16} />
+                    </button>
+                  </div>
+                )}
 
                 {selectedTrend ? (
                   <>
