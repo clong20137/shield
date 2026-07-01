@@ -144,6 +144,7 @@ type DailyExportFormat = 'csv' | 'pdf' | 'xls';
 type DailyAnalyticsRange = '1d' | '7d' | '1m' | '3m' | '6m' | '1y' | 'custom';
 type DailyGraphType = 'line' | 'bar';
 type DailyCompareMode = 'none' | 'user' | 'district';
+type TrooperDailyTab = 'graph' | 'table' | 'exports';
 
 const dailyAnalyticsRanges: Array<{ value: DailyAnalyticsRange; label: string }> = [
   { value: '1d', label: '1 Day' },
@@ -157,6 +158,12 @@ const dailyAnalyticsRanges: Array<{ value: DailyAnalyticsRange; label: string }>
 const dailyGraphTypes: Array<{ value: DailyGraphType; label: string }> = [
   { value: 'line', label: 'Line' },
   { value: 'bar', label: 'Bar' },
+];
+
+const trooperDailyTabs: Array<{ value: TrooperDailyTab; label: string }> = [
+  { value: 'graph', label: 'Graph' },
+  { value: 'table', label: 'Table' },
+  { value: 'exports', label: 'Exports' },
 ];
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -355,6 +362,7 @@ const ReportsPage: React.FC<{
 }> = ({ currentUser, onToast, getErrorMessage: getAppErrorMessage }) => {
   const initialAnalyticsDatesRef = useRef(getRangeDates('1m'));
   const [selectedReportType, setSelectedReportType] = useState<'trooper-daily' | 'cpar'>('trooper-daily');
+  const [activeTrooperDailyTab, setActiveTrooperDailyTab] = useState<TrooperDailyTab>('graph');
   const [trooperDailies, setTrooperDailies] = useState<TrooperDailyReportEntry[]>([]);
   const [dailySearch, setDailySearch] = useState('');
   const [dailyFrom, setDailyFrom] = useState('');
@@ -936,7 +944,30 @@ const ReportsPage: React.FC<{
           </span>
         </div>
 
-        <form onSubmit={searchTrooperDailies} className="mb-4 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))_auto_auto_auto]">
+        <div className="mb-5 flex flex-wrap gap-2 border-b border-gray-200 pb-3 dark:border-gray-800">
+          {trooperDailyTabs.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setActiveTrooperDailyTab(tab.value)}
+              className={`rounded px-4 py-2 text-sm font-black transition ${
+                activeTrooperDailyTab === tab.value
+                  ? 'bg-primary-500 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTrooperDailyTab === 'table' && (
+        <section className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/60">
+          <div className="mb-3">
+            <h3 className="text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Report Table Filters</h3>
+            <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">These filters only affect the report entries table.</p>
+          </div>
+          <form onSubmit={searchTrooperDailies} className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))_auto_auto]">
           <input
             value={dailySearch}
             onChange={(event) => setDailySearch(event.target.value)}
@@ -965,23 +996,11 @@ const ReportsPage: React.FC<{
           <button type="button" onClick={clearTrooperDailyFilters} className="btn-secondary" aria-label="Clear Trooper Daily filters" title="Clear">
             <X size={16} />
           </button>
-          <div className="flex gap-2">
-            <select
-              value={dailyExportFormat}
-              onChange={(event) => setDailyExportFormat(event.target.value as DailyExportFormat)}
-              className="min-w-24 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-              aria-label="Export format"
-            >
-              <option value="csv">CSV</option>
-              <option value="pdf">PDF</option>
-              <option value="xls">XLS</option>
-            </select>
-            <button type="button" onClick={exportTrooperDailies} className="btn-secondary" disabled={dailyExporting} aria-label="Export Trooper Daily reports" title={dailyExporting ? 'Exporting' : 'Export'}>
-              <Download size={16} />
-            </button>
-          </div>
-        </form>
+          </form>
+        </section>
+        )}
 
+        {activeTrooperDailyTab === 'graph' && (
         <section className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/60">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -1070,9 +1089,6 @@ const ReportsPage: React.FC<{
                         <option key={trend.key} value={trend.key}>{trend.label}</option>
                       ))}
                     </select>
-                    <button type="button" onClick={exportAnalyticsChart} className="btn-secondary" aria-label="Download graph" title="Download Graph">
-                      <Download size={16} />
-                    </button>
                   </div>
                 </div>
 
@@ -1111,7 +1127,9 @@ const ReportsPage: React.FC<{
                   </div>
                 </div>
 
-                <div className="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto]">
+                <details className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                  <summary className="cursor-pointer text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Advanced</summary>
+                  <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto_auto]">
                   <select
                     value={dailyCompareMode}
                     onChange={(event) => changeCompareMode(event.target.value as DailyCompareMode)}
@@ -1181,7 +1199,11 @@ const ReportsPage: React.FC<{
                   <button type="button" onClick={refreshCompareAnalytics} disabled={dailyCompareMode === 'none' || compareAnalyticsLoading} className="btn-secondary" aria-label="Refresh comparison" title="Refresh Compare">
                     {compareAnalyticsLoading ? 'Loading' : 'Compare'}
                   </button>
-                </div>
+                  <button type="button" onClick={exportAnalyticsChart} className="btn-secondary" aria-label="Download graph" title="Download Graph">
+                    <Download size={16} />
+                  </button>
+                  </div>
+                </details>
                 {compareAnalyticsError && <div className="error mb-4">{compareAnalyticsError}</div>}
 
                 {selectedTrend ? (
@@ -1240,7 +1262,39 @@ const ReportsPage: React.FC<{
             <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No analytics available yet.</p>
           )}
         </section>
+        )}
 
+        {activeTrooperDailyTab === 'exports' && (
+          <section className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/60">
+            <div className="mb-4">
+              <h3 className="text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Exports</h3>
+              <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                Export uses the current table filters for search, date range, and district.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={dailyExportFormat}
+                onChange={(event) => setDailyExportFormat(event.target.value as DailyExportFormat)}
+                className="min-w-28 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+                aria-label="Export format"
+              >
+                <option value="csv">CSV</option>
+                <option value="pdf">PDF</option>
+                <option value="xls">XLS</option>
+              </select>
+              <button type="button" onClick={exportTrooperDailies} className="btn-secondary" disabled={dailyExporting} aria-label="Export Trooper Daily reports" title={dailyExporting ? 'Exporting' : 'Export'}>
+                <Download size={16} />
+              </button>
+              <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                {dailyTotal.toLocaleString()} matching report{dailyTotal === 1 ? '' : 's'}
+              </span>
+            </div>
+          </section>
+        )}
+
+        {activeTrooperDailyTab === 'table' && (
+        <>
         {dailyError && <div className="error">{dailyError}</div>}
         {dailyLoading ? (
           <div className="loading">Loading Trooper Daily reports...</div>
@@ -1365,6 +1419,8 @@ const ReportsPage: React.FC<{
               </table>
             </div>
           </>
+        )}
+        </>
         )}
       </section>
       ) : (
