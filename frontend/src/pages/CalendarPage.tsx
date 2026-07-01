@@ -812,6 +812,19 @@ function getHourTargetLabel(targetHours: number, actualHours: number, label = 'M
   return difference <= 0.01 ? label : `${formatHours(difference)} hr off`;
 }
 
+function getHourBalanceLabel(targetHours: number, actualHours: number, matchLabel = 'Matches'): string {
+  if (targetHours <= 0.01) {
+    return actualHours > 0.01 ? `${formatHours(actualHours)}h over expected hours` : 'No worked-hour target';
+  }
+
+  const difference = actualHours - targetHours;
+  if (Math.abs(difference) <= 0.01) {
+    return matchLabel;
+  }
+
+  return `${formatHours(Math.abs(difference))}h ${difference > 0 ? 'over' : 'short'}`;
+}
+
 function isHourMatch(reportedHours: number, comparisonHours: number): boolean {
   return reportedHours > 0 && comparisonHours > 0 && Math.abs(reportedHours - comparisonHours) <= 0.01;
 }
@@ -2556,8 +2569,10 @@ function CalendarPage({
   const standardDutyActivityHours = dutyActivityHourFields.reduce((total, key) => total + parseNumericDetail(entryDetails, key), 0);
   const dutyActivityHours = standardDutyActivityHours + tCodeHours;
   const remainingDutyActivityHours = Math.max(shiftDutyTargetHours - dutyActivityHours, 0);
-  const hasShiftTime = calculatedShiftHours > 0;
   const hasShiftDutyTarget = shiftDutyTargetHours > 0;
+  const tCodeBalanceLabel = getHourBalanceLabel(shiftDutyTargetHours, tCodeHours, 'on target');
+  const dutyActivityBalanceLabel = getHourBalanceLabel(shiftDutyTargetHours, dutyActivityHours, hasShiftDutyTarget ? 'Matches worked hours' : 'No worked hours');
+  const hasShiftTime = calculatedShiftHours > 0;
   const hasReportedHours = reportedDutyHours > 0;
   const shiftHoursMatch = isHourTargetMatch(shiftDutyTargetHours, calculatedShiftHours);
   const attendanceHoursMatch = isHourMatch(reportedDutyHours, attendanceHours);
@@ -2606,7 +2621,8 @@ function CalendarPage({
     { label: 'Reported', value: reportedDutyHours, helper: '', isMatch: false },
     { label: 'Shift', value: calculatedShiftHours, helper: getHourTargetLabel(shiftDutyTargetHours, calculatedShiftHours, hasShiftDutyTarget ? 'Matches worked hours' : 'No worked hours'), isMatch: shiftHoursMatch || (!hasShiftDutyTarget && calculatedShiftHours <= 0.01) },
     { label: 'Attendance', value: attendanceHours, helper: getDifferenceLabel(reportedDutyHours, attendanceHours), isMatch: attendanceHoursMatch },
-    { label: 'Duty Activity', value: dutyActivityHours, helper: tCodeHours > 0 ? `Includes ${formatHours(tCodeHours)}h T-Code` : getHourTargetLabel(shiftDutyTargetHours, dutyActivityHours, hasShiftDutyTarget ? 'Matches worked hours' : 'No worked hours'), isMatch: dutyActivityHoursMatch || (!hasShiftDutyTarget && dutyActivityHours <= 0.01) },
+    { label: 'T-Codes', value: tCodeHours, helper: tCodeBalanceLabel, isMatch: isHourTargetMatch(shiftDutyTargetHours, tCodeHours) || (!hasShiftDutyTarget && tCodeHours <= 0.01) },
+    { label: 'Duty Activity', value: dutyActivityHours, helper: tCodeHours > 0 ? `Includes ${formatHours(tCodeHours)}h T-Code - ${dutyActivityBalanceLabel}` : dutyActivityBalanceLabel, isMatch: dutyActivityHoursMatch || (!hasShiftDutyTarget && dutyActivityHours <= 0.01) },
   ];
   const activeHourGuidance = (() => {
     if (!hasReportedHours) {
@@ -2909,9 +2925,6 @@ function CalendarPage({
             <CalendarClock size={16} />
           </button>
         </div>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Personal duty information for {currentUser.displayName || currentUser.email}.
-        </p>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2 rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-950">
@@ -3759,9 +3772,8 @@ function CalendarPage({
                           </p>
                           {tCodeHours > 0 && (
                             <p className="mt-2 rounded-lg border border-accent/20 bg-accent/5 px-3 py-2 text-sm font-semibold text-gray-700 dark:border-accent/30 dark:bg-accent/10 dark:text-gray-200">
-                              {formatHours(tCodeHours)}h T-Code counts toward Duty Hours. {remainingDutyActivityHours > 0.01
-                                ? `Report ${formatHours(remainingDutyActivityHours)}h more in Duty Hours to reach ${formatHours(shiftDutyTargetHours)}h.`
-                                : `Duty Hours target of ${formatHours(shiftDutyTargetHours)}h is covered.`}
+                              {formatHours(tCodeHours)}h T-Code counts toward Duty Hours. T-Codes are {tCodeBalanceLabel} against {formatHours(shiftDutyTargetHours)}h worked hours.
+                              {remainingDutyActivityHours > 0.01 ? ` Duty activity still needs ${formatHours(remainingDutyActivityHours)}h to reach the target.` : ''}
                             </p>
                           )}
                         </div>
@@ -4249,7 +4261,7 @@ function CalendarPage({
               </div>
             </div>
 
-            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               {hourMetrics.map((metric) => (
                 <div key={metric.label} className={`rounded-lg border p-3 ${
                   metric.isMatch
