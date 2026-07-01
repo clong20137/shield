@@ -142,6 +142,8 @@ const trooperDailySections = [
 
 type DailyExportFormat = 'csv' | 'pdf' | 'xls';
 type DailyAnalyticsRange = '1d' | '7d' | '1m' | '3m' | '6m' | '1y' | 'custom';
+type DailyGraphType = 'line' | 'bar';
+type DailyCompareMode = 'none' | 'user' | 'district';
 
 const dailyAnalyticsRanges: Array<{ value: DailyAnalyticsRange; label: string }> = [
   { value: '1d', label: '1 Day' },
@@ -150,6 +152,11 @@ const dailyAnalyticsRanges: Array<{ value: DailyAnalyticsRange; label: string }>
   { value: '3m', label: '3 Months' },
   { value: '6m', label: '6 Months' },
   { value: '1y', label: '1 Year' },
+];
+
+const dailyGraphTypes: Array<{ value: DailyGraphType; label: string }> = [
+  { value: 'line', label: 'Line' },
+  { value: 'bar', label: 'Bar' },
 ];
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -206,68 +213,134 @@ function getRangeDates(range: DailyAnalyticsRange) {
   return { from: formatDateInput(from), to: formatDateInput(to) };
 }
 
-const AnalyticsLineChart: React.FC<{
-  points: Array<{ label: string; value: number }>;
-  color?: string;
+const AnalyticsChart: React.FC<{
+  series: Array<{ name: string; points: Array<{ label: string; value: number }>; color: string }>;
+  graphType: DailyGraphType;
   height?: number;
   valueLabel?: string;
-}> = ({ points, color = 'rgb(157 134 92)', height = 172, valueLabel = '' }) => {
+}> = ({ series, graphType, height = 172, valueLabel = '' }) => {
+  const [hoveredPoint, setHoveredPoint] = useState<{ name: string; label: string; value: number; x: number; y: number; color: string } | null>(null);
   const width = 640;
   const padding = { top: 14, right: 18, bottom: 32, left: 42 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
-  const values = points.map((point) => Number(point.value) || 0);
+  const allPoints = series.flatMap((item) => item.points);
+  const values = allPoints.map((point) => Number(point.value) || 0);
   const maxValue = Math.max(1, ...values);
   const minValue = Math.min(0, ...values);
   const range = Math.max(1, maxValue - minValue);
-  const coordinates = points.map((point, index) => {
-    const x = padding.left + (points.length <= 1 ? chartWidth : (index / (points.length - 1)) * chartWidth);
-    const y = padding.top + chartHeight - (((Number(point.value) || 0) - minValue) / range) * chartHeight;
-    return { ...point, x, y };
-  });
-  const path = coordinates.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
-  const fillPath = coordinates.length > 0
-    ? `${path} L ${coordinates[coordinates.length - 1].x.toFixed(2)} ${padding.top + chartHeight} L ${coordinates[0].x.toFixed(2)} ${padding.top + chartHeight} Z`
-    : '';
+  const primaryPoints = series[0]?.points || [];
+  const seriesCoordinates = series.map((item) => ({
+    ...item,
+    coordinates: item.points.map((point, index) => {
+      const x = padding.left + (item.points.length <= 1 ? chartWidth : (index / (item.points.length - 1)) * chartWidth);
+      const y = padding.top + chartHeight - (((Number(point.value) || 0) - minValue) / range) * chartHeight;
+      return { ...point, value: Number(point.value) || 0, x, y };
+    }),
+  }));
+  const labelIndexes = primaryPoints.length <= 6
+    ? primaryPoints.map((_, index) => index)
+    : [0, Math.floor((primaryPoints.length - 1) / 2), primaryPoints.length - 1];
   const ticks = [maxValue, (maxValue + minValue) / 2, minValue];
-  const labelIndexes = coordinates.length <= 6
-    ? coordinates.map((_, index) => index)
-    : [0, Math.floor((coordinates.length - 1) / 2), coordinates.length - 1];
 
-  if (points.length === 0) {
+  if (allPoints.length === 0) {
     return <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No chart data yet.</p>;
   }
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} role="img" className="h-full min-h-[150px] w-full overflow-visible">
-      {ticks.map((tick) => {
-        const y = padding.top + chartHeight - ((tick - minValue) / range) * chartHeight;
-        return (
-          <g key={tick}>
-            <line x1={padding.left} x2={padding.left + chartWidth} y1={y} y2={y} stroke="currentColor" strokeOpacity="0.12" />
-            <text x={padding.left - 8} y={y + 4} textAnchor="end" className="fill-gray-500 text-[11px] dark:fill-gray-400">
-              {formatMetric(tick, tick % 1 === 0 ? 0 : 1)}
+    <div className="relative h-full min-h-[150px] w-full">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" className="h-full min-h-[150px] w-full overflow-visible" onMouseLeave={() => setHoveredPoint(null)}>
+        {ticks.map((tick) => {
+          const y = padding.top + chartHeight - ((tick - minValue) / range) * chartHeight;
+          return (
+            <g key={tick}>
+              <line x1={padding.left} x2={padding.left + chartWidth} y1={y} y2={y} stroke="currentColor" strokeOpacity="0.12" />
+              <text x={padding.left - 8} y={y + 4} textAnchor="end" className="fill-gray-500 text-[11px] dark:fill-gray-400">
+                {formatMetric(tick, tick % 1 === 0 ? 0 : 1)}
+              </text>
+            </g>
+          );
+        })}
+
+        {graphType === 'bar' ? (
+          seriesCoordinates.map((item, seriesIndex) => {
+            const groupWidth = chartWidth / Math.max(1, item.coordinates.length);
+            const barWidth = Math.min(24, Math.max(5, (groupWidth - 8) / Math.max(1, seriesCoordinates.length)));
+            return item.coordinates.map((point, index) => {
+              const x = padding.left + index * groupWidth + (groupWidth - barWidth * seriesCoordinates.length) / 2 + seriesIndex * barWidth;
+              const barHeight = chartHeight - (point.y - padding.top);
+              return (
+                <rect
+                  key={`${item.name}-${point.label}`}
+                  x={x}
+                  y={point.y}
+                  width={barWidth}
+                  height={Math.max(1, barHeight)}
+                  rx="3"
+                  fill={item.color}
+                  opacity={seriesIndex === 0 ? 0.9 : 0.65}
+                  onMouseEnter={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: x + barWidth / 2, y: point.y, color: item.color })}
+                  onMouseMove={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: x + barWidth / 2, y: point.y, color: item.color })}
+                />
+              );
+            });
+          })
+        ) : (
+          seriesCoordinates.map((item) => {
+            const path = item.coordinates.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
+            const fillPath = item.coordinates.length > 0
+              ? `${path} L ${item.coordinates[item.coordinates.length - 1].x.toFixed(2)} ${padding.top + chartHeight} L ${item.coordinates[0].x.toFixed(2)} ${padding.top + chartHeight} Z`
+              : '';
+            return (
+              <g key={item.name}>
+                {fillPath && <path d={fillPath} fill={item.color} opacity="0.08" />}
+                <path d={path} fill="none" stroke={item.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                {item.coordinates.map((point) => (
+                  <circle
+                    key={`${item.name}-${point.label}-${point.x}`}
+                    cx={point.x}
+                    cy={point.y}
+                    r="4"
+                    fill={item.color}
+                    stroke="white"
+                    strokeWidth="2"
+                    onMouseEnter={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: point.x, y: point.y, color: item.color })}
+                    onMouseMove={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: point.x, y: point.y, color: item.color })}
+                  />
+                ))}
+              </g>
+            );
+          })
+        )}
+
+        {labelIndexes.map((index) => {
+          const point = primaryPoints[index];
+          const x = padding.left + (primaryPoints.length <= 1 ? chartWidth : (index / (primaryPoints.length - 1)) * chartWidth);
+          return (
+            <text key={`${point.label}-label`} x={x} y={height - 9} textAnchor={index === 0 ? 'start' : index === primaryPoints.length - 1 ? 'end' : 'middle'} className="fill-gray-500 text-[11px] dark:fill-gray-400">
+              {formatAnalyticsLabel(point.label)}
             </text>
-          </g>
-        );
-      })}
-      {fillPath && <path d={fillPath} fill={color} opacity="0.12" />}
-      <path d={path} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      {coordinates.map((point) => (
-        <g key={`${point.label}-${point.x}`}>
-          <circle cx={point.x} cy={point.y} r="4" fill={color} stroke="white" strokeWidth="2" />
-          <title>{`${formatAnalyticsLabel(point.label)}: ${formatMetric(Number(point.value) || 0, 1)}${valueLabel}`}</title>
-        </g>
-      ))}
-      {labelIndexes.map((index) => {
-        const point = coordinates[index];
-        return (
-          <text key={`${point.label}-label`} x={point.x} y={height - 9} textAnchor={index === 0 ? 'start' : index === coordinates.length - 1 ? 'end' : 'middle'} className="fill-gray-500 text-[11px] dark:fill-gray-400">
-            {formatAnalyticsLabel(point.label)}
-          </text>
-        );
-      })}
-    </svg>
+          );
+        })}
+      </svg>
+      {hoveredPoint && (
+        <div
+          className="pointer-events-none absolute z-10 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-xl dark:border-gray-700 dark:bg-gray-950"
+          style={{
+            left: `${Math.min(82, Math.max(8, (hoveredPoint.x / width) * 100))}%`,
+            top: `${Math.min(72, Math.max(8, (hoveredPoint.y / height) * 100))}%`,
+            transform: 'translate(-50%, -110%)',
+          }}
+        >
+          <div className="mb-1 flex items-center gap-2 font-black text-gray-900 dark:text-gray-100">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: hoveredPoint.color }} />
+            {hoveredPoint.name}
+          </div>
+          <p className="font-semibold text-gray-500 dark:text-gray-400">{formatAnalyticsLabel(hoveredPoint.label)}</p>
+          <p className="text-sm font-black text-accent">{formatMetric(hoveredPoint.value, 1)}{valueLabel}</p>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -298,6 +371,13 @@ const ReportsPage: React.FC<{
   const [analyticsDistrict, setAnalyticsDistrict] = useState('');
   const [analyticsFrom, setAnalyticsFrom] = useState(initialAnalyticsDatesRef.current.from);
   const [analyticsTo, setAnalyticsTo] = useState(initialAnalyticsDatesRef.current.to);
+  const [dailyGraphType, setDailyGraphType] = useState<DailyGraphType>('line');
+  const [dailyCompareMode, setDailyCompareMode] = useState<DailyCompareMode>('none');
+  const [compareSearch, setCompareSearch] = useState('');
+  const [compareDistrict, setCompareDistrict] = useState('');
+  const [compareAnalytics, setCompareAnalytics] = useState<TrooperDailyAnalyticsResponse | null>(null);
+  const [compareAnalyticsLoading, setCompareAnalyticsLoading] = useState(false);
+  const [compareAnalyticsError, setCompareAnalyticsError] = useState<string | null>(null);
   const [dailyExportFormat, setDailyExportFormat] = useState<DailyExportFormat>('csv');
   const [isSelectedDailyExportMenuOpen, setIsSelectedDailyExportMenuOpen] = useState(false);
   const [rowDailyExportFormats, setRowDailyExportFormats] = useState<Record<string, DailyExportFormat>>({});
@@ -309,6 +389,7 @@ const ReportsPage: React.FC<{
   const dailyRefreshTimerRef = useRef<number | null>(null);
   const dailyLoadInFlightRef = useRef(false);
   const dailyLoadPendingRef = useRef(false);
+  const analyticsChartRef = useRef<HTMLDivElement | null>(null);
   const canReviewTrooperDailies = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('reports:trooper-dailies'));
 
   const loadTrooperDailyAnalytics = async (
@@ -339,6 +420,56 @@ const ReportsPage: React.FC<{
       console.error(err);
     } finally {
       setDailyAnalyticsLoading(false);
+    }
+  };
+
+  const getCompareFilters = (
+    mode = dailyCompareMode,
+    from = analyticsFrom,
+    to = analyticsTo,
+    search = compareSearch,
+    district = compareDistrict,
+  ) => {
+    if (mode === 'user') {
+      return { q: search, from, to, district: '' };
+    }
+
+    if (mode === 'district') {
+      return { q: '', from, to, district };
+    }
+
+    return null;
+  };
+
+  const loadCompareAnalytics = async (
+    showLoading = true,
+    filters = getCompareFilters(),
+  ) => {
+    if (!filters) {
+      setCompareAnalytics(null);
+      setCompareAnalyticsError(null);
+      return;
+    }
+
+    if (showLoading) {
+      setCompareAnalyticsLoading(true);
+    }
+    setCompareAnalyticsError(null);
+
+    try {
+      const response = await reportService.getTrooperDailyAnalytics({
+        q: filters.q.trim() || undefined,
+        from: filters.from || undefined,
+        to: filters.to || undefined,
+        district: filters.district || undefined,
+      });
+      setCompareAnalytics(response.data);
+    } catch (err) {
+      const message = getErrorMessage(err, 'Failed to load comparison analytics.');
+      setCompareAnalyticsError(message);
+      console.error(err);
+    } finally {
+      setCompareAnalyticsLoading(false);
     }
   };
 
@@ -410,6 +541,7 @@ const ReportsPage: React.FC<{
         dailyRefreshTimerRef.current = null;
         void loadTrooperDailies(false);
         void loadTrooperDailyAnalytics(false);
+        void loadCompareAnalytics(false);
       }, 500);
     };
 
@@ -459,6 +591,7 @@ const ReportsPage: React.FC<{
       district: analyticsDistrict,
     };
     void loadTrooperDailyAnalytics(true, filters);
+    void loadCompareAnalytics(true, getCompareFilters(dailyCompareMode, dates.from, dates.to));
   };
 
   const searchTrooperDailyAnalytics = (event: React.FormEvent<HTMLFormElement>) => {
@@ -469,6 +602,7 @@ const ReportsPage: React.FC<{
       to: analyticsTo,
       district: analyticsDistrict,
     });
+    void loadCompareAnalytics(true);
   };
 
   const clearTrooperDailyAnalyticsFilters = () => {
@@ -481,6 +615,21 @@ const ReportsPage: React.FC<{
       setDailyAnalyticsRange('1m');
     }
     void loadTrooperDailyAnalytics(true, { q: '', from: dates.from, to: dates.to, district: '' });
+    void loadCompareAnalytics(true, getCompareFilters(dailyCompareMode, dates.from, dates.to));
+  };
+
+  const changeCompareMode = (mode: DailyCompareMode) => {
+    setDailyCompareMode(mode);
+    if (mode === 'none') {
+      setCompareAnalytics(null);
+      setCompareAnalyticsError(null);
+      return;
+    }
+    void loadCompareAnalytics(true, getCompareFilters(mode));
+  };
+
+  const refreshCompareAnalytics = () => {
+    void loadCompareAnalytics(true);
   };
 
   const goToDailyPage = (page: number) => {
@@ -623,11 +772,73 @@ const ReportsPage: React.FC<{
     : '';
   const dailyFieldTrends = Array.isArray(dailyAnalytics?.fieldTrends) ? dailyAnalytics.fieldTrends : [];
   const dailyActivitySections = Array.isArray(dailyAnalytics?.activitySections) ? dailyAnalytics.activitySections : [];
+  const compareFieldTrends = Array.isArray(compareAnalytics?.fieldTrends) ? compareAnalytics.fieldTrends : [];
   const visibleFieldTrends = dailyFieldTrends.filter((trend) => trend.total > 0);
   const selectedTrend = dailyFieldTrends.find((trend) => trend.key === selectedAnalyticsMetric)
     || visibleFieldTrends[0]
     || dailyFieldTrends[0]
     || null;
+  const compareSelectedTrend = compareFieldTrends.find((trend) => trend.key === selectedTrend?.key);
+  const primarySeriesName = analyticsSearch.trim()
+    ? analyticsSearch.trim()
+    : analyticsDistrict
+      ? analyticsDistrict
+      : 'Overall';
+  const compareSeriesName = dailyCompareMode === 'user'
+    ? compareSearch.trim() || 'Compare User'
+    : dailyCompareMode === 'district'
+      ? compareDistrict || 'Compare District'
+      : '';
+  const chartSeries = selectedTrend
+    ? [
+      { name: primarySeriesName, points: selectedTrend.points, color: 'rgb(157 134 92)' },
+      ...(dailyCompareMode !== 'none' && compareSelectedTrend ? [{ name: compareSeriesName, points: compareSelectedTrend.points, color: 'rgb(37 99 235)' }] : []),
+    ]
+    : [];
+
+  const exportAnalyticsChart = async () => {
+    const svg = analyticsChartRef.current?.querySelector('svg');
+    if (!svg) {
+      onToast('error', 'No graph is available to export.');
+      return;
+    }
+
+    const clonedSvg = svg.cloneNode(true) as SVGElement;
+    clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    const svgText = new XMLSerializer().serializeToString(clonedSvg);
+    const image = new Image();
+    const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1280;
+      canvas.height = 520;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        URL.revokeObjectURL(url);
+        onToast('error', 'Unable to export this graph.');
+        return;
+      }
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      const link = document.createElement('a');
+      const metric = selectedTrend?.label || 'trooper-daily-graph';
+      link.download = `${metric.toLowerCase().replace(/[^a-z0-9]+/gu, '-') || 'trooper-daily-graph'}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      onToast('success', 'Graph downloaded.');
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      onToast('error', 'Unable to export this graph.');
+    };
+
+    image.src = url;
+  };
 
   return (
     <div>
@@ -785,33 +996,94 @@ const ReportsPage: React.FC<{
                     <h4 className="text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Trooper Daily Graph</h4>
                     <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Select one report field and a date range.</p>
                   </div>
-                  <select
-                    value={selectedTrend?.key || selectedAnalyticsMetric}
-                    onChange={(event) => setSelectedAnalyticsMetric(event.target.value)}
-                    className="max-w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
-                  >
-                    {dailyFieldTrends.map((trend) => (
-                      <option key={trend.key} value={trend.key}>{trend.label}</option>
-                    ))}
-                  </select>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={selectedTrend?.key || selectedAnalyticsMetric}
+                      onChange={(event) => setSelectedAnalyticsMetric(event.target.value)}
+                      className="max-w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
+                    >
+                      {dailyFieldTrends.map((trend) => (
+                        <option key={trend.key} value={trend.key}>{trend.label}</option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={exportAnalyticsChart} className="btn-secondary" aria-label="Download graph" title="Download Graph">
+                      <Download size={16} />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="mb-4 flex flex-wrap gap-2">
-                  {dailyAnalyticsRanges.map((range) => (
-                    <button
-                      key={range.value}
-                      type="button"
-                      onClick={() => applyDailyAnalyticsRange(range.value)}
-                      className={`rounded border px-3 py-2 text-xs font-black uppercase tracking-wide transition ${
-                        dailyAnalyticsRange === range.value
-                          ? 'border-accent bg-accent text-white'
-                          : 'border-gray-300 bg-white text-gray-700 hover:border-accent/60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
-                      }`}
-                    >
-                      {range.label}
-                    </button>
-                  ))}
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap gap-2">
+                    {dailyAnalyticsRanges.map((range) => (
+                      <button
+                        key={range.value}
+                        type="button"
+                        onClick={() => applyDailyAnalyticsRange(range.value)}
+                        className={`rounded border px-3 py-2 text-xs font-black uppercase tracking-wide transition ${
+                          dailyAnalyticsRange === range.value
+                            ? 'border-accent bg-accent text-white'
+                            : 'border-gray-300 bg-white text-gray-700 hover:border-accent/60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
+                        }`}
+                      >
+                        {range.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {dailyGraphTypes.map((type) => (
+                      <button
+                        key={type.value}
+                        type="button"
+                        onClick={() => setDailyGraphType(type.value)}
+                        className={`rounded border px-3 py-2 text-xs font-black uppercase tracking-wide transition ${
+                          dailyGraphType === type.value
+                            ? 'border-primary-500 bg-primary-500 text-white'
+                            : 'border-gray-300 bg-white text-gray-700 hover:border-primary-500/60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
+                        }`}
+                      >
+                        {type.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                <div className="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto]">
+                  <select
+                    value={dailyCompareMode}
+                    onChange={(event) => changeCompareMode(event.target.value as DailyCompareMode)}
+                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-900"
+                    aria-label="Compare graph mode"
+                  >
+                    <option value="none">No Compare</option>
+                    <option value="user">Compare User</option>
+                    <option value="district">Compare District</option>
+                  </select>
+                  {dailyCompareMode === 'user' ? (
+                    <input
+                      value={compareSearch}
+                      onChange={(event) => setCompareSearch(event.target.value)}
+                      placeholder="Compare user, email, PE, badge..."
+                      className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                    />
+                  ) : dailyCompareMode === 'district' ? (
+                    <select
+                      value={compareDistrict}
+                      onChange={(event) => setCompareDistrict(event.target.value)}
+                      className="rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                    >
+                      <option value="">Choose district</option>
+                      {districtOptions.map((district) => <option key={district}>{district}</option>)}
+                    </select>
+                  ) : (
+                    <div className="rounded border border-dashed border-gray-300 px-3 py-2 text-sm font-semibold text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                      Compare another user or district on the same graph.
+                    </div>
+                  )}
+                  <button type="button" onClick={refreshCompareAnalytics} disabled={dailyCompareMode === 'none' || compareAnalyticsLoading} className="btn-secondary" aria-label="Refresh comparison" title="Refresh Compare">
+                    {compareAnalyticsLoading ? 'Loading' : 'Compare'}
+                  </button>
+                </div>
+                {compareAnalyticsError && <div className="error mb-4">{compareAnalyticsError}</div>}
 
                 {selectedTrend ? (
                   <>
@@ -822,8 +1094,18 @@ const ReportsPage: React.FC<{
                       </div>
                       <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-black text-accent">Total {formatMetric(selectedTrend.total, 1)}</span>
                     </div>
-                    <div className="h-72">
-                      <AnalyticsLineChart points={selectedTrend.points} height={260} />
+                    {dailyCompareMode !== 'none' && compareSelectedTrend && (
+                      <div className="mb-3 flex flex-wrap gap-3 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {chartSeries.map((item) => (
+                          <span key={item.name} className="flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                            {item.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div ref={analyticsChartRef} className="h-72">
+                      <AnalyticsChart series={chartSeries} graphType={dailyGraphType} height={260} />
                     </div>
                   </>
                 ) : (
