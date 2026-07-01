@@ -330,14 +330,13 @@ const MemorialPage: React.FC<MemorialPageProps> = ({ currentUser, onToast }) => 
           </div>
         </div>
         <div className="border-t border-gray-200 p-4 dark:border-gray-800 sm:p-5">
-          <label className="relative block min-w-0">
-            <Search size={18} className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-gray-400" />
+          <label className="flex h-11 min-w-0 items-center gap-3 rounded border border-gray-300 bg-white px-4 text-gray-900 transition focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500/15 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
+            <Search size={18} className="shrink-0 text-gray-400" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search memorial profiles"
-              className="h-11 w-full rounded border border-gray-300 bg-white py-2 pr-3 text-sm font-semibold text-gray-900 outline-none transition placeholder:text-gray-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-400"
-              style={{ paddingLeft: '3rem' }}
+              className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-semibold text-current outline-none placeholder:text-gray-500 focus:ring-0 dark:placeholder:text-gray-400"
             />
           </label>
         </div>
