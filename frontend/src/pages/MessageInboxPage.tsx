@@ -1,6 +1,6 @@
 import { ClipboardEvent, DragEvent, FormEvent, KeyboardEvent, MouseEvent, lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Building2, Check, CheckCheck, Download, Image as ImageIcon, Pencil, Pin, PinOff, Search, SmilePlus, Paperclip, Plus, Save, Send, Trash2, Users, X } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Building2, Check, CheckCheck, Download, Image as ImageIcon, Pencil, Pin, PinOff, RefreshCw, Search, SmilePlus, Paperclip, Plus, Save, Send, Trash2, Users, X } from 'lucide-react';
 import type { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, errorLogService, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, messageService, userService, User, UserMessage } from '../services/api';
 import { subscribeMessageRealtime } from '../services/realtime';
@@ -36,10 +36,29 @@ interface MessageThread {
   participantNames: string[];
   threadType: string;
   subject: string;
-  latestMessage?: UserMessage;
-  messages: UserMessage[];
+  latestMessage?: LocalUserMessage;
+  messages: LocalUserMessage[];
   unreadCount: number;
 }
+
+type LocalDeliveryStatus = 'sending' | 'failed';
+
+interface MessageRetryPayload {
+  threadType: string;
+  threadId: string;
+  recipientUserId: string;
+  recipientUserIds: string[];
+  subject: string;
+  body: string;
+  audienceType: 'group' | 'district';
+  threadTitle: string;
+}
+
+type LocalUserMessage = UserMessage & {
+  localDeliveryStatus?: LocalDeliveryStatus;
+  localError?: string;
+  retryPayload?: MessageRetryPayload;
+};
 
 interface ThreadMemberPreview {
   id: string;
@@ -51,10 +70,11 @@ interface ThreadMessageWindowState {
   page: number;
   hasMore: boolean;
   isLoading: boolean;
-  messages: UserMessage[];
+  messages: LocalUserMessage[];
 }
 
 const PINNED_THREADS_KEY_PREFIX = 'shield_pinned_message_threads';
+const MESSAGE_OUTBOX_KEY_PREFIX = 'shield_pending_message_outbox';
 const THREAD_MESSAGE_PAGE_SIZE = 40;
 const THREAD_LIST_MESSAGE_PAGE_SIZE = 80;
 const THREAD_SEARCH_MESSAGE_BODY_SCAN_LIMIT = 12;
@@ -310,7 +330,20 @@ function getMessageSenderDisplayName(message: UserMessage, thread: MessageThread
   return message.senderName || message.senderEmail || thread.participantNames[participantIndex] || 'Sender';
 }
 
+function getLocalDeliveryStatus(message: UserMessage): LocalDeliveryStatus | null {
+  return (message as LocalUserMessage).localDeliveryStatus || null;
+}
+
 function getDeliveryLabel(message: UserMessage): string {
+  const localStatus = getLocalDeliveryStatus(message);
+  if (localStatus === 'sending') {
+    return 'Sending';
+  }
+
+  if (localStatus === 'failed') {
+    return 'Failed';
+  }
+
   return message.isRead ? 'Read' : 'Delivered';
 }
 
@@ -481,9 +514,39 @@ async function downloadMessageImage(assetUrl: string, fileName: string): Promise
   URL.revokeObjectURL(blobUrl);
 }
 
+function getOutboxStorageKey(accountId: string): string {
+  return `${MESSAGE_OUTBOX_KEY_PREFIX}_${accountId}`;
+}
+
+function readPendingOutbox(accountId: string): LocalUserMessage[] {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(getOutboxStorageKey(accountId)) || '[]');
+    return Array.isArray(parsed)
+      ? parsed
+          .filter((message): message is LocalUserMessage => Boolean(message?.id && message?.retryPayload))
+          .map((message) => ({ ...message, localDeliveryStatus: 'failed' }))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePendingOutbox(accountId: string, messages: LocalUserMessage[]): void {
+  const pendingMessages = messages
+    .filter((message) => message.id.startsWith('local-') && message.retryPayload && message.localDeliveryStatus === 'failed')
+    .map((message) => ({ ...message, localDeliveryStatus: 'failed' as const }));
+
+  if (pendingMessages.length === 0) {
+    window.localStorage.removeItem(getOutboxStorageKey(accountId));
+    return;
+  }
+
+  window.localStorage.setItem(getOutboxStorageKey(accountId), JSON.stringify(pendingMessages));
+}
+
 function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRecipient = null, targetThreadId = null, composeRequestKey = 0, isBackgrounded = false }: MessageInboxPageProps) {
-  const [inboxMessages, setInboxMessages] = useState<UserMessage[]>([]);
-  const [sentMessages, setSentMessages] = useState<UserMessage[]>([]);
+  const [inboxMessages, setInboxMessages] = useState<LocalUserMessage[]>([]);
+  const [sentMessages, setSentMessages] = useState<LocalUserMessage[]>(() => readPendingOutbox(currentUser.id));
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState('');
   const [replyAttachments, setReplyAttachments] = useState<File[]>([]);
@@ -558,6 +621,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const messageImageInputRef = useRef<HTMLInputElement | null>(null);
   const messageReloadTimerRef = useRef<number | null>(null);
   const threadMessageScrollFrameRef = useRef<number | null>(null);
+  const selectedThreadIdRef = useRef<string | null>(null);
   const messageLoadInFlightRef = useRef(false);
   const messageLoadPendingRef = useRef(false);
   const appliedTargetThreadIdRef = useRef<string | null>(null);
@@ -610,7 +674,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     event.preventDefault();
     event.stopPropagation();
   };
-  const mergeSentMessages = (newMessages: UserMessage[]) => {
+  const mergeSentMessages = (newMessages: LocalUserMessage[]) => {
     if (newMessages.length === 0) {
       return;
     }
@@ -650,6 +714,14 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     setReplyAttachments([]);
     setSearchTerm('');
   }, [currentUser.id, targetRecipient?.id]);
+
+  useEffect(() => {
+    selectedThreadIdRef.current = selectedThreadId;
+  }, [selectedThreadId]);
+
+  useEffect(() => {
+    writePendingOutbox(currentUser.id, sentMessages);
+  }, [currentUser.id, sentMessages]);
 
   useEffect(() => {
     const container = threadListContainerRef.current;
@@ -755,7 +827,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
       if (sentResult.status === 'fulfilled') {
         if (showLoading) {
-          setSentMessages(sentResult.value.data);
+          setSentMessages((currentMessages) => [
+            ...currentMessages.filter((message) => message.id.startsWith('local-') && message.retryPayload),
+            ...sentResult.value.data,
+          ]);
         } else {
           setSentMessages((currentMessages) => {
             const nextMessages = new Map(currentMessages.map((message) => [message.id, message]));
@@ -801,7 +876,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     }
   };
 
-  const mergeThreadMessages = (messages: UserMessage[], shouldAutoScroll = true) => {
+  const mergeThreadMessages = (messages: LocalUserMessage[], shouldAutoScroll = true) => {
     if (messages.length === 0) {
       return;
     }
@@ -898,7 +973,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     });
   };
 
-  const updateMessageEverywhere = (updatedMessage: UserMessage) => {
+  const updateMessageEverywhere = (updatedMessage: LocalUserMessage) => {
     const updateList = (messages: UserMessage[]) =>
       messages.map((message) => (message.id === updatedMessage.id ? updatedMessage : message));
 
@@ -1104,6 +1179,10 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
           return;
         }
         mergeThreadMessages([payload.message]);
+        const incomingThreadId = getThreadId(payload.message, currentUser.id);
+        if (payload.message.senderAccountId !== currentUser.id && incomingThreadId !== selectedThreadIdRef.current) {
+          onToast('info', `New message from ${payload.message.senderName || payload.message.senderEmail || 'Messages'}.`);
+        }
       } catch (err) {
         console.error('Message update parse error:', err);
         handleRealtimeMessageUpdate();
@@ -1480,6 +1559,25 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     ? selectedThread.participantIds.find((id) => id && id !== currentUser.id) || selectedThread.id
     : '';
 
+  const getThreadDeliveryLabel = (message: LocalUserMessage, thread: MessageThread): string => {
+    const localStatus = getLocalDeliveryStatus(message);
+    if (localStatus) {
+      return getDeliveryLabel(message);
+    }
+
+    if (thread.threadType !== 'direct' && message.groupMessageId) {
+      const groupCopies = sentMessages.filter((sentMessage) => sentMessage.groupMessageId === message.groupMessageId);
+      const totalRecipients = Math.max(thread.participantIds.filter((id) => id !== currentUser.id).length, groupCopies.length);
+      const readCount = groupCopies.filter((sentMessage) => sentMessage.isRead).length;
+
+      if (totalRecipients > 1) {
+        return readCount > 0 ? `Read by ${readCount}/${totalRecipients}` : `Delivered to ${totalRecipients}`;
+      }
+    }
+
+    return getDeliveryLabel(message);
+  };
+
   useEffect(() => {
     if (!selectedThreadId || selectedThread || isLoading) {
       return;
@@ -1645,6 +1743,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       topSpacerHeight: startIndex * THREAD_MESSAGE_ROW_ESTIMATE,
     };
   }, [activeThreadSearchTerm, displayedMessages, threadMessageScrollTop, threadMessageViewportHeight]);
+  const latestDisplayedMessageId = displayedMessages[displayedMessages.length - 1]?.id || '';
 
   useEffect(() => {
     if (!selectedThreadId) {
@@ -1724,16 +1823,17 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       }
 
       activeContainer.scrollTop = activeContainer.scrollHeight;
+      latestMessageRef.current?.scrollIntoView({ block: 'end' });
       setThreadMessageScrollTop(activeContainer.scrollTop);
 
-      if (frame < 2) {
+      if (frame < 5) {
         frame += 1;
         window.requestAnimationFrame(scrollToBottom);
       }
     };
 
     window.requestAnimationFrame(scrollToBottom);
-  }, [selectedThreadId, displayedMessages.length, virtualDisplayedMessages.endIndex]);
+  }, [selectedThreadId, displayedMessages.length, latestDisplayedMessageId, virtualDisplayedMessages.endIndex]);
 
   useEffect(() => {
     if (!selectedThread) {
@@ -2154,6 +2254,88 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
     }
   };
 
+  const sendRetryPayload = async (payload: MessageRetryPayload) => {
+    if (payload.threadType !== 'direct') {
+      const response = await messageService.sendGroup({
+        senderAccountId: currentUser.id,
+        recipientUserIds: payload.recipientUserIds,
+        subject: payload.subject,
+        body: payload.body,
+        audienceType: payload.audienceType,
+        threadId: payload.threadId.startsWith('draft-group:') ? undefined : payload.threadId,
+        threadTitle: payload.threadTitle,
+      });
+      return {
+        threadId: response.data.threadId,
+        messages: response.data.messages || [],
+      };
+    }
+
+    const response = await messageService.send({
+      senderAccountId: currentUser.id,
+      recipientUserId: payload.recipientUserId,
+      subject: payload.subject,
+      body: payload.body,
+    });
+    return {
+      threadId: payload.recipientUserId,
+      messages: [response.data],
+    };
+  };
+
+  const retryLocalMessage = async (message: LocalUserMessage) => {
+    if (!message.retryPayload || message.localDeliveryStatus === 'sending') {
+      return;
+    }
+
+    setSentMessages((messages) =>
+      messages.map((item) =>
+        item.id === message.id ? { ...item, localDeliveryStatus: 'sending', localError: undefined } : item,
+      ),
+    );
+    setThreadMessageWindows((current) => {
+      const next = { ...current };
+      Object.entries(next).forEach(([threadId, windowState]) => {
+        next[threadId] = {
+          ...windowState,
+          messages: windowState.messages.map((item) =>
+            item.id === message.id ? { ...item, localDeliveryStatus: 'sending', localError: undefined } : item,
+          ),
+        };
+      });
+      return next;
+    });
+
+    try {
+      const result = await sendRetryPayload(message.retryPayload);
+      removeLocalSentMessage(message.id);
+      mergeSentMessages(result.messages);
+      mergeThreadMessages(result.messages);
+      setSelectedThreadId(result.threadId);
+      onToast('success', 'Message sent.');
+    } catch (error) {
+      const errorMessage = getApiErrorMessage(error, 'Still unable to send message.');
+      setSentMessages((messages) =>
+        messages.map((item) =>
+          item.id === message.id ? { ...item, localDeliveryStatus: 'failed', localError: errorMessage } : item,
+        ),
+      );
+      setThreadMessageWindows((current) => {
+        const next = { ...current };
+        Object.entries(next).forEach(([threadId, windowState]) => {
+          next[threadId] = {
+            ...windowState,
+            messages: windowState.messages.map((item) =>
+              item.id === message.id ? { ...item, localDeliveryStatus: 'failed', localError: errorMessage } : item,
+            ),
+          };
+        });
+        return next;
+      });
+      onToast('error', errorMessage);
+    }
+  };
+
   const sendReply = async (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
 
@@ -2192,7 +2374,17 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       const optimisticThreadId = selectedThread.threadType === 'direct'
         ? null
         : selectedThread.id;
-      const optimisticMessage: UserMessage = {
+      const retryPayload: MessageRetryPayload = {
+        threadType: selectedThread.threadType,
+        threadId: selectedThread.id,
+        recipientUserId: selectedThread.threadType === 'direct' ? directRecipientId : '',
+        recipientUserIds: selectedThread.threadType === 'direct' ? [] : selectedThread.participantIds.filter((id) => id !== currentUser.id),
+        subject: selectedThread.subject || selectedThread.contactName || 'Message',
+        body: messageBody,
+        audienceType: selectedThread.threadType === 'district' ? 'district' : 'group',
+        threadTitle: selectedThread.contactName,
+      };
+      const optimisticMessage: LocalUserMessage = {
         id: optimisticMessageId,
         senderAccountId: currentUser.id,
         recipientUserId: selectedThread.threadType === 'direct'
@@ -2224,6 +2416,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         recipientProfilePictureUrl: selectedThread.contactProfilePictureUrl,
         recipientLastSeenAt: selectedThread.contactLastSeenAt,
         recipientReceivesMessages: selectedThread.contactReceivesMessages,
+        localDeliveryStatus: 'sending',
+        retryPayload,
       };
       mergeSentMessages([optimisticMessage]);
       mergeThreadMessages([optimisticMessage]);
@@ -2334,8 +2528,30 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
       if (didClearDraft) {
         if (optimisticMessageId) {
-          removeLocalSentMessage(optimisticMessageId);
+          const errorMessage = getApiErrorMessage(err, 'Failed to send message.');
+          setSentMessages((messages) =>
+            messages.map((message) =>
+              message.id === optimisticMessageId
+                ? { ...message, localDeliveryStatus: 'failed', localError: errorMessage }
+                : message,
+            ),
+          );
+          setThreadMessageWindows((current) => {
+            const next = { ...current };
+            Object.entries(next).forEach(([threadId, windowState]) => {
+              next[threadId] = {
+                ...windowState,
+                messages: windowState.messages.map((message) =>
+                  message.id === optimisticMessageId
+                    ? { ...message, localDeliveryStatus: 'failed', localError: errorMessage }
+                    : message,
+                ),
+              };
+            });
+            return next;
+          });
         }
+      } else {
         setReplyBody(draftBody);
         setReplyAttachments(draftAttachments);
       }
@@ -2346,6 +2562,23 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   };
 
   const deleteMessage = async (message: UserMessage) => {
+    if (message.id.startsWith('local-')) {
+      removeLocalSentMessage(message.id);
+      setThreadMessageWindows((current) => {
+        const next = { ...current };
+        Object.entries(next).forEach(([threadId, windowState]) => {
+          next[threadId] = {
+            ...windowState,
+            messages: windowState.messages.filter((item) => item.id !== message.id),
+          };
+        });
+        return next;
+      });
+      setMessagePendingDelete(null);
+      onToast('success', 'Message removed.');
+      return;
+    }
+
     try {
       const response = await messageService.delete(message.id, currentUser.id);
       const updatedMessage = response.data;
@@ -3055,6 +3288,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                     new Date(message.createdAt).getTime() - new Date(previousMessage.createdAt).getTime() > 10 * 60 * 1000;
                   const isSystem = isSystemMessage(message);
                   const isDeleted = isDeletedMessage(message);
+                  const localDeliveryStatus = getLocalDeliveryStatus(message);
+                  const deliveryLabel = getThreadDeliveryLabel(message, selectedThread);
 
                   return (
                     <div
@@ -3157,9 +3392,9 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                           <div className={`mt-1 flex items-center gap-1.5 px-1 text-[11px] font-semibold text-gray-400 ${isMine ? 'justify-end' : 'justify-start'}`}>
                             <span>{formatMessageTime(message.createdAt)}</span>
                             {isMine && (
-                              <span className="inline-flex items-center gap-1">
-                                {message.isRead ? <CheckCheck size={12} /> : <Check size={12} />}
-                                {getDeliveryLabel(message)}
+                              <span className={`inline-flex items-center gap-1 ${localDeliveryStatus === 'failed' ? 'text-red-500 dark:text-red-300' : localDeliveryStatus === 'sending' ? 'text-gray-500 dark:text-gray-300' : ''}`}>
+                                {localDeliveryStatus === 'failed' ? <AlertCircle size={12} /> : message.isRead ? <CheckCheck size={12} /> : <Check size={12} />}
+                                {deliveryLabel}
                               </span>
                             )}
                           </div>
@@ -3175,6 +3410,18 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                                 >
                                   <Trash2 size={13} />
                                 </button>
+                                {localDeliveryStatus === 'failed' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void retryLocalMessage(message)}
+                                    className="flex h-7 items-center gap-1 rounded-full bg-primary-500 px-2.5 text-white opacity-100 shadow-sm transition hover:bg-primary-600 sm:opacity-0 sm:group-hover:opacity-100"
+                                    aria-label="Retry message"
+                                    title={(message as LocalUserMessage).localError || 'Retry message'}
+                                  >
+                                    <RefreshCw size={13} />
+                                    <span>Retry</span>
+                                  </button>
+                                )}
                                 <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                                   <SmilePlus size={13} />
                                   {messageReactionOptions.map((reaction) => (
