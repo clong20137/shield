@@ -1,9 +1,11 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Check, ChevronLeft, ChevronRight, ExternalLink, Folder, FolderUp, HardDrive, Image, Pencil, Plus, Search, Trash2, Upload, Wrench, X } from 'lucide-react';
+import { AlertTriangle, Camera, Check, ChevronLeft, ChevronRight, ExternalLink, Folder, FolderUp, HardDrive, Image, Pencil, Plus, Search, Trash2, Upload, Wrench, X } from 'lucide-react';
 import { AuthAccount, getAssetThumbnailUrl, getAssetUrl, handleAssetThumbnailError, MediaLibraryFolder, MediaLibraryItem, mediaService, userService } from '../services/api';
 
 const pageSize = 60;
+const profilePictureDeleteBatchSize = 25;
 const allowedProfilePhotoExtensions = new Set(['jpg', 'jpeg', 'jfif', 'png', 'gif', 'webp']);
+const profilePictureDeleteConfirmation = 'DELETE PROFILE PICTURES';
 
 function formatBytes(value: number): string {
   if (value < 1024) return `${value} B`;
@@ -56,6 +58,15 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
     skippedFiles: Array<{ fileName: string; peNumber: string; reason: string }>;
     ignoredCount: number;
   } | null>(null);
+  const [isProfileDeleteModalOpen, setIsProfileDeleteModalOpen] = useState(false);
+  const [profileDeleteConfirmText, setProfileDeleteConfirmText] = useState('');
+  const [profileDeleteProgress, setProfileDeleteProgress] = useState({
+    deletedCount: 0,
+    clearedUserCount: 0,
+    totalCount: 0,
+    remainingCount: 0,
+    message: 'Ready to delete profile pictures.',
+  });
   const [isUploading, setIsUploading] = useState(false);
   const [isImportingProfilePhotos, setIsImportingProfilePhotos] = useState(false);
   const [isRepairingProfilePhotos, setIsRepairingProfilePhotos] = useState(false);
@@ -151,6 +162,10 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
     () => folders.find((folder) => folder.key === activeFolder) || null,
     [activeFolder, folders],
   );
+  const profilePhotoCount = folders.find((folder) => folder.key === 'profile-pictures')?.count || 0;
+  const profileDeletePercent = profileDeleteProgress.totalCount === 0
+    ? 0
+    : Math.min(100, Math.round((profileDeleteProgress.deletedCount / profileDeleteProgress.totalCount) * 100));
   const pageCount = Math.max(Math.ceil(total / pageSize), 1);
   const firstItem = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const lastItem = Math.min(page * pageSize, total);
@@ -322,27 +337,78 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
     }
   };
 
-  const deleteAllProfilePictures = async () => {
-    const profileFolder = folders.find((folder) => folder.key === 'profile-pictures');
-    const profilePhotoCount = profileFolder?.count || 0;
+  const openProfileDeleteModal = () => {
     if (profilePhotoCount === 0) {
       onToast('info', 'There are no profile pictures to delete.');
       return;
     }
 
-    const confirmation = window.prompt(`This will delete ${profilePhotoCount} profile picture file${profilePhotoCount === 1 ? '' : 's'} and clear matching user profile photo links. Type DELETE PROFILE PICTURES to continue.`);
-    if (confirmation !== 'DELETE PROFILE PICTURES') {
+    setProfileDeleteConfirmText('');
+    setProfileDeleteProgress({
+      deletedCount: 0,
+      clearedUserCount: 0,
+      totalCount: profilePhotoCount,
+      remainingCount: profilePhotoCount,
+      message: `Ready to delete ${profilePhotoCount} profile picture file${profilePhotoCount === 1 ? '' : 's'}.`,
+    });
+    setIsProfileDeleteModalOpen(true);
+  };
+
+  const closeProfileDeleteModal = () => {
+    if (isDeletingProfilePhotos) return;
+    setIsProfileDeleteModalOpen(false);
+  };
+
+  const deleteAllProfilePictures = async () => {
+    if (profileDeleteConfirmText !== profilePictureDeleteConfirmation) {
       return;
     }
 
     setIsDeletingProfilePhotos(true);
+    setProfileDeleteProgress((progress) => ({
+      ...progress,
+      message: 'Deleting profile picture files...',
+    }));
+
     try {
-      const response = await mediaService.deleteAllProfilePictures();
+      let deletedCount = 0;
+      let clearedUserCount = 0;
+      let totalCount = profilePhotoCount;
+      let remainingCount = profilePhotoCount;
+
+      for (let batchIndex = 0; batchIndex < 1000; batchIndex += 1) {
+        const response = await mediaService.deleteAllProfilePictures(profilePictureDeleteBatchSize);
+        const batch = response.data;
+        if (batchIndex === 0) {
+          totalCount = batch.totalCount || profilePhotoCount;
+        }
+
+        deletedCount += batch.deletedCount;
+        clearedUserCount += batch.clearedUserCount;
+        remainingCount = batch.remainingCount;
+
+        setProfileDeleteProgress({
+          deletedCount,
+          clearedUserCount,
+          totalCount,
+          remainingCount,
+          message: batch.done ? 'Profile picture delete complete.' : `${remainingCount} profile picture file${remainingCount === 1 ? '' : 's'} remaining...`,
+        });
+
+        if (batch.done || batch.deletedCount === 0) {
+          break;
+        }
+      }
+
       setSelectedItem(null);
-      onToast('success', `Deleted ${response.data.deletedCount} profile picture file${response.data.deletedCount === 1 ? '' : 's'} and cleared ${response.data.clearedUserCount} user link${response.data.clearedUserCount === 1 ? '' : 's'}.`);
+      onToast('success', `Deleted ${deletedCount} profile picture file${deletedCount === 1 ? '' : 's'} and cleared ${clearedUserCount} user link${clearedUserCount === 1 ? '' : 's'}.`);
       await loadMedia();
     } catch (err) {
       onToast('error', getErrorMessage(err, 'Failed to delete profile pictures.'));
+      setProfileDeleteProgress((progress) => ({
+        ...progress,
+        message: 'Delete stopped before all profile pictures were removed.',
+      }));
     } finally {
       setIsDeletingProfilePhotos(false);
     }
@@ -441,7 +507,7 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
               </>
             )}
             {activeFolderDetails && isProfilePicturesFolder && canDeleteMedia && (
-              <button type="button" onClick={() => void deleteAllProfilePictures()} className="btn-danger" disabled={isDeletingProfilePhotos || isImportingProfilePhotos} aria-label="Delete all profile pictures" title={isDeletingProfilePhotos ? 'Deleting profile pictures' : 'Delete all profile pictures'}>
+              <button type="button" onClick={openProfileDeleteModal} className="btn-danger" disabled={isDeletingProfilePhotos || isImportingProfilePhotos} aria-label="Delete all profile pictures" title={isDeletingProfilePhotos ? 'Deleting profile pictures' : 'Delete all profile pictures'}>
                 <Trash2 size={16} />
                 {isDeletingProfilePhotos ? 'Deleting' : 'Delete All'}
               </button>
@@ -496,6 +562,66 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
               {profileImportSummary.skippedFiles.length > 20 && <p>{profileImportSummary.skippedFiles.length - 20} more skipped files.</p>}
             </div>
           )}
+        </div>
+      )}
+
+      {isProfileDeleteModalOpen && (
+        <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="profile-delete-title">
+          <div className="w-full max-w-lg overflow-hidden rounded border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-950">
+            <div className="flex items-start justify-between gap-3 border-b border-gray-200 p-4 dark:border-gray-800">
+              <div className="flex min-w-0 gap-3">
+                <div className="mt-0.5 rounded bg-red-50 p-2 text-red-600 dark:bg-red-950/50 dark:text-red-200">
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 id="profile-delete-title" className="text-base font-bold text-gray-900 dark:text-white">Delete profile pictures</h3>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">This removes every file in Profile Pictures and clears matching user profile photo links.</p>
+                </div>
+              </div>
+              <button type="button" onClick={closeProfileDeleteModal} className="btn-secondary" disabled={isDeletingProfilePhotos} aria-label="Close delete profile pictures modal" title="Close">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="space-y-4 p-4">
+              <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-100">
+                <p className="font-semibold">{profilePhotoCount} profile picture file{profilePhotoCount === 1 ? '' : 's'} queued for deletion.</p>
+                <p className="mt-1">Type {profilePictureDeleteConfirmation} to unlock the delete button.</p>
+              </div>
+              <input
+                value={profileDeleteConfirmText}
+                onChange={(event) => setProfileDeleteConfirmText(event.target.value)}
+                disabled={isDeletingProfilePhotos || profileDeletePercent === 100}
+                placeholder={profilePictureDeleteConfirmation}
+                className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-900"
+              />
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-3 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                  <span>{profileDeleteProgress.message}</span>
+                  <span>{profileDeletePercent}%</span>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-900">
+                  <div className="h-full rounded-full bg-red-500 transition-all duration-300" style={{ width: `${profileDeletePercent}%` }} />
+                </div>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Deleted {profileDeleteProgress.deletedCount} of {profileDeleteProgress.totalCount} file{profileDeleteProgress.totalCount === 1 ? '' : 's'}; cleared {profileDeleteProgress.clearedUserCount} user link{profileDeleteProgress.clearedUserCount === 1 ? '' : 's'}.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col-reverse gap-2 border-t border-gray-200 p-4 dark:border-gray-800 sm:flex-row sm:justify-end">
+              <button type="button" onClick={closeProfileDeleteModal} className="btn-secondary" disabled={isDeletingProfilePhotos}>
+                {profileDeletePercent === 100 ? 'Close' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteAllProfilePictures()}
+                className="btn-danger"
+                disabled={isDeletingProfilePhotos || profileDeleteConfirmText !== profilePictureDeleteConfirmation || profileDeletePercent === 100}
+              >
+                <Trash2 size={16} />
+                {isDeletingProfilePhotos ? 'Deleting' : 'Delete All'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

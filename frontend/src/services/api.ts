@@ -397,6 +397,9 @@ export interface ProfilePictureRepairResponse {
 export interface ProfilePictureDeleteAllResponse {
   deletedCount: number;
   clearedUserCount: number;
+  totalCount: number;
+  remainingCount: number;
+  done: boolean;
 }
 
 export interface MediaLibraryItem {
@@ -1603,8 +1606,10 @@ export const mediaService = {
     api.put<{ fileName: string }>(`/media/images/${encodeURIComponent(folder)}/${encodeURIComponent(fileName)}`, { name }),
   deleteImage: (folder: string, fileName: string) =>
     api.delete(`/media/images/${encodeURIComponent(folder)}/${encodeURIComponent(fileName)}`),
-  deleteAllProfilePictures: () =>
-    api.delete<ProfilePictureDeleteAllResponse>('/media/profile-pictures'),
+  deleteAllProfilePictures: (batchSize?: number) =>
+    api.delete<ProfilePictureDeleteAllResponse>('/media/profile-pictures', {
+      params: batchSize ? { batchSize } : undefined,
+    }),
 };
 
 export const notificationSoundService = {

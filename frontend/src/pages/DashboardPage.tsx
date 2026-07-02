@@ -863,9 +863,7 @@ function DashboardNews({
                       className={`h-full w-full object-cover opacity-95 transition duration-700 ease-out group-hover:scale-[1.025] ${index === normalizedActiveFeaturedIndex ? 'dashboard-news-image-outward' : ''}`}
                     />
                   ) : (
-                    <div className="flex h-full items-center justify-center bg-primary-500/30 text-blue-100">
-                      <Image size={52} />
-                    </div>
+                    <div className="h-full bg-gray-900" />
                   )}
                 </Link>
                 <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/45 to-black/10" />

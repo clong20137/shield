@@ -497,6 +497,11 @@ export class MediaController {
       const uploadsRoot = getUploadsRoot();
       const deletedUrls: string[] = [];
       let deletedCount = 0;
+      const requestedBatchSize = Number(req.query.batchSize);
+      const batchSize = Number.isFinite(requestedBatchSize) && requestedBatchSize > 0
+        ? Math.min(Math.floor(requestedBatchSize), 100)
+        : 0;
+      const profileImageFiles: string[] = [];
 
       if (fs.existsSync(folderPath)) {
         for (const fileName of fs.readdirSync(folderPath)) {
@@ -506,14 +511,21 @@ export class MediaController {
             continue;
           }
 
-          const relativePath = path.relative(uploadsRoot, filePath);
-          deletedUrls.push(getUploadUrl(relativePath));
-          await deleteImageFileAndThumbnails(filePath);
-          deletedCount += 1;
+          profileImageFiles.push(filePath);
         }
       }
 
+      const filesToDelete = batchSize > 0 ? profileImageFiles.slice(0, batchSize) : profileImageFiles;
+      for (const filePath of filesToDelete) {
+        const relativePath = path.relative(uploadsRoot, filePath);
+        deletedUrls.push(getUploadUrl(relativePath));
+        await deleteImageFileAndThumbnails(filePath);
+        deletedCount += 1;
+      }
+
       const clearedUserCount = await UserModel.clearProfilePicturesByUrls(deletedUrls);
+      const totalCount = profileImageFiles.length;
+      const remainingCount = Math.max(totalCount - deletedCount, 0);
       const actor = await getSessionAccount(req);
       await AuditLogModel.create({
         actorId: actor?.id || null,
@@ -521,12 +533,12 @@ export class MediaController {
         action: 'media.profile_pictures_deleted',
         entityType: 'media-folder',
         entityId: profilePicturesFolder,
-        details: JSON.stringify({ folder: profilePicturesFolder, deletedCount, clearedUserCount }),
+        details: JSON.stringify({ folder: profilePicturesFolder, deletedCount, clearedUserCount, remainingCount }),
         ...requestAuditFields(req),
       });
       broadcastAppEvent({ type: 'media-updated', entityId: profilePicturesFolder });
       broadcastAppEvent({ type: 'user-updated' });
-      res.json({ deletedCount, clearedUserCount });
+      res.json({ deletedCount, clearedUserCount, totalCount, remainingCount, done: remainingCount === 0 });
     } catch (error) {
       console.error('Delete all profile pictures error:', error);
       res.status(500).json({ error: 'Failed to delete profile pictures' });
