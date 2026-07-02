@@ -434,6 +434,14 @@ export interface MediaLibraryResponse {
   totalSize: number;
 }
 
+export interface MediaUsageRecord {
+  url: string;
+  source: 'user-profile' | 'dashboard-post' | 'message-thread';
+  label: string;
+  detail: string;
+  entityId: string;
+}
+
 export interface SystemStatistics {
   totalUsers: number;
   activeUsers: number;
@@ -1610,6 +1618,8 @@ export const mediaService = {
     mediaService.deleteImages([{ folder, fileName }]),
   moveImages: (items: Array<Pick<MediaLibraryItem, 'folder' | 'fileName'>>, targetFolder: string) =>
     api.post<{ movedCount: number; skipped: Array<{ fileName: string; reason: string }> }>('/media/images/move', { items, targetFolder }),
+  getImageUsage: (items: Array<Pick<MediaLibraryItem, 'folder' | 'fileName'>>) =>
+    api.post<{ usages: MediaUsageRecord[] }>('/media/images/usage', { items }),
   deleteImages: (items: Array<Pick<MediaLibraryItem, 'folder' | 'fileName'>>) =>
     api.post<{ deletedCount: number; skipped: Array<{ fileName: string; reason: string }> }>('/media/images/delete', { items }),
   deleteAllProfilePictures: (batchSize?: number) =>

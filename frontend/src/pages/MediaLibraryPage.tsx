@@ -1,6 +1,6 @@
 import { ChangeEvent, DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Camera, Check, ChevronLeft, ChevronRight, Download, ExternalLink, Folder, FolderUp, HardDrive, Image, MoveRight, Pencil, Plus, Search, Trash2, Upload, X, Wrench } from 'lucide-react';
-import { AuthAccount, getAssetThumbnailUrl, getAssetUrl, handleAssetThumbnailError, MediaLibraryFolder, MediaLibraryItem, mediaService, userService } from '../services/api';
+import { AlertTriangle, Camera, Check, ChevronLeft, ChevronRight, Copy, Download, ExternalLink, Folder, FolderUp, HardDrive, Image, ListTree, MoveRight, Pencil, Plus, Search, Trash2, Upload, X, Wrench } from 'lucide-react';
+import { AuthAccount, getAssetThumbnailUrl, getAssetUrl, handleAssetThumbnailError, MediaLibraryFolder, MediaLibraryItem, MediaUsageRecord, mediaService, userService } from '../services/api';
 
 const pageSize = 60;
 const profilePictureDeleteBatchSize = 25;
@@ -33,6 +33,17 @@ function getCustomFolderDisplayLabel(folderKey: string): string {
     .join(' ') || folderKey;
 }
 
+function getUsageProtection(error: unknown): MediaUsageRecord[] {
+  const response = (error as { response?: { status?: number; data?: { usages?: MediaUsageRecord[] } } })?.response;
+  return response?.status === 409 && Array.isArray(response.data?.usages) ? response.data.usages : [];
+}
+
+function getUsageSourceLabel(source: MediaUsageRecord['source']): string {
+  if (source === 'user-profile') return 'User profile';
+  if (source === 'dashboard-post') return 'Dashboard post';
+  return 'Group message';
+}
+
 interface MediaLibraryPageProps {
   account: AuthAccount;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
@@ -57,6 +68,10 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
   const [selectedItem, setSelectedItem] = useState<MediaLibraryItem | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [moveTargetFolder, setMoveTargetFolder] = useState('');
+  const [dropTargetFolder, setDropTargetFolder] = useState('');
+  const [deleteProtection, setDeleteProtection] = useState<{ title: string; message: string; usages: MediaUsageRecord[] } | null>(null);
+  const [previewUsages, setPreviewUsages] = useState<MediaUsageRecord[]>([]);
+  const [isCheckingPreviewUsage, setIsCheckingPreviewUsage] = useState(false);
   const [isDraggingUpload, setIsDraggingUpload] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [editingFolderKey, setEditingFolderKey] = useState('');
@@ -105,6 +120,7 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
     () => items.filter((item) => selectedItemIds.includes(item.id)),
     [items, selectedItemIds],
   );
+  const selectedItemIndex = selectedItem ? items.findIndex((item) => item.id === selectedItem.id) : -1;
   const childFolders = useMemo(
     () => folders.filter((folder) => folder.parentKey === activeFolder),
     [activeFolder, folders],
@@ -178,6 +194,65 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
     setSelectedItemIds([]);
     setMoveTargetFolder('');
   }, [activeFolder, debouncedSearchTerm, page]);
+
+  useEffect(() => {
+    if (!selectedItem || !canViewMedia) {
+      setPreviewUsages([]);
+      return;
+    }
+
+    let isMounted = true;
+    setIsCheckingPreviewUsage(true);
+    mediaService.getImageUsage([selectedItem])
+      .then((response) => {
+        if (isMounted) {
+          setPreviewUsages(response.data.usages);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setPreviewUsages([]);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsCheckingPreviewUsage(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedItem, canViewMedia]);
+
+  useEffect(() => {
+    if (!selectedItem) {
+      return undefined;
+    }
+
+    const handlePreviewKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSelectedItem(null);
+      }
+      if (event.key === 'ArrowLeft') {
+        setSelectedItem((current) => {
+          if (!current) return current;
+          const currentIndex = items.findIndex((item) => item.id === current.id);
+          return currentIndex > 0 ? items[currentIndex - 1] : current;
+        });
+      }
+      if (event.key === 'ArrowRight') {
+        setSelectedItem((current) => {
+          if (!current) return current;
+          const currentIndex = items.findIndex((item) => item.id === current.id);
+          return currentIndex >= 0 && currentIndex < items.length - 1 ? items[currentIndex + 1] : current;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handlePreviewKeyDown);
+    return () => window.removeEventListener('keydown', handlePreviewKeyDown);
+  }, [selectedItem, items]);
 
   useEffect(() => {
     const handleMediaUpdate = () => {
@@ -270,6 +345,15 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
       onToast('success', 'Folder deleted.');
       await loadMedia();
     } catch (err) {
+      const usages = getUsageProtection(err);
+      if (usages.length > 0) {
+        setDeleteProtection({
+          title: 'Folder is protected',
+          message: `${folder.label} contains media that is still used elsewhere in Shield. Remove those references before deleting the folder.`,
+          usages,
+        });
+        return;
+      }
       onToast('error', getErrorMessage(err, 'Failed to delete folder.'));
     }
   };
@@ -389,6 +473,15 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
       onToast('success', 'Image deleted.');
       await loadMedia();
     } catch (err) {
+      const usages = getUsageProtection(err);
+      if (usages.length > 0) {
+        setDeleteProtection({
+          title: 'Image is protected',
+          message: `${item.fileName} is still used elsewhere in Shield. Remove those references before deleting it.`,
+          usages,
+        });
+        return;
+      }
       onToast('error', getErrorMessage(err, 'Failed to delete image.'));
     }
   };
@@ -414,11 +507,11 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
     setRenamingImageName(item.fileName.replace(/\.[^.]+$/u, ''));
   };
 
-  const moveSelectedImages = async () => {
-    if (selectedItems.length === 0 || !moveTargetFolder) return;
+  const moveSelectedImagesTo = async (targetFolder: string) => {
+    if (selectedItems.length === 0 || !targetFolder) return;
 
     try {
-      const response = await mediaService.moveImages(selectedItems, moveTargetFolder);
+      const response = await mediaService.moveImages(selectedItems, targetFolder);
       onToast('success', `Moved ${response.data.movedCount} image${response.data.movedCount === 1 ? '' : 's'}.`);
       setSelectedItemIds([]);
       setMoveTargetFolder('');
@@ -426,6 +519,20 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
     } catch (err) {
       onToast('error', getErrorMessage(err, 'Failed to move selected images.'));
     }
+  };
+
+  const moveSelectedImages = async () => {
+    await moveSelectedImagesTo(moveTargetFolder);
+  };
+
+  const handleFolderDropMove = async (event: DragEvent<HTMLElement>, folderKey: string) => {
+    event.preventDefault();
+    setDropTargetFolder('');
+    if (!canEditMedia || selectedItems.length === 0 || folderKey === activeFolder) {
+      return;
+    }
+
+    await moveSelectedImagesTo(folderKey);
   };
 
   const deleteSelectedImages = async () => {
@@ -438,7 +545,25 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
       setSelectedItemIds([]);
       await loadMedia();
     } catch (err) {
+      const usages = getUsageProtection(err);
+      if (usages.length > 0) {
+        setDeleteProtection({
+          title: 'Selected images are protected',
+          message: 'One or more selected images are still used elsewhere in Shield. Remove those references before deleting them.',
+          usages,
+        });
+        return;
+      }
       onToast('error', getErrorMessage(err, 'Failed to delete selected images.'));
+    }
+  };
+
+  const copySelectedItemLink = async (item: MediaLibraryItem) => {
+    try {
+      await navigator.clipboard.writeText(getAssetUrl(item.url));
+      onToast('info', 'Image link copied.');
+    } catch {
+      onToast('error', 'Could not copy image link.');
     }
   };
 
@@ -531,6 +656,54 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
       setIsDeletingProfilePhotos(false);
     }
   };
+
+  const folderTree = (
+    <aside className="rounded border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+      <div className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white">
+        <ListTree size={16} className="text-primary-500" />
+        Folders
+      </div>
+      <div className="space-y-1">
+        <button
+          type="button"
+          onClick={closeFolder}
+          className={`flex w-full items-center justify-between rounded px-2 py-2 text-left text-sm font-semibold transition ${!activeFolder ? 'bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-blue-100' : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800'}`}
+        >
+          <span>All Media</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">{totalItems}</span>
+        </button>
+        {folders.map((folder) => (
+          <button
+            key={folder.key}
+            type="button"
+            onClick={() => openFolder(folder.key)}
+            onDragEnter={(event) => {
+              if (canEditMedia && selectedItems.length > 0 && folder.key !== activeFolder) {
+                event.preventDefault();
+                setDropTargetFolder(folder.key);
+              }
+            }}
+            onDragOver={(event) => {
+              if (canEditMedia && selectedItems.length > 0 && folder.key !== activeFolder) {
+                event.preventDefault();
+              }
+            }}
+            onDragLeave={() => setDropTargetFolder((current) => (current === folder.key ? '' : current))}
+            onDrop={(event) => void handleFolderDropMove(event, folder.key)}
+            className={`flex w-full items-center justify-between gap-2 rounded py-2 pr-2 text-left text-sm font-semibold transition ${activeFolder === folder.key ? 'bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-blue-100' : dropTargetFolder === folder.key ? 'bg-amber-50 text-amber-800 ring-2 ring-amber-300 dark:bg-amber-950/40 dark:text-amber-100' : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800'}`}
+            style={{ paddingLeft: `${8 + folder.depth * 18}px` }}
+            title={selectedItems.length > 0 && folder.key !== activeFolder ? `Drop to move ${selectedItems.length} selected image${selectedItems.length === 1 ? '' : 's'}` : folder.label}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <Folder size={15} className="shrink-0 text-primary-500" />
+              <span className="truncate">{folder.label}</span>
+            </span>
+            <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">{folder.count}</span>
+          </button>
+        ))}
+      </div>
+    </aside>
+  );
 
   if (!canViewMedia) {
     return <div className="empty-state">You do not have permission to view the media library.</div>;
@@ -763,13 +936,31 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
         </form>
       )}
 
+      <div className="grid gap-4 lg:grid-cols-[260px,1fr]">
+        <div className="lg:sticky lg:top-4 lg:self-start">
+          {folderTree}
+        </div>
+        <div className="min-w-0 space-y-4">
       {!activeFolder && (
         <>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {childFolders.map((folder) => (
             <article
               key={folder.key}
-              className="rounded border border-gray-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:hover:border-primary-700"
+              onDragEnter={(event) => {
+                if (canEditMedia && selectedItems.length > 0 && folder.key !== activeFolder) {
+                  event.preventDefault();
+                  setDropTargetFolder(folder.key);
+                }
+              }}
+              onDragOver={(event) => {
+                if (canEditMedia && selectedItems.length > 0 && folder.key !== activeFolder) {
+                  event.preventDefault();
+                }
+              }}
+              onDragLeave={() => setDropTargetFolder((current) => (current === folder.key ? '' : current))}
+              onDrop={(event) => void handleFolderDropMove(event, folder.key)}
+              className={`rounded border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-md dark:bg-gray-900 dark:hover:border-primary-700 ${dropTargetFolder === folder.key ? 'border-amber-300 ring-2 ring-amber-300 dark:border-amber-400' : 'border-gray-200 dark:border-gray-800'}`}
             >
               <div className="flex items-start gap-3" onDoubleClick={() => openFolder(folder.key)}>
                 <button type="button" onClick={() => openFolder(folder.key)} className="rounded bg-primary-50 p-3 text-primary-500 dark:bg-primary-900/30 dark:text-primary-200" aria-label={`Open ${folder.label}`}>
@@ -880,7 +1071,23 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
           {childFolders.length > 0 && (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
               {childFolders.map((folder) => (
-                <article key={folder.key} className="rounded border border-gray-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:hover:border-primary-700">
+                <article
+                  key={folder.key}
+                  onDragEnter={(event) => {
+                    if (canEditMedia && selectedItems.length > 0 && folder.key !== activeFolder) {
+                      event.preventDefault();
+                      setDropTargetFolder(folder.key);
+                    }
+                  }}
+                  onDragOver={(event) => {
+                    if (canEditMedia && selectedItems.length > 0 && folder.key !== activeFolder) {
+                      event.preventDefault();
+                    }
+                  }}
+                  onDragLeave={() => setDropTargetFolder((current) => (current === folder.key ? '' : current))}
+                  onDrop={(event) => void handleFolderDropMove(event, folder.key)}
+                  className={`rounded border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-md dark:bg-gray-900 dark:hover:border-primary-700 ${dropTargetFolder === folder.key ? 'border-amber-300 ring-2 ring-amber-300 dark:border-amber-400' : 'border-gray-200 dark:border-gray-800'}`}
+                >
                   <div className="flex items-start gap-3" onDoubleClick={() => openFolder(folder.key)}>
                     <button type="button" onClick={() => openFolder(folder.key)} className="rounded bg-primary-50 p-3 text-primary-500 dark:bg-primary-900/30 dark:text-primary-200" aria-label={`Open ${folder.label}`}>
                       <Folder size={24} />
@@ -925,7 +1132,18 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
           ) : (
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
               {items.map((item) => (
-                <article key={item.id} className={`group relative overflow-hidden rounded border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:bg-gray-900 ${selectedItemIds.includes(item.id) ? 'border-primary-500 ring-2 ring-primary-500/25 dark:border-blue-300' : 'border-gray-200 dark:border-gray-800'}`}>
+                <article
+                  key={item.id}
+                  draggable={canEditMedia}
+                  onDragStart={(event) => {
+                    if (!selectedItemIds.includes(item.id)) {
+                      setSelectedItemIds([item.id]);
+                    }
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', item.id);
+                  }}
+                  className={`group relative overflow-hidden rounded border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:bg-gray-900 ${selectedItemIds.includes(item.id) ? 'border-primary-500 ring-2 ring-primary-500/25 dark:border-blue-300' : 'border-gray-200 dark:border-gray-800'}`}
+                >
                   <label className="absolute left-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded bg-white/95 shadow dark:bg-gray-950/95" title="Select image">
                     <input
                       type="checkbox"
@@ -990,15 +1208,66 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
         </>
       )}
 
+        </div>
+      </div>
+
+      {deleteProtection && (
+        <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="media-protection-title">
+          <div className="w-full max-w-xl overflow-hidden rounded border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-950">
+            <div className="flex items-start justify-between gap-3 border-b border-gray-200 p-4 dark:border-gray-800">
+              <div className="flex min-w-0 gap-3">
+                <div className="mt-0.5 rounded bg-amber-50 p-2 text-amber-700 dark:bg-amber-950/50 dark:text-amber-200">
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 id="media-protection-title" className="text-base font-bold text-gray-900 dark:text-white">{deleteProtection.title}</h3>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{deleteProtection.message}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setDeleteProtection(null)} className="btn-secondary" aria-label="Close media protection modal" title="Close">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="max-h-[50vh] space-y-2 overflow-auto p-4">
+              {deleteProtection.usages.map((usage) => (
+                <div key={`${usage.source}-${usage.entityId}-${usage.url}`} className="rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded bg-primary-50 px-2 py-1 text-xs font-bold uppercase text-primary-700 dark:bg-primary-950/40 dark:text-blue-100">{getUsageSourceLabel(usage.source)}</span>
+                    <p className="min-w-0 flex-1 truncate text-sm font-bold text-gray-900 dark:text-white">{usage.label}</p>
+                  </div>
+                  {usage.detail && <p className="mt-1 break-words text-xs text-gray-500 dark:text-gray-400">{usage.detail}</p>}
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end border-t border-gray-200 p-4 dark:border-gray-800">
+              <button type="button" onClick={() => setDeleteProtection(null)} className="btn-primary">
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {selectedItem && (
-        <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-950">
+        <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true">
+          <div className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-950">
             <div className="flex items-center justify-between gap-3 border-b border-gray-200 p-4 dark:border-gray-800">
               <div className="min-w-0">
                 <h3 className="truncate text-base font-bold text-gray-900 dark:text-white">{selectedItem.fileName}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{formatBytes(selectedItem.size)} / {formatDate(selectedItem.updatedAt)}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {selectedItemIndex + 1} of {items.length} / {selectedItem.label}
+                </p>
               </div>
               <div className="flex items-center gap-2">
+                <button type="button" onClick={() => selectedItemIndex > 0 && setSelectedItem(items[selectedItemIndex - 1])} className="btn-secondary" disabled={selectedItemIndex <= 0} aria-label="Previous image" title="Previous">
+                  <ChevronLeft size={16} />
+                </button>
+                <button type="button" onClick={() => selectedItemIndex < items.length - 1 && setSelectedItem(items[selectedItemIndex + 1])} className="btn-secondary" disabled={selectedItemIndex < 0 || selectedItemIndex >= items.length - 1} aria-label="Next image" title="Next">
+                  <ChevronRight size={16} />
+                </button>
+                <button type="button" onClick={() => void copySelectedItemLink(selectedItem)} className="btn-secondary" aria-label="Copy image link" title="Copy Link">
+                  <Copy size={16} />
+                </button>
                 {canDeleteMedia && (
                   <button type="button" onClick={() => void deleteImage(selectedItem)} className="btn-danger" aria-label="Delete media" title="Delete">
                     <Trash2 size={16} />
@@ -1012,12 +1281,61 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
                 </button>
               </div>
             </div>
-            <div className="max-h-[72vh] overflow-auto bg-gray-100 p-4 dark:bg-gray-900">
-              <img
-                src={getAssetUrl(selectedItem.url)}
-                alt=""
-                className="mx-auto max-h-[68vh] max-w-full rounded bg-white object-contain shadow-sm dark:bg-gray-950"
-              />
+            <div className="grid max-h-[78vh] overflow-hidden lg:grid-cols-[minmax(0,1fr),320px]">
+              <div className="flex min-h-[52vh] items-center justify-center overflow-auto bg-gray-100 p-4 dark:bg-gray-900">
+                <img
+                  src={getAssetUrl(selectedItem.url)}
+                  alt=""
+                  className="max-h-[72vh] max-w-full rounded bg-white object-contain shadow-sm dark:bg-gray-950"
+                />
+              </div>
+              <aside className="space-y-4 overflow-auto border-t border-gray-200 p-4 dark:border-gray-800 lg:border-l lg:border-t-0">
+                <div>
+                  <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Details</p>
+                  <dl className="mt-2 space-y-2 text-sm">
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-gray-500 dark:text-gray-400">Size</dt>
+                      <dd className="font-semibold text-gray-900 dark:text-white">{formatBytes(selectedItem.size)}</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-gray-500 dark:text-gray-400">Updated</dt>
+                      <dd className="text-right font-semibold text-gray-900 dark:text-white">{formatDate(selectedItem.updatedAt)}</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-gray-500 dark:text-gray-400">Folder</dt>
+                      <dd className="max-w-40 truncate text-right font-semibold text-gray-900 dark:text-white">{selectedItem.label}</dd>
+                    </div>
+                  </dl>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Used By</p>
+                  {isCheckingPreviewUsage ? (
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Checking usage...</p>
+                  ) : previewUsages.length === 0 ? (
+                    <p className="mt-2 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-100">No current references found.</p>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      {previewUsages.map((usage) => (
+                        <div key={`${usage.source}-${usage.entityId}-${usage.url}`} className="rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900">
+                          <span className="rounded bg-primary-50 px-2 py-1 text-xs font-bold uppercase text-primary-700 dark:bg-primary-950/40 dark:text-blue-100">{getUsageSourceLabel(usage.source)}</span>
+                          <p className="mt-2 truncate text-sm font-bold text-gray-900 dark:text-white">{usage.label}</p>
+                          {usage.detail && <p className="mt-1 break-words text-xs text-gray-500 dark:text-gray-400">{usage.detail}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <a href={getAssetUrl(selectedItem.url)} download={selectedItem.fileName} className="btn-secondary justify-center">
+                    <Download size={16} />
+                    Download
+                  </a>
+                  <button type="button" onClick={() => setSelectedItemIds((current) => (current.includes(selectedItem.id) ? current : [...current, selectedItem.id]))} className="btn-secondary justify-center">
+                    <Check size={16} />
+                    Select
+                  </button>
+                </div>
+              </aside>
             </div>
           </div>
         </div>

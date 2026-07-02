@@ -1,7 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { Request, Response } from 'express';
+import { RowDataPacket } from 'mysql2';
 import { v4 as uuidv4 } from 'uuid';
+import pool from '../config/database';
 import { AuditLogModel } from '../models/AuditLog';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { UserModel } from '../models/User';
@@ -18,6 +20,27 @@ const mediaFolders = [
 const protectedFolders = new Set<string>(mediaFolders.map((folder) => folder.key));
 const dashboardMediaFolder = 'dashboard-posts';
 const profilePicturesFolder = 'profile-pictures';
+
+interface MediaUsageRecord {
+  url: string;
+  source: 'user-profile' | 'dashboard-post' | 'message-thread';
+  label: string;
+  detail: string;
+  entityId: string;
+}
+
+interface MediaUsageRow extends RowDataPacket {
+  source: MediaUsageRecord['source'];
+  url: string;
+  entityId: string;
+  label: string | null;
+  detail: string | null;
+}
+
+interface MediaImageRequestItem {
+  folder?: unknown;
+  fileName?: unknown;
+}
 
 function getUploadsRoot(): string {
   return path.resolve(process.cwd(), 'uploads');
@@ -157,6 +180,97 @@ async function deleteImageFileAndThumbnails(filePath: string) {
   const thumbDirectory = path.join(path.dirname(filePath), 'thumbs');
   await fs.promises.rm(filePath, { force: true });
   await Promise.all([96, 256, 480].map((width) => fs.promises.rm(path.join(thumbDirectory, `${parsed.name}-${width}.webp`), { force: true })));
+}
+
+function getImageUrlFromItem(folder: string, fileName: string): string | null {
+  const filePath = getSafeImagePath(folder, fileName);
+  if (!filePath) {
+    return null;
+  }
+
+  return getUploadUrl(path.relative(getUploadsRoot(), filePath));
+}
+
+function collectImageUrlsFromFolder(folderPath: string): string[] {
+  const uploadsRoot = getUploadsRoot();
+  const urls: string[] = [];
+
+  const visitFolder = (absoluteFolderPath: string) => {
+    if (!fs.existsSync(absoluteFolderPath)) {
+      return;
+    }
+
+    for (const entry of fs.readdirSync(absoluteFolderPath, { withFileTypes: true })) {
+      if (entry.name === 'thumbs') {
+        continue;
+      }
+
+      const entryPath = path.join(absoluteFolderPath, entry.name);
+      if (entry.isDirectory()) {
+        visitFolder(entryPath);
+        continue;
+      }
+
+      if (entry.isFile() && allowedImageExtensions.has(path.extname(entry.name).toLowerCase())) {
+        urls.push(getUploadUrl(path.relative(uploadsRoot, entryPath)));
+      }
+    }
+  };
+
+  visitFolder(folderPath);
+  return urls;
+}
+
+async function getMediaUsageByUrls(urls: string[]): Promise<MediaUsageRecord[]> {
+  const uniqueUrls = [...new Set(urls.filter(Boolean))];
+  if (uniqueUrls.length === 0) {
+    return [];
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    const [userRows] = await conn.query<MediaUsageRow[]>(
+      `SELECT 'user-profile' AS source,
+              \`profilePictureUrl\` AS url,
+              \`id\` AS entityId,
+              TRIM(CONCAT(COALESCE(\`firstName\`, ''), ' ', COALESCE(\`lastName\`, ''))) AS label,
+              COALESCE(\`email\`, \`peNumber\`, '') AS detail
+       FROM users
+       WHERE \`profilePictureUrl\` IN (?)`,
+      [uniqueUrls],
+    );
+    const [postRows] = await conn.query<MediaUsageRow[]>(
+      `SELECT 'dashboard-post' AS source,
+              \`imageUrl\` AS url,
+              \`id\` AS entityId,
+              \`title\` AS label,
+              \`category\` AS detail
+       FROM dashboard_posts
+       WHERE \`imageUrl\` IN (?)`,
+      [uniqueUrls],
+    );
+    const [messageRows] = await conn.query<MediaUsageRow[]>(
+      `SELECT 'message-thread' AS source,
+              \`threadImageUrl\` AS url,
+              COALESCE(\`threadId\`, \`id\`) AS entityId,
+              COALESCE(\`threadTitle\`, 'Group message') AS label,
+              COALESCE(\`threadParticipantNames\`, '') AS detail
+       FROM user_messages
+       WHERE \`threadImageUrl\` IN (?)
+       GROUP BY \`threadImageUrl\`, COALESCE(\`threadId\`, \`id\`), COALESCE(\`threadTitle\`, 'Group message'), COALESCE(\`threadParticipantNames\`, '')`,
+      [uniqueUrls],
+    );
+
+    return [...userRows, ...postRows, ...messageRows].map((row) => ({
+      url: row.url,
+      source: row.source,
+      entityId: row.entityId,
+      label: row.label || 'Untitled',
+      detail: row.detail || '',
+    }));
+  } finally {
+    conn.release();
+  }
 }
 
 export class MediaController {
@@ -385,6 +499,14 @@ export class MediaController {
         return res.status(404).json({ error: 'Folder not found' });
       }
 
+      const usages = await getMediaUsageByUrls(collectImageUrlsFromFolder(folderPath));
+      if (usages.length > 0) {
+        return res.status(409).json({
+          error: 'Folder contains media that is currently in use.',
+          usages,
+        });
+      }
+
       await fs.promises.rm(folderPath, { recursive: true, force: true });
       const actor = await getSessionAccount(req);
       await AuditLogModel.create({
@@ -472,7 +594,22 @@ export class MediaController {
 
   static async deleteImages(req: Request, res: Response) {
     try {
-      const items = Array.isArray(req.body?.items) ? req.body.items : [];
+      const items: MediaImageRequestItem[] = Array.isArray(req.body?.items) ? req.body.items : [];
+      const urlsToDelete = items.slice(0, 300)
+        .map((item: MediaImageRequestItem) => {
+          const folder = sanitizeFolderPath(typeof item?.folder === 'string' ? item.folder : '');
+          const fileName = typeof item?.fileName === 'string' ? item.fileName : '';
+          return getImageUrlFromItem(folder, fileName);
+        })
+        .filter((url: string | null): url is string => Boolean(url));
+      const usages = await getMediaUsageByUrls(urlsToDelete);
+      if (usages.length > 0) {
+        return res.status(409).json({
+          error: 'One or more selected images are currently in use.',
+          usages,
+        });
+      }
+
       let deletedCount = 0;
       const skipped: Array<{ fileName: string; reason: string }> = [];
       for (const item of items.slice(0, 300)) {
@@ -619,6 +756,15 @@ export class MediaController {
         return res.status(404).json({ error: 'Image not found' });
       }
 
+      const imageUrl = getUploadUrl(path.relative(getUploadsRoot(), filePath));
+      const usages = await getMediaUsageByUrls([imageUrl]);
+      if (usages.length > 0) {
+        return res.status(409).json({
+          error: 'This image is currently in use.',
+          usages,
+        });
+      }
+
       await deleteImageFileAndThumbnails(filePath);
       const actor = await getSessionAccount(req);
       await AuditLogModel.create({
@@ -635,6 +781,25 @@ export class MediaController {
     } catch (error) {
       console.error('Delete media image error:', error);
       res.status(500).json({ error: 'Failed to delete media image' });
+    }
+  }
+
+  static async getImageUsage(req: Request, res: Response) {
+    try {
+      const items: MediaImageRequestItem[] = Array.isArray(req.body?.items) ? req.body.items : [];
+      const urls = items.slice(0, 300)
+        .map((item: MediaImageRequestItem) => {
+          const folder = sanitizeFolderPath(typeof item?.folder === 'string' ? item.folder : '');
+          const fileName = typeof item?.fileName === 'string' ? item.fileName : '';
+          return getImageUrlFromItem(folder, fileName);
+        })
+        .filter((url: string | null): url is string => Boolean(url));
+
+      const usages = await getMediaUsageByUrls(urls);
+      res.json({ usages });
+    } catch (error) {
+      console.error('Get media usage error:', error);
+      res.status(500).json({ error: 'Failed to check media usage' });
     }
   }
 
