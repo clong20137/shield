@@ -202,30 +202,17 @@ function getThreadType(message: UserMessage): string {
   return message.threadType || 'direct';
 }
 
-function getVisualMessageKey(message: UserMessage): string {
-  return getThreadType(message) !== 'direct' && message.groupMessageId
+function getVisualMessageKey(message: UserMessage, currentUserId: string): string {
+  return getThreadType(message) !== 'direct' && message.senderAccountId === currentUserId && message.groupMessageId
     ? `group:${message.groupMessageId}`
     : `message:${message.id}`;
-}
-
-function getVisualMessagePriority(message: UserMessage, currentUserId: string): number {
-  if (message.senderAccountId === currentUserId || message.recipientUserId === currentUserId) {
-    return 2;
-  }
-
-  return 1;
 }
 
 function collapseVisualThreadMessages(messages: UserMessage[], currentUserId: string): UserMessage[] {
   const byVisualKey = new Map<string, UserMessage>();
 
   [...messages].sort(compareMessagesAscending).forEach((message) => {
-    const visualKey = getVisualMessageKey(message);
-    const existingMessage = byVisualKey.get(visualKey);
-
-    if (!existingMessage || getVisualMessagePriority(message, currentUserId) >= getVisualMessagePriority(existingMessage, currentUserId)) {
-      byVisualKey.set(visualKey, message);
-    }
+    byVisualKey.set(getVisualMessageKey(message, currentUserId), message);
   });
 
   return Array.from(byVisualKey.values()).sort(compareMessagesAscending);
@@ -1378,7 +1365,8 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
         return;
       }
 
-      if (!existingThread.messages.some((item) => (item.groupMessageId || item.id) === (message.groupMessageId || message.id))) {
+      const visualMessageKey = getVisualMessageKey(message, currentUser.id);
+      if (!existingThread.messages.some((item) => getVisualMessageKey(item, currentUser.id) === visualMessageKey)) {
         existingThread.messages.push(message);
       }
       existingThread.latestMessage = message;
