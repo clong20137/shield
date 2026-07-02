@@ -1,6 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+function hasNodeModulePackage(id: string, packageName: string) {
+  const normalizedId = id.replace(/\\/g, '/')
+  return normalizedId.includes(`/node_modules/${packageName}/`)
+}
+
 export default defineConfig(({ command }) => ({
   base: command === 'build' ? process.env.VITE_APP_BASE_PATH || '/shield/' : '/',
   plugins: [react()],
@@ -33,7 +38,12 @@ export default defineConfig(({ command }) => ({
             return 'vendor-qrcode';
           }
 
-          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+          if (
+            hasNodeModulePackage(id, 'react') ||
+            hasNodeModulePackage(id, 'react-dom') ||
+            hasNodeModulePackage(id, 'react-router') ||
+            hasNodeModulePackage(id, 'react-router-dom')
+          ) {
             return 'vendor-react';
           }
 
