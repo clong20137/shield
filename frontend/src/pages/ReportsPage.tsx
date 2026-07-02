@@ -1,5 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, RotateCcw, Search, Table, X } from 'lucide-react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { AuthAccount, reportService, TrooperDailyReportEntry, TrooperDailyAnalyticsResponse, User, userService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import PerformanceEvaluationsPage from './PerformanceEvaluationsPage';
@@ -367,186 +379,77 @@ const AnalyticsChart: React.FC<{
   height?: number;
   valueLabel?: string;
 }> = ({ series, graphType, height = 172, valueLabel = '' }) => {
-  const [hoveredPoint, setHoveredPoint] = useState<{ name: string; label: string; value: number; x: number; y: number; color: string } | null>(null);
-  const width = 1200;
-  const padding = { top: 22, right: 32, bottom: 46, left: 64 };
-  const chartWidth = width - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
   const allPoints = series.flatMap((item) => item.points);
-  const values = allPoints.map((point) => Number(point.value) || 0);
-  const maxValue = Math.max(1, ...values);
-  const minValue = Math.min(0, ...values);
-  const range = Math.max(1, maxValue - minValue);
-  const primaryPoints = series[0]?.points || [];
-  const seriesCoordinates = series.map((item) => ({
-    ...item,
-    coordinates: item.points.map((point, index) => {
-      const x = padding.left + (item.points.length <= 1 ? chartWidth : (index / (item.points.length - 1)) * chartWidth);
-      const y = padding.top + chartHeight - (((Number(point.value) || 0) - minValue) / range) * chartHeight;
-      return { ...point, value: Number(point.value) || 0, x, y };
-    }),
-  }));
-  const labelIndexes = primaryPoints.length <= 10
-    ? primaryPoints.map((_, index) => index)
-    : Array.from(new Set([
-      0,
-      Math.floor((primaryPoints.length - 1) * 0.25),
-      Math.floor((primaryPoints.length - 1) * 0.5),
-      Math.floor((primaryPoints.length - 1) * 0.75),
-      primaryPoints.length - 1,
-    ]));
-  const ticks = [maxValue, maxValue * 0.75 + minValue * 0.25, (maxValue + minValue) / 2, maxValue * 0.25 + minValue * 0.75, minValue];
 
   if (allPoints.length === 0) {
     return <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No chart data yet.</p>;
   }
 
+  const labels = Array.from(new Set(series.flatMap((item) => item.points.map((point) => point.label))));
+  const data = labels.map((label) => {
+    const row: Record<string, string | number> = {
+      label,
+      displayLabel: formatAnalyticsLabel(label),
+    };
+    series.forEach((item, index) => {
+      row[`series-${index}`] = Number(item.points.find((point) => point.label === label)?.value) || 0;
+    });
+    return row;
+  });
+  const tooltipStyle = {
+    border: '1px solid rgb(229 231 235)',
+    borderRadius: 8,
+    boxShadow: '0 18px 45px rgba(15, 23, 42, 0.18)',
+    fontSize: 12,
+  };
+
   return (
-    <div className="relative h-full min-h-[320px] w-full">
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" className="h-full min-h-[320px] w-full overflow-visible" preserveAspectRatio="none" onMouseLeave={() => setHoveredPoint(null)}>
-        <rect x={padding.left} y={padding.top} width={chartWidth} height={chartHeight} rx="10" fill="currentColor" className="text-gray-50 dark:text-gray-950" opacity="0.7" />
-        {ticks.map((tick) => {
-          const y = padding.top + chartHeight - ((tick - minValue) / range) * chartHeight;
-          return (
-            <g key={tick}>
-              <line x1={padding.left} x2={padding.left + chartWidth} y1={y} y2={y} stroke="currentColor" strokeOpacity="0.12" />
-              <text x={padding.left - 12} y={y + 4} textAnchor="end" className="fill-gray-500 text-[12px] font-bold dark:fill-gray-400">
-                {formatMetric(tick, tick % 1 === 0 ? 0 : 1)}
-              </text>
-            </g>
-          );
-        })}
-
+    <div className="h-full min-h-[320px] w-full">
+      <ResponsiveContainer width="100%" height={height}>
         {graphType === 'bar' ? (
-          seriesCoordinates.map((item, seriesIndex) => {
-            const groupWidth = chartWidth / Math.max(1, item.coordinates.length);
-            const barWidth = Math.min(38, Math.max(7, (groupWidth - 10) / Math.max(1, seriesCoordinates.length)));
-            return item.coordinates.map((point, index) => {
-              const x = padding.left + index * groupWidth + (groupWidth - barWidth * seriesCoordinates.length) / 2 + seriesIndex * barWidth;
-              const barHeight = chartHeight - (point.y - padding.top);
-              return (
-                <g key={`${item.name}-${point.label}`}>
-                  <rect
-                    x={x}
-                    y={point.y}
-                    width={barWidth}
-                    height={Math.max(1, barHeight)}
-                    rx="5"
-                    fill={item.color}
-                    opacity={hoveredPoint?.name === item.name && hoveredPoint.label === point.label ? 1 : seriesIndex === 0 ? 0.88 : 0.62}
-                    className="cursor-pointer transition-opacity"
-                    onMouseEnter={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: x + barWidth / 2, y: point.y, color: item.color })}
-                    onMouseMove={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: x + barWidth / 2, y: point.y, color: item.color })}
-                  >
-                    <animate attributeName="y" from={padding.top + chartHeight} to={point.y} dur="420ms" fill="freeze" />
-                    <animate attributeName="height" from="1" to={Math.max(1, barHeight)} dur="420ms" fill="freeze" />
-                  </rect>
-                  <rect
-                    x={padding.left + index * groupWidth}
-                    y={padding.top}
-                    width={groupWidth}
-                    height={chartHeight}
-                    fill="transparent"
-                    className="cursor-pointer"
-                    onMouseEnter={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: x + barWidth / 2, y: point.y, color: item.color })}
-                    onMouseMove={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: x + barWidth / 2, y: point.y, color: item.color })}
-                  />
-                </g>
-              );
-            });
-          })
+          <BarChart data={data} margin={{ top: 16, right: 22, bottom: 18, left: 8 }} barGap={8} barCategoryGap="24%">
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" strokeOpacity={0.12} />
+            <XAxis dataKey="displayLabel" tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} minTickGap={18} />
+            <YAxis tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={58} tickFormatter={(value) => formatMetric(Number(value), 1)} />
+            <Tooltip
+              cursor={{ fill: 'rgba(37, 99, 235, 0.08)' }}
+              contentStyle={tooltipStyle}
+              labelStyle={{ fontWeight: 900, color: 'rgb(17 24 39)' }}
+              formatter={(value, name) => [`${formatMetric(Number(value), 1)}${valueLabel}`, name]}
+            />
+            {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12, fontWeight: 800, paddingTop: 8 }} />}
+            {series.map((item, index) => (
+              <Bar key={item.name} dataKey={`series-${index}`} name={item.name} fill={item.color} radius={[5, 5, 0, 0]} maxBarSize={42} />
+            ))}
+          </BarChart>
         ) : (
-          seriesCoordinates.map((item) => {
-            const path = item.coordinates.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
-            const fillPath = item.coordinates.length > 0
-              ? `${path} L ${item.coordinates[item.coordinates.length - 1].x.toFixed(2)} ${padding.top + chartHeight} L ${item.coordinates[0].x.toFixed(2)} ${padding.top + chartHeight} Z`
-              : '';
-            return (
-              <g key={item.name}>
-                {fillPath && (
-                  <path d={fillPath} fill={item.color} opacity="0.08">
-                    <animate attributeName="opacity" from="0" to="0.08" dur="500ms" fill="freeze" />
-                  </path>
-                )}
-                <path
-                  d={path}
-                  fill="none"
-                  stroke={item.color}
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  pathLength="100"
-                  strokeDasharray="100"
-                  strokeDashoffset="100"
-                >
-                  <animate attributeName="stroke-dashoffset" from="100" to="0" dur="520ms" fill="freeze" />
-                </path>
-                {item.coordinates.map((point) => (
-                  <g key={`${item.name}-${point.label}-${point.x}`}>
-                    {hoveredPoint?.name === item.name && hoveredPoint.label === point.label && (
-                      <>
-                        <line x1={point.x} x2={point.x} y1={padding.top} y2={padding.top + chartHeight} stroke={item.color} strokeOpacity="0.25" strokeDasharray="6 6" />
-                        <circle cx={point.x} cy={point.y} r="9" fill={item.color} opacity="0.15" />
-                      </>
-                    )}
-                    <circle
-                      cx={point.x}
-                      cy={point.y}
-                      r="5"
-                      fill={item.color}
-                      stroke="white"
-                      strokeWidth="2.5"
-                      opacity="0"
-                      className="cursor-pointer"
-                      onMouseEnter={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: point.x, y: point.y, color: item.color })}
-                      onMouseMove={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: point.x, y: point.y, color: item.color })}
-                    >
-                      <animate attributeName="opacity" from="0" to="1" dur="240ms" begin="260ms" fill="freeze" />
-                      <animate attributeName="r" from="2" to="5" dur="240ms" begin="260ms" fill="freeze" />
-                    </circle>
-                    <circle
-                      cx={point.x}
-                      cy={point.y}
-                      r="16"
-                      fill="transparent"
-                      className="cursor-pointer"
-                      onMouseEnter={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: point.x, y: point.y, color: item.color })}
-                      onMouseMove={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: point.x, y: point.y, color: item.color })}
-                    />
-                  </g>
-                ))}
-              </g>
-            );
-          })
+          <LineChart data={data} margin={{ top: 16, right: 22, bottom: 18, left: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" strokeOpacity={0.12} />
+            <XAxis dataKey="displayLabel" tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} minTickGap={18} />
+            <YAxis tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={58} tickFormatter={(value) => formatMetric(Number(value), 1)} />
+            <Tooltip
+              cursor={{ stroke: 'rgba(37, 99, 235, 0.32)', strokeWidth: 2, strokeDasharray: '5 5' }}
+              contentStyle={tooltipStyle}
+              labelStyle={{ fontWeight: 900, color: 'rgb(17 24 39)' }}
+              formatter={(value, name) => [`${formatMetric(Number(value), 1)}${valueLabel}`, name]}
+            />
+            {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12, fontWeight: 800, paddingTop: 8 }} />}
+            {series.map((item, index) => (
+              <Line
+                key={item.name}
+                type="monotone"
+                dataKey={`series-${index}`}
+                name={item.name}
+                stroke={item.color}
+                strokeWidth={3}
+                dot={{ r: 4, strokeWidth: 2, fill: '#ffffff' }}
+                activeDot={{ r: 7, strokeWidth: 2 }}
+                connectNulls
+              />
+            ))}
+          </LineChart>
         )}
-
-        {labelIndexes.map((index) => {
-          const point = primaryPoints[index];
-          const x = padding.left + (primaryPoints.length <= 1 ? chartWidth : (index / (primaryPoints.length - 1)) * chartWidth);
-          return (
-            <text key={`${point.label}-label`} x={x} y={height - 16} textAnchor={index === 0 ? 'start' : index === primaryPoints.length - 1 ? 'end' : 'middle'} className="fill-gray-500 text-[12px] font-bold dark:fill-gray-400">
-              {formatAnalyticsLabel(point.label)}
-            </text>
-          );
-        })}
-      </svg>
-      {hoveredPoint && (
-        <div
-          className="pointer-events-none absolute z-10 min-w-40 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-xl dark:border-gray-700 dark:bg-gray-950"
-          style={{
-            left: `${(hoveredPoint.x / width) * 100}%`,
-            top: `${(hoveredPoint.y / height) * 100}%`,
-            transform: 'translate(-50%, calc(-100% - 10px))',
-          }}
-        >
-          <div className="mb-1 flex items-center gap-2 font-black text-gray-900 dark:text-gray-100">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: hoveredPoint.color }} />
-            {hoveredPoint.name}
-          </div>
-          <p className="font-semibold text-gray-500 dark:text-gray-400">{formatAnalyticsLabel(hoveredPoint.label)}</p>
-          <p className="text-sm font-black text-accent">{formatMetric(hoveredPoint.value, 1)}{valueLabel}</p>
-        </div>
-      )}
+      </ResponsiveContainer>
     </div>
   );
 };
@@ -1609,7 +1512,6 @@ const ReportsPage: React.FC<{
                   </div>
                 )}
               </div>
-
             </>
           ) : (
             <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No analytics available yet.</p>
