@@ -4,7 +4,7 @@ import { MentionTextarea } from '../MentionTextarea';
 import type { ToastType } from '../ToastHost';
 import { AuthAccount, errorLogService, getAssetThumbnailUrl, getAssetUrl, handleAssetThumbnailError, messageService, User, UserMessage, userService } from '../../services/api';
 import { subscribeMessageRealtime } from '../../services/realtime';
-import { getPresenceSnapshot, normalizePresenceStatus, PresenceState } from '../../utils/presence';
+import { getCachedPresenceMap, getPresenceSnapshot, parsePresenceRealtimeEvent, PresenceState, subscribePresenceCache, syncPresenceFromPayload } from '../../utils/presence';
 
 export interface RecentConversation {
   id: string;
@@ -1140,6 +1140,10 @@ export const RecentMessagesDockContainer = memo(function RecentMessagesDockConta
         }
 
         setConversations(response.data);
+        setPresenceByAccount((current) => ({
+          ...getCachedPresenceMap(response.data.map((conversation) => conversation.directParticipantId).filter(Boolean)),
+          ...current,
+        }));
       } catch (error) {
         console.error('Failed to load recent conversations:', error);
         try {
@@ -1152,7 +1156,12 @@ export const RecentMessagesDockContainer = memo(function RecentMessagesDockConta
           }
           const inboxMessages = inboxResult.status === 'fulfilled' ? inboxResult.value.data : [];
           const sentMessages = sentResult.status === 'fulfilled' ? sentResult.value.data : [];
-          setConversations(buildRecentConversations([...inboxMessages, ...sentMessages], currentUser.id));
+          const fallbackConversations = buildRecentConversations([...inboxMessages, ...sentMessages], currentUser.id);
+          setConversations(fallbackConversations);
+          setPresenceByAccount((current) => ({
+            ...getCachedPresenceMap(fallbackConversations.map((conversation) => conversation.directParticipantId).filter(Boolean)),
+            ...current,
+          }));
         } catch (fallbackError) {
           console.error('Failed to load fallback recent conversations:', fallbackError);
         }
@@ -1174,30 +1183,12 @@ export const RecentMessagesDockContainer = memo(function RecentMessagesDockConta
     window.addEventListener('shield:messages-updated', queueRecentConversationLoad);
 
     const handlePresenceUpdate = (event: Event) => {
-      try {
-        const payload = JSON.parse((event as MessageEvent).data || '{}') as {
-          actorAccountId?: string;
-          actorOnline?: boolean;
-          actorAway?: boolean;
-          actorStatus?: string;
-          actorLastSeenAt?: string | null;
-        };
-
-        if (!payload.actorAccountId) {
-          return;
-        }
-
+      const update = syncPresenceFromPayload(parsePresenceRealtimeEvent(event));
+      if (update) {
         setPresenceByAccount((current) => ({
           ...current,
-          [payload.actorAccountId as string]: {
-            online: payload.actorOnline === true,
-            away: payload.actorAway === true,
-            status: normalizePresenceStatus(payload.actorStatus),
-            lastSeenAt: payload.actorLastSeenAt || null,
-          },
+          [update.accountId]: update.presence,
         }));
-      } catch (error) {
-        console.error('Failed to parse recent conversation presence update:', error);
       }
     };
     const handleTypingUpdate = (event: Event) => {
@@ -1238,6 +1229,12 @@ export const RecentMessagesDockContainer = memo(function RecentMessagesDockConta
       subscribeMessageRealtime('presence-updated', handlePresenceUpdate),
       subscribeMessageRealtime('error', (event) => {
         console.error('Recent conversations realtime connection error:', event);
+      }),
+      subscribePresenceCache((accountId, presence) => {
+        setPresenceByAccount((current) => ({
+          ...current,
+          [accountId]: presence,
+        }));
       }),
     ];
 

@@ -7,7 +7,7 @@ import { subscribeMessageRealtime } from '../services/realtime';
 import { districtOptions } from '../constants/districts';
 import { UserDetail } from '../components/UserDetail';
 import { getPostBodyText } from '../components/RichPostEditor';
-import { getPresenceSnapshot, normalizePresenceStatus, PresenceState } from '../utils/presence';
+import { getCachedPresenceMap, getPresenceSnapshot, parsePresenceRealtimeEvent, PresenceState, subscribePresenceCache, syncPresenceFromPayload } from '../utils/presence';
 
 type CalendarEntryForm = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 type DashboardPostForm = Pick<DashboardPost, 'title' | 'body' | 'category' | 'imageUrl' | 'allowComments'>;
@@ -1276,6 +1276,10 @@ function PinnedProfilesWidget({
     }
 
     setProfiles(initialProfiles);
+    setPresenceByAccount((current) => ({
+      ...getCachedPresenceMap(initialProfiles.map((profile) => profile.id)),
+      ...current,
+    }));
     setIsLoading(false);
   }, [initialProfiles]);
 
@@ -1292,6 +1296,10 @@ function PinnedProfilesWidget({
     try {
       const response = await pinnedProfileService.getAll();
       setProfiles(response.data);
+      setPresenceByAccount((current) => ({
+        ...getCachedPresenceMap(response.data.map((profile) => profile.id)),
+        ...current,
+      }));
     } catch (err) {
       console.error('Failed to load pinned profiles:', err);
       setProfiles((currentProfiles) => (currentProfiles.length > 0 ? currentProfiles : initialProfiles ?? []));
@@ -1314,30 +1322,12 @@ function PinnedProfilesWidget({
     }
 
     const handlePresenceUpdate = (event: Event) => {
-      try {
-        const payload = JSON.parse((event as MessageEvent).data || '{}') as {
-          actorAccountId?: string;
-          actorOnline?: boolean;
-          actorAway?: boolean;
-          actorStatus?: string;
-          actorLastSeenAt?: string | null;
-        };
-
-        if (!payload.actorAccountId) {
-          return;
-        }
-
+      const update = syncPresenceFromPayload(parsePresenceRealtimeEvent(event));
+      if (update) {
         setPresenceByAccount((current) => ({
           ...current,
-          [payload.actorAccountId as string]: {
-            online: payload.actorOnline === true,
-            away: payload.actorAway === true,
-            status: normalizePresenceStatus(payload.actorStatus),
-            lastSeenAt: payload.actorLastSeenAt || null,
-          },
+          [update.accountId]: update.presence,
         }));
-      } catch (err) {
-        console.error('Failed to parse pinned profile presence update:', err);
       }
     };
 
@@ -1345,10 +1335,17 @@ function PinnedProfilesWidget({
     const unsubscribeError = subscribeMessageRealtime('error', (event) => {
       console.error('Pinned profile presence connection error:', event);
     });
+    const unsubscribePresenceCache = subscribePresenceCache((accountId, presence) => {
+      setPresenceByAccount((current) => ({
+        ...current,
+        [accountId]: presence,
+      }));
+    });
 
     return () => {
       unsubscribePresence();
       unsubscribeError();
+      unsubscribePresenceCache();
     };
   }, [currentUser?.id]);
 

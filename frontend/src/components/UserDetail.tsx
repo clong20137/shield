@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Download, ExternalLink, Flag, Gauge, Laptop, Mail, Pencil, Phone, Save, Send, Smartphone, X } from 'lucide-react';
 import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetFullImageUrl, getAssetThumbnailUrl, handleAssetImageError, handleAssetThumbnailError, MileageSummary, mileageService, User } from '../services/api';
 import { subscribeMessageRealtime } from '../services/realtime';
-import { getLastOnlineLabel, getPresenceSnapshot, normalizePresenceStatus, PresenceDisplayStatus, PresenceState } from '../utils/presence';
+import { getCachedPresence, getLastOnlineLabel, getPresenceSnapshot, parsePresenceRealtimeEvent, PresenceDisplayStatus, PresenceState, subscribePresenceCache, syncPresenceFromPayload } from '../utils/presence';
 import { RankBadge } from './RankBadge';
 
 interface UserDetailProps {
@@ -311,30 +311,12 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
   }, [isPhotoPreviewOpen]);
 
   useEffect(() => {
-    setRealtimePresence(null);
+    setRealtimePresence(getCachedPresence(user.id));
     let isMounted = true;
     const handlePresenceUpdate = (event: Event) => {
-      try {
-        const payload = JSON.parse((event as MessageEvent).data || '{}') as {
-          actorAccountId?: string;
-          actorOnline?: boolean;
-          actorAway?: boolean;
-          actorStatus?: string;
-          actorLastSeenAt?: string | null;
-        };
-
-        if (!isMounted || payload.actorAccountId !== user.id) {
-          return;
-        }
-
-        setRealtimePresence({
-          online: payload.actorOnline === true,
-          away: payload.actorAway === true,
-          status: normalizePresenceStatus(payload.actorStatus),
-          lastSeenAt: payload.actorLastSeenAt || null,
-        });
-      } catch (error) {
-        console.error('Failed to parse profile presence update:', error);
+      const update = syncPresenceFromPayload(parsePresenceRealtimeEvent(event));
+      if (isMounted && update?.accountId === user.id) {
+        setRealtimePresence(update.presence);
       }
     };
 
@@ -342,11 +324,17 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
     const unsubscribeError = subscribeMessageRealtime('error', (event) => {
       console.error('Profile presence connection error:', event);
     });
+    const unsubscribePresenceCache = subscribePresenceCache((accountId, presence) => {
+      if (isMounted && accountId === user.id) {
+        setRealtimePresence(presence);
+      }
+    });
 
     return () => {
       isMounted = false;
       unsubscribePresence();
       unsubscribeError();
+      unsubscribePresenceCache();
     };
   }, [user.id]);
 

@@ -14,6 +14,7 @@ import { AuthAccount, authService, bugReportService, BugReport, BugReportPriorit
 import { closeRealtimeConnections, subscribeAppRealtime, subscribeMessageRealtime } from './services/realtime';
 import { useUnreadCounts } from './hooks/useUnreadCounts';
 import { getEffectiveSeasonalTheme, getSeasonalThemeOption, normalizeSeasonalTheme, SEASONAL_THEME_CLASSES, type EffectiveSeasonalTheme, type SeasonalThemePreference } from './theme/seasonalThemes';
+import { syncPresenceFromPayload } from './utils/presence';
 
 const AccountSettingsPage = lazy(() => import('./pages/AccountSettingsPage').then((module) => ({ default: module.AccountSettingsPage })));
 const MessageInboxPage = lazy(() => import('./pages/MessageInboxPage'));
@@ -3366,6 +3367,13 @@ function App() {
         return;
       }
       lastPresencePostRef.current[status] = now;
+      syncPresenceFromPayload({
+        actorAccountId: currentUser.id,
+        actorOnline: true,
+        actorAway: status === 'away',
+        actorStatus: status,
+        actorLastSeenAt: new Date().toISOString(),
+      });
       const requestId = awayPresenceRequestRef.current + 1;
       awayPresenceRequestRef.current = requestId;
       messageService.updatePresence(status).catch((error) => {
@@ -3439,6 +3447,13 @@ function App() {
 
     const activeHeartbeat = window.setInterval(() => {
       if (!isAppBackgrounded && awayPresenceStateRef.current === 'active') {
+        syncPresenceFromPayload({
+          actorAccountId: currentUser.id,
+          actorOnline: true,
+          actorAway: false,
+          actorStatus: 'active',
+          actorLastSeenAt: new Date().toISOString(),
+        });
         messageService.updatePresence('active').catch((error) => {
           console.error('Failed to refresh active presence:', error);
         });

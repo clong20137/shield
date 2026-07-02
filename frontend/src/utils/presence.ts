@@ -8,6 +8,14 @@ export interface PresenceState {
   lastSeenAt?: string | null;
 }
 
+export interface PresenceRealtimePayload {
+  actorAccountId?: string;
+  actorOnline?: boolean;
+  actorAway?: boolean;
+  actorStatus?: string | null;
+  actorLastSeenAt?: string | null;
+}
+
 export interface PresenceSnapshot {
   online: boolean;
   away: boolean;
@@ -20,9 +28,111 @@ export interface PresenceSnapshot {
 
 const ACTIVE_WINDOW_MS = 2 * 60 * 1000;
 const AWAY_WINDOW_MS = 5 * 60 * 1000;
+const PRESENCE_CACHE_KEY = 'shield_presence_cache';
+export const PRESENCE_UPDATED_EVENT = 'shield:presence-updated';
+
+const presenceCache: Record<string, PresenceState> = (() => {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(PRESENCE_CACHE_KEY) || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+})();
 
 export function normalizePresenceStatus(status?: string | null): PresenceStatus {
   return status === 'away' || status === 'busy' ? status : 'active';
+}
+
+function persistPresenceCache() {
+  try {
+    window.localStorage.setItem(PRESENCE_CACHE_KEY, JSON.stringify(presenceCache));
+  } catch {
+    // Presence should stay best-effort; storage limits should not affect messaging.
+  }
+}
+
+function ageCachedPresence(presence: PresenceState): PresenceState {
+  if (!presence.online || !presence.lastSeenAt) {
+    return presence;
+  }
+
+  const lastSeenTime = new Date(presence.lastSeenAt).getTime();
+  if (Number.isNaN(lastSeenTime) || Date.now() - lastSeenTime < AWAY_WINDOW_MS) {
+    return presence;
+  }
+
+  return {
+    ...presence,
+    online: false,
+    away: false,
+  };
+}
+
+export function getCachedPresence(accountId?: string | null): PresenceState | null {
+  if (!accountId) {
+    return null;
+  }
+
+  const presence = presenceCache[accountId];
+  return presence ? ageCachedPresence(presence) : null;
+}
+
+export function getCachedPresenceMap(accountIds: string[]): Record<string, PresenceState> {
+  return accountIds.reduce<Record<string, PresenceState>>((map, accountId) => {
+    const presence = getCachedPresence(accountId);
+    if (presence) {
+      map[accountId] = presence;
+    }
+    return map;
+  }, {});
+}
+
+export function parsePresenceRealtimeEvent(event: Event): PresenceRealtimePayload | null {
+  try {
+    return JSON.parse((event as MessageEvent).data || '{}') as PresenceRealtimePayload;
+  } catch {
+    return null;
+  }
+}
+
+export function syncPresenceFromPayload(payload: PresenceRealtimePayload | null): { accountId: string; presence: PresenceState } | null {
+  if (!payload?.actorAccountId) {
+    return null;
+  }
+
+  const presence: PresenceState = {
+    online: payload.actorOnline === true,
+    away: payload.actorAway === true,
+    status: normalizePresenceStatus(payload.actorStatus),
+    lastSeenAt: payload.actorLastSeenAt || null,
+  };
+  presenceCache[payload.actorAccountId] = presence;
+  persistPresenceCache();
+  window.dispatchEvent(new CustomEvent(PRESENCE_UPDATED_EVENT, {
+    detail: {
+      accountId: payload.actorAccountId,
+      presence,
+    },
+  }));
+
+  return { accountId: payload.actorAccountId, presence };
+}
+
+export function subscribePresenceCache(listener: (accountId: string, presence: PresenceState) => void) {
+  const handler = (event: Event) => {
+    const detail = (event as CustomEvent<{ accountId?: string; presence?: PresenceState }>).detail;
+    if (detail?.accountId && detail.presence) {
+      listener(detail.accountId, detail.presence);
+    }
+  };
+
+  window.addEventListener(PRESENCE_UPDATED_EVENT, handler as EventListener);
+  return () => window.removeEventListener(PRESENCE_UPDATED_EVENT, handler as EventListener);
 }
 
 function getLastSeenTime(lastSeenAt?: string | null): number | null {

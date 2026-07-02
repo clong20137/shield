@@ -4,7 +4,7 @@ import { AlertCircle, ArrowLeft, Building2, Check, CheckCheck, Download, Image a
 import type { EmojiClickData } from 'emoji-picker-react';
 import { AuthAccount, errorLogService, getAssetThumbnailUrl, getAssetUrl, handleAssetImageError, handleAssetThumbnailError, messageService, userService, User, UserMessage } from '../services/api';
 import { subscribeMessageRealtime } from '../services/realtime';
-import { normalizePresenceStatus } from '../utils/presence';
+import { getCachedPresenceMap, parsePresenceRealtimeEvent, PresenceState, subscribePresenceCache, syncPresenceFromPayload } from '../utils/presence';
 import { AppContextMenu } from '../components/AppContextMenu';
 import { RankBadge } from '../components/RankBadge';
 import { MentionText } from '../components/MentionText';
@@ -589,7 +589,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   const [isComposerFocused, setIsComposerFocused] = useState(false);
   const [isCompactComposeOpen, setIsCompactComposeOpen] = useState(false);
   const [composeKeyboardInset, setComposeKeyboardInset] = useState(12);
-  const [presenceByAccount, setPresenceByAccount] = useState<Record<string, { online: boolean; away: boolean; status?: 'active' | 'away' | 'busy'; lastSeenAt: string | null }>>({});
+  const [presenceByAccount, setPresenceByAccount] = useState<Record<string, PresenceState>>({});
   const [threadMessageWindows, setThreadMessageWindows] = useState<Record<string, ThreadMessageWindowState>>({});
   const [threadListScrollTop, setThreadListScrollTop] = useState(0);
   const [threadListViewportHeight, setThreadListViewportHeight] = useState(0);
@@ -1230,31 +1230,18 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       }
     };
     const handlePresenceUpdate = (event: Event) => {
-      try {
-        const payload = JSON.parse((event as MessageEvent<string>).data) as {
-          actorAccountId?: string;
-          actorOnline?: boolean;
-          actorAway?: boolean;
-          actorStatus?: string;
-          actorLastSeenAt?: string;
-        };
-        if (!payload.actorAccountId) {
-          loadMessages(false);
-          return;
-        }
+      const payload = parsePresenceRealtimeEvent(event);
+      if (!payload?.actorAccountId) {
+        loadMessages(false);
+        return;
+      }
 
+      const update = syncPresenceFromPayload(payload);
+      if (update) {
         setPresenceByAccount((current) => ({
           ...current,
-          [payload.actorAccountId as string]: {
-            online: payload.actorOnline === true,
-            away: payload.actorAway === true,
-            status: normalizePresenceStatus(payload.actorStatus),
-            lastSeenAt: payload.actorLastSeenAt || null,
-          },
+          [update.accountId]: update.presence,
         }));
-      } catch (err) {
-        console.error('Presence update parse error:', err);
-        loadMessages(false);
       }
     };
     const unsubscribeRealtime = [
@@ -1267,6 +1254,12 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       subscribeMessageRealtime('presence-updated', handlePresenceUpdate),
       subscribeMessageRealtime('error', (event) => {
         console.error('Message realtime connection error:', event);
+      }),
+      subscribePresenceCache((accountId, presence) => {
+        setPresenceByAccount((current) => ({
+          ...current,
+          [accountId]: presence,
+        }));
       }),
     ];
     window.addEventListener('shield:messages-updated', handleRealtimeMessageUpdate);
@@ -1533,6 +1526,20 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       ].join(' ').toLowerCase().includes(term);
     });
   }, [currentUser.id, draftGroupRecipients, draftRecipient, draftThreadTitle, searchTerm, threads]);
+
+  useEffect(() => {
+    const directThreadIds = filteredThreads
+      .filter((thread) => thread.threadType === 'direct')
+      .map((thread) => thread.id);
+    if (directThreadIds.length === 0) {
+      return;
+    }
+
+    setPresenceByAccount((current) => ({
+      ...getCachedPresenceMap(directThreadIds),
+      ...current,
+    }));
+  }, [filteredThreads]);
 
   const virtualThreadList = useMemo(() => {
     const viewportHeight = threadListViewportHeight || 720;
