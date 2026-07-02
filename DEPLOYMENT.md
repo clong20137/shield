@@ -55,9 +55,10 @@ SETUP_ENV_LOCKED=true
 
 PM2 keeps the Express API running in the background, restarts it after crashes, and gives you a visual terminal monitor instead of leaving the API open in a regular terminal window.
 
-1. Install PM2 globally on the server:
+1. Install PM2 and the Windows startup helper globally on the server:
 ```powershell
 npm install -g pm2
+npm install -g pm2-windows-startup
 ```
 
 2. From the SHIELD project root, install dependencies and build the backend:
@@ -84,10 +85,13 @@ pm2 monit
 pm2 save
 ```
 
-6. Set up Windows startup. Run the command PM2 prints after this:
+6. Install PM2 startup for Windows so the saved process list is restored after reboot:
 ```powershell
-pm2 startup
+pm2-startup install
+pm2 save
 ```
+
+After reboot, Windows starts PM2 and PM2 resurrects `shield-api` from the saved process list. If you ever change the PM2 process list, run `pm2 save` again.
 
 Useful PM2 commands:
 ```powershell

@@ -1250,6 +1250,11 @@ export const authService = {
     api.put<AuthResponse>(`/auth/accounts/${accountId}/onboarding-complete`),
 };
 
+export const systemService = {
+  restartApi: () =>
+    api.post<{ message: string; managedByPm2: boolean }>('/system/restart-api'),
+};
+
 export const userService = {
   search: (searchTerm: string, filters?: UserFilters) =>
     api.get('/users/search', { params: { q: searchTerm, ...filters } }),

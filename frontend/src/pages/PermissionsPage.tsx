@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ChevronLeft, ChevronRight, Mail, Pencil, Plus, Save, Search, ShieldCheck, ShieldAlert, Sparkles, X } from 'lucide-react';
-import { AccessReviewResponse, AuthAccount, AuthInvite, AuthRole, RegistrationSettings, ThemeSettings, authService, reportService } from '../services/api';
+import { AlertTriangle, ChevronLeft, ChevronRight, Mail, Pencil, Plus, Power, Save, Search, ShieldCheck, ShieldAlert, Sparkles, X } from 'lucide-react';
+import { AccessReviewResponse, AuthAccount, AuthInvite, AuthRole, RegistrationSettings, ThemeSettings, authService, reportService, systemService } from '../services/api';
 import { getEffectiveSeasonalTheme, getSeasonalThemeOption, SEASONAL_THEME_OPTIONS, type SeasonalThemePreference } from '../theme/seasonalThemes';
 
 const APP_BASE_PATH = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
@@ -240,6 +240,7 @@ function PermissionsPage({
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [accessReview, setAccessReview] = useState<AccessReviewResponse | null>(null);
   const [reviewPage, setReviewPage] = useState(1);
+  const [isRestartingApi, setIsRestartingApi] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -452,6 +453,25 @@ function PermissionsPage({
     };
     reader.onerror = () => onToast('error', 'Logo image could not be read.');
     reader.readAsDataURL(file);
+  };
+
+  const restartApi = async () => {
+    if (!window.confirm('Restart the Shield API now? Users may briefly see the app reconnect while PM2 starts it again.')) {
+      return;
+    }
+
+    setIsRestartingApi(true);
+    try {
+      const response = await systemService.restartApi();
+      onToast('info', response.data.message);
+      window.setTimeout(() => {
+        onToast('info', 'Waiting for the API to come back online...');
+      }, 1500);
+    } catch (err) {
+      const message = getErrorMessage(err, 'Failed to request API restart.');
+      onToast('error', message);
+      setIsRestartingApi(false);
+    }
   };
 
   const createInvite = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -762,6 +782,40 @@ function PermissionsPage({
           <h2>General Settings</h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Set the visible app name, control public registration, or create secure invite links for new accounts.
+          </p>
+        </div>
+
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/70 dark:bg-amber-950/30">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <h3 className="flex items-center gap-2 text-base font-bold text-gray-900 dark:text-white">
+                <Power size={18} className="text-amber-700 dark:text-amber-200" />
+                API Service Control
+              </h3>
+              <p className="mt-1 text-sm text-gray-700 dark:text-gray-200">
+                Use PM2 on the server so the Express API starts with Windows and comes back online after this restart action.
+              </p>
+              <div className="mt-3 grid gap-2 text-xs font-semibold text-gray-600 dark:text-gray-300 sm:grid-cols-2">
+                <code className="rounded bg-white px-2 py-1 dark:bg-gray-900">pm2 start ecosystem.config.cjs</code>
+                <code className="rounded bg-white px-2 py-1 dark:bg-gray-900">pm2 save</code>
+                <code className="rounded bg-white px-2 py-1 dark:bg-gray-900">pm2-startup install</code>
+                <code className="rounded bg-white px-2 py-1 dark:bg-gray-900">pm2 monit</code>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void restartApi()}
+              className="btn-danger shrink-0"
+              disabled={isRestartingApi}
+              aria-label="Restart Shield API"
+              title={isRestartingApi ? 'Restart requested' : 'Restart API'}
+            >
+              <Power size={16} />
+              {isRestartingApi ? 'Restarting' : 'Restart API'}
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-amber-800 dark:text-amber-100">
+            Only use this after PM2 auto-start is configured. If the API is running from a normal terminal, it will shut down and must be started manually.
           </p>
         </div>
 

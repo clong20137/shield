@@ -30,6 +30,7 @@ import quickNoteRoutes from './routes/quickNoteRoutes';
 import urgentAlertRoutes from './routes/urgentAlertRoutes';
 import mediaRoutes from './routes/mediaRoutes';
 import memorialProfileRoutes from './routes/memorialProfileRoutes';
+import systemRoutes from './routes/systemRoutes';
 import { startSecurityCleanupJob } from './services/securityCleanup';
 import { requireAuthenticated } from './middleware/authSession';
 import { rateLimit } from './middleware/rateLimit';
@@ -245,6 +246,7 @@ app.use('/api/quick-notes', quickNoteRoutes);
 app.use('/api/urgent-alerts', urgentAlertRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/memorial-profiles', memorialProfileRoutes);
+app.use('/api/system', systemRoutes);
 
 const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
 app.use(express.static(frontendDistPath));
