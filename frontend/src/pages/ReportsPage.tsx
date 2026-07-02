@@ -1527,9 +1527,6 @@ const ReportsPage: React.FC<{
                 </div>
 
                 <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
-                  <button type="button" onClick={saveCurrentGraphView} className="btn-secondary" aria-label="Save graph view" title="Save View">
-                    <Save size={16} />
-                  </button>
                   <select
                     value={selectedSavedGraphViewId}
                     onChange={(event) => applySavedGraphView(event.target.value)}
@@ -1541,6 +1538,9 @@ const ReportsPage: React.FC<{
                       <option key={view.id} value={view.id}>{view.name}</option>
                     ))}
                   </select>
+                  <button type="button" onClick={saveCurrentGraphView} className="btn-secondary" aria-label="Save graph view" title="Save View">
+                    <Save size={16} />
+                  </button>
                   <button
                     type="button"
                     onClick={deleteSavedGraphView}

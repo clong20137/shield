@@ -64,6 +64,11 @@ interface ThreadMemberPreview {
   id: string;
   name: string;
   profilePictureUrl: string;
+  presence?: {
+    online: boolean;
+    status: 'active' | 'away' | 'busy';
+    label: string;
+  };
 }
 
 interface ThreadMessageWindowState {
@@ -195,6 +200,22 @@ function PresenceDot({
       {isOnline && <span className={`absolute inset-0 animate-ping rounded-full ${pulseClass} opacity-75`} />}
     </span>
   );
+}
+
+function getPresenceDotClass(presence?: ThreadMemberPreview['presence']): string {
+  if (!presence?.online) {
+    return 'bg-gray-400';
+  }
+
+  if (presence.status === 'busy') {
+    return 'bg-red-500';
+  }
+
+  if (presence.status === 'away') {
+    return 'bg-amber-400';
+  }
+
+  return 'bg-green-500';
 }
 
 function getThreadId(message: UserMessage, currentUserId: string): string {
@@ -1528,15 +1549,15 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   }, [currentUser.id, draftGroupRecipients, draftRecipient, draftThreadTitle, searchTerm, threads]);
 
   useEffect(() => {
-    const directThreadIds = filteredThreads
-      .filter((thread) => thread.threadType === 'direct')
-      .map((thread) => thread.id);
-    if (directThreadIds.length === 0) {
+    const accountIds = Array.from(new Set(filteredThreads.flatMap((thread) => (
+      thread.threadType === 'direct' ? [thread.id] : thread.participantIds
+    )))).filter(Boolean);
+    if (accountIds.length === 0) {
       return;
     }
 
     setPresenceByAccount((current) => ({
-      ...getCachedPresenceMap(directThreadIds),
+      ...getCachedPresenceMap(accountIds),
       ...current,
     }));
   }, [filteredThreads]);
@@ -1770,12 +1791,28 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
   }, [selectedThreadId]);
   const getThreadPresence = (thread: MessageThread) => {
     if (thread.threadType !== 'direct') {
+      const memberPresence = thread.participantIds
+        .filter((id) => id && id !== currentUser.id)
+        .map((id) => presenceByAccount[id])
+        .filter((presence): presence is PresenceState => Boolean(presence?.online));
+      const busyCount = memberPresence.filter((presence) => presence.status === 'busy').length;
+      const awayCount = memberPresence.filter((presence) => presence.status === 'away').length;
+      const activeCount = memberPresence.filter((presence) => presence.status !== 'busy' && presence.status !== 'away').length;
+      const status = busyCount > 0 ? 'busy' as const : activeCount > 0 ? 'active' as const : awayCount > 0 ? 'away' as const : 'active' as const;
+      const statusParts = [
+        activeCount > 0 ? `${activeCount} active` : '',
+        busyCount > 0 ? `${busyCount} busy` : '',
+        awayCount > 0 ? `${awayCount} away` : '',
+      ].filter(Boolean);
+
       return {
-        online: false,
-        away: false,
-        status: 'active' as const,
+        online: memberPresence.length > 0,
+        away: awayCount > 0 && activeCount === 0 && busyCount === 0,
+        status,
         lastSeenAt: null,
-        label: `${Math.max(thread.participantIds.length - 1, 0)} members`,
+        label: statusParts.length > 0
+          ? `${statusParts.join(', ')} - ${Math.max(thread.participantIds.length - 1, 0)} members`
+          : `${Math.max(thread.participantIds.length - 1, 0)} members`,
       };
     }
 
@@ -1804,13 +1841,23 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
 
     return selectedThread.participantIds.map((id, index) => {
       const directoryMember = memberDirectory[id];
+      const realtimePresence = presenceByAccount[id];
+      const online = realtimePresence?.online === true || realtimePresence?.status === 'busy' || realtimePresence?.status === 'away';
+      const status = realtimePresence?.status === 'busy' || realtimePresence?.status === 'away' || realtimePresence?.status === 'active'
+        ? realtimePresence.status
+        : 'active';
       return {
         id,
-        name: directoryMember?.name || selectedThread.participantNames[index] || 'Member',
+        name: id === currentUser.id ? 'You' : directoryMember?.name || selectedThread.participantNames[index] || 'Member',
         profilePictureUrl: directoryMember?.profilePictureUrl || '',
+        presence: realtimePresence ? {
+          online,
+          status,
+          label: online ? getPresenceDisplay(realtimePresence.lastSeenAt, online, status) : 'Offline',
+        } : undefined,
       };
     });
-  }, [memberDirectory, selectedThread]);
+  }, [currentUser.id, memberDirectory, presenceByAccount, selectedThread]);
 
   useLayoutEffect(() => {
     if (!autoScrollToNewestRef.current || displayedMessages.length === 0) {
@@ -3184,7 +3231,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                               <Pencil size={14} />
                             </button>
                           )}
-                          {selectedThread.threadType === 'direct' && (
+                          {(selectedThread.threadType === 'direct' || selectedPresence?.online) && (
                             <PresenceDot isOnline={selectedPresence?.online === true} status={selectedPresence?.status || 'active'} />
                           )}
                         </>
@@ -3216,6 +3263,13 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                                 />
                               ) : (
                                 <span>{getInitials(member.name)}</span>
+                              )}
+                              {member.presence && (
+                                <span
+                                  className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border border-white dark:border-gray-900 ${getPresenceDotClass(member.presence)}`}
+                                  title={`${member.name}: ${member.presence.label}`}
+                                  aria-label={`${member.name}: ${member.presence.label}`}
+                                />
                               )}
                             </span>
                           ))}

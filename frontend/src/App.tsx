@@ -3596,7 +3596,8 @@ function App() {
     const id = Date.now();
     const toast = { id, type, message };
     setToasts((currentToasts) => [...currentToasts, toast]);
-    if (options.saveToNotifications !== false) {
+    const shouldSaveToNotifications = options.saveToNotifications ?? type === 'error';
+    if (shouldSaveToNotifications) {
       setNotifications((currentNotifications) => [toast, ...currentNotifications].slice(0, 20));
     }
     window.setTimeout(() => {
