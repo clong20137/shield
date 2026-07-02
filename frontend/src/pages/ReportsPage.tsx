@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, Search, Table, X } from 'lucide-react';
+import { BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, Save, Search, Table, Trash2, X } from 'lucide-react';
 import {
   Bar,
   BarChart,
+  Brush,
   CartesianGrid,
   Legend,
   Line,
@@ -169,6 +170,20 @@ type DailyCompareItem = {
   loading?: boolean;
   error?: string | null;
 };
+type ChartSeries = { name: string; points: Array<{ label: string; value: number }>; color: string };
+type SavedReportGraphView = {
+  id: string;
+  name: string;
+  metric: string;
+  range: DailyAnalyticsRange;
+  graphType: DailyGraphType;
+  search: string;
+  district: string;
+  from: string;
+  to: string;
+  compareItems: Array<Omit<DailyCompareItem, 'analytics' | 'loading' | 'error'>>;
+  savedAt: string;
+};
 
 const dailyAnalyticsRanges: Array<{ value: DailyAnalyticsRange; label: string }> = [
   { value: '1d', label: '1 Day' },
@@ -194,6 +209,7 @@ const compareSeriesColors = [
 ];
 
 const LIVE_REPORT_REFRESH_MS = 15_000;
+const SAVED_REPORT_GRAPH_VIEWS_KEY = 'shield_saved_report_graph_views';
 
 const trooperDailyTabs: Array<{ value: TrooperDailyTab; label: string }> = [
   { value: 'graph', label: 'Graph' },
@@ -277,6 +293,49 @@ function downloadReportBlob(content: BlobPart, type: string, filename: string) {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function loadSavedReportGraphViews(): SavedReportGraphView[] {
+  try {
+    const saved = window.localStorage.getItem(SAVED_REPORT_GRAPH_VIEWS_KEY);
+    const parsed = saved ? JSON.parse(saved) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveReportGraphViews(views: SavedReportGraphView[]) {
+  window.localStorage.setItem(SAVED_REPORT_GRAPH_VIEWS_KEY, JSON.stringify(views));
+}
+
+function getSeriesTrend(points: Array<{ label: string; value: number }>) {
+  const values = points.map((point) => Number(point.value) || 0);
+  if (values.length < 2) {
+    return { label: 'No trend', tone: 'neutral' as const, percent: 0 };
+  }
+
+  const splitIndex = Math.max(1, Math.floor(values.length / 2));
+  const previous = values.slice(0, splitIndex).reduce((sum, value) => sum + value, 0);
+  const current = values.slice(splitIndex).reduce((sum, value) => sum + value, 0);
+  const delta = current - previous;
+  const percent = previous === 0 ? (current > 0 ? 100 : 0) : (delta / Math.abs(previous)) * 100;
+
+  if (Math.abs(percent) < 0.5) {
+    return { label: 'Flat', tone: 'neutral' as const, percent: 0 };
+  }
+
+  return {
+    label: `${percent > 0 ? 'Up' : 'Down'} ${formatMetric(Math.abs(percent), 1)}%`,
+    tone: percent > 0 ? 'up' as const : 'down' as const,
+    percent,
+  };
+}
+
+function getTrendBadgeClass(tone: 'up' | 'down' | 'neutral') {
+  if (tone === 'up') return 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-200';
+  if (tone === 'down') return 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200';
+  return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300';
 }
 
 function escapeReportCsv(value: unknown) {
@@ -376,7 +435,7 @@ function buildSimpleAnalyticsPdf(title: string, subtitle: string, headers: strin
 }
 
 const AnalyticsChart: React.FC<{
-  series: Array<{ name: string; points: Array<{ label: string; value: number }>; color: string }>;
+  series: ChartSeries[];
   graphType: DailyGraphType;
   height?: number;
   valueLabel?: string;
@@ -398,42 +457,74 @@ const AnalyticsChart: React.FC<{
     });
     return row;
   });
-  const tooltipStyle = {
-    border: '1px solid rgb(229 231 235)',
-    borderRadius: 8,
-    boxShadow: '0 18px 45px rgba(15, 23, 42, 0.18)',
-    fontSize: 12,
+  const renderTooltip = ({ active, label, payload }: { active?: boolean; label?: React.ReactNode; payload?: Array<{ dataKey?: string | number; name?: string | number; value?: number; color?: string }> }) => {
+    if (!active || !payload || payload.length === 0) {
+      return null;
+    }
+
+    const labelText = String(label ?? '');
+    const rowIndex = data.findIndex((row) => row.displayLabel === labelText);
+
+    return (
+      <div className="min-w-56 rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-xl dark:border-gray-700 dark:bg-gray-950">
+        <p className="mb-2 font-black uppercase tracking-wide text-gray-900 dark:text-gray-100">{labelText}</p>
+        <div className="space-y-2">
+          {payload.map((entry) => {
+            const seriesIndex = Number(String(entry.dataKey || '').replace('series-', ''));
+            const previousValue = rowIndex > 0 && Number.isFinite(seriesIndex)
+              ? Number(data[rowIndex - 1]?.[`series-${seriesIndex}`]) || 0
+              : null;
+            const currentValue = Number(entry.value) || 0;
+            const delta = previousValue === null ? null : currentValue - previousValue;
+
+            return (
+              <div key={`${entry.dataKey}-${entry.name}`} className="flex items-start justify-between gap-4">
+                <span className="min-w-0">
+                  <span className="flex items-center gap-2 font-bold text-gray-700 dark:text-gray-200">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                    <span className="truncate">{entry.name}</span>
+                  </span>
+                  {delta !== null && (
+                    <span className={`mt-0.5 block font-bold ${delta > 0 ? 'text-green-600' : delta < 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                      {delta > 0 ? '+' : ''}{formatMetric(delta, 1)} from previous
+                    </span>
+                  )}
+                </span>
+                <span className="shrink-0 font-black text-gray-900 dark:text-gray-100">{formatMetric(currentValue, 1)}{valueLabel}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   return (
     <div className="h-full min-h-[320px] w-full">
       <ResponsiveContainer width="100%" height={height}>
         {graphType === 'bar' ? (
-          <BarChart data={data} margin={{ top: 16, right: 22, bottom: 18, left: 8 }} barGap={8} barCategoryGap="24%">
+          <BarChart data={data} margin={{ top: 16, right: 22, bottom: 46, left: 8 }} barGap={8} barCategoryGap="24%">
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" strokeOpacity={0.12} />
             <XAxis dataKey="displayLabel" tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} minTickGap={18} />
             <YAxis tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={58} tickFormatter={(value) => formatMetric(Number(value), 1)} />
             <Tooltip
               cursor={{ fill: 'rgba(37, 99, 235, 0.08)' }}
-              contentStyle={tooltipStyle}
-              labelStyle={{ fontWeight: 900, color: 'rgb(17 24 39)' }}
-              formatter={(value, name) => [`${formatMetric(Number(value), 1)}${valueLabel}`, name]}
+              content={renderTooltip}
             />
             {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12, fontWeight: 800, paddingTop: 8 }} />}
             {series.map((item, index) => (
               <Bar key={item.name} dataKey={`series-${index}`} name={item.name} fill={item.color} radius={[5, 5, 0, 0]} maxBarSize={42} />
             ))}
+            {data.length > 8 && <Brush dataKey="displayLabel" height={24} travellerWidth={10} stroke="rgb(157 134 92)" />}
           </BarChart>
         ) : (
-          <LineChart data={data} margin={{ top: 16, right: 22, bottom: 18, left: 8 }}>
+          <LineChart data={data} margin={{ top: 16, right: 22, bottom: 46, left: 8 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" strokeOpacity={0.12} />
             <XAxis dataKey="displayLabel" tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} minTickGap={18} />
             <YAxis tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={58} tickFormatter={(value) => formatMetric(Number(value), 1)} />
             <Tooltip
               cursor={{ stroke: 'rgba(37, 99, 235, 0.32)', strokeWidth: 2, strokeDasharray: '5 5' }}
-              contentStyle={tooltipStyle}
-              labelStyle={{ fontWeight: 900, color: 'rgb(17 24 39)' }}
-              formatter={(value, name) => [`${formatMetric(Number(value), 1)}${valueLabel}`, name]}
+              content={renderTooltip}
             />
             {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12, fontWeight: 800, paddingTop: 8 }} />}
             {series.map((item, index) => (
@@ -449,6 +540,7 @@ const AnalyticsChart: React.FC<{
                 connectNulls
               />
             ))}
+            {data.length > 8 && <Brush dataKey="displayLabel" height={24} travellerWidth={10} stroke="rgb(157 134 92)" />}
           </LineChart>
         )}
       </ResponsiveContainer>
@@ -495,6 +587,8 @@ const ReportsPage: React.FC<{
   const [compareItems, setCompareItems] = useState<DailyCompareItem[]>([]);
   const [compareAnalyticsLoading, setCompareAnalyticsLoading] = useState(false);
   const [compareAnalyticsError, setCompareAnalyticsError] = useState<string | null>(null);
+  const [savedGraphViews, setSavedGraphViews] = useState<SavedReportGraphView[]>(() => loadSavedReportGraphViews());
+  const [selectedSavedGraphViewId, setSelectedSavedGraphViewId] = useState('');
   const [dailyExportFormat, setDailyExportFormat] = useState<DailyExportFormat>('csv');
   const [isDailyAnalyticsExportMenuOpen, setIsDailyAnalyticsExportMenuOpen] = useState(false);
   const [isSelectedDailyExportMenuOpen, setIsSelectedDailyExportMenuOpen] = useState(false);
@@ -1033,6 +1127,81 @@ const ReportsPage: React.FC<{
     groups[section] = [...(groups[section] || []), trend];
     return groups;
   }, {});
+  const trendBadges = chartSeries.map((series) => ({
+    name: series.name,
+    color: series.color,
+    ...getSeriesTrend(series.points),
+  }));
+  const saveCurrentGraphView = () => {
+    if (!selectedTrend) {
+      onToast('error', 'Choose a graph metric before saving this view.');
+      return;
+    }
+
+    const viewNameParts = [
+      selectedTrend.label,
+      dailyAnalyticsRanges.find((range) => range.value === dailyAnalyticsRange)?.label || 'Custom',
+      analyticsDistrict || analyticsSearch.trim() || 'Overall',
+    ];
+    const view: SavedReportGraphView = {
+      id: `${Date.now()}`,
+      name: viewNameParts.filter(Boolean).join(' - '),
+      metric: selectedTrend.key,
+      range: dailyAnalyticsRange,
+      graphType: dailyGraphType,
+      search: analyticsSearch,
+      district: analyticsDistrict,
+      from: analyticsFrom,
+      to: analyticsTo,
+      compareItems: compareItems.map(({ analytics, loading, error, ...item }) => item),
+      savedAt: new Date().toISOString(),
+    };
+    const nextViews = [view, ...savedGraphViews.filter((savedView) => savedView.name !== view.name)].slice(0, 12);
+    setSavedGraphViews(nextViews);
+    setSelectedSavedGraphViewId(view.id);
+    saveReportGraphViews(nextViews);
+    onToast('success', 'Graph view saved.');
+  };
+  const applySavedGraphView = (viewId: string) => {
+    const view = savedGraphViews.find((savedView) => savedView.id === viewId);
+    setSelectedSavedGraphViewId(viewId);
+    if (!view) {
+      return;
+    }
+
+    const restoredCompareItems: DailyCompareItem[] = view.compareItems.map((item) => ({
+      ...item,
+      loading: true,
+      error: null,
+    }));
+    setSelectedAnalyticsMetric(view.metric);
+    setDailyAnalyticsRange(view.range);
+    setDailyGraphType(view.graphType);
+    setAnalyticsSearch(view.search);
+    setAnalyticsDistrict(view.district);
+    setAnalyticsFrom(view.from);
+    setAnalyticsTo(view.to);
+    setCompareItems(restoredCompareItems);
+    setDailyCompareMode(restoredCompareItems[0]?.type || 'user');
+    void loadTrooperDailyAnalytics(true, {
+      q: view.search,
+      from: view.from,
+      to: view.to,
+      district: view.district,
+    });
+    void reloadCompareItems(restoredCompareItems, view.from, view.to);
+  };
+  const deleteSavedGraphView = () => {
+    if (!selectedSavedGraphViewId) {
+      return;
+    }
+
+    const nextViews = savedGraphViews.filter((view) => view.id !== selectedSavedGraphViewId);
+    setSavedGraphViews(nextViews);
+    setSelectedSavedGraphViewId('');
+    saveReportGraphViews(nextViews);
+    onToast('success', 'Saved graph view removed.');
+  };
   const exportAnalyticsPng = () => {
     const svg = analyticsChartRef.current?.querySelector('svg');
     if (!svg) {
@@ -1357,6 +1526,33 @@ const ReportsPage: React.FC<{
                   </div>
                 </div>
 
+                <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                  <button type="button" onClick={saveCurrentGraphView} className="btn-secondary" aria-label="Save graph view" title="Save View">
+                    <Save size={16} />
+                  </button>
+                  <select
+                    value={selectedSavedGraphViewId}
+                    onChange={(event) => applySavedGraphView(event.target.value)}
+                    className="min-w-60 flex-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-900"
+                    aria-label="Saved graph views"
+                  >
+                    <option value="">Saved views</option>
+                    {savedGraphViews.map((view) => (
+                      <option key={view.id} value={view.id}>{view.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={deleteSavedGraphView}
+                    className="btn-secondary"
+                    disabled={!selectedSavedGraphViewId}
+                    aria-label="Delete saved graph view"
+                    title="Delete Saved View"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+
                 {canViewAllTrooperDailies ? (
                   <>
                     <section className="relative z-40 mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
@@ -1510,6 +1706,16 @@ const ReportsPage: React.FC<{
                           <span key={item.name} className="flex items-center gap-2">
                             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
                             {item.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {trendBadges.length > 0 && (
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        {trendBadges.map((badge) => (
+                          <span key={badge.name} className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black uppercase ${getTrendBadgeClass(badge.tone)}`}>
+                            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: badge.color }} />
+                            {badge.name}: {badge.label}
                           </span>
                         ))}
                       </div>
