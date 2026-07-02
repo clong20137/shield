@@ -229,37 +229,6 @@
         transition: transform 180ms ease;
       }
 
-      .fleet-logo-ring {
-        fill: rgba(255, 255, 255, 0.1);
-        stroke: rgba(215, 197, 154, 0.72);
-        stroke-width: 3;
-      }
-
-      .fleet-logo-road {
-        fill: none;
-        stroke: white;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-        stroke-width: 9;
-      }
-
-      .fleet-logo-lane {
-        fill: none;
-        stroke: var(--gold-light);
-        stroke-linecap: round;
-        stroke-width: 5;
-      }
-
-      .fleet-logo-text {
-        fill: white;
-        font-family:
-          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-          "Segoe UI", sans-serif;
-        font-size: 28px;
-        font-weight: 950;
-        letter-spacing: 0.06em;
-      }
-
       .app-body {
         display: grid;
         gap: 18px;
@@ -417,14 +386,7 @@
 
           <article class="app-card">
             <div class="app-image fleet-image">
-              <svg class="fleet-logo" viewBox="0 0 220 220" role="img" aria-label="Fleet">
-                <circle class="fleet-logo-ring" cx="110" cy="110" r="92" />
-                <path class="fleet-logo-road" d="M63 150c20-11 31-26 35-46l12-55 12 55c4 20 15 35 35 46" />
-                <path class="fleet-logo-lane" d="M110 72v21" />
-                <path class="fleet-logo-lane" d="M110 115v24" />
-                <path class="fleet-logo-lane" d="M76 156h68" />
-                <text class="fleet-logo-text" x="110" y="184" text-anchor="middle">FLEET</text>
-              </svg>
+              <img class="fleet-logo" src="/shield/fleet-badge-app-logo.svg" alt="Fleet" />
             </div>
             <div class="app-body">
               <div>
