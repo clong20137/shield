@@ -40,12 +40,12 @@ function finishInitialSplash() {
 const remainingSplashMs = Math.max(0, MINIMUM_SPLASH_MS - (performance.now() - splashStartedAt));
 window.setTimeout(finishInitialSplash, remainingSplashMs);
 
-if ('serviceWorker' in navigator && (window.isSecureContext || window.location.hostname === 'localhost')) {
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    const basePath = import.meta.env.BASE_URL || '/';
-    const serviceWorkerUrl = `${basePath.replace(/\/?$/u, '/')}service-worker.js`;
-    navigator.serviceWorker.register(serviceWorkerUrl).catch((error) => {
-      console.error('Failed to register app service worker:', error);
-    });
+    navigator.serviceWorker.getRegistrations()
+      .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+      .catch((error) => {
+        console.error('Failed to unregister app service worker:', error);
+      });
   });
 }
