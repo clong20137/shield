@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Activity, BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock, Download, FileText, RotateCcw, Search, Table, Users, X } from 'lucide-react';
+import { BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, RotateCcw, Search, Table, X } from 'lucide-react';
 import { AuthAccount, reportService, TrooperDailyReportEntry, TrooperDailyAnalyticsResponse, User, userService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import PerformanceEvaluationsPage from './PerformanceEvaluationsPage';
@@ -368,8 +368,8 @@ const AnalyticsChart: React.FC<{
   valueLabel?: string;
 }> = ({ series, graphType, height = 172, valueLabel = '' }) => {
   const [hoveredPoint, setHoveredPoint] = useState<{ name: string; label: string; value: number; x: number; y: number; color: string } | null>(null);
-  const width = 640;
-  const padding = { top: 14, right: 18, bottom: 32, left: 42 };
+  const width = 1200;
+  const padding = { top: 22, right: 32, bottom: 46, left: 64 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
   const allPoints = series.flatMap((item) => item.points);
@@ -386,24 +386,31 @@ const AnalyticsChart: React.FC<{
       return { ...point, value: Number(point.value) || 0, x, y };
     }),
   }));
-  const labelIndexes = primaryPoints.length <= 6
+  const labelIndexes = primaryPoints.length <= 10
     ? primaryPoints.map((_, index) => index)
-    : [0, Math.floor((primaryPoints.length - 1) / 2), primaryPoints.length - 1];
-  const ticks = [maxValue, (maxValue + minValue) / 2, minValue];
+    : Array.from(new Set([
+      0,
+      Math.floor((primaryPoints.length - 1) * 0.25),
+      Math.floor((primaryPoints.length - 1) * 0.5),
+      Math.floor((primaryPoints.length - 1) * 0.75),
+      primaryPoints.length - 1,
+    ]));
+  const ticks = [maxValue, maxValue * 0.75 + minValue * 0.25, (maxValue + minValue) / 2, maxValue * 0.25 + minValue * 0.75, minValue];
 
   if (allPoints.length === 0) {
     return <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No chart data yet.</p>;
   }
 
   return (
-    <div className="relative h-full min-h-[150px] w-full">
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" className="h-full min-h-[150px] w-full overflow-visible" onMouseLeave={() => setHoveredPoint(null)}>
+    <div className="relative h-full min-h-[320px] w-full">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" className="h-full min-h-[320px] w-full overflow-visible" preserveAspectRatio="none" onMouseLeave={() => setHoveredPoint(null)}>
+        <rect x={padding.left} y={padding.top} width={chartWidth} height={chartHeight} rx="10" fill="currentColor" className="text-gray-50 dark:text-gray-950" opacity="0.7" />
         {ticks.map((tick) => {
           const y = padding.top + chartHeight - ((tick - minValue) / range) * chartHeight;
           return (
             <g key={tick}>
               <line x1={padding.left} x2={padding.left + chartWidth} y1={y} y2={y} stroke="currentColor" strokeOpacity="0.12" />
-              <text x={padding.left - 8} y={y + 4} textAnchor="end" className="fill-gray-500 text-[11px] dark:fill-gray-400">
+              <text x={padding.left - 12} y={y + 4} textAnchor="end" className="fill-gray-500 text-[12px] font-bold dark:fill-gray-400">
                 {formatMetric(tick, tick % 1 === 0 ? 0 : 1)}
               </text>
             </g>
@@ -413,27 +420,38 @@ const AnalyticsChart: React.FC<{
         {graphType === 'bar' ? (
           seriesCoordinates.map((item, seriesIndex) => {
             const groupWidth = chartWidth / Math.max(1, item.coordinates.length);
-            const barWidth = Math.min(24, Math.max(5, (groupWidth - 8) / Math.max(1, seriesCoordinates.length)));
+            const barWidth = Math.min(38, Math.max(7, (groupWidth - 10) / Math.max(1, seriesCoordinates.length)));
             return item.coordinates.map((point, index) => {
               const x = padding.left + index * groupWidth + (groupWidth - barWidth * seriesCoordinates.length) / 2 + seriesIndex * barWidth;
               const barHeight = chartHeight - (point.y - padding.top);
               return (
-                <rect
-                  key={`${item.name}-${point.label}`}
-                  x={x}
-                  y={point.y}
-                  width={barWidth}
-                  height={Math.max(1, barHeight)}
-                  rx="3"
-                  fill={item.color}
-                  opacity={seriesIndex === 0 ? 0.9 : 0.65}
-                  className="cursor-pointer"
-                  onMouseEnter={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: x + barWidth / 2, y: point.y, color: item.color })}
-                  onMouseMove={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: x + barWidth / 2, y: point.y, color: item.color })}
-                >
-                  <animate attributeName="y" from={padding.top + chartHeight} to={point.y} dur="420ms" fill="freeze" />
-                  <animate attributeName="height" from="1" to={Math.max(1, barHeight)} dur="420ms" fill="freeze" />
-                </rect>
+                <g key={`${item.name}-${point.label}`}>
+                  <rect
+                    x={x}
+                    y={point.y}
+                    width={barWidth}
+                    height={Math.max(1, barHeight)}
+                    rx="5"
+                    fill={item.color}
+                    opacity={hoveredPoint?.name === item.name && hoveredPoint.label === point.label ? 1 : seriesIndex === 0 ? 0.88 : 0.62}
+                    className="cursor-pointer transition-opacity"
+                    onMouseEnter={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: x + barWidth / 2, y: point.y, color: item.color })}
+                    onMouseMove={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: x + barWidth / 2, y: point.y, color: item.color })}
+                  >
+                    <animate attributeName="y" from={padding.top + chartHeight} to={point.y} dur="420ms" fill="freeze" />
+                    <animate attributeName="height" from="1" to={Math.max(1, barHeight)} dur="420ms" fill="freeze" />
+                  </rect>
+                  <rect
+                    x={padding.left + index * groupWidth}
+                    y={padding.top}
+                    width={groupWidth}
+                    height={chartHeight}
+                    fill="transparent"
+                    className="cursor-pointer"
+                    onMouseEnter={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: x + barWidth / 2, y: point.y, color: item.color })}
+                    onMouseMove={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: x + barWidth / 2, y: point.y, color: item.color })}
+                  />
+                </g>
               );
             });
           })
@@ -454,7 +472,7 @@ const AnalyticsChart: React.FC<{
                   d={path}
                   fill="none"
                   stroke={item.color}
-                  strokeWidth="3"
+                  strokeWidth="4"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   pathLength="100"
@@ -464,22 +482,38 @@ const AnalyticsChart: React.FC<{
                   <animate attributeName="stroke-dashoffset" from="100" to="0" dur="520ms" fill="freeze" />
                 </path>
                 {item.coordinates.map((point) => (
-                  <circle
-                    key={`${item.name}-${point.label}-${point.x}`}
-                    cx={point.x}
-                    cy={point.y}
-                    r="4"
-                    fill={item.color}
-                    stroke="white"
-                    strokeWidth="2"
-                    opacity="0"
-                    className="cursor-pointer"
-                    onMouseEnter={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: point.x, y: point.y, color: item.color })}
-                    onMouseMove={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: point.x, y: point.y, color: item.color })}
-                  >
-                    <animate attributeName="opacity" from="0" to="1" dur="240ms" begin="260ms" fill="freeze" />
-                    <animate attributeName="r" from="2" to="4" dur="240ms" begin="260ms" fill="freeze" />
-                  </circle>
+                  <g key={`${item.name}-${point.label}-${point.x}`}>
+                    {hoveredPoint?.name === item.name && hoveredPoint.label === point.label && (
+                      <>
+                        <line x1={point.x} x2={point.x} y1={padding.top} y2={padding.top + chartHeight} stroke={item.color} strokeOpacity="0.25" strokeDasharray="6 6" />
+                        <circle cx={point.x} cy={point.y} r="9" fill={item.color} opacity="0.15" />
+                      </>
+                    )}
+                    <circle
+                      cx={point.x}
+                      cy={point.y}
+                      r="5"
+                      fill={item.color}
+                      stroke="white"
+                      strokeWidth="2.5"
+                      opacity="0"
+                      className="cursor-pointer"
+                      onMouseEnter={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: point.x, y: point.y, color: item.color })}
+                      onMouseMove={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: point.x, y: point.y, color: item.color })}
+                    >
+                      <animate attributeName="opacity" from="0" to="1" dur="240ms" begin="260ms" fill="freeze" />
+                      <animate attributeName="r" from="2" to="5" dur="240ms" begin="260ms" fill="freeze" />
+                    </circle>
+                    <circle
+                      cx={point.x}
+                      cy={point.y}
+                      r="16"
+                      fill="transparent"
+                      className="cursor-pointer"
+                      onMouseEnter={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: point.x, y: point.y, color: item.color })}
+                      onMouseMove={() => setHoveredPoint({ name: item.name, label: point.label, value: point.value, x: point.x, y: point.y, color: item.color })}
+                    />
+                  </g>
                 ))}
               </g>
             );
@@ -490,7 +524,7 @@ const AnalyticsChart: React.FC<{
           const point = primaryPoints[index];
           const x = padding.left + (primaryPoints.length <= 1 ? chartWidth : (index / (primaryPoints.length - 1)) * chartWidth);
           return (
-            <text key={`${point.label}-label`} x={x} y={height - 9} textAnchor={index === 0 ? 'start' : index === primaryPoints.length - 1 ? 'end' : 'middle'} className="fill-gray-500 text-[11px] dark:fill-gray-400">
+            <text key={`${point.label}-label`} x={x} y={height - 16} textAnchor={index === 0 ? 'start' : index === primaryPoints.length - 1 ? 'end' : 'middle'} className="fill-gray-500 text-[12px] font-bold dark:fill-gray-400">
               {formatAnalyticsLabel(point.label)}
             </text>
           );
@@ -498,7 +532,7 @@ const AnalyticsChart: React.FC<{
       </svg>
       {hoveredPoint && (
         <div
-          className="pointer-events-none absolute z-10 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-xl dark:border-gray-700 dark:bg-gray-950"
+          className="pointer-events-none absolute z-10 min-w-40 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-xl dark:border-gray-700 dark:bg-gray-950"
           style={{
             left: `${(hoveredPoint.x / width) * 100}%`,
             top: `${(hoveredPoint.y / height) * 100}%`,
@@ -1053,7 +1087,6 @@ const ReportsPage: React.FC<{
     ? `${selectedDaily.user.firstName || ''} ${selectedDaily.user.lastName || ''}`.trim() || selectedDaily.user.email || 'Unknown'
     : '';
   const dailyFieldTrends = Array.isArray(dailyAnalytics?.fieldTrends) ? dailyAnalytics.fieldTrends : [];
-  const dailyActivitySections = Array.isArray(dailyAnalytics?.activitySections) ? dailyAnalytics.activitySections : [];
   const visibleFieldTrends = dailyFieldTrends.filter((trend) => trend.total > 0);
   const selectedTrend = dailyFieldTrends.find((trend) => trend.key === selectedAnalyticsMetric)
     || visibleFieldTrends[0]
@@ -1084,15 +1117,6 @@ const ReportsPage: React.FC<{
     groups[section] = [...(groups[section] || []), trend];
     return groups;
   }, {});
-  const activeGraphChips = [
-    selectedTrend ? `Metric: ${selectedTrend.label}` : '',
-    `Range: ${dailyAnalyticsRanges.find((range) => range.value === dailyAnalyticsRange)?.label || 'Custom'}`,
-    analyticsSearch.trim() ? `Search: ${analyticsSearch.trim()}` : '',
-    analyticsDistrict ? `District: ${analyticsDistrict}` : 'Overall',
-    compareItems.length > 0 ? `Compare: ${compareItems.length}` : '',
-    `Type: ${dailyGraphTypes.find((type) => type.value === dailyGraphType)?.label || 'Line'}`,
-  ].filter(Boolean);
-
   const exportAnalyticsPng = () => {
     const svg = analyticsChartRef.current?.querySelector('svg');
     if (!svg) {
@@ -1349,8 +1373,8 @@ const ReportsPage: React.FC<{
               <button type="submit" className="btn-primary" aria-label="Search analytics" title="Search Analytics">
                 <Search size={16} />
               </button>
-              <button type="button" onClick={clearTrooperDailyAnalyticsFilters} className="btn-secondary" aria-label="Show overall analytics" title="Overall Data">
-                Overall
+              <button type="button" onClick={clearTrooperDailyAnalyticsFilters} className="btn-secondary" aria-label="Clear analytics filters" title="Clear Filters">
+                <X size={16} />
               </button>
             </form>
           )}
@@ -1360,39 +1384,14 @@ const ReportsPage: React.FC<{
             <div className="loading">Loading Trooper Daily analytics...</div>
           ) : dailyAnalytics ? (
             <>
-              <div className="mb-4 grid grid-cols-2 gap-2 xl:grid-cols-4">
-                {[
-                  { label: 'Reports', value: formatMetric(dailyAnalytics.totals.totalReports), icon: FileText },
-                  { label: 'Total Hours', value: formatMetric(dailyAnalytics.totals.totalHours, 1), icon: Clock },
-                  { label: 'Avg Hours', value: formatMetric(dailyAnalytics.totals.averageHours, 1), icon: Activity },
-                  ...(canViewAllTrooperDailies ? [{ label: 'Troopers', value: formatMetric(dailyAnalytics.totals.uniqueTroopers), icon: Users }] : []),
-                ].map((metric) => {
-                  const MetricIcon = metric.icon;
-                  return (
-                    <div key={metric.label} className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
-                        <MetricIcon size={18} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{metric.label}</p>
-                        <p className="truncate text-lg font-black text-gray-900 dark:text-gray-50">{metric.value}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
               <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h4 className="text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Trooper Daily Graph</h4>
-                    <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Select one report field and a date range.</p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                <div className="mb-4 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(14rem,0.9fr)_minmax(0,1.6fr)_auto_auto] xl:items-center">
+                  <div className="min-w-0">
                     <select
                       value={selectedTrend?.key || selectedAnalyticsMetric}
                       onChange={(event) => setSelectedAnalyticsMetric(event.target.value)}
-                      className="max-w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
+                      className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
+                      aria-label="Graph metric"
                     >
                       {Object.entries(groupedFieldTrends).map(([section, trends]) => (
                         <optgroup key={section} label={section}>
@@ -1403,9 +1402,6 @@ const ReportsPage: React.FC<{
                       ))}
                     </select>
                   </div>
-                </div>
-
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap gap-2">
                     {dailyAnalyticsRanges.map((range) => (
                       <button
@@ -1438,14 +1434,9 @@ const ReportsPage: React.FC<{
                       </button>
                     ))}
                   </div>
-                </div>
-
-                <div className="mb-4 flex flex-wrap gap-2">
-                  {activeGraphChips.map((chip) => (
-                    <span key={chip} className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                      {chip}
-                    </span>
-                  ))}
+                  <div className="flex justify-start xl:justify-end">
+                    {renderAnalyticsExportDropdown()}
+                  </div>
                 </div>
 
                 {canViewAllTrooperDailies ? (
@@ -1460,7 +1451,6 @@ const ReportsPage: React.FC<{
                           <button type="button" onClick={refreshCompareAnalytics} disabled={compareItems.length === 0 || compareAnalyticsLoading} className="btn-secondary" aria-label="Refresh comparisons" title="Refresh Compare">
                             {compareAnalyticsLoading ? 'Loading' : 'Refresh'}
                           </button>
-                          {renderAnalyticsExportDropdown()}
                         </div>
                       </div>
 
@@ -1583,11 +1573,7 @@ const ReportsPage: React.FC<{
                     </section>
                     {compareAnalyticsError && <div className="error mb-4">{compareAnalyticsError}</div>}
                   </>
-                ) : (
-                  <div className="mb-4 flex justify-end">
-                    {renderAnalyticsExportDropdown()}
-                  </div>
-                )}
+                ) : null}
 
                 {selectedTrend ? (
                   <>
@@ -1596,7 +1582,7 @@ const ReportsPage: React.FC<{
                         <p className="text-base font-black text-gray-900 dark:text-gray-100">{selectedTrend.label}</p>
                         <p className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{selectedTrend.section}</p>
                       </div>
-                      <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-black text-accent">Total {formatMetric(selectedTrend.total, 1)}</span>
+                      <span className="text-sm font-black text-accent">Total {formatMetric(selectedTrend.total, 1)}</span>
                     </div>
                     {chartSeries.length > 1 && (
                       <div className="mb-3 flex flex-wrap gap-3 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -1608,45 +1594,22 @@ const ReportsPage: React.FC<{
                         ))}
                       </div>
                     )}
-                    <div ref={analyticsChartRef} className="h-72">
-                      <AnalyticsChart series={chartSeries} graphType={dailyGraphType} height={260} />
+                    <div ref={analyticsChartRef} className="h-[26rem] w-full">
+                      <AnalyticsChart series={chartSeries} graphType={dailyGraphType} height={420} />
                     </div>
                   </>
                 ) : (
                   <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300">
                     <p className="font-black text-gray-900 dark:text-gray-100">No graph data for this view yet.</p>
-                    <p className="mt-1">Try a wider date range, switch to Overall, choose another district, or select a different metric.</p>
+                    <p className="mt-1">Try a wider date range, clear the filters, choose another district, or select a different metric.</p>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <button type="button" onClick={() => applyDailyAnalyticsRange('1y')} className="btn-secondary">1 Year</button>
-                      <button type="button" onClick={clearTrooperDailyAnalyticsFilters} className="btn-secondary">Overall</button>
+                      <button type="button" onClick={clearTrooperDailyAnalyticsFilters} className="btn-secondary">Clear Filters</button>
                     </div>
                   </div>
                 )}
               </div>
 
-              <details className="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <summary className="cursor-pointer text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Metric Shortcuts</summary>
-                <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
-                  {dailyActivitySections.map((section) => (
-                    <section key={section.title} className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
-                      <h5 className="mb-3 text-xs font-black uppercase tracking-wide text-gray-600 dark:text-gray-300">{section.title}</h5>
-                      <div className="space-y-2">
-                        {section.totals.slice(0, 10).map((item) => (
-                          <button
-                            key={item.key}
-                            type="button"
-                            onClick={() => setSelectedAnalyticsMetric(item.key)}
-                            className="flex w-full items-center justify-between gap-3 rounded border border-transparent px-2 py-1.5 text-left text-sm font-semibold text-gray-700 transition hover:border-accent/30 hover:bg-white dark:text-gray-200 dark:hover:bg-gray-900"
-                          >
-                            <span className="truncate">{item.label}</span>
-                            <span className="shrink-0 font-black text-gray-950 dark:text-white">{formatMetric(item.value, 1)}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-                  ))}
-                </div>
-              </details>
             </>
           ) : (
             <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No analytics available yet.</p>
