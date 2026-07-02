@@ -51,7 +51,64 @@ SETUP_ENV_LOCKED=true
 
 ## Backend Deployment
 
-### Using Node.js
+### Using PM2 on Windows/IIS
+
+PM2 keeps the Express API running in the background, restarts it after crashes, and gives you a visual terminal monitor instead of leaving the API open in a regular terminal window.
+
+1. Install PM2 globally on the server:
+```powershell
+npm install -g pm2
+```
+
+2. From the SHIELD project root, install dependencies and build the backend:
+```powershell
+cd C:\inetpub\wwwroot\shield
+cd backend
+npm install
+npm run build
+cd ..
+```
+
+3. Start the API using the checked-in PM2 config:
+```powershell
+pm2 start ecosystem.config.cjs
+```
+
+4. Open the visual PM2 monitor:
+```powershell
+pm2 monit
+```
+
+5. Save the process list so PM2 remembers SHIELD:
+```powershell
+pm2 save
+```
+
+6. Set up Windows startup. Run the command PM2 prints after this:
+```powershell
+pm2 startup
+```
+
+Useful PM2 commands:
+```powershell
+pm2 status
+pm2 logs shield-api
+pm2 restart shield-api
+pm2 stop shield-api
+pm2 delete shield-api
+```
+
+After pulling new code, rebuild and restart:
+```powershell
+cd C:\inetpub\wwwroot\shield\backend
+npm install
+npm run build
+cd ..
+pm2 restart shield-api
+pm2 save
+```
+
+### Using Node.js Directly
 
 1. Build the backend:
 ```bash
