@@ -1120,7 +1120,7 @@ const ReportsPage: React.FC<{
   };
 
   const renderAnalyticsExportDropdown = () => (
-    <div className="relative">
+    <div className="relative z-[100]">
       <button
         type="button"
         onClick={() => setIsDailyAnalyticsExportMenuOpen((open) => !open)}
@@ -1133,7 +1133,7 @@ const ReportsPage: React.FC<{
         <Download size={16} /> <ChevronDown size={14} />
       </button>
       {isDailyAnalyticsExportMenuOpen && (
-        <div className="absolute right-0 top-11 z-40 min-w-36 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-950">
+        <div className="absolute right-0 top-11 z-[110] min-w-36 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-950">
           {[
             { format: 'csv' as const, label: 'CSV' },
             { format: 'pdf' as const, label: 'PDF' },
