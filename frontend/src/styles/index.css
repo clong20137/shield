@@ -1316,7 +1316,7 @@
   html.seasonal-theme-winter article[class~='bg-white'],
   html.seasonal-theme-winter aside[class~='bg-white'] {
     position: relative;
-    overflow: hidden;
+    overflow: visible;
   }
 
   html.seasonal-theme-christmas .modal-window::after,

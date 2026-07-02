@@ -3259,14 +3259,14 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
                                   src={getAssetThumbnailUrl(member.profilePictureUrl, 96)}
                                   alt={member.name}
                                   onError={(event) => handleAssetThumbnailError(event, member.profilePictureUrl)}
-                                  className="h-full w-full object-cover"
+                                  className="h-full w-full rounded-full object-cover"
                                 />
                               ) : (
-                                <span>{getInitials(member.name)}</span>
+                                <span className="flex h-full w-full items-center justify-center rounded-full">{getInitials(member.name)}</span>
                               )}
                               {member.presence && (
                                 <span
-                                  className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border border-white dark:border-gray-900 ${getPresenceDotClass(member.presence)}`}
+                                  className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white shadow-sm dark:border-gray-900 ${getPresenceDotClass(member.presence)}`}
                                   title={`${member.name}: ${member.presence.label}`}
                                   aria-label={`${member.name}: ${member.presence.label}`}
                                 />
