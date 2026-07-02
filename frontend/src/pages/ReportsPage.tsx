@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, RotateCcw, Search, Table, X } from 'lucide-react';
+import { BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, Search, Table, X } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -192,6 +192,8 @@ const compareSeriesColors = [
   'rgb(234 88 12)',
   'rgb(8 145 178)',
 ];
+
+const LIVE_REPORT_REFRESH_MS = 15_000;
 
 const trooperDailyTabs: Array<{ value: TrooperDailyTab; label: string }> = [
   { value: 'graph', label: 'Graph' },
@@ -656,6 +658,16 @@ const ReportsPage: React.FC<{
       void loadTrooperDailies();
       void loadTrooperDailyAnalytics();
     }
+    const refreshReportsQuietly = () => {
+      if (selectedReportType !== 'trooper-daily') {
+        return;
+      }
+
+      void loadTrooperDailies(false);
+      void loadTrooperDailyAnalytics(false);
+      void reloadCompareItems(compareItems, analyticsFrom, analyticsTo, false);
+    };
+
     const handleReportsUpdate = () => {
       if (selectedReportType !== 'trooper-daily') {
         return;
@@ -667,11 +679,13 @@ const ReportsPage: React.FC<{
 
       dailyRefreshTimerRef.current = window.setTimeout(() => {
         dailyRefreshTimerRef.current = null;
-        void loadTrooperDailies(false);
-        void loadTrooperDailyAnalytics(false);
-        void reloadCompareItems(compareItems, analyticsFrom, analyticsTo, false);
+        refreshReportsQuietly();
       }, 500);
     };
+
+    const liveRefreshInterval = selectedReportType === 'trooper-daily'
+      ? window.setInterval(refreshReportsQuietly, LIVE_REPORT_REFRESH_MS)
+      : null;
 
     window.addEventListener('shield:user-updated', handleReportsUpdate);
     window.addEventListener('shield:dashboard-updated', handleReportsUpdate);
@@ -680,6 +694,9 @@ const ReportsPage: React.FC<{
       window.removeEventListener('shield:user-updated', handleReportsUpdate);
       window.removeEventListener('shield:dashboard-updated', handleReportsUpdate);
       window.removeEventListener('shield:calendar-updated', handleReportsUpdate);
+      if (liveRefreshInterval) {
+        window.clearInterval(liveRefreshInterval);
+      }
       if (dailyRefreshTimerRef.current) {
         window.clearTimeout(dailyRefreshTimerRef.current);
         dailyRefreshTimerRef.current = null;
@@ -787,10 +804,6 @@ const ReportsPage: React.FC<{
     }
     void loadTrooperDailyAnalytics(true, { q: '', from: dates.from, to: dates.to, district: '' });
     void reloadCompareItems(compareItems, dates.from, dates.to);
-  };
-
-  const refreshCompareAnalytics = () => {
-    void reloadCompareItems();
   };
 
   const addCompareItem = async (item: Omit<DailyCompareItem, 'color' | 'loading' | 'error'>) => {
@@ -1114,8 +1127,10 @@ const ReportsPage: React.FC<{
         className="btn-secondary"
         aria-haspopup="menu"
         aria-expanded={isDailyAnalyticsExportMenuOpen}
+        aria-label="Export graph"
+        title="Export graph"
       >
-        <Download size={16} /> Export <ChevronDown size={14} />
+        <Download size={16} /> <ChevronDown size={14} />
       </button>
       {isDailyAnalyticsExportMenuOpen && (
         <div className="absolute right-0 top-11 z-40 min-w-36 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-950">
@@ -1344,35 +1359,37 @@ const ReportsPage: React.FC<{
 
                 {canViewAllTrooperDailies ? (
                   <>
-                    <section className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                    <section className="relative z-40 mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <h5 className="text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Compare</h5>
-                          <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Add users or districts to the same graph.</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <button type="button" onClick={refreshCompareAnalytics} disabled={compareItems.length === 0 || compareAnalyticsLoading} className="btn-secondary" aria-label="Refresh comparisons" title="Refresh Compare">
-                            {compareAnalyticsLoading ? 'Loading' : 'Refresh'}
-                          </button>
-                        </div>
+                        <h5 className="text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Compare</h5>
+                        {compareAnalyticsLoading && (
+                          <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-black uppercase text-accent">Updating</span>
+                        )}
                       </div>
 
-                      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,0.7fr)_minmax(0,1.4fr)]">
-                        <select
-                          value={dailyCompareMode}
-                          onChange={(event) => {
-                            setDailyCompareMode(event.target.value as DailyCompareMode);
-                            setCompareSearch('');
-                            setCompareDistrictSearch('');
-                            setIsCompareUserSearchOpen(false);
-                            setIsCompareDistrictSearchOpen(false);
-                          }}
-                          className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-900"
-                          aria-label="Compare graph mode"
-                        >
-                          <option value="user">Compare Users</option>
-                          <option value="district">Compare Districts</option>
-                        </select>
+                      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-start">
+                        <div className="inline-flex w-full rounded border border-gray-300 bg-white p-1 dark:border-gray-700 dark:bg-gray-900 xl:w-auto" aria-label="Compare graph mode">
+                          {(['user', 'district'] as const).map((mode) => (
+                            <button
+                              key={mode}
+                              type="button"
+                              onClick={() => {
+                                setDailyCompareMode(mode);
+                                setCompareSearch('');
+                                setCompareDistrictSearch('');
+                                setIsCompareUserSearchOpen(false);
+                                setIsCompareDistrictSearchOpen(false);
+                              }}
+                              className={`min-w-24 flex-1 rounded px-3 py-1.5 text-xs font-black uppercase tracking-wide transition xl:flex-none ${
+                                dailyCompareMode === mode
+                                  ? 'bg-primary-500 text-white'
+                                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                              }`}
+                            >
+                              {mode === 'user' ? 'Users' : 'Districts'}
+                            </button>
+                          ))}
+                        </div>
 
                         {dailyCompareMode === 'user' ? (
                           <div className="relative">
@@ -1387,11 +1404,11 @@ const ReportsPage: React.FC<{
                                   setIsCompareUserSearchOpen(true);
                                 }
                               }}
-                              placeholder="Type a user name, email, PE, or badge..."
+                              placeholder="Add user by name, email, PE, or badge..."
                               className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
                             />
                             {isCompareUserSearchOpen && (compareUserResults.length > 0 || compareUserSearchLoading) && (
-                              <div className="absolute left-0 right-0 top-11 z-30 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-950">
+                              <div className="absolute left-0 right-0 top-11 z-[90] max-h-72 overflow-auto rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-950">
                                 {compareUserSearchLoading ? (
                                   <div className="px-3 py-2 text-sm font-semibold text-gray-500 dark:text-gray-400">Searching users...</div>
                                 ) : (
@@ -1433,11 +1450,11 @@ const ReportsPage: React.FC<{
                                   }
                                 }
                               }}
-                              placeholder="Type a district..."
+                              placeholder="Add district..."
                               className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
                             />
                             {isCompareDistrictSearchOpen && (
-                              <div className="absolute left-0 right-0 top-11 z-30 max-h-64 overflow-auto rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-950">
+                              <div className="absolute left-0 right-0 top-11 z-[90] max-h-72 overflow-auto rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-950">
                                 {compareDistrictMatches.length > 0 ? (
                                   compareDistrictMatches.map((district) => (
                                     <button
@@ -1805,7 +1822,7 @@ const ReportsPage: React.FC<{
                         aria-label="Return Trooper Daily for correction"
                         title="Return for Correction"
                       >
-                        <RotateCcw size={16} />
+                        <X size={16} />
                       </button>
                     </div>
                   )}
