@@ -33,8 +33,18 @@ function sanitizeFolderName(value: string): string {
     .slice(0, 64);
 }
 
+function sanitizeFolderPath(value: string): string {
+  return value
+    .replace(/\\/gu, '/')
+    .split('/')
+    .map((part) => sanitizeFolderName(part))
+    .filter(Boolean)
+    .join('/');
+}
+
 function getCustomFolderLabel(folderKey: string): string {
-  return folderKey
+  const displayKey = folderKey.split('/').filter(Boolean).pop() || folderKey;
+  return displayKey
     .split('-')
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -47,7 +57,7 @@ function isPathInside(parentPath: string, childPath: string): boolean {
 }
 
 function getSafeFolderPath(folderKey: string): string | null {
-  const cleanFolder = sanitizeFolderName(folderKey);
+  const cleanFolder = sanitizeFolderPath(folderKey);
   if (!cleanFolder || cleanFolder !== folderKey) {
     return null;
   }
@@ -67,19 +77,44 @@ function getSafeImagePath(folderKey: string, fileName: string): string | null {
   return isPathInside(folderPath, filePath) ? filePath : null;
 }
 
-function getFolderDefinitions(): Array<{ key: string; label: string; protected: boolean }> {
+function getFolderDefinitions(): Array<{ key: string; label: string; parentKey: string; depth: number; protected: boolean }> {
   const uploadsRoot = getUploadsRoot();
-  const builtinFolders = mediaFolders.map((folder) => ({ ...folder, protected: true }));
+  const builtinFolders = mediaFolders.map((folder) => ({ ...folder, parentKey: '', depth: 0, protected: true }));
 
   if (!fs.existsSync(uploadsRoot)) {
     return builtinFolders;
   }
 
-  const customFolders = fs.readdirSync(uploadsRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && !protectedFolders.has(entry.name) && entry.name !== 'thumbs')
-    .map((entry) => ({ key: entry.name, label: getCustomFolderLabel(entry.name), protected: false }));
+  const discoveredFolders: Array<{ key: string; label: string; parentKey: string; depth: number; protected: boolean }> = [];
+  const visitFolder = (absoluteFolderPath: string, relativeFolderPath = '') => {
+    for (const entry of fs.readdirSync(absoluteFolderPath, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name === 'thumbs') {
+        continue;
+      }
 
-  return [...builtinFolders, ...customFolders].sort((a, b) => Number(b.protected) - Number(a.protected) || a.label.localeCompare(b.label));
+      const key = sanitizeFolderPath([relativeFolderPath, entry.name].filter(Boolean).join('/'));
+      if (!key || protectedFolders.has(key)) {
+        if (protectedFolders.has(key)) {
+          visitFolder(path.join(absoluteFolderPath, entry.name), key);
+        }
+        continue;
+      }
+
+      const parentKey = key.split('/').slice(0, -1).join('/');
+      discoveredFolders.push({
+        key,
+        label: getCustomFolderLabel(key),
+        parentKey,
+        depth: parentKey ? parentKey.split('/').length : 0,
+        protected: false,
+      });
+      visitFolder(path.join(absoluteFolderPath, entry.name), key);
+    }
+  };
+
+  visitFolder(uploadsRoot);
+
+  return [...builtinFolders, ...discoveredFolders].sort((a, b) => Number(b.protected) - Number(a.protected) || a.key.localeCompare(b.key));
 }
 
 function requestAuditFields(req: Request) {
@@ -134,15 +169,19 @@ export class MediaController {
 
       const uploadsRoot = getUploadsRoot();
       const selectedFolder = typeof req.query.folder === 'string' ? req.query.folder : '';
+      const safeSelectedFolder = selectedFolder ? sanitizeFolderPath(selectedFolder) : '';
+      if (selectedFolder && selectedFolder !== safeSelectedFolder) {
+        return res.status(400).json({ error: 'Valid folder is required' });
+      }
       const searchTerm = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : '';
       const page = Math.max(Number(req.query.page) || 1, 1);
       const limit = Math.min(Math.max(Number(req.query.limit) || 60, 12), 120);
       const hasFullMediaAccess = account.role === 'administrator' || await canUseFullMediaLibrary(account.id);
       const hasProfilePictureMediaAccess = account.role === 'administrator' || await canUseProfilePictureMedia(account.id);
       const hasDashboardMediaAccess = account.role === 'administrator' || await canUseDashboardMedia(account.id);
-      const canReadSelectedProfilePictures = hasProfilePictureMediaAccess && (!selectedFolder || selectedFolder === 'profile-pictures');
+      const canReadSelectedProfilePictures = hasProfilePictureMediaAccess && (!safeSelectedFolder || safeSelectedFolder === 'profile-pictures');
 
-      if (!hasFullMediaAccess && !canReadSelectedProfilePictures && (!hasDashboardMediaAccess || selectedFolder !== dashboardMediaFolder)) {
+      if (!hasFullMediaAccess && !canReadSelectedProfilePictures && (!hasDashboardMediaAccess || safeSelectedFolder !== dashboardMediaFolder)) {
         return res.status(403).json({ error: 'Permission denied' });
       }
 
@@ -162,6 +201,8 @@ export class MediaController {
         count: number;
         size: number;
         updatedAt: Date | null;
+        parentKey: string;
+        depth: number;
         protected: boolean;
       }> = [];
 
@@ -178,13 +219,13 @@ export class MediaController {
       });
 
       for (const folder of availableFolders) {
-        const folderPath = path.join(uploadsRoot, folder.key);
+        const folderPath = path.join(uploadsRoot, ...folder.key.split('/'));
         let folderCount = 0;
         let folderSize = 0;
         let folderUpdatedAt: Date | null = null;
 
         if (!fs.existsSync(folderPath)) {
-          folders.push({ key: folder.key, label: folder.label, count: 0, size: 0, updatedAt: null, protected: folder.protected });
+          folders.push({ key: folder.key, label: folder.label, count: 0, size: 0, updatedAt: null, parentKey: folder.parentKey, depth: folder.depth, protected: folder.protected });
           continue;
         }
 
@@ -201,7 +242,7 @@ export class MediaController {
             folderUpdatedAt = stat.mtime;
           }
 
-          if (selectedFolder && selectedFolder !== folder.key) {
+          if (safeSelectedFolder && safeSelectedFolder !== folder.key) {
             continue;
           }
 
@@ -228,6 +269,8 @@ export class MediaController {
           count: folderCount,
           size: folderSize,
           updatedAt: folderUpdatedAt,
+          parentKey: folder.parentKey,
+          depth: folder.depth,
           protected: folder.protected,
         });
       }
@@ -256,7 +299,9 @@ export class MediaController {
   static async createFolder(req: Request, res: Response) {
     try {
       const name = typeof req.body?.name === 'string' ? req.body.name : '';
-      const folderKey = sanitizeFolderName(name);
+      const parentKey = typeof req.body?.parent === 'string' ? sanitizeFolderPath(req.body.parent) : '';
+      const folderName = sanitizeFolderName(name);
+      const folderKey = sanitizeFolderPath([parentKey, folderName].filter(Boolean).join('/'));
       const folderPath = getSafeFolderPath(folderKey);
       if (!folderKey || !folderPath) {
         return res.status(400).json({ error: 'Folder name is required' });
@@ -278,7 +323,7 @@ export class MediaController {
         ...requestAuditFields(req),
       });
       broadcastAppEvent({ type: 'media-updated', entityId: folderKey });
-      res.status(201).json({ key: folderKey, label: getCustomFolderLabel(folderKey), count: 0, size: 0, updatedAt: null, protected: false });
+      res.status(201).json({ key: folderKey, label: getCustomFolderLabel(folderKey), count: 0, size: 0, updatedAt: null, parentKey, depth: parentKey ? parentKey.split('/').length : 0, protected: false });
     } catch (error) {
       console.error('Create media folder error:', error);
       res.status(500).json({ error: 'Failed to create media folder' });
@@ -287,12 +332,14 @@ export class MediaController {
 
   static async renameFolder(req: Request, res: Response) {
     try {
-      const currentFolder = req.params.folder;
+      const currentFolder = sanitizeFolderPath(req.params.folder || req.body?.folder || '');
       if (protectedFolders.has(currentFolder)) {
         return res.status(400).json({ error: 'System folders cannot be renamed' });
       }
 
-      const nextFolder = sanitizeFolderName(typeof req.body?.name === 'string' ? req.body.name : '');
+      const parentKey = currentFolder.split('/').slice(0, -1).join('/');
+      const nextFolderName = sanitizeFolderName(typeof req.body?.name === 'string' ? req.body.name : '');
+      const nextFolder = sanitizeFolderPath([parentKey, nextFolderName].filter(Boolean).join('/'));
       const currentPath = getSafeFolderPath(currentFolder);
       const nextPath = getSafeFolderPath(nextFolder);
       if (!currentPath || !nextPath || !nextFolder) {
@@ -328,7 +375,7 @@ export class MediaController {
 
   static async deleteFolder(req: Request, res: Response) {
     try {
-      const folderKey = req.params.folder;
+      const folderKey = sanitizeFolderPath(req.params.folder || req.body?.folder || '');
       if (protectedFolders.has(folderKey)) {
         return res.status(400).json({ error: 'System folders cannot be deleted' });
       }
@@ -354,6 +401,108 @@ export class MediaController {
     } catch (error) {
       console.error('Delete media folder error:', error);
       res.status(500).json({ error: 'Failed to delete media folder' });
+    }
+  }
+
+  static async moveImages(req: Request, res: Response) {
+    try {
+      const items = Array.isArray(req.body?.items) ? req.body.items : [];
+      const targetFolder = sanitizeFolderPath(typeof req.body?.targetFolder === 'string' ? req.body.targetFolder : '');
+      const targetFolderPath = getSafeFolderPath(targetFolder);
+      if (!targetFolderPath || !fs.existsSync(targetFolderPath)) {
+        return res.status(400).json({ error: 'Valid destination folder is required' });
+      }
+
+      let movedCount = 0;
+      const skipped: Array<{ fileName: string; reason: string }> = [];
+      for (const item of items.slice(0, 300)) {
+        const sourceFolder = sanitizeFolderPath(typeof item?.folder === 'string' ? item.folder : '');
+        const fileName = typeof item?.fileName === 'string' ? item.fileName : '';
+        const sourcePath = getSafeImagePath(sourceFolder, fileName);
+        const destinationPath = getSafeImagePath(targetFolder, fileName);
+        if (!sourcePath || !destinationPath || !fs.existsSync(sourcePath)) {
+          skipped.push({ fileName, reason: 'Image not found' });
+          continue;
+        }
+
+        if (sourceFolder === targetFolder) {
+          skipped.push({ fileName, reason: 'Already in destination' });
+          continue;
+        }
+
+        let finalDestinationPath = destinationPath;
+        if (fs.existsSync(finalDestinationPath)) {
+          const parsed = path.parse(fileName);
+          finalDestinationPath = getSafeImagePath(targetFolder, `${parsed.name}-${Date.now()}${parsed.ext}`) || destinationPath;
+        }
+
+        await fs.promises.rename(sourcePath, finalDestinationPath);
+        const sourceThumbDirectory = path.join(path.dirname(sourcePath), 'thumbs');
+        const destinationThumbDirectory = path.join(path.dirname(finalDestinationPath), 'thumbs');
+        await fs.promises.mkdir(destinationThumbDirectory, { recursive: true });
+        const sourceParsed = path.parse(sourcePath);
+        const destinationParsed = path.parse(finalDestinationPath);
+        await Promise.all([96, 256, 480].map(async (width) => {
+          const sourceThumb = path.join(sourceThumbDirectory, `${sourceParsed.name}-${width}.webp`);
+          const destinationThumb = path.join(destinationThumbDirectory, `${destinationParsed.name}-${width}.webp`);
+          if (fs.existsSync(sourceThumb)) {
+            await fs.promises.rename(sourceThumb, destinationThumb);
+          }
+        }));
+        movedCount += 1;
+      }
+
+      const actor = await getSessionAccount(req);
+      await AuditLogModel.create({
+        actorId: actor?.id || null,
+        actorName: actor?.displayName || actor?.email || null,
+        action: 'media.images_moved',
+        entityType: 'media-folder',
+        entityId: targetFolder,
+        details: JSON.stringify({ targetFolder, movedCount, skippedCount: skipped.length }),
+        ...requestAuditFields(req),
+      });
+      broadcastAppEvent({ type: 'media-updated', entityId: targetFolder });
+      res.json({ movedCount, skipped });
+    } catch (error) {
+      console.error('Move media images error:', error);
+      res.status(500).json({ error: 'Failed to move media images' });
+    }
+  }
+
+  static async deleteImages(req: Request, res: Response) {
+    try {
+      const items = Array.isArray(req.body?.items) ? req.body.items : [];
+      let deletedCount = 0;
+      const skipped: Array<{ fileName: string; reason: string }> = [];
+      for (const item of items.slice(0, 300)) {
+        const folder = sanitizeFolderPath(typeof item?.folder === 'string' ? item.folder : '');
+        const fileName = typeof item?.fileName === 'string' ? item.fileName : '';
+        const filePath = getSafeImagePath(folder, fileName);
+        if (!filePath || !fs.existsSync(filePath)) {
+          skipped.push({ fileName, reason: 'Image not found' });
+          continue;
+        }
+
+        await deleteImageFileAndThumbnails(filePath);
+        deletedCount += 1;
+      }
+
+      const actor = await getSessionAccount(req);
+      await AuditLogModel.create({
+        actorId: actor?.id || null,
+        actorName: actor?.displayName || actor?.email || null,
+        action: 'media.images_deleted',
+        entityType: 'media-image',
+        entityId: 'bulk',
+        details: JSON.stringify({ deletedCount, skippedCount: skipped.length }),
+        ...requestAuditFields(req),
+      });
+      broadcastAppEvent({ type: 'media-updated', entityId: 'bulk' });
+      res.json({ deletedCount, skipped });
+    } catch (error) {
+      console.error('Bulk delete media images error:', error);
+      res.status(500).json({ error: 'Failed to delete media images' });
     }
   }
 
@@ -422,8 +571,10 @@ export class MediaController {
 
   static async renameImage(req: Request, res: Response) {
     try {
-      const filePath = getSafeImagePath(req.params.folder, req.params.fileName);
-      const extension = path.extname(req.params.fileName).toLowerCase();
+      const folder = sanitizeFolderPath(req.params.folder || req.body?.folder || '');
+      const fileName = typeof (req.params.fileName || req.body?.fileName) === 'string' ? (req.params.fileName || req.body?.fileName) : '';
+      const filePath = getSafeImagePath(folder, fileName);
+      const extension = path.extname(fileName).toLowerCase();
       const nextBaseName = sanitizeFolderName(typeof req.body?.name === 'string' ? req.body.name : '');
       if (!filePath || !nextBaseName) {
         return res.status(400).json({ error: 'Valid image name is required' });
@@ -433,7 +584,7 @@ export class MediaController {
         return res.status(404).json({ error: 'Image not found' });
       }
 
-      const nextPath = getSafeImagePath(req.params.folder, `${nextBaseName}${extension}`);
+      const nextPath = getSafeImagePath(folder, `${nextBaseName}${extension}`);
       if (!nextPath) {
         return res.status(400).json({ error: 'Valid image name is required' });
       }
@@ -449,11 +600,11 @@ export class MediaController {
         actorName: actor?.displayName || actor?.email || null,
         action: 'media.image_renamed',
         entityType: 'media-image',
-        entityId: `${req.params.folder}/${path.basename(nextPath)}`,
-        details: JSON.stringify({ from: req.params.fileName, to: path.basename(nextPath) }),
+        entityId: `${folder}/${path.basename(nextPath)}`,
+        details: JSON.stringify({ from: fileName, to: path.basename(nextPath) }),
         ...requestAuditFields(req),
       });
-      broadcastAppEvent({ type: 'media-updated', entityId: req.params.folder });
+      broadcastAppEvent({ type: 'media-updated', entityId: folder });
       res.json({ fileName: path.basename(nextPath) });
     } catch (error) {
       console.error('Rename media image error:', error);

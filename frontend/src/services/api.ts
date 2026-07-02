@@ -419,6 +419,8 @@ export interface MediaLibraryFolder {
   count: number;
   size: number;
   updatedAt: string | null;
+  parentKey: string;
+  depth: number;
   protected: boolean;
 }
 
@@ -1583,12 +1585,12 @@ export const districtFeedService = {
 export const mediaService = {
   getAll: (params?: { folder?: string; q?: string; page?: number; limit?: number }) =>
     api.get<MediaLibraryResponse>('/media', { params }),
-  createFolder: (name: string) =>
-    api.post<MediaLibraryFolder>('/media/folders', { name }),
+  createFolder: (name: string, parent?: string) =>
+    api.post<MediaLibraryFolder>('/media/folders', { name, parent }),
   renameFolder: (folder: string, name: string) =>
-    api.put<Pick<MediaLibraryFolder, 'key' | 'label'>>(`/media/folders/${encodeURIComponent(folder)}`, { name }),
+    api.put<Pick<MediaLibraryFolder, 'key' | 'label'>>('/media/folders', { folder, name }),
   deleteFolder: (folder: string) =>
-    api.delete(`/media/folders/${encodeURIComponent(folder)}`),
+    api.delete('/media/folders', { data: { folder } }),
   uploadImages: (folder: string, files: File[], onProgress?: (progress: number) => void) => {
     const formData = new FormData();
     formData.append('folder', folder);
@@ -1603,9 +1605,13 @@ export const mediaService = {
     });
   },
   renameImage: (folder: string, fileName: string, name: string) =>
-    api.put<{ fileName: string }>(`/media/images/${encodeURIComponent(folder)}/${encodeURIComponent(fileName)}`, { name }),
+    api.put<{ fileName: string }>('/media/images/rename', { folder, fileName, name }),
   deleteImage: (folder: string, fileName: string) =>
-    api.delete(`/media/images/${encodeURIComponent(folder)}/${encodeURIComponent(fileName)}`),
+    mediaService.deleteImages([{ folder, fileName }]),
+  moveImages: (items: Array<Pick<MediaLibraryItem, 'folder' | 'fileName'>>, targetFolder: string) =>
+    api.post<{ movedCount: number; skipped: Array<{ fileName: string; reason: string }> }>('/media/images/move', { items, targetFolder }),
+  deleteImages: (items: Array<Pick<MediaLibraryItem, 'folder' | 'fileName'>>) =>
+    api.post<{ deletedCount: number; skipped: Array<{ fileName: string; reason: string }> }>('/media/images/delete', { items }),
   deleteAllProfilePictures: (batchSize?: number) =>
     api.delete<ProfilePictureDeleteAllResponse>('/media/profile-pictures', {
       params: batchSize ? { batchSize } : undefined,

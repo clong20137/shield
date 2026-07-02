@@ -1,5 +1,5 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Camera, Check, ChevronLeft, ChevronRight, ExternalLink, Folder, FolderUp, HardDrive, Image, Pencil, Plus, Search, Trash2, Upload, Wrench, X } from 'lucide-react';
+import { ChangeEvent, DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, Camera, Check, ChevronLeft, ChevronRight, Download, ExternalLink, Folder, FolderUp, HardDrive, Image, MoveRight, Pencil, Plus, Search, Trash2, Upload, X, Wrench } from 'lucide-react';
 import { AuthAccount, getAssetThumbnailUrl, getAssetUrl, handleAssetThumbnailError, MediaLibraryFolder, MediaLibraryItem, mediaService, userService } from '../services/api';
 
 const pageSize = 60;
@@ -24,6 +24,15 @@ function formatDate(value: string | null): string {
   });
 }
 
+function getCustomFolderDisplayLabel(folderKey: string): string {
+  const name = folderKey.split('/').filter(Boolean).pop() || folderKey;
+  return name
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ') || folderKey;
+}
+
 interface MediaLibraryPageProps {
   account: AuthAccount;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
@@ -46,6 +55,9 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState<MediaLibraryItem | null>(null);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [moveTargetFolder, setMoveTargetFolder] = useState('');
+  const [isDraggingUpload, setIsDraggingUpload] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [editingFolderKey, setEditingFolderKey] = useState('');
   const [editingFolderName, setEditingFolderName] = useState('');
@@ -89,6 +101,31 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
   const canEditMedia = hasPermission(account, 'media:edit');
   const canDeleteMedia = hasPermission(account, 'media:delete');
   const isProfilePicturesFolder = activeFolder === 'profile-pictures';
+  const selectedItems = useMemo(
+    () => items.filter((item) => selectedItemIds.includes(item.id)),
+    [items, selectedItemIds],
+  );
+  const childFolders = useMemo(
+    () => folders.filter((folder) => folder.parentKey === activeFolder),
+    [activeFolder, folders],
+  );
+  const availableMoveFolders = useMemo(
+    () => folders.filter((folder) => folder.key !== activeFolder),
+    [activeFolder, folders],
+  );
+  const folderBreadcrumbs = useMemo(() => {
+    if (!activeFolder) {
+      return [];
+    }
+
+    return activeFolder.split('/').map((_, index, parts) => {
+      const key = parts.slice(0, index + 1).join('/');
+      return {
+        key,
+        label: folders.find((folder) => folder.key === key)?.label || getCustomFolderDisplayLabel(key),
+      };
+    });
+  }, [activeFolder, folders]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -135,6 +172,11 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
 
   useEffect(() => {
     void loadMedia();
+  }, [activeFolder, debouncedSearchTerm, page]);
+
+  useEffect(() => {
+    setSelectedItemIds([]);
+    setMoveTargetFolder('');
   }, [activeFolder, debouncedSearchTerm, page]);
 
   useEffect(() => {
@@ -189,7 +231,7 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
     if (!newFolderName.trim()) return;
 
     try {
-      await mediaService.createFolder(newFolderName);
+      await mediaService.createFolder(newFolderName, activeFolder || undefined);
       setNewFolderName('');
       onToast('success', 'Folder created.');
       await loadMedia();
@@ -232,9 +274,7 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
     }
   };
 
-  const uploadImages = async (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    event.target.value = '';
+  const uploadImageFiles = async (files: File[]) => {
     if (!activeFolder || files.length === 0) return;
 
     setIsUploading(true);
@@ -249,6 +289,22 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const uploadImages = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    await uploadImageFiles(files);
+  };
+
+  const handleDropUpload = async (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDraggingUpload(false);
+    if (!activeFolder || !canUploadMedia) {
+      return;
+    }
+
+    await uploadImageFiles(Array.from(event.dataTransfer.files || []));
   };
 
   const importProfilePhotos = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -335,6 +391,68 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
     } catch (err) {
       onToast('error', getErrorMessage(err, 'Failed to delete image.'));
     }
+  };
+
+  const toggleSelectedItem = (itemId: string) => {
+    setSelectedItemIds((current) => (
+      current.includes(itemId)
+        ? current.filter((id) => id !== itemId)
+        : [...current, itemId]
+    ));
+  };
+
+  const selectAllVisibleItems = () => {
+    setSelectedItemIds((current) => (
+      current.length === items.length ? [] : items.map((item) => item.id)
+    ));
+  };
+
+  const renameSelectedImage = () => {
+    const item = selectedItems[0];
+    if (!item) return;
+    setRenamingImageId(item.id);
+    setRenamingImageName(item.fileName.replace(/\.[^.]+$/u, ''));
+  };
+
+  const moveSelectedImages = async () => {
+    if (selectedItems.length === 0 || !moveTargetFolder) return;
+
+    try {
+      const response = await mediaService.moveImages(selectedItems, moveTargetFolder);
+      onToast('success', `Moved ${response.data.movedCount} image${response.data.movedCount === 1 ? '' : 's'}.`);
+      setSelectedItemIds([]);
+      setMoveTargetFolder('');
+      await loadMedia();
+    } catch (err) {
+      onToast('error', getErrorMessage(err, 'Failed to move selected images.'));
+    }
+  };
+
+  const deleteSelectedImages = async () => {
+    if (selectedItems.length === 0 || !window.confirm(`Delete ${selectedItems.length} selected image${selectedItems.length === 1 ? '' : 's'}?`)) return;
+
+    try {
+      const response = await mediaService.deleteImages(selectedItems);
+      setSelectedItem((selected) => selected && selectedItemIds.includes(selected.id) ? null : selected);
+      onToast('success', `Deleted ${response.data.deletedCount} image${response.data.deletedCount === 1 ? '' : 's'}.`);
+      setSelectedItemIds([]);
+      await loadMedia();
+    } catch (err) {
+      onToast('error', getErrorMessage(err, 'Failed to delete selected images.'));
+    }
+  };
+
+  const downloadSelectedImages = () => {
+    selectedItems.forEach((item, index) => {
+      window.setTimeout(() => {
+        const link = document.createElement('a');
+        link.href = getAssetUrl(item.url);
+        link.download = item.fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }, index * 150);
+    });
   };
 
   const openProfileDeleteModal = () => {
@@ -460,9 +578,20 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Media Library</h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {activeFolderDetails ? `${activeFolderDetails.label} / ${total} matching image${total === 1 ? '' : 's'}` : 'Double-click a folder to browse its files.'}
-            </p>
+            {activeFolderDetails ? (
+              <div className="mt-1 flex flex-wrap items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
+                <button type="button" onClick={closeFolder} className="font-semibold text-primary-500 hover:underline">Folders</button>
+                {folderBreadcrumbs.map((crumb) => (
+                  <span key={crumb.key} className="inline-flex items-center gap-1">
+                    <span>/</span>
+                    <button type="button" onClick={() => openFolder(crumb.key)} className="font-semibold text-gray-700 hover:text-primary-500 dark:text-gray-200">{crumb.label}</button>
+                  </span>
+                ))}
+                <span className="ml-1">/ {total} image{total === 1 ? '' : 's'}</span>
+              </div>
+            ) : (
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Double-click a folder to browse its files.</p>
+            )}
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -625,18 +754,19 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
         </div>
       )}
 
+      {canEditMedia && (
+        <form onSubmit={createFolder} className="flex flex-col gap-2 rounded border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 sm:flex-row">
+          <input value={newFolderName} onChange={(event) => setNewFolderName(event.target.value)} placeholder={activeFolder ? 'New subfolder name' : 'New folder name'} className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
+          <button type="submit" className="btn-primary" aria-label="Create folder" title="Create Folder">
+            <Plus size={16} />
+          </button>
+        </form>
+      )}
+
       {!activeFolder && (
         <>
-        {canEditMedia && (
-          <form onSubmit={createFolder} className="flex flex-col gap-2 rounded border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 sm:flex-row">
-            <input value={newFolderName} onChange={(event) => setNewFolderName(event.target.value)} placeholder="New folder name" className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
-            <button type="submit" className="btn-primary" aria-label="Create folder" title="Create Folder">
-              <Plus size={16} />
-            </button>
-          </form>
-        )}
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {folders.map((folder) => (
+          {childFolders.map((folder) => (
             <article
               key={folder.key}
               className="rounded border border-gray-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:hover:border-primary-700"
@@ -682,8 +812,60 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
 
       {activeFolder && (
         <>
+          {canUploadMedia && (
+            <div
+              onDragEnter={(event) => { event.preventDefault(); setIsDraggingUpload(true); }}
+              onDragOver={(event) => event.preventDefault()}
+              onDragLeave={() => setIsDraggingUpload(false)}
+              onDrop={handleDropUpload}
+              className={`flex min-h-24 flex-col items-center justify-center rounded border border-dashed p-4 text-center transition ${isDraggingUpload ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-blue-100' : 'border-gray-300 bg-gray-50 text-gray-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300'}`}
+            >
+              <Upload size={22} />
+              <p className="mt-2 text-sm font-bold">Drag images here to upload to {activeFolderDetails?.label || 'this folder'}</p>
+              <p className="mt-1 text-xs">JPG, PNG, GIF, WEBP up to 20 MB each.</p>
+            </div>
+          )}
+
+          {selectedItems.length > 0 && (
+            <div className="sticky top-2 z-20 flex flex-col gap-2 rounded border border-primary-200 bg-white p-3 shadow-lg dark:border-primary-800 dark:bg-gray-900 lg:flex-row lg:items-center lg:justify-between">
+              <p className="text-sm font-bold text-gray-900 dark:text-white">{selectedItems.length} selected</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={renameSelectedImage} className="btn-secondary" disabled={selectedItems.length !== 1 || !canEditMedia} aria-label="Rename selected image" title="Rename">
+                  <Pencil size={16} />
+                </button>
+                <button type="button" onClick={downloadSelectedImages} className="btn-secondary" aria-label="Download selected images" title="Download">
+                  <Download size={16} />
+                </button>
+                {canEditMedia && (
+                  <>
+                    <select value={moveTargetFolder} onChange={(event) => setMoveTargetFolder(event.target.value)} className="min-w-52 rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950" aria-label="Move selected images to folder">
+                      <option value="">Move to...</option>
+                      {availableMoveFolders.map((folder) => (
+                        <option key={folder.key} value={folder.key}>{`${'  '.repeat(folder.depth)}${folder.label}`}</option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={() => void moveSelectedImages()} className="btn-secondary" disabled={!moveTargetFolder} aria-label="Move selected images" title="Move">
+                      <MoveRight size={16} />
+                    </button>
+                  </>
+                )}
+                {canDeleteMedia && (
+                  <button type="button" onClick={() => void deleteSelectedImages()} className="btn-danger" aria-label="Delete selected images" title="Delete">
+                    <Trash2 size={16} />
+                  </button>
+                )}
+                <button type="button" onClick={() => setSelectedItemIds([])} className="btn-secondary" aria-label="Clear selection" title="Clear">
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col gap-2 text-sm text-gray-500 dark:text-gray-400 sm:flex-row sm:items-center sm:justify-between">
-            <p>Showing {firstItem}-{lastItem} of {total}</p>
+            <label className="inline-flex items-center gap-2 font-semibold">
+              <input type="checkbox" checked={items.length > 0 && selectedItemIds.length === items.length} onChange={selectAllVisibleItems} />
+              Showing {firstItem}-{lastItem} of {total}
+            </label>
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => setPage((current) => Math.max(current - 1, 1))} disabled={page <= 1} className="btn-secondary">
                 <ChevronLeft size={16} />
@@ -695,6 +877,47 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
             </div>
           </div>
 
+          {childFolders.length > 0 && (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {childFolders.map((folder) => (
+                <article key={folder.key} className="rounded border border-gray-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:hover:border-primary-700">
+                  <div className="flex items-start gap-3" onDoubleClick={() => openFolder(folder.key)}>
+                    <button type="button" onClick={() => openFolder(folder.key)} className="rounded bg-primary-50 p-3 text-primary-500 dark:bg-primary-900/30 dark:text-primary-200" aria-label={`Open ${folder.label}`}>
+                      <Folder size={24} />
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      {editingFolderKey === folder.key ? (
+                        <div className="flex gap-2">
+                          <input value={editingFolderName} onChange={(event) => setEditingFolderName(event.target.value)} className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-950" autoFocus />
+                          <button type="button" onClick={() => void renameFolder(folder)} className="btn-secondary" aria-label="Save folder name" title="Save">
+                            <Check size={15} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button type="button" onClick={() => openFolder(folder.key)} className="block max-w-full text-left">
+                          <p className="truncate text-base font-bold text-gray-900 dark:text-white">{folder.label}</p>
+                        </button>
+                      )}
+                      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{folder.count} image{folder.count === 1 ? '' : 's'} / {formatBytes(folder.size)}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {canEditMedia && !folder.protected && (
+                        <button type="button" onClick={() => { setEditingFolderKey(folder.key); setEditingFolderName(folder.label); }} className="btn-secondary" aria-label="Rename folder" title="Rename">
+                          <Pencil size={15} />
+                        </button>
+                      )}
+                      {canDeleteMedia && !folder.protected && (
+                        <button type="button" onClick={() => void deleteFolder(folder)} className="btn-danger" aria-label="Delete folder" title="Delete">
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+
           {isLoading ? (
             <div className="loading">Loading media...</div>
           ) : items.length === 0 ? (
@@ -702,7 +925,15 @@ export default function MediaLibraryPage({ account, onToast, getErrorMessage }: 
           ) : (
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
               {items.map((item) => (
-                <article key={item.id} className="group overflow-hidden rounded border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+                <article key={item.id} className={`group relative overflow-hidden rounded border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:bg-gray-900 ${selectedItemIds.includes(item.id) ? 'border-primary-500 ring-2 ring-primary-500/25 dark:border-blue-300' : 'border-gray-200 dark:border-gray-800'}`}>
+                  <label className="absolute left-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded bg-white/95 shadow dark:bg-gray-950/95" title="Select image">
+                    <input
+                      type="checkbox"
+                      checked={selectedItemIds.includes(item.id)}
+                      onChange={() => toggleSelectedItem(item.id)}
+                      aria-label={`Select ${item.fileName}`}
+                    />
+                  </label>
                   <button
                     type="button"
                     onClick={() => setSelectedItem(item)}
