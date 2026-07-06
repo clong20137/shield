@@ -884,6 +884,8 @@ export interface DeviceListResponse {
   data: DeviceRecord[];
   total: number;
   statusCounts?: Record<string, number>;
+  typeStatusCounts?: Record<string, Record<string, number>>;
+  modelCounts?: Record<string, number>;
   page: number;
   pageSize: number;
   totalPages: number;
@@ -1428,7 +1430,7 @@ export const errorLogService = {
 };
 
 export const deviceService = {
-  getAll: (params?: { q?: string; type?: string; status?: string; sortKey?: string; page?: number; pageSize?: number }) =>
+  getAll: (params?: { q?: string; type?: string; model?: string; status?: string; sortKey?: string; page?: number; pageSize?: number }) =>
     api.get<DeviceListResponse>('/devices', { params }),
 
   getAssignedToMe: () =>

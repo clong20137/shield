@@ -369,6 +369,7 @@ export class DeviceController {
       const result = await DeviceModel.listDevices(pagination.pageSize, pagination.offset, {
         q: cleanString(req.query.q, 150),
         type: cleanString(req.query.type, 50),
+        model: cleanString(req.query.model, 150),
         status: cleanString(req.query.status, 50),
         sortKey: cleanString(req.query.sortKey, 50),
       });
@@ -376,6 +377,8 @@ export class DeviceController {
         data: result.data,
         total: result.total,
         statusCounts: result.statusCounts,
+        typeStatusCounts: result.typeStatusCounts,
+        modelCounts: result.modelCounts,
         page: pagination.page,
         pageSize: pagination.pageSize,
         totalPages: Math.max(1, Math.ceil(result.total / pagination.pageSize)),

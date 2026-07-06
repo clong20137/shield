@@ -338,13 +338,15 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [isDeviceFormOpen, setIsDeviceFormOpen] = useState(false);
   const [filter, setFilter] = useState<DeviceType | 'All'>('All');
   const [statusFilter, setStatusFilter] = useState<DeviceStatusFilter>('All');
+  const [modelFilter, setModelFilter] = useState('All');
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [totalDevices, setTotalDevices] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [deviceStatusCounts, setDeviceStatusCounts] = useState<Record<string, number>>({});
+  const [deviceTypeStatusCounts, setDeviceTypeStatusCounts] = useState<Record<string, Record<string, number>>>({});
+  const [deviceModelCounts, setDeviceModelCounts] = useState<Record<string, number>>({});
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [pageContextMenu, setPageContextMenu] = useState<AppContextMenuPosition | null>(null);
   const [devicePendingDelete, setDevicePendingDelete] = useState<DeviceRecord | null>(null);
@@ -403,7 +405,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       setDevices([]);
       setTotalDevices(0);
       setTotalPages(1);
-      setDeviceStatusCounts({});
+      setDeviceTypeStatusCounts({});
+      setDeviceModelCounts({});
       setLoading(false);
       return;
     }
@@ -412,7 +415,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       setDevices([]);
       setTotalDevices(0);
       setTotalPages(1);
-      setDeviceStatusCounts({});
+      setDeviceTypeStatusCounts({});
+      setDeviceModelCounts({});
       setLoading(false);
       setError('You do not have permission to manage devices.');
       return;
@@ -430,6 +434,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       const response = await deviceService.getAll({
         q: query.trim() || undefined,
         type: filter === 'All' ? undefined : filter,
+        model: modelFilter === 'All' ? undefined : modelFilter,
         status: statusFilter === 'All' ? undefined : statusFilter,
         sortKey,
         page,
@@ -442,7 +447,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       setDevices(normalizedResponse.data);
       setTotalDevices(normalizedResponse.total);
       setTotalPages(normalizedResponse.totalPages);
-      setDeviceStatusCounts(response.data.statusCounts || {});
+      setDeviceTypeStatusCounts(response.data.typeStatusCounts || {});
+      setDeviceModelCounts(response.data.modelCounts || {});
       if (normalizedResponse.page !== page) {
         setPage(normalizedResponse.page);
       }
@@ -458,7 +464,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         setIsFiltering(false);
       }
     }
-  }, [canManageDevices, currentUser?.id, filter, page, pageSize, query, sortKey, statusFilter]);
+  }, [canManageDevices, currentUser?.id, filter, modelFilter, page, pageSize, query, sortKey, statusFilter]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -602,17 +608,12 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
 
   useEffect(() => {
     setDeviceTableScrollTop(0);
-  }, [page, pageSize, filter, query, sortKey, statusFilter]);
+  }, [page, pageSize, filter, modelFilter, query, sortKey, statusFilter]);
 
-  const statusCounts = useMemo(() => {
-    const orderedFilters: DeviceStatusFilter[] = ['All', 'Assigned', 'Unassigned', 'Available', 'Maintenance', 'Damaged', 'Lost', 'Retired'];
-    const allStatusCount = Object.values(deviceStatusCounts).reduce((total, count) => total + count, 0);
-
-    return orderedFilters.map((status) => ({
-      status,
-      count: status === 'All' ? allStatusCount || totalDevices : deviceStatusCounts[status] || 0,
-    }));
-  }, [deviceStatusCounts, totalDevices]);
+  const modelOptions = useMemo(
+    () => Object.entries(deviceModelCounts).sort(([first], [second]) => first.localeCompare(second)),
+    [deviceModelCounts],
+  );
 
   const filteredRegisteredUsers = useMemo(() => {
     const search = assigneeSearch.trim().toLowerCase();
@@ -1001,7 +1002,15 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const clearDeviceView = () => {
     setFilter('All');
     setStatusFilter('All');
+    setModelFilter('All');
     setQuery('');
+    setSelectedDevices([]);
+    setPage(1);
+  };
+
+  const applyInventoryTreeFilter = (nextType: DeviceType | 'All', nextStatus: DeviceStatusFilter = 'All') => {
+    setFilter(nextType);
+    setStatusFilter(nextStatus);
     setSelectedDevices([]);
     setPage(1);
   };
@@ -1073,10 +1082,11 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       )}
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
-      <DeviceStatusRail
-        statusCounts={statusCounts}
-        statusFilter={statusFilter}
-        setStatusFilter={setStatusFilter}
+      <DeviceInventoryTree
+        typeStatusCounts={deviceTypeStatusCounts}
+        activeType={filter}
+        activeStatus={statusFilter}
+        onSelect={applyInventoryTreeFilter}
       />
       <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
         <div className="mb-5 flex flex-col gap-4">
@@ -1118,7 +1128,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <option key={user.id} value={user.email}>{user.displayName || user.email}</option>
               ))}
             </select>
-            <button type="button" onClick={() => void startCameraScanner()} className="btn-secondary justify-center" aria-label="Scan with camera" title="Scan with Camera">
+            <button type="button" onClick={() => void startCameraScanner()} className="btn-secondary justify-center md:hidden" aria-label="Scan with camera" title="Scan with Camera">
               <Camera size={16} />
               <span>Camera</span>
             </button>
@@ -1156,10 +1166,14 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             </div>
           )}
 
-          <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <select value={filter} onChange={(event) => { setPage(1); setFilter(event.target.value as DeviceType | 'All'); }} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
               <option>All</option>
               {deviceTypes.map((type) => <option key={type}>{type}</option>)}
+            </select>
+            <select value={modelFilter} onChange={(event) => { setPage(1); setModelFilter(event.target.value); }} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
+              <option value="All">All Models</option>
+              {modelOptions.map(([model, count]) => <option key={model} value={model}>{model} ({count})</option>)}
             </select>
             <select value={statusFilter} onChange={(event) => { setPage(1); setStatusFilter(event.target.value as DeviceStatusFilter); }} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
               <option>All</option>
@@ -1524,7 +1538,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           actions={[
             { label: 'Refresh Inventory', icon: RefreshCw, onSelect: () => void loadDevices(false), disabled: !canManageDevices },
             { label: 'Add Device', icon: Plus, onSelect: openAddDeviceModal, disabled: !canManageDevices },
-            { label: 'Scan With Camera', icon: Camera, onSelect: () => void startCameraScanner(), disabled: !canManageDevices },
             { label: 'Export Page', icon: Download, onSelect: exportCsv, disabled: devices.length === 0 },
             { label: 'Export Phones', icon: Smartphone, onSelect: () => void exportPhoneInventory(), disabled: !canManageDevices },
             { label: 'Delete Phones', icon: Trash2, onSelect: () => setIsDeletePhonesConfirmOpen(true), disabled: !canManageDevices },
@@ -1545,14 +1558,16 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function DeviceStatusRail({
-  statusCounts,
-  statusFilter,
-  setStatusFilter,
+function DeviceInventoryTree({
+  typeStatusCounts,
+  activeType,
+  activeStatus,
+  onSelect,
 }: {
-  statusCounts: Array<{ status: DeviceStatusFilter; count: number }>;
-  statusFilter: DeviceStatusFilter;
-  setStatusFilter: (status: DeviceStatusFilter) => void;
+  typeStatusCounts: Record<string, Record<string, number>>;
+  activeType: DeviceType | 'All';
+  activeStatus: DeviceStatusFilter;
+  onSelect: (type: DeviceType | 'All', status?: DeviceStatusFilter) => void;
 }) {
   const getRailIcon = (status: DeviceStatusFilter) => {
     if (status === 'All') return Laptop;
@@ -1566,42 +1581,99 @@ function DeviceStatusRail({
     return deviceStatusMeta[status].cardTone;
   };
 
+  const typeEntries = deviceTypes.map((type) => {
+    const counts = typeStatusCounts[type] || {};
+    const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+    return { type, counts, total };
+  });
+  const allTotal = typeEntries.reduce((sum, item) => sum + item.total, 0);
+
   return (
     <aside className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 xl:sticky xl:top-5 xl:max-h-[calc(100vh-2.5rem)] xl:overflow-y-auto">
       <div className="border-b border-gray-200 px-1 pb-3 dark:border-gray-800">
         <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Device Views</p>
-        <h2 className="mt-1 text-lg font-bold text-gray-900 dark:text-gray-100">Inventory Status</h2>
+        <h2 className="mt-1 text-lg font-bold text-gray-900 dark:text-gray-100">Inventory</h2>
       </div>
 
       <div className="mt-3 space-y-1">
-        {statusCounts.map((item) => {
-          const RailIcon = getRailIcon(item.status);
-          const isActive = statusFilter === item.status;
+        <button
+          type="button"
+          onClick={() => onSelect('All', 'All')}
+          className={`flex w-full items-center gap-3 rounded border px-3 py-2.5 text-left transition hover:border-accent hover:bg-accent/10 ${
+            activeType === 'All' && activeStatus === 'All'
+              ? 'border-accent bg-accent/10 text-accent shadow-sm'
+              : 'border-transparent text-gray-600 dark:text-gray-300'
+          }`}
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-primary-50 text-primary-500 dark:bg-blue-950/40 dark:text-blue-100">
+            <Laptop size={18} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-bold">All Devices</span>
+            <span className="block text-xs font-semibold text-gray-400 dark:text-gray-500">{allTotal} devices</span>
+          </span>
+          <span className="rounded bg-gray-100 px-2 py-1 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">{allTotal}</span>
+        </button>
+
+        {typeEntries.map(({ type, counts, total }) => {
+          const TypeIcon = deviceIconMap[type];
+          const isTypeActive = activeType === type && activeStatus === 'All';
+          const statuses = (['Assigned', 'Unassigned', 'Available', 'Maintenance', 'Damaged', 'Lost', 'Retired'] as DeviceStatusFilter[])
+            .filter((status) => (counts[status] || 0) > 0);
 
           return (
+            <div key={type} className="rounded border border-transparent">
             <button
-              key={item.status}
               type="button"
-              onClick={() => setStatusFilter(item.status)}
+              onClick={() => onSelect(type, 'All')}
               className={`flex w-full items-center gap-3 rounded border px-3 py-2.5 text-left transition hover:border-accent hover:bg-accent/10 ${
-                isActive
+                isTypeActive
                   ? 'border-accent bg-accent/10 text-accent shadow-sm'
                   : 'border-transparent text-gray-600 dark:text-gray-300'
               }`}
             >
-              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded ${getRailTone(item.status)}`}>
-                <RailIcon size={18} />
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                <TypeIcon size={18} />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-bold">{item.status}</span>
+                <span className="block truncate text-sm font-bold">{type}</span>
                 <span className="block text-xs font-semibold text-gray-400 dark:text-gray-500">
-                  {item.count} device{item.count === 1 ? '' : 's'}
+                  {total} device{total === 1 ? '' : 's'}
                 </span>
               </span>
               <span className="rounded bg-gray-100 px-2 py-1 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">
-                {item.count}
+                {total}
               </span>
             </button>
+              {statuses.length > 0 && (
+                <div className="ml-5 mt-1 space-y-1 border-l border-gray-200 pl-3 dark:border-gray-800">
+                  {statuses.map((status) => {
+                    const StatusIcon = getRailIcon(status);
+                    const isActive = activeType === type && activeStatus === status;
+                    const count = counts[status] || 0;
+
+                    return (
+                      <button
+                        key={`${type}-${status}`}
+                        type="button"
+                        onClick={() => onSelect(type, status)}
+                        className={`flex w-full items-center gap-2 rounded border px-2.5 py-2 text-left text-sm transition hover:border-accent hover:bg-accent/10 ${
+                          isActive
+                            ? 'border-accent bg-accent/10 text-accent shadow-sm'
+                            : 'border-transparent text-gray-600 dark:text-gray-300'
+                        }`}
+                      >
+                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded ${getRailTone(status)}`}>
+                          <StatusIcon size={15} />
+                        </span>
+                        <span className="min-w-0 flex-1 truncate font-semibold">{status}</span>
+                        <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </div>

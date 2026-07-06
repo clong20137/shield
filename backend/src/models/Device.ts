@@ -49,6 +49,15 @@ interface DeviceStatusCountRow extends RowDataPacket {
   statusGroup: string;
   total: number;
 }
+interface DeviceTypeStatusCountRow extends RowDataPacket {
+  type: string;
+  statusGroup: string;
+  total: number;
+}
+interface DeviceModelCountRow extends RowDataPacket {
+  makeModel: string;
+  total: number;
+}
 
 export type DeviceInput = Omit<Device, 'id' | 'createdAt' | 'updatedAt'>;
 
@@ -64,6 +73,7 @@ export interface DeviceEventInput {
 export interface DeviceListFilters {
   q?: string;
   type?: string;
+  model?: string;
   status?: string;
   sortKey?: string;
 }
@@ -72,16 +82,28 @@ export interface DeviceListResult {
   data: Device[];
   total: number;
   statusCounts: Record<string, number>;
+  typeStatusCounts: Record<string, Record<string, number>>;
+  modelCounts: Record<string, number>;
 }
 
-function buildDeviceWhere(filters: DeviceListFilters = {}, options: { includeStatus?: boolean } = {}) {
+function buildDeviceWhere(filters: DeviceListFilters = {}, options: { includeType?: boolean; includeModel?: boolean; includeStatus?: boolean } = {}) {
   const where: string[] = [];
   const params: Array<string | number> = [];
   const searchTerm = filters.q?.trim();
 
-  if (filters.type && filters.type !== 'All') {
+  if (options.includeType !== false && filters.type && filters.type !== 'All') {
     where.push('`type` = ?');
     params.push(filters.type);
+  }
+
+  if (options.includeModel !== false && filters.model && filters.model !== 'All') {
+    if (filters.model === 'Unknown') {
+      where.push("COALESCE(NULLIF(`makeModel`, ''), 'Unknown') = ?");
+      params.push('Unknown');
+    } else {
+      where.push('`makeModel` = ?');
+      params.push(filters.model);
+    }
   }
 
   if (options.includeStatus !== false && filters.status && filters.status !== 'All') {
@@ -204,6 +226,8 @@ export class DeviceModel {
     try {
       const { params, whereSql } = buildDeviceWhere(filters);
       const statusWhere = buildDeviceWhere(filters, { includeStatus: false });
+      const treeWhere = buildDeviceWhere(filters, { includeType: false, includeStatus: false });
+      const modelWhere = buildDeviceWhere(filters, { includeModel: false, includeStatus: false });
 
       const sortColumns: Record<string, string> = {
         assetTag: '`assetTag`',
@@ -235,6 +259,28 @@ export class DeviceModel {
         GROUP BY 1`,
         statusWhere.params,
       );
+      const [typeStatusRows] = await conn.query<DeviceTypeStatusCountRow[]>(
+        `SELECT
+          \`type\`,
+          CASE
+            WHEN COALESCE(\`assignedTo\`, '') = '' THEN 'Unassigned'
+            ELSE \`status\`
+          END as \`statusGroup\`,
+          COUNT(*) as total
+        FROM devices
+        ${treeWhere.whereSql}
+        GROUP BY \`type\`, 2
+        ORDER BY \`type\`, 2`,
+        treeWhere.params,
+      );
+      const [modelRows] = await conn.query<DeviceModelCountRow[]>(
+        `SELECT COALESCE(NULLIF(\`makeModel\`, ''), 'Unknown') as \`makeModel\`, COUNT(*) as total
+        FROM devices
+        ${modelWhere.whereSql}
+        GROUP BY 1
+        ORDER BY \`makeModel\``,
+        modelWhere.params,
+      );
       const [rows] = await conn.query<DeviceRow[]>(
         `SELECT ${deviceColumns}
         FROM devices
@@ -249,6 +295,17 @@ export class DeviceModel {
         total: Number(countRows[0]?.total || 0),
         statusCounts: statusRows.reduce<Record<string, number>>((counts, row) => {
           counts[row.statusGroup || 'Unassigned'] = Number(row.total || 0);
+          return counts;
+        }, {}),
+        typeStatusCounts: typeStatusRows.reduce<Record<string, Record<string, number>>>((counts, row) => {
+          const type = row.type || 'Other';
+          counts[type] = counts[type] || {};
+          counts[type][row.statusGroup || 'Unassigned'] = Number(row.total || 0);
+          return counts;
+        }, {}),
+        modelCounts: modelRows.reduce<Record<string, number>>((counts, row) => {
+          const makeModel = row.makeModel || 'Unknown';
+          counts[makeModel] = Number(row.total || 0);
           return counts;
         }, {}),
       };

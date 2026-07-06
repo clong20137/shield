@@ -3219,6 +3219,7 @@ function App() {
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const rateLimitToastRef = useRef(0);
+  const desktopUpdateToastRef = useRef<Record<string, number>>({});
   const desktopUpdateCheckIsManualRef = useRef(false);
   const desktopUpdateCheckedAccountRef = useRef<string | null>(null);
   const initialLoadingRef = useRef(true);
@@ -3605,6 +3606,17 @@ function App() {
     }, 4500);
   };
 
+  const showDesktopUpdateToast = (key: string, type: ToastType, message: string, ttlMs = 30000) => {
+    const now = Date.now();
+    const lastShownAt = desktopUpdateToastRef.current[key] || 0;
+    if (now - lastShownAt < ttlMs) {
+      return;
+    }
+
+    desktopUpdateToastRef.current[key] = now;
+    showToast(type, message, { saveToNotifications: false });
+  };
+
   useEffect(() => {
     initialLoadingRef.current = isSetupLoading || isSessionLoading;
   }, [isSessionLoading, isSetupLoading]);
@@ -3645,33 +3657,38 @@ function App() {
       if (status.type === 'available') {
         setDesktopPreferences((preferences) => preferences ? { ...preferences, updateDownloaded: false } : preferences);
         setIsDesktopUpdatePromptOpen(true);
-        showToast('info', status.version ? `${appName} desktop update ${status.version} is downloading.` : `A ${appName} desktop update is downloading.`, { saveToNotifications: false });
+        showDesktopUpdateToast(
+          `available:${status.version || 'unknown'}`,
+          'info',
+          status.version ? `${appName} desktop update ${status.version} is downloading.` : `A ${appName} desktop update is downloading.`,
+          60000,
+        );
         desktopUpdateCheckIsManualRef.current = false;
       }
 
       if (status.type === 'downloaded') {
         setDesktopPreferences((preferences) => preferences ? { ...preferences, updateDownloaded: true } : preferences);
         setIsDesktopUpdatePromptOpen(true);
-        showToast('success', `${appName} desktop update downloaded. ${appName} will restart automatically.`, { saveToNotifications: false });
+        showDesktopUpdateToast(`downloaded:${status.version || 'unknown'}`, 'success', `${appName} desktop update downloaded. ${appName} will restart automatically.`, 60000);
         desktopUpdateCheckIsManualRef.current = false;
       }
 
       if (status.type === 'restarting') {
         setIsDesktopStartupUpdateBlocking(true);
         setIsDesktopUpdatePromptOpen(true);
-        showToast('info', `Restarting ${appName} to install the desktop update...`, { saveToNotifications: false });
+        showDesktopUpdateToast('restarting', 'info', `Restarting ${appName} to install the desktop update...`);
       }
 
       if (status.type === 'not-available') {
         if (desktopUpdateCheckIsManualRef.current) {
-          showToast('success', `${appName} desktop is up to date.`, { saveToNotifications: false });
+          showDesktopUpdateToast('manual-not-available', 'success', `${appName} desktop is up to date.`, 5000);
         }
       }
 
       if (status.type === 'error') {
         console.error('Desktop update error:', status.message);
         if (desktopUpdateCheckIsManualRef.current) {
-          showToast('error', `Failed to check for ${appName} desktop updates.`, { saveToNotifications: false });
+          showDesktopUpdateToast(`manual-error:${status.message || 'unknown'}`, 'error', `Failed to check for ${appName} desktop updates.`, 5000);
         }
       }
 
@@ -3688,7 +3705,7 @@ function App() {
 
     return window.shieldDesktop?.onWebAppUpdateStatus?.((status) => {
       if (status.type === 'reloading') {
-        showToast('info', `${appName} is updating. The app will refresh in a moment.`, { saveToNotifications: false });
+        showDesktopUpdateToast('webapp-reloading', 'info', `${appName} is updating. The app will refresh in a moment.`);
       }
     });
   }, []);
@@ -3829,14 +3846,14 @@ function App() {
       const result = await window.shieldDesktop?.checkForUpdates?.();
       if (result && !result.ok) {
         desktopUpdateCheckIsManualRef.current = false;
-        showToast('error', result.message || 'Desktop update check is not available.', { saveToNotifications: false });
+        showDesktopUpdateToast(`manual-result-error:${result.message || 'unavailable'}`, 'error', result.message || 'Desktop update check is not available.', 5000);
         return;
       }
-      showToast('info', `Checking for ${appName} desktop updates...`, { saveToNotifications: false });
+      showDesktopUpdateToast('manual-checking', 'info', `Checking for ${appName} desktop updates...`, 5000);
     } catch (error) {
       desktopUpdateCheckIsManualRef.current = false;
       console.error('Failed to check for desktop updates:', error);
-      showToast('error', 'Failed to check for desktop updates.', { saveToNotifications: false });
+      showDesktopUpdateToast('manual-check-failed', 'error', 'Failed to check for desktop updates.', 5000);
     }
   };
 
