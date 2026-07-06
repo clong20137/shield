@@ -512,7 +512,9 @@ export class DeviceController {
         }
       }
 
-      changedDeviceIds.forEach((id) => broadcastAppEvent({ type: 'device-updated', entityId: id }));
+      if (changedDeviceIds.size > 0) {
+        broadcastAppEvent({ type: 'device-updated', entityId: 'phone-import' });
+      }
       res.json(summary);
     } catch (error) {
       if (isDuplicateAssetTagError(error)) {

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, Save, Search, Table, Trash2, X } from 'lucide-react';
+import { BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, LineChart as LineChartIcon, Save, Search, Table, Trash2, X } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -157,6 +157,7 @@ type DailyExportFormat = 'csv' | 'pdf' | 'xls';
 type DailyAnalyticsExportFormat = 'csv' | 'pdf' | 'png';
 type DailyAnalyticsRange = '1d' | '7d' | '1m' | '3m' | '6m' | '1y' | 'custom';
 type DailyGraphType = 'line' | 'bar';
+type DeviceReportGraphType = 'bar' | 'line';
 type DailyCompareMode = 'none' | 'user' | 'district';
 type ReportType = 'trooper-daily' | 'cpar' | 'devices';
 type TrooperDailyTab = 'graph' | 'table' | 'exports';
@@ -198,6 +199,11 @@ const dailyAnalyticsRanges: Array<{ value: DailyAnalyticsRange; label: string }>
 const dailyGraphTypes: Array<{ value: DailyGraphType; label: string }> = [
   { value: 'line', label: 'Line' },
   { value: 'bar', label: 'Bar' },
+];
+
+const deviceReportGraphTypes: Array<{ value: DeviceReportGraphType; label: string; icon: typeof BarChart3 }> = [
+  { value: 'bar', label: 'Bar', icon: BarChart3 },
+  { value: 'line', label: 'Line', icon: LineChartIcon },
 ];
 
 const compareSeriesColors = [
@@ -553,7 +559,8 @@ const DeviceReportBarChart: React.FC<{
   title: string;
   data: DeviceReportGroup[];
   color?: string;
-}> = ({ title, data, color = '#1a365d' }) => {
+  graphType?: DeviceReportGraphType;
+}> = ({ title, data, color = '#1a365d', graphType = 'bar' }) => {
   const chartData = data.map((item) => ({ ...item, displayLabel: formatAnalyticsLabel(item.label) }));
   const total = data.reduce((sum, item) => sum + item.count, 0);
 
@@ -567,13 +574,23 @@ const DeviceReportBarChart: React.FC<{
         <div className="empty-state rounded border border-dashed border-gray-300 py-8 text-sm dark:border-gray-700">No device data available.</div>
       ) : (
         <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={chartData} margin={{ top: 8, right: 10, bottom: 44, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.25)" />
-            <XAxis dataKey="displayLabel" interval={0} angle={-28} textAnchor="end" height={64} tick={{ fontSize: 11, fontWeight: 700 }} tickLine={false} axisLine={false} />
-            <YAxis allowDecimals={false} tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={44} />
-            <Tooltip formatter={(value) => [formatMetric(Number(value)), 'Devices']} />
-            <Bar dataKey="count" fill={color} radius={[6, 6, 0, 0]} />
-          </BarChart>
+          {graphType === 'line' ? (
+            <LineChart data={chartData} margin={{ top: 8, right: 14, bottom: 44, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.25)" />
+              <XAxis dataKey="displayLabel" interval={0} angle={-28} textAnchor="end" height={64} tick={{ fontSize: 11, fontWeight: 700 }} tickLine={false} axisLine={false} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={44} />
+              <Tooltip formatter={(value) => [formatMetric(Number(value)), 'Devices']} />
+              <Line type="monotone" dataKey="count" stroke={color} strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#ffffff' }} activeDot={{ r: 7, strokeWidth: 2 }} />
+            </LineChart>
+          ) : (
+            <BarChart data={chartData} margin={{ top: 8, right: 10, bottom: 44, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.25)" />
+              <XAxis dataKey="displayLabel" interval={0} angle={-28} textAnchor="end" height={64} tick={{ fontSize: 11, fontWeight: 700 }} tickLine={false} axisLine={false} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={44} />
+              <Tooltip formatter={(value) => [formatMetric(Number(value)), 'Devices']} />
+              <Bar dataKey="count" fill={color} radius={[6, 6, 0, 0]} />
+            </BarChart>
+          )}
         </ResponsiveContainer>
       )}
     </section>
@@ -591,6 +608,7 @@ const ReportsPage: React.FC<{
   const [deviceReport, setDeviceReport] = useState<DeviceManagementReportResponse | null>(null);
   const [deviceReportLoading, setDeviceReportLoading] = useState(false);
   const [deviceReportError, setDeviceReportError] = useState<string | null>(null);
+  const [deviceReportGraphType, setDeviceReportGraphType] = useState<DeviceReportGraphType>('bar');
   const [trooperDailies, setTrooperDailies] = useState<TrooperDailyReportEntry[]>([]);
   const [dailySearch, setDailySearch] = useState('');
   const [dailyFrom, setDailyFrom] = useState('');
@@ -1987,6 +2005,25 @@ const ReportsPage: React.FC<{
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <div className="flex overflow-hidden rounded border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-950" role="group" aria-label="Device report graph type">
+                {deviceReportGraphTypes.map(({ value, label, icon: Icon }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setDeviceReportGraphType(value)}
+                    className={`flex h-9 items-center gap-1.5 px-3 text-xs font-black uppercase transition ${
+                      deviceReportGraphType === value
+                        ? 'bg-primary-500 text-white'
+                        : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                    }`}
+                    aria-pressed={deviceReportGraphType === value}
+                    title={`${label} graph`}
+                  >
+                    <Icon size={15} />
+                    {label}
+                  </button>
+                ))}
+              </div>
               {deviceReportLoading && (
                 <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold uppercase text-accent">Updating</span>
               )}
@@ -2025,12 +2062,12 @@ const ReportsPage: React.FC<{
               </div>
 
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <DeviceReportBarChart title="Devices by Type" data={deviceReport.byType} color="#1a365d" />
-                <DeviceReportBarChart title="Devices by Status" data={deviceReport.byStatus} color="#9C865C" />
-                <DeviceReportBarChart title="Devices by Carrier" data={deviceReport.byCarrier} color="#2563eb" />
-                <DeviceReportBarChart title="Devices by Condition" data={deviceReport.byCondition} color="#059669" />
+                <DeviceReportBarChart title="Devices by Type" data={deviceReport.byType} color="#1a365d" graphType={deviceReportGraphType} />
+                <DeviceReportBarChart title="Devices by Status" data={deviceReport.byStatus} color="#9C865C" graphType={deviceReportGraphType} />
+                <DeviceReportBarChart title="Devices by Carrier" data={deviceReport.byCarrier} color="#2563eb" graphType={deviceReportGraphType} />
+                <DeviceReportBarChart title="Devices by Condition" data={deviceReport.byCondition} color="#059669" graphType={deviceReportGraphType} />
                 <div className="xl:col-span-2">
-                  <DeviceReportBarChart title="Top Models" data={deviceReport.byModel} color="#7c3aed" />
+                  <DeviceReportBarChart title="Top Models" data={deviceReport.byModel} color="#7c3aed" graphType={deviceReportGraphType} />
                 </div>
               </div>
             </>

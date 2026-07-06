@@ -36,7 +36,8 @@ const deviceConditions = ['Excellent', 'Good', 'Fair', 'Poor', 'Damaged'];
 const DEVICE_TABLE_ROW_HEIGHT = 64;
 const DEVICE_TABLE_OVERSCAN = 8;
 const DEVICE_TABLE_MAX_HEIGHT = 620;
-const PHONE_IMPORT_BATCH_SIZE = 100;
+const PHONE_IMPORT_BATCH_SIZE = 500;
+const PHONE_IMPORT_BATCH_PAUSE_MS = 150;
 
 const defaultDeviceForm: DeviceForm = {
   type: 'Cell Phone',
@@ -211,6 +212,12 @@ function parseCsvRows(text: string): Record<string, string>[] {
       row[header] = values[index] || '';
       return row;
     }, {});
+  });
+}
+
+function waitForPhoneImportPause() {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, PHONE_IMPORT_BATCH_PAUSE_MS);
   });
 }
 
@@ -988,6 +995,10 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           currentBatch: batchIndex + 1,
           totalBatches,
         });
+
+        if (batchIndex < totalBatches - 1) {
+          await waitForPhoneImportPause();
+        }
       }
 
       setPhoneImportSummary({
