@@ -596,8 +596,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       return;
     }
 
-    if (!form.assetTag.trim() || !form.makeModel.trim()) {
-      setError('Enter an asset tag and make/model before saving.');
+    if ((form.type !== 'Cell Phone' && !form.assetTag.trim()) || !form.makeModel.trim()) {
+      setError(form.type === 'Cell Phone' ? 'Enter a make/model before saving.' : 'Enter an asset tag and make/model before saving.');
       return;
     }
 
@@ -773,7 +773,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       setPhoneImportSummary(null);
       setIsDeletePhonesConfirmOpen(false);
       await loadDevices(false);
-      setDeviceNotice(`Deleted ${response.data.deletedCount} phone records.`);
+      setDeviceNotice(`Deleted ${response.data.deletedCount} phone and Cradlepoint records.`);
     } catch (err) {
       console.error('Failed to delete phone inventory:', err);
       setError('Failed to delete phone inventory.');
@@ -1306,7 +1306,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           {canManageDevices && (
             <button type="button" onClick={() => setIsDeletePhonesConfirmOpen(true)} className="btn-danger" title="Delete all phones" aria-label="Delete all phones">
               <Trash2 size={16} />
-              <span>Delete All Phones</span>
+              <span>Delete Phones</span>
             </button>
           )}
           {canManageDevices && (
@@ -1373,7 +1373,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                     {deviceTypes.map((type) => <option key={type}>{type}</option>)}
                   </select>
                 </Field>
-                <TextField label="Asset Tag" value={form.assetTag} required onChange={(value) => setForm((current) => ({ ...current, assetTag: value }))} />
+                {form.type !== 'Cell Phone' && <TextField label="Asset Tag" value={form.assetTag} required onChange={(value) => setForm((current) => ({ ...current, assetTag: value }))} />}
                 <TextField label="Make / Model" value={form.makeModel} required onChange={(value) => setForm((current) => ({ ...current, makeModel: value }))} />
                 <TextField label="Serial Number" value={form.serialNumber} onChange={(value) => setForm((current) => ({ ...current, serialNumber: value }))} />
                 <Field label="Assigned To">
@@ -1447,24 +1447,25 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           </div>
         </div>
       )}
-      {isDeletePhonesConfirmOpen && (
-        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/45">
-          <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete All Phones</h2>
+      {isDeletePhonesConfirmOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/45 px-4 pt-[12dvh]">
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Phones</h2>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Delete every Cell Phone device record? Radios, computers, MiFis, and Cradlepoints will stay untouched.
+              Delete every Cell Phone and Cradlepoint device record? Radios, computers, and MiFis will stay untouched.
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setIsDeletePhonesConfirmOpen(false)} className="btn-secondary" aria-label="Cancel phone deletion" title="Cancel">
                 <span>Cancel</span>
               </button>
-              <button type="button" onClick={() => void deleteAllPhones()} className="btn-danger" aria-label="Delete all phones" title="Delete All Phones">
+              <button type="button" onClick={() => void deleteAllPhones()} className="btn-danger" aria-label="Delete phones" title="Delete Phones">
                 <Trash2 size={16} />
                 <span>Delete All</span>
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
       {pageContextMenu && (
         <AppContextMenu
@@ -1476,7 +1477,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             { label: 'Scan With Camera', icon: Camera, onSelect: () => void startCameraScanner(), disabled: !canManageDevices },
             { label: 'Export Page', icon: Download, onSelect: exportCsv, disabled: devices.length === 0 },
             { label: 'Export Phones', icon: Smartphone, onSelect: () => void exportPhoneInventory(), disabled: !canManageDevices },
-            { label: 'Delete All Phones', icon: Trash2, onSelect: () => setIsDeletePhonesConfirmOpen(true), disabled: !canManageDevices },
+            { label: 'Delete Phones', icon: Trash2, onSelect: () => setIsDeletePhonesConfirmOpen(true), disabled: !canManageDevices },
             { label: 'Clear Filters', icon: X, onSelect: clearDeviceView },
           ]}
         />

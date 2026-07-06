@@ -143,7 +143,7 @@ export class DeviceModel {
   static async deletePhoneDevices(): Promise<number> {
     const conn = await pool.getConnection();
     try {
-      const [result] = await conn.query<ResultSetHeader>('DELETE FROM devices WHERE `type` = ?', ['Cell Phone']);
+      const [result] = await conn.query<ResultSetHeader>('DELETE FROM devices WHERE `type` IN (?, ?)', ['Cell Phone', 'Cradlepoint']);
       return result.affectedRows;
     } finally {
       conn.release();

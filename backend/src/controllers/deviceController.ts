@@ -157,6 +157,10 @@ function buildDeviceMatchKey(device: Device): string[] {
 
 function cleanPhoneModelName(value: string): string {
   const normalizedValue = value.replace(/\s+/gu, ' ').trim();
+  if (/cradlepoint/iu.test(normalizedValue)) {
+    return 'Cradlepoint';
+  }
+
   const iphoneMatch = normalizedValue.match(/\bi\s*phone\s*(\d{1,2})(?:\s*(pro\s*max|pro|plus|mini))?/iu);
 
   if (iphoneMatch) {
@@ -169,6 +173,27 @@ function cleanPhoneModelName(value: string): string {
   return normalizedValue || 'Agency Phone';
 }
 
+function getGeneratedAssetTag(type: string, phoneNumber: string, imei: string, simNumber: string, rowNumber?: number): string {
+  const prefix = type === 'Cradlepoint' ? 'CRADLEPOINT' : type === 'Cell Phone' ? 'PHONE' : normalizeLooseKey(type).toUpperCase() || 'DEVICE';
+  const phoneDigits = normalizeDigits(phoneNumber);
+  const imeiKey = normalizeLooseKey(imei);
+  const simKey = normalizeLooseKey(simNumber);
+
+  if (phoneDigits) {
+    return `${prefix}-${phoneDigits}`;
+  }
+
+  if (imeiKey) {
+    return `${prefix}-IMEI-${imeiKey.slice(-6)}`;
+  }
+
+  if (simKey) {
+    return `${prefix}-ICCID-${simKey.slice(-6)}`;
+  }
+
+  return `${prefix}-IMPORT-${rowNumber || Date.now()}`;
+}
+
 function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNumber: number): DeviceInput {
   const phoneNumber = normalizePhone(getImportValue(row, ['phoneNumber', 'phone number', 'wirelessNumber', 'wireless number', 'line', 'mobile']));
   const imei = getImportValue(row, ['currentDeviceId4gOnly', 'current device id 4g only', 'current device id - 4g only', 'current device id', 'imei', 'imei1', 'imei 1']);
@@ -176,15 +201,14 @@ function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNu
   const condition = getImportValue(row, ['condition']);
   const isNewUser = isNewUserImportRow(row);
   const importedModel = getImportValue(row, ['deviceModel', 'device model', 'deviceModal', 'device modal', 'makeModel', 'make model', 'model', 'device', 'description']);
-  const assetTag = getImportValue(row, ['assetTag', 'asset tag', 'deviceId', 'device id', 'inventoryId', 'inventory id'])
-    || (phoneNumber ? `PHONE-${normalizeDigits(phoneNumber).slice(-4)}` : '')
-    || (imei ? `IMEI-${normalizeLooseKey(imei).slice(-6)}` : '')
-    || `PHONE-IMPORT-${rowNumber}`;
+  const makeModel = cleanPhoneModelName(importedModel);
+  const type = /cradlepoint/iu.test(importedModel) || makeModel === 'Cradlepoint' ? 'Cradlepoint' : 'Cell Phone';
+  const assetTag = getGeneratedAssetTag(type, phoneNumber, imei, simNumber, rowNumber);
 
   return {
-    type: 'Cell Phone',
+    type,
     assetTag,
-    makeModel: cleanPhoneModelName(importedModel),
+    makeModel,
     serialNumber: getImportValue(row, ['serialNumber', 'serial number', 'serial']),
     assignedTo,
     status: assignedTo ? 'Assigned' : 'Available',
@@ -207,11 +231,13 @@ function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNu
 
 function validateDevicePayload(body: Record<string, unknown>) {
   const type = cleanString(body.type, 50);
-  const assetTag = cleanString(body.assetTag, 100);
+  const phoneNumber = normalizePhone(body.phoneNumber);
+  const imei = cleanString(body.imei, 100);
+  const simNumber = cleanString(body.simNumber, 100);
+  const assetTag = cleanString(body.assetTag, 100) || (type === 'Cell Phone' ? getGeneratedAssetTag(type, phoneNumber, imei, simNumber) : '');
   const makeModel = cleanString(body.makeModel, 150);
   const status = cleanString(body.status, 50) || 'Available';
   const condition = cleanString(body.condition, 50) || 'Good';
-  const phoneNumber = normalizePhone(body.phoneNumber);
   const dateFields = ['warrantyExpiration', 'replacementDueDate', 'maintenanceDueDate', 'lastServiceDate', 'purchaseDate'] as const;
   const dates = Object.fromEntries(dateFields.map((field) => [field, cleanString(body[field], 20)])) as Record<typeof dateFields[number], string>;
 
@@ -252,8 +278,8 @@ function validateDevicePayload(body: Record<string, unknown>) {
       location: cleanString(body.location, 150),
       notes: cleanMultiline(body.notes, 5000),
       phoneNumber,
-      imei: cleanString(body.imei, 100),
-      simNumber: cleanString(body.simNumber, 100),
+      imei,
+      simNumber,
       radioId: cleanString(body.radioId, 100),
       hostname: cleanString(body.hostname, 150),
       routerId: cleanString(body.routerId, 150),
