@@ -1337,19 +1337,19 @@ function SidebarLink({ to, label, compact, icon: Icon }: SidebarLinkProps) {
 }
 
 interface MobileNavigationProps {
-  isAdministrator: boolean;
+  canManageDevices: boolean;
   unreadMessages: number;
   showCalendar: boolean;
 }
 
 function MobileNavigation({
-  isAdministrator,
+  canManageDevices,
   unreadMessages,
   showCalendar,
 }: MobileNavigationProps) {
   const navItems = [
     { to: '/', label: 'Home', icon: LayoutDashboard },
-    isAdministrator
+    canManageDevices
       ? { to: '/devices', label: 'Devices', icon: Laptop }
       : { to: '/search', label: 'Search', icon: Search },
     { to: '/reports', label: 'Reports', icon: BarChart3 },
@@ -4972,6 +4972,7 @@ function App() {
     isAdministrator ||
     hasPermission('admin:access')
   ));
+  const canManageDevices = hasPermission('devices:manage');
   const getDefaultAdminConsoleTab = (): AdminConsoleTab => {
     if (hasPermission('admin:general') && hasPermission('roles:manage')) return 'general';
     if (hasPermission('admin:permissions') && hasPermission('roles:manage')) return 'permissions';
@@ -6164,7 +6165,7 @@ function App() {
 
             <nav data-onboarding-target="navigation" className="flex shrink-0 flex-col gap-1.5 px-3 py-2">
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
-              {isAdministrator && <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />}
+              {canManageDevices && <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />}
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
             </nav>
 
@@ -6405,7 +6406,7 @@ function App() {
             </main>
           </div>
           <MobileNavigation
-            isAdministrator={isAdministrator}
+            canManageDevices={canManageDevices}
             unreadMessages={messageUnreadCount}
             showCalendar={showCalendar}
           />

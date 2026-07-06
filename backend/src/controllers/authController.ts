@@ -10,7 +10,7 @@ import { AuthSessionModel } from '../models/AuthSession';
 import { AuditLogModel } from '../models/AuditLog';
 import { SystemSettingModel } from '../models/SystemSetting';
 import { AUTH_SESSION_COOKIE_NAME, getSessionAccount, getSessionToken } from '../middleware/authSession';
-import { broadcastAppEvent } from '../services/appEvents';
+import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents';
 import { broadcastMessageEventToAll } from '../services/messageEvents';
 import { sendEmail } from '../services/emailService';
 import { cleanMultiline, cleanString, isOneOf, isStrongPassword, isValidEmail, normalizeEmail, strongPasswordMessage } from '../utils/validation';
@@ -1897,6 +1897,8 @@ export class AuthController {
 
       broadcastAppEvent({ type: 'permission-updated', entityId: accountId });
       broadcastAppEvent({ type: 'user-updated', entityId: accountId });
+      broadcastAccountEvent(accountId, { type: 'permission-updated', entityId: accountId });
+      broadcastAccountEvent(accountId, { type: 'user-updated', entityId: accountId });
       await AuditLogModel.create({
         actorId: requester?.id || null,
         actorName: requester?.displayName || requester?.email || null,
