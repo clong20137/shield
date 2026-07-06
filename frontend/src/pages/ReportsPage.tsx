@@ -2171,16 +2171,24 @@ const ReportsPage: React.FC<{
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={deviceReportDimension}
-                onChange={(event) => setDeviceReportDimension(event.target.value as DeviceReportDimension)}
-                className="h-9 rounded border border-gray-300 bg-white px-3 text-sm font-bold dark:border-gray-700 dark:bg-gray-950"
-                aria-label="Device report view"
-              >
+              <div className="flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-gray-950" role="tablist" aria-label="Device report view">
                 {deviceReportDimensions.map((dimension) => (
-                  <option key={dimension.value} value={dimension.value}>{dimension.label}</option>
+                  <button
+                    key={dimension.value}
+                    type="button"
+                    onClick={() => setDeviceReportDimension(dimension.value)}
+                    className={`rounded px-3 py-1.5 text-xs font-black uppercase tracking-wide transition ${
+                      deviceReportDimension === dimension.value
+                        ? 'bg-primary-500 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-white hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-gray-100'
+                    }`}
+                    role="tab"
+                    aria-selected={deviceReportDimension === dimension.value}
+                  >
+                    {dimension.label}
+                  </button>
                 ))}
-              </select>
+              </div>
               {deviceReportLoading && (
                 <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold uppercase text-accent">Updating</span>
               )}
