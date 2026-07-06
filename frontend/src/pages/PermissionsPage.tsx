@@ -63,6 +63,13 @@ const permissionGroups = [
     ],
   },
   {
+    title: 'Fleet',
+    description: 'Fleet app booking visibility and appointment management.',
+    permissions: [
+      { key: 'fleet:bookings:manage', label: 'View and manage Fleet booking calendar' },
+    ],
+  },
+  {
     title: 'Reports & Reviews',
     description: 'Submitted reports, CPAR workflows, and review access.',
     permissions: [
