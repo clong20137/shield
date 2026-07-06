@@ -60,6 +60,11 @@ function getImportValue(row: PhoneImportRow, aliases: string[]): string {
   return cleanString(entry?.[1], 500);
 }
 
+function isNewUserImportRow(row: PhoneImportRow): boolean {
+  const rawAssignedTo = getImportValue(row, ['assignedTo', 'assigned to', 'userName', 'user name', 'name', 'employeeName', 'employee name', 'user']);
+  return normalizeLooseKey(rawAssignedTo) === 'newuser';
+}
+
 function getDisplayName(user: User): string {
   return `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || user.id;
 }
@@ -84,6 +89,7 @@ function buildUserMatcher(users: User[]): Map<string, string> {
     addKey(fullName, true);
     addKey(lastFirst, true);
     addKey(user.peNumber, true);
+    addKey(normalizeLooseKey(user.peNumber).replace(/^pe/u, '').replace(/^0+/u, ''), true);
     addKey(user.badgeNumber, true);
     addKey(user.radioNumber, true);
 
@@ -102,6 +108,8 @@ function resolveAssignedTo(row: PhoneImportRow, matcher: Map<string, string>): {
   const identity = getImportValue(row, [
     'assignedTo',
     'assigned to',
+    'userName',
+    'user name',
     'name',
     'employeeName',
     'employee name',
@@ -115,6 +123,11 @@ function resolveAssignedTo(row: PhoneImportRow, matcher: Map<string, string>): {
     'radio',
   ]);
   const number = getImportValue(row, ['phoneNumber', 'phone number', 'wirelessNumber', 'wireless number', 'line', 'mobile']);
+
+  if (isNewUserImportRow(row)) {
+    return { assignedTo: '', matched: false };
+  }
+
   const candidates = [
     normalizeKey(identity),
     normalizeLooseKey(identity),
@@ -144,9 +157,10 @@ function buildDeviceMatchKey(device: Device): string[] {
 
 function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNumber: number): DeviceInput {
   const phoneNumber = normalizePhone(getImportValue(row, ['phoneNumber', 'phone number', 'wirelessNumber', 'wireless number', 'line', 'mobile']));
-  const imei = getImportValue(row, ['imei', 'imei1', 'imei 1']);
-  const simNumber = getImportValue(row, ['iccid', 'simNumber', 'sim number', 'sim', 'eid']);
+  const imei = getImportValue(row, ['imei', 'imei1', 'imei 1', 'sim']);
+  const simNumber = getImportValue(row, ['iccid', 'simNumber', 'sim number', 'eid']);
   const condition = getImportValue(row, ['condition']);
+  const isNewUser = isNewUserImportRow(row);
   const assetTag = getImportValue(row, ['assetTag', 'asset tag', 'deviceId', 'device id', 'inventoryId', 'inventory id'])
     || (phoneNumber ? `PHONE-${normalizeDigits(phoneNumber).slice(-4)}` : '')
     || (imei ? `IMEI-${normalizeLooseKey(imei).slice(-6)}` : '')
@@ -160,7 +174,7 @@ function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNu
     assignedTo,
     status: assignedTo ? 'Assigned' : 'Available',
     location: getImportValue(row, ['location', 'site', 'district']),
-    notes: getImportValue(row, ['notes', 'note']),
+    notes: isNewUser ? [getImportValue(row, ['notes', 'note']), 'Phone import marked this line as NEW USER.'].filter(Boolean).join('\n') : getImportValue(row, ['notes', 'note']),
     phoneNumber,
     imei,
     simNumber,
@@ -373,6 +387,8 @@ export class DeviceController {
 
         if (assignment.matched) {
           summary.matchedCount += 1;
+        } else if (isNewUserImportRow(row)) {
+          summary.unmatchedRows.push({ rowNumber, reason: 'Marked NEW USER in import and left unassigned for review', row });
         } else if (assignment.assignedTo) {
           summary.unmatchedRows.push({ rowNumber, reason: 'Could not match assignment to a SHIELD user', row });
         }
