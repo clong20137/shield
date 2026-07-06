@@ -5,12 +5,14 @@ import helmet from 'helmet';
 import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
+import zlib from 'zlib';
 import { initializeDatabase } from './config/initializeDatabase';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
 import reportRoutes from './routes/reportRoutes';
 import calendarRoutes from './routes/calendarRoutes';
 import deviceRoutes from './routes/deviceRoutes';
+import { resumePhoneImportJobs } from './controllers/deviceController';
 import messageRoutes from './routes/messageRoutes';
 import auditRoutes from './routes/auditRoutes';
 import errorLogRoutes from './routes/errorLogRoutes';
@@ -54,6 +56,8 @@ const apiRateLimitMax = Number(process.env.API_RATE_LIMIT_MAX || 3600);
 const apiRequestTimeoutMs = Number(process.env.API_REQUEST_TIMEOUT_MS || 30 * 1000);
 const isProduction = process.env.NODE_ENV === 'production';
 const thumbnailGenerationPromises = new Map<string, Promise<string | null>>();
+const COMPRESSIBLE_CONTENT_TYPES = ['application/json', 'application/javascript', 'text/', 'image/svg+xml'];
+const MIN_COMPRESS_BYTES = 1024;
 
 function getCspOrigins(): string[] {
   const configuredApiUrl = process.env.VITE_API_URL || process.env.API_BASE_URL || '';
@@ -137,6 +141,88 @@ async function generateMissingUploadThumbnail(req: Request, res: Response, next:
   return next();
 }
 
+function shouldTryCompress(req: Request, res: Response): boolean {
+  if (req.method === 'HEAD' || req.path.includes('/events') || req.path.startsWith('/uploads') || req.path.startsWith('/api/uploads')) {
+    return false;
+  }
+
+  if (res.getHeader('Content-Encoding')) {
+    return false;
+  }
+
+  const acceptedEncoding = req.get('accept-encoding') || '';
+  return /\bbr\b|\bgzip\b/u.test(acceptedEncoding);
+}
+
+function getCompressionEncoding(req: Request): 'br' | 'gzip' | null {
+  const acceptedEncoding = req.get('accept-encoding') || '';
+  if (/\bbr\b/u.test(acceptedEncoding)) return 'br';
+  if (/\bgzip\b/u.test(acceptedEncoding)) return 'gzip';
+  return null;
+}
+
+function isCompressibleResponse(res: Response, bodyLength: number): boolean {
+  if (bodyLength < MIN_COMPRESS_BYTES || res.statusCode < 200 || [204, 304].includes(res.statusCode)) {
+    return false;
+  }
+
+  const contentType = String(res.getHeader('Content-Type') || '').toLowerCase();
+  return COMPRESSIBLE_CONTENT_TYPES.some((item) => contentType.includes(item));
+}
+
+function compressionMiddleware(req: Request, res: Response, next: express.NextFunction) {
+  if (!shouldTryCompress(req, res)) {
+    return next();
+  }
+
+  const chunks: Buffer[] = [];
+  const originalWrite = res.write.bind(res);
+  const originalEnd = res.end.bind(res);
+
+  res.write = ((chunk: unknown, encoding?: BufferEncoding | ((error?: Error) => void), callback?: (error?: Error) => void) => {
+    if (chunk) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), typeof encoding === 'string' ? encoding : undefined));
+    }
+    if (typeof encoding === 'function') {
+      encoding();
+    } else {
+      callback?.();
+    }
+    return true;
+  }) as typeof res.write;
+
+  res.end = ((chunk?: unknown, encoding?: BufferEncoding | (() => void), callback?: () => void) => {
+    if (chunk) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), typeof encoding === 'string' ? encoding : undefined));
+    }
+
+    const body = Buffer.concat(chunks);
+    const done = typeof encoding === 'function' ? encoding : callback;
+    const compressionEncoding = getCompressionEncoding(req);
+
+    if (!compressionEncoding || !isCompressibleResponse(res, body.length)) {
+      return originalEnd(body, done);
+    }
+
+    const compressor = compressionEncoding === 'br' ? zlib.brotliCompress : zlib.gzip;
+    compressor(body, (error, compressedBody) => {
+      if (error) {
+        originalEnd(body, done);
+        return;
+      }
+
+      res.setHeader('Content-Encoding', compressionEncoding);
+      res.setHeader('Vary', 'Accept-Encoding');
+      res.removeHeader('Content-Length');
+      originalEnd(compressedBody, done);
+    });
+
+    return res;
+  }) as typeof res.end;
+
+  return next();
+}
+
 // Middleware
 app.disable('x-powered-by');
 if (process.env.TRUST_PROXY === 'true') {
@@ -192,6 +278,7 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(compressionMiddleware);
 app.use('/api', csrfProtection({ allowedOrigins }));
 const uploadsStaticMiddleware = express.static(path.join(process.cwd(), 'uploads'), {
   fallthrough: false,
@@ -335,6 +422,7 @@ initializeDatabase()
       });
     startSecurityCleanupJob();
     startReminderNotificationScheduler();
+    resumePhoneImportJobs();
   })
   .catch((error) => {
     console.error('Failed to initialize database. Starting setup-capable API anyway:', error);

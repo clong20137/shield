@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
+import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { v4 as uuidv4 } from 'uuid';
+import pool from '../config/database';
 import { Device, DeviceInput, DeviceModel } from '../models/Device';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { User, UserModel } from '../models/User';
@@ -46,6 +48,21 @@ type PhoneImportJob = {
   updatedAt: string;
   completedAt: string | null;
 };
+interface ImportJobRow extends RowDataPacket {
+  id: string;
+  type: string;
+  status: PhoneImportJobStatus;
+  actorId: string | null;
+  actorName: string | null;
+  payloadJson: string | null;
+  resultJson: string | null;
+  processedRows: number;
+  totalRows: number;
+  error: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  completedAt: Date | string | null;
+}
 
 const phoneExportHeaders = [
   'assetTag',
@@ -129,6 +146,20 @@ function waitForImportJobYield() {
   return new Promise((resolve) => {
     setTimeout(resolve, 0);
   });
+}
+
+function toIsoDateTime(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+function safeParseJson<T>(value: string | null | undefined, fallback: T): T {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
 }
 
 function getImportValue(row: PhoneImportRow, aliases: string[]): string {
@@ -519,6 +550,88 @@ function getPublicPhoneImportJob(job: PhoneImportJob) {
   };
 }
 
+function importJobRowToPhoneJob(row: ImportJobRow): PhoneImportJob {
+  const rows = safeParseJson<PhoneImportRow[]>(row.payloadJson, []);
+  const summary = safeParseJson<PhoneImportSummary>(row.resultJson, createEmptyPhoneImportSummary(Number(row.totalRows) || rows.length));
+
+  return {
+    id: row.id,
+    status: row.status,
+    rows,
+    actorId: row.actorId || '',
+    actorName: row.actorName || '',
+    processedRows: Number(row.processedRows) || 0,
+    totalRows: Number(row.totalRows) || rows.length,
+    summary,
+    error: row.error || null,
+    createdAt: toIsoDateTime(row.createdAt) || new Date().toISOString(),
+    updatedAt: toIsoDateTime(row.updatedAt) || new Date().toISOString(),
+    completedAt: toIsoDateTime(row.completedAt),
+  };
+}
+
+async function insertPhoneImportJob(job: PhoneImportJob) {
+  await pool.query<ResultSetHeader>(
+    `INSERT INTO import_jobs (
+      \`id\`, \`type\`, \`status\`, \`actorId\`, \`actorName\`, \`payloadJson\`, \`resultJson\`,
+      \`processedRows\`, \`totalRows\`, \`error\`, \`completedAt\`
+    ) VALUES (?, 'phone-import', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      job.id,
+      job.status,
+      job.actorId || null,
+      job.actorName || null,
+      JSON.stringify(job.rows),
+      JSON.stringify(job.summary),
+      job.processedRows,
+      job.totalRows,
+      job.error,
+      job.completedAt,
+    ],
+  );
+}
+
+async function updatePhoneImportJob(job: PhoneImportJob, includePayload = false) {
+  const payloadSql = includePayload ? ', `payloadJson` = ?' : '';
+  const params: Array<string | number | Date | null> = [
+    job.status,
+    JSON.stringify(job.summary),
+    job.processedRows,
+    job.totalRows,
+    job.error,
+    job.completedAt ? new Date(job.completedAt) : null,
+  ];
+
+  if (includePayload) {
+    params.push(JSON.stringify(job.rows));
+  }
+  params.push(job.id);
+
+  await pool.query<ResultSetHeader>(
+    `UPDATE import_jobs
+     SET \`status\` = ?, \`resultJson\` = ?, \`processedRows\` = ?, \`totalRows\` = ?, \`error\` = ?, \`completedAt\` = ?${payloadSql}
+     WHERE \`id\` = ? AND \`type\` = 'phone-import'`,
+    params,
+  );
+}
+
+async function loadPhoneImportJob(jobId: string): Promise<PhoneImportJob | null> {
+  const [rows] = await pool.query<ImportJobRow[]>(
+    'SELECT * FROM import_jobs WHERE `id` = ? AND `type` = ? LIMIT 1',
+    [jobId, 'phone-import'],
+  );
+
+  return rows[0] ? importJobRowToPhoneJob(rows[0]) : null;
+}
+
+async function loadRunnablePhoneImportJobs(): Promise<PhoneImportJob[]> {
+  const [rows] = await pool.query<ImportJobRow[]>(
+    "SELECT * FROM import_jobs WHERE `type` = 'phone-import' AND `status` IN ('queued', 'processing') ORDER BY `createdAt` ASC LIMIT 5",
+  );
+
+  return rows.map(importJobRowToPhoneJob).filter((job) => job.rows.length > 0);
+}
+
 function schedulePhoneImportJobCleanup(jobId: string) {
   setTimeout(() => {
     phoneImportJobs.delete(jobId);
@@ -526,13 +639,15 @@ function schedulePhoneImportJobCleanup(jobId: string) {
 }
 
 async function runPhoneImportJob(jobId: string) {
-  const job = phoneImportJobs.get(jobId);
+  const job = phoneImportJobs.get(jobId) || await loadPhoneImportJob(jobId);
   if (!job) {
     return;
   }
 
+  phoneImportJobs.set(job.id, job);
   job.status = 'processing';
   job.updatedAt = new Date().toISOString();
+  await updatePhoneImportJob(job);
 
   try {
     const result = await processPhoneImportRows(job.rows, {
@@ -547,6 +662,9 @@ async function runPhoneImportJob(jobId: string) {
           skippedRows: summary.skippedRows.slice(-100),
         };
         job.updatedAt = new Date().toISOString();
+        if (processedRows % PHONE_IMPORT_JOB_CHUNK_SIZE === 0 || processedRows === job.totalRows) {
+          void updatePhoneImportJob(job).catch((error) => console.error('Failed to update phone import job progress:', error));
+        }
       },
     });
 
@@ -556,6 +674,7 @@ async function runPhoneImportJob(jobId: string) {
     job.completedAt = new Date().toISOString();
     job.updatedAt = job.completedAt;
     job.rows = [];
+    await updatePhoneImportJob(job, true);
 
     if (result.changedDeviceCount > 0) {
       broadcastAppEvent({ type: 'device-updated', entityId: 'phone-import' });
@@ -565,9 +684,25 @@ async function runPhoneImportJob(jobId: string) {
     job.error = error instanceof Error ? error.message : 'Failed to import phones';
     job.completedAt = new Date().toISOString();
     job.updatedAt = job.completedAt;
+    await updatePhoneImportJob(job).catch((updateError) => console.error('Failed to mark phone import job failed:', updateError));
     console.error('Phone import job error:', error);
   } finally {
     schedulePhoneImportJobCleanup(jobId);
+  }
+}
+
+export async function resumePhoneImportJobs() {
+  try {
+    const jobs = await loadRunnablePhoneImportJobs();
+    jobs.forEach((job) => {
+      phoneImportJobs.set(job.id, job);
+      setTimeout(() => void runPhoneImportJob(job.id), 0);
+    });
+    if (jobs.length > 0) {
+      console.info(`Resumed ${jobs.length} phone import job${jobs.length === 1 ? '' : 's'}.`);
+    }
+  } catch (error) {
+    console.error('Failed to resume phone import jobs:', error);
   }
 }
 
@@ -718,6 +853,7 @@ export class DeviceController {
       };
 
       phoneImportJobs.set(job.id, job);
+      await insertPhoneImportJob(job);
       setTimeout(() => void runPhoneImportJob(job.id), 0);
 
       return res.status(202).json(getPublicPhoneImportJob(job));
@@ -728,7 +864,7 @@ export class DeviceController {
   }
 
   static async getPhoneImportJob(req: Request, res: Response) {
-    const job = phoneImportJobs.get(req.params.jobId);
+    const job = phoneImportJobs.get(req.params.jobId) || await loadPhoneImportJob(req.params.jobId);
     if (!job) {
       return res.status(404).json({ error: 'Import job not found or expired' });
     }

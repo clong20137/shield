@@ -149,6 +149,24 @@ CREATE TABLE IF NOT EXISTS device_events (
   INDEX `idx_device_events_device_created` (`deviceId`, `createdAt`)
 );
 
+CREATE TABLE IF NOT EXISTS import_jobs (
+  `id` VARCHAR(36) PRIMARY KEY,
+  `type` VARCHAR(50) NOT NULL,
+  `status` VARCHAR(30) NOT NULL DEFAULT 'queued',
+  `actorId` VARCHAR(36),
+  `actorName` VARCHAR(150),
+  `payloadJson` LONGTEXT,
+  `resultJson` MEDIUMTEXT,
+  `processedRows` INT NOT NULL DEFAULT 0,
+  `totalRows` INT NOT NULL DEFAULT 0,
+  `error` TEXT,
+  `createdAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `completedAt` DATETIME,
+  INDEX `idx_import_jobs_type_status` (`type`, `status`),
+  INDEX `idx_import_jobs_created` (`createdAt`)
+);
+
 -- Sample Data (Optional)
 INSERT INTO users (
   `id`, `firstName`, `lastName`, `peNumber`, `carNumber`, `badgeNumber`,
