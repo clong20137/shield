@@ -14,9 +14,9 @@ router.post('/shortcuts', requirePermission('calendar:manage'), CalendarControll
 router.put('/shortcuts/:id', requirePermission('calendar:manage'), CalendarController.updateShortcut);
 router.delete('/shortcuts/:id', requirePermission('calendar:manage'), CalendarController.deleteShortcut);
 router.post('/autosave', requirePermission('calendar:manage'), CalendarController.autosaveDraft);
-router.post('/fleet-bookings/:bookingId', requirePermission('fleet:bookings:manage'), CalendarController.syncFleetBooking);
-router.put('/fleet-bookings/:bookingId', requirePermission('fleet:bookings:manage'), CalendarController.syncFleetBooking);
-router.delete('/fleet-bookings/:bookingId', requirePermission('fleet:bookings:manage'), CalendarController.deleteFleetBooking);
+router.post('/fleet-bookings/:bookingId', requireAuthenticated(), CalendarController.syncFleetBooking);
+router.put('/fleet-bookings/:bookingId', requireAuthenticated(), CalendarController.syncFleetBooking);
+router.delete('/fleet-bookings/:bookingId', requireAuthenticated(), CalendarController.deleteFleetBooking);
 router.post('/', requirePermission('calendar:manage'), CalendarController.createEntry);
 router.put('/:id', requirePermission('calendar:manage'), CalendarController.updateEntry);
 router.delete('/:id', requirePermission('calendar:manage'), CalendarController.deleteEntry);

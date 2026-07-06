@@ -92,7 +92,7 @@ function subtractMinutesFromLocalDateTime(value: string, minutes: number): strin
 
 function normalizeFleetBookingStatus(value: string): FleetBookingStatus {
   const normalizedValue = value.trim().toLowerCase().replace(/\s+/gu, '-');
-  if (['approved', 'approve', 'accepted', 'confirmed'].includes(normalizedValue)) {
+  if (['approved', 'approve', 'accepted', 'confirmed', 'scheduled', 'in-progress', 'waiting-on-parts', 'ready-for-pickup', 'complete'].includes(normalizedValue)) {
     return 'approved';
   }
 
@@ -193,6 +193,15 @@ async function getFleetNotificationRecipients(ownerAccountId: string) {
   }));
 
   return Array.from(recipients.values());
+}
+
+async function canSyncFleetBooking(account: { id: string; role: string }, ownerAccountId: string) {
+  if (account.id === ownerAccountId || account.role === 'administrator') {
+    return true;
+  }
+
+  const permissions = await AuthAccountModel.getPermissionsForAccount(account.id);
+  return permissions.includes('fleet:bookings:manage');
 }
 
 async function createFleetBookingNotifications(input: {
@@ -454,12 +463,16 @@ export class CalendarController {
         return res.status(404).json({ error: 'Fleet booking owner not found' });
       }
 
+      if (!(await canSyncFleetBooking(account, validation.value.ownerAccountId))) {
+        return res.status(403).json({ error: 'Fleet booking sync permission required' });
+      }
+
       const existingEntry = await CalendarEntryModel.findFleetBookingEntry(validation.value.ownerAccountId, validation.value.bookingId);
       const previousStatus = existingEntry?.details?.status
         ? normalizeFleetBookingStatus(existingEntry.details.status)
         : null;
 
-      if (validation.value.status === 'canceled') {
+      if (validation.value.status === 'canceled' || validation.value.status === 'denied') {
         const deletedCalendarEntries = await CalendarEntryModel.deleteFleetBookingEntry(validation.value.ownerAccountId, validation.value.bookingId);
         const deletedReminders = await ReminderModel.deleteLinked(validation.value.ownerAccountId, fleetBookingReminderSourceType, validation.value.bookingId);
         await createFleetBookingNotifications({
@@ -538,6 +551,10 @@ export class CalendarController {
       const bookingId = cleanString(req.params.bookingId || req.body?.bookingId, 80);
       if (!bookingId || !ownerAccountId) {
         return res.status(400).json({ error: 'Fleet booking ID and owner account are required' });
+      }
+
+      if (!(await canSyncFleetBooking(account, ownerAccountId))) {
+        return res.status(403).json({ error: 'Fleet booking sync permission required' });
       }
 
       const existingEntry = await CalendarEntryModel.findFleetBookingEntry(ownerAccountId, bookingId);

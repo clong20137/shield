@@ -62,9 +62,8 @@ export interface FleetBookingCalendarInput {
 }
 
 const fleetBookingStatusColors: Record<string, string> = {
-  requested: '#D97706',
+  requested: '#EAB308',
   approved: '#16A34A',
-  denied: '#DC2626',
 };
 
 function formatDate(value: Date | string): string {
@@ -191,7 +190,14 @@ export class CalendarEntryModel {
     const conn = await pool.getConnection();
     try {
       const [rows] = await conn.query<CalendarEntryRow[]>(
-        'SELECT * FROM calendar_entries WHERE `ownerAccountId` = ? ORDER BY `entryDate` DESC, `updatedAt` DESC LIMIT ? OFFSET ?',
+        `SELECT * FROM calendar_entries
+         WHERE \`ownerAccountId\` = ?
+           AND NOT (
+             JSON_UNQUOTE(JSON_EXTRACT(\`details\`, '$.source')) = 'Fleet'
+             AND LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(\`details\`, '$.status')), '')) IN ('denied', 'canceled', 'cancelled')
+           )
+         ORDER BY \`entryDate\` DESC, \`updatedAt\` DESC
+         LIMIT ? OFFSET ?`,
         [ownerAccountId, limit, offset]
       );
 
