@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, LineChart as LineChartIcon, Save, Search, Table, Trash2, X } from 'lucide-react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Download, FileText, LineChart as LineChartIcon, Save, Search, Smartphone, Table, Trash2, X } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -15,8 +15,9 @@ import {
 } from 'recharts';
 import { AuthAccount, DeviceManagementReportResponse, DeviceReportGroup, reportService, TrooperDailyReportEntry, TrooperDailyAnalyticsResponse, User, userService } from '../services/api';
 import { districtOptions } from '../constants/districts';
-import PerformanceEvaluationsPage from './PerformanceEvaluationsPage';
 import { downloadTrooperDailiesCsv, downloadTrooperDailiesPdf, downloadTrooperDailiesXls } from '../utils/trooperDailyExport';
+
+const PerformanceEvaluationsPage = lazy(() => import('./PerformanceEvaluationsPage'));
 
 const trooperDailySections = [
   {
@@ -222,6 +223,32 @@ const trooperDailyTabs: Array<{ value: TrooperDailyTab; label: string }> = [
   { value: 'graph', label: 'Graph' },
   { value: 'table', label: 'Table' },
   { value: 'exports', label: 'Exports' },
+];
+
+const reportWorkspaces: Array<{
+  value: ReportType;
+  label: string;
+  description: string;
+  icon: typeof BarChart3;
+}> = [
+  {
+    value: 'trooper-daily',
+    label: 'Trooper Dailies',
+    description: 'Daily activity analytics, review queue, and exports.',
+    icon: ClipboardList,
+  },
+  {
+    value: 'devices',
+    label: 'Device Management',
+    description: 'Inventory cost, carrier, model, status, and condition data.',
+    icon: Smartphone,
+  },
+  {
+    value: 'cpar',
+    label: 'CPAR',
+    description: 'Performance evaluations and report workflows.',
+    icon: FileText,
+  },
 ];
 
 const trooperDailyFieldSections = new Map<string, string>(
@@ -609,6 +636,8 @@ const ReportsPage: React.FC<{
   const initialAnalyticsDatesRef = useRef(getRangeDates('1m'));
   const [selectedReportType, setSelectedReportType] = useState<ReportType>('trooper-daily');
   const [activeTrooperDailyTab, setActiveTrooperDailyTab] = useState<TrooperDailyTab>('graph');
+  const [isTableFilterOpen, setIsTableFilterOpen] = useState(false);
+  const [isAnalyticsFilterOpen, setIsAnalyticsFilterOpen] = useState(false);
   const [deviceReport, setDeviceReport] = useState<DeviceManagementReportResponse | null>(null);
   const [deviceReportLoading, setDeviceReportLoading] = useState(false);
   const [deviceReportError, setDeviceReportError] = useState<string | null>(null);
@@ -665,6 +694,12 @@ const ReportsPage: React.FC<{
   const canViewAllTrooperDailies = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('reports:trooper-dailies'));
   const canReviewTrooperDailies = canViewAllTrooperDailies;
   const canViewDeviceReports = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('devices:manage'));
+  const activeReportWorkspace = reportWorkspaces.find((workspace) => workspace.value === selectedReportType) || reportWorkspaces[0];
+  const selectedReportTitle = selectedReportType === 'trooper-daily'
+    ? 'Trooper Daily Reports'
+    : selectedReportType === 'devices'
+      ? 'Device Management Reports'
+      : 'CPAR Reports';
 
   const loadDeviceReport = async (showLoading = true) => {
     if (!canViewDeviceReports) {
@@ -1448,21 +1483,41 @@ const ReportsPage: React.FC<{
 
   return (
     <div>
-      <h1 className="mb-8">Reports & Analytics</h1>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="mb-2">Reports & Analytics</h1>
+          <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">{activeReportWorkspace.description}</p>
+        </div>
+        <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-black uppercase tracking-wide text-accent">{selectedReportTitle}</span>
+      </div>
 
-      <section className="mb-6 rounded-lg border border-gray-200 bg-white p-5 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
-        <label className="block max-w-md">
-          <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Report to Load</span>
-          <select
-            value={selectedReportType}
-            onChange={(event) => setSelectedReportType(event.target.value as ReportType)}
-            className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-          >
-            <option value="trooper-daily">Trooper Daily Reports</option>
-            <option value="devices">Device Management Reports</option>
-            <option value="cpar">CPAR</option>
-          </select>
-        </label>
+      <section className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-3">
+        {reportWorkspaces.map((workspace) => {
+          const WorkspaceIcon = workspace.icon;
+          const isSelected = selectedReportType === workspace.value;
+
+          return (
+            <button
+              key={workspace.value}
+              type="button"
+              onClick={() => setSelectedReportType(workspace.value)}
+              className={`group flex min-h-28 items-start gap-3 rounded-lg border p-4 text-left transition ${
+                isSelected
+                  ? 'border-primary-500 bg-primary-500 text-white shadow'
+                  : 'border-gray-200 bg-white text-gray-800 hover:border-primary-300 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:hover:border-primary-700 dark:hover:bg-gray-800'
+              }`}
+              aria-pressed={isSelected}
+            >
+              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded ${isSelected ? 'bg-white/15 text-white' : 'bg-primary-50 text-primary-600 dark:bg-gray-800 dark:text-gray-200'}`}>
+                <WorkspaceIcon size={20} />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-base font-black">{workspace.label}</span>
+                <span className={`mt-1 block text-sm font-semibold ${isSelected ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>{workspace.description}</span>
+              </span>
+            </button>
+          );
+        })}
       </section>
 
       {selectedReportType === 'trooper-daily' ? (
@@ -1479,6 +1534,20 @@ const ReportsPage: React.FC<{
           <span className="rounded bg-accent/10 px-3 py-1 text-sm font-bold text-accent">
             {dailyTotal.toLocaleString()} result{dailyTotal === 1 ? '' : 's'}
           </span>
+        </div>
+
+        <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[
+            ['Reports', dailyAnalytics?.totals?.totalReports ?? dailyTotal],
+            ['Total Hours', formatMetric(Number(dailyAnalytics?.totals?.totalHours || 0), 1)],
+            ['Avg. Hours', formatMetric(Number(dailyAnalytics?.totals?.averageHours || 0), 1)],
+            ['Troopers', dailyAnalytics?.totals?.uniqueTroopers ?? 0],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/60">
+              <p className="text-xs font-black uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
+              <p className="mt-2 text-2xl font-black text-gray-900 dark:text-gray-100">{typeof value === 'number' ? formatMetric(value) : value}</p>
+            </div>
+          ))}
         </div>
 
         <div className="mb-5 flex flex-wrap gap-2 border-b border-gray-200 pb-3 dark:border-gray-800">
@@ -1499,6 +1568,25 @@ const ReportsPage: React.FC<{
         </div>
 
         {activeTrooperDailyTab === 'table' && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950/60">
+            <div>
+              <p className="text-sm font-black text-gray-900 dark:text-gray-100">Report Table</p>
+              <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Review submitted entries, open individual reports, and download selected records.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsTableFilterOpen((open) => !open)}
+              className="btn-secondary"
+              aria-expanded={isTableFilterOpen}
+              aria-label="Toggle table filters"
+              title="Filters"
+            >
+              <Search size={16} /> <ChevronDown size={14} className={`transition ${isTableFilterOpen ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+        )}
+
+        {activeTrooperDailyTab === 'table' && isTableFilterOpen && (
         <section className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/60">
           <div className="mb-3">
             <h3 className="text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Report Table Filters</h3>
@@ -1562,9 +1650,21 @@ const ReportsPage: React.FC<{
                 </span>
               </div>
             )}
+            {canViewAllTrooperDailies && (
+              <button
+                type="button"
+                onClick={() => setIsAnalyticsFilterOpen((open) => !open)}
+                className="btn-secondary"
+                aria-expanded={isAnalyticsFilterOpen}
+                aria-label="Toggle analytics filters"
+                title="Analytics Filters"
+              >
+                <Search size={16} /> <ChevronDown size={14} className={`transition ${isAnalyticsFilterOpen ? 'rotate-180' : ''}`} />
+              </button>
+            )}
           </div>
 
-          {canViewAllTrooperDailies && (
+          {canViewAllTrooperDailies && isAnalyticsFilterOpen && (
             <form onSubmit={searchTrooperDailyAnalytics} className="mb-4 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]">
               <input
                 value={analyticsSearch}
@@ -2139,7 +2239,9 @@ const ReportsPage: React.FC<{
         </section>
       ) : (
         currentUser ? (
-          <PerformanceEvaluationsPage currentUser={currentUser} onToast={onToast} getErrorMessage={getAppErrorMessage} compactTitle />
+          <Suspense fallback={<div className="loading">Loading CPAR reports...</div>}>
+            <PerformanceEvaluationsPage currentUser={currentUser} onToast={onToast} getErrorMessage={getAppErrorMessage} compactTitle />
+          </Suspense>
         ) : (
           <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">Sign in to view CPAR reports.</div>
         )
