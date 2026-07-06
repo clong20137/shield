@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
-import { BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Download, FileText, LineChart as LineChartIcon, Save, Search, Smartphone, Table, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, BarChart3, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Download, FileText, Save, Search, Smartphone, Table, Trash2, X } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -158,7 +158,6 @@ type DailyExportFormat = 'csv' | 'pdf' | 'xls';
 type DailyAnalyticsExportFormat = 'csv' | 'pdf' | 'png';
 type DailyAnalyticsRange = '1d' | '7d' | '1m' | '3m' | '6m' | '1y' | 'custom';
 type DailyGraphType = 'line' | 'bar';
-type DeviceReportGraphType = 'bar' | 'line';
 type DeviceReportDimension = 'type' | 'status' | 'carrier' | 'condition' | 'model' | 'cost';
 type DailyCompareMode = 'none' | 'user' | 'district';
 type ReportType = 'trooper-daily' | 'cpar' | 'devices';
@@ -203,11 +202,6 @@ const dailyGraphTypes: Array<{ value: DailyGraphType; label: string }> = [
   { value: 'bar', label: 'Bar' },
 ];
 
-const deviceReportGraphTypes: Array<{ value: DeviceReportGraphType; label: string; icon: typeof BarChart3 }> = [
-  { value: 'bar', label: 'Bar', icon: BarChart3 },
-  { value: 'line', label: 'Line', icon: LineChartIcon },
-];
-
 const deviceReportDimensions: Array<{
   value: DeviceReportDimension;
   label: string;
@@ -233,6 +227,7 @@ const compareSeriesColors = [
 
 const LIVE_REPORT_REFRESH_MS = 15_000;
 const SAVED_REPORT_GRAPH_VIEWS_KEY = 'shield_saved_report_graph_views';
+const DEVICE_REPORT_TOTAL_SNAPSHOT_KEY = 'shield_device_report_total_snapshot';
 
 const trooperDailyTabs: Array<{ value: TrooperDailyTab; label: string }> = [
   { value: 'graph', label: 'Graph' },
@@ -360,6 +355,24 @@ function loadSavedReportGraphViews(): SavedReportGraphView[] {
 
 function saveReportGraphViews(views: SavedReportGraphView[]) {
   window.localStorage.setItem(SAVED_REPORT_GRAPH_VIEWS_KEY, JSON.stringify(views));
+}
+
+function loadDeviceReportTotalSnapshot() {
+  try {
+    const saved = window.localStorage.getItem(DEVICE_REPORT_TOTAL_SNAPSHOT_KEY);
+    const parsed = saved ? JSON.parse(saved) : null;
+    return parsed && typeof parsed.total === 'number' ? { total: parsed.total as number, savedAt: String(parsed.savedAt || '') } : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveDeviceReportTotalSnapshot(total: number) {
+  try {
+    window.localStorage.setItem(DEVICE_REPORT_TOTAL_SNAPSHOT_KEY, JSON.stringify({ total, savedAt: new Date().toISOString() }));
+  } catch {
+    // Local storage can fail in locked-down browser contexts.
+  }
 }
 
 function getSeriesTrend(points: Array<{ label: string; value: number }>) {
@@ -561,7 +574,7 @@ const AnalyticsChart: React.FC<{
             <XAxis dataKey="displayLabel" tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} minTickGap={18} />
             <YAxis tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={58} tickFormatter={(value) => formatMetric(Number(value), 1)} />
             <Tooltip
-              cursor={{ fill: 'rgba(37, 99, 235, 0.08)' }}
+              cursor={false}
               content={renderTooltip}
             />
             {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12, fontWeight: 800, paddingTop: 8 }} />}
@@ -605,9 +618,8 @@ const DeviceReportBarChart: React.FC<{
   title: string;
   data: DeviceReportGroup[];
   color?: string;
-  graphType?: DeviceReportGraphType;
   valueLabel?: string;
-}> = ({ title, data, color = '#1a365d', graphType = 'bar', valueLabel = 'Devices' }) => {
+}> = ({ title, data, color = '#1a365d', valueLabel = 'Devices' }) => {
   const chartData = data.map((item) => ({ ...item, displayLabel: formatAnalyticsLabel(item.label) }));
   const total = data.reduce((sum, item) => sum + item.count, 0);
   const formatValue = (value: number) => valueLabel === 'Monthly Cost' ? formatCurrency(value) : formatMetric(value);
@@ -622,23 +634,13 @@ const DeviceReportBarChart: React.FC<{
         <div className="empty-state rounded border border-dashed border-gray-300 py-8 text-sm dark:border-gray-700">No device data available.</div>
       ) : (
         <ResponsiveContainer width="100%" height={360}>
-          {graphType === 'line' ? (
-            <LineChart data={chartData} margin={{ top: 8, right: 14, bottom: 44, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.25)" />
-              <XAxis dataKey="displayLabel" interval={0} angle={-28} textAnchor="end" height={64} tick={{ fontSize: 11, fontWeight: 700 }} tickLine={false} axisLine={false} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={44} />
-              <Tooltip formatter={(value) => [formatValue(Number(value)), valueLabel]} />
-              <Line type="monotone" dataKey="count" stroke={color} strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#ffffff' }} activeDot={{ r: 7, strokeWidth: 2 }} />
-            </LineChart>
-          ) : (
-            <BarChart data={chartData} margin={{ top: 8, right: 10, bottom: 44, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.25)" />
-              <XAxis dataKey="displayLabel" interval={0} angle={-28} textAnchor="end" height={64} tick={{ fontSize: 11, fontWeight: 700 }} tickLine={false} axisLine={false} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={44} />
-              <Tooltip formatter={(value) => [formatValue(Number(value)), valueLabel]} />
-              <Bar dataKey="count" fill={color} radius={[6, 6, 0, 0]} />
-            </BarChart>
-          )}
+          <BarChart data={chartData} margin={{ top: 8, right: 10, bottom: 44, left: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.25)" />
+            <XAxis dataKey="displayLabel" interval={0} angle={-28} textAnchor="end" height={64} tick={{ fontSize: 11, fontWeight: 700 }} tickLine={false} axisLine={false} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={44} />
+            <Tooltip cursor={false} formatter={(value) => [formatValue(Number(value)), valueLabel]} />
+            <Bar dataKey="count" fill={color} radius={[6, 6, 0, 0]} />
+          </BarChart>
         </ResponsiveContainer>
       )}
     </section>
@@ -658,8 +660,8 @@ const ReportsPage: React.FC<{
   const [deviceReport, setDeviceReport] = useState<DeviceManagementReportResponse | null>(null);
   const [deviceReportLoading, setDeviceReportLoading] = useState(false);
   const [deviceReportError, setDeviceReportError] = useState<string | null>(null);
-  const [deviceReportGraphType, setDeviceReportGraphType] = useState<DeviceReportGraphType>('bar');
   const [deviceReportDimension, setDeviceReportDimension] = useState<DeviceReportDimension>('type');
+  const [deviceReportTotalDelta, setDeviceReportTotalDelta] = useState(0);
   const [trooperDailies, setTrooperDailies] = useState<TrooperDailyReportEntry[]>([]);
   const [dailySearch, setDailySearch] = useState('');
   const [dailyFrom, setDailyFrom] = useState('');
@@ -740,6 +742,10 @@ const ReportsPage: React.FC<{
 
     try {
       const response = await reportService.getDeviceManagementReports();
+      const totalDevices = response.data.summary.totalDevices;
+      const previousSnapshot = loadDeviceReportTotalSnapshot();
+      setDeviceReportTotalDelta(previousSnapshot ? totalDevices - previousSnapshot.total : 0);
+      saveDeviceReportTotalSnapshot(totalDevices);
       setDeviceReport(response.data);
     } catch (err) {
       const message = getErrorMessage(err, 'Failed to load Device Management Reports.');
@@ -2175,25 +2181,6 @@ const ReportsPage: React.FC<{
                   <option key={dimension.value} value={dimension.value}>{dimension.label}</option>
                 ))}
               </select>
-              <div className="flex overflow-hidden rounded border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-950" role="group" aria-label="Device report graph type">
-                {deviceReportGraphTypes.map(({ value, label, icon: Icon }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setDeviceReportGraphType(value)}
-                    className={`flex h-9 items-center gap-1.5 px-3 text-xs font-black uppercase transition ${
-                      deviceReportGraphType === value
-                        ? 'bg-primary-500 text-white'
-                        : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
-                    }`}
-                    aria-pressed={deviceReportGraphType === value}
-                    title={`${label} graph`}
-                  >
-                    <Icon size={15} />
-                    {label}
-                  </button>
-                ))}
-              </div>
               {deviceReportLoading && (
                 <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold uppercase text-accent">Updating</span>
               )}
@@ -2213,6 +2200,16 @@ const ReportsPage: React.FC<{
               <div className="mb-5 flex flex-wrap gap-x-6 gap-y-2 border-b border-gray-200 pb-4 text-sm dark:border-gray-800">
                 <span className="font-semibold text-gray-500 dark:text-gray-400">
                   Total <strong className="ml-1 text-gray-900 dark:text-gray-100">{formatMetric(deviceReport.summary.totalDevices)}</strong>
+                  {deviceReportTotalDelta !== 0 && (
+                    <span className={`ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-black ${
+                      deviceReportTotalDelta > 0
+                        ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-200'
+                        : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200'
+                    }`}>
+                      {deviceReportTotalDelta > 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+                      {formatMetric(Math.abs(deviceReportTotalDelta))}
+                    </span>
+                  )}
                 </span>
                 <span className="font-semibold text-gray-500 dark:text-gray-400">
                   Assigned <strong className="ml-1 text-gray-900 dark:text-gray-100">{formatMetric(deviceReport.summary.assignedDevices)}</strong>
@@ -2229,7 +2226,6 @@ const ReportsPage: React.FC<{
                 title={selectedDeviceReportDimension.value === 'cost' ? 'Estimated Monthly Cost' : `Devices by ${selectedDeviceReportDimension.label}`}
                 data={selectedDeviceReportData}
                 color={selectedDeviceReportDimension.color}
-                graphType={deviceReportGraphType}
                 valueLabel={selectedDeviceReportDimension.valueLabel}
               />
             </>
