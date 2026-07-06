@@ -65,6 +65,10 @@ function isNewUserImportRow(row: PhoneImportRow): boolean {
   return normalizeLooseKey(rawAssignedTo) === 'newuser';
 }
 
+function hasImportAssignee(row: PhoneImportRow): boolean {
+  return Boolean(getImportValue(row, ['assignedTo', 'assigned to', 'userName', 'user name', 'name', 'employeeName', 'employee name', 'user']).trim());
+}
+
 function getDisplayName(user: User): string {
   return `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || user.id;
 }
@@ -142,7 +146,7 @@ function resolveAssignedTo(row: PhoneImportRow, matcher: Map<string, string>): {
     }
   }
 
-  return { assignedTo: identity, matched: false };
+  return { assignedTo: '', matched: false };
 }
 
 function buildDeviceMatchKey(device: Device): string[] {
@@ -161,6 +165,10 @@ function cleanPhoneModelName(value: string): string {
     return 'Cradlepoint';
   }
 
+  if (/(verizon\s+jetpack|inseego)/iu.test(normalizedValue)) {
+    return normalizedValue.match(/inseego/iu) ? 'Inseego MiFi' : 'Verizon Jetpack';
+  }
+
   const iphoneMatch = normalizedValue.match(/\bi\s*phone\s*(\d{1,2})(?:\s*(pro\s*max|pro|plus|mini))?/iu);
 
   if (iphoneMatch) {
@@ -173,8 +181,20 @@ function cleanPhoneModelName(value: string): string {
   return normalizedValue || 'Agency Phone';
 }
 
+function getImportedDeviceType(modelName: string): DeviceInput['type'] {
+  if (/cradlepoint/iu.test(modelName)) {
+    return 'Cradlepoint';
+  }
+
+  if (/(verizon\s+jetpack|inseego)/iu.test(modelName)) {
+    return 'MiFi Device';
+  }
+
+  return 'Cell Phone';
+}
+
 function getGeneratedAssetTag(type: string, phoneNumber: string, imei: string, simNumber: string, rowNumber?: number): string {
-  const prefix = type === 'Cradlepoint' ? 'CRADLEPOINT' : type === 'Cell Phone' ? 'PHONE' : normalizeLooseKey(type).toUpperCase() || 'DEVICE';
+  const prefix = type === 'Cradlepoint' ? 'CRADLEPOINT' : type === 'MiFi Device' ? 'MIFI' : type === 'Cell Phone' ? 'PHONE' : normalizeLooseKey(type).toUpperCase() || 'DEVICE';
   const phoneDigits = normalizeDigits(phoneNumber);
   const imeiKey = normalizeLooseKey(imei);
   const simKey = normalizeLooseKey(simNumber);
@@ -202,7 +222,7 @@ function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNu
   const isNewUser = isNewUserImportRow(row);
   const importedModel = getImportValue(row, ['deviceModel', 'device model', 'deviceModal', 'device modal', 'makeModel', 'make model', 'model', 'device', 'description']);
   const makeModel = cleanPhoneModelName(importedModel);
-  const type = /cradlepoint/iu.test(importedModel) || makeModel === 'Cradlepoint' ? 'Cradlepoint' : 'Cell Phone';
+  const type = getImportedDeviceType(importedModel || makeModel);
   const assetTag = getGeneratedAssetTag(type, phoneNumber, imei, simNumber, rowNumber);
 
   return {
@@ -234,7 +254,8 @@ function validateDevicePayload(body: Record<string, unknown>) {
   const phoneNumber = normalizePhone(body.phoneNumber);
   const imei = cleanString(body.imei, 100);
   const simNumber = cleanString(body.simNumber, 100);
-  const assetTag = cleanString(body.assetTag, 100) || (type === 'Cell Phone' ? getGeneratedAssetTag(type, phoneNumber, imei, simNumber) : '');
+  const assetTag = cleanString(body.assetTag, 100)
+    || (type === 'Cell Phone' || type === 'MiFi Device' ? getGeneratedAssetTag(type, phoneNumber, imei, simNumber) : '');
   const makeModel = cleanString(body.makeModel, 150);
   const status = cleanString(body.status, 50) || 'Available';
   const condition = cleanString(body.condition, 50) || 'Good';
@@ -431,8 +452,8 @@ export class DeviceController {
           summary.matchedCount += 1;
         } else if (isNewUserImportRow(row)) {
           summary.unmatchedRows.push({ rowNumber, reason: 'Marked NEW USER in import and left unassigned for review', row });
-        } else if (assignment.assignedTo) {
-          summary.unmatchedRows.push({ rowNumber, reason: 'Could not match assignment to a SHIELD user', row });
+        } else if (hasImportAssignee(row)) {
+          summary.unmatchedRows.push({ rowNumber, reason: 'Could not match assignment to a SHIELD user and left device unassigned', row });
         }
 
         const matchKeys = buildDeviceMatchKey(validation.value as Device);
