@@ -119,13 +119,14 @@ async function canViewHiddenUsers(account?: { id: string; role: string } | null)
   return permissions.includes('users:view-hidden');
 }
 
-async function withPermissions<T extends { id: string; role: string }>(account: T): Promise<T & { permissions: string[] }> {
+async function withPermissions<T extends { id: string; role: string }>(account: T): Promise<T & { permissions: string[]; explicitPermissions: string[] }> {
+  const explicitPermissions = await AuthAccountModel.getPermissionsForAccount(account.id);
   // Administrators receive the full permission surface even if the roles table has not caught up during an upgrade.
   const permissions = account.role === 'administrator'
     ? [...allowedPermissions]
-    : await AuthAccountModel.getPermissionsForAccount(account.id);
+    : explicitPermissions;
 
-  return { ...account, permissions };
+  return { ...account, permissions, explicitPermissions };
 }
 
 const registrationModes = ['public', 'invite-only', 'disabled'] as const;

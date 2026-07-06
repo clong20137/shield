@@ -12,6 +12,7 @@ export interface AuthAccount {
   profilePictureUrl: string;
   role: string;
   permissions?: string[];
+  explicitPermissions?: string[];
   district: string;
   isActive: boolean;
   mustChangePassword: boolean;
