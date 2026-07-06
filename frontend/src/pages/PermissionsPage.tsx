@@ -793,12 +793,12 @@ function PermissionsPage({
                 API Service Control
               </h3>
               <p className="mt-1 text-sm text-gray-700 dark:text-gray-200">
-                Use PM2 on the server so the Express API starts with Windows and comes back online after this restart action.
+                Run the Express API under PM2 or the ShieldApi Windows Service so it starts with Windows and comes back online after this restart action.
               </p>
               <div className="mt-3 grid gap-2 text-xs font-semibold text-gray-600 dark:text-gray-300 sm:grid-cols-2">
                 <code className="rounded bg-white px-2 py-1 dark:bg-gray-900">pm2 start ecosystem.config.cjs</code>
                 <code className="rounded bg-white px-2 py-1 dark:bg-gray-900">pm2 save</code>
-                <code className="rounded bg-white px-2 py-1 dark:bg-gray-900">pm2-startup install</code>
+                <code className="rounded bg-white px-2 py-1 dark:bg-gray-900">.\deployment\windows\install-shield-api-service.ps1</code>
                 <code className="rounded bg-white px-2 py-1 dark:bg-gray-900">pm2 monit</code>
               </div>
             </div>
@@ -815,7 +815,7 @@ function PermissionsPage({
             </button>
           </div>
           <p className="mt-3 text-xs text-amber-800 dark:text-amber-100">
-            Only use this after PM2 auto-start is configured. If the API is running from a normal terminal, it will shut down and must be started manually.
+            Only use this after PM2 or the ShieldApi Windows Service is configured. If the API is running from a normal terminal, it will shut down and must be started manually.
           </p>
         </div>
 

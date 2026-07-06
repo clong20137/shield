@@ -126,6 +126,79 @@ npm run build
 npm start
 ```
 
+### Using a Windows Service with NSSM
+
+Use this when you want Shield API to appear in **Windows Services** and automatically start whenever Windows starts. NSSM is used because `node.exe` is not a native Windows Service executable by itself.
+
+1. Install or download NSSM on the server:
+- With Chocolatey:
+```powershell
+choco install nssm
+```
+- Or download NSSM and note the path to `nssm.exe`, for example:
+```powershell
+C:\Tools\nssm\nssm.exe
+```
+
+2. Pull the latest code, install dependencies, and build:
+```powershell
+cd C:\inetpub\wwwroot\shield
+git pull
+cd backend
+npm install
+npm run build
+cd ..
+```
+
+3. Open **PowerShell as Administrator** and install the service:
+```powershell
+.\deployment\windows\install-shield-api-service.ps1
+```
+
+If NSSM is not on PATH, pass the path:
+```powershell
+.\deployment\windows\install-shield-api-service.ps1 -NssmPath C:\Tools\nssm\nssm.exe
+```
+
+4. Verify it is running:
+```powershell
+Get-Service ShieldApi
+```
+
+The service is installed as:
+- Service name: `ShieldApi`
+- Display name: `Shield API`
+- Startup type: automatic
+- Working directory: `C:\inetpub\wwwroot\shield\backend`
+- Entry point: `node dist\index.js`
+
+Logs are written to:
+```powershell
+C:\inetpub\wwwroot\shield\backend\logs\service-output.log
+C:\inetpub\wwwroot\shield\backend\logs\service-error.log
+```
+
+Common service commands:
+```powershell
+Restart-Service ShieldApi
+Stop-Service ShieldApi
+Start-Service ShieldApi
+Get-Service ShieldApi
+```
+
+To remove the service:
+```powershell
+.\deployment\windows\remove-shield-api-service.ps1
+```
+
+After pulling new code, rebuild and restart:
+```powershell
+cd C:\inetpub\wwwroot\shield\backend
+npm install
+npm run build
+Restart-Service ShieldApi
+```
+
 ### Using Docker (Optional)
 
 Create a `Dockerfile` in the backend directory:
