@@ -57,8 +57,15 @@ export interface FleetBookingCalendarInput {
   location: string;
   vehicleLabel: string;
   status: string;
+  statusLabel?: string;
   notes: string;
 }
+
+const fleetBookingStatusColors: Record<string, string> = {
+  requested: '#D97706',
+  approved: '#16A34A',
+  denied: '#DC2626',
+};
 
 function formatDate(value: Date | string): string {
   if (typeof value === 'string') {
@@ -127,6 +134,7 @@ export class CalendarEntryModel {
       location: input.location,
       vehicle: input.vehicleLabel,
       status: input.status,
+      statusLabel: input.statusLabel || input.status,
       notes: input.notes,
     };
     const entry = {
@@ -136,7 +144,7 @@ export class CalendarEntryModel {
       dutyHours: '0',
       districtWorked: input.location || 'Headquarters',
       specialStatus: 'None',
-      color: '#9C865C',
+      color: fleetBookingStatusColors[input.status] || '#9C865C',
       details,
       submissionStatus: 'Submitted' as const,
     };

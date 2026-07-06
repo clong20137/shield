@@ -575,6 +575,74 @@ const getDailyReviewIcon = (entry?: CalendarEntry | null) => {
   return ShieldAlert;
 };
 
+function isFleetBookingEntry(entry?: CalendarEntry | null): boolean {
+  return entry?.details?.source === 'Fleet' || Boolean(entry?.details?.fleetBookingId);
+}
+
+function getFleetBookingStatus(entry?: CalendarEntry | null): 'requested' | 'approved' | 'denied' | 'canceled' {
+  const status = (entry?.details?.status || '').toLowerCase();
+  if (['approved', 'approve', 'accepted', 'confirmed'].includes(status)) {
+    return 'approved';
+  }
+
+  if (['denied', 'deny', 'declined', 'rejected', 'returned'].includes(status)) {
+    return 'denied';
+  }
+
+  if (['canceled', 'cancelled', 'cancel'].includes(status)) {
+    return 'canceled';
+  }
+
+  return 'requested';
+}
+
+function getFleetBookingStatusLabel(entry?: CalendarEntry | null): string {
+  const explicitLabel = entry?.details?.statusLabel?.trim();
+  if (explicitLabel) {
+    return explicitLabel;
+  }
+
+  const status = getFleetBookingStatus(entry);
+  return status === 'approved' ? 'Approved' : status === 'denied' ? 'Denied' : status === 'canceled' ? 'Canceled' : 'Requested';
+}
+
+function getFleetBookingBadgeClass(entry?: CalendarEntry | null): string {
+  const status = getFleetBookingStatus(entry);
+  if (status === 'approved') {
+    return 'bg-green-50 text-green-700 ring-green-200 dark:bg-green-950/40 dark:text-green-100 dark:ring-green-900';
+  }
+
+  if (status === 'denied' || status === 'canceled') {
+    return 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-950/40 dark:text-red-100 dark:ring-red-900';
+  }
+
+  return 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-900';
+}
+
+function getCalendarEntryDisplay(entry: CalendarEntry) {
+  if (isFleetBookingEntry(entry)) {
+    const title = entry.details?.title || 'Fleet Booking';
+    const vehicle = entry.details?.vehicle ? ` - ${entry.details.vehicle}` : '';
+    const location = entry.details?.location || entry.districtWorked;
+    const start = entry.details?.startAt ? new Date(entry.details.startAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+    const timePrefix = start ? `${start} - ` : '';
+    return {
+      title: `${timePrefix}${title}`,
+      subtitle: `${location}${vehicle}`,
+      badge: getFleetBookingStatusLabel(entry),
+      titleAttribute: `${title}${vehicle} - ${getFleetBookingStatusLabel(entry)}${location ? ` - ${location}` : ''}`,
+    };
+  }
+
+  const reviewLabel = getDailyReviewLabel(entry);
+  return {
+    title: `${entry.submissionStatus === 'Draft' ? 'Draft - ' : ''}${entry.dutyHours}h ${entry.districtWorked}`,
+    subtitle: `${entry.submissionStatus === 'Draft' ? 'Draft' : 'Submitted'} - ${entry.dutyHours} duty hours - ${entry.specialStatus}`,
+    badge: entry.submissionStatus === 'Submitted' && getDailyReviewStatus(entry) === 'Approved' ? 'Approved' : '',
+    titleAttribute: `${entry.dutyHours} hours - ${entry.districtWorked}${reviewLabel ? ` - ${reviewLabel}` : ''}`,
+  };
+}
+
 const formatDailyReviewedAt = (value?: string | null): string | null => {
   if (!value) {
     return null;
@@ -3026,16 +3094,23 @@ function CalendarPage({
                   </div>
                   <div className="hidden space-y-1 sm:block">
                     {dayEntries.slice(0, 3).map((entry) => {
-                      const reviewLabel = getDailyReviewLabel(entry);
+                      const display = getCalendarEntryDisplay(entry);
+                      const isFleetBooking = isFleetBookingEntry(entry);
                       return (
                         <div
                           key={entry.id}
                           className="truncate rounded px-2 py-1 text-xs font-semibold text-white"
                           style={{ backgroundColor: entry.color }}
-                          title={`${entry.dutyHours} hours - ${entry.districtWorked}${reviewLabel ? ` - ${reviewLabel}` : ''}`}
+                          title={display.titleAttribute}
                         >
-                          {entry.submissionStatus === 'Draft' ? 'Draft - ' : ''}{entry.dutyHours}h {entry.districtWorked}
-                          {entry.submissionStatus === 'Submitted' && getDailyReviewStatus(entry) === 'Approved' && (
+                          {isFleetBooking && <Truck size={11} className="mr-1 inline-block align-[-2px]" />}
+                          {display.title}
+                          {isFleetBooking && (
+                            <span className="ml-1 inline-flex items-center rounded-full bg-white/25 px-1 py-0.5 text-[9px] uppercase">
+                              {display.badge}
+                            </span>
+                          )}
+                          {!isFleetBooking && entry.submissionStatus === 'Submitted' && getDailyReviewStatus(entry) === 'Approved' && (
                             <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1 py-0.5 text-[9px] uppercase">
                               <BadgeCheck size={10} />
                               Approved
@@ -3088,20 +3163,30 @@ function CalendarPage({
                   <div className="space-y-2">
                     {dayEntries.length === 0 ? (
                       <p className="text-xs font-semibold text-gray-400">No report</p>
-                    ) : dayEntries.map((entry) => (
-                      <div key={entry.id} className="rounded px-2 py-1.5 text-xs font-bold text-white" style={{ backgroundColor: entry.color }}>
-                        <div className="mb-1 flex flex-wrap items-center gap-1">
-                          {entry.submissionStatus === 'Draft' && <span className="inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] uppercase">Draft</span>}
-                          {entry.submissionStatus === 'Submitted' && getDailyReviewStatus(entry) === 'Approved' && (
-                            <span className="inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] uppercase">
-                              <BadgeCheck size={11} />
-                              Approved
-                            </span>
-                          )}
+                    ) : dayEntries.map((entry) => {
+                      const display = getCalendarEntryDisplay(entry);
+                      const isFleetBooking = isFleetBookingEntry(entry);
+                      return (
+                        <div key={entry.id} className="rounded px-2 py-1.5 text-xs font-bold text-white" style={{ backgroundColor: entry.color }} title={display.titleAttribute}>
+                          <div className="mb-1 flex flex-wrap items-center gap-1">
+                            {isFleetBooking && (
+                              <span className="inline-flex items-center gap-1 rounded bg-white/25 px-1.5 py-0.5 text-[10px] uppercase">
+                                <Truck size={11} />
+                                {display.badge}
+                              </span>
+                            )}
+                            {!isFleetBooking && entry.submissionStatus === 'Draft' && <span className="inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] uppercase">Draft</span>}
+                            {!isFleetBooking && entry.submissionStatus === 'Submitted' && getDailyReviewStatus(entry) === 'Approved' && (
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] uppercase">
+                                <BadgeCheck size={11} />
+                                Approved
+                              </span>
+                            )}
+                          </div>
+                          {display.title}<br />{display.subtitle}
                         </div>
-                        {entry.dutyHours}h<br />{entry.districtWorked}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </button>
               );
@@ -3131,31 +3216,41 @@ function CalendarPage({
               </button>
             ) : (
               <div className="space-y-3">
-                {activeViewEntries.map((entry) => (
-                  <button
-                    key={entry.id}
-                    type="button"
-                    onClick={() => openDay(entry.date)}
-                    onContextMenu={(event) => openDailyStripContextMenu(event, entry.date, entry)}
-                    className="w-full rounded border border-gray-200 p-4 text-left transition hover:border-accent hover:bg-accent/5 dark:border-gray-800"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="font-bold text-gray-900 dark:text-gray-100">{entry.districtWorked}</p>
-                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                          {entry.submissionStatus === 'Draft' ? 'Draft - ' : 'Submitted - '}{entry.dutyHours} duty hours - {entry.specialStatus}
-                        </p>
-                        {entry.submissionStatus === 'Submitted' && (
-                          <span className={`mt-2 inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-bold ${getDailyReviewBadgeClass(entry)}`}>
-                            {React.createElement(getDailyReviewIcon(entry), { size: 13 })}
-                            {getDailyReviewLabel(entry)}
-                          </span>
-                        )}
+                {activeViewEntries.map((entry) => {
+                  const display = getCalendarEntryDisplay(entry);
+                  const isFleetBooking = isFleetBookingEntry(entry);
+                  return (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      onClick={() => openDay(entry.date)}
+                      onContextMenu={(event) => openDailyStripContextMenu(event, entry.date, entry)}
+                      className="w-full rounded border border-gray-200 p-4 text-left transition hover:border-accent hover:bg-accent/5 dark:border-gray-800"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="flex flex-wrap items-center gap-2 font-bold text-gray-900 dark:text-gray-100">
+                            {isFleetBooking && <Truck size={16} className="text-accent" />}
+                            {isFleetBooking ? display.title : entry.districtWorked}
+                          </p>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{display.subtitle}</p>
+                          {isFleetBooking ? (
+                            <span className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-bold ring-1 ${getFleetBookingBadgeClass(entry)}`}>
+                              <Truck size={13} />
+                              {display.badge}
+                            </span>
+                          ) : entry.submissionStatus === 'Submitted' && (
+                            <span className={`mt-2 inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-bold ${getDailyReviewBadgeClass(entry)}`}>
+                              {React.createElement(getDailyReviewIcon(entry), { size: 13 })}
+                              {getDailyReviewLabel(entry)}
+                            </span>
+                          )}
+                        </div>
+                        <span className="h-4 w-4 rounded-full" style={{ backgroundColor: entry.color }} />
                       </div>
-                      <span className="h-4 w-4 rounded-full" style={{ backgroundColor: entry.color }} />
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -3985,9 +4080,24 @@ function CalendarPage({
           <span className="block text-accent">{dailyStripTooltip.dateKey}</span>
           {dailyStripTooltip.entry ? (
             <>
-              <span className="mt-1 block">{dailyStripTooltip.entry.submissionStatus} - {dailyStripTooltip.entry.dutyHours || 0}h</span>
-              <span className="mt-0.5 block text-gray-300">{dailyStripTooltip.entry.districtWorked || 'No district'}</span>
-              {dailyStripTooltip.entry.submissionStatus === 'Submitted' && (
+              {isFleetBookingEntry(dailyStripTooltip.entry) ? (
+                <>
+                  <span className="mt-1 flex items-center gap-1">
+                    <Truck size={12} />
+                    {getCalendarEntryDisplay(dailyStripTooltip.entry).title}
+                  </span>
+                  <span className="mt-0.5 block text-gray-300">{getCalendarEntryDisplay(dailyStripTooltip.entry).subtitle}</span>
+                  <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${getFleetBookingStatus(dailyStripTooltip.entry) === 'approved' ? 'bg-green-500/20 text-green-100' : getFleetBookingStatus(dailyStripTooltip.entry) === 'denied' ? 'bg-red-500/20 text-red-100' : 'bg-amber-500/20 text-amber-100'}`}>
+                    {getFleetBookingStatusLabel(dailyStripTooltip.entry)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="mt-1 block">{dailyStripTooltip.entry.submissionStatus} - {dailyStripTooltip.entry.dutyHours || 0}h</span>
+                  <span className="mt-0.5 block text-gray-300">{dailyStripTooltip.entry.districtWorked || 'No district'}</span>
+                </>
+              )}
+              {!isFleetBookingEntry(dailyStripTooltip.entry) && dailyStripTooltip.entry.submissionStatus === 'Submitted' && (
                 <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${
                   getDailyReviewStatus(dailyStripTooltip.entry) === 'Approved'
                     ? 'bg-green-500/20 text-green-100'
