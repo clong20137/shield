@@ -170,32 +170,6 @@ function escapeCsv(value: string | number | undefined | null): string {
   return /[",\n]/u.test(text) ? `"${text.replace(/"/gu, '""')}"` : text;
 }
 
-function parseCsvLine(line: string): string[] {
-  const values: string[] = [];
-  let current = '';
-  let inQuotes = false;
-
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index];
-    const nextChar = line[index + 1];
-
-    if (char === '"' && inQuotes && nextChar === '"') {
-      current += '"';
-      index += 1;
-    } else if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      values.push(current);
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-
-  values.push(current);
-  return values;
-}
-
 function hasCsvDataRows(text: string): boolean {
   let lineStart = 0;
   let rowIndex = 0;
@@ -346,7 +320,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [pageContextMenu, setPageContextMenu] = useState<AppContextMenuPosition | null>(null);
   const [devicePendingDelete, setDevicePendingDelete] = useState<DeviceRecord | null>(null);
   const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false);
-  const [isDeletePhonesConfirmOpen, setIsDeletePhonesConfirmOpen] = useState(false);
   const [eventNotes, setEventNotes] = useState('');
   const [assigneeSearch, setAssigneeSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -671,23 +644,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     }
   };
 
-  const deleteAllPhones = async () => {
-    if (!canManageDevices) return;
-
-    try {
-      setError(null);
-      setDeviceNotice(null);
-      const response = await deviceService.deletePhones();
-      setPhoneImportSummary(null);
-      setIsDeletePhonesConfirmOpen(false);
-      await loadDevices(false);
-      setDeviceNotice(`Deleted ${response.data.deletedCount} phone and Cradlepoint records.`);
-    } catch (err) {
-      console.error('Failed to delete phone inventory:', err);
-      setError('Failed to delete phone inventory.');
-    }
-  };
-
   const exportCsv = () => {
     const headers = [
       'type',
@@ -722,57 +678,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     link.download = `shield-device-inventory-page-${safePage}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-  };
-
-  const exportPhoneInventory = async () => {
-    if (!canManageDevices) return;
-
-    try {
-      setError(null);
-      const response = await deviceService.exportPhones();
-      const url = URL.createObjectURL(response.data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'shield-phone-inventory.csv';
-      link.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Failed to export phones:', err);
-      setError('Failed to export phone inventory.');
-    }
-  };
-
-  const importCsv = async (event: ChangeEvent<HTMLInputElement>) => {
-    if (!canManageDevices) return;
-
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const text = await file.text();
-    const [headerLine, ...lines] = text.split(/\r?\n/u).filter(Boolean);
-    const headers = parseCsvLine(headerLine);
-
-    try {
-      const importedDevices = await Promise.all(
-        lines.map((line) => {
-          const values = parseCsvLine(line);
-          const nextForm = { ...defaultDeviceForm };
-          headers.forEach((header, index) => {
-            const normalizedHeader = header === 'iccid' ? 'simNumber' : header;
-            if (normalizedHeader in nextForm) {
-              (nextForm as Record<string, string>)[normalizedHeader] = values[index] || '';
-            }
-          });
-          return deviceService.create({ ...cleanDeviceFormForType(nextForm), ...actor, eventNotes: 'Imported from CSV.' });
-        }),
-      );
-      setDevices((currentDevices) => [...importedDevices.map((response) => response.data), ...currentDevices]);
-    } catch (err) {
-      console.error('Failed to import devices:', err);
-      setError('Failed to import CSV. Check required fields and duplicate asset tags.');
-    } finally {
-      event.target.value = '';
-    }
   };
 
   const importPhoneCsv = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -904,11 +809,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             Track assigned equipment, maintenance, inventory status, and ownership history.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="rounded bg-accent/10 px-4 py-2 text-sm font-bold text-accent">
-            {totalDevices} total devices
-          </div>
-        </div>
       </div>
 
       {error && <div className="error">{error}</div>}
@@ -972,40 +872,18 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             </div>
             <div className="flex flex-wrap justify-start gap-2 sm:justify-end">
               {canManageDevices && (
-                <button type="button" onClick={openAddDeviceModal} className="btn-primary" title="Add Device" aria-label="Add Device">
+                <button type="button" onClick={openAddDeviceModal} className="btn-primary h-10 w-10 justify-center p-0" title="Add Device" aria-label="Add Device">
                   <Plus size={16} />
-                  <span>Add Device</span>
                 </button>
               )}
-              <button type="button" onClick={exportCsv} className="btn-secondary" title="Export current page" aria-label="Export current page">
+              <button type="button" onClick={exportCsv} className="btn-secondary h-10 w-10 justify-center p-0" title="Export current page" aria-label="Export current page">
                 <Download size={16} />
-                <span>Export Page</span>
               </button>
               {canManageDevices && (
-                <button type="button" onClick={() => void exportPhoneInventory()} className="btn-secondary" title="Export all phones" aria-label="Export all phones">
-                  <Smartphone size={16} />
-                  <span>Export Phones</span>
-                </button>
-              )}
-              {canManageDevices && (
-                <label className="btn-secondary cursor-pointer" title="Import CSV" aria-label="Import CSV">
+                <label className="btn-secondary h-10 w-10 cursor-pointer justify-center p-0" title="Import phone CSV" aria-label="Import phone CSV">
                   <Upload size={16} />
-                  <span>Import</span>
-                  <input type="file" accept=".csv" className="hidden" onChange={importCsv} />
-                </label>
-              )}
-              {canManageDevices && (
-                <label className="btn-secondary cursor-pointer" title="Import phone CSV" aria-label="Import phone CSV">
-                  <Upload size={16} />
-                  <span>Import Phones</span>
                   <input type="file" accept=".csv" className="hidden" onChange={importPhoneCsv} />
                 </label>
-              )}
-              {canManageDevices && (
-                <button type="button" onClick={() => setIsDeletePhonesConfirmOpen(true)} className="btn-danger" title="Delete all phones" aria-label="Delete all phones">
-                  <Trash2 size={16} />
-                  <span>Delete Phones</span>
-                </button>
               )}
             </div>
           </div>
@@ -1344,26 +1222,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         </div>,
         document.body,
       )}
-      {isDeletePhonesConfirmOpen && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/45 px-4 pt-[12dvh]">
-          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Phones</h2>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Delete every Cell Phone and Cradlepoint device record? Radios, computers, and MiFis will stay untouched.
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setIsDeletePhonesConfirmOpen(false)} className="btn-secondary" aria-label="Cancel phone deletion" title="Cancel">
-                <span>Cancel</span>
-              </button>
-              <button type="button" onClick={() => void deleteAllPhones()} className="btn-danger" aria-label="Delete phones" title="Delete Phones">
-                <Trash2 size={16} />
-                <span>Delete All</span>
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )}
       {pageContextMenu && (
         <AppContextMenu
           position={pageContextMenu}
@@ -1372,8 +1230,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             { label: 'Refresh Inventory', icon: RefreshCw, onSelect: () => void loadDevices(false), disabled: !canManageDevices },
             { label: 'Add Device', icon: Plus, onSelect: openAddDeviceModal, disabled: !canManageDevices },
             { label: 'Export Page', icon: Download, onSelect: exportCsv, disabled: devices.length === 0 },
-            { label: 'Export Phones', icon: Smartphone, onSelect: () => void exportPhoneInventory(), disabled: !canManageDevices },
-            { label: 'Delete Phones', icon: Trash2, onSelect: () => setIsDeletePhonesConfirmOpen(true), disabled: !canManageDevices },
             { label: 'Clear Filters', icon: X, onSelect: clearDeviceView },
           ]}
         />
