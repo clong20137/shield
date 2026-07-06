@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { DeviceModel } from '../models/Device';
+import { Device, DeviceInput, DeviceModel } from '../models/Device';
 import { AuthAccountModel } from '../models/AuthAccount';
-import { UserModel } from '../models/User';
+import { User, UserModel } from '../models/User';
 import { broadcastAppEvent } from '../services/appEvents';
 import { getSessionAccount } from '../middleware/authSession';
 import { cleanMultiline, cleanString, isOneOf, isValidIsoDate, isValidPhone, normalizePhone } from '../utils/validation';
@@ -19,6 +19,162 @@ function isDuplicateAssetTagError(error: unknown): boolean {
 const deviceTypes = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio', 'Cradlepoint'] as const;
 const deviceStatuses = ['Available', 'Assigned', 'Maintenance', 'Retired', 'Damaged', 'Lost'] as const;
 const deviceConditions = ['New', 'Good', 'Fair', 'Poor', 'Damaged'] as const;
+
+type PhoneImportRow = Record<string, unknown>;
+
+const phoneExportHeaders = [
+  'assetTag',
+  'makeModel',
+  'serialNumber',
+  'assignedTo',
+  'status',
+  'location',
+  'phoneNumber',
+  'imei',
+  'iccid',
+  'replacementDueDate',
+  'condition',
+  'notes',
+];
+
+function normalizeDigits(value: unknown): string {
+  return String(value || '').replace(/\D/gu, '');
+}
+
+function normalizeKey(value: unknown): string {
+  return String(value || '').trim().toLowerCase();
+}
+
+function normalizeLooseKey(value: unknown): string {
+  return normalizeKey(value).replace(/[^a-z0-9]/gu, '');
+}
+
+function csvEscape(value: unknown): string {
+  const text = String(value ?? '');
+  return /[",\r\n]/u.test(text) ? `"${text.replace(/"/gu, '""')}"` : text;
+}
+
+function getImportValue(row: PhoneImportRow, aliases: string[]): string {
+  const normalizedAliases = aliases.map(normalizeLooseKey);
+  const entry = Object.entries(row).find(([key]) => normalizedAliases.includes(normalizeLooseKey(key)));
+  return cleanString(entry?.[1], 500);
+}
+
+function getDisplayName(user: User): string {
+  return `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || user.id;
+}
+
+function buildUserMatcher(users: User[]): Map<string, string> {
+  const matcher = new Map<string, string>();
+
+  users.forEach((user) => {
+    const label = user.email || getDisplayName(user);
+    const addKey = (value: unknown, loose = false) => {
+      const key = loose ? normalizeLooseKey(value) : normalizeKey(value);
+      if (key && !matcher.has(key)) {
+        matcher.set(key, label);
+      }
+    };
+    const fullName = getDisplayName(user);
+    const lastFirst = `${user.lastName || ''} ${user.firstName || ''}`.trim();
+
+    addKey(user.email);
+    addKey(fullName);
+    addKey(lastFirst);
+    addKey(fullName, true);
+    addKey(lastFirst, true);
+    addKey(user.peNumber, true);
+    addKey(user.badgeNumber, true);
+    addKey(user.radioNumber, true);
+
+    [user.departmentPhoneNumber, user.personalPhoneNumber].forEach((phone) => {
+      const digits = normalizeDigits(phone);
+      if (digits.length >= 7 && !matcher.has(digits)) {
+        matcher.set(digits, label);
+      }
+    });
+  });
+
+  return matcher;
+}
+
+function resolveAssignedTo(row: PhoneImportRow, matcher: Map<string, string>): { assignedTo: string; matched: boolean } {
+  const identity = getImportValue(row, [
+    'assignedTo',
+    'assigned to',
+    'name',
+    'employeeName',
+    'employee name',
+    'user',
+    'email',
+    'peNumber',
+    'pe',
+    'badgeNumber',
+    'badge',
+    'radioNumber',
+    'radio',
+  ]);
+  const number = getImportValue(row, ['phoneNumber', 'phone number', 'wirelessNumber', 'wireless number', 'line', 'mobile']);
+  const candidates = [
+    normalizeKey(identity),
+    normalizeLooseKey(identity),
+    normalizeDigits(identity),
+    normalizeDigits(number),
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const match = matcher.get(candidate);
+    if (match) {
+      return { assignedTo: match, matched: true };
+    }
+  }
+
+  return { assignedTo: identity, matched: false };
+}
+
+function buildDeviceMatchKey(device: Device): string[] {
+  return [
+    device.assetTag ? `asset:${normalizeKey(device.assetTag)}` : '',
+    normalizeDigits(device.phoneNumber) ? `phone:${normalizeDigits(device.phoneNumber)}` : '',
+    device.imei ? `imei:${normalizeLooseKey(device.imei)}` : '',
+    device.simNumber ? `sim:${normalizeLooseKey(device.simNumber)}` : '',
+    device.serialNumber ? `serial:${normalizeLooseKey(device.serialNumber)}` : '',
+  ].filter(Boolean);
+}
+
+function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNumber: number): DeviceInput {
+  const phoneNumber = normalizePhone(getImportValue(row, ['phoneNumber', 'phone number', 'wirelessNumber', 'wireless number', 'line', 'mobile']));
+  const imei = getImportValue(row, ['imei', 'imei1', 'imei 1']);
+  const simNumber = getImportValue(row, ['iccid', 'simNumber', 'sim number', 'sim', 'eid']);
+  const condition = getImportValue(row, ['condition']);
+  const assetTag = getImportValue(row, ['assetTag', 'asset tag', 'deviceId', 'device id', 'inventoryId', 'inventory id'])
+    || (phoneNumber ? `PHONE-${normalizeDigits(phoneNumber).slice(-4)}` : '')
+    || (imei ? `IMEI-${normalizeLooseKey(imei).slice(-6)}` : '')
+    || `PHONE-IMPORT-${rowNumber}`;
+
+  return {
+    type: 'Cell Phone',
+    assetTag,
+    makeModel: getImportValue(row, ['makeModel', 'make model', 'model', 'device', 'description']) || 'Agency Phone',
+    serialNumber: getImportValue(row, ['serialNumber', 'serial number', 'serial']),
+    assignedTo,
+    status: assignedTo ? 'Assigned' : 'Available',
+    location: getImportValue(row, ['location', 'site', 'district']),
+    notes: getImportValue(row, ['notes', 'note']),
+    phoneNumber,
+    imei,
+    simNumber,
+    radioId: '',
+    hostname: '',
+    routerId: '',
+    warrantyExpiration: '',
+    replacementDueDate: getImportValue(row, ['replacementDueDate', 'replacement due date']),
+    maintenanceDueDate: '',
+    lastServiceDate: '',
+    purchaseDate: getImportValue(row, ['purchaseDate', 'purchase date']),
+    condition: condition === 'Excellent' ? 'New' : isOneOf(condition, deviceConditions) ? condition : 'Good',
+  };
+}
 
 function validateDevicePayload(body: Record<string, unknown>) {
   const type = cleanString(body.type, 50);
@@ -149,6 +305,130 @@ export class DeviceController {
     } catch (error) {
       console.error('Device list error:', error);
       res.status(500).json({ error: 'Failed to load devices' });
+    }
+  }
+
+  static async exportPhones(req: Request, res: Response) {
+    try {
+      const phones = await DeviceModel.listPhoneDevices();
+      const rows = phones.map((device) =>
+        phoneExportHeaders.map((header) => {
+          const value = header === 'iccid' ? device.simNumber : device[header as keyof Device];
+          return csvEscape(value);
+        }).join(','),
+      );
+      const csv = [phoneExportHeaders.join(','), ...rows].join('\n');
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="shield-phone-inventory.csv"');
+      res.send(csv);
+    } catch (error) {
+      console.error('Phone export error:', error);
+      res.status(500).json({ error: 'Failed to export phones' });
+    }
+  }
+
+  static async importPhones(req: Request, res: Response) {
+    try {
+      const rows = Array.isArray(req.body?.rows) ? req.body.rows as PhoneImportRow[] : [];
+      const actorId = cleanString(req.body?.actorId, 36);
+      const actorName = cleanString(req.body?.actorName, 150);
+
+      if (rows.length === 0) {
+        return res.status(400).json({ error: 'Import rows are required' });
+      }
+
+      const users = await UserModel.getAllUsers(10000, 0, true);
+      const userMatcher = buildUserMatcher(users);
+      const existingPhones = await DeviceModel.listPhoneDevices();
+      const deviceMatcher = new Map<string, Device>();
+      existingPhones.forEach((device) => {
+        buildDeviceMatchKey(device).forEach((key) => {
+          if (!deviceMatcher.has(key)) {
+            deviceMatcher.set(key, device);
+          }
+        });
+      });
+
+      const summary = {
+        totalRows: rows.length,
+        createdCount: 0,
+        updatedCount: 0,
+        matchedCount: 0,
+        unmatchedRows: [] as Array<{ rowNumber: number; reason: string; row: PhoneImportRow }>,
+        skippedRows: [] as Array<{ rowNumber: number; reason: string; row: PhoneImportRow }>,
+      };
+      const changedDeviceIds = new Set<string>();
+
+      for (const [index, row] of rows.entries()) {
+        const rowNumber = index + 2;
+        const assignment = resolveAssignedTo(row, userMatcher);
+        const importedDevice = buildImportedPhoneDevice(row, assignment.assignedTo, rowNumber);
+        const validation = validateDevicePayload(importedDevice as unknown as Record<string, unknown>);
+
+        if (validation.error || !validation.value) {
+          summary.skippedRows.push({ rowNumber, reason: validation.error || 'Invalid phone row', row });
+          continue;
+        }
+
+        if (assignment.matched) {
+          summary.matchedCount += 1;
+        } else if (assignment.assignedTo) {
+          summary.unmatchedRows.push({ rowNumber, reason: 'Could not match assignment to a SHIELD user', row });
+        }
+
+        const matchKeys = buildDeviceMatchKey(validation.value as Device);
+        const existingDevice = matchKeys.map((key) => deviceMatcher.get(key)).find(Boolean);
+
+        if (existingDevice) {
+          const mergedDevice = {
+            ...existingDevice,
+            ...validation.value,
+            serialNumber: validation.value.serialNumber || existingDevice.serialNumber,
+            location: validation.value.location || existingDevice.location,
+            notes: validation.value.notes || existingDevice.notes,
+            replacementDueDate: validation.value.replacementDueDate || existingDevice.replacementDueDate,
+            purchaseDate: validation.value.purchaseDate || existingDevice.purchaseDate,
+            condition: validation.value.condition || existingDevice.condition,
+          };
+          const updated = await DeviceModel.updateDevice(existingDevice.id, mergedDevice, {
+            action: 'Phone Import',
+            actorId,
+            actorName,
+            assignedTo: mergedDevice.assignedTo,
+            status: mergedDevice.status,
+            notes: assignment.matched ? 'Updated from phone import and matched to user.' : 'Updated from phone import.',
+          });
+
+          if (updated) {
+            summary.updatedCount += 1;
+            changedDeviceIds.add(updated.id);
+            buildDeviceMatchKey(updated).forEach((key) => deviceMatcher.set(key, updated));
+          }
+        } else {
+          const created = await DeviceModel.createDevice(validation.value, {
+            action: 'Phone Import',
+            actorId,
+            actorName,
+            assignedTo: validation.value.assignedTo,
+            status: validation.value.status,
+            notes: assignment.matched ? 'Created from phone import and matched to user.' : 'Created from phone import.',
+          });
+          summary.createdCount += 1;
+          changedDeviceIds.add(created.id);
+          buildDeviceMatchKey(created).forEach((key) => deviceMatcher.set(key, created));
+        }
+      }
+
+      changedDeviceIds.forEach((id) => broadcastAppEvent({ type: 'device-updated', entityId: id }));
+      res.json(summary);
+    } catch (error) {
+      if (isDuplicateAssetTagError(error)) {
+        return res.status(409).json({ error: 'A phone with that asset tag already exists' });
+      }
+
+      console.error('Phone import error:', error);
+      res.status(500).json({ error: 'Failed to import phones' });
     }
   }
 

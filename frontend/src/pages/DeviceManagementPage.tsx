@@ -12,6 +12,14 @@ type DeviceForm = Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'>;
 type DeviceConditionalField = 'phoneNumber' | 'imei' | 'simNumber' | 'radioId' | 'hostname' | 'routerId';
 type SortKey = keyof Pick<DeviceRecord, 'type' | 'assetTag' | 'makeModel' | 'assignedTo' | 'status' | 'location' | 'maintenanceDueDate' | 'replacementDueDate' | 'updatedAt'>;
 type ScanMode = 'lookup' | 'check-in' | 'check-out';
+type PhoneImportSummary = {
+  totalRows: number;
+  createdCount: number;
+  updatedCount: number;
+  matchedCount: number;
+  unmatchedCount: number;
+  skippedCount: number;
+};
 
 const deviceTypes: DeviceType[] = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio', 'Cradlepoint'];
 const deviceStatuses: DeviceStatus[] = ['Available', 'Assigned', 'Maintenance', 'Damaged', 'Lost', 'Retired'];
@@ -178,6 +186,22 @@ function parseCsvLine(line: string): string[] {
   return values;
 }
 
+function parseCsvRows(text: string): Record<string, string>[] {
+  const [headerLine, ...lines] = text.split(/\r?\n/u).filter((line) => line.trim().length > 0);
+  if (!headerLine) {
+    return [];
+  }
+
+  const headers = parseCsvLine(headerLine).map((header) => header.trim());
+  return lines.map((line) => {
+    const values = parseCsvLine(line);
+    return headers.reduce<Record<string, string>>((row, header, index) => {
+      row[header] = values[index] || '';
+      return row;
+    }, {});
+  });
+}
+
 function formatDate(value: string): string {
   return value ? new Date(value).toLocaleDateString() : 'N/A';
 }
@@ -304,6 +328,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [isCameraScanActive, setIsCameraScanActive] = useState(false);
   const [cameraScanStatus, setCameraScanStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [phoneImportSummary, setPhoneImportSummary] = useState<PhoneImportSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
   const [deviceTableScrollTop, setDeviceTableScrollTop] = useState(0);
@@ -762,6 +787,24 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     URL.revokeObjectURL(url);
   };
 
+  const exportPhoneInventory = async () => {
+    if (!canManageDevices) return;
+
+    try {
+      setError(null);
+      const response = await deviceService.exportPhones();
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'shield-phone-inventory.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export phones:', err);
+      setError('Failed to export phone inventory.');
+    }
+  };
+
   const importCsv = async (event: ChangeEvent<HTMLInputElement>) => {
     if (!canManageDevices) return;
 
@@ -790,6 +833,39 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     } catch (err) {
       console.error('Failed to import devices:', err);
       setError('Failed to import CSV. Check required fields and duplicate asset tags.');
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  const importPhoneCsv = async (event: ChangeEvent<HTMLInputElement>) => {
+    if (!canManageDevices) return;
+
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setError(null);
+      setPhoneImportSummary(null);
+      const rows = parseCsvRows(await file.text());
+      if (rows.length === 0) {
+        setError('Phone import CSV is empty.');
+        return;
+      }
+
+      const response = await deviceService.importPhones({ rows, ...actor });
+      setPhoneImportSummary({
+        totalRows: response.data.totalRows,
+        createdCount: response.data.createdCount,
+        updatedCount: response.data.updatedCount,
+        matchedCount: response.data.matchedCount,
+        unmatchedCount: response.data.unmatchedRows.length,
+        skippedCount: response.data.skippedRows.length,
+      });
+      await loadDevices(false);
+    } catch (err) {
+      console.error('Failed to import phones:', err);
+      setError('Failed to import phone CSV. Check columns, phone numbers, and duplicate asset tags.');
     } finally {
       event.target.value = '';
     }
@@ -851,6 +927,11 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       </div>
 
       {error && <div className="error">{error}</div>}
+      {phoneImportSummary && (
+        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-100">
+          Phone import complete: {phoneImportSummary.createdCount} created, {phoneImportSummary.updatedCount} updated, {phoneImportSummary.matchedCount} matched, {phoneImportSummary.unmatchedCount} unmatched, {phoneImportSummary.skippedCount} skipped from {phoneImportSummary.totalRows} rows.
+        </div>
+      )}
       {loading && <div className="loading">Loading device inventory...</div>}
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
@@ -1121,10 +1202,23 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             <span>Export Page</span>
           </button>
           {canManageDevices && (
+            <button type="button" onClick={() => void exportPhoneInventory()} className="btn-secondary" title="Export all phones" aria-label="Export all phones">
+              <Smartphone size={16} />
+              <span>Export Phones</span>
+            </button>
+          )}
+          {canManageDevices && (
             <label className="btn-secondary cursor-pointer" title="Import CSV" aria-label="Import CSV">
               <Upload size={16} />
               <span>Import</span>
               <input type="file" accept=".csv" className="hidden" onChange={importCsv} />
+            </label>
+          )}
+          {canManageDevices && (
+            <label className="btn-secondary cursor-pointer" title="Import phone CSV" aria-label="Import phone CSV">
+              <Upload size={16} />
+              <span>Import Phones</span>
+              <input type="file" accept=".csv" className="hidden" onChange={importPhoneCsv} />
             </label>
           )}
         </div>
@@ -1260,6 +1354,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             { label: 'Add Device', icon: Plus, onSelect: openAddDeviceModal, disabled: !canManageDevices },
             { label: 'Scan With Camera', icon: Camera, onSelect: () => void startCameraScanner(), disabled: !canManageDevices },
             { label: 'Export Page', icon: Download, onSelect: exportCsv, disabled: devices.length === 0 },
+            { label: 'Export Phones', icon: Smartphone, onSelect: () => void exportPhoneInventory(), disabled: !canManageDevices },
             { label: 'Clear Filters', icon: X, onSelect: clearDeviceView },
           ]}
         />

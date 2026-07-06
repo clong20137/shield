@@ -123,6 +123,23 @@ function normalizeDeviceInput(device: DeviceInput): DeviceInput {
 }
 
 export class DeviceModel {
+  static async listPhoneDevices(): Promise<Device[]> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<DeviceRow[]>(
+        `SELECT ${deviceColumns}
+        FROM devices
+        WHERE \`type\` = ?
+        ORDER BY \`assignedTo\`, \`assetTag\``,
+        ['Cell Phone']
+      );
+
+      return rows;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async listDevices(limit = 250, offset = 0, filters: DeviceListFilters = {}): Promise<DeviceListResult> {
     const conn = await pool.getConnection();
     try {

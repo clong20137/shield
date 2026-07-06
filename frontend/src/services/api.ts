@@ -888,6 +888,15 @@ export interface DeviceListResponse {
   totalPages: number;
 }
 
+export interface PhoneImportResponse {
+  totalRows: number;
+  createdCount: number;
+  updatedCount: number;
+  matchedCount: number;
+  unmatchedRows: Array<{ rowNumber: number; reason: string; row: Record<string, unknown> }>;
+  skippedRows: Array<{ rowNumber: number; reason: string; row: Record<string, unknown> }>;
+}
+
 export interface DeviceEvent {
   id: string;
   deviceId: string;
@@ -1426,6 +1435,12 @@ export const deviceService = {
 
   getAssignedToUser: (accountId: string) =>
     api.get<DeviceRecord[]>(`/devices/assigned/${accountId}`),
+
+  exportPhones: () =>
+    api.get<Blob>('/devices/phones/export', { responseType: 'blob' }),
+
+  importPhones: (payload: { rows: Record<string, string>[]; actorId?: string; actorName?: string }) =>
+    api.post<PhoneImportResponse>('/devices/phones/import', payload, { timeout: 60000 }),
 
   create: (device: Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'> & { actorId?: string; actorName?: string; eventNotes?: string }) =>
     api.post<DeviceRecord>('/devices', device),

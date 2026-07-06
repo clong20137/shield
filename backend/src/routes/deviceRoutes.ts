@@ -7,6 +7,8 @@ const router = Router();
 
 router.get('/assigned/me', requireAuthenticated(), DeviceController.listAssignedDevices);
 router.get('/assigned/:accountId', requireAuthenticated(), DeviceController.listAssignedDevicesForUser);
+router.get('/phones/export', requirePermission('devices:manage'), DeviceController.exportPhones);
+router.post('/phones/import', requirePermission('devices:manage'), DeviceController.importPhones);
 router.get('/', requirePermission('devices:manage'), DeviceController.listDevices);
 router.post('/', requirePermission('devices:manage'), DeviceController.createDevice);
 router.get('/:id/history', requirePermission('devices:manage'), DeviceController.listDeviceEvents);
