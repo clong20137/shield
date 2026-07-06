@@ -20,6 +20,12 @@ type PhoneImportSummary = {
   unmatchedCount: number;
   skippedCount: number;
 };
+type PhoneImportProgress = {
+  processedRows: number;
+  totalRows: number;
+  currentBatch: number;
+  totalBatches: number;
+};
 
 const deviceTypes: DeviceType[] = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio', 'Cradlepoint'];
 const deviceStatuses: DeviceStatus[] = ['Available', 'Assigned', 'Maintenance', 'Damaged', 'Lost', 'Retired'];
@@ -27,6 +33,7 @@ const deviceConditions = ['Excellent', 'Good', 'Fair', 'Poor', 'Damaged'];
 const DEVICE_TABLE_ROW_HEIGHT = 64;
 const DEVICE_TABLE_OVERSCAN = 8;
 const DEVICE_TABLE_MAX_HEIGHT = 620;
+const PHONE_IMPORT_BATCH_SIZE = 100;
 
 const defaultDeviceForm: DeviceForm = {
   type: 'Cell Phone',
@@ -329,6 +336,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [cameraScanStatus, setCameraScanStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [phoneImportSummary, setPhoneImportSummary] = useState<PhoneImportSummary | null>(null);
+  const [phoneImportProgress, setPhoneImportProgress] = useState<PhoneImportProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
   const [deviceTableScrollTop, setDeviceTableScrollTop] = useState(0);
@@ -853,20 +861,54 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         return;
       }
 
-      const response = await deviceService.importPhones({ rows, ...actor });
+      const totalBatches = Math.ceil(rows.length / PHONE_IMPORT_BATCH_SIZE);
+      const summary = {
+        totalRows: rows.length,
+        createdCount: 0,
+        updatedCount: 0,
+        matchedCount: 0,
+        unmatchedCount: 0,
+        skippedCount: 0,
+      };
+      setPhoneImportProgress({ processedRows: 0, totalRows: rows.length, currentBatch: 0, totalBatches });
+
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += 1) {
+        const batchStart = batchIndex * PHONE_IMPORT_BATCH_SIZE;
+        const batchRows = rows.slice(batchStart, batchStart + PHONE_IMPORT_BATCH_SIZE);
+        setPhoneImportProgress({
+          processedRows: batchStart,
+          totalRows: rows.length,
+          currentBatch: batchIndex + 1,
+          totalBatches,
+        });
+        const response = await deviceService.importPhones({ rows: batchRows, ...actor });
+        summary.createdCount += response.data.createdCount;
+        summary.updatedCount += response.data.updatedCount;
+        summary.matchedCount += response.data.matchedCount;
+        summary.unmatchedCount += response.data.unmatchedRows.length;
+        summary.skippedCount += response.data.skippedRows.length;
+        setPhoneImportProgress({
+          processedRows: Math.min(batchStart + batchRows.length, rows.length),
+          totalRows: rows.length,
+          currentBatch: batchIndex + 1,
+          totalBatches,
+        });
+      }
+
       setPhoneImportSummary({
-        totalRows: response.data.totalRows,
-        createdCount: response.data.createdCount,
-        updatedCount: response.data.updatedCount,
-        matchedCount: response.data.matchedCount,
-        unmatchedCount: response.data.unmatchedRows.length,
-        skippedCount: response.data.skippedRows.length,
+        totalRows: summary.totalRows,
+        createdCount: summary.createdCount,
+        updatedCount: summary.updatedCount,
+        matchedCount: summary.matchedCount,
+        unmatchedCount: summary.unmatchedCount,
+        skippedCount: summary.skippedCount,
       });
       await loadDevices(false);
     } catch (err) {
       console.error('Failed to import phones:', err);
       setError('Failed to import phone CSV. Check columns, phone numbers, and duplicate asset tags.');
     } finally {
+      setPhoneImportProgress(null);
       event.target.value = '';
     }
   };
@@ -933,6 +975,33 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         </div>
       )}
       {loading && <div className="loading">Loading device inventory...</div>}
+      {phoneImportProgress && (
+        <div className="modal-backdrop fixed inset-0 z-[80] flex items-center justify-center bg-black/45">
+          <div className="modal-window w-full max-w-md rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded bg-primary-100 text-primary-700 dark:bg-primary-950 dark:text-primary-100">
+                <Upload size={20} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Importing Phones</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Batch {phoneImportProgress.currentBatch} of {phoneImportProgress.totalBatches}
+                </p>
+              </div>
+            </div>
+            <div className="mb-2 flex justify-between text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <span>{phoneImportProgress.processedRows} of {phoneImportProgress.totalRows} rows</span>
+              <span>{Math.round((phoneImportProgress.processedRows / Math.max(phoneImportProgress.totalRows, 1)) * 100)}%</span>
+            </div>
+            <div className="h-3 overflow-hidden rounded bg-gray-200 dark:bg-gray-800">
+              <div
+                className="h-full rounded bg-primary-600 transition-all duration-300 dark:bg-primary-400"
+                style={{ width: `${Math.round((phoneImportProgress.processedRows / Math.max(phoneImportProgress.totalRows, 1)) * 100)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
       <DeviceStatusRail
