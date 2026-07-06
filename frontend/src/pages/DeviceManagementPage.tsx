@@ -1,7 +1,7 @@
 import { ChangeEvent, FormEvent, MouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { IScannerControls } from '@zxing/browser';
-import { AlertTriangle, ArchiveX, Camera, CheckCircle2, ChevronDown, ChevronRight, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, QrCode, Radio, RefreshCw, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
+import { AlertTriangle, ArchiveX, Camera, CheckCircle2, ChevronRight, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, QrCode, Radio, RefreshCw, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, deviceService, DeviceRecord } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
 import { AppContextMenu, AppContextMenuPosition, shouldUseNativeContextMenu } from '../components/AppContextMenu';
@@ -36,6 +36,7 @@ const DEVICE_TABLE_ROW_HEIGHT = 64;
 const DEVICE_TABLE_OVERSCAN = 8;
 const DEVICE_TABLE_MAX_HEIGHT = 620;
 const PHONE_IMPORT_POLL_MS = 900;
+const INVENTORY_TREE_COLLAPSE_KEY = 'shield_device_inventory_tree_collapsed';
 
 const defaultDeviceForm: DeviceForm = {
   type: 'Cell Phone',
@@ -337,6 +338,18 @@ function normalizeDeviceListResponse(
   };
 }
 
+function loadCollapsedInventoryTypes(): Record<string, boolean> {
+  try {
+    const storedValue = window.localStorage.getItem(INVENTORY_TREE_COLLAPSE_KEY);
+    const parsedValue = storedValue ? JSON.parse(storedValue) : {};
+    return parsedValue && typeof parsedValue === 'object' && !Array.isArray(parsedValue)
+      ? parsedValue as Record<string, boolean>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
 function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null }) {
   const [devices, setDevices] = useState<DeviceRecord[]>([]);
   const [registeredUsers, setRegisteredUsers] = useState<AuthAccount[]>([]);
@@ -354,7 +367,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [totalPages, setTotalPages] = useState(1);
   const [deviceTypeStatusCounts, setDeviceTypeStatusCounts] = useState<Record<string, Record<string, number>>>({});
   const [deviceModelCounts, setDeviceModelCounts] = useState<Record<string, number>>({});
-  const [collapsedInventoryTypes, setCollapsedInventoryTypes] = useState<Record<string, boolean>>({});
+  const [collapsedInventoryTypes, setCollapsedInventoryTypes] = useState<Record<string, boolean>>(() => loadCollapsedInventoryTypes());
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [pageContextMenu, setPageContextMenu] = useState<AppContextMenuPosition | null>(null);
   const [devicePendingDelete, setDevicePendingDelete] = useState<DeviceRecord | null>(null);
@@ -1040,6 +1053,20 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setPage(1);
   };
 
+  const toggleInventoryType = useCallback((type: DeviceType) => {
+    setCollapsedInventoryTypes((current) => {
+      const next = { ...current, [type]: !current[type] };
+
+      try {
+        window.localStorage.setItem(INVENTORY_TREE_COLLAPSE_KEY, JSON.stringify(next));
+      } catch {
+        // Local storage can fail in locked-down browser contexts.
+      }
+
+      return next;
+    });
+  }, []);
+
   const openPageContextMenu = (event: MouseEvent<HTMLElement>) => {
     if (event.defaultPrevented || shouldUseNativeContextMenu(event.target)) {
       return;
@@ -1113,7 +1140,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         activeStatus={statusFilter}
         onSelect={applyInventoryTreeFilter}
         collapsedTypes={collapsedInventoryTypes}
-        onToggleType={(type) => setCollapsedInventoryTypes((current) => ({ ...current, [type]: !current[type] }))}
+        onToggleType={toggleInventoryType}
       />
       <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
         <div className="mb-5 flex flex-col gap-4">
@@ -1639,6 +1666,8 @@ function DeviceInventoryTree({
     return deviceStatusMeta[status].cardTone;
   };
 
+  const getCountLabel = (count: number) => `${count} device${count === 1 ? '' : 's'}`;
+
   const typeEntries = deviceTypes.map((type) => {
     const counts = typeStatusCounts[type] || {};
     const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
@@ -1650,25 +1679,32 @@ function DeviceInventoryTree({
     <aside className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 xl:sticky xl:top-5 xl:max-h-[calc(100vh-2.5rem)] xl:overflow-y-auto">
       <div className="border-b border-gray-200 px-1 pb-3 dark:border-gray-800">
         <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Device Views</p>
-        <h2 className="mt-1 text-lg font-bold text-gray-900 dark:text-gray-100">Inventory</h2>
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Inventory</h2>
+          <span className="rounded bg-gray-100 px-2 py-1 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">
+            {allTotal}
+          </span>
+        </div>
       </div>
 
-      <div className="mt-3 space-y-1">
+      <div className="mt-3 space-y-1.5" role="tree" aria-label="Device inventory filters">
         <button
           type="button"
           onClick={() => onSelect('All', 'All')}
-          className={`flex w-full items-center gap-3 rounded border px-3 py-2.5 text-left transition hover:border-accent hover:bg-accent/10 ${
+          role="treeitem"
+          aria-current={activeType === 'All' && activeStatus === 'All' ? 'page' : undefined}
+          className={`group relative flex w-full items-center gap-3 overflow-hidden rounded-lg border px-3 py-2.5 text-left transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-accent/60 hover:bg-accent/10 hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
             activeType === 'All' && activeStatus === 'All'
-              ? 'border-accent bg-accent/10 text-accent shadow-sm'
+              ? 'border-accent bg-accent/10 text-accent shadow-sm before:absolute before:bottom-1 before:left-0 before:top-1 before:w-1 before:rounded-r before:bg-accent'
               : 'border-transparent text-gray-600 dark:text-gray-300'
           }`}
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-primary-50 text-primary-500 dark:bg-blue-950/40 dark:text-blue-100">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-primary-50 text-primary-500 transition-transform duration-200 group-hover:scale-105 dark:bg-blue-950/40 dark:text-blue-100">
             <Laptop size={18} />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-bold">All Devices</span>
-            <span className="block text-xs font-semibold text-gray-400 dark:text-gray-500">{allTotal} devices</span>
+            <span className="block text-xs font-semibold text-gray-400 dark:text-gray-500">{getCountLabel(allTotal)}</span>
           </span>
           <span className="rounded bg-gray-100 px-2 py-1 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">{allTotal}</span>
         </button>
@@ -1676,29 +1712,35 @@ function DeviceInventoryTree({
         {typeEntries.map(({ type, counts, total }) => {
           const TypeIcon = deviceIconMap[type];
           const isTypeActive = activeType === type && activeStatus === 'All';
+          const hasActiveChild = activeType === type && activeStatus !== 'All';
           const statuses = (['Assigned', 'Unassigned', 'Available', 'Maintenance', 'Damaged', 'Lost', 'Retired'] as DeviceStatusFilter[])
             .filter((status) => (counts[status] || 0) > 0);
           const isSubtreeCollapsed = Boolean(collapsedTypes[type]);
 
           return (
-            <div key={type} className="rounded border border-transparent">
-              <div className={`flex items-center rounded border transition hover:border-accent hover:bg-accent/10 ${
+            <div key={type} className="rounded-lg">
+              <div className={`group relative flex items-center overflow-hidden rounded-lg border transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-accent/60 hover:bg-accent/10 hover:shadow-sm ${
                 isTypeActive
-                  ? 'border-accent bg-accent/10 text-accent shadow-sm'
-                  : 'border-transparent text-gray-600 dark:text-gray-300'
+                  ? 'border-accent bg-accent/10 text-accent shadow-sm before:absolute before:bottom-1 before:left-0 before:top-1 before:w-1 before:rounded-r before:bg-accent'
+                  : hasActiveChild
+                    ? 'border-accent/40 bg-accent/5 text-gray-700 dark:text-gray-200'
+                    : 'border-transparent text-gray-600 dark:text-gray-300'
               }`}>
                 <button
                   type="button"
                   onClick={() => onSelect(type, 'All')}
-                  className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left"
+                  role="treeitem"
+                  aria-current={isTypeActive ? 'page' : undefined}
+                  aria-expanded={!isSubtreeCollapsed}
+                  className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-slate-100 text-slate-700 transition-transform duration-200 group-hover:scale-105 dark:bg-slate-800 dark:text-slate-200">
                     <TypeIcon size={18} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-bold">{type}</span>
                     <span className="block text-xs font-semibold text-gray-400 dark:text-gray-500">
-                      {total} device{total === 1 ? '' : 's'}
+                      {getCountLabel(total)}
                     </span>
                   </span>
                   <span className="rounded bg-gray-100 px-2 py-1 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">
@@ -1708,15 +1750,16 @@ function DeviceInventoryTree({
                 <button
                   type="button"
                   onClick={() => onToggleType(type)}
-                  className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded text-gray-500 hover:bg-gray-100 hover:text-accent dark:text-gray-300 dark:hover:bg-gray-800"
+                  className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded text-gray-500 transition-colors duration-200 hover:bg-gray-100 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent dark:text-gray-300 dark:hover:bg-gray-800"
+                  aria-expanded={!isSubtreeCollapsed}
                   aria-label={isSubtreeCollapsed ? `Expand ${type} statuses` : `Collapse ${type} statuses`}
                   title={isSubtreeCollapsed ? 'Expand Statuses' : 'Collapse Statuses'}
                 >
-                  {isSubtreeCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                  <ChevronRight className={`transition-transform duration-200 ${isSubtreeCollapsed ? '' : 'rotate-90'}`} size={16} />
                 </button>
               </div>
               {!isSubtreeCollapsed && statuses.length > 0 && (
-                <div className="ml-5 mt-1 space-y-1 border-l border-gray-200 pl-3 dark:border-gray-800">
+                <div className="ml-5 mt-1.5 space-y-1 border-l border-gray-200 pl-3 dark:border-gray-800" role="group">
                   {statuses.map((status) => {
                     const StatusIcon = getRailIcon(status);
                     const isActive = activeType === type && activeStatus === status;
@@ -1727,13 +1770,15 @@ function DeviceInventoryTree({
                         key={`${type}-${status}`}
                         type="button"
                         onClick={() => onSelect(type, status)}
-                        className={`flex w-full items-center gap-2 rounded border px-2.5 py-2 text-left text-sm transition hover:border-accent hover:bg-accent/10 ${
+                        role="treeitem"
+                        aria-current={isActive ? 'page' : undefined}
+                        className={`group/status relative flex w-full items-center gap-2 overflow-hidden rounded-lg border px-2.5 py-2 text-left text-sm transition-all duration-200 ease-out hover:translate-x-1 hover:border-accent/60 hover:bg-accent/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                           isActive
-                            ? 'border-accent bg-accent/10 text-accent shadow-sm'
+                            ? 'border-accent bg-accent/10 text-accent shadow-sm before:absolute before:bottom-1 before:left-0 before:top-1 before:w-1 before:rounded-r before:bg-accent'
                             : 'border-transparent text-gray-600 dark:text-gray-300'
                         }`}
                       >
-                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded ${getRailTone(status)}`}>
+                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded transition-transform duration-200 group-hover/status:scale-105 ${getRailTone(status)}`}>
                           <StatusIcon size={15} />
                         </span>
                         <span className="min-w-0 flex-1 truncate font-semibold">{status}</span>
@@ -1743,11 +1788,17 @@ function DeviceInventoryTree({
                   })}
                 </div>
               )}
+              {!isSubtreeCollapsed && statuses.length === 0 && (
+                <div className="ml-5 mt-1.5 border-l border-gray-200 pl-3 dark:border-gray-800" role="group">
+                  <div className="rounded-lg px-3 py-2 text-xs font-semibold text-gray-400 dark:text-gray-500">
+                    No counted status yet
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
       </div>
-
     </aside>
   );
 }
