@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { getSessionAccount } from '../middleware/authSession';
 import { QuickNoteModel } from '../models/QuickNote';
+import { clearDashboardSummaryCacheForAccount } from '../services/appCache';
 
 export class QuickNoteController {
   static async get(req: Request, res: Response) {
@@ -27,6 +28,7 @@ export class QuickNoteController {
 
       const content = typeof req.body?.content === 'string' ? req.body.content.slice(0, 10000) : '';
       const note = await QuickNoteModel.save(account.id, content);
+      clearDashboardSummaryCacheForAccount(account.id);
       res.json(note);
     } catch (error) {
       console.error('Save quick note error:', error);

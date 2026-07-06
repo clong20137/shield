@@ -8,6 +8,7 @@ import { PinnedProfileModel } from '../models/PinnedProfile';
 import { QuickNoteModel } from '../models/QuickNote';
 import { ReminderModel } from '../models/Reminder';
 import { broadcastAccountEvent } from '../services/appEvents';
+import { clearDashboardSummaryCacheForAccount, getCachedDashboardSummary, setCachedDashboardSummary } from '../services/appCache';
 
 async function canViewHiddenUsers(account: { id: string; role: string }): Promise<boolean> {
   if (account.role === 'administrator') {
@@ -28,8 +29,14 @@ export class DashboardSummaryController {
 
       const dueCount = await ReminderModel.createDueNotifications(account.id);
       if (dueCount > 0) {
+        clearDashboardSummaryCacheForAccount(account.id);
         broadcastAccountEvent(account.id, { type: 'notification-created' });
         broadcastAccountEvent(account.id, { type: 'reminder-updated' });
+      }
+
+      const cachedSummary = dueCount === 0 ? getCachedDashboardSummary(account.id) : null;
+      if (cachedSummary) {
+        return res.json(cachedSummary);
       }
 
       const includeHiddenProfiles = await canViewHiddenUsers(account);
@@ -42,7 +49,7 @@ export class DashboardSummaryController {
         DistrictFeedPostModel.listByDistrict(account.district || '', 8),
       ]);
 
-      res.json({
+      const summary = {
         calendarEntries,
         reminders,
         pinnedProfiles,
@@ -50,7 +57,10 @@ export class DashboardSummaryController {
         quickNote,
         districtFeedPosts,
         dueReminderNotificationsCreated: dueCount,
-      });
+      };
+
+      setCachedDashboardSummary(account.id, summary);
+      res.json(summary);
     } catch (error) {
       console.error('Dashboard summary error:', error);
       res.status(500).json({ error: 'Failed to load dashboard summary' });

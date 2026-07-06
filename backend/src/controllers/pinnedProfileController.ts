@@ -3,6 +3,7 @@ import { getSessionAccount } from '../middleware/authSession';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { PinnedProfileModel } from '../models/PinnedProfile';
 import { UserModel } from '../models/User';
+import { clearDashboardSummaryCacheForAccount } from '../services/appCache';
 
 async function canViewHiddenUsers(account: { id: string; role: string }): Promise<boolean> {
   if (account.role === 'administrator') {
@@ -43,6 +44,7 @@ export class PinnedProfileController {
       }
 
       const profile = await PinnedProfileModel.pin(account.id, profileUserId);
+      clearDashboardSummaryCacheForAccount(account.id);
       res.status(201).json(profile);
     } catch (error) {
       console.error('Pin profile error:', error);
@@ -58,6 +60,7 @@ export class PinnedProfileController {
       }
 
       await PinnedProfileModel.unpin(account.id, String(req.params.userId || '').trim());
+      clearDashboardSummaryCacheForAccount(account.id);
       res.json({ message: 'Profile unpinned' });
     } catch (error) {
       console.error('Unpin profile error:', error);

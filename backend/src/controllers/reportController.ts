@@ -7,6 +7,7 @@ import { CalendarEntryModel } from '../models/CalendarEntry';
 import { AuditLogModel } from '../models/AuditLog';
 import { UserNotificationModel } from '../models/UserNotification';
 import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents';
+import { getCachedDeviceReport, setCachedDeviceReport } from '../services/appCache';
 import { cleanMultiline, cleanString, isOneOf } from '../utils/validation';
 import { parsePagination } from '../utils/pagination';
 
@@ -439,6 +440,11 @@ export class ReportController {
   static async getDeviceManagementReports(req: Request, res: Response) {
     let conn;
     try {
+      const cachedReport = getCachedDeviceReport();
+      if (cachedReport) {
+        return res.json(cachedReport);
+      }
+
       conn = await pool.getConnection();
       const [summaryRows] = await conn.query<DeviceReportSummaryRow[]>(
         `SELECT
@@ -509,7 +515,7 @@ export class ReportController {
       };
       const costEstimate = buildDeviceCostEstimate(costRows);
 
-      res.json({
+      const response = {
         generatedAt: new Date().toISOString(),
         summary: {
           totalDevices: Number(summary.totalDevices) || 0,
@@ -527,7 +533,10 @@ export class ReportController {
         byModel: mapGroup(modelRows),
         byCondition: mapGroup(conditionRows),
         costEstimate,
-      });
+      };
+
+      setCachedDeviceReport(response);
+      res.json(response);
     } catch (error) {
       console.error('Device management report error:', error);
       res.status(500).json({ error: 'Failed to load device management reports' });

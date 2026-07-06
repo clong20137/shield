@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { clearCachesForAccountEvent, clearCachesForAppEvent } from './appCache';
 
 export type AppEventType =
   | 'audit-updated'
@@ -66,11 +67,13 @@ export function addAppEventClient(accountId: string, response: Response) {
 }
 
 export function broadcastAppEvent(payload: AppEventPayload) {
+  clearCachesForAppEvent(payload.type);
   globalClients.forEach((client) => writeEvent(client, payload));
 }
 
 export function broadcastAccountEvent(accountId: string | null | undefined, payload: AppEventPayload) {
   if (!accountId) return;
+  clearCachesForAccountEvent(accountId, payload.type);
   const clients = accountClients.get(accountId);
   clients?.forEach((client) => writeEvent(client, { ...payload, accountId }));
 }
