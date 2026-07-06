@@ -1431,12 +1431,7 @@ function DeviceInventoryTree({
     <aside className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 xl:sticky xl:top-5 xl:max-h-[calc(100vh-2.5rem)] xl:overflow-y-auto">
       <div className="border-b border-gray-200 px-1 pb-3 dark:border-gray-800">
         <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Device Views</p>
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Inventory</h2>
-          <span className="rounded bg-gray-100 px-2 py-1 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">
-            {allTotal}
-          </span>
-        </div>
+        <h2 className="mt-1 text-lg font-bold text-gray-900 dark:text-gray-100">Inventory</h2>
       </div>
 
       <div className="mt-3 space-y-1.5" role="tree" aria-label="Device inventory filters">
@@ -1458,7 +1453,6 @@ function DeviceInventoryTree({
             <span className="block truncate text-sm font-bold">All Devices</span>
             <span className="block text-xs font-semibold text-gray-400 dark:text-gray-500">{getCountLabel(allTotal)}</span>
           </span>
-          <span className="rounded bg-gray-100 px-2 py-1 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">{allTotal}</span>
         </button>
 
         {typeEntries.map(({ type, counts, total }) => {
@@ -1494,9 +1488,6 @@ function DeviceInventoryTree({
                     <span className="block text-xs font-semibold text-gray-400 dark:text-gray-500">
                       {getCountLabel(total)}
                     </span>
-                  </span>
-                  <span className="rounded bg-gray-100 px-2 py-1 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">
-                    {total}
                   </span>
                 </button>
                 <button
