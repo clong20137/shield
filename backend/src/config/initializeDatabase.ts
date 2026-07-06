@@ -807,9 +807,13 @@ export async function initializeDatabase() {
   await ensureColumn('reminders', 'priority', "`priority` VARCHAR(20) NOT NULL DEFAULT 'Normal'");
   await ensureColumn('reminders', 'notes', '`notes` TEXT');
   await ensureColumn('reminders', 'notifiedAt', '`notifiedAt` TIMESTAMP NULL');
+  await ensureColumn('reminders', 'sourceType', '`sourceType` VARCHAR(50) NULL');
+  await ensureColumn('reminders', 'sourceId', '`sourceId` VARCHAR(80) NULL');
+  await ensureColumn('reminders', 'reminderKind', '`reminderKind` VARCHAR(50) NULL');
   await ensureIndex('reminders', 'idx_reminders_account_open_created', '`accountId`, `completedAt`, `createdAt`');
   await ensureIndex('reminders', 'idx_reminders_due_notify', '`accountId`, `completedAt`, `notifiedAt`, `remindOn`, `createdAt`');
   await ensureIndex('reminders', 'idx_reminders_due_time_notify', '`accountId`, `completedAt`, `notifiedAt`, `remindAt`, `createdAt`');
+  await ensureIndex('reminders', 'idx_reminders_source', '`accountId`, `sourceType`, `sourceId`, `reminderKind`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS performance_evaluations (

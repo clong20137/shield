@@ -47,6 +47,18 @@ interface MileageTotalRow extends RowDataPacket {
 }
 
 export type CalendarEntryInput = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
+export interface FleetBookingCalendarInput {
+  bookingId: string;
+  ownerAccountId: string;
+  title: string;
+  serviceType: string;
+  startAt: string;
+  endAt: string;
+  location: string;
+  vehicleLabel: string;
+  status: string;
+  notes: string;
+}
 
 function formatDate(value: Date | string): string {
   if (typeof value === 'string') {
@@ -85,6 +97,72 @@ function toCalendarEntry(row: CalendarEntryRow): CalendarEntry {
 }
 
 export class CalendarEntryModel {
+  static async findFleetBookingEntry(ownerAccountId: string, bookingId: string): Promise<CalendarEntry | null> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<CalendarEntryRow[]>(
+        `SELECT * FROM calendar_entries
+         WHERE \`ownerAccountId\` = ?
+           AND JSON_UNQUOTE(JSON_EXTRACT(\`details\`, '$.fleetBookingId')) = ?
+         ORDER BY \`updatedAt\` DESC
+         LIMIT 1`,
+        [ownerAccountId, bookingId],
+      );
+
+      return rows[0] ? toCalendarEntry(rows[0]) : null;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async upsertFleetBookingEntry(input: FleetBookingCalendarInput): Promise<CalendarEntry> {
+    const date = input.startAt.slice(0, 10);
+    const details = {
+      fleetBookingId: input.bookingId,
+      source: 'Fleet',
+      title: input.title,
+      serviceType: input.serviceType,
+      startAt: input.startAt,
+      endAt: input.endAt,
+      location: input.location,
+      vehicle: input.vehicleLabel,
+      status: input.status,
+      notes: input.notes,
+    };
+    const entry = {
+      ownerAccountId: input.ownerAccountId,
+      category: 'General Information',
+      date,
+      dutyHours: '0',
+      districtWorked: input.location || 'Headquarters',
+      specialStatus: 'None',
+      color: '#9C865C',
+      details,
+      submissionStatus: 'Submitted' as const,
+    };
+    const existing = await CalendarEntryModel.findFleetBookingEntry(input.ownerAccountId, input.bookingId);
+
+    return existing
+      ? (await CalendarEntryModel.updateEntry(existing.id, entry)) || existing
+      : CalendarEntryModel.createEntry(entry);
+  }
+
+  static async deleteFleetBookingEntry(ownerAccountId: string, bookingId: string): Promise<number> {
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>(
+        `DELETE FROM calendar_entries
+         WHERE \`ownerAccountId\` = ?
+           AND JSON_UNQUOTE(JSON_EXTRACT(\`details\`, '$.fleetBookingId')) = ?`,
+        [ownerAccountId, bookingId],
+      );
+
+      return result.affectedRows;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async getMileageTotal(ownerAccountId: string): Promise<number> {
     const conn = await pool.getConnection();
     try {

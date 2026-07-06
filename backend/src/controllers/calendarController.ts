@@ -1,13 +1,14 @@
 import { Request, Response } from 'express';
 import { CalendarEntryModel } from '../models/CalendarEntry';
 import { CalendarShortcutModel } from '../models/CalendarShortcut';
+import { ReminderModel } from '../models/Reminder';
 import { SystemSettingModel } from '../models/SystemSetting';
 import { AuditLogModel } from '../models/AuditLog';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { UserModel } from '../models/User';
 import { getSessionAccount } from '../middleware/authSession';
-import { broadcastAppEvent } from '../services/appEvents';
-import { cleanRecord, cleanString, isOneOf, isValidHexColor, isValidIsoDate } from '../utils/validation';
+import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents';
+import { cleanMultiline, cleanRecord, cleanString, isOneOf, isValidHexColor, isValidIsoDate } from '../utils/validation';
 import { parsePagination } from '../utils/pagination';
 
 const calendarCategories = ['General Information', 'Trooper Daily'] as const;
@@ -44,6 +45,40 @@ const specialStatusOptions = ['None', 'TDY', 'Military Leave', 'Disability', 'Li
 const submissionStatusOptions = ['Draft', 'Submitted'] as const;
 const tCodeOptionsSettingKey = 'trooperDaily.tCodeOptions';
 const defaultTCodeOptions = ['T-1', 'T-2', 'T-3'];
+const fleetBookingReminderSourceType = 'fleet-booking';
+const fleetBookingReminderKind = 'booking-start';
+
+function isValidLocalDateTime(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/u.test(value)) {
+    return false;
+  }
+
+  const [datePart, timePart] = value.split('T');
+  if (!isValidIsoDate(datePart)) {
+    return false;
+  }
+
+  const [hour, minute] = timePart.split(':').map(Number);
+  return Number.isInteger(hour) && Number.isInteger(minute) && hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+}
+
+function formatLocalDateTime(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  const hours = String(value.getHours()).padStart(2, '0');
+  const minutes = String(value.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function subtractMinutesFromLocalDateTime(value: string, minutes: number): string {
+  const [datePart, timePart] = value.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute] = timePart.split(':').map(Number);
+  const date = new Date(year, month - 1, day, hour, minute);
+  date.setMinutes(date.getMinutes() - minutes);
+  return formatLocalDateTime(date);
+}
 
 function normalizeTCodeOptions(value: unknown): string[] {
   if (!Array.isArray(value)) {
@@ -214,6 +249,60 @@ function validateCalendarShortcutPayload(body: Record<string, unknown>) {
   };
 }
 
+function validateFleetBookingPayload(body: Record<string, unknown>, bookingIdParam?: string) {
+  const bookingId = cleanString(bookingIdParam || body.bookingId, 80);
+  const ownerAccountId = cleanString(body.ownerAccountId || body.accountId, 36);
+  const title = cleanString(body.title, 120);
+  const serviceType = cleanString(body.serviceType, 120);
+  const startAt = cleanString(body.startAt, 20);
+  const endAt = cleanString(body.endAt, 20);
+  const location = cleanString(body.location, 100) || 'Headquarters';
+  const vehicleLabel = cleanString(body.vehicleLabel || body.vehicle, 120);
+  const status = cleanString(body.status, 50) || 'Scheduled';
+  const notes = cleanMultiline(body.notes, 1000);
+  const reminderLeadMinutes = Number(body.reminderLeadMinutes ?? 30);
+
+  if (!bookingId) {
+    return { error: 'Fleet booking ID is required' };
+  }
+
+  if (!ownerAccountId) {
+    return { error: 'Fleet booking owner account is required' };
+  }
+
+  if (!title) {
+    return { error: 'Fleet booking title is required' };
+  }
+
+  if (!startAt || !isValidLocalDateTime(startAt)) {
+    return { error: 'Fleet booking start time must use YYYY-MM-DDTHH:mm format' };
+  }
+
+  if (!endAt || !isValidLocalDateTime(endAt)) {
+    return { error: 'Fleet booking end time must use YYYY-MM-DDTHH:mm format' };
+  }
+
+  if (!Number.isFinite(reminderLeadMinutes) || reminderLeadMinutes < 0 || reminderLeadMinutes > 1440) {
+    return { error: 'Reminder lead time must be between 0 and 1440 minutes' };
+  }
+
+  return {
+    value: {
+      bookingId,
+      ownerAccountId,
+      title,
+      serviceType,
+      startAt,
+      endAt,
+      location,
+      vehicleLabel,
+      status,
+      notes,
+      reminderLeadMinutes,
+    },
+  };
+}
+
 export class CalendarController {
   static async listTCodeOptions(req: Request, res: Response) {
     try {
@@ -258,6 +347,97 @@ export class CalendarController {
     } catch (error) {
       console.error('Profile calendar list error:', error);
       res.status(500).json({ error: 'Failed to load profile calendar' });
+    }
+  }
+
+  static async syncFleetBooking(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in to sync Fleet bookings' });
+      }
+
+      const validation = validateFleetBookingPayload(req.body, req.params.bookingId);
+      if (validation.error || !validation.value) {
+        return res.status(400).json({ error: validation.error || 'Invalid Fleet booking' });
+      }
+
+      const targetUser = await UserModel.getUserById(validation.value.ownerAccountId);
+      if (!targetUser) {
+        return res.status(404).json({ error: 'Fleet booking owner not found' });
+      }
+
+      if (['Canceled', 'Cancelled'].includes(validation.value.status)) {
+        const deletedCalendarEntries = await CalendarEntryModel.deleteFleetBookingEntry(validation.value.ownerAccountId, validation.value.bookingId);
+        const deletedReminders = await ReminderModel.deleteLinked(validation.value.ownerAccountId, fleetBookingReminderSourceType, validation.value.bookingId);
+        broadcastAppEvent({ type: 'calendar-updated', entityId: validation.value.bookingId });
+        broadcastAccountEvent(validation.value.ownerAccountId, { type: 'reminder-updated', entityId: validation.value.bookingId });
+        return res.json({ deletedCalendarEntries, deletedReminders });
+      }
+
+      const entry = await CalendarEntryModel.upsertFleetBookingEntry(validation.value);
+      const remindAt = subtractMinutesFromLocalDateTime(validation.value.startAt, validation.value.reminderLeadMinutes);
+      const reminder = await ReminderModel.upsertLinked(
+        validation.value.ownerAccountId,
+        `Fleet booking: ${validation.value.title}`,
+        remindAt.slice(0, 10),
+        remindAt,
+        [
+          validation.value.vehicleLabel ? `Vehicle: ${validation.value.vehicleLabel}` : '',
+          validation.value.location ? `Location: ${validation.value.location}` : '',
+          validation.value.notes,
+        ].filter(Boolean).join('\n'),
+        fleetBookingReminderSourceType,
+        validation.value.bookingId,
+        fleetBookingReminderKind,
+      );
+
+      await AuditLogModel.create({
+        ...getAuditActor(account),
+        action: 'synced',
+        entityType: 'fleet_booking',
+        entityId: validation.value.bookingId,
+        details: JSON.stringify({ calendarEntryId: entry.id, reminderId: reminder.id }),
+      });
+
+      broadcastAppEvent({ type: 'calendar-updated', entityId: entry.id });
+      broadcastAccountEvent(validation.value.ownerAccountId, { type: 'reminder-updated', entityId: reminder.id });
+      res.json({ calendarEntry: entry, reminder });
+    } catch (error) {
+      console.error('Fleet booking calendar sync error:', error);
+      res.status(500).json({ error: 'Failed to sync Fleet booking' });
+    }
+  }
+
+  static async deleteFleetBooking(req: Request, res: Response) {
+    try {
+      const account = await getSessionAccount(req);
+      if (!account) {
+        return res.status(401).json({ error: 'Sign in to sync Fleet bookings' });
+      }
+
+      const ownerAccountId = cleanString(req.body?.ownerAccountId || req.body?.accountId || req.query.ownerAccountId || req.query.accountId, 36);
+      const bookingId = cleanString(req.params.bookingId || req.body?.bookingId, 80);
+      if (!bookingId || !ownerAccountId) {
+        return res.status(400).json({ error: 'Fleet booking ID and owner account are required' });
+      }
+
+      const deletedCalendarEntries = await CalendarEntryModel.deleteFleetBookingEntry(ownerAccountId, bookingId);
+      const deletedReminders = await ReminderModel.deleteLinked(ownerAccountId, fleetBookingReminderSourceType, bookingId);
+      await AuditLogModel.create({
+        ...getAuditActor(account),
+        action: 'deleted',
+        entityType: 'fleet_booking',
+        entityId: bookingId,
+        details: JSON.stringify({ deletedCalendarEntries, deletedReminders }),
+      });
+
+      broadcastAppEvent({ type: 'calendar-updated', entityId: bookingId });
+      broadcastAccountEvent(ownerAccountId, { type: 'reminder-updated', entityId: bookingId });
+      res.json({ deletedCalendarEntries, deletedReminders });
+    } catch (error) {
+      console.error('Fleet booking calendar delete error:', error);
+      res.status(500).json({ error: 'Failed to delete Fleet booking sync' });
     }
   }
 

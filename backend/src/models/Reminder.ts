@@ -35,6 +35,11 @@ interface ReminderRow extends RowDataPacket {
   updatedAt: Date;
 }
 
+export interface DueReminderNotificationResult {
+  accountId: string;
+  reminderId: string;
+}
+
 function toReminder(row: ReminderRow): Reminder {
   return {
     id: row.id,
@@ -141,6 +146,102 @@ export class ReminderModel {
     }
   }
 
+  static async createLinked(
+    accountId: string,
+    title: string,
+    remindOn: string,
+    remindAt: string | null,
+    notes: string,
+    sourceType: string,
+    sourceId: string,
+    reminderKind: string,
+  ): Promise<Reminder> {
+    const conn = await pool.getConnection();
+    try {
+      const id = uuidv4();
+      const now = new Date();
+      await conn.query<ResultSetHeader>(
+        `INSERT INTO reminders (
+          \`id\`, \`accountId\`, \`title\`, \`priority\`, \`notes\`, \`remindOn\`, \`remindAt\`,
+          \`recurrenceRule\`, \`notifiedAt\`, \`completedAt\`, \`sourceType\`, \`sourceId\`, \`reminderKind\`, \`createdAt\`, \`updatedAt\`
+        ) VALUES (?, ?, ?, 'High', ?, ?, ?, 'none', NULL, NULL, ?, ?, ?, ?, ?)`,
+        [id, accountId, title, notes, remindOn, toSqlDateTime(remindAt), sourceType, sourceId, reminderKind, now, now],
+      );
+
+      return { id, accountId, title, priority: 'High', notes, remindOn, remindAt, recurrenceRule: 'none', notifiedAt: null, completedAt: null, createdAt: now, updatedAt: now };
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async upsertLinked(
+    accountId: string,
+    title: string,
+    remindOn: string,
+    remindAt: string | null,
+    notes: string,
+    sourceType: string,
+    sourceId: string,
+    reminderKind: string,
+  ): Promise<Reminder> {
+    const conn = await pool.getConnection();
+    try {
+      const [existingRows] = await conn.query<ReminderRow[]>(
+        `SELECT * FROM reminders
+         WHERE \`accountId\` = ?
+           AND \`sourceType\` = ?
+           AND \`sourceId\` = ?
+           AND \`reminderKind\` = ?
+         ORDER BY \`updatedAt\` DESC
+         LIMIT 1`,
+        [accountId, sourceType, sourceId, reminderKind],
+      );
+
+      if (!existingRows[0]) {
+        return ReminderModel.createLinked(accountId, title, remindOn, remindAt, notes, sourceType, sourceId, reminderKind);
+      }
+
+      const id = existingRows[0].id;
+      await conn.query<ResultSetHeader>(
+        `UPDATE reminders
+         SET \`title\` = ?,
+             \`priority\` = 'High',
+             \`notes\` = ?,
+             \`remindOn\` = ?,
+             \`remindAt\` = ?,
+             \`recurrenceRule\` = 'none',
+             \`notifiedAt\` = NULL,
+             \`completedAt\` = NULL,
+             \`updatedAt\` = ?
+         WHERE \`id\` = ? AND \`accountId\` = ?`,
+        [title, notes, remindOn, toSqlDateTime(remindAt), new Date(), id, accountId],
+      );
+
+      const [rows] = await conn.query<ReminderRow[]>(
+        'SELECT * FROM reminders WHERE `id` = ? AND `accountId` = ? LIMIT 1',
+        [id, accountId],
+      );
+
+      return rows[0] ? toReminder(rows[0]) : ReminderModel.createLinked(accountId, title, remindOn, remindAt, notes, sourceType, sourceId, reminderKind);
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async deleteLinked(accountId: string, sourceType: string, sourceId: string): Promise<number> {
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>(
+        'DELETE FROM reminders WHERE `accountId` = ? AND `sourceType` = ? AND `sourceId` = ?',
+        [accountId, sourceType, sourceId],
+      );
+
+      return result.affectedRows;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async update(id: string, accountId: string, updates: { title?: string; priority?: Reminder['priority']; notes?: string; remindOn?: string; remindAt?: string | null; recurrenceRule?: ReminderRecurrenceRule; completed?: boolean }): Promise<Reminder | null> {
     const conn = await pool.getConnection();
     try {
@@ -239,6 +340,41 @@ export class ReminderModel {
       }
 
       return rows.length;
+    } finally {
+      conn.release();
+    }
+  }
+
+  static async createDueNotificationsForAll(): Promise<DueReminderNotificationResult[]> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<ReminderRow[]>(
+        `SELECT * FROM reminders
+         WHERE \`completedAt\` IS NULL
+           AND \`notifiedAt\` IS NULL
+           AND COALESCE(\`remindAt\`, TIMESTAMP(\`remindOn\`, '00:00:00')) <= NOW()
+         ORDER BY COALESCE(\`remindAt\`, TIMESTAMP(\`remindOn\`, '00:00:00')) ASC, \`createdAt\` ASC
+         LIMIT 100`,
+      );
+
+      const results: DueReminderNotificationResult[] = [];
+      for (const reminder of rows) {
+        await UserNotificationModel.create({
+          userId: reminder.accountId,
+          type: 'reminder',
+          title: 'Reminder',
+          message: reminder.notes ? `${reminder.title}: ${reminder.notes}` : reminder.title,
+          entityType: 'reminder',
+          entityId: reminder.id,
+        });
+        await conn.query<ResultSetHeader>(
+          'UPDATE reminders SET `notifiedAt` = ?, `updatedAt` = ? WHERE `id` = ? AND `accountId` = ?',
+          [new Date(), new Date(), reminder.id, reminder.accountId],
+        );
+        results.push({ accountId: reminder.accountId, reminderId: reminder.id });
+      }
+
+      return results;
     } finally {
       conn.release();
     }

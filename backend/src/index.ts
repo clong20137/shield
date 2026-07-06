@@ -31,6 +31,7 @@ import urgentAlertRoutes from './routes/urgentAlertRoutes';
 import mediaRoutes from './routes/mediaRoutes';
 import memorialProfileRoutes from './routes/memorialProfileRoutes';
 import systemRoutes from './routes/systemRoutes';
+import { startReminderNotificationScheduler } from './services/reminderScheduler';
 import { startSecurityCleanupJob } from './services/securityCleanup';
 import { requireAuthenticated } from './middleware/authSession';
 import { rateLimit } from './middleware/rateLimit';
@@ -318,6 +319,7 @@ initializeDatabase()
         console.error('Failed to protect existing sensitive profile fields:', error);
       });
     startSecurityCleanupJob();
+    startReminderNotificationScheduler();
   })
   .catch((error) => {
     console.error('Failed to initialize database. Starting setup-capable API anyway:', error);
