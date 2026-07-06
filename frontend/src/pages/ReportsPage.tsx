@@ -13,7 +13,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { AuthAccount, reportService, TrooperDailyReportEntry, TrooperDailyAnalyticsResponse, User, userService } from '../services/api';
+import { AuthAccount, DeviceManagementReportResponse, DeviceReportGroup, reportService, TrooperDailyReportEntry, TrooperDailyAnalyticsResponse, User, userService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import PerformanceEvaluationsPage from './PerformanceEvaluationsPage';
 import { downloadTrooperDailiesCsv, downloadTrooperDailiesPdf, downloadTrooperDailiesXls } from '../utils/trooperDailyExport';
@@ -158,6 +158,7 @@ type DailyAnalyticsExportFormat = 'csv' | 'pdf' | 'png';
 type DailyAnalyticsRange = '1d' | '7d' | '1m' | '3m' | '6m' | '1y' | 'custom';
 type DailyGraphType = 'line' | 'bar';
 type DailyCompareMode = 'none' | 'user' | 'district';
+type ReportType = 'trooper-daily' | 'cpar' | 'devices';
 type TrooperDailyTab = 'graph' | 'table' | 'exports';
 type DailyCompareItem = {
   id: string;
@@ -548,14 +549,48 @@ const AnalyticsChart: React.FC<{
   );
 };
 
+const DeviceReportBarChart: React.FC<{
+  title: string;
+  data: DeviceReportGroup[];
+  color?: string;
+}> = ({ title, data, color = '#1a365d' }) => {
+  const chartData = data.map((item) => ({ ...item, displayLabel: formatAnalyticsLabel(item.label) }));
+  const total = data.reduce((sum, item) => sum + item.count, 0);
+
+  return (
+    <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">{title}</h3>
+        <span className="rounded bg-gray-100 px-2 py-1 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">{formatMetric(total)}</span>
+      </div>
+      {chartData.length === 0 ? (
+        <div className="empty-state rounded border border-dashed border-gray-300 py-8 text-sm dark:border-gray-700">No device data available.</div>
+      ) : (
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={chartData} margin={{ top: 8, right: 10, bottom: 44, left: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.25)" />
+            <XAxis dataKey="displayLabel" interval={0} angle={-28} textAnchor="end" height={64} tick={{ fontSize: 11, fontWeight: 700 }} tickLine={false} axisLine={false} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={44} />
+            <Tooltip formatter={(value) => [formatMetric(Number(value)), 'Devices']} />
+            <Bar dataKey="count" fill={color} radius={[6, 6, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </section>
+  );
+};
+
 const ReportsPage: React.FC<{
   currentUser: AuthAccount | null;
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
   getErrorMessage: (error: unknown, fallback: string) => string;
 }> = ({ currentUser, onToast, getErrorMessage: getAppErrorMessage }) => {
   const initialAnalyticsDatesRef = useRef(getRangeDates('1m'));
-  const [selectedReportType, setSelectedReportType] = useState<'trooper-daily' | 'cpar'>('trooper-daily');
+  const [selectedReportType, setSelectedReportType] = useState<ReportType>('trooper-daily');
   const [activeTrooperDailyTab, setActiveTrooperDailyTab] = useState<TrooperDailyTab>('graph');
+  const [deviceReport, setDeviceReport] = useState<DeviceManagementReportResponse | null>(null);
+  const [deviceReportLoading, setDeviceReportLoading] = useState(false);
+  const [deviceReportError, setDeviceReportError] = useState<string | null>(null);
   const [trooperDailies, setTrooperDailies] = useState<TrooperDailyReportEntry[]>([]);
   const [dailySearch, setDailySearch] = useState('');
   const [dailyFrom, setDailyFrom] = useState('');
@@ -604,6 +639,32 @@ const ReportsPage: React.FC<{
   const analyticsChartRef = useRef<HTMLDivElement | null>(null);
   const canViewAllTrooperDailies = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('reports:trooper-dailies'));
   const canReviewTrooperDailies = canViewAllTrooperDailies;
+  const canViewDeviceReports = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('devices:manage'));
+
+  const loadDeviceReport = async (showLoading = true) => {
+    if (!canViewDeviceReports) {
+      setDeviceReport(null);
+      setDeviceReportError('Device Management Reports require device management permission.');
+      setDeviceReportLoading(false);
+      return;
+    }
+
+    if (showLoading) {
+      setDeviceReportLoading(true);
+    }
+    setDeviceReportError(null);
+
+    try {
+      const response = await reportService.getDeviceManagementReports();
+      setDeviceReport(response.data);
+    } catch (err) {
+      const message = getErrorMessage(err, 'Failed to load Device Management Reports.');
+      setDeviceReportError(message);
+      console.error(err);
+    } finally {
+      setDeviceReportLoading(false);
+    }
+  };
 
   const loadTrooperDailyAnalytics = async (
     showLoading = true,
@@ -751,8 +812,15 @@ const ReportsPage: React.FC<{
     if (selectedReportType === 'trooper-daily') {
       void loadTrooperDailies();
       void loadTrooperDailyAnalytics();
+    } else if (selectedReportType === 'devices') {
+      void loadDeviceReport();
     }
     const refreshReportsQuietly = () => {
+      if (selectedReportType === 'devices') {
+        void loadDeviceReport(false);
+        return;
+      }
+
       if (selectedReportType !== 'trooper-daily') {
         return;
       }
@@ -763,6 +831,11 @@ const ReportsPage: React.FC<{
     };
 
     const handleReportsUpdate = () => {
+      if (selectedReportType === 'devices') {
+        void loadDeviceReport(false);
+        return;
+      }
+
       if (selectedReportType !== 'trooper-daily') {
         return;
       }
@@ -784,10 +857,12 @@ const ReportsPage: React.FC<{
     window.addEventListener('shield:user-updated', handleReportsUpdate);
     window.addEventListener('shield:dashboard-updated', handleReportsUpdate);
     window.addEventListener('shield:calendar-updated', handleReportsUpdate);
+    window.addEventListener('shield:device-updated', handleReportsUpdate);
     return () => {
       window.removeEventListener('shield:user-updated', handleReportsUpdate);
       window.removeEventListener('shield:dashboard-updated', handleReportsUpdate);
       window.removeEventListener('shield:calendar-updated', handleReportsUpdate);
+      window.removeEventListener('shield:device-updated', handleReportsUpdate);
       if (liveRefreshInterval) {
         window.clearInterval(liveRefreshInterval);
       }
@@ -1333,10 +1408,11 @@ const ReportsPage: React.FC<{
           <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Report to Load</span>
           <select
             value={selectedReportType}
-            onChange={(event) => setSelectedReportType(event.target.value as 'trooper-daily' | 'cpar')}
+            onChange={(event) => setSelectedReportType(event.target.value as ReportType)}
             className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
           >
             <option value="trooper-daily">Trooper Daily Reports</option>
+            <option value="devices">Device Management Reports</option>
             <option value="cpar">CPAR</option>
           </select>
         </label>
@@ -1901,6 +1977,67 @@ const ReportsPage: React.FC<{
         </>
         )}
       </section>
+      ) : selectedReportType === 'devices' ? (
+        <section className="mb-8 rounded-lg border border-gray-200 bg-white p-5 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2>Device Management Reports</h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Inventory graph data by type, status, carrier, model, and condition.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {deviceReportLoading && (
+                <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold uppercase text-accent">Updating</span>
+              )}
+              {deviceReport?.generatedAt && (
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold uppercase text-gray-500 dark:bg-gray-800 dark:text-gray-300">
+                  Updated {new Date(deviceReport.generatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                </span>
+              )}
+              <button type="button" onClick={() => void loadDeviceReport()} className="btn-secondary" aria-label="Refresh device reports" title="Refresh">
+                <BarChart3 size={16} />
+              </button>
+            </div>
+          </div>
+
+          {deviceReportError && <div className="error mb-4">{deviceReportError}</div>}
+          {deviceReportLoading && !deviceReport ? (
+            <div className="loading">Loading Device Management Reports...</div>
+          ) : deviceReport ? (
+            <>
+              <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {[
+                  ['Total Devices', deviceReport.summary.totalDevices],
+                  ['Assigned', deviceReport.summary.assignedDevices],
+                  ['Unassigned', deviceReport.summary.unassignedDevices],
+                  ['Available', deviceReport.summary.availableDevices],
+                  ['Maintenance', deviceReport.summary.maintenanceDevices],
+                  ['Damaged', deviceReport.summary.damagedDevices],
+                  ['Lost', deviceReport.summary.lostDevices],
+                  ['Retired', deviceReport.summary.retiredDevices],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/60">
+                    <p className="text-xs font-black uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
+                    <p className="mt-2 text-2xl font-black text-gray-900 dark:text-gray-100">{formatMetric(Number(value))}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <DeviceReportBarChart title="Devices by Type" data={deviceReport.byType} color="#1a365d" />
+                <DeviceReportBarChart title="Devices by Status" data={deviceReport.byStatus} color="#9C865C" />
+                <DeviceReportBarChart title="Devices by Carrier" data={deviceReport.byCarrier} color="#2563eb" />
+                <DeviceReportBarChart title="Devices by Condition" data={deviceReport.byCondition} color="#059669" />
+                <div className="xl:col-span-2">
+                  <DeviceReportBarChart title="Top Models" data={deviceReport.byModel} color="#7c3aed" />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No device report data available.</div>
+          )}
+        </section>
       ) : (
         currentUser ? (
           <PerformanceEvaluationsPage currentUser={currentUser} onToast={onToast} getErrorMessage={getAppErrorMessage} compactTitle />

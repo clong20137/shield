@@ -1,7 +1,7 @@
 import { ChangeEvent, FormEvent, MouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { IScannerControls } from '@zxing/browser';
-import { AlertTriangle, ArchiveX, Camera, CheckCircle2, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, QrCode, Radio, RefreshCw, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
+import { AlertTriangle, ArchiveX, Camera, CheckCircle2, ChevronLeft, ChevronRight, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, QrCode, Radio, RefreshCw, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, deviceService, DeviceRecord } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
 import { AppContextMenu, AppContextMenuPosition, shouldUseNativeContextMenu } from '../components/AppContextMenu';
@@ -351,6 +351,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [totalPages, setTotalPages] = useState(1);
   const [deviceTypeStatusCounts, setDeviceTypeStatusCounts] = useState<Record<string, Record<string, number>>>({});
   const [deviceModelCounts, setDeviceModelCounts] = useState<Record<string, number>>({});
+  const [isInventoryTreeCollapsed, setIsInventoryTreeCollapsed] = useState(false);
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [pageContextMenu, setPageContextMenu] = useState<AppContextMenuPosition | null>(null);
   const [devicePendingDelete, setDevicePendingDelete] = useState<DeviceRecord | null>(null);
@@ -1086,12 +1087,14 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         document.body,
       )}
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
+      <div className={`grid grid-cols-1 gap-5 ${isInventoryTreeCollapsed ? 'xl:grid-cols-[56px_minmax(0,1fr)]' : 'xl:grid-cols-[280px_minmax(0,1fr)]'}`}>
       <DeviceInventoryTree
         typeStatusCounts={deviceTypeStatusCounts}
         activeType={filter}
         activeStatus={statusFilter}
         onSelect={applyInventoryTreeFilter}
+        collapsed={isInventoryTreeCollapsed}
+        onToggleCollapsed={() => setIsInventoryTreeCollapsed((collapsed) => !collapsed)}
       />
       <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
         <div className="mb-5 flex flex-col gap-4">
@@ -1573,11 +1576,15 @@ function DeviceInventoryTree({
   activeType,
   activeStatus,
   onSelect,
+  collapsed,
+  onToggleCollapsed,
 }: {
   typeStatusCounts: Record<string, Record<string, number>>;
   activeType: DeviceType | 'All';
   activeStatus: DeviceStatusFilter;
   onSelect: (type: DeviceType | 'All', status?: DeviceStatusFilter) => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }) {
   const getRailIcon = (status: DeviceStatusFilter) => {
     if (status === 'All') return Laptop;
@@ -1599,10 +1606,23 @@ function DeviceInventoryTree({
   const allTotal = typeEntries.reduce((sum, item) => sum + item.total, 0);
 
   return (
-    <aside className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 xl:sticky xl:top-5 xl:max-h-[calc(100vh-2.5rem)] xl:overflow-y-auto">
-      <div className="border-b border-gray-200 px-1 pb-3 dark:border-gray-800">
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Device Views</p>
-        <h2 className="mt-1 text-lg font-bold text-gray-900 dark:text-gray-100">Inventory</h2>
+    <aside className={`rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 xl:sticky xl:top-5 xl:max-h-[calc(100vh-2.5rem)] xl:overflow-y-auto ${collapsed ? 'xl:px-2' : ''}`}>
+      <div className={`border-b border-gray-200 pb-3 dark:border-gray-800 ${collapsed ? 'flex justify-center' : 'flex items-start justify-between gap-3 px-1'}`}>
+        {!collapsed && (
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-accent">Device Views</p>
+            <h2 className="mt-1 text-lg font-bold text-gray-900 dark:text-gray-100">Inventory</h2>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-gray-200 bg-gray-50 text-gray-600 hover:border-accent hover:text-accent dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300"
+          aria-label={collapsed ? 'Expand inventory tree' : 'Collapse inventory tree'}
+          title={collapsed ? 'Expand Inventory' : 'Collapse Inventory'}
+        >
+          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
       </div>
 
       <div className="mt-3 space-y-1">
@@ -1618,11 +1638,11 @@ function DeviceInventoryTree({
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-primary-50 text-primary-500 dark:bg-blue-950/40 dark:text-blue-100">
             <Laptop size={18} />
           </span>
-          <span className="min-w-0 flex-1">
+          {!collapsed && <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-bold">All Devices</span>
             <span className="block text-xs font-semibold text-gray-400 dark:text-gray-500">{allTotal} devices</span>
-          </span>
-          <span className="rounded bg-gray-100 px-2 py-1 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">{allTotal}</span>
+          </span>}
+          {!collapsed && <span className="rounded bg-gray-100 px-2 py-1 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">{allTotal}</span>}
         </button>
 
         {typeEntries.map(({ type, counts, total }) => {
@@ -1645,17 +1665,17 @@ function DeviceInventoryTree({
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                 <TypeIcon size={18} />
               </span>
-              <span className="min-w-0 flex-1">
+              {!collapsed && <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-bold">{type}</span>
                 <span className="block text-xs font-semibold text-gray-400 dark:text-gray-500">
                   {total} device{total === 1 ? '' : 's'}
                 </span>
-              </span>
-              <span className="rounded bg-gray-100 px-2 py-1 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">
+              </span>}
+              {!collapsed && <span className="rounded bg-gray-100 px-2 py-1 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">
                 {total}
-              </span>
+              </span>}
             </button>
-              {statuses.length > 0 && (
+              {!collapsed && statuses.length > 0 && (
                 <div className="ml-5 mt-1 space-y-1 border-l border-gray-200 pl-3 dark:border-gray-800">
                   {statuses.map((status) => {
                     const StatusIcon = getRailIcon(status);

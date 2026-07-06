@@ -791,6 +791,30 @@ export interface TrooperDailyAnalyticsResponse {
   fieldTrends: TrooperDailyAnalyticsFieldTrend[];
 }
 
+export interface DeviceReportGroup {
+  label: string;
+  count: number;
+}
+
+export interface DeviceManagementReportResponse {
+  generatedAt: string;
+  summary: {
+    totalDevices: number;
+    assignedDevices: number;
+    unassignedDevices: number;
+    availableDevices: number;
+    maintenanceDevices: number;
+    damagedDevices: number;
+    lostDevices: number;
+    retiredDevices: number;
+  };
+  byType: DeviceReportGroup[];
+  byStatus: DeviceReportGroup[];
+  byCarrier: DeviceReportGroup[];
+  byModel: DeviceReportGroup[];
+  byCondition: DeviceReportGroup[];
+}
+
 export interface AuditLog {
   id: string;
   actorId: string | null;
@@ -1374,6 +1398,9 @@ export const reportService = {
 
   getTrooperDailyAnalytics: (filters?: { q?: string; from?: string; to?: string; district?: string }) =>
     api.get<TrooperDailyAnalyticsResponse>('/reports/trooper-dailies/analytics', { params: filters }),
+
+  getDeviceManagementReports: () =>
+    api.get<DeviceManagementReportResponse>('/reports/devices'),
 
   reviewTrooperDaily: (id: string, status: 'Approved' | 'Returned', notes: string) =>
     api.put<TrooperDailyReportEntry>(`/reports/trooper-dailies/${id}/review`, { status, notes }),

@@ -24,6 +24,22 @@ interface AccountStatisticsRow extends RowDataPacket {
   standardAccounts: number;
 }
 
+interface DeviceReportSummaryRow extends RowDataPacket {
+  totalDevices: number;
+  assignedDevices: number;
+  unassignedDevices: number;
+  availableDevices: number;
+  maintenanceDevices: number;
+  damagedDevices: number;
+  lostDevices: number;
+  retiredDevices: number;
+}
+
+interface DeviceReportGroupRow extends RowDataPacket {
+  label: string;
+  count: number;
+}
+
 interface TrooperDailyReportRow extends RowDataPacket {
   id: string;
   ownerAccountId: string;
@@ -340,6 +356,95 @@ async function buildTrooperDailyReportScope(req: Request) {
 }
 
 export class ReportController {
+  static async getDeviceManagementReports(req: Request, res: Response) {
+    let conn;
+    try {
+      conn = await pool.getConnection();
+      const [summaryRows] = await conn.query<DeviceReportSummaryRow[]>(
+        `SELECT
+          COUNT(*) AS totalDevices,
+          SUM(CASE WHEN COALESCE(\`assignedTo\`, '') <> '' THEN 1 ELSE 0 END) AS assignedDevices,
+          SUM(CASE WHEN COALESCE(\`assignedTo\`, '') = '' THEN 1 ELSE 0 END) AS unassignedDevices,
+          SUM(CASE WHEN \`status\` = 'Available' THEN 1 ELSE 0 END) AS availableDevices,
+          SUM(CASE WHEN \`status\` = 'Maintenance' THEN 1 ELSE 0 END) AS maintenanceDevices,
+          SUM(CASE WHEN \`status\` = 'Damaged' THEN 1 ELSE 0 END) AS damagedDevices,
+          SUM(CASE WHEN \`status\` = 'Lost' THEN 1 ELSE 0 END) AS lostDevices,
+          SUM(CASE WHEN \`status\` = 'Retired' THEN 1 ELSE 0 END) AS retiredDevices
+        FROM devices`,
+      );
+      const [typeRows] = await conn.query<DeviceReportGroupRow[]>(
+        `SELECT COALESCE(NULLIF(\`type\`, ''), 'Unknown') AS label, COUNT(*) AS count
+        FROM devices
+        GROUP BY label
+        ORDER BY count DESC, label`,
+      );
+      const [statusRows] = await conn.query<DeviceReportGroupRow[]>(
+        `SELECT COALESCE(NULLIF(\`status\`, ''), 'Unknown') AS label, COUNT(*) AS count
+        FROM devices
+        GROUP BY label
+        ORDER BY count DESC, label`,
+      );
+      const [carrierRows] = await conn.query<DeviceReportGroupRow[]>(
+        `SELECT COALESCE(NULLIF(\`carrier\`, ''), 'Unknown') AS label, COUNT(*) AS count
+        FROM devices
+        GROUP BY label
+        ORDER BY count DESC, label`,
+      );
+      const [modelRows] = await conn.query<DeviceReportGroupRow[]>(
+        `SELECT COALESCE(NULLIF(\`makeModel\`, ''), 'Unknown') AS label, COUNT(*) AS count
+        FROM devices
+        GROUP BY label
+        ORDER BY count DESC, label
+        LIMIT 12`,
+      );
+      const [conditionRows] = await conn.query<DeviceReportGroupRow[]>(
+        `SELECT COALESCE(NULLIF(\`condition\`, ''), 'Unknown') AS label, COUNT(*) AS count
+        FROM devices
+        GROUP BY label
+        ORDER BY count DESC, label`,
+      );
+
+      const mapGroup = (rows: DeviceReportGroupRow[]) => rows.map((row) => ({
+        label: row.label || 'Unknown',
+        count: Number(row.count) || 0,
+      }));
+      const summary = summaryRows[0] || {
+        totalDevices: 0,
+        assignedDevices: 0,
+        unassignedDevices: 0,
+        availableDevices: 0,
+        maintenanceDevices: 0,
+        damagedDevices: 0,
+        lostDevices: 0,
+        retiredDevices: 0,
+      };
+
+      res.json({
+        generatedAt: new Date().toISOString(),
+        summary: {
+          totalDevices: Number(summary.totalDevices) || 0,
+          assignedDevices: Number(summary.assignedDevices) || 0,
+          unassignedDevices: Number(summary.unassignedDevices) || 0,
+          availableDevices: Number(summary.availableDevices) || 0,
+          maintenanceDevices: Number(summary.maintenanceDevices) || 0,
+          damagedDevices: Number(summary.damagedDevices) || 0,
+          lostDevices: Number(summary.lostDevices) || 0,
+          retiredDevices: Number(summary.retiredDevices) || 0,
+        },
+        byType: mapGroup(typeRows),
+        byStatus: mapGroup(statusRows),
+        byCarrier: mapGroup(carrierRows),
+        byModel: mapGroup(modelRows),
+        byCondition: mapGroup(conditionRows),
+      });
+    } catch (error) {
+      console.error('Device management report error:', error);
+      res.status(500).json({ error: 'Failed to load device management reports' });
+    } finally {
+      conn?.release();
+    }
+  }
+
   static async getAccessReview(req: Request, res: Response) {
     let conn;
     try {
