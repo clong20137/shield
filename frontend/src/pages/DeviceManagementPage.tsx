@@ -355,6 +355,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [pageContextMenu, setPageContextMenu] = useState<AppContextMenuPosition | null>(null);
   const [devicePendingDelete, setDevicePendingDelete] = useState<DeviceRecord | null>(null);
+  const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false);
   const [isDeletePhonesConfirmOpen, setIsDeletePhonesConfirmOpen] = useState(false);
   const [eventNotes, setEventNotes] = useState('');
   const [assigneeSearch, setAssigneeSearch] = useState('');
@@ -811,6 +812,30 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     }
   };
 
+  const deleteSelectedDevices = async () => {
+    if (!canManageDevices || selectedDevices.length === 0) return;
+
+    const selectedIds = Array.from(new Set(selectedDevices));
+    const selected = devices.filter((device) => selectedIds.includes(device.id));
+
+    try {
+      setError(null);
+      await Promise.all(selectedIds.map((id) => {
+        const device = selected.find((item) => item.id === id);
+        const label = device ? getDeviceDisplayName(device) : 'selected device';
+        return deviceService.delete(id, { ...actor, eventNotes: `Deleted ${label} from bulk selection.` });
+      }));
+      setDevices((currentDevices) => currentDevices.filter((device) => !selectedIds.includes(device.id)));
+      setSelectedDevices([]);
+      setIsBulkDeleteConfirmOpen(false);
+      setDeviceNotice(`Deleted ${selectedIds.length} selected device${selectedIds.length === 1 ? '' : 's'}.`);
+      await loadDevices(false);
+    } catch (err) {
+      console.error('Failed to delete selected devices:', err);
+      setError('Failed to delete selected devices.');
+    }
+  };
+
   const deleteAllPhones = async () => {
     if (!canManageDevices) return;
 
@@ -1203,6 +1228,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         {selectedDevices.length > 0 && canManageDevices && (
           <div className="mb-4 flex flex-wrap items-center gap-3 rounded bg-gray-50 p-3 dark:bg-gray-950">
             <span className="text-sm font-bold">{selectedDevices.length} selected</span>
+            <button type="button" onClick={() => setIsBulkDeleteConfirmOpen(true)} className="btn-danger" aria-label="Delete selected devices" title="Delete Selected"><Trash2 size={16} /><span>Delete</span></button>
             <button type="button" onClick={() => bulkStatusUpdate('Maintenance')} className="btn-secondary" aria-label="Move selected to maintenance" title="Maintenance"><Wrench size={16} /></button>
             <button type="button" onClick={() => bulkStatusUpdate('Retired')} className="btn-secondary" aria-label="Retire selected devices" title="Retire"><ArchiveX size={16} /></button>
             <button type="button" onClick={() => setSelectedDevices([])} className="btn-secondary" aria-label="Clear selected devices" title="Clear"><X size={16} /></button>
@@ -1505,8 +1531,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         </FloatingWindow>
       )}
 
-      {devicePendingDelete && (
-        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/45">
+      {devicePendingDelete && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/45 px-4 pt-[12dvh]">
           <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Device</h2>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
@@ -1522,7 +1548,28 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
+      )}
+      {isBulkDeleteConfirmOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/45 px-4 pt-[12dvh]">
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Selected Devices</h2>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Delete {selectedDevices.length} selected device{selectedDevices.length === 1 ? '' : 's'}? This cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setIsBulkDeleteConfirmOpen(false)} className="btn-secondary" aria-label="Cancel selected device deletion" title="Cancel">
+                <span>Cancel</span>
+              </button>
+              <button type="button" onClick={() => void deleteSelectedDevices()} className="btn-danger" aria-label="Delete selected devices" title="Delete Selected">
+                <Trash2 size={16} />
+                <span>Delete All</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
       {isDeletePhonesConfirmOpen && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/45 px-4 pt-[12dvh]">
