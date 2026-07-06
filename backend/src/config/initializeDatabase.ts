@@ -858,6 +858,7 @@ export async function initializeDatabase() {
       \`serialNumber\` VARCHAR(150),
       \`assignedTo\` VARCHAR(150),
       \`status\` VARCHAR(50) NOT NULL DEFAULT 'Available',
+      \`carrier\` VARCHAR(50) NOT NULL DEFAULT 'Verizon',
       \`location\` VARCHAR(150),
       \`notes\` TEXT,
       \`phoneNumber\` VARCHAR(50),
@@ -880,6 +881,7 @@ export async function initializeDatabase() {
   `);
 
   await ensureColumn('devices', 'phoneNumber', '`phoneNumber` VARCHAR(50)');
+  await ensureColumn('devices', 'carrier', "`carrier` VARCHAR(50) NOT NULL DEFAULT 'Verizon'");
   await ensureColumn('devices', 'imei', '`imei` VARCHAR(100)');
   await ensureColumn('devices', 'simNumber', '`simNumber` VARCHAR(100)');
   await ensureColumn('devices', 'radioId', '`radioId` VARCHAR(100)');

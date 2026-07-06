@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS devices (
   `serialNumber` VARCHAR(150),
   `assignedTo` VARCHAR(150),
   `status` VARCHAR(50) NOT NULL DEFAULT 'Available',
+  `carrier` VARCHAR(50) NOT NULL DEFAULT 'Verizon',
   `location` VARCHAR(150),
   `notes` TEXT,
   `phoneNumber` VARCHAR(50),

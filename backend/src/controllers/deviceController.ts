@@ -19,6 +19,7 @@ function isDuplicateAssetTagError(error: unknown): boolean {
 const deviceTypes = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio', 'Cradlepoint'] as const;
 const deviceStatuses = ['Available', 'Assigned', 'Maintenance', 'Retired', 'Damaged', 'Lost'] as const;
 const deviceConditions = ['New', 'Good', 'Fair', 'Poor', 'Damaged'] as const;
+const deviceCarriers = ['Verizon', 'AT&T'] as const;
 
 type PhoneImportRow = Record<string, unknown>;
 
@@ -28,6 +29,7 @@ const phoneExportHeaders = [
   'serialNumber',
   'assignedTo',
   'status',
+  'carrier',
   'location',
   'phoneNumber',
   'imei',
@@ -233,6 +235,7 @@ function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNu
     serialNumber: getImportValue(row, ['serialNumber', 'serial number', 'serial']),
     assignedTo,
     status: assignedTo ? 'Assigned' : 'Available',
+    carrier: getImportValue(row, ['carrier', 'wireless carrier', 'provider']) || 'Verizon',
     location: getImportValue(row, ['location', 'site', 'district']),
     notes: isNewUser ? [getImportValue(row, ['notes', 'note']), 'Phone import marked this line as NEW USER.'].filter(Boolean).join('\n') : getImportValue(row, ['notes', 'note']),
     phoneNumber,
@@ -259,6 +262,7 @@ function validateDevicePayload(body: Record<string, unknown>) {
     || (type === 'Cell Phone' || type === 'MiFi Device' ? getGeneratedAssetTag(type, phoneNumber, imei, simNumber) : '');
   const makeModel = cleanString(body.makeModel, 150);
   const status = cleanString(body.status, 50) || 'Available';
+  const carrier = cleanString(body.carrier, 50) || 'Verizon';
   const condition = cleanString(body.condition, 50) || 'Good';
   const dateFields = ['warrantyExpiration', 'replacementDueDate', 'maintenanceDueDate', 'lastServiceDate', 'purchaseDate'] as const;
   const dates = Object.fromEntries(dateFields.map((field) => [field, cleanString(body[field], 20)])) as Record<typeof dateFields[number], string>;
@@ -273,6 +277,10 @@ function validateDevicePayload(body: Record<string, unknown>) {
 
   if (!isOneOf(status, deviceStatuses)) {
     return { error: 'Choose a valid device status' };
+  }
+
+  if (!isOneOf(carrier, deviceCarriers)) {
+    return { error: 'Choose a valid carrier' };
   }
 
   if (!isOneOf(condition, deviceConditions)) {
@@ -297,6 +305,7 @@ function validateDevicePayload(body: Record<string, unknown>) {
       serialNumber: cleanString(body.serialNumber, 150),
       assignedTo: cleanString(body.assignedTo, 150),
       status,
+      carrier,
       location: cleanString(body.location, 150),
       notes: cleanMultiline(body.notes, 5000),
       phoneNumber,

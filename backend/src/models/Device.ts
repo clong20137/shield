@@ -10,6 +10,7 @@ export interface Device {
   serialNumber: string;
   assignedTo: string;
   status: string;
+  carrier: string;
   location: string;
   notes: string;
   phoneNumber: string;
@@ -123,6 +124,7 @@ function buildDeviceWhere(filters: DeviceListFilters = {}, options: { includeTyp
       OR LOWER(\`serialNumber\`) LIKE ?
       OR LOWER(\`assignedTo\`) LIKE ?
       OR LOWER(\`status\`) LIKE ?
+      OR LOWER(\`carrier\`) LIKE ?
       OR LOWER(\`location\`) LIKE ?
       OR LOWER(\`phoneNumber\`) LIKE ?
       OR LOWER(\`imei\`) LIKE ?
@@ -131,7 +133,7 @@ function buildDeviceWhere(filters: DeviceListFilters = {}, options: { includeTyp
       OR LOWER(\`hostname\`) LIKE ?
       OR LOWER(\`routerId\`) LIKE ?
     )`);
-    params.push(...Array.from({ length: 12 }, () => likeTerm));
+    params.push(...Array.from({ length: 13 }, () => likeTerm));
   }
 
   return {
@@ -148,6 +150,7 @@ const deviceColumns = [
   '`serialNumber`',
   '`assignedTo`',
   '`status`',
+  '`carrier`',
   '`location`',
   '`notes`',
   '`phoneNumber`',
@@ -176,6 +179,7 @@ function normalizeDeviceInput(device: DeviceInput): DeviceInput {
     serialNumber: device.serialNumber || '',
     assignedTo: device.assignedTo || '',
     status: device.status || 'Available',
+    carrier: device.carrier || 'Verizon',
     location: device.location || '',
     notes: device.notes || '',
     phoneNumber: device.phoneNumber || '',
@@ -232,6 +236,7 @@ export class DeviceModel {
       const sortColumns: Record<string, string> = {
         assetTag: '`assetTag`',
         assignedTo: '`assignedTo`',
+        carrier: '`carrier`',
         location: '`location`',
         maintenanceDueDate: '`maintenanceDueDate`',
         makeModel: '`makeModel`',
@@ -356,11 +361,11 @@ export class DeviceModel {
       await conn.query<ResultSetHeader>(
         `INSERT INTO devices (
           \`id\`, \`type\`, \`assetTag\`, \`makeModel\`, \`serialNumber\`, \`assignedTo\`,
-          \`status\`, \`location\`, \`notes\`, \`phoneNumber\`, \`imei\`, \`simNumber\`,
+          \`status\`, \`carrier\`, \`location\`, \`notes\`, \`phoneNumber\`, \`imei\`, \`simNumber\`,
           \`radioId\`, \`hostname\`, \`routerId\`, \`warrantyExpiration\`, \`replacementDueDate\`,
           \`maintenanceDueDate\`, \`lastServiceDate\`, \`purchaseDate\`, \`condition\`,
           \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           device.type,
@@ -369,6 +374,7 @@ export class DeviceModel {
           device.serialNumber,
           device.assignedTo,
           device.status,
+          device.carrier,
           device.location,
           device.notes,
           device.phoneNumber,
@@ -417,6 +423,7 @@ export class DeviceModel {
           \`serialNumber\` = ?,
           \`assignedTo\` = ?,
           \`status\` = ?,
+          \`carrier\` = ?,
           \`location\` = ?,
           \`notes\` = ?,
           \`phoneNumber\` = ?,
@@ -440,6 +447,7 @@ export class DeviceModel {
           device.serialNumber,
           device.assignedTo,
           device.status,
+          device.carrier,
           device.location,
           device.notes,
           device.phoneNumber,

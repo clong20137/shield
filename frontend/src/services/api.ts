@@ -862,6 +862,7 @@ export interface DeviceRecord {
   serialNumber: string;
   assignedTo: string;
   status: 'Available' | 'Assigned' | 'Maintenance' | 'Retired' | 'Damaged' | 'Lost';
+  carrier: 'Verizon' | 'AT&T';
   location: string;
   notes: string;
   phoneNumber: string;

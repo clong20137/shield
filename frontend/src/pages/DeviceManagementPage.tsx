@@ -8,10 +8,11 @@ import { AppContextMenu, AppContextMenuPosition, shouldUseNativeContextMenu } fr
 
 type DeviceType = DeviceRecord['type'];
 type DeviceStatus = DeviceRecord['status'];
+type DeviceCarrier = DeviceRecord['carrier'];
 type DeviceStatusFilter = DeviceStatus | 'All' | 'Unassigned';
 type DeviceForm = Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'>;
 type DeviceConditionalField = 'phoneNumber' | 'imei' | 'simNumber' | 'radioId' | 'hostname' | 'routerId';
-type SortKey = keyof Pick<DeviceRecord, 'type' | 'assetTag' | 'makeModel' | 'assignedTo' | 'status' | 'location' | 'maintenanceDueDate' | 'replacementDueDate' | 'updatedAt'>;
+type SortKey = keyof Pick<DeviceRecord, 'type' | 'assetTag' | 'makeModel' | 'assignedTo' | 'status' | 'carrier' | 'location' | 'maintenanceDueDate' | 'replacementDueDate' | 'updatedAt'>;
 type ScanMode = 'lookup' | 'check-in' | 'check-out';
 type PhoneImportSummary = {
   totalRows: number;
@@ -30,6 +31,7 @@ type PhoneImportProgress = {
 
 const deviceTypes: DeviceType[] = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio', 'Cradlepoint'];
 const deviceStatuses: DeviceStatus[] = ['Available', 'Assigned', 'Maintenance', 'Damaged', 'Lost', 'Retired'];
+const deviceCarriers: DeviceCarrier[] = ['Verizon', 'AT&T'];
 const deviceConditions = ['Excellent', 'Good', 'Fair', 'Poor', 'Damaged'];
 const DEVICE_TABLE_ROW_HEIGHT = 64;
 const DEVICE_TABLE_OVERSCAN = 8;
@@ -43,6 +45,7 @@ const defaultDeviceForm: DeviceForm = {
   serialNumber: '',
   assignedTo: '',
   status: 'Available',
+  carrier: 'Verizon',
   location: '',
   notes: '',
   phoneNumber: '',
@@ -146,6 +149,7 @@ function toDeviceForm(device: DeviceRecord): DeviceForm {
     serialNumber: device.serialNumber || '',
     assignedTo: device.assignedTo || '',
     status: device.status,
+    carrier: device.carrier || 'Verizon',
     location: device.location || '',
     notes: device.notes || '',
     phoneNumber: device.phoneNumber || '',
@@ -831,6 +835,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       'serialNumber',
       'assignedTo',
       'status',
+      'carrier',
       'location',
       'phoneNumber',
       'imei',
@@ -1185,7 +1190,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               <option value="type">Type</option>
               <option value="status">Status</option>
               <option value="assignedTo">Assigned To</option>
-              <option value="maintenanceDueDate">Maintenance Due</option>
+              <option value="carrier">Carrier</option>
               <option value="replacementDueDate">Replacement Due</option>
             </select>
             <input value={query} onChange={(event) => { setPage(1); setQuery(event.target.value); }} placeholder="Search inventory" className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
@@ -1261,7 +1266,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                   <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                     <Detail label="Assigned" value={device.assignedTo || 'Unassigned'} />
                     <Detail label="Condition" value={device.condition || 'Good'} />
-                    <Detail label="Maintenance" value={formatDate(device.maintenanceDueDate)} />
+                    <Detail label="Carrier" value={device.carrier || 'Verizon'} />
                     <Detail label="Replacement" value={formatDate(device.replacementDueDate)} />
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -1288,7 +1293,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                   <th className="px-2 py-2">Device</th>
                   <th className="px-2 py-2">Assigned</th>
                   <th className="px-2 py-2">Status</th>
-                  <th className="px-2 py-2">Maintenance</th>
+                  <th className="px-2 py-2">Carrier</th>
                   <th className="px-2 py-2 text-right">Actions</th>
                 </tr>
               </thead>
@@ -1322,7 +1327,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                       </td>
                       <td className="max-w-[220px] truncate px-2 py-2">{device.assignedTo || 'Unassigned'}</td>
                       <td className="px-2 py-2"><DeviceStatusCluster device={device} /></td>
-                      <td className={`px-2 py-2 ${isDueSoon(device.maintenanceDueDate) ? 'font-bold text-danger' : ''}`}>{formatDate(device.maintenanceDueDate)}</td>
+                      <td className="px-2 py-2 font-semibold">{device.carrier || 'Verizon'}</td>
                       <td className="px-2 py-2">
                         <div className="flex justify-end gap-1.5">
                           {canManageDevices && <button type="button" onClick={(event) => { event.stopPropagation(); editDevice(device); }} className="btn-secondary h-8 w-8 p-0" aria-label="Edit device" title="Edit"><Pencil size={14} /></button>}
@@ -1449,6 +1454,11 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <Field label="Status">
                   <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as DeviceStatus }))} className={getDeviceInputClass()}>
                     {deviceStatuses.map((status) => <option key={status}>{status}</option>)}
+                  </select>
+                </Field>
+                <Field label="Carrier">
+                  <select value={form.carrier || 'Verizon'} onChange={(event) => setForm((current) => ({ ...current, carrier: event.target.value as DeviceCarrier }))} className={getDeviceInputClass()}>
+                    {deviceCarriers.map((carrier) => <option key={carrier}>{carrier}</option>)}
                   </select>
                 </Field>
                 <Field label="Condition">
