@@ -937,6 +937,18 @@ export interface PhoneImportResponse {
   skippedRows: Array<{ rowNumber: number; reason: string; row: Record<string, unknown> }>;
 }
 
+export interface PhoneImportJob {
+  id: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  processedRows: number;
+  totalRows: number;
+  summary: PhoneImportResponse;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+}
+
 export interface DeviceEvent {
   id: string;
   deviceId: string;
@@ -1484,6 +1496,14 @@ export const deviceService = {
 
   importPhones: (payload: { rows: Record<string, string>[]; actorId?: string; actorName?: string }) =>
     api.post<PhoneImportResponse>('/devices/phones/import', payload, { timeout: 60000 }),
+  startPhoneImportJob: (csvText: string, actor?: { actorId?: string; actorName?: string }) =>
+    api.post<PhoneImportJob>('/devices/phones/import-jobs', csvText, {
+      headers: { 'Content-Type': 'text/csv' },
+      params: actor,
+      timeout: 60000,
+    }),
+  getPhoneImportJob: (jobId: string) =>
+    api.get<PhoneImportJob>(`/devices/phones/import-jobs/${jobId}`),
 
   deletePhones: () =>
     api.delete<{ deletedCount: number }>('/devices/phones'),

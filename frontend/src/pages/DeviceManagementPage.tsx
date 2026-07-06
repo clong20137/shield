@@ -25,8 +25,7 @@ type PhoneImportSummary = {
 type PhoneImportProgress = {
   processedRows: number;
   totalRows: number;
-  currentBatch: number;
-  totalBatches: number;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
 };
 
 const deviceTypes: DeviceType[] = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio', 'Cradlepoint'];
@@ -36,8 +35,7 @@ const deviceConditions = ['Excellent', 'Good', 'Fair', 'Poor', 'Damaged'];
 const DEVICE_TABLE_ROW_HEIGHT = 64;
 const DEVICE_TABLE_OVERSCAN = 8;
 const DEVICE_TABLE_MAX_HEIGHT = 620;
-const PHONE_IMPORT_BATCH_SIZE = 500;
-const PHONE_IMPORT_BATCH_PAUSE_MS = 150;
+const PHONE_IMPORT_POLL_MS = 900;
 
 const defaultDeviceForm: DeviceForm = {
   type: 'Cell Phone',
@@ -197,28 +195,6 @@ function parseCsvLine(line: string): string[] {
 
   values.push(current);
   return values;
-}
-
-function parseCsvRows(text: string): Record<string, string>[] {
-  const [headerLine, ...lines] = text.split(/\r?\n/u).filter((line) => line.trim().length > 0);
-  if (!headerLine) {
-    return [];
-  }
-
-  const headers = parseCsvLine(headerLine).map((header) => header.trim());
-  return lines.map((line) => {
-    const values = parseCsvLine(line);
-    return headers.reduce<Record<string, string>>((row, header, index) => {
-      row[header] = values[index] || '';
-      return row;
-    }, {});
-  });
-}
-
-function waitForPhoneImportPause() {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, PHONE_IMPORT_BATCH_PAUSE_MS);
-  });
 }
 
 function formatDate(value: string): string {
@@ -957,57 +933,45 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       setError(null);
       setDeviceNotice(null);
       setPhoneImportSummary(null);
-      const rows = parseCsvRows(await file.text());
-      if (rows.length === 0) {
+      const csvText = await file.text();
+      const dataRows = csvText.split(/\r?\n/u).filter((line, index) => index > 0 && line.trim().length > 0);
+      if (dataRows.length === 0) {
         setError('Phone import CSV is empty.');
         return;
       }
 
-      const totalBatches = Math.ceil(rows.length / PHONE_IMPORT_BATCH_SIZE);
-      const summary = {
-        totalRows: rows.length,
-        createdCount: 0,
-        updatedCount: 0,
-        matchedCount: 0,
-        unmatchedCount: 0,
-        skippedCount: 0,
-      };
-      setPhoneImportProgress({ processedRows: 0, totalRows: rows.length, currentBatch: 0, totalBatches });
+      const response = await deviceService.startPhoneImportJob(csvText, actor);
+      let importJob = response.data;
+      setPhoneImportProgress({
+        processedRows: importJob.processedRows,
+        totalRows: importJob.totalRows,
+        status: importJob.status,
+      });
 
-      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += 1) {
-        const batchStart = batchIndex * PHONE_IMPORT_BATCH_SIZE;
-        const batchRows = rows.slice(batchStart, batchStart + PHONE_IMPORT_BATCH_SIZE);
-        setPhoneImportProgress({
-          processedRows: batchStart,
-          totalRows: rows.length,
-          currentBatch: batchIndex + 1,
-          totalBatches,
+      while (importJob.status === 'queued' || importJob.status === 'processing') {
+        await new Promise((resolve) => {
+          window.setTimeout(resolve, PHONE_IMPORT_POLL_MS);
         });
-        const response = await deviceService.importPhones({ rows: batchRows, ...actor });
-        summary.createdCount += response.data.createdCount;
-        summary.updatedCount += response.data.updatedCount;
-        summary.matchedCount += response.data.matchedCount;
-        summary.unmatchedCount += response.data.unmatchedRows.length;
-        summary.skippedCount += response.data.skippedRows.length;
+        importJob = (await deviceService.getPhoneImportJob(importJob.id)).data;
         setPhoneImportProgress({
-          processedRows: Math.min(batchStart + batchRows.length, rows.length),
-          totalRows: rows.length,
-          currentBatch: batchIndex + 1,
-          totalBatches,
+          processedRows: importJob.processedRows,
+          totalRows: importJob.totalRows,
+          status: importJob.status,
         });
+      }
 
-        if (batchIndex < totalBatches - 1) {
-          await waitForPhoneImportPause();
-        }
+      if (importJob.status === 'failed') {
+        setError(importJob.error || 'Failed to import phone CSV.');
+        return;
       }
 
       setPhoneImportSummary({
-        totalRows: summary.totalRows,
-        createdCount: summary.createdCount,
-        updatedCount: summary.updatedCount,
-        matchedCount: summary.matchedCount,
-        unmatchedCount: summary.unmatchedCount,
-        skippedCount: summary.skippedCount,
+        totalRows: importJob.summary.totalRows,
+        createdCount: importJob.summary.createdCount,
+        updatedCount: importJob.summary.updatedCount,
+        matchedCount: importJob.summary.matchedCount,
+        unmatchedCount: importJob.summary.unmatchedRows.length,
+        skippedCount: importJob.summary.skippedRows.length,
       });
       await loadDevices(false);
     } catch (err) {
@@ -1104,7 +1068,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Importing Phones</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Batch {phoneImportProgress.currentBatch} of {phoneImportProgress.totalBatches}
+                  {phoneImportProgress.status === 'queued' ? 'Queued for processing' : 'Processing on the server'}
                 </p>
               </div>
             </div>
