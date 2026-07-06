@@ -1,7 +1,6 @@
 import { ChangeEvent, FormEvent, MouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { IScannerControls } from '@zxing/browser';
-import { AlertTriangle, ArchiveX, Camera, CheckCircle2, ChevronRight, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, QrCode, Radio, RefreshCw, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
+import { AlertTriangle, ArchiveX, CheckCircle2, ChevronLeft, ChevronRight, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, Radio, RefreshCw, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, deviceService, DeviceRecord } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
 import { AppContextMenu, AppContextMenuPosition, shouldUseNativeContextMenu } from '../components/AppContextMenu';
@@ -13,7 +12,6 @@ type DeviceStatusFilter = DeviceStatus | 'All' | 'Unassigned';
 type DeviceForm = Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'>;
 type DeviceConditionalField = 'phoneNumber' | 'imei' | 'simNumber' | 'radioId' | 'hostname' | 'routerId';
 type SortKey = keyof Pick<DeviceRecord, 'type' | 'assetTag' | 'makeModel' | 'assignedTo' | 'status' | 'carrier' | 'location' | 'maintenanceDueDate' | 'replacementDueDate' | 'updatedAt'>;
-type ScanMode = 'lookup' | 'check-in' | 'check-out';
 type PhoneImportSummary = {
   totalRows: number;
   createdCount: number;
@@ -284,30 +282,6 @@ function getDeviceDisplayMeta(device: DeviceRecord): string {
   return details.join(' - ');
 }
 
-function normalizeScanValue(value: string): string {
-  return value
-    .trim()
-    .replace(/^shield-device:/iu, '')
-    .replace(/^asset:/iu, '')
-    .toLowerCase();
-}
-
-function deviceMatchesScan(device: DeviceRecord, scanValue: string): boolean {
-  const normalizedScan = normalizeScanValue(scanValue);
-  if (!normalizedScan) return false;
-
-  return [
-    device.assetTag,
-    device.serialNumber,
-    device.imei,
-    device.simNumber,
-    device.radioId,
-    device.hostname,
-    device.routerId,
-    device.phoneNumber,
-  ].some((value) => normalizeScanValue(value || '') === normalizedScan);
-}
-
 function getInitialDeviceModalPosition() {
   const width = Math.min(window.innerWidth - 16, 1152);
   return {
@@ -375,13 +349,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [isDeletePhonesConfirmOpen, setIsDeletePhonesConfirmOpen] = useState(false);
   const [eventNotes, setEventNotes] = useState('');
   const [assigneeSearch, setAssigneeSearch] = useState('');
-  const [scanValue, setScanValue] = useState('');
-  const [scanMode, setScanMode] = useState<ScanMode>('lookup');
-  const [scanAssignee, setScanAssignee] = useState('');
-  const [scanFeedback, setScanFeedback] = useState<string | null>(null);
-  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
-  const [isCameraScanActive, setIsCameraScanActive] = useState(false);
-  const [cameraScanStatus, setCameraScanStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [deviceNotice, setDeviceNotice] = useState<string | null>(null);
   const [phoneImportSummary, setPhoneImportSummary] = useState<PhoneImportSummary | null>(null);
@@ -394,8 +361,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const hasLoadedRegisteredUsersRef = useRef(false);
   const deviceRefreshTimerRef = useRef<number | null>(null);
   const userRefreshTimerRef = useRef<number | null>(null);
-  const scannerVideoRef = useRef<HTMLVideoElement | null>(null);
-  const scannerControlsRef = useRef<IScannerControls | null>(null);
 
   const canManageDevices = currentUser?.role === 'administrator';
   const actor = { actorId: currentUser?.id, actorName: currentUser?.displayName || currentUser?.email };
@@ -540,71 +505,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     };
   }, [loadRegisteredUsers]);
 
-  const stopCameraScanner = useCallback(() => {
-    scannerControlsRef.current?.stop();
-    scannerControlsRef.current = null;
-    if (scannerVideoRef.current) {
-      scannerVideoRef.current.srcObject = null;
-    }
-    setIsCameraScanActive(false);
-  }, []);
-
-  useEffect(() => stopCameraScanner, [stopCameraScanner]);
-
-  const closeCameraScanner = () => {
-    stopCameraScanner();
-    setIsCameraScannerOpen(false);
-  };
-
-  const startCameraScanner = async () => {
-    setIsCameraScannerOpen(true);
-    setCameraScanStatus('Starting camera...');
-
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraScanStatus('Camera scanning needs HTTPS and browser camera permission. Open the secure app URL, then try again.');
-      return;
-    }
-
-    try {
-      stopCameraScanner();
-      const video = scannerVideoRef.current;
-      if (!video) {
-        setCameraScanStatus('Camera preview is not ready yet.');
-        return;
-      }
-
-      const { BrowserMultiFormatReader } = await import('@zxing/browser');
-      const reader = new BrowserMultiFormatReader();
-      setIsCameraScanActive(true);
-      setCameraScanStatus('Point the camera at a QR code or barcode.');
-      scannerControlsRef.current = await reader.decodeFromConstraints({
-        video: {
-          facingMode: { ideal: 'environment' },
-        },
-        audio: false,
-      }, video, (result, error, controls) => {
-        if (error && !result) {
-          return;
-        }
-
-        const value = result?.getText().trim();
-        if (value) {
-          controls.stop();
-          scannerControlsRef.current = null;
-          setIsCameraScanActive(false);
-          setScanValue(value);
-          setScanFeedback(`Scanned ${value}. Tap Apply to continue.`);
-          setCameraScanStatus('Scan captured.');
-          setIsCameraScannerOpen(false);
-        }
-      });
-    } catch (err) {
-      console.error('Failed to start device scanner:', err);
-      setCameraScanStatus('Unable to start the camera. Use HTTPS, allow camera access, and try again.');
-      stopCameraScanner();
-    }
-  };
-
   const safePage = Math.min(page, totalPages);
   const pageStartIndex = (safePage - 1) * pageSize;
   const paginatedDevices = devices;
@@ -723,87 +623,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setForm(defaultDeviceForm);
     setEventNotes('');
     setAssigneeSearch('');
-  };
-
-  useEffect(() => {
-    if (scanMode === 'check-out' && !hasLoadedRegisteredUsersRef.current) {
-      void loadRegisteredUsers();
-    }
-  }, [loadRegisteredUsers, scanMode]);
-
-  const updateDeviceStatus = async (
-    device: DeviceRecord,
-    status: DeviceStatus,
-    action: string,
-    options: { assignedTo?: string; notes?: string } = {},
-  ) => {
-    if (!canManageDevices) return;
-
-    try {
-      const response = await deviceService.update(device.id, {
-        ...toDeviceForm(device),
-        status,
-        assignedTo: status === 'Available' ? '' : options.assignedTo ?? device.assignedTo,
-        lastServiceDate: action === 'Maintenance' ? new Date().toISOString().slice(0, 10) : device.lastServiceDate || '',
-        ...actor,
-        eventAction: action,
-        eventNotes: options.notes || eventNotes || action,
-      });
-      setDevices((currentDevices) => currentDevices.map((item) => (item.id === device.id ? response.data : item)));
-    } catch (err) {
-      console.error('Failed to update device status:', err);
-      setError('Failed to update device status.');
-    }
-  };
-
-  const findScannedDevice = async (value: string) => {
-    const localMatch = devices.find((device) => deviceMatchesScan(device, value));
-    if (localMatch) {
-      return localMatch;
-    }
-
-    const response = await deviceService.getAll({ q: value, page: 1, pageSize: 5 });
-    const normalizedResponse = normalizeDeviceListResponse(response.data, 1);
-    return normalizedResponse.data.find((device) => deviceMatchesScan(device, value)) || null;
-  };
-
-  const handleScannerSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    const scannedDevice = await findScannedDevice(scanValue);
-    if (!scannedDevice) {
-      setScanFeedback('No device matched that scan. Try asset tag, serial, IMEI, ICCID, radio ID, hostname, router ID, or phone number.');
-      return;
-    }
-
-    setScanFeedback(null);
-
-    if (scanMode === 'lookup') {
-      setScanFeedback(`Found ${getDeviceDisplayName(scannedDevice)}: ${getDeviceDisplayMeta(scannedDevice)}.`);
-      setScanValue('');
-      return;
-    }
-
-    if (!canManageDevices) {
-      setScanFeedback('You do not have permission to check devices in or out.');
-      return;
-    }
-
-    if (scanMode === 'check-out' && !scanAssignee.trim()) {
-      setScanFeedback('Choose who the device is being checked out to.');
-      return;
-    }
-
-    const nextStatus = scanMode === 'check-in' ? 'Available' : 'Assigned';
-    const action = scanMode === 'check-in' ? 'Scanned In' : 'Scanned Out';
-    const assignee = scanMode === 'check-in' ? '' : scanAssignee;
-
-    await updateDeviceStatus(scannedDevice, nextStatus, action, {
-      assignedTo: assignee,
-      notes: scanMode === 'check-in' ? `Scanned in from ${scanValue}.` : `Scanned out to ${assignee}.`,
-    });
-    setScanFeedback(`${getDeviceDisplayName(scannedDevice)} ${scanMode === 'check-in' ? 'checked in' : `checked out to ${assignee}`}.`);
-    setScanValue('');
   };
 
   const deleteDevice = async (device: DeviceRecord) => {
@@ -1144,83 +963,54 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       />
       <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
         <div className="mb-5 flex flex-col gap-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2>Inventory</h2>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Search inventory, filter lifecycle status, or scan a device identifier.
+                Search inventory, filter lifecycle status, and manage device imports.
               </p>
+            </div>
+            <div className="flex flex-wrap justify-start gap-2 sm:justify-end">
+              {canManageDevices && (
+                <button type="button" onClick={openAddDeviceModal} className="btn-primary" title="Add Device" aria-label="Add Device">
+                  <Plus size={16} />
+                  <span>Add Device</span>
+                </button>
+              )}
+              <button type="button" onClick={exportCsv} className="btn-secondary" title="Export current page" aria-label="Export current page">
+                <Download size={16} />
+                <span>Export Page</span>
+              </button>
+              {canManageDevices && (
+                <button type="button" onClick={() => void exportPhoneInventory()} className="btn-secondary" title="Export all phones" aria-label="Export all phones">
+                  <Smartphone size={16} />
+                  <span>Export Phones</span>
+                </button>
+              )}
+              {canManageDevices && (
+                <label className="btn-secondary cursor-pointer" title="Import CSV" aria-label="Import CSV">
+                  <Upload size={16} />
+                  <span>Import</span>
+                  <input type="file" accept=".csv" className="hidden" onChange={importCsv} />
+                </label>
+              )}
+              {canManageDevices && (
+                <label className="btn-secondary cursor-pointer" title="Import phone CSV" aria-label="Import phone CSV">
+                  <Upload size={16} />
+                  <span>Import Phones</span>
+                  <input type="file" accept=".csv" className="hidden" onChange={importPhoneCsv} />
+                </label>
+              )}
+              {canManageDevices && (
+                <button type="button" onClick={() => setIsDeletePhonesConfirmOpen(true)} className="btn-danger" title="Delete all phones" aria-label="Delete all phones">
+                  <Trash2 size={16} />
+                  <span>Delete Phones</span>
+                </button>
+              )}
             </div>
           </div>
 
-          <form onSubmit={handleScannerSubmit} className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_160px_minmax(0,1fr)_auto_auto]">
-            <input
-              value={scanValue}
-              onChange={(event) => setScanValue(event.target.value)}
-              placeholder="Scan or enter asset tag, serial, IMEI, ICCID, radio ID, hostname, router ID, or phone"
-              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-              autoComplete="off"
-            />
-            <select
-              value={scanMode}
-              onChange={(event) => setScanMode(event.target.value as ScanMode)}
-              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-            >
-              <option value="lookup">Lookup</option>
-              <option value="check-in">Check In</option>
-              <option value="check-out">Check Out</option>
-            </select>
-            <select
-              value={scanAssignee}
-              onChange={(event) => setScanAssignee(event.target.value)}
-              disabled={scanMode !== 'check-out'}
-              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950"
-              aria-label="Check out assignee"
-            >
-              <option value="">Select assignee</option>
-              {registeredUsers.map((user) => (
-                <option key={user.id} value={user.email}>{user.displayName || user.email}</option>
-              ))}
-            </select>
-            <button type="button" onClick={() => void startCameraScanner()} className="btn-secondary justify-center md:hidden" aria-label="Scan with camera" title="Scan with Camera">
-              <Camera size={16} />
-              <span>Camera</span>
-            </button>
-            <button type="submit" className="btn-primary justify-center" aria-label="Apply scan" title="Apply Scan">
-              <QrCode size={16} />
-              <span>Apply</span>
-            </button>
-          </form>
-
-          {isCameraScannerOpen && (
-            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-950 text-white shadow-lg dark:border-gray-800">
-              <div className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-black">Camera Scan</p>
-                  <p className="truncate text-xs font-semibold text-white/65">{cameraScanStatus || 'Point the camera at a device label.'}</p>
-                </div>
-                <button type="button" onClick={closeCameraScanner} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20" aria-label="Close camera scanner" title="Close">
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="relative aspect-[4/3] bg-black">
-                <video ref={scannerVideoRef} className="h-full w-full object-cover" playsInline muted />
-                {isCameraScanActive && (
-                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <div className="h-36 w-64 max-w-[78vw] rounded-2xl border-2 border-accent shadow-[0_0_0_999px_rgba(0,0,0,0.28)]" />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {scanFeedback && (
-            <div className="rounded border border-accent/30 bg-accent/10 px-3 py-2 text-sm font-semibold text-accent">
-              {scanFeedback}
-            </div>
-          )}
-
-          <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid w-full grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:grid-cols-2 xl:grid-cols-[1.35fr_1fr_1fr_1fr_1.6fr] dark:border-gray-800 dark:bg-gray-950">
             <select value={filter} onChange={(event) => { setPage(1); setFilter(event.target.value as DeviceType | 'All'); }} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
               <option>All</option>
               {deviceTypes.map((type) => <option key={type}>{type}</option>)}
@@ -1274,11 +1064,11 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 {[25, 50, 100, 250].map((size) => <option key={size} value={size}>{size}</option>)}
               </select>
               <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={safePage <= 1} className="btn-secondary px-2 py-1 text-xs" aria-label="Previous device page" title="Previous">
-                Previous
+                <ChevronLeft size={16} />
               </button>
               <span className="font-semibold text-gray-700 dark:text-gray-200">Page {safePage} of {totalPages}</span>
               <button type="button" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={safePage >= totalPages} className="btn-secondary px-2 py-1 text-xs" aria-label="Next device page" title="Next">
-                Next
+                <ChevronRight size={16} />
               </button>
             </div>
           </div>
@@ -1397,44 +1187,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           </div>
           </>
         )}
-        <div className="mt-5 flex flex-wrap justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-800">
-          {canManageDevices && (
-            <button type="button" onClick={openAddDeviceModal} className="btn-primary" title="Add Device" aria-label="Add Device">
-              <Plus size={16} />
-              <span>Add Device</span>
-            </button>
-          )}
-          <button type="button" onClick={exportCsv} className="btn-secondary" title="Export current page" aria-label="Export current page">
-            <Download size={16} />
-            <span>Export Page</span>
-          </button>
-          {canManageDevices && (
-            <button type="button" onClick={() => void exportPhoneInventory()} className="btn-secondary" title="Export all phones" aria-label="Export all phones">
-              <Smartphone size={16} />
-              <span>Export Phones</span>
-            </button>
-          )}
-          {canManageDevices && (
-            <button type="button" onClick={() => setIsDeletePhonesConfirmOpen(true)} className="btn-danger" title="Delete all phones" aria-label="Delete all phones">
-              <Trash2 size={16} />
-              <span>Delete Phones</span>
-            </button>
-          )}
-          {canManageDevices && (
-            <label className="btn-secondary cursor-pointer" title="Import CSV" aria-label="Import CSV">
-              <Upload size={16} />
-              <span>Import</span>
-              <input type="file" accept=".csv" className="hidden" onChange={importCsv} />
-            </label>
-          )}
-          {canManageDevices && (
-            <label className="btn-secondary cursor-pointer" title="Import phone CSV" aria-label="Import phone CSV">
-              <Upload size={16} />
-              <span>Import Phones</span>
-              <input type="file" accept=".csv" className="hidden" onChange={importPhoneCsv} />
-            </label>
-          )}
-        </div>
       </section>
       </div>
 
@@ -1758,43 +1510,51 @@ function DeviceInventoryTree({
                   <ChevronRight className={`transition-transform duration-200 ${isSubtreeCollapsed ? '' : 'rotate-90'}`} size={16} />
                 </button>
               </div>
-              {!isSubtreeCollapsed && statuses.length > 0 && (
-                <div className="ml-5 mt-1.5 space-y-1 border-l border-gray-200 pl-3 dark:border-gray-800" role="group">
-                  {statuses.map((status) => {
-                    const StatusIcon = getRailIcon(status);
-                    const isActive = activeType === type && activeStatus === status;
-                    const count = counts[status] || 0;
+              <div
+                className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
+                  isSubtreeCollapsed ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'
+                }`}
+              >
+                <div className="min-h-0 overflow-hidden">
+                  {statuses.length > 0 ? (
+                    <div className="ml-5 mt-1.5 space-y-1 border-l border-gray-200 pl-3 dark:border-gray-800" role="group">
+                      {statuses.map((status) => {
+                        const StatusIcon = getRailIcon(status);
+                        const isActive = activeType === type && activeStatus === status;
+                        const count = counts[status] || 0;
 
-                    return (
-                      <button
-                        key={`${type}-${status}`}
-                        type="button"
-                        onClick={() => onSelect(type, status)}
-                        role="treeitem"
-                        aria-current={isActive ? 'page' : undefined}
-                        className={`group/status relative flex w-full items-center gap-2 overflow-hidden rounded-lg border px-2.5 py-2 text-left text-sm transition-all duration-200 ease-out hover:translate-x-1 hover:border-accent/60 hover:bg-accent/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                          isActive
-                            ? 'border-accent bg-accent/10 text-accent shadow-sm before:absolute before:bottom-1 before:left-0 before:top-1 before:w-1 before:rounded-r before:bg-accent'
-                            : 'border-transparent text-gray-600 dark:text-gray-300'
-                        }`}
-                      >
-                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded transition-transform duration-200 group-hover/status:scale-105 ${getRailTone(status)}`}>
-                          <StatusIcon size={15} />
-                        </span>
-                        <span className="min-w-0 flex-1 truncate font-semibold">{status}</span>
-                        <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">{count}</span>
-                      </button>
-                    );
-                  })}
+                        return (
+                          <button
+                            key={`${type}-${status}`}
+                            type="button"
+                            onClick={() => onSelect(type, status)}
+                            role="treeitem"
+                            aria-current={isActive ? 'page' : undefined}
+                            tabIndex={isSubtreeCollapsed ? -1 : 0}
+                            className={`group/status relative flex w-full items-center gap-2 overflow-hidden rounded-lg border px-2.5 py-2 text-left text-sm transition-all duration-200 ease-out hover:translate-x-1 hover:border-accent/60 hover:bg-accent/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                              isActive
+                                ? 'border-accent bg-accent/10 text-accent shadow-sm before:absolute before:bottom-1 before:left-0 before:top-1 before:w-1 before:rounded-r before:bg-accent'
+                                : 'border-transparent text-gray-600 dark:text-gray-300'
+                            }`}
+                          >
+                            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded transition-transform duration-200 group-hover/status:scale-105 ${getRailTone(status)}`}>
+                              <StatusIcon size={15} />
+                            </span>
+                            <span className="min-w-0 flex-1 truncate font-semibold">{status}</span>
+                            <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">{count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="ml-5 mt-1.5 border-l border-gray-200 pl-3 dark:border-gray-800" role="group">
+                      <div className="rounded-lg px-3 py-2 text-xs font-semibold text-gray-400 dark:text-gray-500">
+                        No counted status yet
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-              {!isSubtreeCollapsed && statuses.length === 0 && (
-                <div className="ml-5 mt-1.5 border-l border-gray-200 pl-3 dark:border-gray-800" role="group">
-                  <div className="rounded-lg px-3 py-2 text-xs font-semibold text-gray-400 dark:text-gray-500">
-                    No counted status yet
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
           );
         })}
