@@ -169,13 +169,14 @@ function cleanPhoneModelName(value: string): string {
     return normalizedValue.match(/inseego/iu) ? 'Inseego MiFi' : 'Verizon Jetpack';
   }
 
-  const iphoneMatch = normalizedValue.match(/\bi\s*phone\s*(\d{1,2})(?:\s*(pro\s*max|pro|plus|mini))?/iu);
+  const iphoneMatch = normalizedValue.match(/\bi\s*phone\s*(\d{1,2})(e)?(?:\s*(pro\s*max|pro|plus|mini))?/iu);
 
   if (iphoneMatch) {
-    const variant = iphoneMatch[2]
-      ? iphoneMatch[2].replace(/\s+/gu, ' ').replace(/\b\w/gu, (letter) => letter.toUpperCase())
+    const suffix = iphoneMatch[2] ? 'e' : '';
+    const variant = iphoneMatch[3]
+      ? iphoneMatch[3].replace(/\s+/gu, ' ').replace(/\b\w/gu, (letter) => letter.toUpperCase())
       : '';
-    return `iPhone ${iphoneMatch[1]}${variant ? ` ${variant}` : ''}`;
+    return `iPhone ${iphoneMatch[1]}${suffix}${variant ? ` ${variant}` : ''}`;
   }
 
   return normalizedValue || 'Agency Phone';
