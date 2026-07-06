@@ -250,7 +250,22 @@ app.use('/api/memorial-profiles', memorialProfileRoutes);
 app.use('/api/system', systemRoutes);
 
 const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
-app.use(express.static(frontendDistPath));
+app.use(express.static(frontendDistPath, {
+  etag: true,
+  immutable: true,
+  lastModified: true,
+  maxAge: '1y',
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('index.html')) {
+      res.setHeader('Cache-Control', 'no-cache');
+      return;
+    }
+
+    if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+  },
+}));
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {

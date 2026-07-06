@@ -897,6 +897,11 @@ export async function initializeDatabase() {
   await ensureIndex('devices', 'idx_devices_assigned_updated', '`assignedTo`, `updatedAt`, `assetTag`');
   await ensureIndex('devices', 'idx_devices_type_updated_asset', '`type`, `updatedAt`, `assetTag`');
   await ensureIndex('devices', 'idx_devices_status_updated_asset', '`status`, `updatedAt`, `assetTag`');
+  await ensureIndex('devices', 'idx_devices_carrier_updated_asset', '`carrier`, `updatedAt`, `assetTag`');
+  await ensureIndex('devices', 'idx_devices_model_updated_asset', '`makeModel`, `updatedAt`, `assetTag`');
+  await ensureIndex('devices', 'idx_devices_type_status', '`type`, `status`');
+  await ensureIndex('devices', 'idx_devices_carrier_type_model', '`carrier`, `type`, `makeModel`');
+  await ensureIndex('devices', 'idx_devices_condition', '`condition`');
   await ensureIndex('devices', 'idx_devices_maintenance_asset', '`maintenanceDueDate`, `assetTag`');
   await ensureIndex('devices', 'idx_devices_replacement_asset', '`replacementDueDate`, `assetTag`');
 

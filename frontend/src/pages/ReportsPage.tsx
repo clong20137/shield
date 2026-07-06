@@ -656,6 +656,9 @@ const ReportsPage: React.FC<{
   const [reviewNotes, setReviewNotes] = useState('');
   const [isReviewSaving, setIsReviewSaving] = useState(false);
   const dailyRefreshTimerRef = useRef<number | null>(null);
+  const deviceReportRefreshTimerRef = useRef<number | null>(null);
+  const deviceReportLoadInFlightRef = useRef(false);
+  const deviceReportLoadPendingRef = useRef(false);
   const dailyLoadInFlightRef = useRef(false);
   const dailyLoadPendingRef = useRef(false);
   const analyticsChartRef = useRef<HTMLDivElement | null>(null);
@@ -671,6 +674,12 @@ const ReportsPage: React.FC<{
       return;
     }
 
+    if (deviceReportLoadInFlightRef.current) {
+      deviceReportLoadPendingRef.current = true;
+      return;
+    }
+
+    deviceReportLoadInFlightRef.current = true;
     if (showLoading) {
       setDeviceReportLoading(true);
     }
@@ -684,7 +693,12 @@ const ReportsPage: React.FC<{
       setDeviceReportError(message);
       console.error(err);
     } finally {
+      deviceReportLoadInFlightRef.current = false;
       setDeviceReportLoading(false);
+      if (deviceReportLoadPendingRef.current) {
+        deviceReportLoadPendingRef.current = false;
+        void loadDeviceReport(false);
+      }
     }
   };
 
@@ -854,7 +868,14 @@ const ReportsPage: React.FC<{
 
     const handleReportsUpdate = () => {
       if (selectedReportType === 'devices') {
-        void loadDeviceReport(false);
+        if (deviceReportRefreshTimerRef.current) {
+          window.clearTimeout(deviceReportRefreshTimerRef.current);
+        }
+
+        deviceReportRefreshTimerRef.current = window.setTimeout(() => {
+          deviceReportRefreshTimerRef.current = null;
+          void loadDeviceReport(false);
+        }, 700);
         return;
       }
 
@@ -891,6 +912,10 @@ const ReportsPage: React.FC<{
       if (dailyRefreshTimerRef.current) {
         window.clearTimeout(dailyRefreshTimerRef.current);
         dailyRefreshTimerRef.current = null;
+      }
+      if (deviceReportRefreshTimerRef.current) {
+        window.clearTimeout(deviceReportRefreshTimerRef.current);
+        deviceReportRefreshTimerRef.current = null;
       }
     };
   }, [selectedReportType, compareItems, analyticsFrom, analyticsTo]);

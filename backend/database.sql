@@ -124,7 +124,14 @@ CREATE TABLE IF NOT EXISTS devices (
   INDEX `idx_devices_type` (`type`),
   INDEX `idx_devices_status` (`status`),
   INDEX `idx_devices_updated_asset` (`updatedAt`, `assetTag`),
-  INDEX `idx_devices_assigned_updated` (`assignedTo`, `updatedAt`, `assetTag`)
+  INDEX `idx_devices_assigned_updated` (`assignedTo`, `updatedAt`, `assetTag`),
+  INDEX `idx_devices_type_updated_asset` (`type`, `updatedAt`, `assetTag`),
+  INDEX `idx_devices_status_updated_asset` (`status`, `updatedAt`, `assetTag`),
+  INDEX `idx_devices_carrier_updated_asset` (`carrier`, `updatedAt`, `assetTag`),
+  INDEX `idx_devices_model_updated_asset` (`makeModel`, `updatedAt`, `assetTag`),
+  INDEX `idx_devices_type_status` (`type`, `status`),
+  INDEX `idx_devices_carrier_type_model` (`carrier`, `type`, `makeModel`),
+  INDEX `idx_devices_condition` (`condition`)
 );
 
 CREATE TABLE IF NOT EXISTS device_events (
