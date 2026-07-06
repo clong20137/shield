@@ -256,6 +256,26 @@ function getDeviceHealthChips(device: DeviceRecord): Array<{ label: string; tone
   return chips;
 }
 
+function getDeviceDisplayName(device: DeviceRecord): string {
+  if (device.type === 'Cell Phone' || device.type === 'Cradlepoint') {
+    return device.makeModel || device.type;
+  }
+
+  return device.assetTag || device.makeModel || device.type;
+}
+
+function getDeviceDisplayMeta(device: DeviceRecord): string {
+  const details: string[] = [device.type];
+
+  if ((device.type === 'Cell Phone' || device.type === 'Cradlepoint') && device.phoneNumber) {
+    details.push(device.phoneNumber);
+  } else if (device.makeModel && device.makeModel !== getDeviceDisplayName(device)) {
+    details.push(device.makeModel);
+  }
+
+  return details.join(' - ');
+}
+
 function normalizeScanValue(value: string): string {
   return value
     .trim()
@@ -324,11 +344,13 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [pageSize, setPageSize] = useState(50);
   const [totalDevices, setTotalDevices] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [deviceStatusCounts, setDeviceStatusCounts] = useState<Record<string, number>>({});
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [pageContextMenu, setPageContextMenu] = useState<AppContextMenuPosition | null>(null);
   const [devicePendingDelete, setDevicePendingDelete] = useState<DeviceRecord | null>(null);
   const [isDeletePhonesConfirmOpen, setIsDeletePhonesConfirmOpen] = useState(false);
   const [eventNotes, setEventNotes] = useState('');
+  const [assigneeSearch, setAssigneeSearch] = useState('');
   const [scanValue, setScanValue] = useState('');
   const [scanMode, setScanMode] = useState<ScanMode>('lookup');
   const [scanAssignee, setScanAssignee] = useState('');
@@ -343,7 +365,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [loading, setLoading] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
   const [deviceTableScrollTop, setDeviceTableScrollTop] = useState(0);
-  const isDeviceLoadInFlightRef = useRef(false);
+  const deviceLoadSequenceRef = useRef(0);
   const isUserLoadInFlightRef = useRef(false);
   const hasLoadedRegisteredUsersRef = useRef(false);
   const deviceRefreshTimerRef = useRef<number | null>(null);
@@ -381,6 +403,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       setDevices([]);
       setTotalDevices(0);
       setTotalPages(1);
+      setDeviceStatusCounts({});
       setLoading(false);
       return;
     }
@@ -389,16 +412,14 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       setDevices([]);
       setTotalDevices(0);
       setTotalPages(1);
+      setDeviceStatusCounts({});
       setLoading(false);
       setError('You do not have permission to manage devices.');
       return;
     }
 
-    if (isDeviceLoadInFlightRef.current) {
-      return;
-    }
-
-    isDeviceLoadInFlightRef.current = true;
+    const loadSequence = deviceLoadSequenceRef.current + 1;
+    deviceLoadSequenceRef.current = loadSequence;
     if (showLoading) {
       setLoading(true);
     } else {
@@ -415,19 +436,27 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         pageSize,
       });
       const normalizedResponse = normalizeDeviceListResponse(response.data, page);
+      if (loadSequence !== deviceLoadSequenceRef.current) {
+        return;
+      }
       setDevices(normalizedResponse.data);
       setTotalDevices(normalizedResponse.total);
       setTotalPages(normalizedResponse.totalPages);
+      setDeviceStatusCounts(response.data.statusCounts || {});
       if (normalizedResponse.page !== page) {
         setPage(normalizedResponse.page);
       }
     } catch (err) {
+      if (loadSequence !== deviceLoadSequenceRef.current) {
+        return;
+      }
       console.error('Failed to load device inventory:', err);
       setError('Failed to load device inventory. Check that the backend is running.');
     } finally {
-      isDeviceLoadInFlightRef.current = false;
-      setLoading(false);
-      setIsFiltering(false);
+      if (loadSequence === deviceLoadSequenceRef.current) {
+        setLoading(false);
+        setIsFiltering(false);
+      }
     }
   }, [canManageDevices, currentUser?.id, filter, page, pageSize, query, sortKey, statusFilter]);
 
@@ -577,16 +606,25 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
 
   const statusCounts = useMemo(() => {
     const orderedFilters: DeviceStatusFilter[] = ['All', 'Assigned', 'Unassigned', 'Available', 'Maintenance', 'Damaged', 'Lost', 'Retired'];
+    const allStatusCount = Object.values(deviceStatusCounts).reduce((total, count) => total + count, 0);
 
     return orderedFilters.map((status) => ({
       status,
-      count: status === 'All'
-        ? totalDevices
-        : status === 'Unassigned'
-          ? devices.filter((device) => !device.assignedTo).length
-          : devices.filter((device) => device.status === status).length,
+      count: status === 'All' ? allStatusCount || totalDevices : deviceStatusCounts[status] || 0,
     }));
-  }, [devices, totalDevices]);
+  }, [deviceStatusCounts, totalDevices]);
+
+  const filteredRegisteredUsers = useMemo(() => {
+    const search = assigneeSearch.trim().toLowerCase();
+    if (!search) {
+      return registeredUsers;
+    }
+
+    return registeredUsers.filter((user) =>
+      [user.displayName, user.email, user.role, user.district]
+        .some((value) => String(value || '').toLowerCase().includes(search)),
+    );
+  }, [assigneeSearch, registeredUsers]);
 
   const saveDevice = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -626,6 +664,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
 
       setForm(defaultDeviceForm);
       setEventNotes('');
+      setAssigneeSearch('');
       setIsDeviceFormOpen(false);
     } catch (err) {
       console.error('Failed to save device:', err);
@@ -637,6 +676,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setEditingId(device.id);
     setForm(toDeviceForm(device));
     setEventNotes('');
+    setAssigneeSearch('');
     setIsDeviceFormOpen(true);
     if (!hasLoadedRegisteredUsersRef.current) {
       void loadRegisteredUsers();
@@ -647,6 +687,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setEditingId(null);
     setForm(defaultDeviceForm);
     setEventNotes('');
+    setAssigneeSearch('');
     setIsDeviceFormOpen(true);
     if (!hasLoadedRegisteredUsersRef.current) {
       void loadRegisteredUsers();
@@ -658,6 +699,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setEditingId(null);
     setForm(defaultDeviceForm);
     setEventNotes('');
+    setAssigneeSearch('');
   };
 
   useEffect(() => {
@@ -714,7 +756,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setScanFeedback(null);
 
     if (scanMode === 'lookup') {
-      setScanFeedback(`Found ${scannedDevice.assetTag}: ${scannedDevice.type} - ${scannedDevice.makeModel}.`);
+      setScanFeedback(`Found ${getDeviceDisplayName(scannedDevice)}: ${getDeviceDisplayMeta(scannedDevice)}.`);
       setScanValue('');
       return;
     }
@@ -737,14 +779,14 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       assignedTo: assignee,
       notes: scanMode === 'check-in' ? `Scanned in from ${scanValue}.` : `Scanned out to ${assignee}.`,
     });
-    setScanFeedback(`${scannedDevice.assetTag} ${scanMode === 'check-in' ? 'checked in' : `checked out to ${assignee}`}.`);
+    setScanFeedback(`${getDeviceDisplayName(scannedDevice)} ${scanMode === 'check-in' ? 'checked in' : `checked out to ${assignee}`}.`);
     setScanValue('');
   };
 
   const deleteDevice = async (device: DeviceRecord) => {
     if (!canManageDevices) return;
 
-    const label = device.assetTag || 'this device';
+    const label = getDeviceDisplayName(device) || 'this device';
 
     try {
       await deviceService.delete(device.id, { ...actor, eventNotes: `Deleted ${label}.` });
@@ -1196,9 +1238,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 font-bold text-gray-900 dark:text-gray-100">
                         <DeviceIcon size={18} className="shrink-0 text-accent" />
-                        <span className="truncate">{device.assetTag}</span>
+                        <span className="truncate">{getDeviceDisplayName(device)}</span>
                       </div>
-                      <p className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">{device.type} - {device.makeModel}</p>
+                      <p className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">{getDeviceDisplayMeta(device)}</p>
                     </div>
                     <DeviceStatusCluster device={device} />
                   </div>
@@ -1259,8 +1301,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                         <span className="flex min-w-0 items-center gap-2 text-left">
                           <DeviceIcon size={17} className="shrink-0 text-accent" />
                           <span className="min-w-0">
-                            <span className="block truncate font-bold text-gray-900 dark:text-gray-100">{device.assetTag}</span>
-                            <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{device.type} - {device.makeModel}</span>
+                            <span className="block truncate font-bold text-gray-900 dark:text-gray-100">{getDeviceDisplayName(device)}</span>
+                            <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{getDeviceDisplayMeta(device)}</span>
                           </span>
                         </span>
                       </td>
@@ -1377,10 +1419,18 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <TextField label="Make / Model" value={form.makeModel} required onChange={(value) => setForm((current) => ({ ...current, makeModel: value }))} />
                 <TextField label="Serial Number" value={form.serialNumber} onChange={(value) => setForm((current) => ({ ...current, serialNumber: value }))} />
                 <Field label="Assigned To">
-                  <select value={form.assignedTo} onChange={(event) => setForm((current) => ({ ...current, assignedTo: event.target.value, status: event.target.value ? 'Assigned' : 'Available' }))} className={getDeviceInputClass()}>
-                    <option value="">Unassigned</option>
-                    {registeredUsers.map((user) => <option key={user.id} value={user.email}>{user.displayName} ({user.email})</option>)}
-                  </select>
+                  <div className="space-y-2">
+                    <input
+                      value={assigneeSearch}
+                      onChange={(event) => setAssigneeSearch(event.target.value)}
+                      placeholder="Search users"
+                      className={getDeviceInputClass()}
+                    />
+                    <select value={form.assignedTo} onChange={(event) => setForm((current) => ({ ...current, assignedTo: event.target.value, status: event.target.value ? 'Assigned' : 'Available' }))} className={getDeviceInputClass()}>
+                      <option value="">Unassigned</option>
+                      {filteredRegisteredUsers.map((user) => <option key={user.id} value={user.email}>{user.displayName} ({user.email})</option>)}
+                    </select>
+                  </div>
                 </Field>
                 <Field label="Status">
                   <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as DeviceStatus }))} className={getDeviceInputClass()}>
@@ -1433,7 +1483,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Device</h2>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Delete {devicePendingDelete.assetTag || 'this device'}? This cannot be undone.
+              Delete {getDeviceDisplayName(devicePendingDelete) || 'this device'}? This cannot be undone.
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setDevicePendingDelete(null)} className="btn-secondary" aria-label="Cancel device deletion" title="Cancel">

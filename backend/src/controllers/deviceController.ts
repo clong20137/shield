@@ -353,6 +353,7 @@ export class DeviceController {
       res.json({
         data: result.data,
         total: result.total,
+        statusCounts: result.statusCounts,
         page: pagination.page,
         pageSize: pagination.pageSize,
         totalPages: Math.max(1, Math.ceil(result.total / pagination.pageSize)),

@@ -45,6 +45,10 @@ interface DeviceEventRow extends RowDataPacket, DeviceEvent {}
 interface DeviceCountRow extends RowDataPacket {
   total: number;
 }
+interface DeviceStatusCountRow extends RowDataPacket {
+  status: string;
+  total: number;
+}
 
 export type DeviceInput = Omit<Device, 'id' | 'createdAt' | 'updatedAt'>;
 
@@ -67,6 +71,51 @@ export interface DeviceListFilters {
 export interface DeviceListResult {
   data: Device[];
   total: number;
+  statusCounts: Record<string, number>;
+}
+
+function buildDeviceWhere(filters: DeviceListFilters = {}, options: { includeStatus?: boolean } = {}) {
+  const where: string[] = [];
+  const params: Array<string | number> = [];
+  const searchTerm = filters.q?.trim();
+
+  if (filters.type && filters.type !== 'All') {
+    where.push('`type` = ?');
+    params.push(filters.type);
+  }
+
+  if (options.includeStatus !== false && filters.status && filters.status !== 'All') {
+    if (filters.status === 'Unassigned') {
+      where.push("COALESCE(`assignedTo`, '') = ''");
+    } else {
+      where.push('`status` = ?');
+      params.push(filters.status);
+    }
+  }
+
+  if (searchTerm) {
+    const likeTerm = `%${searchTerm.toLowerCase()}%`;
+    where.push(`(
+      LOWER(\`assetTag\`) LIKE ?
+      OR LOWER(\`makeModel\`) LIKE ?
+      OR LOWER(\`serialNumber\`) LIKE ?
+      OR LOWER(\`assignedTo\`) LIKE ?
+      OR LOWER(\`status\`) LIKE ?
+      OR LOWER(\`location\`) LIKE ?
+      OR LOWER(\`phoneNumber\`) LIKE ?
+      OR LOWER(\`imei\`) LIKE ?
+      OR LOWER(\`simNumber\`) LIKE ?
+      OR LOWER(\`radioId\`) LIKE ?
+      OR LOWER(\`hostname\`) LIKE ?
+      OR LOWER(\`routerId\`) LIKE ?
+    )`);
+    params.push(...Array.from({ length: 12 }, () => likeTerm));
+  }
+
+  return {
+    params,
+    whereSql: where.length > 0 ? `WHERE ${where.join(' AND ')}` : '',
+  };
 }
 
 const deviceColumns = [
@@ -153,42 +202,8 @@ export class DeviceModel {
   static async listDevices(limit = 250, offset = 0, filters: DeviceListFilters = {}): Promise<DeviceListResult> {
     const conn = await pool.getConnection();
     try {
-      const where: string[] = [];
-      const params: Array<string | number> = [];
-      const searchTerm = filters.q?.trim();
-
-      if (filters.type && filters.type !== 'All') {
-        where.push('`type` = ?');
-        params.push(filters.type);
-      }
-
-      if (filters.status && filters.status !== 'All') {
-        if (filters.status === 'Unassigned') {
-          where.push("COALESCE(`assignedTo`, '') = ''");
-        } else {
-          where.push('`status` = ?');
-          params.push(filters.status);
-        }
-      }
-
-      if (searchTerm) {
-        const likeTerm = `%${searchTerm.toLowerCase()}%`;
-        where.push(`(
-          LOWER(\`assetTag\`) LIKE ?
-          OR LOWER(\`makeModel\`) LIKE ?
-          OR LOWER(\`serialNumber\`) LIKE ?
-          OR LOWER(\`assignedTo\`) LIKE ?
-          OR LOWER(\`status\`) LIKE ?
-          OR LOWER(\`location\`) LIKE ?
-          OR LOWER(\`phoneNumber\`) LIKE ?
-          OR LOWER(\`imei\`) LIKE ?
-          OR LOWER(\`simNumber\`) LIKE ?
-          OR LOWER(\`radioId\`) LIKE ?
-          OR LOWER(\`hostname\`) LIKE ?
-          OR LOWER(\`routerId\`) LIKE ?
-        )`);
-        params.push(...Array.from({ length: 12 }, () => likeTerm));
-      }
+      const { params, whereSql } = buildDeviceWhere(filters);
+      const statusWhere = buildDeviceWhere(filters, { includeStatus: false });
 
       const sortColumns: Record<string, string> = {
         assetTag: '`assetTag`',
@@ -203,11 +218,22 @@ export class DeviceModel {
       };
       const sortColumn = sortColumns[filters.sortKey || ''] || '`updatedAt`';
       const sortDirection = sortColumn === '`updatedAt`' ? 'DESC' : 'ASC';
-      const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
 
       const [countRows] = await conn.query<DeviceCountRow[]>(
         `SELECT COUNT(*) as total FROM devices ${whereSql}`,
         params,
+      );
+      const [statusRows] = await conn.query<DeviceStatusCountRow[]>(
+        `SELECT
+          CASE
+            WHEN COALESCE(\`assignedTo\`, '') = '' THEN 'Unassigned'
+            ELSE \`status\`
+          END as status,
+          COUNT(*) as total
+        FROM devices
+        ${statusWhere.whereSql}
+        GROUP BY status`,
+        statusWhere.params,
       );
       const [rows] = await conn.query<DeviceRow[]>(
         `SELECT ${deviceColumns}
@@ -221,6 +247,10 @@ export class DeviceModel {
       return {
         data: rows,
         total: Number(countRows[0]?.total || 0),
+        statusCounts: statusRows.reduce<Record<string, number>>((counts, row) => {
+          counts[row.status || 'Unassigned'] = Number(row.total || 0);
+          return counts;
+        }, {}),
       };
     } finally {
       conn.release();

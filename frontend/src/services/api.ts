@@ -883,6 +883,7 @@ export interface DeviceRecord {
 export interface DeviceListResponse {
   data: DeviceRecord[];
   total: number;
+  statusCounts?: Record<string, number>;
   page: number;
   pageSize: number;
   totalPages: number;
