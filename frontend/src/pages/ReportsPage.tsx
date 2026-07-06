@@ -159,6 +159,7 @@ type DailyAnalyticsExportFormat = 'csv' | 'pdf' | 'png';
 type DailyAnalyticsRange = '1d' | '7d' | '1m' | '3m' | '6m' | '1y' | 'custom';
 type DailyGraphType = 'line' | 'bar';
 type DeviceReportGraphType = 'bar' | 'line';
+type DeviceReportDimension = 'type' | 'status' | 'carrier' | 'condition' | 'model' | 'cost';
 type DailyCompareMode = 'none' | 'user' | 'district';
 type ReportType = 'trooper-daily' | 'cpar' | 'devices';
 type TrooperDailyTab = 'graph' | 'table' | 'exports';
@@ -205,6 +206,20 @@ const dailyGraphTypes: Array<{ value: DailyGraphType; label: string }> = [
 const deviceReportGraphTypes: Array<{ value: DeviceReportGraphType; label: string; icon: typeof BarChart3 }> = [
   { value: 'bar', label: 'Bar', icon: BarChart3 },
   { value: 'line', label: 'Line', icon: LineChartIcon },
+];
+
+const deviceReportDimensions: Array<{
+  value: DeviceReportDimension;
+  label: string;
+  color: string;
+  valueLabel: string;
+}> = [
+  { value: 'type', label: 'Type', color: '#1a365d', valueLabel: 'Devices' },
+  { value: 'status', label: 'Status', color: '#9C865C', valueLabel: 'Devices' },
+  { value: 'carrier', label: 'Carrier', color: '#2563eb', valueLabel: 'Devices' },
+  { value: 'condition', label: 'Condition', color: '#059669', valueLabel: 'Devices' },
+  { value: 'model', label: 'Model', color: '#7c3aed', valueLabel: 'Devices' },
+  { value: 'cost', label: 'Monthly Cost', color: '#0f766e', valueLabel: 'Monthly Cost' },
 ];
 
 const compareSeriesColors = [
@@ -591,26 +606,28 @@ const DeviceReportBarChart: React.FC<{
   data: DeviceReportGroup[];
   color?: string;
   graphType?: DeviceReportGraphType;
-}> = ({ title, data, color = '#1a365d', graphType = 'bar' }) => {
+  valueLabel?: string;
+}> = ({ title, data, color = '#1a365d', graphType = 'bar', valueLabel = 'Devices' }) => {
   const chartData = data.map((item) => ({ ...item, displayLabel: formatAnalyticsLabel(item.label) }));
   const total = data.reduce((sum, item) => sum + item.count, 0);
+  const formatValue = (value: number) => valueLabel === 'Monthly Cost' ? formatCurrency(value) : formatMetric(value);
 
   return (
-    <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+    <section className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">{title}</h3>
-        <span className="rounded bg-gray-100 px-2 py-1 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">{formatMetric(total)}</span>
+        <span className="rounded bg-gray-100 px-2 py-1 text-xs font-black text-gray-600 dark:bg-gray-800 dark:text-gray-200">{formatValue(total)}</span>
       </div>
       {chartData.length === 0 ? (
         <div className="empty-state rounded border border-dashed border-gray-300 py-8 text-sm dark:border-gray-700">No device data available.</div>
       ) : (
-        <ResponsiveContainer width="100%" height={260}>
+        <ResponsiveContainer width="100%" height={360}>
           {graphType === 'line' ? (
             <LineChart data={chartData} margin={{ top: 8, right: 14, bottom: 44, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.25)" />
               <XAxis dataKey="displayLabel" interval={0} angle={-28} textAnchor="end" height={64} tick={{ fontSize: 11, fontWeight: 700 }} tickLine={false} axisLine={false} />
               <YAxis allowDecimals={false} tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={44} />
-              <Tooltip formatter={(value) => [formatMetric(Number(value)), 'Devices']} />
+              <Tooltip formatter={(value) => [formatValue(Number(value)), valueLabel]} />
               <Line type="monotone" dataKey="count" stroke={color} strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#ffffff' }} activeDot={{ r: 7, strokeWidth: 2 }} />
             </LineChart>
           ) : (
@@ -618,7 +635,7 @@ const DeviceReportBarChart: React.FC<{
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.25)" />
               <XAxis dataKey="displayLabel" interval={0} angle={-28} textAnchor="end" height={64} tick={{ fontSize: 11, fontWeight: 700 }} tickLine={false} axisLine={false} />
               <YAxis allowDecimals={false} tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={44} />
-              <Tooltip formatter={(value) => [formatMetric(Number(value)), 'Devices']} />
+              <Tooltip formatter={(value) => [formatValue(Number(value)), valueLabel]} />
               <Bar dataKey="count" fill={color} radius={[6, 6, 0, 0]} />
             </BarChart>
           )}
@@ -642,6 +659,7 @@ const ReportsPage: React.FC<{
   const [deviceReportLoading, setDeviceReportLoading] = useState(false);
   const [deviceReportError, setDeviceReportError] = useState<string | null>(null);
   const [deviceReportGraphType, setDeviceReportGraphType] = useState<DeviceReportGraphType>('bar');
+  const [deviceReportDimension, setDeviceReportDimension] = useState<DeviceReportDimension>('type');
   const [trooperDailies, setTrooperDailies] = useState<TrooperDailyReportEntry[]>([]);
   const [dailySearch, setDailySearch] = useState('');
   const [dailyFrom, setDailyFrom] = useState('');
@@ -1445,6 +1463,24 @@ const ReportsPage: React.FC<{
     onToast('success', `Graph ${format.toUpperCase()} export ready.`);
   };
 
+  const selectedDeviceReportDimension = deviceReportDimensions.find((dimension) => dimension.value === deviceReportDimension) || deviceReportDimensions[0];
+  const selectedDeviceReportData: DeviceReportGroup[] = deviceReport
+    ? deviceReportDimension === 'type'
+      ? deviceReport.byType
+      : deviceReportDimension === 'status'
+        ? deviceReport.byStatus
+        : deviceReportDimension === 'carrier'
+          ? deviceReport.byCarrier
+          : deviceReportDimension === 'condition'
+            ? deviceReport.byCondition
+            : deviceReportDimension === 'model'
+              ? deviceReport.byModel
+              : (deviceReport.costEstimate?.breakdown || []).map((item) => ({
+                label: item.label,
+                count: item.monthlyTotal,
+              }))
+    : [];
+
   const renderAnalyticsExportDropdown = () => (
     <div className="relative z-[100]">
       <button
@@ -1491,7 +1527,7 @@ const ReportsPage: React.FC<{
         <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-black uppercase tracking-wide text-accent">{selectedReportTitle}</span>
       </div>
 
-      <section className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-3">
+      <section className="mb-6 flex flex-wrap gap-2 rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900" aria-label="Report workspace selector">
         {reportWorkspaces.map((workspace) => {
           const WorkspaceIcon = workspace.icon;
           const isSelected = selectedReportType === workspace.value;
@@ -1501,20 +1537,16 @@ const ReportsPage: React.FC<{
               key={workspace.value}
               type="button"
               onClick={() => setSelectedReportType(workspace.value)}
-              className={`group flex min-h-28 items-start gap-3 rounded-lg border p-4 text-left transition ${
+              className={`group flex items-center gap-2 rounded px-3 py-2 text-left text-sm font-black transition ${
                 isSelected
-                  ? 'border-primary-500 bg-primary-500 text-white shadow'
-                  : 'border-gray-200 bg-white text-gray-800 hover:border-primary-300 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:hover:border-primary-700 dark:hover:bg-gray-800'
+                  ? 'bg-primary-500 text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
               }`}
               aria-pressed={isSelected}
+              title={workspace.description}
             >
-              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded ${isSelected ? 'bg-white/15 text-white' : 'bg-primary-50 text-primary-600 dark:bg-gray-800 dark:text-gray-200'}`}>
-                <WorkspaceIcon size={20} />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-base font-black">{workspace.label}</span>
-                <span className={`mt-1 block text-sm font-semibold ${isSelected ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>{workspace.description}</span>
-              </span>
+              <WorkspaceIcon size={16} />
+              <span>{workspace.label}</span>
             </button>
           );
         })}
@@ -1536,17 +1568,16 @@ const ReportsPage: React.FC<{
           </span>
         </div>
 
-        <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="mb-5 flex flex-wrap gap-x-6 gap-y-2 border-b border-gray-200 pb-4 text-sm dark:border-gray-800">
           {[
             ['Reports', dailyAnalytics?.totals?.totalReports ?? dailyTotal],
             ['Total Hours', formatMetric(Number(dailyAnalytics?.totals?.totalHours || 0), 1)],
             ['Avg. Hours', formatMetric(Number(dailyAnalytics?.totals?.averageHours || 0), 1)],
             ['Troopers', dailyAnalytics?.totals?.uniqueTroopers ?? 0],
           ].map(([label, value]) => (
-            <div key={label} className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/60">
-              <p className="text-xs font-black uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
-              <p className="mt-2 text-2xl font-black text-gray-900 dark:text-gray-100">{typeof value === 'number' ? formatMetric(value) : value}</p>
-            </div>
+            <span key={label} className="font-semibold text-gray-500 dark:text-gray-400">
+              {label} <strong className="ml-1 text-gray-900 dark:text-gray-100">{typeof value === 'number' ? formatMetric(value) : value}</strong>
+            </span>
           ))}
         </div>
 
@@ -2130,10 +2161,20 @@ const ReportsPage: React.FC<{
             <div>
               <h2>Device Management Reports</h2>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Inventory graph data by type, status, carrier, model, and condition.
+                Pick a view and the graph updates.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={deviceReportDimension}
+                onChange={(event) => setDeviceReportDimension(event.target.value as DeviceReportDimension)}
+                className="h-9 rounded border border-gray-300 bg-white px-3 text-sm font-bold dark:border-gray-700 dark:bg-gray-950"
+                aria-label="Device report view"
+              >
+                {deviceReportDimensions.map((dimension) => (
+                  <option key={dimension.value} value={dimension.value}>{dimension.label}</option>
+                ))}
+              </select>
               <div className="flex overflow-hidden rounded border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-950" role="group" aria-label="Device report graph type">
                 {deviceReportGraphTypes.map(({ value, label, icon: Icon }) => (
                   <button
@@ -2169,69 +2210,28 @@ const ReportsPage: React.FC<{
             <div className="loading">Loading Device Management Reports...</div>
           ) : deviceReport ? (
             <>
-              <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {[
-                  ['Est. Monthly Cost', formatCurrency(deviceReport.costEstimate?.estimatedMonthlyTotal || 0)],
-                  ['Est. Annual Cost', formatCurrency(deviceReport.costEstimate?.estimatedAnnualTotal || 0)],
-                  ['Total Devices', deviceReport.summary.totalDevices],
-                  ['Assigned', deviceReport.summary.assignedDevices],
-                  ['Unassigned', deviceReport.summary.unassignedDevices],
-                  ['Available', deviceReport.summary.availableDevices],
-                  ['Maintenance', deviceReport.summary.maintenanceDevices],
-                  ['Damaged', deviceReport.summary.damagedDevices],
-                  ['Lost', deviceReport.summary.lostDevices],
-                  ['Retired', deviceReport.summary.retiredDevices],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/60">
-                    <p className="text-xs font-black uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
-                    <p className="mt-2 text-2xl font-black text-gray-900 dark:text-gray-100">{typeof value === 'number' ? formatMetric(value) : value}</p>
-                  </div>
-                ))}
+              <div className="mb-5 flex flex-wrap gap-x-6 gap-y-2 border-b border-gray-200 pb-4 text-sm dark:border-gray-800">
+                <span className="font-semibold text-gray-500 dark:text-gray-400">
+                  Total <strong className="ml-1 text-gray-900 dark:text-gray-100">{formatMetric(deviceReport.summary.totalDevices)}</strong>
+                </span>
+                <span className="font-semibold text-gray-500 dark:text-gray-400">
+                  Assigned <strong className="ml-1 text-gray-900 dark:text-gray-100">{formatMetric(deviceReport.summary.assignedDevices)}</strong>
+                </span>
+                <span className="font-semibold text-gray-500 dark:text-gray-400">
+                  Unassigned <strong className="ml-1 text-gray-900 dark:text-gray-100">{formatMetric(deviceReport.summary.unassignedDevices)}</strong>
+                </span>
+                <span className="font-semibold text-gray-500 dark:text-gray-400">
+                  Est. monthly <strong className="ml-1 text-gray-900 dark:text-gray-100">{formatCurrency(deviceReport.costEstimate?.estimatedMonthlyTotal || 0)}</strong>
+                </span>
               </div>
 
-              {deviceReport.costEstimate?.breakdown?.length ? (
-                <section className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/60">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Estimated Carrier Costs</h3>
-                      <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Monthly estimates based on device type and carrier.</p>
-                    </div>
-                    <span className="rounded bg-accent/10 px-2 py-1 text-xs font-black text-accent">{formatCurrency(deviceReport.costEstimate.estimatedMonthlyTotal)} / mo</span>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                          <th className="px-3 py-2 font-black">Category</th>
-                          <th className="px-3 py-2 font-black">Devices</th>
-                          <th className="px-3 py-2 font-black">Rate</th>
-                          <th className="px-3 py-2 font-black">Monthly</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {deviceReport.costEstimate.breakdown.map((item) => (
-                          <tr key={item.label} className="border-b border-gray-200 last:border-0 dark:border-gray-800">
-                            <td className="px-3 py-2 font-bold text-gray-900 dark:text-gray-100">{item.label}</td>
-                            <td className="px-3 py-2 font-semibold text-gray-600 dark:text-gray-300">{formatMetric(item.count)}</td>
-                            <td className="px-3 py-2 font-semibold text-gray-600 dark:text-gray-300">{formatCurrency(item.monthlyRate)}</td>
-                            <td className="px-3 py-2 font-black text-gray-900 dark:text-gray-100">{formatCurrency(item.monthlyTotal)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              ) : null}
-
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <DeviceReportBarChart title="Devices by Type" data={deviceReport.byType} color="#1a365d" graphType={deviceReportGraphType} />
-                <DeviceReportBarChart title="Devices by Status" data={deviceReport.byStatus} color="#9C865C" graphType={deviceReportGraphType} />
-                <DeviceReportBarChart title="Devices by Carrier" data={deviceReport.byCarrier} color="#2563eb" graphType={deviceReportGraphType} />
-                <DeviceReportBarChart title="Devices by Condition" data={deviceReport.byCondition} color="#059669" graphType={deviceReportGraphType} />
-                <div className="xl:col-span-2">
-                  <DeviceReportBarChart title="Top Models" data={deviceReport.byModel} color="#7c3aed" graphType={deviceReportGraphType} />
-                </div>
-              </div>
+              <DeviceReportBarChart
+                title={selectedDeviceReportDimension.value === 'cost' ? 'Estimated Monthly Cost' : `Devices by ${selectedDeviceReportDimension.label}`}
+                data={selectedDeviceReportData}
+                color={selectedDeviceReportDimension.color}
+                graphType={deviceReportGraphType}
+                valueLabel={selectedDeviceReportDimension.valueLabel}
+              />
             </>
           ) : (
             <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No device report data available.</div>
