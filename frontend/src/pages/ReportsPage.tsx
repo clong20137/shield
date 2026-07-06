@@ -245,6 +245,10 @@ function formatMetric(value: number, maximumFractionDigits = 0): string {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(value);
 }
 
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(value);
+}
+
 function formatAnalyticsLabel(label: string): string {
   if (/^\d{4}-\d{2}$/u.test(label)) {
     const date = new Date(`${label}-01T00:00:00`);
@@ -2032,9 +2036,6 @@ const ReportsPage: React.FC<{
                   Updated {new Date(deviceReport.generatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                 </span>
               )}
-              <button type="button" onClick={() => void loadDeviceReport()} className="btn-secondary" aria-label="Refresh device reports" title="Refresh">
-                <BarChart3 size={16} />
-              </button>
             </div>
           </div>
 
@@ -2045,6 +2046,8 @@ const ReportsPage: React.FC<{
             <>
               <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {[
+                  ['Est. Monthly Cost', formatCurrency(deviceReport.costEstimate?.estimatedMonthlyTotal || 0)],
+                  ['Est. Annual Cost', formatCurrency(deviceReport.costEstimate?.estimatedAnnualTotal || 0)],
                   ['Total Devices', deviceReport.summary.totalDevices],
                   ['Assigned', deviceReport.summary.assignedDevices],
                   ['Unassigned', deviceReport.summary.unassignedDevices],
@@ -2056,10 +2059,44 @@ const ReportsPage: React.FC<{
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/60">
                     <p className="text-xs font-black uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
-                    <p className="mt-2 text-2xl font-black text-gray-900 dark:text-gray-100">{formatMetric(Number(value))}</p>
+                    <p className="mt-2 text-2xl font-black text-gray-900 dark:text-gray-100">{typeof value === 'number' ? formatMetric(value) : value}</p>
                   </div>
                 ))}
               </div>
+
+              {deviceReport.costEstimate?.breakdown?.length ? (
+                <section className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/60">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Estimated Carrier Costs</h3>
+                      <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Monthly estimates based on device type and carrier.</p>
+                    </div>
+                    <span className="rounded bg-accent/10 px-2 py-1 text-xs font-black text-accent">{formatCurrency(deviceReport.costEstimate.estimatedMonthlyTotal)} / mo</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                          <th className="px-3 py-2 font-black">Category</th>
+                          <th className="px-3 py-2 font-black">Devices</th>
+                          <th className="px-3 py-2 font-black">Rate</th>
+                          <th className="px-3 py-2 font-black">Monthly</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {deviceReport.costEstimate.breakdown.map((item) => (
+                          <tr key={item.label} className="border-b border-gray-200 last:border-0 dark:border-gray-800">
+                            <td className="px-3 py-2 font-bold text-gray-900 dark:text-gray-100">{item.label}</td>
+                            <td className="px-3 py-2 font-semibold text-gray-600 dark:text-gray-300">{formatMetric(item.count)}</td>
+                            <td className="px-3 py-2 font-semibold text-gray-600 dark:text-gray-300">{formatCurrency(item.monthlyRate)}</td>
+                            <td className="px-3 py-2 font-black text-gray-900 dark:text-gray-100">{formatCurrency(item.monthlyTotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ) : null}
 
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 <DeviceReportBarChart title="Devices by Type" data={deviceReport.byType} color="#1a365d" graphType={deviceReportGraphType} />

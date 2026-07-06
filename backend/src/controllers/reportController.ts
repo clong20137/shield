@@ -40,6 +40,20 @@ interface DeviceReportGroupRow extends RowDataPacket {
   count: number;
 }
 
+interface DeviceCostGroupRow extends RowDataPacket {
+  type: string;
+  carrier: string;
+  makeModel: string;
+  count: number;
+}
+
+type DeviceCostBreakdown = {
+  label: string;
+  count: number;
+  monthlyRate: number;
+  monthlyTotal: number;
+};
+
 interface TrooperDailyReportRow extends RowDataPacket {
   id: string;
   ownerAccountId: string;
@@ -281,6 +295,72 @@ function parsePermissionList(value: string | null): string[] {
   }
 }
 
+function getEstimatedDeviceMonthlyRate(type: string, carrier: string, makeModel: string): { label: string; monthlyRate: number } | null {
+  const normalizedType = type.trim().toLowerCase();
+  const normalizedCarrier = carrier.trim().toLowerCase();
+  const normalizedModel = makeModel.trim().toLowerCase();
+  const isVerizon = normalizedCarrier.includes('verizon');
+  const isAtt = normalizedCarrier.includes('at&t') || normalizedCarrier.includes('att');
+  const isPhone = normalizedType === 'cell phone' || /\biphone\b|\bphone\b/u.test(normalizedModel);
+  const isMifi = normalizedType === 'mifi device' || /\bmifi\b|jetpack|inseego/u.test(normalizedModel);
+  const isTablet = normalizedType === 'tablet' || /\btablet\b|\bipad\b/u.test(normalizedModel);
+  const isCradlepoint = normalizedType === 'cradlepoint' || /cradlepoint/u.test(normalizedModel);
+
+  if (isCradlepoint && (isAtt || isVerizon)) {
+    return { label: `${isAtt ? 'AT&T' : 'Verizon'} Cradlepoint`, monthlyRate: 29.99 };
+  }
+
+  if (isVerizon && isMifi) {
+    return { label: 'Verizon MiFi', monthlyRate: 29.99 };
+  }
+
+  if (isAtt && isTablet) {
+    return { label: 'AT&T Tablet', monthlyRate: 19.99 };
+  }
+
+  if (isVerizon && isPhone) {
+    return { label: 'Verizon Phone', monthlyRate: 35.99 };
+  }
+
+  if (isAtt && isPhone) {
+    return { label: 'AT&T Phone', monthlyRate: 35.99 };
+  }
+
+  return null;
+}
+
+function buildDeviceCostEstimate(rows: DeviceCostGroupRow[]) {
+  const breakdownMap = new Map<string, DeviceCostBreakdown>();
+
+  rows.forEach((row) => {
+    const estimate = getEstimatedDeviceMonthlyRate(row.type || '', row.carrier || '', row.makeModel || '');
+    if (!estimate) {
+      return;
+    }
+
+    const count = Number(row.count) || 0;
+    const existing = breakdownMap.get(estimate.label) || {
+      label: estimate.label,
+      count: 0,
+      monthlyRate: estimate.monthlyRate,
+      monthlyTotal: 0,
+    };
+
+    existing.count += count;
+    existing.monthlyTotal = Number((existing.count * existing.monthlyRate).toFixed(2));
+    breakdownMap.set(estimate.label, existing);
+  });
+
+  const breakdown = Array.from(breakdownMap.values()).sort((first, second) => second.monthlyTotal - first.monthlyTotal || first.label.localeCompare(second.label));
+  const estimatedMonthlyTotal = Number(breakdown.reduce((sum, item) => sum + item.monthlyTotal, 0).toFixed(2));
+
+  return {
+    estimatedMonthlyTotal,
+    estimatedAnnualTotal: Number((estimatedMonthlyTotal * 12).toFixed(2)),
+    breakdown,
+  };
+}
+
 function isStaleLastSeen(value: Date | null, staleBefore: Date): boolean {
   return !value || value.getTime() < staleBefore.getTime();
 }
@@ -403,6 +483,15 @@ export class ReportController {
         GROUP BY label
         ORDER BY count DESC, label`,
       );
+      const [costRows] = await conn.query<DeviceCostGroupRow[]>(
+        `SELECT
+          COALESCE(NULLIF(\`type\`, ''), 'Unknown') AS type,
+          COALESCE(NULLIF(\`carrier\`, ''), 'Unknown') AS carrier,
+          COALESCE(NULLIF(\`makeModel\`, ''), '') AS makeModel,
+          COUNT(*) AS count
+        FROM devices
+        GROUP BY type, carrier, makeModel`,
+      );
 
       const mapGroup = (rows: DeviceReportGroupRow[]) => rows.map((row) => ({
         label: row.label || 'Unknown',
@@ -418,6 +507,7 @@ export class ReportController {
         lostDevices: 0,
         retiredDevices: 0,
       };
+      const costEstimate = buildDeviceCostEstimate(costRows);
 
       res.json({
         generatedAt: new Date().toISOString(),
@@ -436,6 +526,7 @@ export class ReportController {
         byCarrier: mapGroup(carrierRows),
         byModel: mapGroup(modelRows),
         byCondition: mapGroup(conditionRows),
+        costEstimate,
       });
     } catch (error) {
       console.error('Device management report error:', error);
