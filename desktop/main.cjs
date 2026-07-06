@@ -35,6 +35,8 @@ let rendererCrashResetTimer = null;
 let quitSignOutRequested = false;
 let quitSignOutComplete = false;
 let quitSignOutTimer = null;
+let desktopMemoryTrimTimer = null;
+let lastDesktopMemoryTrimAt = 0;
 const pendingCrashReports = [];
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -65,6 +67,13 @@ const webAppSignatureRequestTimeoutMs = 10 * 1000;
 const webAppLoadRetryBaseMs = 2 * 1000;
 const webAppLoadRetryMaxMs = 25 * 1000;
 const quitSignOutWaitMs = 1800;
+const desktopMemoryTrimDelayMs = 30 * 1000;
+const desktopMemoryTrimCooldownMs = 10 * 60 * 1000;
+const desktopRendererHeapMb = Math.max(192, Math.min(512, Number.parseInt(process.env.SHIELD_DESKTOP_RENDERER_HEAP_MB || '256', 10) || 256));
+const desktopDiskCacheBytes = Math.max(10 * 1024 * 1024, Math.min(100 * 1024 * 1024, Number.parseInt(process.env.SHIELD_DESKTOP_DISK_CACHE_MB || '50', 10) * 1024 * 1024 || 50 * 1024 * 1024));
+
+app.commandLine.appendSwitch('js-flags', `--max-old-space-size=${desktopRendererHeapMb}`);
+app.commandLine.appendSwitch('disk-cache-size', String(desktopDiskCacheBytes));
 
 const pngCrcTable = Array.from({ length: 256 }, (_, index) => {
   let value = index;
@@ -1122,18 +1131,67 @@ function stopDesktopIdleChecks() {
   }
 }
 
+function cancelDesktopMemoryTrim() {
+  if (desktopMemoryTrimTimer) {
+    clearTimeout(desktopMemoryTrimTimer);
+    desktopMemoryTrimTimer = null;
+  }
+}
+
+async function trimDesktopMemory(reason) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  if (Date.now() - lastDesktopMemoryTrimAt < desktopMemoryTrimCooldownMs) {
+    return;
+  }
+
+  if (mainWindow.isVisible() && !mainWindow.isMinimized() && mainWindow.isFocused()) {
+    return;
+  }
+
+  lastDesktopMemoryTrimAt = Date.now();
+  try {
+    const memoryBefore = process.getProcessMemoryInfo ? await process.getProcessMemoryInfo() : null;
+    await mainWindow.webContents.session.clearCache();
+    if (typeof mainWindow.webContents.session.clearCodeCaches === 'function') {
+      await mainWindow.webContents.session.clearCodeCaches({});
+    }
+    const memoryAfter = process.getProcessMemoryInfo ? await process.getProcessMemoryInfo() : null;
+    appendDesktopLog('desktop-memory-trim', {
+      reason,
+      privateKbBefore: memoryBefore?.private,
+      privateKbAfter: memoryAfter?.private
+    });
+  } catch (error) {
+    appendDesktopLog('desktop-memory-trim-failed', { reason, message: error.message });
+  }
+}
+
+function scheduleDesktopMemoryTrim(reason) {
+  cancelDesktopMemoryTrim();
+  desktopMemoryTrimTimer = setTimeout(() => {
+    desktopMemoryTrimTimer = null;
+    void trimDesktopMemory(reason);
+  }, desktopMemoryTrimDelayMs);
+}
+
 function registerPowerMonitorEvents() {
   powerMonitor.on('resume', () => {
+    cancelDesktopMemoryTrim();
     checkDesktopIdleStatus({ force: true });
     void checkForWebAppUpdate();
   });
   powerMonitor.on('unlock-screen', () => {
+    cancelDesktopMemoryTrim();
     checkDesktopIdleStatus({ force: true });
     void checkForWebAppUpdate();
   });
   powerMonitor.on('lock-screen', () => {
     sendDesktopIdleStatus('busy', powerMonitor.getSystemIdleTime());
     setDesktopPresenceStatus('busy', { force: true });
+    scheduleDesktopMemoryTrim('lock-screen');
   });
 }
 
@@ -1432,7 +1490,7 @@ function createMainWindow() {
       nodeIntegration: false,
       sandbox: true,
       webviewTag: false,
-      backgroundThrottling: false
+      backgroundThrottling: process.env.SHIELD_DESKTOP_BACKGROUND_THROTTLING === 'false' ? false : true
     }
   });
 
@@ -1475,6 +1533,7 @@ function createMainWindow() {
   });
 
   mainWindow.on('focus', () => {
+    cancelDesktopMemoryTrim();
     sendWindowVisibilityStatus();
     checkDesktopIdleStatus({ force: true });
     void checkForWebAppUpdate();
@@ -1483,9 +1542,11 @@ function createMainWindow() {
   mainWindow.on('blur', () => {
     sendWindowVisibilityStatus();
     checkDesktopIdleStatus({ force: true });
+    scheduleDesktopMemoryTrim('blur');
   });
 
   mainWindow.on('show', () => {
+    cancelDesktopMemoryTrim();
     sendWindowVisibilityStatus();
     checkDesktopIdleStatus({ force: true });
     void checkForWebAppUpdate();
@@ -1494,20 +1555,24 @@ function createMainWindow() {
   mainWindow.on('hide', () => {
     sendWindowVisibilityStatus();
     checkDesktopIdleStatus({ force: true });
+    scheduleDesktopMemoryTrim('hide');
   });
 
   mainWindow.on('minimize', () => {
     sendWindowVisibilityStatus();
     checkDesktopIdleStatus({ force: true });
+    scheduleDesktopMemoryTrim('minimize');
   });
 
   mainWindow.on('restore', () => {
+    cancelDesktopMemoryTrim();
     sendWindowVisibilityStatus();
     checkDesktopIdleStatus({ force: true });
     void checkForWebAppUpdate();
   });
 
   mainWindow.on('closed', () => {
+    cancelDesktopMemoryTrim();
     clearWebAppLoadRetryTimer();
     webAppLoadRetryCount = 0;
     stopWebAppUpdateChecks();
@@ -1646,6 +1711,7 @@ if (hasSingleInstanceLock) {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  cancelDesktopMemoryTrim();
   stopWebAppUpdateChecks();
   stopDesktopIdleChecks();
   if (desktopUpdateCheckTimer) {

@@ -197,6 +197,26 @@ function parseCsvLine(line: string): string[] {
   return values;
 }
 
+function hasCsvDataRows(text: string): boolean {
+  let lineStart = 0;
+  let rowIndex = 0;
+
+  for (let index = 0; index <= text.length; index += 1) {
+    if (index !== text.length && text[index] !== '\n') {
+      continue;
+    }
+
+    const line = text.slice(lineStart, index).replace(/\r$/u, '');
+    if (rowIndex > 0 && line.trim().length > 0) {
+      return true;
+    }
+    rowIndex += 1;
+    lineStart = index + 1;
+  }
+
+  return false;
+}
+
 function formatDate(value: string): string {
   return value ? new Date(value).toLocaleDateString() : 'N/A';
 }
@@ -934,8 +954,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       setDeviceNotice(null);
       setPhoneImportSummary(null);
       const csvText = await file.text();
-      const dataRows = csvText.split(/\r?\n/u).filter((line, index) => index > 0 && line.trim().length > 0);
-      if (dataRows.length === 0) {
+      if (!hasCsvDataRows(csvText)) {
         setError('Phone import CSV is empty.');
         return;
       }
