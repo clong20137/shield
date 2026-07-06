@@ -46,7 +46,7 @@ interface DeviceCountRow extends RowDataPacket {
   total: number;
 }
 interface DeviceStatusCountRow extends RowDataPacket {
-  status: string;
+  statusGroup: string;
   total: number;
 }
 
@@ -228,11 +228,11 @@ export class DeviceModel {
           CASE
             WHEN COALESCE(\`assignedTo\`, '') = '' THEN 'Unassigned'
             ELSE \`status\`
-          END as status,
+          END as \`statusGroup\`,
           COUNT(*) as total
         FROM devices
         ${statusWhere.whereSql}
-        GROUP BY status`,
+        GROUP BY 1`,
         statusWhere.params,
       );
       const [rows] = await conn.query<DeviceRow[]>(
@@ -248,7 +248,7 @@ export class DeviceModel {
         data: rows,
         total: Number(countRows[0]?.total || 0),
         statusCounts: statusRows.reduce<Record<string, number>>((counts, row) => {
-          counts[row.status || 'Unassigned'] = Number(row.total || 0);
+          counts[row.statusGroup || 'Unassigned'] = Number(row.total || 0);
           return counts;
         }, {}),
       };
