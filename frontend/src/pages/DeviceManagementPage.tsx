@@ -1,4 +1,5 @@
 import { ChangeEvent, FormEvent, MouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { IScannerControls } from '@zxing/browser';
 import { AlertTriangle, ArchiveX, Camera, CheckCircle2, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, QrCode, Radio, RefreshCw, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, deviceService, DeviceRecord } from '../services/api';
@@ -326,6 +327,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [pageContextMenu, setPageContextMenu] = useState<AppContextMenuPosition | null>(null);
   const [devicePendingDelete, setDevicePendingDelete] = useState<DeviceRecord | null>(null);
+  const [isDeletePhonesConfirmOpen, setIsDeletePhonesConfirmOpen] = useState(false);
   const [eventNotes, setEventNotes] = useState('');
   const [scanValue, setScanValue] = useState('');
   const [scanMode, setScanMode] = useState<ScanMode>('lookup');
@@ -335,6 +337,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [isCameraScanActive, setIsCameraScanActive] = useState(false);
   const [cameraScanStatus, setCameraScanStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [deviceNotice, setDeviceNotice] = useState<string | null>(null);
   const [phoneImportSummary, setPhoneImportSummary] = useState<PhoneImportSummary | null>(null);
   const [phoneImportProgress, setPhoneImportProgress] = useState<PhoneImportProgress | null>(null);
   const [loading, setLoading] = useState(true);
@@ -760,6 +763,23 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     }
   };
 
+  const deleteAllPhones = async () => {
+    if (!canManageDevices) return;
+
+    try {
+      setError(null);
+      setDeviceNotice(null);
+      const response = await deviceService.deletePhones();
+      setPhoneImportSummary(null);
+      setIsDeletePhonesConfirmOpen(false);
+      await loadDevices(false);
+      setDeviceNotice(`Deleted ${response.data.deletedCount} phone records.`);
+    } catch (err) {
+      console.error('Failed to delete phone inventory:', err);
+      setError('Failed to delete phone inventory.');
+    }
+  };
+
   const exportCsv = () => {
     const headers = [
       'type',
@@ -854,6 +874,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
 
     try {
       setError(null);
+      setDeviceNotice(null);
       setPhoneImportSummary(null);
       const rows = parseCsvRows(await file.text());
       if (rows.length === 0) {
@@ -969,15 +990,20 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       </div>
 
       {error && <div className="error">{error}</div>}
+      {deviceNotice && (
+        <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+          {deviceNotice}
+        </div>
+      )}
       {phoneImportSummary && (
         <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-100">
           Phone import complete: {phoneImportSummary.createdCount} created, {phoneImportSummary.updatedCount} updated, {phoneImportSummary.matchedCount} matched, {phoneImportSummary.unmatchedCount} unmatched, {phoneImportSummary.skippedCount} skipped from {phoneImportSummary.totalRows} rows.
         </div>
       )}
       {loading && <div className="loading">Loading device inventory...</div>}
-      {phoneImportProgress && (
-        <div className="modal-backdrop fixed inset-0 z-[80] flex items-center justify-center bg-black/45">
-          <div className="modal-window w-full max-w-md rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+      {phoneImportProgress && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/45 px-4 pt-[12dvh]">
+          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded bg-primary-100 text-primary-700 dark:bg-primary-950 dark:text-primary-100">
                 <Upload size={20} />
@@ -1000,7 +1026,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
@@ -1277,6 +1304,12 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             </button>
           )}
           {canManageDevices && (
+            <button type="button" onClick={() => setIsDeletePhonesConfirmOpen(true)} className="btn-danger" title="Delete all phones" aria-label="Delete all phones">
+              <Trash2 size={16} />
+              <span>Delete All Phones</span>
+            </button>
+          )}
+          {canManageDevices && (
             <label className="btn-secondary cursor-pointer" title="Import CSV" aria-label="Import CSV">
               <Upload size={16} />
               <span>Import</span>
@@ -1414,6 +1447,25 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           </div>
         </div>
       )}
+      {isDeletePhonesConfirmOpen && (
+        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/45">
+          <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete All Phones</h2>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Delete every Cell Phone device record? Radios, computers, MiFis, and Cradlepoints will stay untouched.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setIsDeletePhonesConfirmOpen(false)} className="btn-secondary" aria-label="Cancel phone deletion" title="Cancel">
+                <span>Cancel</span>
+              </button>
+              <button type="button" onClick={() => void deleteAllPhones()} className="btn-danger" aria-label="Delete all phones" title="Delete All Phones">
+                <Trash2 size={16} />
+                <span>Delete All</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {pageContextMenu && (
         <AppContextMenu
           position={pageContextMenu}
@@ -1424,6 +1476,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             { label: 'Scan With Camera', icon: Camera, onSelect: () => void startCameraScanner(), disabled: !canManageDevices },
             { label: 'Export Page', icon: Download, onSelect: exportCsv, disabled: devices.length === 0 },
             { label: 'Export Phones', icon: Smartphone, onSelect: () => void exportPhoneInventory(), disabled: !canManageDevices },
+            { label: 'Delete All Phones', icon: Trash2, onSelect: () => setIsDeletePhonesConfirmOpen(true), disabled: !canManageDevices },
             { label: 'Clear Filters', icon: X, onSelect: clearDeviceView },
           ]}
         />

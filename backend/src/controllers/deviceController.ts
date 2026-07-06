@@ -155,12 +155,27 @@ function buildDeviceMatchKey(device: Device): string[] {
   ].filter(Boolean);
 }
 
+function cleanPhoneModelName(value: string): string {
+  const normalizedValue = value.replace(/\s+/gu, ' ').trim();
+  const iphoneMatch = normalizedValue.match(/\bi\s*phone\s*(\d{1,2})(?:\s*(pro\s*max|pro|plus|mini))?/iu);
+
+  if (iphoneMatch) {
+    const variant = iphoneMatch[2]
+      ? iphoneMatch[2].replace(/\s+/gu, ' ').replace(/\b\w/gu, (letter) => letter.toUpperCase())
+      : '';
+    return `iPhone ${iphoneMatch[1]}${variant ? ` ${variant}` : ''}`;
+  }
+
+  return normalizedValue || 'Agency Phone';
+}
+
 function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNumber: number): DeviceInput {
   const phoneNumber = normalizePhone(getImportValue(row, ['phoneNumber', 'phone number', 'wirelessNumber', 'wireless number', 'line', 'mobile']));
-  const imei = getImportValue(row, ['imei', 'imei1', 'imei 1', 'sim']);
-  const simNumber = getImportValue(row, ['iccid', 'simNumber', 'sim number', 'eid']);
+  const imei = getImportValue(row, ['currentDeviceId4gOnly', 'current device id 4g only', 'current device id - 4g only', 'current device id', 'imei', 'imei1', 'imei 1']);
+  const simNumber = getImportValue(row, ['sim', 'iccid', 'simNumber', 'sim number', 'eid']);
   const condition = getImportValue(row, ['condition']);
   const isNewUser = isNewUserImportRow(row);
+  const importedModel = getImportValue(row, ['deviceModel', 'device model', 'deviceModal', 'device modal', 'makeModel', 'make model', 'model', 'device', 'description']);
   const assetTag = getImportValue(row, ['assetTag', 'asset tag', 'deviceId', 'device id', 'inventoryId', 'inventory id'])
     || (phoneNumber ? `PHONE-${normalizeDigits(phoneNumber).slice(-4)}` : '')
     || (imei ? `IMEI-${normalizeLooseKey(imei).slice(-6)}` : '')
@@ -169,7 +184,7 @@ function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNu
   return {
     type: 'Cell Phone',
     assetTag,
-    makeModel: getImportValue(row, ['makeModel', 'make model', 'model', 'device', 'description']) || 'Agency Phone',
+    makeModel: cleanPhoneModelName(importedModel),
     serialNumber: getImportValue(row, ['serialNumber', 'serial number', 'serial']),
     assignedTo,
     status: assignedTo ? 'Assigned' : 'Available',
@@ -445,6 +460,17 @@ export class DeviceController {
 
       console.error('Phone import error:', error);
       res.status(500).json({ error: 'Failed to import phones' });
+    }
+  }
+
+  static async deletePhones(req: Request, res: Response) {
+    try {
+      const deletedCount = await DeviceModel.deletePhoneDevices();
+      broadcastAppEvent({ type: 'device-updated', entityId: 'phone-inventory' });
+      res.json({ deletedCount });
+    } catch (error) {
+      console.error('Phone delete all error:', error);
+      res.status(500).json({ error: 'Failed to delete phone inventory' });
     }
   }
 

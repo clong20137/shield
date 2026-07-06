@@ -9,6 +9,7 @@ router.get('/assigned/me', requireAuthenticated(), DeviceController.listAssigned
 router.get('/assigned/:accountId', requireAuthenticated(), DeviceController.listAssignedDevicesForUser);
 router.get('/phones/export', requirePermission('devices:manage'), DeviceController.exportPhones);
 router.post('/phones/import', requirePermission('devices:manage'), DeviceController.importPhones);
+router.delete('/phones', requirePermission('devices:manage'), DeviceController.deletePhones);
 router.get('/', requirePermission('devices:manage'), DeviceController.listDevices);
 router.post('/', requirePermission('devices:manage'), DeviceController.createDevice);
 router.get('/:id/history', requirePermission('devices:manage'), DeviceController.listDeviceEvents);

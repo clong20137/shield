@@ -1442,6 +1442,9 @@ export const deviceService = {
   importPhones: (payload: { rows: Record<string, string>[]; actorId?: string; actorName?: string }) =>
     api.post<PhoneImportResponse>('/devices/phones/import', payload, { timeout: 60000 }),
 
+  deletePhones: () =>
+    api.delete<{ deletedCount: number }>('/devices/phones'),
+
   create: (device: Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'> & { actorId?: string; actorName?: string; eventNotes?: string }) =>
     api.post<DeviceRecord>('/devices', device),
 

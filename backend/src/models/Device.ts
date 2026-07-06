@@ -140,6 +140,16 @@ export class DeviceModel {
     }
   }
 
+  static async deletePhoneDevices(): Promise<number> {
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.query<ResultSetHeader>('DELETE FROM devices WHERE `type` = ?', ['Cell Phone']);
+      return result.affectedRows;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async listDevices(limit = 250, offset = 0, filters: DeviceListFilters = {}): Promise<DeviceListResult> {
     const conn = await pool.getConnection();
     try {
