@@ -37,6 +37,8 @@ const allowedPermissions = [
   'calendar:manage',
   'calendar:view-profiles',
   'fleet:bookings:manage',
+  'fleet:vehicles:manage',
+  'fleet:inventory:manage',
   'reports:trooper-dailies',
   'reports:cpar',
   'audit:view',

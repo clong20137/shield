@@ -218,6 +218,8 @@ const privilegedPermissions = new Set([
   'media:delete',
   'devices:manage',
   'fleet:bookings:manage',
+  'fleet:vehicles:manage',
+  'fleet:inventory:manage',
   'reports:trooper-dailies',
   'alerts:send',
   'dashboard:manage',

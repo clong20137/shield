@@ -64,9 +64,11 @@ const permissionGroups = [
   },
   {
     title: 'Fleet',
-    description: 'Fleet app booking visibility and appointment management.',
+    description: 'Fleet app calendar, vehicle, and inventory module access.',
     permissions: [
       { key: 'fleet:bookings:manage', label: 'View and manage Fleet booking calendar' },
+      { key: 'fleet:vehicles:manage', label: 'Access and manage Fleet vehicles page' },
+      { key: 'fleet:inventory:manage', label: 'Access and manage Fleet inventory page' },
     ],
   },
   {
