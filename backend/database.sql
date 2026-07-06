@@ -58,6 +58,10 @@ CREATE TABLE IF NOT EXISTS users (
   INDEX `idx_user_role` (`role`),
   INDEX `idx_users_active_district` (`isActive`, `district`),
   INDEX `idx_users_name` (`lastName`, `firstName`),
+  INDEX `idx_users_rank_active_hidden` (`rank`, `isActive`, `isHidden`),
+  INDEX `idx_users_district_active_hidden` (`district`, `isActive`, `isHidden`),
+  INDEX `idx_users_employment_active_hidden` (`employmentType`, `isActive`, `isHidden`),
+  INDEX `idx_users_account_review` (`passwordHash`(64), `role`, `twoFactorEnabled`, `lastSeenAt`),
   INDEX `idx_users_people_soft` (`peopleSoftId`),
   INDEX `idx_users_radio` (`radioNumber`),
   INDEX `idx_users_personal_phone_hash` (`personalPhoneNumberHash`),
@@ -96,6 +100,18 @@ CREATE TABLE IF NOT EXISTS user_messages (
   INDEX `idx_messages_group_participant_cursor` (`threadId`, `senderAccountId`, `recipientUserId`, `createdAt`, `id`)
 );
 
+CREATE TABLE IF NOT EXISTS user_sessions (
+  `id` VARCHAR(36) PRIMARY KEY,
+  `userId` VARCHAR(36) NOT NULL,
+  `tokenHash` VARCHAR(128) NOT NULL UNIQUE,
+  `expiresAt` TIMESTAMP NOT NULL,
+  `createdAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `revokedAt` TIMESTAMP NULL,
+  INDEX `idx_user_sessions_user` (`userId`),
+  INDEX `idx_user_sessions_token` (`tokenHash`),
+  INDEX `idx_user_sessions_active_by_user` (`revokedAt`, `expiresAt`, `userId`)
+);
+
 CREATE TABLE IF NOT EXISTS devices (
   `id` VARCHAR(36) PRIMARY KEY,
   `type` VARCHAR(50) NOT NULL,
@@ -131,6 +147,11 @@ CREATE TABLE IF NOT EXISTS devices (
   INDEX `idx_devices_model_updated_asset` (`makeModel`, `updatedAt`, `assetTag`),
   INDEX `idx_devices_type_status` (`type`, `status`),
   INDEX `idx_devices_carrier_type_model` (`carrier`, `type`, `makeModel`),
+  INDEX `idx_devices_type_carrier_model` (`type`, `carrier`, `makeModel`),
+  INDEX `idx_devices_phone_number` (`phoneNumber`),
+  INDEX `idx_devices_imei` (`imei`),
+  INDEX `idx_devices_sim_number` (`simNumber`),
+  INDEX `idx_devices_serial_number` (`serialNumber`),
   INDEX `idx_devices_condition` (`condition`)
 );
 
@@ -164,7 +185,8 @@ CREATE TABLE IF NOT EXISTS import_jobs (
   `updatedAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `completedAt` DATETIME,
   INDEX `idx_import_jobs_type_status` (`type`, `status`),
-  INDEX `idx_import_jobs_created` (`createdAt`)
+  INDEX `idx_import_jobs_created` (`createdAt`),
+  INDEX `idx_import_jobs_completed` (`completedAt`)
 );
 
 -- Sample Data (Optional)

@@ -187,6 +187,10 @@ export async function initializeDatabase() {
   await ensureIndex('users', 'idx_users_active_district', '`isActive`, `district`');
   await ensureIndex('users', 'idx_users_memorial_watch', '`isMemorial`, `endOfWatchDate`, `lastName`, `firstName`');
   await ensureIndex('users', 'idx_users_hidden_filters_name', '`isHidden`, `district`, `rank`, `isActive`, `lastName`, `firstName`');
+  await ensureIndex('users', 'idx_users_rank_active_hidden', '`rank`, `isActive`, `isHidden`');
+  await ensureIndex('users', 'idx_users_district_active_hidden', '`district`, `isActive`, `isHidden`');
+  await ensureIndex('users', 'idx_users_employment_active_hidden', '`employmentType`, `isActive`, `isHidden`');
+  await ensureIndex('users', 'idx_users_account_review', '`passwordHash`(64), `role`, `twoFactorEnabled`, `lastSeenAt`');
   await ensureIndex('users', 'idx_users_people_soft', '`peopleSoftId`');
   await ensureIndex('users', 'idx_users_radio', '`radioNumber`');
   await ensureIndex('users', 'idx_users_public_safety', '`publicSafetyId`');
@@ -323,6 +327,7 @@ export async function initializeDatabase() {
       INDEX \`idx_user_sessions_token\` (\`tokenHash\`)
     )
   `);
+  await ensureIndex('user_sessions', 'idx_user_sessions_active_by_user', '`revokedAt`, `expiresAt`, `userId`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS roles (
@@ -578,6 +583,8 @@ export async function initializeDatabase() {
   await ensureIndex('calendar_entries', 'idx_calendar_review_status', '`reviewStatus`, `entryDate`');
   await ensureIndex('calendar_entries', 'idx_calendar_submission_status', '`submissionStatus`, `entryDate`');
   await ensureIndex('calendar_entries', 'idx_calendar_trooper_report', '`category`, `submissionStatus`, `districtWorked`, `entryDate`, `updatedAt`');
+  await ensureIndex('calendar_entries', 'idx_calendar_trooper_report_date', '`category`, `submissionStatus`, `entryDate`, `updatedAt`, `ownerAccountId`');
+  await ensureIndex('calendar_entries', 'idx_calendar_trooper_owner_report_date', '`category`, `submissionStatus`, `ownerAccountId`, `entryDate`, `updatedAt`');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS calendar_shortcuts (
@@ -901,6 +908,11 @@ export async function initializeDatabase() {
   await ensureIndex('devices', 'idx_devices_model_updated_asset', '`makeModel`, `updatedAt`, `assetTag`');
   await ensureIndex('devices', 'idx_devices_type_status', '`type`, `status`');
   await ensureIndex('devices', 'idx_devices_carrier_type_model', '`carrier`, `type`, `makeModel`');
+  await ensureIndex('devices', 'idx_devices_type_carrier_model', '`type`, `carrier`, `makeModel`');
+  await ensureIndex('devices', 'idx_devices_phone_number', '`phoneNumber`');
+  await ensureIndex('devices', 'idx_devices_imei', '`imei`');
+  await ensureIndex('devices', 'idx_devices_sim_number', '`simNumber`');
+  await ensureIndex('devices', 'idx_devices_serial_number', '`serialNumber`');
   await ensureIndex('devices', 'idx_devices_condition', '`condition`');
   await ensureIndex('devices', 'idx_devices_maintenance_asset', '`maintenanceDueDate`, `assetTag`');
   await ensureIndex('devices', 'idx_devices_replacement_asset', '`replacementDueDate`, `assetTag`');
@@ -941,5 +953,6 @@ export async function initializeDatabase() {
       INDEX \`idx_import_jobs_created\` (\`createdAt\`)
     )
   `);
+  await ensureIndex('import_jobs', 'idx_import_jobs_completed', '`completedAt`');
 }
 
