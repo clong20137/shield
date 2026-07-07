@@ -8,6 +8,7 @@ import { AppContextMenu, AppContextMenuPosition, shouldUseNativeContextMenu } fr
 type DeviceType = DeviceRecord['type'];
 type DeviceStatus = DeviceRecord['status'];
 type DeviceCarrier = DeviceRecord['carrier'];
+type DeviceExportScope = DeviceCarrier | 'All';
 type DeviceStatusFilter = DeviceStatus | 'All' | 'Unassigned';
 type DeviceForm = Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'>;
 type DeviceConditionalField = 'phoneNumber' | 'imei' | 'simNumber' | 'radioId' | 'hostname' | 'routerId';
@@ -382,6 +383,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [phoneImportProgress, setPhoneImportProgress] = useState<PhoneImportProgress | null>(null);
   const [phoneImportType, setPhoneImportType] = useState<PhoneImportType>('verizon-phone');
   const [isPhoneImportMenuOpen, setIsPhoneImportMenuOpen] = useState(false);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
   const [deviceTableScrollTop, setDeviceTableScrollTop] = useState(0);
@@ -718,7 +720,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     }
   };
 
-  const exportCsv = () => {
+  const exportCsv = (scope: DeviceExportScope = 'All') => {
     const headers = [
       'type',
       'assetTag',
@@ -749,16 +751,19 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       'condition',
       'notes',
     ];
-    const rows = devices.map((device) =>
+    const exportDevices = scope === 'All' ? devices : devices.filter((device) => device.carrier === scope);
+    const rows = exportDevices.map((device) =>
       headers.map((header) => escapeCsv(header === 'iccid' ? device.simNumber : device[header as keyof DeviceRecord])).join(','),
     );
     const blob = new Blob([[headers.join(','), ...rows].join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
+    const scopeLabel = scope === 'All' ? 'all' : scope.toLowerCase().replace(/[^a-z0-9]+/gu, '-');
     link.href = url;
-    link.download = `shield-device-inventory-page-${safePage}.csv`;
+    link.download = `shield-device-inventory-${scopeLabel}-page-${safePage}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+    setIsExportMenuOpen(false);
   };
 
   const importPhoneReport = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -891,6 +896,11 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setPageContextMenu({ x: event.clientX, y: event.clientY });
   };
   const selectedPhoneImportOption = phoneImportOptions.find((option) => option.value === phoneImportType) || phoneImportOptions[0];
+  const exportOptions: Array<{ value: DeviceExportScope; label: string; count: number }> = [
+    { value: 'All', label: 'All', count: devices.length },
+    { value: 'Verizon', label: 'Verizon', count: devices.filter((device) => device.carrier === 'Verizon').length },
+    { value: 'AT&T', label: 'AT&T', count: devices.filter((device) => device.carrier === 'AT&T').length },
+  ];
 
   return (
     <div onContextMenu={openPageContextMenu}>
@@ -968,9 +978,41 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                   <Plus size={16} />
                 </button>
               )}
-              <button type="button" onClick={exportCsv} className="btn-secondary h-10 w-10 justify-center p-0" title="Export current page" aria-label="Export current page">
-                <Download size={16} />
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsExportMenuOpen((open) => !open);
+                    setIsPhoneImportMenuOpen(false);
+                  }}
+                  className="btn-secondary h-10 gap-1 px-3"
+                  title="Export current page"
+                  aria-label="Export current page"
+                  aria-haspopup="menu"
+                  aria-expanded={isExportMenuOpen}
+                  disabled={devices.length === 0}
+                >
+                  <Download size={16} />
+                  <ChevronDown size={14} className={`transition ${isExportMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {isExportMenuOpen && (
+                  <div className="absolute right-0 top-12 z-40 min-w-48 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-950" role="menu">
+                    {exportOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => exportCsv(option.value)}
+                        disabled={option.count === 0}
+                        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-100 dark:hover:bg-gray-900"
+                        role="menuitem"
+                      >
+                        <span>{option.label}</span>
+                        <span className="text-xs text-gray-400">{option.count}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               {canManageDevices && (
                 <button
                   type="button"
@@ -986,15 +1028,17 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => setIsPhoneImportMenuOpen((open) => !open)}
-                    className="btn-secondary h-10 gap-2 px-3"
+                    onClick={() => {
+                      setIsPhoneImportMenuOpen((open) => !open);
+                      setIsExportMenuOpen(false);
+                    }}
+                    className="btn-secondary h-10 gap-1 px-3"
                     aria-haspopup="menu"
                     aria-expanded={isPhoneImportMenuOpen}
                     aria-label="Import device report"
                     title={`Import ${selectedPhoneImportOption.label}`}
                   >
                     <Upload size={16} />
-                    <span className="hidden text-sm font-bold sm:inline">Import</span>
                     <ChevronDown size={14} className={`transition ${isPhoneImportMenuOpen ? 'rotate-180' : ''}`} />
                   </button>
                   {isPhoneImportMenuOpen && (
