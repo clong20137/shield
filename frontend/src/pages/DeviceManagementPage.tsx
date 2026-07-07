@@ -265,7 +265,7 @@ function getDeviceHealthChips(device: DeviceRecord): Array<{ label: string; tone
   const chips: Array<{ label: string; tone: string }> = [];
 
   if (device.possibleInactive) {
-    chips.push({ label: 'Possible inactive', tone: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-200' });
+    chips.push({ label: 'Possible inactive', tone: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200' });
   }
 
   if (!device.assignedTo && device.status === 'Assigned') {
@@ -1203,8 +1203,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             </select>
             <label className={`flex h-10 cursor-pointer items-center justify-center gap-2 rounded border px-3 text-sm font-bold transition ${
               possibleInactiveOnly
-                ? 'border-orange-300 bg-orange-100 text-orange-800 dark:border-orange-800 dark:bg-orange-950/60 dark:text-orange-100'
-                : 'border-gray-300 bg-white text-gray-600 hover:bg-orange-50 hover:text-orange-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-orange-100'
+                ? 'border-red-300 bg-red-100 text-red-800 dark:border-red-800 dark:bg-red-950/60 dark:text-red-100'
+                : 'border-gray-300 bg-white text-gray-600 hover:bg-red-50 hover:text-red-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-red-100'
             }`}>
               <input
                 type="checkbox"
@@ -1213,7 +1213,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                   setPage(1);
                   setPossibleInactiveOnly(event.target.checked);
                 }}
-                className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
               />
               <AlertTriangle size={15} />
               <span className="whitespace-nowrap">Possible inactive</span>
@@ -1221,7 +1221,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             <input value={query} onChange={(event) => { setPage(1); setQuery(event.target.value); }} placeholder="Search inventory" className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
           </div>
           {assignedUserFilter && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-800 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-100">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
               <span>Reviewing devices assigned to a deactivated account.</span>
               <button
                 type="button"
@@ -1229,7 +1229,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                   setAssignedUserFilter('');
                   setPage(1);
                 }}
-                className="rounded px-2 py-1 text-xs font-black uppercase transition hover:bg-orange-100 dark:hover:bg-orange-900"
+                className="rounded px-2 py-1 text-xs font-black uppercase transition hover:bg-red-100 dark:hover:bg-red-900"
               >
                 Clear review
               </button>
@@ -1526,14 +1526,14 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 </div>
                 <label className={`flex items-start gap-3 rounded-lg border px-3 py-3 text-sm font-semibold ${
                   form.possibleInactive
-                    ? 'border-orange-300 bg-orange-50 text-orange-800 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-100'
+                    ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100'
                     : 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200'
                 }`}>
                   <input
                     type="checkbox"
                     checked={form.possibleInactive}
                     onChange={(event) => setForm((current) => ({ ...current, possibleInactive: event.target.checked }))}
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
                   />
                   <span>
                     <span className="block font-black">Possible inactive</span>

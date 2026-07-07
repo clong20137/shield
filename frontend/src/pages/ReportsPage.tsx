@@ -2471,7 +2471,7 @@ const ReportsPage: React.FC<{
                 <button
                   type="button"
                   onClick={() => openDeviceInventoryDrilldown({ possibleInactive: true })}
-                  className="font-semibold text-orange-600 transition hover:text-orange-700 dark:text-orange-300 dark:hover:text-orange-200"
+                  className="font-semibold text-red-600 transition hover:text-red-700 dark:text-red-300 dark:hover:text-red-200"
                   title="Open possible inactive devices"
                 >
                   Possible inactive <strong className="ml-1">{formatMetric(deviceReport.summary.possibleInactiveDevices)}</strong>

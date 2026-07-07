@@ -43,7 +43,7 @@ export function DeviceUsageSummary({ devices }: { devices: DeviceRecord[] }) {
             {formatUsageValue(totalMinutes, 'min', 0)}
           </span>
           {inactiveCount > 0 && (
-            <span className="rounded bg-orange-100 px-2 py-1 text-orange-700 dark:bg-orange-950 dark:text-orange-200">
+            <span className="rounded bg-red-100 px-2 py-1 text-red-700 dark:bg-red-950 dark:text-red-200">
               {inactiveCount} possible inactive
             </span>
           )}
@@ -65,7 +65,7 @@ export function DeviceUsageSummary({ devices }: { devices: DeviceRecord[] }) {
                   <p className="truncate text-xs text-gray-500 dark:text-gray-400">{device.phoneNumber || device.assetTag || device.type}</p>
                 </div>
                 {device.possibleInactive && (
-                  <span className="shrink-0 rounded bg-orange-100 px-2 py-1 text-[11px] font-black uppercase text-orange-700 dark:bg-orange-950 dark:text-orange-200">
+                  <span className="shrink-0 rounded bg-red-100 px-2 py-1 text-[11px] font-black uppercase text-red-700 dark:bg-red-950 dark:text-red-200">
                     Possible inactive
                   </span>
                 )}
