@@ -390,7 +390,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [phoneImportProgress, setPhoneImportProgress] = useState<PhoneImportProgress | null>(null);
   const [phoneImportType, setPhoneImportType] = useState<PhoneImportType>('verizon-phone');
   const [phoneImportReportMonth, setPhoneImportReportMonth] = useState(getCurrentReportMonth);
-  const [isPhoneImportMenuOpen, setIsPhoneImportMenuOpen] = useState(false);
+  const [isPhoneImportSetupOpen, setIsPhoneImportSetupOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
@@ -836,11 +836,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     }
   };
 
-  const openPhoneImportPicker = (importType: PhoneImportType) => {
-    const selectedImport = phoneImportOptions.find((option) => option.value === importType) || phoneImportOptions[0];
-    pendingPhoneImportTypeRef.current = selectedImport.value;
-    setPhoneImportType(selectedImport.value);
-    setIsPhoneImportMenuOpen(false);
+  const beginPhoneImport = () => {
+    pendingPhoneImportTypeRef.current = phoneImportType;
+    setIsPhoneImportSetupOpen(false);
     window.setTimeout(() => phoneImportInputRef.current?.click(), 0);
   };
 
@@ -1003,7 +1001,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                   type="button"
                   onClick={() => {
                     setIsExportMenuOpen((open) => !open);
-                    setIsPhoneImportMenuOpen(false);
+                    setIsPhoneImportSetupOpen(false);
                   }}
                   className="btn-secondary h-10 gap-1 px-3"
                   title="Export current page"
@@ -1034,52 +1032,23 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 )}
               </div>
               {canManageDevices && (
-                <input
-                  type="month"
-                  value={phoneImportReportMonth}
-                  onChange={(event) => setPhoneImportReportMonth(event.target.value || getCurrentReportMonth())}
-                  className="h-10 rounded border border-gray-300 bg-white px-3 text-sm font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                  aria-label="Report month"
-                  title="Report month"
-                />
-              )}
-              {canManageDevices && (
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => {
-                      setIsPhoneImportMenuOpen((open) => !open);
+                      setIsPhoneImportSetupOpen(true);
                       setIsExportMenuOpen(false);
                     }}
-                    className="btn-secondary h-10 gap-1 px-3"
-                    aria-haspopup="menu"
-                    aria-expanded={isPhoneImportMenuOpen}
+                    className="btn-secondary h-10 w-10 justify-center p-0"
                     aria-label="Import device report"
-                    title={`Import ${selectedPhoneImportOption.label}`}
+                    title="Import device report"
                   >
                     <Upload size={16} />
-                    <ChevronDown size={14} className={`transition ${isPhoneImportMenuOpen ? 'rotate-180' : ''}`} />
                   </button>
-                  {isPhoneImportMenuOpen && (
-                    <div className="absolute right-0 top-12 z-40 min-w-56 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-950" role="menu">
-                      {phoneImportOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => openPhoneImportPicker(option.value)}
-                          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-bold text-gray-700 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-900"
-                          role="menuitem"
-                        >
-                          <span>{option.label}</span>
-                          {phoneImportType === option.value && <CheckCircle2 size={15} className="text-accent" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                   <input
                     ref={phoneImportInputRef}
                     type="file"
-                    accept=".csv,.xlsx,.xls"
+                    accept={selectedPhoneImportOption.accept}
                     className="hidden"
                     onChange={importPhoneReport}
                   />
@@ -1429,6 +1398,52 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               <button type="button" onClick={() => void deleteSelectedDevices()} className="btn-danger" aria-label="Delete selected devices" title="Delete Selected">
                 <Trash2 size={16} />
                 <span>Delete All</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+      {canManageDevices && isPhoneImportSetupOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/45 px-4 pt-[12dvh]">
+          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Import Device Report</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Choose the carrier and the month this report represents.</p>
+              </div>
+              <button type="button" onClick={() => setIsPhoneImportSetupOpen(false)} className="btn-secondary h-9 w-9 justify-center p-0" aria-label="Close import setup" title="Close">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <Field label="Carrier">
+                <select
+                  value={phoneImportType}
+                  onChange={(event) => setPhoneImportType(event.target.value as PhoneImportType)}
+                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                >
+                  {phoneImportOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Report Month">
+                <input
+                  type="month"
+                  value={phoneImportReportMonth}
+                  onChange={(event) => setPhoneImportReportMonth(event.target.value || getCurrentReportMonth())}
+                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+                />
+              </Field>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button type="button" onClick={() => setIsPhoneImportSetupOpen(false)} className="btn-secondary" aria-label="Cancel import setup" title="Cancel">
+                <span>Cancel</span>
+              </button>
+              <button type="button" onClick={beginPhoneImport} className="btn-primary" aria-label="Choose report file" title="Choose File">
+                <Upload size={16} />
+                <span>Choose File</span>
               </button>
             </div>
           </div>
