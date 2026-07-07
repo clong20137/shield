@@ -203,11 +203,6 @@ function getImportValue(row: PhoneImportRow, aliases: string[]): string {
   return cleanString(entry?.[1], 500);
 }
 
-function isAgencyEmail(value: string): boolean {
-  const normalizedEmail = normalizeKey(value).replace(/,gov$/u, '.gov');
-  return normalizedEmail.endsWith('@isp.in.gov');
-}
-
 function normalizeImportDate(value: string): string {
   const text = value.trim();
   if (!text) {
@@ -295,6 +290,36 @@ function buildUserMatcher(users: User[]): UserMatcher {
   return { departmentPhones, identities };
 }
 
+function getIdentityMatchKeys(value: string): string[] {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return [];
+  }
+
+  const keys = [
+    normalizeKey(trimmedValue),
+    normalizeLooseKey(trimmedValue),
+    normalizeDigits(trimmedValue),
+  ];
+  const commaNameMatch = trimmedValue.match(/^([^,]+),\s*(.+)$/u);
+  if (commaNameMatch) {
+    const lastName = commaNameMatch[1].trim();
+    const firstName = commaNameMatch[2].trim().split(/\s+/u)[0] || '';
+    keys.push(normalizeLooseKey(`${firstName} ${lastName}`));
+    keys.push(normalizeLooseKey(`${lastName} ${firstName}`));
+  } else {
+    const nameParts = trimmedValue.split(/\s+/u).filter(Boolean);
+    if (nameParts.length >= 2) {
+      const firstName = nameParts[0];
+      const lastName = nameParts[nameParts.length - 1];
+      keys.push(normalizeLooseKey(`${firstName} ${lastName}`));
+      keys.push(normalizeLooseKey(`${lastName} ${firstName}`));
+    }
+  }
+
+  return [...new Set(keys.filter(Boolean))];
+}
+
 function resolveAssignedTo(row: PhoneImportRow, matcher: UserMatcher): { assignedTo: string; matched: boolean } {
   const identity = getImportValue(row, [
     'assignedTo',
@@ -330,11 +355,9 @@ function resolveAssignedTo(row: PhoneImportRow, matcher: UserMatcher): { assigne
   }
 
   const identityCandidates = [
-    isAgencyEmail(email) ? normalizeKey(email) : '',
-    !/@/u.test(identity) || isAgencyEmail(identity) ? normalizeKey(identity) : '',
-    !/@/u.test(identity) || isAgencyEmail(identity) ? normalizeLooseKey(identity) : '',
-    normalizeDigits(identity),
-  ].filter(Boolean);
+    ...getIdentityMatchKeys(identity),
+    ...getIdentityMatchKeys(email),
+  ];
 
   for (const candidate of identityCandidates) {
     const match = matcher.identities.get(candidate);
