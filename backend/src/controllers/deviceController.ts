@@ -97,6 +97,9 @@ const PHONE_IMPORT_JOB_CHUNK_SIZE = 100;
 const PHONE_IMPORT_JOB_RETENTION_MS = 60 * 60 * 1000;
 const dataUsageImportAliases = ['dataUsageGb', 'data usage gb', 'data usage in gb', 'data usage', 'usage gb'];
 const mobileMinutesImportAliases = ['mobileToMobileUsedMinutes', 'mobile to mobile used minutes', 'mobile to mobile used minutes calling minutes', 'calling minutes', 'mobile minutes', 'used minutes', 'minutes'];
+const activationDateImportAliases = ['contractActivationDate', 'contract activation date', 'contract activated date', 'contract start date', 'contractStartDate', 'activationDate', 'activation date'];
+const contractEndDateImportAliases = ['contractEndDate', 'contract end date', 'contract expiration date', 'contractExpirationDate', 'contract end', 'contract expires', 'contract expiry date'];
+const eligibilityDateImportAliases = ['upgradeEligibilityDate', 'upgrade eligibility date', 'upgradeElgibilityDate', 'upgrade elgibility date', 'upgradeEligibleDate', 'upgrade eligible date', 'eligibilityDate', 'eligibility date', 'elgibilityDate', 'elgibility date'];
 
 function normalizeDigits(value: unknown): string {
   return String(value || '').replace(/\D/gu, '');
@@ -214,6 +217,11 @@ function getImportValue(row: PhoneImportRow, aliases: string[]): string {
   return cleanString(value === undefined || value === null ? '' : String(value), 500);
 }
 
+function getImportRawValue(row: PhoneImportRow, aliases: string[]): unknown {
+  const normalizedAliases = aliases.map(normalizeLooseKey);
+  return Object.entries(row).find(([key]) => normalizedAliases.includes(normalizeLooseKey(key)))?.[1];
+}
+
 function hasImportColumn(row: PhoneImportRow, aliases: string[]): boolean {
   const normalizedAliases = aliases.map(normalizeLooseKey);
   return Object.keys(row).some((key) => normalizedAliases.includes(normalizeLooseKey(key)));
@@ -244,6 +252,13 @@ function normalizeImportDate(value: unknown): string {
   if (Number.isFinite(excelSerial) && excelSerial > 20_000 && excelSerial < 80_000) {
     const date = new Date(Date.UTC(1899, 11, 30 + Math.floor(excelSerial)));
     return date.toISOString().slice(0, 10);
+  }
+
+  if (/[a-z]/iu.test(text)) {
+    const parsedDate = new Date(text);
+    if (!Number.isNaN(parsedDate.getTime())) {
+      return parsedDate.toISOString().slice(0, 10);
+    }
   }
 
   return '';
@@ -505,9 +520,9 @@ function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNu
     maintenanceDueDate: '',
     lastServiceDate: '',
     purchaseDate: getImportValue(row, ['purchaseDate', 'purchase date']),
-    activationDate: normalizeImportDate(getImportValue(row, ['contractActivationDate', 'contract activation date', 'contractStartDate', 'contract start date', 'activationDate', 'activation date'])),
-    contractEndDate: normalizeImportDate(getImportValue(row, ['contractEndDate', 'contract end date', 'contractExpirationDate', 'contract expiration date', 'contract end', 'contract expires'])),
-    eligibilityDate: normalizeImportDate(getImportValue(row, ['upgradeEligibilityDate', 'upgrade eligibility date', 'upgradeElgibilityDate', 'upgrade elgibility date', 'upgradeEligibleDate', 'upgrade eligible date', 'eligibilityDate', 'eligibility date', 'elgibilityDate', 'elgibility date'])),
+    activationDate: normalizeImportDate(getImportRawValue(row, activationDateImportAliases)),
+    contractEndDate: normalizeImportDate(getImportRawValue(row, contractEndDateImportAliases)),
+    eligibilityDate: normalizeImportDate(getImportRawValue(row, eligibilityDateImportAliases)),
     monthlyCharge: normalizeImportMoney(getImportValue(row, ['totalCurrentCharges', 'total current charges', 'currentCharges', 'current charges', 'monthlyCharge', 'monthly charge'])),
     dataUsageGb,
     mobileMinutes,
@@ -532,7 +547,7 @@ function validateDevicePayload(body: Record<string, unknown>) {
   const mobileMinutes = Math.round(normalizeImportNumber(String(body.mobileMinutes ?? '')));
   const possibleInactive = body.possibleInactive === true || body.possibleInactive === 'true' || body.possibleInactive === 1 || body.possibleInactive === '1';
   const dateFields = ['warrantyExpiration', 'replacementDueDate', 'maintenanceDueDate', 'lastServiceDate', 'purchaseDate', 'activationDate', 'contractEndDate', 'eligibilityDate'] as const;
-  const dates = Object.fromEntries(dateFields.map((field) => [field, normalizeImportDate(String(body[field] ?? ''))])) as Record<typeof dateFields[number], string>;
+  const dates = Object.fromEntries(dateFields.map((field) => [field, normalizeImportDate(body[field])])) as Record<typeof dateFields[number], string>;
 
   if (!type || !assetTag || !makeModel) {
     return { error: 'Device type, asset tag, and make/model are required' };
