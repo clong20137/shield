@@ -5,6 +5,7 @@ import {
   BarChart,
   Brush,
   CartesianGrid,
+  Cell,
   Legend,
   Line,
   LineChart,
@@ -215,6 +216,11 @@ const deviceReportDimensions: Array<{
   { value: 'model', label: 'Model', color: '#7c3aed', valueLabel: 'Devices' },
   { value: 'cost', label: 'Monthly Cost', color: '#0f766e', valueLabel: 'Monthly Cost' },
 ];
+
+const carrierReportColors: Record<string, string> = {
+  'at&t': '#00A8E0',
+  verizon: '#EE0000',
+};
 
 const compareSeriesColors = [
   'rgb(37 99 235)',
@@ -617,8 +623,9 @@ const DeviceReportBarChart: React.FC<{
   title: string;
   data: DeviceReportGroup[];
   color?: string;
+  colorByLabel?: (label: string) => string | undefined;
   valueLabel?: string;
-}> = ({ title, data, color = '#1a365d', valueLabel = 'Devices' }) => {
+}> = ({ title, data, color = '#1a365d', colorByLabel, valueLabel = 'Devices' }) => {
   const chartData = data.map((item) => ({ ...item, displayLabel: formatAnalyticsLabel(item.label) }));
   const total = data.reduce((sum, item) => sum + item.count, 0);
   const formatValue = (value: number) => valueLabel === 'Monthly Cost' ? formatCurrency(value) : formatMetric(value);
@@ -638,7 +645,11 @@ const DeviceReportBarChart: React.FC<{
             <XAxis dataKey="displayLabel" interval={0} angle={-28} textAnchor="end" height={64} tick={{ fontSize: 11, fontWeight: 700 }} tickLine={false} axisLine={false} />
             <YAxis allowDecimals={false} tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={44} />
             <Tooltip cursor={false} formatter={(value) => [formatValue(Number(value)), valueLabel]} />
-            <Bar dataKey="count" fill={color} radius={[6, 6, 0, 0]} />
+            <Bar dataKey="count" fill={color} radius={[6, 6, 0, 0]}>
+              {chartData.map((item) => (
+                <Cell key={item.label} fill={colorByLabel?.(item.label) || color} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       )}
@@ -2274,6 +2285,7 @@ const ReportsPage: React.FC<{
                 title={selectedDeviceReportDimension.value === 'cost' ? 'Estimated Monthly Cost' : `Devices by ${selectedDeviceReportDimension.label}`}
                 data={selectedDeviceReportData}
                 color={selectedDeviceReportDimension.color}
+                colorByLabel={selectedDeviceReportDimension.value === 'carrier' ? (label) => carrierReportColors[label.toLowerCase()] : undefined}
                 valueLabel={selectedDeviceReportDimension.valueLabel}
               />
             </>
