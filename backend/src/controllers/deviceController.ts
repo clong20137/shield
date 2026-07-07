@@ -209,11 +209,12 @@ function normalizeImportDate(value: string): string {
     return '';
   }
 
-  if (/^\d{4}-\d{2}-\d{2}$/u.test(text)) {
-    return text;
+  const isoMatch = text.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s].*)?$/u);
+  if (isoMatch) {
+    return isoMatch[1];
   }
 
-  const slashMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/u);
+  const slashMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?)?$/iu);
   if (slashMatch) {
     const year = slashMatch[3].length === 2 ? `20${slashMatch[3]}` : slashMatch[3];
     return `${year}-${slashMatch[1].padStart(2, '0')}-${slashMatch[2].padStart(2, '0')}`;
@@ -225,7 +226,7 @@ function normalizeImportDate(value: string): string {
     return date.toISOString().slice(0, 10);
   }
 
-  return text;
+  return '';
 }
 
 function normalizeImportMoney(value: string): number {
