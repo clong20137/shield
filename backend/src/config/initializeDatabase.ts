@@ -883,6 +883,9 @@ export async function initializeDatabase() {
       \`contractEndDate\` DATE,
       \`eligibilityDate\` DATE,
       \`monthlyCharge\` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      \`dataUsageGb\` DECIMAL(10,3) NOT NULL DEFAULT 0.000,
+      \`mobileMinutes\` INT NOT NULL DEFAULT 0,
+      \`possibleInactive\` TINYINT(1) NOT NULL DEFAULT 0,
       \`condition\` VARCHAR(50) NOT NULL DEFAULT 'Good',
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -907,6 +910,9 @@ export async function initializeDatabase() {
   await ensureColumn('devices', 'contractEndDate', '`contractEndDate` DATE');
   await ensureColumn('devices', 'eligibilityDate', '`eligibilityDate` DATE');
   await ensureColumn('devices', 'monthlyCharge', '`monthlyCharge` DECIMAL(10,2) NOT NULL DEFAULT 0.00');
+  await ensureColumn('devices', 'dataUsageGb', '`dataUsageGb` DECIMAL(10,3) NOT NULL DEFAULT 0.000');
+  await ensureColumn('devices', 'mobileMinutes', '`mobileMinutes` INT NOT NULL DEFAULT 0');
+  await ensureColumn('devices', 'possibleInactive', '`possibleInactive` TINYINT(1) NOT NULL DEFAULT 0');
   await ensureColumn('devices', 'condition', "`condition` VARCHAR(50) NOT NULL DEFAULT 'Good'");
   await ensureIndex('devices', 'idx_devices_updated_asset', '`updatedAt`, `assetTag`');
   await ensureIndex('devices', 'idx_devices_assigned_updated', '`assignedTo`, `updatedAt`, `assetTag`');

@@ -65,6 +65,9 @@ const defaultDeviceForm: DeviceForm = {
   contractEndDate: '',
   eligibilityDate: '',
   monthlyCharge: 0,
+  dataUsageGb: 0,
+  mobileMinutes: 0,
+  possibleInactive: false,
   condition: 'Good',
 };
 
@@ -173,11 +176,14 @@ function toDeviceForm(device: DeviceRecord): DeviceForm {
     contractEndDate: device.contractEndDate || '',
     eligibilityDate: device.eligibilityDate || '',
     monthlyCharge: Number(device.monthlyCharge) || 0,
+    dataUsageGb: Number(device.dataUsageGb) || 0,
+    mobileMinutes: Number(device.mobileMinutes) || 0,
+    possibleInactive: Boolean(device.possibleInactive),
     condition: device.condition || 'Good',
   };
 }
 
-function escapeCsv(value: string | number | undefined | null): string {
+function escapeCsv(value: string | number | boolean | undefined | null): string {
   const text = String(value ?? '');
   return /[",\n]/u.test(text) ? `"${text.replace(/"/gu, '""')}"` : text;
 }
@@ -250,6 +256,10 @@ function isPastDue(value: string): boolean {
 
 function getDeviceHealthChips(device: DeviceRecord): Array<{ label: string; tone: string }> {
   const chips: Array<{ label: string; tone: string }> = [];
+
+  if (device.possibleInactive) {
+    chips.push({ label: 'Possible inactive', tone: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-200' });
+  }
 
   if (!device.assignedTo && device.status === 'Assigned') {
     chips.push({ label: 'Missing assignee', tone: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200' });
@@ -732,6 +742,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       'contractEndDate',
       'eligibilityDate',
       'monthlyCharge',
+      'dataUsageGb',
+      'mobileMinutes',
+      'possibleInactive',
       'condition',
       'notes',
     ];
@@ -1109,6 +1122,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                     <Detail label="Carrier" value={device.carrier || 'Verizon'} />
                     <Detail label="Replacement" value={formatDate(device.replacementDueDate)} />
                     {canManageDevices && <Detail label="Monthly" value={formatCurrency(device.monthlyCharge)} />}
+                    {canManageDevices && <Detail label="Usage" value={`${Number(device.dataUsageGb) || 0} GB / ${Number(device.mobileMinutes) || 0} min`} />}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {canManageDevices && <button type="button" onClick={(event) => { event.stopPropagation(); editDevice(device); }} className="btn-secondary" aria-label="Edit device" title="Edit"><Pencil size={15} /><span>Edit</span></button>}
@@ -1285,6 +1299,14 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 {canManageDevices && <DateField label="Contract End Date" value={form.contractEndDate} onChange={(value) => setForm((current) => ({ ...current, contractEndDate: value }))} />}
                 {canManageDevices && <DateField label="Eligibility Date" value={form.eligibilityDate} onChange={(value) => setForm((current) => ({ ...current, eligibilityDate: value }))} />}
                 {canManageDevices && <MoneyField label="Monthly Charge" value={form.monthlyCharge} onChange={(value) => setForm((current) => ({ ...current, monthlyCharge: value }))} />}
+                {canManageDevices && <NumberField label="Data Usage (GB)" value={form.dataUsageGb} step="0.001" onChange={(value) => setForm((current) => ({ ...current, dataUsageGb: value }))} />}
+                {canManageDevices && <NumberField label="Calling Minutes" value={form.mobileMinutes} step="1" onChange={(value) => setForm((current) => ({ ...current, mobileMinutes: value }))} />}
+                {canManageDevices && (
+                  <label className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm font-semibold dark:border-gray-700">
+                    <input type="checkbox" checked={form.possibleInactive} onChange={(event) => setForm((current) => ({ ...current, possibleInactive: event.target.checked }))} />
+                    Possible inactive
+                  </label>
+                )}
                 <label className="block lg:col-span-2">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Event Note</span>
                   <input value={eventNotes} onChange={(event) => setEventNotes(event.target.value)} className={getDeviceInputClass()} />
@@ -1584,6 +1606,21 @@ function MoneyField({ label, value, onChange }: { label: string; value: number; 
         type="number"
         min="0"
         step="0.01"
+        value={Number(value) || ''}
+        onChange={(event) => onChange(Number(event.target.value) || 0)}
+        className={getDeviceInputClass()}
+      />
+    </Field>
+  );
+}
+
+function NumberField({ label, value, step, onChange }: { label: string; value: number; step: string; onChange: (value: number) => void }) {
+  return (
+    <Field label={label}>
+      <input
+        type="number"
+        min="0"
+        step={step}
         value={Number(value) || ''}
         onChange={(event) => onChange(Number(event.target.value) || 0)}
         className={getDeviceInputClass()}

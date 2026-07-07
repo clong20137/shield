@@ -916,6 +916,9 @@ export interface DeviceRecord {
   contractEndDate: string;
   eligibilityDate: string;
   monthlyCharge: number;
+  dataUsageGb: number;
+  mobileMinutes: number;
+  possibleInactive: boolean;
   condition: string;
   createdAt: string;
   updatedAt: string;

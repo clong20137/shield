@@ -28,6 +28,9 @@ export interface Device {
   contractEndDate: string;
   eligibilityDate: string;
   monthlyCharge: number;
+  dataUsageGb: number;
+  mobileMinutes: number;
+  possibleInactive: boolean;
   condition: string;
   createdAt: Date;
   updatedAt: Date;
@@ -175,6 +178,9 @@ const deviceColumns = [
   "DATE_FORMAT(`contractEndDate`, '%Y-%m-%d') AS `contractEndDate`",
   "DATE_FORMAT(`eligibilityDate`, '%Y-%m-%d') AS `eligibilityDate`",
   'COALESCE(`monthlyCharge`, 0) AS `monthlyCharge`',
+  'COALESCE(`dataUsageGb`, 0) AS `dataUsageGb`',
+  'COALESCE(`mobileMinutes`, 0) AS `mobileMinutes`',
+  'COALESCE(`possibleInactive`, 0) AS `possibleInactive`',
   '`condition`',
   '`createdAt`',
   '`updatedAt`',
@@ -208,6 +214,9 @@ function normalizeDeviceInput(device: DeviceInput): DeviceInput {
     contractEndDate: device.contractEndDate || '',
     eligibilityDate: device.eligibilityDate || '',
     monthlyCharge: Number(device.monthlyCharge) || 0,
+    dataUsageGb: Number(device.dataUsageGb) || 0,
+    mobileMinutes: Number(device.mobileMinutes) || 0,
+    possibleInactive: Boolean(device.possibleInactive),
     condition: device.condition || 'Good',
   };
 }
@@ -396,9 +405,10 @@ export class DeviceModel {
           \`status\`, \`carrier\`, \`location\`, \`notes\`, \`phoneNumber\`, \`imei\`, \`simNumber\`,
           \`radioId\`, \`hostname\`, \`routerId\`, \`warrantyExpiration\`, \`replacementDueDate\`,
           \`maintenanceDueDate\`, \`lastServiceDate\`, \`purchaseDate\`, \`activationDate\`,
-          \`contractEndDate\`, \`eligibilityDate\`, \`monthlyCharge\`, \`condition\`,
+          \`contractEndDate\`, \`eligibilityDate\`, \`monthlyCharge\`, \`dataUsageGb\`,
+          \`mobileMinutes\`, \`possibleInactive\`, \`condition\`,
           \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           device.type,
@@ -425,6 +435,9 @@ export class DeviceModel {
           nullableDate(device.contractEndDate),
           nullableDate(device.eligibilityDate),
           device.monthlyCharge,
+          device.dataUsageGb,
+          device.mobileMinutes,
+          device.possibleInactive,
           device.condition,
           now,
           now,
@@ -478,6 +491,9 @@ export class DeviceModel {
           \`contractEndDate\` = ?,
           \`eligibilityDate\` = ?,
           \`monthlyCharge\` = ?,
+          \`dataUsageGb\` = ?,
+          \`mobileMinutes\` = ?,
+          \`possibleInactive\` = ?,
           \`condition\` = ?,
           \`updatedAt\` = ?
         WHERE \`id\` = ?`,
@@ -506,6 +522,9 @@ export class DeviceModel {
           nullableDate(device.contractEndDate),
           nullableDate(device.eligibilityDate),
           device.monthlyCharge,
+          device.dataUsageGb,
+          device.mobileMinutes,
+          device.possibleInactive,
           device.condition,
           new Date(),
           id,

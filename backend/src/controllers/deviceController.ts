@@ -86,12 +86,17 @@ const phoneExportHeaders = [
   'contractEndDate',
   'eligibilityDate',
   'monthlyCharge',
+  'dataUsageGb',
+  'mobileMinutes',
+  'possibleInactive',
   'condition',
   'notes',
 ];
 const phoneImportJobs = new Map<string, PhoneImportJob>();
 const PHONE_IMPORT_JOB_CHUNK_SIZE = 100;
 const PHONE_IMPORT_JOB_RETENTION_MS = 60 * 60 * 1000;
+const dataUsageImportAliases = ['dataUsageGb', 'data usage gb', 'data usage in gb', 'data usage', 'usage gb'];
+const mobileMinutesImportAliases = ['mobileToMobileUsedMinutes', 'mobile to mobile used minutes', 'mobile to mobile used minutes calling minutes', 'calling minutes', 'mobile minutes', 'used minutes', 'minutes'];
 
 function normalizeDigits(value: unknown): string {
   return String(value || '').replace(/\D/gu, '');
@@ -203,6 +208,11 @@ function getImportValue(row: PhoneImportRow, aliases: string[]): string {
   return cleanString(entry?.[1], 500);
 }
 
+function hasImportColumn(row: PhoneImportRow, aliases: string[]): boolean {
+  const normalizedAliases = aliases.map(normalizeLooseKey);
+  return Object.keys(row).some((key) => normalizedAliases.includes(normalizeLooseKey(key)));
+}
+
 function normalizeImportDate(value: string): string {
   const text = value.replace(/[–—]/gu, '-').trim();
   if (!text) {
@@ -232,6 +242,16 @@ function normalizeImportDate(value: string): string {
 function normalizeImportMoney(value: string): number {
   const amount = Number(value.replace(/[$,\s]/gu, ''));
   return Number.isFinite(amount) && amount > 0 ? Number(amount.toFixed(2)) : 0;
+}
+
+function normalizeImportNumber(value: string): number {
+  const numberMatch = value.match(/-?\d+(?:\.\d+)?/u);
+  if (!numberMatch) {
+    return 0;
+  }
+
+  const amount = Number(numberMatch[0]);
+  return Number.isFinite(amount) && amount > 0 ? amount : 0;
 }
 
 function isNewUserImportRow(row: PhoneImportRow): boolean {
@@ -450,6 +470,9 @@ function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNu
   const makeModel = cleanPhoneModelName(importedModel);
   const type = getImportedDeviceType(importedModel || makeModel);
   const assetTag = getGeneratedAssetTag(type, phoneNumber, imei, simNumber, rowNumber);
+  const dataUsageGb = normalizeImportNumber(getImportValue(row, dataUsageImportAliases));
+  const mobileMinutes = Math.round(normalizeImportNumber(getImportValue(row, mobileMinutesImportAliases)));
+  const hasUsageColumns = hasImportColumn(row, dataUsageImportAliases) || hasImportColumn(row, mobileMinutesImportAliases);
 
   return {
     type,
@@ -476,6 +499,9 @@ function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNu
     contractEndDate: normalizeImportDate(getImportValue(row, ['contractEndDate', 'contract end date', 'contractExpirationDate', 'contract expiration date', 'contract end', 'contract expires'])),
     eligibilityDate: normalizeImportDate(getImportValue(row, ['upgradeEligibilityDate', 'upgrade eligibility date', 'upgradeElgibilityDate', 'upgrade elgibility date', 'upgradeEligibleDate', 'upgrade eligible date', 'eligibilityDate', 'eligibility date', 'elgibilityDate', 'elgibility date'])),
     monthlyCharge: normalizeImportMoney(getImportValue(row, ['totalCurrentCharges', 'total current charges', 'currentCharges', 'current charges', 'monthlyCharge', 'monthly charge'])),
+    dataUsageGb,
+    mobileMinutes,
+    possibleInactive: hasUsageColumns && dataUsageGb <= 0 && mobileMinutes <= 0,
     condition: condition === 'Excellent' ? 'New' : isOneOf(condition, deviceConditions) ? condition : 'Good',
   };
 }
@@ -492,6 +518,9 @@ function validateDevicePayload(body: Record<string, unknown>) {
   const carrier = cleanString(body.carrier, 50) || 'Verizon';
   const condition = cleanString(body.condition, 50) || 'Good';
   const monthlyCharge = normalizeImportMoney(String(body.monthlyCharge ?? ''));
+  const dataUsageGb = normalizeImportNumber(String(body.dataUsageGb ?? ''));
+  const mobileMinutes = Math.round(normalizeImportNumber(String(body.mobileMinutes ?? '')));
+  const possibleInactive = body.possibleInactive === true || body.possibleInactive === 'true' || body.possibleInactive === 1 || body.possibleInactive === '1';
   const dateFields = ['warrantyExpiration', 'replacementDueDate', 'maintenanceDueDate', 'lastServiceDate', 'purchaseDate', 'activationDate', 'contractEndDate', 'eligibilityDate'] as const;
   const dates = Object.fromEntries(dateFields.map((field) => [field, normalizeImportDate(String(body[field] ?? ''))])) as Record<typeof dateFields[number], string>;
 
@@ -551,6 +580,9 @@ function validateDevicePayload(body: Record<string, unknown>) {
       contractEndDate: dates.contractEndDate,
       eligibilityDate: dates.eligibilityDate,
       monthlyCharge,
+      dataUsageGb,
+      mobileMinutes,
+      possibleInactive,
       condition,
     },
   };
@@ -595,6 +627,7 @@ async function processPhoneImportRows(
 
   for (const [index, row] of rows.entries()) {
     const rowNumber = index + 2;
+    const hasUsageImportColumns = hasImportColumn(row, dataUsageImportAliases) || hasImportColumn(row, mobileMinutesImportAliases);
     const assignment = resolveAssignedTo(row, userMatcher);
     const importedDevice = buildImportedPhoneDevice(row, assignment.assignedTo, rowNumber, importType);
     const validation = validateDevicePayload(importedDevice as unknown as Record<string, unknown>);
@@ -632,6 +665,9 @@ async function processPhoneImportRows(
         contractEndDate: validation.value.contractEndDate || existingDevice.contractEndDate,
         eligibilityDate: validation.value.eligibilityDate || existingDevice.eligibilityDate,
         monthlyCharge: validation.value.monthlyCharge || existingDevice.monthlyCharge,
+        dataUsageGb: hasUsageImportColumns ? validation.value.dataUsageGb : existingDevice.dataUsageGb,
+        mobileMinutes: hasUsageImportColumns ? validation.value.mobileMinutes : existingDevice.mobileMinutes,
+        possibleInactive: hasUsageImportColumns ? validation.value.possibleInactive : existingDevice.possibleInactive,
         condition: validation.value.condition || existingDevice.condition,
       };
       const updated = await DeviceModel.updateDevice(existingDevice.id, mergedDevice, {
