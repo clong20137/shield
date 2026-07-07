@@ -1,7 +1,7 @@
 import { ChangeEvent, FormEvent, MouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, ArchiveX, CheckCircle2, ChevronLeft, ChevronRight, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, Radio, RefreshCw, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
-import { authService, AuthAccount, deviceService, DeviceRecord } from '../services/api';
+import { authService, AuthAccount, deviceService, DeviceRecord, PhoneImportType } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
 import { AppContextMenu, AppContextMenuPosition, shouldUseNativeContextMenu } from '../components/AppContextMenu';
 
@@ -35,6 +35,10 @@ const DEVICE_TABLE_OVERSCAN = 8;
 const DEVICE_TABLE_MAX_HEIGHT = 620;
 const PHONE_IMPORT_POLL_MS = 900;
 const INVENTORY_TREE_COLLAPSE_KEY = 'shield_device_inventory_tree_collapsed';
+const phoneImportOptions: Array<{ value: PhoneImportType; label: string; accept: string }> = [
+  { value: 'verizon-phone', label: 'Verizon Phone CSV', accept: '.csv' },
+  { value: 'att-firstnet', label: 'AT&T FirstNet XLSX', accept: '.xlsx,.xls,.csv' },
+];
 
 const defaultDeviceForm: DeviceForm = {
   type: 'Cell Phone',
@@ -190,6 +194,19 @@ function hasCsvDataRows(text: string): boolean {
   return false;
 }
 
+async function readPhoneImportFileAsCsv(file: File): Promise<string> {
+  if (/\.xlsx?$/iu.test(file.name)) {
+    const XLSX = await import('xlsx');
+    const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = firstSheetName ? workbook.Sheets[firstSheetName] : null;
+
+    return worksheet ? XLSX.utils.sheet_to_csv(worksheet) : '';
+  }
+
+  return file.text();
+}
+
 function formatDate(value: string): string {
   return value ? new Date(value).toLocaleDateString() : 'N/A';
 }
@@ -326,6 +343,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [deviceNotice, setDeviceNotice] = useState<string | null>(null);
   const [phoneImportSummary, setPhoneImportSummary] = useState<PhoneImportSummary | null>(null);
   const [phoneImportProgress, setPhoneImportProgress] = useState<PhoneImportProgress | null>(null);
+  const [phoneImportType, setPhoneImportType] = useState<PhoneImportType>('verizon-phone');
   const [loading, setLoading] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
   const [deviceTableScrollTop, setDeviceTableScrollTop] = useState(0);
@@ -680,23 +698,24 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     URL.revokeObjectURL(url);
   };
 
-  const importPhoneCsv = async (event: ChangeEvent<HTMLInputElement>) => {
+  const importPhoneReport = async (event: ChangeEvent<HTMLInputElement>) => {
     if (!canManageDevices) return;
 
     const file = event.target.files?.[0];
     if (!file) return;
+    const selectedImport = phoneImportOptions.find((option) => option.value === phoneImportType) || phoneImportOptions[0];
 
     try {
       setError(null);
       setDeviceNotice(null);
       setPhoneImportSummary(null);
-      const csvText = await file.text();
+      const csvText = await readPhoneImportFileAsCsv(file);
       if (!hasCsvDataRows(csvText)) {
-        setError('Phone import CSV is empty.');
+        setError(`${selectedImport.label} import file is empty.`);
         return;
       }
 
-      const response = await deviceService.startPhoneImportJob(csvText, actor);
+      const response = await deviceService.startPhoneImportJob(csvText, actor, phoneImportType);
       let importJob = response.data;
       setPhoneImportProgress({
         processedRows: importJob.processedRows,
@@ -717,7 +736,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       }
 
       if (importJob.status === 'failed') {
-        setError(importJob.error || 'Failed to import phone CSV.');
+        setError(importJob.error || `Failed to import ${selectedImport.label}.`);
         return;
       }
 
@@ -732,7 +751,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       await loadDevices(false);
     } catch (err) {
       console.error('Failed to import phones:', err);
-      setError('Failed to import phone CSV. Check columns, phone numbers, and duplicate asset tags.');
+      setError(`Failed to import ${selectedImport.label}. Check columns, phone numbers, and duplicate asset tags.`);
     } finally {
       setPhoneImportProgress(null);
       event.target.value = '';
@@ -799,6 +818,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     event.preventDefault();
     setPageContextMenu({ x: event.clientX, y: event.clientY });
   };
+  const selectedPhoneImportOption = phoneImportOptions.find((option) => option.value === phoneImportType) || phoneImportOptions[0];
 
   return (
     <div onContextMenu={openPageContextMenu}>
@@ -819,7 +839,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       )}
       {phoneImportSummary && (
         <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-100">
-          Phone import complete: {phoneImportSummary.createdCount} created, {phoneImportSummary.updatedCount} updated, {phoneImportSummary.matchedCount} matched, {phoneImportSummary.unmatchedCount} unmatched, {phoneImportSummary.skippedCount} skipped from {phoneImportSummary.totalRows} rows.
+          {selectedPhoneImportOption.label} import complete: {phoneImportSummary.createdCount} created, {phoneImportSummary.updatedCount} updated, {phoneImportSummary.matchedCount} matched, {phoneImportSummary.unmatchedCount} unmatched, {phoneImportSummary.skippedCount} skipped from {phoneImportSummary.totalRows} rows.
         </div>
       )}
       {loading && <div className="loading">Loading device inventory...</div>}
@@ -831,7 +851,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <Upload size={20} />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Importing Phones</h2>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Importing {selectedPhoneImportOption.label}</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {phoneImportProgress.status === 'queued' ? 'Queued for processing' : 'Processing on the server'}
                 </p>
@@ -880,10 +900,27 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <Download size={16} />
               </button>
               {canManageDevices && (
-                <label className="btn-secondary h-10 w-10 cursor-pointer justify-center p-0" title="Import phone CSV" aria-label="Import phone CSV">
-                  <Upload size={16} />
-                  <input type="file" accept=".csv" className="hidden" onChange={importPhoneCsv} />
-                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={phoneImportType}
+                    onChange={(event) => setPhoneImportType(event.target.value as PhoneImportType)}
+                    className="h-10 rounded border border-gray-300 bg-white px-3 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
+                    aria-label="Choose device import report"
+                  >
+                    {phoneImportOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  <label className="btn-secondary h-10 w-10 cursor-pointer justify-center p-0" title={`Import ${selectedPhoneImportOption.label}`} aria-label="Import selected device report">
+                    <Upload size={16} />
+                    <input
+                      type="file"
+                      accept={selectedPhoneImportOption.accept}
+                      className="hidden"
+                      onChange={importPhoneReport}
+                    />
+                  </label>
+                </div>
               )}
             </div>
           </div>

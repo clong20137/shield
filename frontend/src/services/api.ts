@@ -949,6 +949,8 @@ export interface PhoneImportJob {
   completedAt: string | null;
 }
 
+export type PhoneImportType = 'verizon-phone' | 'att-firstnet';
+
 export interface DeviceEvent {
   id: string;
   deviceId: string;
@@ -1494,12 +1496,12 @@ export const deviceService = {
   exportPhones: () =>
     api.get<Blob>('/devices/phones/export', { responseType: 'blob' }),
 
-  importPhones: (payload: { rows: Record<string, string>[]; actorId?: string; actorName?: string }) =>
+  importPhones: (payload: { rows: Record<string, string>[]; actorId?: string; actorName?: string; importType?: PhoneImportType }) =>
     api.post<PhoneImportResponse>('/devices/phones/import', payload, { timeout: 60000 }),
-  startPhoneImportJob: (csvText: string, actor?: { actorId?: string; actorName?: string }) =>
+  startPhoneImportJob: (csvText: string, actor?: { actorId?: string; actorName?: string }, importType: PhoneImportType = 'verizon-phone') =>
     api.post<PhoneImportJob>('/devices/phones/import-jobs', csvText, {
       headers: { 'Content-Type': 'text/csv' },
-      params: actor,
+      params: { ...actor, importType },
       timeout: 60000,
     }),
   getPhoneImportJob: (jobId: string) =>

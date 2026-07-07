@@ -25,6 +25,7 @@ const deviceConditions = ['New', 'Good', 'Fair', 'Poor', 'Damaged'] as const;
 const deviceCarriers = ['Verizon', 'AT&T'] as const;
 
 type PhoneImportRow = Record<string, unknown>;
+type PhoneImportType = 'verizon-phone' | 'att-firstnet';
 type PhoneImportSummary = {
   totalRows: number;
   createdCount: number;
@@ -47,6 +48,7 @@ type PhoneImportJob = {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  importType: PhoneImportType;
 };
 interface ImportJobRow extends RowDataPacket {
   id: string;
@@ -93,6 +95,10 @@ function normalizeKey(value: unknown): string {
 
 function normalizeLooseKey(value: unknown): string {
   return normalizeKey(value).replace(/[^a-z0-9]/gu, '');
+}
+
+function normalizePhoneImportType(value: unknown): PhoneImportType {
+  return normalizeLooseKey(value) === 'attfirstnet' ? 'att-firstnet' : 'verizon-phone';
 }
 
 function csvEscape(value: unknown): string {
@@ -169,12 +175,12 @@ function getImportValue(row: PhoneImportRow, aliases: string[]): string {
 }
 
 function isNewUserImportRow(row: PhoneImportRow): boolean {
-  const rawAssignedTo = getImportValue(row, ['assignedTo', 'assigned to', 'userName', 'user name', 'name', 'employeeName', 'employee name', 'user']);
+  const rawAssignedTo = getImportValue(row, ['assignedTo', 'assigned to', 'userName', 'user name', 'wirelessUserFullName', 'wireless user full name', 'name', 'employeeName', 'employee name', 'user']);
   return normalizeLooseKey(rawAssignedTo) === 'newuser';
 }
 
 function hasImportAssignee(row: PhoneImportRow): boolean {
-  return Boolean(getImportValue(row, ['assignedTo', 'assigned to', 'userName', 'user name', 'name', 'employeeName', 'employee name', 'user']).trim());
+  return Boolean(getImportValue(row, ['assignedTo', 'assigned to', 'userName', 'user name', 'wirelessUserFullName', 'wireless user full name', 'name', 'employeeName', 'employee name', 'user']).trim());
 }
 
 function getDisplayName(user: User): string {
@@ -222,6 +228,8 @@ function resolveAssignedTo(row: PhoneImportRow, matcher: Map<string, string>): {
     'assigned to',
     'userName',
     'user name',
+    'wirelessUserFullName',
+    'wireless user full name',
     'name',
     'employeeName',
     'employee name',
@@ -234,7 +242,7 @@ function resolveAssignedTo(row: PhoneImportRow, matcher: Map<string, string>): {
     'radioNumber',
     'radio',
   ]);
-  const number = getImportValue(row, ['phoneNumber', 'phone number', 'wirelessNumber', 'wireless number', 'line', 'mobile']);
+  const number = getImportValue(row, ['phoneNumber', 'phone number', 'wirelessNumber', 'wireless number', 'wireless', 'line', 'mobile']);
 
   if (isNewUserImportRow(row)) {
     return { assignedTo: '', matched: false };
@@ -323,13 +331,13 @@ function getGeneratedAssetTag(type: string, phoneNumber: string, imei: string, s
   return `${prefix}-IMPORT-${rowNumber || Date.now()}`;
 }
 
-function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNumber: number): DeviceInput {
-  const phoneNumber = normalizePhone(getImportValue(row, ['phoneNumber', 'phone number', 'wirelessNumber', 'wireless number', 'line', 'mobile']));
-  const imei = getImportValue(row, ['currentDeviceId4gOnly', 'current device id 4g only', 'current device id - 4g only', 'current device id', 'imei', 'imei1', 'imei 1']);
+function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNumber: number, importType: PhoneImportType): DeviceInput {
+  const phoneNumber = normalizePhone(getImportValue(row, ['phoneNumber', 'phone number', 'wirelessNumber', 'wireless number', 'wireless', 'line', 'mobile']));
+  const imei = getImportValue(row, ['phoneOrDeviceIdImei', 'phone or device id imei', 'phone or device id (imei)', 'phone or device id', 'currentDeviceId4gOnly', 'current device id 4g only', 'current device id - 4g only', 'current device id', 'imei', 'imei1', 'imei 1']);
   const simNumber = getImportValue(row, ['sim', 'iccid', 'simNumber', 'sim number', 'eid']);
   const condition = getImportValue(row, ['condition']);
   const isNewUser = isNewUserImportRow(row);
-  const importedModel = getImportValue(row, ['deviceModel', 'device model', 'deviceModal', 'device modal', 'makeModel', 'make model', 'model', 'device', 'description']);
+  const importedModel = getImportValue(row, ['phoneOrDeviceModel', 'phone or device model', 'deviceModel', 'device model', 'deviceModal', 'device modal', 'makeModel', 'make model', 'model', 'device', 'description']);
   const makeModel = cleanPhoneModelName(importedModel);
   const type = getImportedDeviceType(importedModel || makeModel);
   const assetTag = getGeneratedAssetTag(type, phoneNumber, imei, simNumber, rowNumber);
@@ -341,7 +349,7 @@ function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNu
     serialNumber: getImportValue(row, ['serialNumber', 'serial number', 'serial']),
     assignedTo,
     status: assignedTo ? 'Assigned' : 'Available',
-    carrier: getImportValue(row, ['carrier', 'wireless carrier', 'provider']) || 'Verizon',
+    carrier: getImportValue(row, ['carrier', 'wireless carrier', 'provider']) || (importType === 'att-firstnet' ? 'AT&T' : 'Verizon'),
     location: getImportValue(row, ['location', 'site', 'district']),
     notes: isNewUser ? [getImportValue(row, ['notes', 'note']), 'Phone import marked this line as NEW USER.'].filter(Boolean).join('\n') : getImportValue(row, ['notes', 'note']),
     phoneNumber,
@@ -446,10 +454,12 @@ async function processPhoneImportRows(
   options: {
     actorId: string;
     actorName: string;
+    importType?: PhoneImportType;
     onProgress?: (processedRows: number, summary: PhoneImportSummary) => void;
     shouldYield?: boolean;
   },
 ) {
+  const importType = options.importType || 'verizon-phone';
   const users = await UserModel.getAllUsers(10000, 0, true);
   const userMatcher = buildUserMatcher(users);
   const existingPhones = await DeviceModel.listPhoneDevices();
@@ -468,7 +478,7 @@ async function processPhoneImportRows(
   for (const [index, row] of rows.entries()) {
     const rowNumber = index + 2;
     const assignment = resolveAssignedTo(row, userMatcher);
-    const importedDevice = buildImportedPhoneDevice(row, assignment.assignedTo, rowNumber);
+    const importedDevice = buildImportedPhoneDevice(row, assignment.assignedTo, rowNumber, importType);
     const validation = validateDevicePayload(importedDevice as unknown as Record<string, unknown>);
 
     if (validation.error || !validation.value) {
@@ -553,6 +563,7 @@ function getPublicPhoneImportJob(job: PhoneImportJob) {
 function importJobRowToPhoneJob(row: ImportJobRow): PhoneImportJob {
   const rows = safeParseJson<PhoneImportRow[]>(row.payloadJson, []);
   const summary = safeParseJson<PhoneImportSummary>(row.resultJson, createEmptyPhoneImportSummary(Number(row.totalRows) || rows.length));
+  const importType = row.type === 'phone-import' ? 'verizon-phone' : normalizePhoneImportType(row.type.replace(/^phone-import:/u, ''));
 
   return {
     id: row.id,
@@ -567,6 +578,7 @@ function importJobRowToPhoneJob(row: ImportJobRow): PhoneImportJob {
     createdAt: toIsoDateTime(row.createdAt) || new Date().toISOString(),
     updatedAt: toIsoDateTime(row.updatedAt) || new Date().toISOString(),
     completedAt: toIsoDateTime(row.completedAt),
+    importType,
   };
 }
 
@@ -575,9 +587,10 @@ async function insertPhoneImportJob(job: PhoneImportJob) {
     `INSERT INTO import_jobs (
       \`id\`, \`type\`, \`status\`, \`actorId\`, \`actorName\`, \`payloadJson\`, \`resultJson\`,
       \`processedRows\`, \`totalRows\`, \`error\`, \`completedAt\`
-    ) VALUES (?, 'phone-import', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       job.id,
+      `phone-import:${job.importType}`,
       job.status,
       job.actorId || null,
       job.actorName || null,
@@ -610,15 +623,15 @@ async function updatePhoneImportJob(job: PhoneImportJob, includePayload = false)
   await pool.query<ResultSetHeader>(
     `UPDATE import_jobs
      SET \`status\` = ?, \`resultJson\` = ?, \`processedRows\` = ?, \`totalRows\` = ?, \`error\` = ?, \`completedAt\` = ?${payloadSql}
-     WHERE \`id\` = ? AND \`type\` = 'phone-import'`,
+     WHERE \`id\` = ? AND \`type\` LIKE 'phone-import%'`,
     params,
   );
 }
 
 async function loadPhoneImportJob(jobId: string): Promise<PhoneImportJob | null> {
   const [rows] = await pool.query<ImportJobRow[]>(
-    'SELECT * FROM import_jobs WHERE `id` = ? AND `type` = ? LIMIT 1',
-    [jobId, 'phone-import'],
+    "SELECT * FROM import_jobs WHERE `id` = ? AND `type` LIKE 'phone-import%' LIMIT 1",
+    [jobId],
   );
 
   return rows[0] ? importJobRowToPhoneJob(rows[0]) : null;
@@ -626,7 +639,7 @@ async function loadPhoneImportJob(jobId: string): Promise<PhoneImportJob | null>
 
 async function loadRunnablePhoneImportJobs(): Promise<PhoneImportJob[]> {
   const [rows] = await pool.query<ImportJobRow[]>(
-    "SELECT * FROM import_jobs WHERE `type` = 'phone-import' AND `status` IN ('queued', 'processing') ORDER BY `createdAt` ASC LIMIT 5",
+    "SELECT * FROM import_jobs WHERE `type` LIKE 'phone-import%' AND `status` IN ('queued', 'processing') ORDER BY `createdAt` ASC LIMIT 5",
   );
 
   return rows.map(importJobRowToPhoneJob).filter((job) => job.rows.length > 0);
@@ -653,6 +666,7 @@ async function runPhoneImportJob(jobId: string) {
     const result = await processPhoneImportRows(job.rows, {
       actorId: job.actorId,
       actorName: job.actorName,
+      importType: job.importType,
       shouldYield: true,
       onProgress: (processedRows, summary) => {
         job.processedRows = processedRows;
@@ -805,12 +819,13 @@ export class DeviceController {
       const rows = Array.isArray(req.body?.rows) ? req.body.rows as PhoneImportRow[] : [];
       const actorId = cleanString(req.body?.actorId, 36);
       const actorName = cleanString(req.body?.actorName, 150);
+      const importType = normalizePhoneImportType(req.body?.importType);
 
       if (rows.length === 0) {
         return res.status(400).json({ error: 'Import rows are required' });
       }
 
-      const result = await processPhoneImportRows(rows, { actorId, actorName });
+      const result = await processPhoneImportRows(rows, { actorId, actorName, importType });
       if (result.changedDeviceCount > 0) {
         broadcastAppEvent({ type: 'device-updated', entityId: 'phone-import' });
       }
@@ -831,6 +846,7 @@ export class DeviceController {
       const rows = parseCsvRows(csvText);
       const actorId = cleanString(req.query.actorId, 36);
       const actorName = cleanString(req.query.actorName, 150);
+      const importType = normalizePhoneImportType(req.query.importType);
 
       if (rows.length === 0) {
         return res.status(400).json({ error: 'Phone import CSV is empty.' });
@@ -850,6 +866,7 @@ export class DeviceController {
         createdAt: now,
         updatedAt: now,
         completedAt: null,
+        importType,
       };
 
       phoneImportJobs.set(job.id, job);
