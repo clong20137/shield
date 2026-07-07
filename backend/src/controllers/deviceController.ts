@@ -34,6 +34,10 @@ type PhoneImportSummary = {
   unmatchedRows: Array<{ rowNumber: number; reason: string; row: PhoneImportRow }>;
   skippedRows: Array<{ rowNumber: number; reason: string; row: PhoneImportRow }>;
 };
+type UserMatcher = {
+  departmentPhones: Map<string, string>;
+  identities: Map<string, string>;
+};
 type PhoneImportJobStatus = 'queued' | 'processing' | 'completed' | 'failed';
 type PhoneImportJob = {
   id: string;
@@ -99,6 +103,27 @@ function normalizeLooseKey(value: unknown): string {
 
 function normalizePhoneImportType(value: unknown): PhoneImportType {
   return normalizeLooseKey(value) === 'attfirstnet' ? 'att-firstnet' : 'verizon-phone';
+}
+
+function detectPhoneImportType(rows: PhoneImportRow[], requestedType: PhoneImportType): PhoneImportType {
+  if (requestedType === 'att-firstnet') {
+    return requestedType;
+  }
+
+  const headerKeys = new Set(
+    rows.flatMap((row) => Object.keys(row).map(normalizeLooseKey)),
+  );
+  const hasAttFirstNetHeaders = (
+    headerKeys.has('wirelessnumber') &&
+    (
+      headerKeys.has('wirelessuserfullname') ||
+      headerKeys.has('phoneordeviceid') ||
+      headerKeys.has('phoneordeviceidimei') ||
+      headerKeys.has('phoneordevicemodel')
+    )
+  );
+
+  return hasAttFirstNetHeaders ? 'att-firstnet' : requestedType;
 }
 
 function csvEscape(value: unknown): string {
@@ -187,15 +212,25 @@ function getDisplayName(user: User): string {
   return `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || user.id;
 }
 
-function buildUserMatcher(users: User[]): Map<string, string> {
-  const matcher = new Map<string, string>();
+function getPhoneMatchKeys(value: unknown): string[] {
+  const digits = normalizeDigits(value);
+  if (digits.length < 7) {
+    return [];
+  }
+
+  return [...new Set([digits, digits.length > 10 ? digits.slice(-10) : ''].filter(Boolean))];
+}
+
+function buildUserMatcher(users: User[]): UserMatcher {
+  const departmentPhones = new Map<string, string>();
+  const identities = new Map<string, string>();
 
   users.forEach((user) => {
     const label = user.email || getDisplayName(user);
     const addKey = (value: unknown, loose = false) => {
       const key = loose ? normalizeLooseKey(value) : normalizeKey(value);
-      if (key && !matcher.has(key)) {
-        matcher.set(key, label);
+      if (key && !identities.has(key)) {
+        identities.set(key, label);
       }
     };
     const fullName = getDisplayName(user);
@@ -211,18 +246,17 @@ function buildUserMatcher(users: User[]): Map<string, string> {
     addKey(user.badgeNumber, true);
     addKey(user.radioNumber, true);
 
-    [user.departmentPhoneNumber, user.personalPhoneNumber].forEach((phone) => {
-      const digits = normalizeDigits(phone);
-      if (digits.length >= 7 && !matcher.has(digits)) {
-        matcher.set(digits, label);
+    getPhoneMatchKeys(user.departmentPhoneNumber).forEach((phoneKey) => {
+      if (!departmentPhones.has(phoneKey)) {
+        departmentPhones.set(phoneKey, label);
       }
     });
   });
 
-  return matcher;
+  return { departmentPhones, identities };
 }
 
-function resolveAssignedTo(row: PhoneImportRow, matcher: Map<string, string>): { assignedTo: string; matched: boolean } {
+function resolveAssignedTo(row: PhoneImportRow, matcher: UserMatcher): { assignedTo: string; matched: boolean } {
   const identity = getImportValue(row, [
     'assignedTo',
     'assigned to',
@@ -248,15 +282,21 @@ function resolveAssignedTo(row: PhoneImportRow, matcher: Map<string, string>): {
     return { assignedTo: '', matched: false };
   }
 
-  const candidates = [
-    normalizeDigits(number),
+  for (const candidate of getPhoneMatchKeys(number)) {
+    const match = matcher.departmentPhones.get(candidate);
+    if (match) {
+      return { assignedTo: match, matched: true };
+    }
+  }
+
+  const identityCandidates = [
     normalizeKey(identity),
     normalizeLooseKey(identity),
     normalizeDigits(identity),
   ].filter(Boolean);
 
-  for (const candidate of candidates) {
-    const match = matcher.get(candidate);
+  for (const candidate of identityCandidates) {
+    const match = matcher.identities.get(candidate);
     if (match) {
       return { assignedTo: match, matched: true };
     }
@@ -349,7 +389,7 @@ function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNu
     serialNumber: getImportValue(row, ['serialNumber', 'serial number', 'serial']),
     assignedTo,
     status: assignedTo ? 'Assigned' : 'Available',
-    carrier: getImportValue(row, ['carrier', 'wireless carrier', 'provider']) || (importType === 'att-firstnet' ? 'AT&T' : 'Verizon'),
+    carrier: importType === 'att-firstnet' ? 'AT&T' : 'Verizon',
     location: getImportValue(row, ['location', 'site', 'district']),
     notes: isNewUser ? [getImportValue(row, ['notes', 'note']), 'Phone import marked this line as NEW USER.'].filter(Boolean).join('\n') : getImportValue(row, ['notes', 'note']),
     phoneNumber,
@@ -459,7 +499,7 @@ async function processPhoneImportRows(
     shouldYield?: boolean;
   },
 ) {
-  const importType = options.importType || 'verizon-phone';
+  const importType = detectPhoneImportType(rows, options.importType || 'verizon-phone');
   const users = await UserModel.getAllUsers(10000, 0, true);
   const userMatcher = buildUserMatcher(users);
   const existingPhones = await DeviceModel.listImportManagedDevices();
@@ -822,7 +862,7 @@ export class DeviceController {
       const rows = Array.isArray(req.body?.rows) ? req.body.rows as PhoneImportRow[] : [];
       const actorId = cleanString(req.body?.actorId, 36);
       const actorName = cleanString(req.body?.actorName, 150);
-      const importType = normalizePhoneImportType(req.body?.importType);
+      const importType = detectPhoneImportType(rows, normalizePhoneImportType(req.body?.importType));
 
       if (rows.length === 0) {
         return res.status(400).json({ error: 'Import rows are required' });
@@ -849,7 +889,7 @@ export class DeviceController {
       const rows = parseCsvRows(csvText);
       const actorId = cleanString(req.query.actorId, 36);
       const actorName = cleanString(req.query.actorName, 150);
-      const importType = normalizePhoneImportType(req.query.importType);
+      const importType = detectPhoneImportType(rows, normalizePhoneImportType(req.query.importType));
 
       if (rows.length === 0) {
         return res.status(400).json({ error: 'Phone import CSV is empty.' });

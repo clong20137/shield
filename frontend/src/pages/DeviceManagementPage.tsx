@@ -201,7 +201,19 @@ async function readPhoneImportFileAsCsv(file: File): Promise<string> {
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = firstSheetName ? workbook.Sheets[firstSheetName] : null;
 
-    return worksheet ? XLSX.utils.sheet_to_csv(worksheet) : '';
+    if (!worksheet) {
+      return '';
+    }
+
+    const rows = XLSX.utils.sheet_to_json<Array<string | number | boolean | null>>(worksheet, {
+      header: 1,
+      defval: '',
+      raw: false,
+    });
+
+    return rows
+      .map((row) => row.map((value) => escapeCsv(value === null ? '' : String(value))).join(','))
+      .join('\n');
   }
 
   return file.text();
