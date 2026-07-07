@@ -1277,10 +1277,10 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 {shouldShowDeviceField(form.type, 'hostname') && <TextField label="Hostname" value={form.hostname} onChange={(value) => setForm((current) => ({ ...current, hostname: value }))} />}
                 {shouldShowDeviceField(form.type, 'routerId') && <TextField label="Router ID" value={form.routerId} onChange={(value) => setForm((current) => ({ ...current, routerId: value }))} />}
                 <DateField label="Purchase Date" value={form.purchaseDate} onChange={(value) => setForm((current) => ({ ...current, purchaseDate: value }))} />
-                <DateField label="Warranty Expiration" value={form.warrantyExpiration} onChange={(value) => setForm((current) => ({ ...current, warrantyExpiration: value }))} />
-                <DateField label="Replacement Due" value={form.replacementDueDate} onChange={(value) => setForm((current) => ({ ...current, replacementDueDate: value }))} />
-                <DateField label="Maintenance Due" value={form.maintenanceDueDate} onChange={(value) => setForm((current) => ({ ...current, maintenanceDueDate: value }))} />
-                <DateField label="Last Service" value={form.lastServiceDate} onChange={(value) => setForm((current) => ({ ...current, lastServiceDate: value }))} />
+                {form.type !== 'Cell Phone' && <DateField label="Warranty Expiration" value={form.warrantyExpiration} onChange={(value) => setForm((current) => ({ ...current, warrantyExpiration: value }))} />}
+                {form.type !== 'Cell Phone' && <DateField label="Replacement Due" value={form.replacementDueDate} onChange={(value) => setForm((current) => ({ ...current, replacementDueDate: value }))} />}
+                {form.type !== 'Cell Phone' && <DateField label="Maintenance Due" value={form.maintenanceDueDate} onChange={(value) => setForm((current) => ({ ...current, maintenanceDueDate: value }))} />}
+                {form.type !== 'Cell Phone' && <DateField label="Last Service" value={form.lastServiceDate} onChange={(value) => setForm((current) => ({ ...current, lastServiceDate: value }))} />}
                 {canManageDevices && <DateField label="Activation Date" value={form.activationDate} onChange={(value) => setForm((current) => ({ ...current, activationDate: value }))} />}
                 {canManageDevices && <DateField label="Contract End Date" value={form.contractEndDate} onChange={(value) => setForm((current) => ({ ...current, contractEndDate: value }))} />}
                 {canManageDevices && <DateField label="Eligibility Date" value={form.eligibilityDate} onChange={(value) => setForm((current) => ({ ...current, eligibilityDate: value }))} />}
