@@ -1520,17 +1520,21 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                           type="button"
                           onClick={() => setPhoneImportReportMonth(month.value)}
                           className={`rounded px-2 py-2 text-xs font-black uppercase transition ${
-                            phoneImportReportMonth === month.value
-                              ? 'bg-primary-500 text-white shadow-sm'
-                              : alreadyHasReport
-                                ? 'bg-amber-50 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-900'
+                            alreadyHasReport
+                              ? phoneImportReportMonth === month.value
+                                ? 'bg-green-600 text-white shadow-sm ring-1 ring-green-500'
+                                : 'bg-green-50 text-green-800 ring-1 ring-green-200 hover:bg-green-100 dark:bg-green-950/40 dark:text-green-100 dark:ring-green-900'
+                              : phoneImportReportMonth === month.value
+                                ? 'bg-primary-500 text-white shadow-sm'
                                 : 'bg-white text-gray-600 hover:bg-primary-50 hover:text-primary-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100'
                           }`}
                           aria-pressed={phoneImportReportMonth === month.value}
                           title={alreadyHasReport ? `${selectedPhoneImportOption.label} report already exists` : undefined}
                         >
-                          <span className="block">{month.label}</span>
-                          {alreadyHasReport && <span className={`mt-0.5 block text-[9px] leading-none ${phoneImportReportMonth === month.value ? 'text-white/80' : 'text-amber-600 dark:text-amber-200'}`}>Saved</span>}
+                          <span className="flex items-center justify-center gap-1">
+                            {alreadyHasReport && <CheckCircle2 size={12} aria-hidden="true" />}
+                            <span>{month.label}</span>
+                          </span>
                         </button>
                       );
                     })}
