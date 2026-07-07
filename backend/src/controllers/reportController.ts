@@ -41,6 +41,12 @@ interface DeviceReportGroupRow extends RowDataPacket {
   count: number;
 }
 
+interface DeviceReportCarrierGroupRow extends RowDataPacket {
+  label: string;
+  carrier: string;
+  count: number;
+}
+
 interface DeviceCostGroupRow extends RowDataPacket {
   type: string;
   carrier: string;
@@ -331,11 +337,25 @@ function getEstimatedDeviceMonthlyRate(type: string, carrier: string, makeModel:
   return null;
 }
 
+function getDeviceCostCategory(type: string, carrier: string, makeModel: string): { label: string; monthlyRate: number } | null {
+  const estimate = getEstimatedDeviceMonthlyRate(type, carrier, makeModel);
+  if (!estimate) {
+    return null;
+  }
+
+  return {
+    label: estimate.label.replace(/^(AT&T|Verizon)\s+/iu, ''),
+    monthlyRate: estimate.monthlyRate,
+  };
+}
+
 function buildDeviceCostEstimate(rows: DeviceCostGroupRow[]) {
   const breakdownMap = new Map<string, DeviceCostBreakdown>();
+  const carrierBreakdownMap = new Map<string, DeviceCostBreakdown & { carrier: string }>();
 
   rows.forEach((row) => {
     const estimate = getEstimatedDeviceMonthlyRate(row.type || '', row.carrier || '', row.makeModel || '');
+    const carrierCategory = getDeviceCostCategory(row.type || '', row.carrier || '', row.makeModel || '');
     const actualMonthlyTotal = Number(row.monthlyChargeTotal) || 0;
     if (!estimate && actualMonthlyTotal <= 0) {
       return;
@@ -354,15 +374,33 @@ function buildDeviceCostEstimate(rows: DeviceCostGroupRow[]) {
     existing.monthlyTotal = Number((existing.monthlyTotal + (actualMonthlyTotal > 0 ? actualMonthlyTotal : count * (estimate?.monthlyRate || 0))).toFixed(2));
     existing.monthlyRate = existing.count > 0 ? Number((existing.monthlyTotal / existing.count).toFixed(2)) : 0;
     breakdownMap.set(label, existing);
+
+    const carrier = row.carrier || 'Unknown';
+    const carrierLabel = carrierCategory?.label || 'Current Charges';
+    const carrierKey = `${carrierLabel}::${carrier}`;
+    const carrierExisting = carrierBreakdownMap.get(carrierKey) || {
+      label: carrierLabel,
+      carrier,
+      count: 0,
+      monthlyRate: carrierCategory?.monthlyRate || 0,
+      monthlyTotal: 0,
+    };
+
+    carrierExisting.count += count;
+    carrierExisting.monthlyTotal = Number((carrierExisting.monthlyTotal + (actualMonthlyTotal > 0 ? actualMonthlyTotal : count * (carrierCategory?.monthlyRate || estimate?.monthlyRate || 0))).toFixed(2));
+    carrierExisting.monthlyRate = carrierExisting.count > 0 ? Number((carrierExisting.monthlyTotal / carrierExisting.count).toFixed(2)) : 0;
+    carrierBreakdownMap.set(carrierKey, carrierExisting);
   });
 
   const breakdown = Array.from(breakdownMap.values()).sort((first, second) => second.monthlyTotal - first.monthlyTotal || first.label.localeCompare(second.label));
+  const carrierBreakdown = Array.from(carrierBreakdownMap.values()).sort((first, second) => second.monthlyTotal - first.monthlyTotal || first.label.localeCompare(second.label));
   const estimatedMonthlyTotal = Number(breakdown.reduce((sum, item) => sum + item.monthlyTotal, 0).toFixed(2));
 
   return {
     estimatedMonthlyTotal,
     estimatedAnnualTotal: Number((estimatedMonthlyTotal * 12).toFixed(2)),
     breakdown,
+    carrierBreakdown,
   };
 }
 
@@ -493,6 +531,50 @@ export class ReportController {
         GROUP BY label
         ORDER BY count DESC, label`,
       );
+      const [typeCarrierRows] = await conn.query<DeviceReportCarrierGroupRow[]>(
+        `SELECT
+          COALESCE(NULLIF(\`type\`, ''), 'Unknown') AS label,
+          COALESCE(NULLIF(\`carrier\`, ''), 'Unknown') AS carrier,
+          COUNT(*) AS count
+        FROM devices
+        GROUP BY label, carrier
+        ORDER BY label, carrier`,
+      );
+      const [statusCarrierRows] = await conn.query<DeviceReportCarrierGroupRow[]>(
+        `SELECT
+          COALESCE(NULLIF(\`status\`, ''), 'Unknown') AS label,
+          COALESCE(NULLIF(\`carrier\`, ''), 'Unknown') AS carrier,
+          COUNT(*) AS count
+        FROM devices
+        GROUP BY label, carrier
+        ORDER BY label, carrier`,
+      );
+      const [modelCarrierRows] = await conn.query<DeviceReportCarrierGroupRow[]>(
+        `SELECT
+          COALESCE(NULLIF(d.\`makeModel\`, ''), 'Unknown') AS label,
+          COALESCE(NULLIF(d.\`carrier\`, ''), 'Unknown') AS carrier,
+          COUNT(*) AS count,
+          MAX(top_models.total) AS sortTotal
+        FROM devices d
+        INNER JOIN (
+          SELECT COALESCE(NULLIF(\`makeModel\`, ''), 'Unknown') AS label, COUNT(*) AS total
+          FROM devices
+          GROUP BY label
+          ORDER BY total DESC, label
+          LIMIT 12
+        ) top_models ON top_models.label = COALESCE(NULLIF(d.\`makeModel\`, ''), 'Unknown')
+        GROUP BY label, carrier
+        ORDER BY sortTotal DESC, label, carrier`,
+      );
+      const [conditionCarrierRows] = await conn.query<DeviceReportCarrierGroupRow[]>(
+        `SELECT
+          COALESCE(NULLIF(\`condition\`, ''), 'Unknown') AS label,
+          COALESCE(NULLIF(\`carrier\`, ''), 'Unknown') AS carrier,
+          COUNT(*) AS count
+        FROM devices
+        GROUP BY label, carrier
+        ORDER BY label, carrier`,
+      );
       const [costRows] = await conn.query<DeviceCostGroupRow[]>(
         `SELECT
           COALESCE(NULLIF(\`type\`, ''), 'Unknown') AS type,
@@ -506,6 +588,11 @@ export class ReportController {
 
       const mapGroup = (rows: DeviceReportGroupRow[]) => rows.map((row) => ({
         label: row.label || 'Unknown',
+        count: Number(row.count) || 0,
+      }));
+      const mapCarrierGroup = (rows: DeviceReportCarrierGroupRow[]) => rows.map((row) => ({
+        label: row.label || 'Unknown',
+        carrier: row.carrier || 'Unknown',
         count: Number(row.count) || 0,
       }));
       const summary = summaryRows[0] || {
@@ -537,6 +624,10 @@ export class ReportController {
         byCarrier: mapGroup(carrierRows),
         byModel: mapGroup(modelRows),
         byCondition: mapGroup(conditionRows),
+        byTypeCarrier: mapCarrierGroup(typeCarrierRows),
+        byStatusCarrier: mapCarrierGroup(statusCarrierRows),
+        byModelCarrier: mapCarrierGroup(modelCarrierRows),
+        byConditionCarrier: mapCarrierGroup(conditionCarrierRows),
         costEstimate,
       };
 

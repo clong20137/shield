@@ -211,7 +211,7 @@ function hasCsvDataRows(text: string): boolean {
 async function readPhoneImportFileAsCsv(file: File): Promise<string> {
   if (/\.xlsx?$/iu.test(file.name)) {
     const XLSX = await import('xlsx');
-    const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = firstSheetName ? workbook.Sheets[firstSheetName] : null;
 
@@ -223,6 +223,7 @@ async function readPhoneImportFileAsCsv(file: File): Promise<string> {
       header: 1,
       defval: '',
       raw: false,
+      dateNF: 'yyyy-mm-dd',
     });
 
     return rows

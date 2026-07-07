@@ -205,7 +205,13 @@ function safeParseJson<T>(value: string | null | undefined, fallback: T): T {
 function getImportValue(row: PhoneImportRow, aliases: string[]): string {
   const normalizedAliases = aliases.map(normalizeLooseKey);
   const entry = Object.entries(row).find(([key]) => normalizedAliases.includes(normalizeLooseKey(key)));
-  return cleanString(entry?.[1], 500);
+  const value = entry?.[1];
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  return cleanString(value === undefined || value === null ? '' : String(value), 500);
 }
 
 function hasImportColumn(row: PhoneImportRow, aliases: string[]): boolean {
@@ -213,8 +219,12 @@ function hasImportColumn(row: PhoneImportRow, aliases: string[]): boolean {
   return Object.keys(row).some((key) => normalizedAliases.includes(normalizeLooseKey(key)));
 }
 
-function normalizeImportDate(value: string): string {
-  const text = value.replace(/[–—]/gu, '-').trim();
+function normalizeImportDate(value: unknown): string {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  const text = String(value ?? '').replace(/[–—]/gu, '-').trim();
   if (!text) {
     return '';
   }
@@ -224,15 +234,15 @@ function normalizeImportDate(value: string): string {
     return isoMatch[1];
   }
 
-  const slashMatch = text.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})\b/iu);
-  if (slashMatch) {
-    const year = slashMatch[3].length === 2 ? `20${slashMatch[3]}` : slashMatch[3];
-    return `${year}-${slashMatch[1].padStart(2, '0')}-${slashMatch[2].padStart(2, '0')}`;
+  const monthDayYearMatch = text.match(/\b(\d{1,2})[/-](\d{1,2})[/-](\d{2}|\d{4})\b/iu);
+  if (monthDayYearMatch) {
+    const year = monthDayYearMatch[3].length === 2 ? `20${monthDayYearMatch[3]}` : monthDayYearMatch[3];
+    return `${year}-${monthDayYearMatch[1].padStart(2, '0')}-${monthDayYearMatch[2].padStart(2, '0')}`;
   }
 
-  const excelSerial = Number(text);
+  const excelSerial = Number(text.replace(/,/gu, ''));
   if (Number.isFinite(excelSerial) && excelSerial > 20_000 && excelSerial < 80_000) {
-    const date = new Date(Date.UTC(1899, 11, 30 + excelSerial));
+    const date = new Date(Date.UTC(1899, 11, 30 + Math.floor(excelSerial)));
     return date.toISOString().slice(0, 10);
   }
 

@@ -796,11 +796,16 @@ export interface DeviceReportGroup {
   count: number;
 }
 
+export interface DeviceReportCarrierGroup extends DeviceReportGroup {
+  carrier: string;
+}
+
 export interface DeviceCostBreakdown {
   label: string;
   count: number;
   monthlyRate: number;
   monthlyTotal: number;
+  carrier?: string;
 }
 
 export interface DeviceManagementReportResponse {
@@ -820,10 +825,15 @@ export interface DeviceManagementReportResponse {
   byCarrier: DeviceReportGroup[];
   byModel: DeviceReportGroup[];
   byCondition: DeviceReportGroup[];
+  byTypeCarrier?: DeviceReportCarrierGroup[];
+  byStatusCarrier?: DeviceReportCarrierGroup[];
+  byModelCarrier?: DeviceReportCarrierGroup[];
+  byConditionCarrier?: DeviceReportCarrierGroup[];
   costEstimate?: {
     estimatedMonthlyTotal: number;
     estimatedAnnualTotal: number;
     breakdown: DeviceCostBreakdown[];
+    carrierBreakdown?: DeviceCostBreakdown[];
   };
 }
 
