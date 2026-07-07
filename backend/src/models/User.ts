@@ -51,6 +51,8 @@ export interface User {
   updatedAt: Date;
 }
 
+const normalizedDepartmentPhoneSql = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(`departmentPhoneNumber`, ''), '(', ''), ')', ''), '-', ''), ' ', ''), '+', ''), '.', '')";
+
 export type CreateUserInput = Omit<User, 'id' | 'createdAt' | 'updatedAt'> & {
   password?: string;
 };
@@ -252,6 +254,7 @@ export class UserModel {
         });
 
         const phoneIndex = createPhoneBlindIndex(trimmedSearchTerm);
+        const phoneDigits = trimmedSearchTerm.replace(/\D/gu, '');
         conditions.push(
           `(
             LOWER(COALESCE(\`firstName\`, '')) LIKE ? OR LOWER(COALESCE(\`lastName\`, '')) LIKE ? OR LOWER(CONCAT_WS(' ', \`firstName\`, \`lastName\`)) LIKE ?
@@ -259,6 +262,7 @@ export class UserModel {
             OR LOWER(COALESCE(\`badgeNumber\`, '')) LIKE ? OR LOWER(COALESCE(\`radioNumber\`, '')) LIKE ? OR LOWER(COALESCE(\`publicSafetyId\`, '')) LIKE ?
             OR LOWER(COALESCE(\`district\`, '')) LIKE ? OR LOWER(COALESCE(\`employmentType\`, '')) LIKE ? OR LOWER(COALESCE(\`status\`, '')) LIKE ?
             OR LOWER(COALESCE(\`supervisor\`, '')) LIKE ? OR LOWER(COALESCE(\`personalPhoneNumber\`, '')) LIKE ? OR \`personalPhoneNumberHash\` = ? OR LOWER(COALESCE(\`departmentPhoneNumber\`, '')) LIKE ?
+            OR ${normalizedDepartmentPhoneSql} LIKE ?
             ${tokenConditions.length > 0 ? `OR (${tokenConditions.join(' AND ')})` : ''}
           )`
         );
@@ -281,6 +285,7 @@ export class UserModel {
           likeTerm,
           phoneIndex || '__no_phone_index__',
           likeTerm,
+          phoneDigits ? `%${phoneDigits}%` : '__no_phone_digits__',
           ...tokenParams
         );
 
@@ -292,7 +297,9 @@ export class UserModel {
 
         searchRankSql = `CASE
           WHEN LOWER(COALESCE(\`email\`, '')) = ? OR LOWER(COALESCE(\`peNumber\`, '')) = ? OR LOWER(COALESCE(\`badgeNumber\`, '')) = ? OR LOWER(COALESCE(\`peopleSoftId\`, '')) = ? OR LOWER(COALESCE(\`publicSafetyId\`, '')) = ? THEN 0
+          ${phoneDigits ? `WHEN ${normalizedDepartmentPhoneSql} = ? THEN 0` : ''}
           WHEN LOWER(CONCAT_WS(' ', \`firstName\`, \`lastName\`)) = ? OR LOWER(COALESCE(\`displayName\`, '')) = ? THEN 1
+          ${phoneDigits ? `WHEN ${normalizedDepartmentPhoneSql} LIKE ? THEN 1` : ''}
           WHEN LOWER(REPLACE(CONCAT_WS('', \`firstName\`, \`lastName\`), ' ', '')) = ? OR LOWER(REPLACE(COALESCE(\`displayName\`, ''), ' ', '')) = ? THEN 2
           ${tokens.length >= 2 ? `WHEN (
             (LOWER(COALESCE(\`firstName\`, '')) LIKE ? AND LOWER(COALESCE(\`lastName\`, '')) LIKE ?)
@@ -308,8 +315,22 @@ export class UserModel {
           normalizedSearchTerm,
           normalizedSearchTerm,
           normalizedSearchTerm,
+        );
+
+        if (phoneDigits) {
+          orderParams.push(phoneDigits);
+        }
+
+        orderParams.push(
           normalizedSearchTerm,
           normalizedSearchTerm,
+        );
+
+        if (phoneDigits) {
+          orderParams.push(`%${phoneDigits}%`);
+        }
+
+        orderParams.push(
           compactSearchTerm,
           compactSearchTerm,
         );

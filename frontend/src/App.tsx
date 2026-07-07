@@ -1922,29 +1922,37 @@ function GlobalSearch({ compact }: { compact: boolean }) {
             <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">Searching...</div>
           ) : results.length > 0 ? (
             <div className="max-h-80 overflow-y-auto py-1">
-              {results.map((user) => (
-                <button
-                  key={user.id}
-                  type="button"
-                  onClick={() => openSearchResult(user)}
-                  className="flex w-full min-w-0 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  <img
-                    src={getAssetThumbnailUrl(user.profilePictureUrl, 96)}
-                    alt={`${user.firstName} ${user.lastName}`}
-                    onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)}
-                    className="mr-3 h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-700"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold">
-                      {user.firstName} {user.lastName}
-                    </p>
-                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-                      {user.email || `PE ${user.peNumber || 'N/A'}`} - {user.district || 'No district'}
-                    </p>
-                  </div>
-                </button>
-              ))}
+              {results.map((user) => {
+                const resultMeta = [
+                  user.email || (user.peNumber ? `PE ${user.peNumber}` : ''),
+                  user.departmentPhoneNumber ? `Dept ${user.departmentPhoneNumber}` : '',
+                  user.district || 'No district',
+                ].filter(Boolean).join(' - ');
+
+                return (
+                  <button
+                    key={user.id}
+                    type="button"
+                    onClick={() => openSearchResult(user)}
+                    className="flex w-full min-w-0 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
+                  >
+                    <img
+                      src={getAssetThumbnailUrl(user.profilePictureUrl, 96)}
+                      alt={`${user.firstName} ${user.lastName}`}
+                      onError={(event) => handleAssetThumbnailError(event, user.profilePictureUrl)}
+                      className="mr-3 h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-700"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold">
+                        {user.firstName} {user.lastName}
+                      </p>
+                      <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                        {resultMeta}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">No matching users found.</div>
