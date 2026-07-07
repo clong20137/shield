@@ -152,6 +152,10 @@ function getReportMonthForToday(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function isHistoricalReportMonth(reportMonth: string | null | undefined): boolean {
+  return Boolean(reportMonth && reportMonth < getReportMonthForToday());
+}
+
 function getCarrierForImportType(importType: PhoneImportType): 'Verizon' | 'AT&T' {
   return importType === 'att-firstnet' ? 'AT&T' : 'Verizon';
 }
@@ -702,6 +706,7 @@ async function processPhoneImportRows(
     importType?: PhoneImportType;
     onProgress?: (processedRows: number, summary: PhoneImportSummary) => void;
     shouldYield?: boolean;
+    snapshotOnly?: boolean;
   },
 ) {
   const importType = detectPhoneImportType(rows, options.importType || 'verizon-phone');
@@ -721,6 +726,7 @@ async function processPhoneImportRows(
   const summary = createEmptyPhoneImportSummary(rows.length);
   const changedDeviceIds = new Set<string>();
   const uploadedDeviceIds = new Set<string>();
+  const importedSnapshotDevices: DeviceInput[] = [];
 
   for (const [index, row] of rows.entries()) {
     const rowNumber = index + 2;
@@ -741,6 +747,16 @@ async function processPhoneImportRows(
       summary.unmatchedRows.push({ rowNumber, reason: 'Marked NEW USER in import and left unassigned for review', row });
     } else if (hasImportAssignee(row)) {
       summary.unmatchedRows.push({ rowNumber, reason: 'Could not match assignment to a SHIELD user and left device unassigned', row });
+    }
+
+    importedSnapshotDevices.push(validation.value);
+
+    if (options.snapshotOnly) {
+      options.onProgress?.(index + 1, summary);
+      if (options.shouldYield && (index + 1) % PHONE_IMPORT_JOB_CHUNK_SIZE === 0) {
+        await waitForImportJobYield();
+      }
+      continue;
     }
 
     const matchKeys = buildDeviceMatchKey(validation.value as Device);
@@ -803,27 +819,29 @@ async function processPhoneImportRows(
     }
   }
 
-  for (const existingDevice of existingPhones) {
-    if (uploadedDeviceIds.has(existingDevice.id)) {
-      continue;
-    }
+  if (!options.snapshotOnly) {
+    for (const existingDevice of existingPhones) {
+      if (uploadedDeviceIds.has(existingDevice.id)) {
+        continue;
+      }
 
-    const deleted = await DeviceModel.deleteDevice(existingDevice.id, {
-      action: 'Phone Import Removed',
-      actorId: options.actorId,
-      actorName: options.actorName,
-      assignedTo: existingDevice.assignedTo,
-      status: existingDevice.status,
-      notes: `${importCarrier} report import removed this device because it was not present in the uploaded report.`,
-    });
+      const deleted = await DeviceModel.deleteDevice(existingDevice.id, {
+        action: 'Phone Import Removed',
+        actorId: options.actorId,
+        actorName: options.actorName,
+        assignedTo: existingDevice.assignedTo,
+        status: existingDevice.status,
+        notes: `${importCarrier} report import removed this device because it was not present in the uploaded report.`,
+      });
 
-    if (deleted) {
-      summary.deletedCount += 1;
-      changedDeviceIds.add(existingDevice.id);
+      if (deleted) {
+        summary.deletedCount += 1;
+        changedDeviceIds.add(existingDevice.id);
+      }
     }
   }
 
-  return { summary, changedDeviceCount: changedDeviceIds.size };
+  return { summary, changedDeviceCount: changedDeviceIds.size, importedSnapshotDevices };
 }
 
 async function getDeviceReportSnapshotGroups(carrier: string, column: 'type' | 'status' | 'makeModel' | 'condition') {
@@ -840,6 +858,63 @@ async function getDeviceReportSnapshotGroups(carrier: string, column: 'type' | '
     label: row.label || 'Unknown',
     count: Number(row.count) || 0,
   }));
+}
+
+function buildImportedSnapshotGroups(devices: DeviceInput[], key: 'type' | 'status' | 'makeModel' | 'condition') {
+  const counts = new Map<string, number>();
+  devices.forEach((device) => {
+    const label = String(device[key] || 'Unknown').trim() || 'Unknown';
+    counts.set(label, (counts.get(label) || 0) + 1);
+  });
+
+  return Array.from(counts.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
+}
+
+async function saveImportedDeviceReportSnapshot(reportMonth: string, importType: PhoneImportType, devices: DeviceInput[]) {
+  const carrier = getCarrierForImportType(importType);
+  const totalDevices = devices.length;
+  const assignedDevices = devices.filter((device) => device.assignedTo).length;
+  const unassignedDevices = totalDevices - assignedDevices;
+  const availableDevices = devices.filter((device) => device.status === 'Available').length;
+  const possibleInactiveDevices = devices.filter((device) => Boolean(device.possibleInactive)).length;
+  const estimatedMonthlyTotal = devices.reduce((sum, device) => sum + (Number(device.monthlyCharge) || 0), 0);
+  const dataJson = JSON.stringify({
+    byType: buildImportedSnapshotGroups(devices, 'type'),
+    byStatus: buildImportedSnapshotGroups(devices, 'status'),
+    byModel: buildImportedSnapshotGroups(devices, 'makeModel'),
+    byCondition: buildImportedSnapshotGroups(devices, 'condition'),
+  });
+
+  await pool.query<ResultSetHeader>(
+    `INSERT INTO device_report_snapshots (
+       \`id\`, \`reportMonth\`, \`carrier\`, \`importType\`, \`totalDevices\`, \`assignedDevices\`,
+       \`unassignedDevices\`, \`availableDevices\`, \`possibleInactiveDevices\`, \`estimatedMonthlyTotal\`, \`dataJson\`
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       \`importType\` = VALUES(\`importType\`),
+       \`totalDevices\` = VALUES(\`totalDevices\`),
+       \`assignedDevices\` = VALUES(\`assignedDevices\`),
+       \`unassignedDevices\` = VALUES(\`unassignedDevices\`),
+       \`availableDevices\` = VALUES(\`availableDevices\`),
+       \`possibleInactiveDevices\` = VALUES(\`possibleInactiveDevices\`),
+       \`estimatedMonthlyTotal\` = VALUES(\`estimatedMonthlyTotal\`),
+       \`dataJson\` = VALUES(\`dataJson\`)`,
+    [
+      uuidv4(),
+      reportMonth,
+      carrier,
+      importType,
+      totalDevices,
+      assignedDevices,
+      unassignedDevices,
+      availableDevices,
+      possibleInactiveDevices,
+      estimatedMonthlyTotal,
+      dataJson,
+    ],
+  );
 }
 
 async function saveDeviceReportSnapshot(reportMonth: string, importType: PhoneImportType) {
@@ -1020,10 +1095,12 @@ async function runPhoneImportJob(jobId: string) {
   await updatePhoneImportJob(job);
 
   try {
+    const snapshotOnly = isHistoricalReportMonth(job.reportMonth);
     const result = await processPhoneImportRows(job.rows, {
       actorId: job.actorId,
       actorName: job.actorName,
       importType: job.importType,
+      snapshotOnly,
       shouldYield: true,
       onProgress: (processedRows, summary) => {
         job.processedRows = processedRows;
@@ -1045,7 +1122,11 @@ async function runPhoneImportJob(jobId: string) {
     job.completedAt = new Date().toISOString();
     job.updatedAt = job.completedAt;
     if (job.reportMonth) {
-      await saveDeviceReportSnapshot(job.reportMonth, job.importType);
+      if (snapshotOnly) {
+        await saveImportedDeviceReportSnapshot(job.reportMonth, job.importType, result.importedSnapshotDevices);
+      } else {
+        await saveDeviceReportSnapshot(job.reportMonth, job.importType);
+      }
     }
     job.rows = [];
     await updatePhoneImportJob(job, true);
@@ -1181,14 +1262,19 @@ export class DeviceController {
       const actorName = cleanString(req.body?.actorName, 150);
       const importType = detectPhoneImportType(rows, normalizePhoneImportType(req.body?.importType));
       const reportMonth = normalizeReportMonth(req.body?.reportMonth);
+      const snapshotOnly = isHistoricalReportMonth(reportMonth);
 
       if (rows.length === 0) {
         return res.status(400).json({ error: 'Import rows are required' });
       }
 
-      const result = await processPhoneImportRows(rows, { actorId, actorName, importType });
+      const result = await processPhoneImportRows(rows, { actorId, actorName, importType, snapshotOnly });
       if (reportMonth) {
-        await saveDeviceReportSnapshot(reportMonth, importType);
+        if (snapshotOnly) {
+          await saveImportedDeviceReportSnapshot(reportMonth, importType, result.importedSnapshotDevices);
+        } else {
+          await saveDeviceReportSnapshot(reportMonth, importType);
+        }
       }
       if (result.changedDeviceCount > 0) {
         broadcastAppEvent({ type: 'device-updated', entityId: 'phone-import' });

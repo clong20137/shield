@@ -223,7 +223,7 @@ const deviceTrendMetrics: Array<{ value: DeviceTrendMetric; label: string; value
   { value: 'assignedDevices', label: 'Assigned', valueLabel: '' },
   { value: 'unassignedDevices', label: 'Unassigned', valueLabel: '' },
   { value: 'possibleInactiveDevices', label: 'Possible Inactive', valueLabel: '' },
-  { value: 'estimatedMonthlyTotal', label: 'Monthly Cost', valueLabel: '' },
+  { value: 'estimatedMonthlyTotal', label: 'Monthly Cost', valueLabel: 'currency' },
 ];
 
 const carrierReportColors: Record<string, string> = {
@@ -522,6 +522,7 @@ const AnalyticsChart: React.FC<{
   valueLabel?: string;
 }> = ({ series, graphType, height = 172, valueLabel = '' }) => {
   const allPoints = series.flatMap((item) => item.points);
+  const formatChartValue = (value: number) => valueLabel === 'currency' ? formatCurrency(value) : `${formatMetric(value, 1)}${valueLabel}`;
 
   if (allPoints.length === 0) {
     return <p className="rounded border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">No chart data yet.</p>;
@@ -567,11 +568,11 @@ const AnalyticsChart: React.FC<{
                   </span>
                   {delta !== null && (
                     <span className={`mt-0.5 block font-bold ${delta > 0 ? 'text-green-600' : delta < 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                      {delta > 0 ? '+' : ''}{formatMetric(delta, 1)} from previous
+                      {delta > 0 ? '+' : ''}{formatChartValue(delta)} from previous
                     </span>
                   )}
                 </span>
-                <span className="shrink-0 font-black text-gray-900 dark:text-gray-100">{formatMetric(currentValue, 1)}{valueLabel}</span>
+                <span className="shrink-0 font-black text-gray-900 dark:text-gray-100">{formatChartValue(currentValue)}</span>
               </div>
             );
           })}
@@ -587,7 +588,7 @@ const AnalyticsChart: React.FC<{
           <BarChart data={data} margin={{ top: 16, right: 22, bottom: 46, left: 8 }} barGap={8} barCategoryGap="24%">
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" strokeOpacity={0.12} />
             <XAxis dataKey="displayLabel" tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} minTickGap={18} />
-            <YAxis tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={58} tickFormatter={(value) => formatMetric(Number(value), 1)} />
+            <YAxis tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={valueLabel === 'currency' ? 82 : 58} tickFormatter={(value) => formatChartValue(Number(value))} />
             <Tooltip
               cursor={false}
               content={renderTooltip}
@@ -602,7 +603,7 @@ const AnalyticsChart: React.FC<{
           <LineChart data={data} margin={{ top: 16, right: 22, bottom: 46, left: 8 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" strokeOpacity={0.12} />
             <XAxis dataKey="displayLabel" tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} minTickGap={18} />
-            <YAxis tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={58} tickFormatter={(value) => formatMetric(Number(value), 1)} />
+            <YAxis tick={{ fontSize: 12, fontWeight: 700 }} tickLine={false} axisLine={false} width={valueLabel === 'currency' ? 82 : 58} tickFormatter={(value) => formatChartValue(Number(value))} />
             <Tooltip
               cursor={{ stroke: 'rgba(37, 99, 235, 0.32)', strokeWidth: 2, strokeDasharray: '5 5' }}
               content={renderTooltip}
