@@ -122,6 +122,8 @@ function buildDeviceWhere(filters: DeviceListFilters = {}, options: { includeTyp
 
   if (searchTerm) {
     const likeTerm = `%${searchTerm.toLowerCase()}%`;
+    const digitSearchTerm = searchTerm.replace(/\D/gu, '');
+    const digitLikeTerm = digitSearchTerm ? `%${digitSearchTerm}%` : '__NO_DIGIT_PHONE_MATCH__';
     where.push(`(
       LOWER(\`assetTag\`) LIKE ?
       OR LOWER(\`makeModel\`) LIKE ?
@@ -131,13 +133,14 @@ function buildDeviceWhere(filters: DeviceListFilters = {}, options: { includeTyp
       OR LOWER(\`carrier\`) LIKE ?
       OR LOWER(\`location\`) LIKE ?
       OR LOWER(\`phoneNumber\`) LIKE ?
+      OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(\`phoneNumber\`, ''), '(', ''), ')', ''), '-', ''), ' ', ''), '+', '') LIKE ?
       OR LOWER(\`imei\`) LIKE ?
       OR LOWER(\`simNumber\`) LIKE ?
       OR LOWER(\`radioId\`) LIKE ?
       OR LOWER(\`hostname\`) LIKE ?
       OR LOWER(\`routerId\`) LIKE ?
     )`);
-    params.push(...Array.from({ length: 13 }, () => likeTerm));
+    params.push(...Array.from({ length: 8 }, () => likeTerm), digitLikeTerm, ...Array.from({ length: 5 }, () => likeTerm));
   }
 
   return {
