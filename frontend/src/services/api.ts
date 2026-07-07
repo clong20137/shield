@@ -1460,6 +1460,12 @@ export const reportService = {
   getDeviceManagementReports: () =>
     api.get<DeviceManagementReportResponse>('/reports/devices'),
 
+  deleteDeviceReportSnapshots: () =>
+    api.delete<{ deletedCount: number }>('/reports/devices/snapshots'),
+
+  deleteSelectedDeviceReportSnapshots: (snapshots: Array<{ reportMonth: string; carrier: string }>) =>
+    api.delete<{ deletedCount: number }>('/reports/devices/snapshots/selected', { data: { snapshots } }),
+
   reviewTrooperDaily: (id: string, status: 'Approved' | 'Returned', notes: string) =>
     api.put<TrooperDailyReportEntry>(`/reports/trooper-dailies/${id}/review`, { status, notes }),
 };

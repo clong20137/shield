@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { RowDataPacket } from 'mysql2';
+import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import pool from '../config/database';
 import { getSessionAccount } from '../middleware/authSession';
 import { AuthAccountModel } from '../models/AuthAccount';
@@ -7,7 +7,7 @@ import { CalendarEntryModel } from '../models/CalendarEntry';
 import { AuditLogModel } from '../models/AuditLog';
 import { UserNotificationModel } from '../models/UserNotification';
 import { broadcastAccountEvent, broadcastAppEvent } from '../services/appEvents';
-import { getCachedDeviceReport, setCachedDeviceReport } from '../services/appCache';
+import { clearDeviceReportCache, getCachedDeviceReport, setCachedDeviceReport } from '../services/appCache';
 import { cleanMultiline, cleanString, isOneOf } from '../utils/validation';
 import { parsePagination } from '../utils/pagination';
 
@@ -675,6 +675,47 @@ export class ReportController {
       res.status(500).json({ error: 'Failed to load device management reports' });
     } finally {
       conn?.release();
+    }
+  }
+
+  static async deleteDeviceReportSnapshots(req: Request, res: Response) {
+    try {
+      const [result] = await pool.query<ResultSetHeader>('DELETE FROM device_report_snapshots');
+      clearDeviceReportCache();
+      broadcastAppEvent({ type: 'device-updated', entityId: 'device-report-snapshots' });
+      res.json({ deletedCount: result.affectedRows });
+    } catch (error) {
+      console.error('Device report snapshot delete all error:', error);
+      res.status(500).json({ error: 'Failed to delete device report snapshots' });
+    }
+  }
+
+  static async deleteSelectedDeviceReportSnapshots(req: Request, res: Response) {
+    try {
+      const snapshots = Array.isArray(req.body?.snapshots) ? req.body.snapshots : [];
+      const pairs = snapshots
+        .map((snapshot: { reportMonth?: unknown; carrier?: unknown }) => ({
+          reportMonth: cleanString(snapshot.reportMonth, 7),
+          carrier: cleanString(snapshot.carrier, 50),
+        }))
+        .filter((snapshot: { reportMonth: string; carrier: string }) => /^\d{4}-\d{2}$/u.test(snapshot.reportMonth) && snapshot.carrier);
+
+      if (pairs.length === 0) {
+        return res.status(400).json({ error: 'Select at least one report snapshot to delete' });
+      }
+
+      const where = pairs.map(() => '(`reportMonth` = ? AND `carrier` = ?)').join(' OR ');
+      const params = pairs.flatMap((snapshot: { reportMonth: string; carrier: string }) => [snapshot.reportMonth, snapshot.carrier]);
+      const [result] = await pool.query<ResultSetHeader>(
+        `DELETE FROM device_report_snapshots WHERE ${where}`,
+        params,
+      );
+      clearDeviceReportCache();
+      broadcastAppEvent({ type: 'device-updated', entityId: 'device-report-snapshots' });
+      res.json({ deletedCount: result.affectedRows });
+    } catch (error) {
+      console.error('Device report snapshot selected delete error:', error);
+      res.status(500).json({ error: 'Failed to delete selected device report snapshots' });
     }
   }
 

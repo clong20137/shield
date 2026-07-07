@@ -9,6 +9,8 @@ router.get('/trooper-dailies', requireAuthenticated(), ReportController.getTroop
 router.get('/trooper-dailies/analytics', requireAuthenticated(), ReportController.getTrooperDailyAnalytics);
 router.put('/trooper-dailies/:id/review', requireAuthenticated(), ReportController.reviewTrooperDaily);
 router.get('/devices', requirePermission('devices:manage'), ReportController.getDeviceManagementReports);
+router.delete('/devices/snapshots', requirePermission('devices:manage'), ReportController.deleteDeviceReportSnapshots);
+router.delete('/devices/snapshots/selected', requirePermission('devices:manage'), ReportController.deleteSelectedDeviceReportSnapshots);
 router.get('/access-review', requirePermission('audit:view'), ReportController.getAccessReview);
 router.get('/by-rank', requirePermission('users:view'), ReportController.getUsersByRank);
 router.get('/by-district', requirePermission('users:view'), ReportController.getUsersByDistrict);

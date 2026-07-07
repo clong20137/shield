@@ -717,6 +717,9 @@ const ReportsPage: React.FC<{
   const [deviceTrendMetric, setDeviceTrendMetric] = useState<DeviceTrendMetric>('totalDevices');
   const [deviceTrendGraphType, setDeviceTrendGraphType] = useState<DailyGraphType>('bar');
   const [deviceReportTotalDelta, setDeviceReportTotalDelta] = useState(0);
+  const [isDeviceReportDeleteModalOpen, setIsDeviceReportDeleteModalOpen] = useState(false);
+  const [selectedDeviceReportSnapshotKeys, setSelectedDeviceReportSnapshotKeys] = useState<string[]>([]);
+  const [deviceReportDeleting, setDeviceReportDeleting] = useState(false);
   const [trooperDailies, setTrooperDailies] = useState<TrooperDailyReportEntry[]>([]);
   const [dailySearch, setDailySearch] = useState('');
   const [dailyFrom, setDailyFrom] = useState('');
@@ -1587,6 +1590,61 @@ const ReportsPage: React.FC<{
           })),
       });
     });
+  const getDeviceSnapshotKey = (snapshot: DeviceReportMonthlySnapshot) => `${snapshot.reportMonth}|${snapshot.carrier}`;
+  const selectedDeviceReportSnapshots = monthlyDeviceSnapshots.filter((snapshot) => selectedDeviceReportSnapshotKeys.includes(getDeviceSnapshotKey(snapshot)));
+  const toggleDeviceReportSnapshot = (snapshot: DeviceReportMonthlySnapshot) => {
+    const key = getDeviceSnapshotKey(snapshot);
+    setSelectedDeviceReportSnapshotKeys((current) =>
+      current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
+    );
+  };
+  const openDeviceReportDeleteModal = () => {
+    setSelectedDeviceReportSnapshotKeys(monthlyDeviceSnapshots.map(getDeviceSnapshotKey));
+    setIsDeviceReportDeleteModalOpen(true);
+  };
+  const deleteSelectedDeviceReportSnapshots = async () => {
+    if (selectedDeviceReportSnapshots.length === 0) {
+      onToast('error', 'Select at least one report to delete.');
+      return;
+    }
+
+    setDeviceReportDeleting(true);
+    try {
+      const response = await reportService.deleteSelectedDeviceReportSnapshots(
+        selectedDeviceReportSnapshots.map((snapshot) => ({
+          reportMonth: snapshot.reportMonth,
+          carrier: snapshot.carrier,
+        })),
+      );
+      onToast('success', `${response.data.deletedCount} report snapshot${response.data.deletedCount === 1 ? '' : 's'} deleted.`);
+      setIsDeviceReportDeleteModalOpen(false);
+      setSelectedDeviceReportSnapshotKeys([]);
+      await loadDeviceReport(false);
+    } catch (err) {
+      onToast('error', getAppErrorMessage(err, 'Failed to delete selected reports.'));
+    } finally {
+      setDeviceReportDeleting(false);
+    }
+  };
+  const deleteAllDeviceReportSnapshots = async () => {
+    if (monthlyDeviceSnapshots.length === 0) {
+      onToast('error', 'No report snapshots are available to delete.');
+      return;
+    }
+
+    setDeviceReportDeleting(true);
+    try {
+      const response = await reportService.deleteDeviceReportSnapshots();
+      onToast('success', `${response.data.deletedCount} report snapshot${response.data.deletedCount === 1 ? '' : 's'} deleted.`);
+      setIsDeviceReportDeleteModalOpen(false);
+      setSelectedDeviceReportSnapshotKeys([]);
+      await loadDeviceReport(false);
+    } catch (err) {
+      onToast('error', getAppErrorMessage(err, 'Failed to delete report snapshots.'));
+    } finally {
+      setDeviceReportDeleting(false);
+    }
+  };
 
   const renderAnalyticsExportDropdown = () => (
     <div className="relative z-[100]">
@@ -2384,6 +2442,16 @@ const ReportsPage: React.FC<{
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Uses the month selected when Verizon or AT&amp;T reports are uploaded.</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={openDeviceReportDeleteModal}
+                      className="btn-danger h-9 w-9 justify-center p-0"
+                      disabled={monthlyDeviceSnapshots.length === 0}
+                      aria-label="Delete report snapshots"
+                      title="Delete Reports"
+                    >
+                      <Trash2 size={15} />
+                    </button>
                     <select
                       value={deviceTrendMetric}
                       onChange={(event) => setDeviceTrendMetric(event.target.value as DeviceTrendMetric)}
@@ -2434,6 +2502,71 @@ const ReportsPage: React.FC<{
         ) : (
           <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">Sign in to view CPAR reports.</div>
         )
+      )}
+
+      {isDeviceReportDeleteModalOpen && (
+        <div className="modal-backdrop fixed inset-0 z-[80] flex items-start justify-center bg-black/60 px-4 pt-[10dvh]">
+          <div className="modal-window flex max-h-[82dvh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl dark:bg-gray-900">
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete Device Reports</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Remove monthly comparison snapshots. This does not delete live device inventory.</p>
+              </div>
+              <button type="button" onClick={() => setIsDeviceReportDeleteModalOpen(false)} className="btn-secondary h-9 w-9 justify-center p-0" aria-label="Close delete reports" title="Close" disabled={deviceReportDeleting}>
+                <X size={16} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              {monthlyDeviceSnapshots.length === 0 ? (
+                <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No monthly report snapshots to delete.</div>
+              ) : (
+                <div className="space-y-2">
+                  {monthlyDeviceSnapshots.map((snapshot) => {
+                    const key = getDeviceSnapshotKey(snapshot);
+                    const checked = selectedDeviceReportSnapshotKeys.includes(key);
+                    return (
+                      <label key={key} className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm transition ${
+                        checked
+                          ? 'border-primary-300 bg-primary-50 dark:border-primary-800 dark:bg-primary-950/40'
+                          : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-900'
+                      }`}>
+                        <span className="flex min-w-0 items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleDeviceReportSnapshot(snapshot)}
+                            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                          />
+                          <span className="min-w-0">
+                            <span className="block font-black text-gray-900 dark:text-gray-100">{formatAnalyticsLabel(snapshot.reportMonth)} - {snapshot.carrier}</span>
+                            <span className="block text-xs text-gray-500 dark:text-gray-400">{formatMetric(snapshot.totalDevices)} devices / {formatCurrency(snapshot.estimatedMonthlyTotal)}</span>
+                          </span>
+                        </span>
+                        <span className="shrink-0 rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-500 dark:bg-gray-800 dark:text-gray-300">{snapshot.importType || 'Report'}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-800">
+              <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">{selectedDeviceReportSnapshots.length} selected</span>
+              <div className="flex flex-wrap justify-end gap-2">
+                <button type="button" onClick={() => setIsDeviceReportDeleteModalOpen(false)} className="btn-secondary" disabled={deviceReportDeleting}>
+                  Cancel
+                </button>
+                <button type="button" onClick={() => void deleteAllDeviceReportSnapshots()} className="btn-danger" disabled={deviceReportDeleting || monthlyDeviceSnapshots.length === 0}>
+                  <Trash2 size={16} />
+                  <span>Delete All Reports</span>
+                </button>
+                <button type="button" onClick={() => void deleteSelectedDeviceReportSnapshots()} className="btn-danger" disabled={deviceReportDeleting || selectedDeviceReportSnapshots.length === 0}>
+                  <Trash2 size={16} />
+                  <span>Delete Selected</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {selectedDaily && (
