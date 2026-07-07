@@ -24,6 +24,10 @@ export interface Device {
   maintenanceDueDate: string;
   lastServiceDate: string;
   purchaseDate: string;
+  activationDate: string;
+  contractEndDate: string;
+  eligibilityDate: string;
+  monthlyCharge: number;
   condition: string;
   createdAt: Date;
   updatedAt: Date;
@@ -164,6 +168,10 @@ const deviceColumns = [
   "DATE_FORMAT(`maintenanceDueDate`, '%Y-%m-%d') AS `maintenanceDueDate`",
   "DATE_FORMAT(`lastServiceDate`, '%Y-%m-%d') AS `lastServiceDate`",
   "DATE_FORMAT(`purchaseDate`, '%Y-%m-%d') AS `purchaseDate`",
+  "DATE_FORMAT(`activationDate`, '%Y-%m-%d') AS `activationDate`",
+  "DATE_FORMAT(`contractEndDate`, '%Y-%m-%d') AS `contractEndDate`",
+  "DATE_FORMAT(`eligibilityDate`, '%Y-%m-%d') AS `eligibilityDate`",
+  'COALESCE(`monthlyCharge`, 0) AS `monthlyCharge`',
   '`condition`',
   '`createdAt`',
   '`updatedAt`',
@@ -193,6 +201,10 @@ function normalizeDeviceInput(device: DeviceInput): DeviceInput {
     maintenanceDueDate: device.maintenanceDueDate || '',
     lastServiceDate: device.lastServiceDate || '',
     purchaseDate: device.purchaseDate || '',
+    activationDate: device.activationDate || '',
+    contractEndDate: device.contractEndDate || '',
+    eligibilityDate: device.eligibilityDate || '',
+    monthlyCharge: Number(device.monthlyCharge) || 0,
     condition: device.condition || 'Good',
   };
 }
@@ -380,9 +392,10 @@ export class DeviceModel {
           \`id\`, \`type\`, \`assetTag\`, \`makeModel\`, \`serialNumber\`, \`assignedTo\`,
           \`status\`, \`carrier\`, \`location\`, \`notes\`, \`phoneNumber\`, \`imei\`, \`simNumber\`,
           \`radioId\`, \`hostname\`, \`routerId\`, \`warrantyExpiration\`, \`replacementDueDate\`,
-          \`maintenanceDueDate\`, \`lastServiceDate\`, \`purchaseDate\`, \`condition\`,
+          \`maintenanceDueDate\`, \`lastServiceDate\`, \`purchaseDate\`, \`activationDate\`,
+          \`contractEndDate\`, \`eligibilityDate\`, \`monthlyCharge\`, \`condition\`,
           \`createdAt\`, \`updatedAt\`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           device.type,
@@ -405,6 +418,10 @@ export class DeviceModel {
           nullableDate(device.maintenanceDueDate),
           nullableDate(device.lastServiceDate),
           nullableDate(device.purchaseDate),
+          nullableDate(device.activationDate),
+          nullableDate(device.contractEndDate),
+          nullableDate(device.eligibilityDate),
+          device.monthlyCharge,
           device.condition,
           now,
           now,
@@ -454,6 +471,10 @@ export class DeviceModel {
           \`maintenanceDueDate\` = ?,
           \`lastServiceDate\` = ?,
           \`purchaseDate\` = ?,
+          \`activationDate\` = ?,
+          \`contractEndDate\` = ?,
+          \`eligibilityDate\` = ?,
+          \`monthlyCharge\` = ?,
           \`condition\` = ?,
           \`updatedAt\` = ?
         WHERE \`id\` = ?`,
@@ -478,6 +499,10 @@ export class DeviceModel {
           nullableDate(device.maintenanceDueDate),
           nullableDate(device.lastServiceDate),
           nullableDate(device.purchaseDate),
+          nullableDate(device.activationDate),
+          nullableDate(device.contractEndDate),
+          nullableDate(device.eligibilityDate),
+          device.monthlyCharge,
           device.condition,
           new Date(),
           id,

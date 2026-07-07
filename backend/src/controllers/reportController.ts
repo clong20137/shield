@@ -46,6 +46,7 @@ interface DeviceCostGroupRow extends RowDataPacket {
   carrier: string;
   makeModel: string;
   count: number;
+  monthlyChargeTotal: number;
 }
 
 type DeviceCostBreakdown = {
@@ -335,21 +336,24 @@ function buildDeviceCostEstimate(rows: DeviceCostGroupRow[]) {
 
   rows.forEach((row) => {
     const estimate = getEstimatedDeviceMonthlyRate(row.type || '', row.carrier || '', row.makeModel || '');
-    if (!estimate) {
+    const actualMonthlyTotal = Number(row.monthlyChargeTotal) || 0;
+    if (!estimate && actualMonthlyTotal <= 0) {
       return;
     }
 
     const count = Number(row.count) || 0;
-    const existing = breakdownMap.get(estimate.label) || {
-      label: estimate.label,
+    const label = estimate?.label || `${row.carrier || 'Imported'} Current Charges`;
+    const existing = breakdownMap.get(label) || {
+      label,
       count: 0,
-      monthlyRate: estimate.monthlyRate,
+      monthlyRate: estimate?.monthlyRate || 0,
       monthlyTotal: 0,
     };
 
     existing.count += count;
-    existing.monthlyTotal = Number((existing.count * existing.monthlyRate).toFixed(2));
-    breakdownMap.set(estimate.label, existing);
+    existing.monthlyTotal = Number((existing.monthlyTotal + (actualMonthlyTotal > 0 ? actualMonthlyTotal : count * (estimate?.monthlyRate || 0))).toFixed(2));
+    existing.monthlyRate = existing.count > 0 ? Number((existing.monthlyTotal / existing.count).toFixed(2)) : 0;
+    breakdownMap.set(label, existing);
   });
 
   const breakdown = Array.from(breakdownMap.values()).sort((first, second) => second.monthlyTotal - first.monthlyTotal || first.label.localeCompare(second.label));
@@ -494,7 +498,8 @@ export class ReportController {
           COALESCE(NULLIF(\`type\`, ''), 'Unknown') AS type,
           COALESCE(NULLIF(\`carrier\`, ''), 'Unknown') AS carrier,
           COALESCE(NULLIF(\`makeModel\`, ''), '') AS makeModel,
-          COUNT(*) AS count
+          COUNT(*) AS count,
+          SUM(COALESCE(\`monthlyCharge\`, 0)) AS monthlyChargeTotal
         FROM devices
         GROUP BY type, carrier, makeModel`,
       );

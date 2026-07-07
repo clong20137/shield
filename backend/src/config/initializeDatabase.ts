@@ -879,6 +879,10 @@ export async function initializeDatabase() {
       \`maintenanceDueDate\` DATE,
       \`lastServiceDate\` DATE,
       \`purchaseDate\` DATE,
+      \`activationDate\` DATE,
+      \`contractEndDate\` DATE,
+      \`eligibilityDate\` DATE,
+      \`monthlyCharge\` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
       \`condition\` VARCHAR(50) NOT NULL DEFAULT 'Good',
       \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -899,6 +903,10 @@ export async function initializeDatabase() {
   await ensureColumn('devices', 'maintenanceDueDate', '`maintenanceDueDate` DATE');
   await ensureColumn('devices', 'lastServiceDate', '`lastServiceDate` DATE');
   await ensureColumn('devices', 'purchaseDate', '`purchaseDate` DATE');
+  await ensureColumn('devices', 'activationDate', '`activationDate` DATE');
+  await ensureColumn('devices', 'contractEndDate', '`contractEndDate` DATE');
+  await ensureColumn('devices', 'eligibilityDate', '`eligibilityDate` DATE');
+  await ensureColumn('devices', 'monthlyCharge', '`monthlyCharge` DECIMAL(10,2) NOT NULL DEFAULT 0.00');
   await ensureColumn('devices', 'condition', "`condition` VARCHAR(50) NOT NULL DEFAULT 'Good'");
   await ensureIndex('devices', 'idx_devices_updated_asset', '`updatedAt`, `assetTag`');
   await ensureIndex('devices', 'idx_devices_assigned_updated', '`assignedTo`, `updatedAt`, `assetTag`');

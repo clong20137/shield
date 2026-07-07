@@ -61,6 +61,10 @@ const defaultDeviceForm: DeviceForm = {
   maintenanceDueDate: '',
   lastServiceDate: '',
   purchaseDate: '',
+  activationDate: '',
+  contractEndDate: '',
+  eligibilityDate: '',
+  monthlyCharge: 0,
   condition: 'Good',
 };
 
@@ -165,6 +169,10 @@ function toDeviceForm(device: DeviceRecord): DeviceForm {
     maintenanceDueDate: device.maintenanceDueDate || '',
     lastServiceDate: device.lastServiceDate || '',
     purchaseDate: device.purchaseDate || '',
+    activationDate: device.activationDate || '',
+    contractEndDate: device.contractEndDate || '',
+    eligibilityDate: device.eligibilityDate || '',
+    monthlyCharge: Number(device.monthlyCharge) || 0,
     condition: device.condition || 'Good',
   };
 }
@@ -221,6 +229,11 @@ async function readPhoneImportFileAsCsv(file: File): Promise<string> {
 
 function formatDate(value: string): string {
   return value ? new Date(value).toLocaleDateString() : 'N/A';
+}
+
+function formatCurrency(value: number | string | undefined | null): string {
+  const amount = Number(value) || 0;
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 }
 
 function isDueSoon(value: string): boolean {
@@ -369,7 +382,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const phoneImportInputRef = useRef<HTMLInputElement | null>(null);
   const pendingPhoneImportTypeRef = useRef<PhoneImportType>('verizon-phone');
 
-  const canManageDevices = currentUser?.role === 'administrator';
+  const canManageDevices = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('devices:manage'));
   const actor = { actorId: currentUser?.id, actorName: currentUser?.displayName || currentUser?.email };
 
   const loadRegisteredUsers = useCallback(async () => {
@@ -715,6 +728,10 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       'maintenanceDueDate',
       'lastServiceDate',
       'purchaseDate',
+      'activationDate',
+      'contractEndDate',
+      'eligibilityDate',
+      'monthlyCharge',
       'condition',
       'notes',
     ];
@@ -1091,6 +1108,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                     <Detail label="Condition" value={device.condition || 'Good'} />
                     <Detail label="Carrier" value={device.carrier || 'Verizon'} />
                     <Detail label="Replacement" value={formatDate(device.replacementDueDate)} />
+                    {canManageDevices && <Detail label="Monthly" value={formatCurrency(device.monthlyCharge)} />}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {canManageDevices && <button type="button" onClick={(event) => { event.stopPropagation(); editDevice(device); }} className="btn-secondary" aria-label="Edit device" title="Edit"><Pencil size={15} /><span>Edit</span></button>}
@@ -1263,6 +1281,10 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <DateField label="Replacement Due" value={form.replacementDueDate} onChange={(value) => setForm((current) => ({ ...current, replacementDueDate: value }))} />
                 <DateField label="Maintenance Due" value={form.maintenanceDueDate} onChange={(value) => setForm((current) => ({ ...current, maintenanceDueDate: value }))} />
                 <DateField label="Last Service" value={form.lastServiceDate} onChange={(value) => setForm((current) => ({ ...current, lastServiceDate: value }))} />
+                {canManageDevices && <DateField label="Activation Date" value={form.activationDate} onChange={(value) => setForm((current) => ({ ...current, activationDate: value }))} />}
+                {canManageDevices && <DateField label="Contract End Date" value={form.contractEndDate} onChange={(value) => setForm((current) => ({ ...current, contractEndDate: value }))} />}
+                {canManageDevices && <DateField label="Eligibility Date" value={form.eligibilityDate} onChange={(value) => setForm((current) => ({ ...current, eligibilityDate: value }))} />}
+                {canManageDevices && <MoneyField label="Monthly Charge" value={form.monthlyCharge} onChange={(value) => setForm((current) => ({ ...current, monthlyCharge: value }))} />}
                 <label className="block lg:col-span-2">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Event Note</span>
                   <input value={eventNotes} onChange={(event) => setEventNotes(event.target.value)} className={getDeviceInputClass()} />
@@ -1551,6 +1573,21 @@ function DateField({ label, value, onChange }: { label: string; value: string; o
   return (
     <Field label={label}>
       <input type="date" value={value || ''} onChange={(event) => onChange(event.target.value)} className={getDeviceInputClass()} />
+    </Field>
+  );
+}
+
+function MoneyField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+  return (
+    <Field label={label}>
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        value={Number(value) || ''}
+        onChange={(event) => onChange(Number(event.target.value) || 0)}
+        className={getDeviceInputClass()}
+      />
     </Field>
   );
 }

@@ -912,6 +912,10 @@ export interface DeviceRecord {
   maintenanceDueDate: string;
   lastServiceDate: string;
   purchaseDate: string;
+  activationDate: string;
+  contractEndDate: string;
+  eligibilityDate: string;
+  monthlyCharge: number;
   condition: string;
   createdAt: string;
   updatedAt: string;

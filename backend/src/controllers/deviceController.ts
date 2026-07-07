@@ -82,6 +82,10 @@ const phoneExportHeaders = [
   'imei',
   'iccid',
   'replacementDueDate',
+  'activationDate',
+  'contractEndDate',
+  'eligibilityDate',
+  'monthlyCharge',
   'condition',
   'notes',
 ];
@@ -199,6 +203,41 @@ function getImportValue(row: PhoneImportRow, aliases: string[]): string {
   return cleanString(entry?.[1], 500);
 }
 
+function isAgencyEmail(value: string): boolean {
+  const normalizedEmail = normalizeKey(value).replace(/,gov$/u, '.gov');
+  return normalizedEmail.endsWith('@isp.in.gov');
+}
+
+function normalizeImportDate(value: string): string {
+  const text = value.trim();
+  if (!text) {
+    return '';
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/u.test(text)) {
+    return text;
+  }
+
+  const slashMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/u);
+  if (slashMatch) {
+    const year = slashMatch[3].length === 2 ? `20${slashMatch[3]}` : slashMatch[3];
+    return `${year}-${slashMatch[1].padStart(2, '0')}-${slashMatch[2].padStart(2, '0')}`;
+  }
+
+  const excelSerial = Number(text);
+  if (Number.isFinite(excelSerial) && excelSerial > 20_000 && excelSerial < 80_000) {
+    const date = new Date(Date.UTC(1899, 11, 30 + excelSerial));
+    return date.toISOString().slice(0, 10);
+  }
+
+  return text;
+}
+
+function normalizeImportMoney(value: string): number {
+  const amount = Number(value.replace(/[$,\s]/gu, ''));
+  return Number.isFinite(amount) && amount > 0 ? Number(amount.toFixed(2)) : 0;
+}
+
 function isNewUserImportRow(row: PhoneImportRow): boolean {
   const rawAssignedTo = getImportValue(row, ['assignedTo', 'assigned to', 'userName', 'user name', 'wirelessUserFullName', 'wireless user full name', 'name', 'employeeName', 'employee name', 'user']);
   return normalizeLooseKey(rawAssignedTo) === 'newuser';
@@ -276,7 +315,8 @@ function resolveAssignedTo(row: PhoneImportRow, matcher: UserMatcher): { assigne
     'radioNumber',
     'radio',
   ]);
-  const number = getImportValue(row, ['phoneNumber', 'phone number', 'wirelessNumber', 'wireless number', 'wireless', 'line', 'mobile']);
+  const email = getImportValue(row, ['emailAddress', 'email address', 'email']);
+  const number = getImportValue(row, ['phoneNumber', 'phone number', 'wirelessNumber', 'wireless number', 'wirlessNumber', 'wirless number', 'wireless', 'wirless', 'line', 'mobile']);
 
   if (isNewUserImportRow(row)) {
     return { assignedTo: '', matched: false };
@@ -290,8 +330,9 @@ function resolveAssignedTo(row: PhoneImportRow, matcher: UserMatcher): { assigne
   }
 
   const identityCandidates = [
-    normalizeKey(identity),
-    normalizeLooseKey(identity),
+    isAgencyEmail(email) ? normalizeKey(email) : '',
+    !/@/u.test(identity) || isAgencyEmail(identity) ? normalizeKey(identity) : '',
+    !/@/u.test(identity) || isAgencyEmail(identity) ? normalizeLooseKey(identity) : '',
     normalizeDigits(identity),
   ].filter(Boolean);
 
@@ -372,8 +413,8 @@ function getGeneratedAssetTag(type: string, phoneNumber: string, imei: string, s
 }
 
 function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNumber: number, importType: PhoneImportType): DeviceInput {
-  const phoneNumber = normalizePhone(getImportValue(row, ['phoneNumber', 'phone number', 'wirelessNumber', 'wireless number', 'wireless', 'line', 'mobile']));
-  const imei = getImportValue(row, ['phoneOrDeviceIdImei', 'phone or device id imei', 'phone or device id (imei)', 'phone or device id', 'currentDeviceId4gOnly', 'current device id 4g only', 'current device id - 4g only', 'current device id', 'imei', 'imei1', 'imei 1']);
+  const phoneNumber = normalizePhone(getImportValue(row, ['phoneNumber', 'phone number', 'wirelessNumber', 'wireless number', 'wirlessNumber', 'wirless number', 'wireless', 'wirless', 'line', 'mobile']));
+  const imei = getImportValue(row, ['phoneOrDeviceIdImei', 'phone or device id imei', 'phone or device id (imei)', 'phone or device id', 'currentDeviceId4gOnly', 'current device id 4g only', 'current device id - 4g only', 'currentDeviceId', 'current device id', 'imei', 'imei1', 'imei 1']);
   const simNumber = getImportValue(row, ['sim', 'iccid', 'simNumber', 'sim number', 'eid']);
   const condition = getImportValue(row, ['condition']);
   const isNewUser = isNewUserImportRow(row);
@@ -403,6 +444,10 @@ function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNu
     maintenanceDueDate: '',
     lastServiceDate: '',
     purchaseDate: getImportValue(row, ['purchaseDate', 'purchase date']),
+    activationDate: normalizeImportDate(getImportValue(row, ['contractActivationDate', 'contract activation date', 'activationDate', 'activation date'])),
+    contractEndDate: normalizeImportDate(getImportValue(row, ['contractEndDate', 'contract end date', 'contractExpirationDate', 'contract expiration date'])),
+    eligibilityDate: normalizeImportDate(getImportValue(row, ['upgradeEligibilityDate', 'upgrade eligibility date', 'upgradeElgibilityDate', 'upgrade elgibility date', 'eligibilityDate', 'eligibility date', 'elgibilityDate', 'elgibility date'])),
+    monthlyCharge: normalizeImportMoney(getImportValue(row, ['totalCurrentCharges', 'total current charges', 'currentCharges', 'current charges', 'monthlyCharge', 'monthly charge'])),
     condition: condition === 'Excellent' ? 'New' : isOneOf(condition, deviceConditions) ? condition : 'Good',
   };
 }
@@ -418,8 +463,9 @@ function validateDevicePayload(body: Record<string, unknown>) {
   const status = cleanString(body.status, 50) || 'Available';
   const carrier = cleanString(body.carrier, 50) || 'Verizon';
   const condition = cleanString(body.condition, 50) || 'Good';
-  const dateFields = ['warrantyExpiration', 'replacementDueDate', 'maintenanceDueDate', 'lastServiceDate', 'purchaseDate'] as const;
-  const dates = Object.fromEntries(dateFields.map((field) => [field, cleanString(body[field], 20)])) as Record<typeof dateFields[number], string>;
+  const monthlyCharge = normalizeImportMoney(String(body.monthlyCharge ?? ''));
+  const dateFields = ['warrantyExpiration', 'replacementDueDate', 'maintenanceDueDate', 'lastServiceDate', 'purchaseDate', 'activationDate', 'contractEndDate', 'eligibilityDate'] as const;
+  const dates = Object.fromEntries(dateFields.map((field) => [field, normalizeImportDate(cleanString(body[field], 20))])) as Record<typeof dateFields[number], string>;
 
   if (!type || !assetTag || !makeModel) {
     return { error: 'Device type, asset tag, and make/model are required' };
@@ -473,6 +519,10 @@ function validateDevicePayload(body: Record<string, unknown>) {
       maintenanceDueDate: dates.maintenanceDueDate,
       lastServiceDate: dates.lastServiceDate,
       purchaseDate: dates.purchaseDate,
+      activationDate: dates.activationDate,
+      contractEndDate: dates.contractEndDate,
+      eligibilityDate: dates.eligibilityDate,
+      monthlyCharge,
       condition,
     },
   };
@@ -550,6 +600,10 @@ async function processPhoneImportRows(
         notes: validation.value.notes || existingDevice.notes,
         replacementDueDate: validation.value.replacementDueDate || existingDevice.replacementDueDate,
         purchaseDate: validation.value.purchaseDate || existingDevice.purchaseDate,
+        activationDate: validation.value.activationDate || existingDevice.activationDate,
+        contractEndDate: validation.value.contractEndDate || existingDevice.contractEndDate,
+        eligibilityDate: validation.value.eligibilityDate || existingDevice.eligibilityDate,
+        monthlyCharge: validation.value.monthlyCharge || existingDevice.monthlyCharge,
         condition: validation.value.condition || existingDevice.condition,
       };
       const updated = await DeviceModel.updateDevice(existingDevice.id, mergedDevice, {
