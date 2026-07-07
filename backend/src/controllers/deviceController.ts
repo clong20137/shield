@@ -381,7 +381,11 @@ function buildDeviceMatchKey(device: Device): string[] {
 }
 
 function cleanPhoneModelName(value: string): string {
-  const normalizedValue = value.replace(/\s+/gu, ' ').trim();
+  const normalizedValue = value
+    .replace(/\b(black|white|red|blue|green|yellow|purple|pink|gold|silver|gray|grey|graphite|midnight|starlight|product\s+red)\b/giu, ' ')
+    .replace(/\b\d+\s*(gb|tb)\b/giu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
   if (/cradlepoint/iu.test(normalizedValue)) {
     return 'Cradlepoint';
   }
@@ -442,7 +446,7 @@ function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNu
   const simNumber = getImportValue(row, ['sim', 'iccid', 'simNumber', 'sim number', 'eid']);
   const condition = getImportValue(row, ['condition']);
   const isNewUser = isNewUserImportRow(row);
-  const importedModel = getImportValue(row, ['phoneOrDeviceModel', 'phone or device model', 'deviceModel', 'device model', 'deviceModal', 'device modal', 'makeModel', 'make model', 'model', 'device', 'description']);
+  const importedModel = getImportValue(row, ['phoneOrDeviceModel', 'phone or device model', 'deviceModel', 'device model', 'deviceModelName', 'device model name', 'deviceModal', 'device modal', 'equipmentModel', 'equipment model', 'makeModel', 'make model', 'model', 'device', 'description']);
   const makeModel = cleanPhoneModelName(importedModel);
   const type = getImportedDeviceType(importedModel || makeModel);
   const assetTag = getGeneratedAssetTag(type, phoneNumber, imei, simNumber, rowNumber);
