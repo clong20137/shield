@@ -1523,7 +1523,7 @@ export const errorLogService = {
 };
 
 export const deviceService = {
-  getAll: (params?: { q?: string; type?: string; model?: string; status?: string; sortKey?: string; page?: number; pageSize?: number }) =>
+  getAll: (params?: { q?: string; type?: string; model?: string; status?: string; possibleInactive?: boolean; sortKey?: string; page?: number; pageSize?: number }) =>
     api.get<DeviceListResponse>('/devices', { params }),
 
   getAssignedToMe: () =>

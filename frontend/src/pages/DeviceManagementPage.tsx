@@ -389,6 +389,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [filter, setFilter] = useState<DeviceType | 'All'>('All');
   const [statusFilter, setStatusFilter] = useState<DeviceStatusFilter>('All');
   const [modelFilter, setModelFilter] = useState('All');
+  const [possibleInactiveOnly, setPossibleInactiveOnly] = useState(false);
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt');
   const [page, setPage] = useState(1);
@@ -507,6 +508,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         type: filter === 'All' ? undefined : filter,
         model: modelFilter === 'All' ? undefined : modelFilter,
         status: statusFilter === 'All' ? undefined : statusFilter,
+        possibleInactive: possibleInactiveOnly || undefined,
         sortKey,
         page,
         pageSize,
@@ -535,7 +537,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         setIsFiltering(false);
       }
     }
-  }, [canManageDevices, currentUser?.id, filter, modelFilter, page, pageSize, query, sortKey, statusFilter]);
+  }, [canManageDevices, currentUser?.id, filter, modelFilter, page, pageSize, possibleInactiveOnly, query, sortKey, statusFilter]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -614,7 +616,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
 
   useEffect(() => {
     setDeviceTableScrollTop(0);
-  }, [page, pageSize, filter, modelFilter, query, sortKey, statusFilter]);
+  }, [page, pageSize, filter, modelFilter, possibleInactiveOnly, query, sortKey, statusFilter]);
 
   const modelOptions = useMemo(
     () => Object.entries(deviceModelCounts).sort(([first], [second]) => first.localeCompare(second)),
@@ -1114,7 +1116,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             </div>
           </div>
 
-          <div className="grid w-full grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:grid-cols-2 xl:grid-cols-[1.35fr_1fr_1fr_1fr_1.6fr] dark:border-gray-800 dark:bg-gray-950">
+          <div className="grid w-full grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr_1fr_auto_1.5fr] dark:border-gray-800 dark:bg-gray-950">
             <select value={filter} onChange={(event) => { setPage(1); setFilter(event.target.value as DeviceType | 'All'); }} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
               <option>All</option>
               {deviceTypes.map((type) => <option key={type}>{type}</option>)}
@@ -1136,6 +1138,23 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               <option value="carrier">Carrier</option>
               <option value="replacementDueDate">Replacement Due</option>
             </select>
+            <label className={`flex h-10 cursor-pointer items-center justify-center gap-2 rounded border px-3 text-sm font-bold transition ${
+              possibleInactiveOnly
+                ? 'border-orange-300 bg-orange-100 text-orange-800 dark:border-orange-800 dark:bg-orange-950/60 dark:text-orange-100'
+                : 'border-gray-300 bg-white text-gray-600 hover:bg-orange-50 hover:text-orange-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-orange-100'
+            }`}>
+              <input
+                type="checkbox"
+                checked={possibleInactiveOnly}
+                onChange={(event) => {
+                  setPage(1);
+                  setPossibleInactiveOnly(event.target.checked);
+                }}
+                className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+              />
+              <AlertTriangle size={15} />
+              <span className="whitespace-nowrap">Possible inactive</span>
+            </label>
             <input value={query} onChange={(event) => { setPage(1); setQuery(event.target.value); }} placeholder="Search inventory" className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
           </div>
         </div>

@@ -1238,6 +1238,7 @@ export class DeviceController {
         type: cleanString(req.query.type, 50),
         model: cleanString(req.query.model, 150),
         status: cleanString(req.query.status, 50),
+        possibleInactive: parseBooleanFlag(req.query.possibleInactive),
         sortKey: cleanString(req.query.sortKey, 50),
       });
       res.json({

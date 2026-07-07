@@ -83,6 +83,7 @@ export interface DeviceListFilters {
   type?: string;
   model?: string;
   status?: string;
+  possibleInactive?: boolean;
   sortKey?: string;
 }
 
@@ -121,6 +122,10 @@ function buildDeviceWhere(filters: DeviceListFilters = {}, options: { includeTyp
       where.push('`status` = ?');
       params.push(filters.status);
     }
+  }
+
+  if (filters.possibleInactive) {
+    where.push('COALESCE(`possibleInactive`, 0) = 1');
   }
 
   if (searchTerm) {
