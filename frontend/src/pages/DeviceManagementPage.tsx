@@ -11,6 +11,7 @@ type DeviceStatus = DeviceRecord['status'];
 type DeviceCarrier = DeviceRecord['carrier'];
 type DeviceExportScope = DeviceCarrier | 'All';
 type DeviceStatusFilter = DeviceStatus | 'All' | 'Unassigned';
+type DeviceFormTab = 'details' | 'usage';
 type DeviceForm = Omit<DeviceRecord, 'id' | 'createdAt' | 'updatedAt'>;
 type DeviceConditionalField = 'phoneNumber' | 'imei' | 'simNumber' | 'radioId' | 'hostname' | 'routerId';
 type SortKey = keyof Pick<DeviceRecord, 'type' | 'assetTag' | 'makeModel' | 'assignedTo' | 'status' | 'carrier' | 'location' | 'maintenanceDueDate' | 'replacementDueDate' | 'updatedAt'>;
@@ -388,6 +389,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [form, setForm] = useState<DeviceForm>(defaultDeviceForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isDeviceFormOpen, setIsDeviceFormOpen] = useState(false);
+  const [deviceFormTab, setDeviceFormTab] = useState<DeviceFormTab>('details');
   const [filter, setFilter] = useState<DeviceType | 'All'>('All');
   const [statusFilter, setStatusFilter] = useState<DeviceStatusFilter>('All');
   const [modelFilter, setModelFilter] = useState('All');
@@ -724,6 +726,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       }
 
       setForm(defaultDeviceForm);
+      setDeviceFormTab('details');
       setEventNotes('');
       setAssigneeSearch('');
       setIsDeviceFormOpen(false);
@@ -736,6 +739,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const editDevice = (device: DeviceRecord) => {
     setEditingId(device.id);
     setForm(toDeviceForm(device));
+    setDeviceFormTab('details');
     setEventNotes('');
     setAssigneeSearch('');
     setIsDeviceFormOpen(true);
@@ -747,6 +751,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const openAddDeviceModal = () => {
     setEditingId(null);
     setForm(defaultDeviceForm);
+    setDeviceFormTab('details');
     setEventNotes('');
     setAssigneeSearch('');
     setIsDeviceFormOpen(true);
@@ -759,6 +764,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setIsDeviceFormOpen(false);
     setEditingId(null);
     setForm(defaultDeviceForm);
+    setDeviceFormTab('details');
     setEventNotes('');
     setAssigneeSearch('');
   };
@@ -778,6 +784,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         setEditingId(null);
         setIsDeviceFormOpen(false);
         setForm(defaultDeviceForm);
+        setDeviceFormTab('details');
       }
     } catch (err) {
       console.error('Failed to delete device:', err);
@@ -1418,6 +1425,29 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             </div>
 
             <form onSubmit={saveDevice} className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <div className="mb-4 flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-gray-950" role="tablist" aria-label="Device edit sections">
+                {[
+                  { value: 'details' as const, label: 'Details' },
+                  { value: 'usage' as const, label: 'Usage' },
+                ].map((tab) => (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => setDeviceFormTab(tab.value)}
+                    className={`rounded px-4 py-2 text-sm font-black transition ${
+                      deviceFormTab === tab.value
+                        ? 'bg-primary-500 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-white hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-gray-100'
+                    }`}
+                    role="tab"
+                    aria-selected={deviceFormTab === tab.value}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {deviceFormTab === 'details' ? (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Field label="Device Type">
                   <select
@@ -1475,18 +1505,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 {form.type !== 'Cell Phone' && <DateField label="Replacement Due" value={form.replacementDueDate} onChange={(value) => setForm((current) => ({ ...current, replacementDueDate: value }))} />}
                 {form.type !== 'Cell Phone' && <DateField label="Maintenance Due" value={form.maintenanceDueDate} onChange={(value) => setForm((current) => ({ ...current, maintenanceDueDate: value }))} />}
                 {form.type !== 'Cell Phone' && <DateField label="Last Service" value={form.lastServiceDate} onChange={(value) => setForm((current) => ({ ...current, lastServiceDate: value }))} />}
-                {canManageDevices && <DateField label="Activation Date" value={form.activationDate} onChange={(value) => setForm((current) => ({ ...current, activationDate: value }))} />}
-                {canManageDevices && <DateField label="Contract End Date" value={form.contractEndDate} onChange={(value) => setForm((current) => ({ ...current, contractEndDate: value }))} />}
-                {canManageDevices && <DateField label="Eligibility Date" value={form.eligibilityDate} onChange={(value) => setForm((current) => ({ ...current, eligibilityDate: value }))} />}
-                {canManageDevices && <MoneyField label="Monthly Charge" value={form.monthlyCharge} onChange={(value) => setForm((current) => ({ ...current, monthlyCharge: value }))} />}
-                {canManageDevices && <NumberField label="Data Usage (GB)" value={form.dataUsageGb} step="0.001" onChange={(value) => setForm((current) => ({ ...current, dataUsageGb: value }))} />}
-                {canManageDevices && <NumberField label="Calling Minutes" value={form.mobileMinutes} step="1" onChange={(value) => setForm((current) => ({ ...current, mobileMinutes: value }))} />}
-                {canManageDevices && (
-                  <label className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm font-semibold dark:border-gray-700">
-                    <input type="checkbox" checked={form.possibleInactive} onChange={(event) => setForm((current) => ({ ...current, possibleInactive: event.target.checked }))} />
-                    Possible inactive
-                  </label>
-                )}
                 <label className="block lg:col-span-2">
                   <span className="mb-1 block text-sm font-semibold text-gray-700 dark:text-gray-300">Event Note</span>
                   <input value={eventNotes} onChange={(event) => setEventNotes(event.target.value)} className={getDeviceInputClass()} />
@@ -1496,6 +1514,39 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                   <textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} className={`${getDeviceInputClass()} min-h-24 resize-y py-2`} />
                 </label>
               </div>
+              ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <NumberField label="Data Usage (GB)" value={form.dataUsageGb} step="0.001" onChange={(value) => setForm((current) => ({ ...current, dataUsageGb: value }))} />
+                  <NumberField label="Calling Minutes" value={form.mobileMinutes} step="1" onChange={(value) => setForm((current) => ({ ...current, mobileMinutes: value }))} />
+                  <MoneyField label="Monthly Charge" value={form.monthlyCharge} onChange={(value) => setForm((current) => ({ ...current, monthlyCharge: value }))} />
+                  <DateField label="Activation Date" value={form.activationDate} onChange={(value) => setForm((current) => ({ ...current, activationDate: value }))} />
+                  <DateField label="Contract End Date" value={form.contractEndDate} onChange={(value) => setForm((current) => ({ ...current, contractEndDate: value }))} />
+                  <DateField label="Eligibility Date" value={form.eligibilityDate} onChange={(value) => setForm((current) => ({ ...current, eligibilityDate: value }))} />
+                </div>
+                <label className={`flex items-start gap-3 rounded-lg border px-3 py-3 text-sm font-semibold ${
+                  form.possibleInactive
+                    ? 'border-orange-300 bg-orange-50 text-orange-800 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-100'
+                    : 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200'
+                }`}>
+                  <input
+                    type="checkbox"
+                    checked={form.possibleInactive}
+                    onChange={(event) => setForm((current) => ({ ...current, possibleInactive: event.target.checked }))}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                  />
+                  <span>
+                    <span className="block font-black">Possible inactive</span>
+                    <span className="mt-0.5 block text-xs font-semibold text-gray-500 dark:text-gray-400">Flags this device for inventory review when usage is consistently zero or unknown.</span>
+                  </span>
+                </label>
+                <div className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-white p-3 text-sm dark:border-gray-800 dark:bg-gray-900 sm:grid-cols-3">
+                  <Detail label="Current Usage" value={`${Number(form.dataUsageGb) || 0} GB`} />
+                  <Detail label="Current Minutes" value={`${Number(form.mobileMinutes) || 0} min`} />
+                  <Detail label="Monthly Charge" value={formatCurrency(form.monthlyCharge)} />
+                </div>
+              </div>
+              )}
 
               <div className="mt-5 flex flex-wrap justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-800">
                 <button type="button" onClick={closeDeviceFormModal} className="btn-secondary" aria-label="Cancel device form" title="Cancel">
