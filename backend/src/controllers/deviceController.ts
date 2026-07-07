@@ -204,17 +204,17 @@ function getImportValue(row: PhoneImportRow, aliases: string[]): string {
 }
 
 function normalizeImportDate(value: string): string {
-  const text = value.trim();
+  const text = value.replace(/[–—]/gu, '-').trim();
   if (!text) {
     return '';
   }
 
-  const isoMatch = text.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s].*)?$/u);
+  const isoMatch = text.match(/\b(\d{4}-\d{2}-\d{2})\b/u);
   if (isoMatch) {
     return isoMatch[1];
   }
 
-  const slashMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?)?$/iu);
+  const slashMatch = text.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})\b/iu);
   if (slashMatch) {
     const year = slashMatch[3].length === 2 ? `20${slashMatch[3]}` : slashMatch[3];
     return `${year}-${slashMatch[1].padStart(2, '0')}-${slashMatch[2].padStart(2, '0')}`;
@@ -472,9 +472,9 @@ function buildImportedPhoneDevice(row: PhoneImportRow, assignedTo: string, rowNu
     maintenanceDueDate: '',
     lastServiceDate: '',
     purchaseDate: getImportValue(row, ['purchaseDate', 'purchase date']),
-    activationDate: normalizeImportDate(getImportValue(row, ['contractActivationDate', 'contract activation date', 'activationDate', 'activation date'])),
-    contractEndDate: normalizeImportDate(getImportValue(row, ['contractEndDate', 'contract end date', 'contractExpirationDate', 'contract expiration date'])),
-    eligibilityDate: normalizeImportDate(getImportValue(row, ['upgradeEligibilityDate', 'upgrade eligibility date', 'upgradeElgibilityDate', 'upgrade elgibility date', 'eligibilityDate', 'eligibility date', 'elgibilityDate', 'elgibility date'])),
+    activationDate: normalizeImportDate(getImportValue(row, ['contractActivationDate', 'contract activation date', 'contractStartDate', 'contract start date', 'activationDate', 'activation date'])),
+    contractEndDate: normalizeImportDate(getImportValue(row, ['contractEndDate', 'contract end date', 'contractExpirationDate', 'contract expiration date', 'contract end', 'contract expires'])),
+    eligibilityDate: normalizeImportDate(getImportValue(row, ['upgradeEligibilityDate', 'upgrade eligibility date', 'upgradeElgibilityDate', 'upgrade elgibility date', 'upgradeEligibleDate', 'upgrade eligible date', 'eligibilityDate', 'eligibility date', 'elgibilityDate', 'elgibility date'])),
     monthlyCharge: normalizeImportMoney(getImportValue(row, ['totalCurrentCharges', 'total current charges', 'currentCharges', 'current charges', 'monthlyCharge', 'monthly charge'])),
     condition: condition === 'Excellent' ? 'New' : isOneOf(condition, deviceConditions) ? condition : 'Good',
   };
@@ -493,7 +493,7 @@ function validateDevicePayload(body: Record<string, unknown>) {
   const condition = cleanString(body.condition, 50) || 'Good';
   const monthlyCharge = normalizeImportMoney(String(body.monthlyCharge ?? ''));
   const dateFields = ['warrantyExpiration', 'replacementDueDate', 'maintenanceDueDate', 'lastServiceDate', 'purchaseDate', 'activationDate', 'contractEndDate', 'eligibilityDate'] as const;
-  const dates = Object.fromEntries(dateFields.map((field) => [field, normalizeImportDate(cleanString(body[field], 20))])) as Record<typeof dateFields[number], string>;
+  const dates = Object.fromEntries(dateFields.map((field) => [field, normalizeImportDate(String(body[field] ?? ''))])) as Record<typeof dateFields[number], string>;
 
   if (!type || !assetTag || !makeModel) {
     return { error: 'Device type, asset tag, and make/model are required' };
