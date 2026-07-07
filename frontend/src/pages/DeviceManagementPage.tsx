@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, MouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, ArchiveX, CheckCircle2, ChevronLeft, ChevronRight, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, Radio, RefreshCw, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
+import { AlertTriangle, ArchiveX, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, Radio, RefreshCw, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, deviceService, DeviceRecord, PhoneImportType } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
 import { AppContextMenu, AppContextMenuPosition, shouldUseNativeContextMenu } from '../components/AppContextMenu';
@@ -344,6 +344,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [phoneImportSummary, setPhoneImportSummary] = useState<PhoneImportSummary | null>(null);
   const [phoneImportProgress, setPhoneImportProgress] = useState<PhoneImportProgress | null>(null);
   const [phoneImportType, setPhoneImportType] = useState<PhoneImportType>('verizon-phone');
+  const [isPhoneImportMenuOpen, setIsPhoneImportMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
   const [deviceTableScrollTop, setDeviceTableScrollTop] = useState(0);
@@ -352,6 +353,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const hasLoadedRegisteredUsersRef = useRef(false);
   const deviceRefreshTimerRef = useRef<number | null>(null);
   const userRefreshTimerRef = useRef<number | null>(null);
+  const phoneImportInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingPhoneImportTypeRef = useRef<PhoneImportType>('verizon-phone');
 
   const canManageDevices = currentUser?.role === 'administrator';
   const actor = { actorId: currentUser?.id, actorName: currentUser?.displayName || currentUser?.email };
@@ -703,7 +706,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
 
     const file = event.target.files?.[0];
     if (!file) return;
-    const selectedImport = phoneImportOptions.find((option) => option.value === phoneImportType) || phoneImportOptions[0];
+    const activeImportType = pendingPhoneImportTypeRef.current || phoneImportType;
+    const selectedImport = phoneImportOptions.find((option) => option.value === activeImportType) || phoneImportOptions[0];
 
     try {
       setError(null);
@@ -715,7 +719,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         return;
       }
 
-      const response = await deviceService.startPhoneImportJob(csvText, actor, phoneImportType);
+      const response = await deviceService.startPhoneImportJob(csvText, actor, activeImportType);
       let importJob = response.data;
       setPhoneImportProgress({
         processedRows: importJob.processedRows,
@@ -756,6 +760,14 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       setPhoneImportProgress(null);
       event.target.value = '';
     }
+  };
+
+  const openPhoneImportPicker = (importType: PhoneImportType) => {
+    const selectedImport = phoneImportOptions.find((option) => option.value === importType) || phoneImportOptions[0];
+    pendingPhoneImportTypeRef.current = selectedImport.value;
+    setPhoneImportType(selectedImport.value);
+    setIsPhoneImportMenuOpen(false);
+    window.setTimeout(() => phoneImportInputRef.current?.click(), 0);
   };
 
   const bulkStatusUpdate = async (status: DeviceStatus) => {
@@ -900,26 +912,43 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <Download size={16} />
               </button>
               {canManageDevices && (
-                <div className="flex items-center gap-2">
-                  <select
-                    value={phoneImportType}
-                    onChange={(event) => setPhoneImportType(event.target.value as PhoneImportType)}
-                    className="h-10 rounded border border-gray-300 bg-white px-3 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
-                    aria-label="Choose device import report"
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsPhoneImportMenuOpen((open) => !open)}
+                    className="btn-secondary h-10 gap-2 px-3"
+                    aria-haspopup="menu"
+                    aria-expanded={isPhoneImportMenuOpen}
+                    aria-label="Import device report"
+                    title={`Import ${selectedPhoneImportOption.label}`}
                   >
-                    {phoneImportOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  <label className="btn-secondary h-10 w-10 cursor-pointer justify-center p-0" title={`Import ${selectedPhoneImportOption.label}`} aria-label="Import selected device report">
                     <Upload size={16} />
-                    <input
-                      type="file"
-                      accept={selectedPhoneImportOption.accept}
-                      className="hidden"
-                      onChange={importPhoneReport}
-                    />
-                  </label>
+                    <span className="hidden text-sm font-bold sm:inline">Import</span>
+                    <ChevronDown size={14} className={`transition ${isPhoneImportMenuOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {isPhoneImportMenuOpen && (
+                    <div className="absolute right-0 top-12 z-40 min-w-56 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-950" role="menu">
+                      {phoneImportOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => openPhoneImportPicker(option.value)}
+                          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-bold text-gray-700 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-900"
+                          role="menuitem"
+                        >
+                          <span>{option.label}</span>
+                          {phoneImportType === option.value && <CheckCircle2 size={15} className="text-accent" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <input
+                    ref={phoneImportInputRef}
+                    type="file"
+                    accept=".csv,.xlsx,.xls"
+                    className="hidden"
+                    onChange={importPhoneReport}
+                  />
                 </div>
               )}
             </div>
