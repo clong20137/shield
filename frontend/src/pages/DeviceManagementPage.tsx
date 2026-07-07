@@ -411,6 +411,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [phoneImportProgress, setPhoneImportProgress] = useState<PhoneImportProgress | null>(null);
   const [phoneImportType, setPhoneImportType] = useState<PhoneImportType>('verizon-phone');
   const [phoneImportReportMonth, setPhoneImportReportMonth] = useState(getCurrentReportMonth);
+  const [forcePhoneImportInventorySync, setForcePhoneImportInventorySync] = useState(false);
   const [isPhoneImportSetupOpen, setIsPhoneImportSetupOpen] = useState(false);
   const [deviceReportSnapshots, setDeviceReportSnapshots] = useState<DeviceReportMonthlySnapshot[]>([]);
   const [deviceReportSnapshotsLoading, setDeviceReportSnapshotsLoading] = useState(false);
@@ -834,7 +835,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         return;
       }
 
-      const response = await deviceService.startPhoneImportJob(csvText, actor, activeImportType, phoneImportReportMonth);
+      const response = await deviceService.startPhoneImportJob(csvText, actor, activeImportType, phoneImportReportMonth, forcePhoneImportInventorySync);
       let importJob = response.data;
       setPhoneImportProgress({
         processedRows: importJob.processedRows,
@@ -886,6 +887,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   };
 
   const openPhoneImportSetup = () => {
+    setForcePhoneImportInventorySync(false);
     setIsPhoneImportSetupOpen(true);
     setIsExportMenuOpen(false);
     void loadDeviceReportSnapshots();
@@ -1540,6 +1542,18 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                   A {selectedPhoneImportOption.label} report already exists for {new Date(`${phoneImportReportMonth}-01T00:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}. Uploading a file here will overwrite that report snapshot.
                 </div>
               )}
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 bg-white px-3 py-3 text-sm dark:border-gray-800 dark:bg-gray-950">
+                <input
+                  type="checkbox"
+                  checked={forcePhoneImportInventorySync}
+                  onChange={(event) => setForcePhoneImportInventorySync(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span>
+                  <span className="block font-black text-gray-900 dark:text-gray-100">Override into actual inventory</span>
+                  <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">Use this report to update live devices even if a newer report already exists.</span>
+                </span>
+              </label>
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" onClick={() => setIsPhoneImportSetupOpen(false)} className="btn-secondary" aria-label="Cancel import setup" title="Cancel">

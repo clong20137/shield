@@ -56,6 +56,7 @@ type PhoneImportJob = {
   completedAt: string | null;
   importType: PhoneImportType;
   reportMonth: string | null;
+  forceInventorySync: boolean;
 };
 interface ImportJobRow extends RowDataPacket {
   id: string;
@@ -1002,7 +1003,12 @@ function getPublicPhoneImportJob(job: PhoneImportJob) {
     updatedAt: job.updatedAt,
     completedAt: job.completedAt,
     reportMonth: job.reportMonth,
+    forceInventorySync: job.forceInventorySync,
   };
+}
+
+function parseBooleanFlag(value: unknown): boolean {
+  return value === true || value === 'true' || value === '1' || value === 1;
 }
 
 function importJobRowToPhoneJob(row: ImportJobRow): PhoneImportJob {
@@ -1025,6 +1031,7 @@ function importJobRowToPhoneJob(row: ImportJobRow): PhoneImportJob {
     completedAt: toIsoDateTime(row.completedAt),
     importType,
     reportMonth: summary.reportMonth ? normalizeReportMonth(summary.reportMonth) : null,
+    forceInventorySync: Boolean((summary as PhoneImportSummary & { forceInventorySync?: boolean }).forceInventorySync),
   };
 }
 
@@ -1041,7 +1048,7 @@ async function insertPhoneImportJob(job: PhoneImportJob) {
       job.actorId || null,
       job.actorName || null,
       JSON.stringify(job.rows),
-      JSON.stringify({ ...job.summary, reportMonth: job.reportMonth }),
+      JSON.stringify({ ...job.summary, reportMonth: job.reportMonth, forceInventorySync: job.forceInventorySync }),
       job.processedRows,
       job.totalRows,
       job.error,
@@ -1054,7 +1061,7 @@ async function updatePhoneImportJob(job: PhoneImportJob, includePayload = false)
   const payloadSql = includePayload ? ', `payloadJson` = ?' : '';
   const params: Array<string | number | Date | null> = [
     job.status,
-    JSON.stringify({ ...job.summary, reportMonth: job.reportMonth }),
+    JSON.stringify({ ...job.summary, reportMonth: job.reportMonth, forceInventorySync: job.forceInventorySync }),
     job.processedRows,
     job.totalRows,
     job.error,
@@ -1109,7 +1116,7 @@ async function runPhoneImportJob(jobId: string) {
   await updatePhoneImportJob(job);
 
   try {
-    const snapshotOnly = await shouldImportSnapshotOnly(job.reportMonth, job.importType);
+    const snapshotOnly = job.forceInventorySync ? false : await shouldImportSnapshotOnly(job.reportMonth, job.importType);
     const result = await processPhoneImportRows(job.rows, {
       actorId: job.actorId,
       actorName: job.actorName,
@@ -1276,7 +1283,8 @@ export class DeviceController {
       const actorName = cleanString(req.body?.actorName, 150);
       const importType = detectPhoneImportType(rows, normalizePhoneImportType(req.body?.importType));
       const reportMonth = normalizeReportMonth(req.body?.reportMonth);
-      const snapshotOnly = await shouldImportSnapshotOnly(reportMonth, importType);
+      const forceInventorySync = parseBooleanFlag(req.body?.forceInventorySync);
+      const snapshotOnly = forceInventorySync ? false : await shouldImportSnapshotOnly(reportMonth, importType);
 
       if (rows.length === 0) {
         return res.status(400).json({ error: 'Import rows are required' });
@@ -1312,6 +1320,7 @@ export class DeviceController {
       const actorName = cleanString(req.query.actorName, 150);
       const importType = detectPhoneImportType(rows, normalizePhoneImportType(req.query.importType));
       const reportMonth = normalizeReportMonth(req.query.reportMonth) || getReportMonthForToday();
+      const forceInventorySync = parseBooleanFlag(req.query.forceInventorySync);
 
       if (rows.length === 0) {
         return res.status(400).json({ error: 'Phone import CSV is empty.' });
@@ -1333,6 +1342,7 @@ export class DeviceController {
         completedAt: null,
         importType,
         reportMonth,
+        forceInventorySync,
       };
 
       phoneImportJobs.set(job.id, job);
