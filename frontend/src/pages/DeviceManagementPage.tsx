@@ -1430,7 +1430,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       )}
       {canManageDevices && isPhoneImportSetupOpen && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/45 px-4 pt-[12dvh]">
-          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+          <div className="w-full max-w-3xl rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Import Device Report</h2>
@@ -1453,8 +1453,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 </select>
               </Field>
               <Field label="Report Month">
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-950">
-                  <div className="mb-2 flex items-center justify-between">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                  <div className="mb-3 flex items-center justify-between">
                     <button
                       type="button"
                       onClick={() => setPhoneImportReportMonth((current) => shiftReportMonthYear(current, -1))}
@@ -1475,13 +1475,13 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                       <ChevronRight size={16} />
                     </button>
                   </div>
-                  <div className="grid grid-cols-6 gap-1 sm:grid-cols-12">
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-12">
                     {reportMonthRailOptions.map((month) => (
                       <button
                         key={month.value}
                         type="button"
                         onClick={() => setPhoneImportReportMonth(month.value)}
-                        className={`rounded px-2 py-2 text-xs font-black uppercase transition ${
+                        className={`rounded px-2 py-2.5 text-xs font-black uppercase transition ${
                           phoneImportReportMonth === month.value
                             ? 'bg-primary-500 text-white shadow-sm'
                             : 'bg-white text-gray-600 hover:bg-primary-50 hover:text-primary-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100'
