@@ -3136,6 +3136,26 @@
     color: rgb(203, 213, 225) !important;
   }
 
+  html.dark .shield-left-panel .global-search-results,
+  html.glass.dark .shield-left-panel .global-search-results {
+    border-color: rgba(148, 163, 184, 0.18) !important;
+    background: rgba(15, 23, 42, 0.82) !important;
+    color: rgb(241, 245, 249) !important;
+    box-shadow: 0 18px 42px rgba(2, 6, 23, 0.28) !important;
+  }
+
+  html.dark .shield-left-panel .global-search-results button:hover,
+  html.glass.dark .shield-left-panel .global-search-results button:hover {
+    background-color: rgba(148, 163, 184, 0.08) !important;
+  }
+
+  html.dark .shield-left-panel .global-search-results .text-gray-500,
+  html.dark .shield-left-panel .global-search-results .dark\:text-gray-400,
+  html.glass.dark .shield-left-panel .global-search-results .text-gray-500,
+  html.glass.dark .shield-left-panel .global-search-results .dark\:text-gray-400 {
+    color: rgb(148, 163, 184) !important;
+  }
+
   .user-detail-tab.user-detail-tab-active,
   .dark .user-detail-tab.user-detail-tab-active,
   html.glass .user-detail-tab.user-detail-tab-active,
