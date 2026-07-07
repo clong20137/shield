@@ -87,6 +87,10 @@ interface DeviceReportSnapshotGroupRow extends RowDataPacket {
   count: number;
 }
 
+interface LatestDeviceReportSnapshotRow extends RowDataPacket {
+  reportMonth: string | null;
+}
+
 const phoneExportHeaders = [
   'assetTag',
   'makeModel',
@@ -152,12 +156,22 @@ function getReportMonthForToday(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function isHistoricalReportMonth(reportMonth: string | null | undefined): boolean {
-  return Boolean(reportMonth && reportMonth < getReportMonthForToday());
-}
-
 function getCarrierForImportType(importType: PhoneImportType): 'Verizon' | 'AT&T' {
   return importType === 'att-firstnet' ? 'AT&T' : 'Verizon';
+}
+
+async function shouldImportSnapshotOnly(reportMonth: string | null | undefined, importType: PhoneImportType): Promise<boolean> {
+  if (!reportMonth) {
+    return false;
+  }
+
+  const carrier = getCarrierForImportType(importType);
+  const [rows] = await pool.query<LatestDeviceReportSnapshotRow[]>(
+    'SELECT MAX(`reportMonth`) AS reportMonth FROM device_report_snapshots WHERE `carrier` = ?',
+    [carrier],
+  );
+  const latestReportMonth = rows[0]?.reportMonth || null;
+  return Boolean(latestReportMonth && reportMonth < latestReportMonth);
 }
 
 function detectPhoneImportType(rows: PhoneImportRow[], requestedType: PhoneImportType): PhoneImportType {
@@ -1095,7 +1109,7 @@ async function runPhoneImportJob(jobId: string) {
   await updatePhoneImportJob(job);
 
   try {
-    const snapshotOnly = isHistoricalReportMonth(job.reportMonth);
+    const snapshotOnly = await shouldImportSnapshotOnly(job.reportMonth, job.importType);
     const result = await processPhoneImportRows(job.rows, {
       actorId: job.actorId,
       actorName: job.actorName,
@@ -1262,7 +1276,7 @@ export class DeviceController {
       const actorName = cleanString(req.body?.actorName, 150);
       const importType = detectPhoneImportType(rows, normalizePhoneImportType(req.body?.importType));
       const reportMonth = normalizeReportMonth(req.body?.reportMonth);
-      const snapshotOnly = isHistoricalReportMonth(reportMonth);
+      const snapshotOnly = await shouldImportSnapshotOnly(reportMonth, importType);
 
       if (rows.length === 0) {
         return res.status(400).json({ error: 'Import rows are required' });
