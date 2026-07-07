@@ -122,6 +122,7 @@ const mobileMinutesImportAliases = ['mobileToMobileUsedMinutes', 'mobile to mobi
 const activationDateImportAliases = ['contractActivationDate', 'contract activation date', 'contract activated date', 'contract start date', 'contractStartDate', 'activationDate', 'activation date'];
 const contractEndDateImportAliases = ['contractEndDate', 'contract end date', 'contract expiration date', 'contractExpirationDate', 'contract end', 'contract expires', 'contract expiry date'];
 const eligibilityDateImportAliases = ['upgradeEligibilityDate', 'upgrade eligibility date', 'upgradeElgibilityDate', 'upgrade elgibility date', 'upgradeEligibleDate', 'upgrade eligible date', 'eligibilityDate', 'eligibility date', 'elgibilityDate', 'elgibility date'];
+const wirelessNumberStatusImportAliases = ['wirelessNumberStatus', 'wireless number status', 'wireless status', 'number status', 'status'];
 
 function normalizeDigits(value: unknown): string {
   return String(value || '').replace(/\D/gu, '');
@@ -283,6 +284,14 @@ function getImportRawValue(row: PhoneImportRow, aliases: string[]): unknown {
 function hasImportColumn(row: PhoneImportRow, aliases: string[]): boolean {
   const normalizedAliases = aliases.map(normalizeLooseKey);
   return Object.keys(row).some((key) => normalizedAliases.includes(normalizeLooseKey(key)));
+}
+
+function shouldSkipInactiveVerizonRow(row: PhoneImportRow, importType: PhoneImportType): boolean {
+  if (importType !== 'verizon-phone' || !hasImportColumn(row, wirelessNumberStatusImportAliases)) {
+    return false;
+  }
+
+  return normalizeKey(getImportValue(row, wirelessNumberStatusImportAliases)) === 'not active';
 }
 
 function normalizeImportDate(value: unknown): string {
@@ -745,6 +754,16 @@ async function processPhoneImportRows(
 
   for (const [index, row] of rows.entries()) {
     const rowNumber = index + 2;
+
+    if (shouldSkipInactiveVerizonRow(row, importType)) {
+      summary.skippedRows.push({ rowNumber, reason: 'Wireless Number status is Not Active', row });
+      options.onProgress?.(index + 1, summary);
+      if (options.shouldYield && (index + 1) % PHONE_IMPORT_JOB_CHUNK_SIZE === 0) {
+        await waitForImportJobYield();
+      }
+      continue;
+    }
+
     const hasUsageImportColumns = hasImportColumn(row, dataUsageImportAliases) || hasImportColumn(row, mobileMinutesImportAliases);
     const assignment = resolveAssignedTo(row, userMatcher);
     const importedDevice = buildImportedPhoneDevice(row, assignment.assignedTo, rowNumber, importType);
