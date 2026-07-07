@@ -557,13 +557,15 @@ export class ReportController {
           MAX(top_models.total) AS sortTotal
         FROM devices d
         INNER JOIN (
-          SELECT COALESCE(NULLIF(\`makeModel\`, ''), 'Unknown') AS label, COUNT(*) AS total
+          SELECT COALESCE(NULLIF(\`makeModel\`, ''), 'Unknown') AS modelLabel, COUNT(*) AS total
           FROM devices
-          GROUP BY label
-          ORDER BY total DESC, label
+          GROUP BY COALESCE(NULLIF(\`makeModel\`, ''), 'Unknown')
+          ORDER BY total DESC, modelLabel
           LIMIT 12
-        ) top_models ON top_models.label = COALESCE(NULLIF(d.\`makeModel\`, ''), 'Unknown')
-        GROUP BY label, carrier
+        ) top_models ON top_models.modelLabel = COALESCE(NULLIF(d.\`makeModel\`, ''), 'Unknown')
+        GROUP BY
+          COALESCE(NULLIF(d.\`makeModel\`, ''), 'Unknown'),
+          COALESCE(NULLIF(d.\`carrier\`, ''), 'Unknown')
         ORDER BY sortTotal DESC, label, carrier`,
       );
       const [conditionCarrierRows] = await conn.query<DeviceReportCarrierGroupRow[]>(
