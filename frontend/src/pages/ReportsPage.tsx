@@ -17,6 +17,7 @@ import {
 import { AuthAccount, DeviceManagementReportResponse, DeviceReportCarrierGroup, DeviceReportGroup, DeviceReportMonthlySnapshot, reportService, TrooperDailyReportEntry, TrooperDailyAnalyticsResponse, User, userService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { downloadTrooperDailiesCsv, downloadTrooperDailiesPdf, downloadTrooperDailiesXls } from '../utils/trooperDailyExport';
+import { useNavigate } from 'react-router-dom';
 
 const PerformanceEvaluationsPage = lazy(() => import('./PerformanceEvaluationsPage'));
 
@@ -637,7 +638,8 @@ const DeviceReportBarChart: React.FC<{
   color?: string;
   colorByLabel?: (label: string) => string | undefined;
   valueLabel?: string;
-}> = ({ title, data, carrierData, color = '#1a365d', colorByLabel, valueLabel = 'Devices' }) => {
+  onDrillDown?: (label: string, carrier?: string) => void;
+}> = ({ title, data, carrierData, color = '#1a365d', colorByLabel, valueLabel = 'Devices', onDrillDown }) => {
   const carriers = carrierData && carrierData.length > 0
     ? Array.from(new Set([
       ...deviceReportCarrierOrder.filter((carrier) => carrierData.some((item) => item.carrier === carrier)),
@@ -681,10 +683,25 @@ const DeviceReportBarChart: React.FC<{
             {carriers.length > 0 && <Legend wrapperStyle={{ fontSize: 12, fontWeight: 800, paddingTop: 8 }} />}
             {carriers.length > 0 ? (
               carriers.map((carrier) => (
-                <Bar key={carrier} dataKey={carrier} name={carrier} fill={carrierReportColors[carrier.toLowerCase()] || color} radius={[6, 6, 0, 0]} maxBarSize={34} />
+                <Bar
+                  key={carrier}
+                  dataKey={carrier}
+                  name={carrier}
+                  fill={carrierReportColors[carrier.toLowerCase()] || color}
+                  radius={[6, 6, 0, 0]}
+                  maxBarSize={34}
+                  cursor={onDrillDown ? 'pointer' : undefined}
+                  onClick={(entry) => onDrillDown?.(String(entry?.payload?.label || ''), carrier)}
+                />
               ))
             ) : (
-              <Bar dataKey="count" fill={color} radius={[6, 6, 0, 0]}>
+              <Bar
+                dataKey="count"
+                fill={color}
+                radius={[6, 6, 0, 0]}
+                cursor={onDrillDown ? 'pointer' : undefined}
+                onClick={(entry) => onDrillDown?.(String(entry?.payload?.label || ''))}
+              >
                 {chartData.map((item) => (
                   <Cell key={String(item.label)} fill={colorByLabel?.(String(item.label)) || color} />
                 ))}
@@ -702,6 +719,7 @@ const ReportsPage: React.FC<{
   onToast: (type: 'success' | 'error' | 'info', message: string) => void;
   getErrorMessage: (error: unknown, fallback: string) => string;
 }> = ({ currentUser, onToast, getErrorMessage: getAppErrorMessage }) => {
+  const navigate = useNavigate();
   const initialAnalyticsDatesRef = useRef(getRangeDates('1m'));
   const [selectedReportType, setSelectedReportType] = useState<ReportType>('trooper-daily');
   const [activeTrooperDailyTab, setActiveTrooperDailyTab] = useState<TrooperDailyTab>('graph');
@@ -1646,6 +1664,34 @@ const ReportsPage: React.FC<{
     }
   };
 
+  const openDeviceInventoryDrilldown = (filters: { type?: string; status?: string; model?: string; carrier?: string; possibleInactive?: boolean; q?: string }) => {
+    const params = new URLSearchParams();
+    if (filters.type) params.set('type', filters.type);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.model) params.set('model', filters.model);
+    if (filters.carrier) params.set('carrier', filters.carrier);
+    if (filters.possibleInactive) params.set('possibleInactive', 'true');
+    if (filters.q) params.set('q', filters.q);
+    navigate(`/devices?${params.toString()}`);
+  };
+
+  const openDeviceReportBarDrilldown = (label: string, carrier?: string) => {
+    if (!label) return;
+
+    const baseFilters = carrier ? { carrier } : {};
+    if (deviceReportDimension === 'type') {
+      openDeviceInventoryDrilldown({ ...baseFilters, type: label });
+    } else if (deviceReportDimension === 'status') {
+      openDeviceInventoryDrilldown({ ...baseFilters, status: label });
+    } else if (deviceReportDimension === 'carrier') {
+      openDeviceInventoryDrilldown({ carrier: label });
+    } else if (deviceReportDimension === 'model') {
+      openDeviceInventoryDrilldown({ ...baseFilters, model: label });
+    } else if (deviceReportDimension === 'condition') {
+      openDeviceInventoryDrilldown({ ...baseFilters, q: label });
+    }
+  };
+
   const renderAnalyticsExportDropdown = () => (
     <div className="relative z-[100]">
       <button
@@ -2422,6 +2468,14 @@ const ReportsPage: React.FC<{
                 <span className="font-semibold text-gray-500 dark:text-gray-400">
                   Unassigned <strong className="ml-1 text-gray-900 dark:text-gray-100">{formatMetric(deviceReport.summary.unassignedDevices)}</strong>
                 </span>
+                <button
+                  type="button"
+                  onClick={() => openDeviceInventoryDrilldown({ possibleInactive: true })}
+                  className="font-semibold text-orange-600 transition hover:text-orange-700 dark:text-orange-300 dark:hover:text-orange-200"
+                  title="Open possible inactive devices"
+                >
+                  Possible inactive <strong className="ml-1">{formatMetric(deviceReport.summary.possibleInactiveDevices)}</strong>
+                </button>
                 <span className="font-semibold text-gray-500 dark:text-gray-400">
                   Est. monthly <strong className="ml-1 text-gray-900 dark:text-gray-100">{formatCurrency(deviceReport.costEstimate?.estimatedMonthlyTotal || 0)}</strong>
                 </span>
@@ -2434,6 +2488,7 @@ const ReportsPage: React.FC<{
                 color={selectedDeviceReportDimension.color}
                 colorByLabel={selectedDeviceReportDimension.value === 'carrier' ? (label) => carrierReportColors[label.toLowerCase()] : undefined}
                 valueLabel={selectedDeviceReportDimension.valueLabel}
+                onDrillDown={selectedDeviceReportDimension.value === 'cost' ? undefined : openDeviceReportBarDrilldown}
               />
               <section className="mt-5 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">

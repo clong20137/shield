@@ -985,4 +985,33 @@ export class AuthAccountModel {
       conn.release();
     }
   }
+
+  static async listActiveDeviceManagerAccountIds(): Promise<string[]> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<Array<RowDataPacket & { id: string; role: string; permissions: string | null }>>(
+        `SELECT u.\`id\`, u.\`role\`, r.\`permissions\`
+         FROM users u
+         LEFT JOIN roles r ON r.\`name\` = u.\`role\`
+         WHERE u.\`isActive\` = 1`
+      );
+
+      return rows
+        .filter((row) => {
+          if (row.role === 'administrator') {
+            return true;
+          }
+
+          try {
+            const permissions = row.permissions ? JSON.parse(row.permissions) : [];
+            return Array.isArray(permissions) && permissions.includes('devices:manage');
+          } catch {
+            return false;
+          }
+        })
+        .map((row) => row.id);
+    } finally {
+      conn.release();
+    }
+  }
 }

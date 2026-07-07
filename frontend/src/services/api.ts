@@ -827,6 +827,7 @@ export interface DeviceManagementReportResponse {
     assignedDevices: number;
     unassignedDevices: number;
     availableDevices: number;
+    possibleInactiveDevices: number;
     maintenanceDevices: number;
     damagedDevices: number;
     lostDevices: number;
@@ -1523,7 +1524,7 @@ export const errorLogService = {
 };
 
 export const deviceService = {
-  getAll: (params?: { q?: string; type?: string; model?: string; status?: string; possibleInactive?: boolean; sortKey?: string; page?: number; pageSize?: number }) =>
+  getAll: (params?: { q?: string; type?: string; model?: string; status?: string; carrier?: string; assignedUserId?: string; possibleInactive?: boolean; sortKey?: string; page?: number; pageSize?: number }) =>
     api.get<DeviceListResponse>('/devices', { params }),
 
   getAssignedToMe: () =>

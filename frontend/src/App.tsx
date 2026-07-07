@@ -5680,6 +5680,16 @@ function App() {
 
     if (notification.entityType === 'performance_evaluation') {
       window.location.assign(withAppBase('/evaluations'));
+      return;
+    }
+
+    if (notification.entityType === 'device_user_review' && notification.entityId) {
+      window.location.assign(withAppBase(`/devices?assignedUserId=${encodeURIComponent(notification.entityId)}`));
+      return;
+    }
+
+    if (notification.entityType === 'device_inventory') {
+      window.location.assign(withAppBase('/devices?possibleInactive=true'));
     }
   };
 

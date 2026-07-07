@@ -9,6 +9,8 @@ import { getSessionAccount } from '../middleware/authSession';
 import { AuthAccountModel } from '../models/AuthAccount';
 import { AuthSessionModel } from '../models/AuthSession';
 import { AuditLogModel } from '../models/AuditLog';
+import { DeviceModel } from '../models/Device';
+import { UserNotificationModel } from '../models/UserNotification';
 import { cleanMultiline, cleanString, isOneOf, isStrongPassword, isValidEmail, isValidPhone, normalizeEmail, normalizePhone, strongPasswordMessage } from '../utils/validation';
 import { isSafeUploadedImage } from '../middleware/profileUpload';
 import { parsePagination } from '../utils/pagination';
@@ -76,6 +78,32 @@ function getDuplicateUserMessage(error: unknown): string {
   }
 
   return 'A unique user identifier is already assigned to another user.';
+}
+
+async function notifyDeviceManagersOfInactiveAccount(user: User) {
+  const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'User';
+  const assignedDevices = await DeviceModel.listAssignedDevices({ email: user.email || '', displayName }, 25, 0);
+  const recipientIds = Array.from(new Set((await AuthAccountModel.listActiveDeviceManagerAccountIds()).filter((accountId) => accountId !== user.id)));
+
+  if (recipientIds.length === 0) {
+    return;
+  }
+
+  const message = assignedDevices.length > 0
+    ? `${displayName}'s account was deactivated and has ${assignedDevices.length} assigned device${assignedDevices.length === 1 ? '' : 's'}. Review Device Management and remove or reassign anything still assigned to this account.`
+    : `${displayName}'s account was deactivated. Review Device Management to confirm nothing is still assigned to this account.`;
+
+  await Promise.all(recipientIds.map(async (recipientId) => {
+    const notification = await UserNotificationModel.create({
+      userId: recipientId,
+      type: 'device_user_review',
+      title: 'Inactive account device review',
+      message,
+      entityType: 'device_user_review',
+      entityId: user.id,
+    });
+    broadcastAccountEvent(recipientId, { type: 'notification-created', entityId: notification.id });
+  }));
 }
 
 function requestAuditFields(req: Request) {
@@ -858,6 +886,10 @@ export class UserController {
       if (validation.value.isActive === false) {
         broadcastAccountEvent(id, { type: 'session-revoked', entityId: id });
         await AuthSessionModel.revokeAllSessions(id);
+      }
+
+      if (before.isActive && validation.value.isActive === false) {
+        await notifyDeviceManagersOfInactiveAccount(before);
       }
 
       broadcastAppEvent({ type: 'user-updated', entityId: id });

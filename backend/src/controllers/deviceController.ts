@@ -1238,6 +1238,8 @@ export class DeviceController {
         type: cleanString(req.query.type, 50),
         model: cleanString(req.query.model, 150),
         status: cleanString(req.query.status, 50),
+        carrier: cleanString(req.query.carrier, 50),
+        assignedUserId: cleanString(req.query.assignedUserId, 36),
         possibleInactive: parseBooleanFlag(req.query.possibleInactive),
         sortKey: cleanString(req.query.sortKey, 50),
       });

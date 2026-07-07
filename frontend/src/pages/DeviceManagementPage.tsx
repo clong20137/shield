@@ -1,5 +1,6 @@
 import { ChangeEvent, FormEvent, MouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, ArchiveX, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, Radio, RefreshCw, Router, Save, Smartphone, Tablet, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, DeviceReportMonthlySnapshot, deviceService, DeviceRecord, PhoneImportType, reportService } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
@@ -381,6 +382,7 @@ function shiftReportMonthYear(reportMonth: string, offset: number): string {
 }
 
 function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null }) {
+  const [searchParams] = useSearchParams();
   const [devices, setDevices] = useState<DeviceRecord[]>([]);
   const [registeredUsers, setRegisteredUsers] = useState<AuthAccount[]>([]);
   const [form, setForm] = useState<DeviceForm>(defaultDeviceForm);
@@ -389,6 +391,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [filter, setFilter] = useState<DeviceType | 'All'>('All');
   const [statusFilter, setStatusFilter] = useState<DeviceStatusFilter>('All');
   const [modelFilter, setModelFilter] = useState('All');
+  const [carrierFilter, setCarrierFilter] = useState<DeviceCarrier | 'All'>('All');
+  const [assignedUserFilter, setAssignedUserFilter] = useState('');
   const [possibleInactiveOnly, setPossibleInactiveOnly] = useState(false);
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt');
@@ -431,6 +435,52 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const canManageDevices = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('devices:manage'));
   const canDeleteAllDevices = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('devices:delete-all'));
   const actor = { actorId: currentUser?.id, actorName: currentUser?.displayName || currentUser?.email };
+
+  useEffect(() => {
+    const nextType = searchParams.get('type');
+    const nextStatus = searchParams.get('status');
+    const nextModel = searchParams.get('model');
+    const nextCarrier = searchParams.get('carrier');
+    const nextAssignedUserId = searchParams.get('assignedUserId');
+    const nextQuery = searchParams.get('q');
+    const nextPossibleInactive = searchParams.get('possibleInactive');
+    const hasUrlFilters = [nextType, nextStatus, nextModel, nextCarrier, nextAssignedUserId, nextQuery, nextPossibleInactive].some((value) => value !== null);
+
+    if (!hasUrlFilters) {
+      return;
+    }
+
+    setFilter('All');
+    setStatusFilter('All');
+    setModelFilter('All');
+    setCarrierFilter('All');
+    setAssignedUserFilter('');
+    setQuery('');
+    setPossibleInactiveOnly(false);
+
+    if (nextType === 'All' || deviceTypes.includes(nextType as DeviceType)) {
+      setFilter(nextType as DeviceType | 'All');
+    }
+    if (nextStatus === 'All' || nextStatus === 'Unassigned' || deviceStatuses.includes(nextStatus as DeviceStatus)) {
+      setStatusFilter(nextStatus as DeviceStatusFilter);
+    }
+    if (nextModel) {
+      setModelFilter(nextModel);
+    }
+    if (nextCarrier === 'All' || deviceCarriers.includes(nextCarrier as DeviceCarrier)) {
+      setCarrierFilter(nextCarrier as DeviceCarrier | 'All');
+    }
+    if (nextAssignedUserId !== null) {
+      setAssignedUserFilter(nextAssignedUserId);
+    }
+    if (nextQuery !== null) {
+      setQuery(nextQuery);
+    }
+    if (nextPossibleInactive !== null) {
+      setPossibleInactiveOnly(nextPossibleInactive === 'true' || nextPossibleInactive === '1');
+    }
+    setPage(1);
+  }, [searchParams]);
 
   const loadDeviceReportSnapshots = useCallback(async () => {
     if (!canManageDevices) {
@@ -508,6 +558,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         type: filter === 'All' ? undefined : filter,
         model: modelFilter === 'All' ? undefined : modelFilter,
         status: statusFilter === 'All' ? undefined : statusFilter,
+        carrier: carrierFilter === 'All' ? undefined : carrierFilter,
+        assignedUserId: assignedUserFilter || undefined,
         possibleInactive: possibleInactiveOnly || undefined,
         sortKey,
         page,
@@ -537,7 +589,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         setIsFiltering(false);
       }
     }
-  }, [canManageDevices, currentUser?.id, filter, modelFilter, page, pageSize, possibleInactiveOnly, query, sortKey, statusFilter]);
+  }, [assignedUserFilter, canManageDevices, carrierFilter, currentUser?.id, filter, modelFilter, page, pageSize, possibleInactiveOnly, query, sortKey, statusFilter]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -616,7 +668,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
 
   useEffect(() => {
     setDeviceTableScrollTop(0);
-  }, [page, pageSize, filter, modelFilter, possibleInactiveOnly, query, sortKey, statusFilter]);
+  }, [page, pageSize, assignedUserFilter, carrierFilter, filter, modelFilter, possibleInactiveOnly, query, sortKey, statusFilter]);
 
   const modelOptions = useMemo(
     () => Object.entries(deviceModelCounts).sort(([first], [second]) => first.localeCompare(second)),
@@ -1116,7 +1168,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             </div>
           </div>
 
-          <div className="grid w-full grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr_1fr_auto_1.5fr] dark:border-gray-800 dark:bg-gray-950">
+          <div className="grid w-full grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:grid-cols-2 xl:grid-cols-[1.1fr_1fr_1fr_0.9fr_1fr_auto_1.4fr] dark:border-gray-800 dark:bg-gray-950">
             <select value={filter} onChange={(event) => { setPage(1); setFilter(event.target.value as DeviceType | 'All'); }} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
               <option>All</option>
               {deviceTypes.map((type) => <option key={type}>{type}</option>)}
@@ -1129,6 +1181,10 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               <option>All</option>
               <option>Unassigned</option>
               {deviceStatuses.map((status) => <option key={status}>{status}</option>)}
+            </select>
+            <select value={carrierFilter} onChange={(event) => { setPage(1); setCarrierFilter(event.target.value as DeviceCarrier | 'All'); }} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
+              <option>All</option>
+              {deviceCarriers.map((carrier) => <option key={carrier}>{carrier}</option>)}
             </select>
             <select value={sortKey} onChange={(event) => { setPage(1); setSortKey(event.target.value as SortKey); }} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
               <option value="assetTag">Asset Tag</option>
@@ -1157,6 +1213,21 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             </label>
             <input value={query} onChange={(event) => { setPage(1); setQuery(event.target.value); }} placeholder="Search inventory" className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
           </div>
+          {assignedUserFilter && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-800 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-100">
+              <span>Reviewing devices assigned to a deactivated account.</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setAssignedUserFilter('');
+                  setPage(1);
+                }}
+                className="rounded px-2 py-1 text-xs font-black uppercase transition hover:bg-orange-100 dark:hover:bg-orange-900"
+              >
+                Clear review
+              </button>
+            </div>
+          )}
         </div>
 
         {selectedDevices.length > 0 && canManageDevices && (

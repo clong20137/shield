@@ -83,6 +83,8 @@ export interface DeviceListFilters {
   type?: string;
   model?: string;
   status?: string;
+  carrier?: string;
+  assignedUserId?: string;
   possibleInactive?: boolean;
   sortKey?: string;
 }
@@ -95,7 +97,7 @@ export interface DeviceListResult {
   modelCounts: Record<string, number>;
 }
 
-function buildDeviceWhere(filters: DeviceListFilters = {}, options: { includeType?: boolean; includeModel?: boolean; includeStatus?: boolean } = {}) {
+function buildDeviceWhere(filters: DeviceListFilters = {}, options: { includeType?: boolean; includeModel?: boolean; includeStatus?: boolean; includeCarrier?: boolean } = {}) {
   const where: string[] = [];
   const params: Array<string | number> = [];
   const searchTerm = filters.q?.trim();
@@ -122,6 +124,25 @@ function buildDeviceWhere(filters: DeviceListFilters = {}, options: { includeTyp
       where.push('`status` = ?');
       params.push(filters.status);
     }
+  }
+
+  if (options.includeCarrier !== false && filters.carrier && filters.carrier !== 'All') {
+    where.push('`carrier` = ?');
+    params.push(filters.carrier);
+  }
+
+  if (filters.assignedUserId) {
+    where.push(`EXISTS (
+      SELECT 1
+      FROM users u
+      WHERE u.\`id\` = ?
+        AND LOWER(COALESCE(devices.\`assignedTo\`, '')) IN (
+          LOWER(COALESCE(u.\`email\`, '')),
+          LOWER(COALESCE(u.\`displayName\`, '')),
+          LOWER(TRIM(CONCAT(COALESCE(u.\`firstName\`, ''), ' ', COALESCE(u.\`lastName\`, ''))))
+        )
+    )`);
+    params.push(filters.assignedUserId);
   }
 
   if (filters.possibleInactive) {
