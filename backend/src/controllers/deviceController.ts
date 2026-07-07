@@ -19,7 +19,7 @@ function isDuplicateAssetTagError(error: unknown): boolean {
   );
 }
 
-const deviceTypes = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio', 'Cradlepoint'] as const;
+const deviceTypes = ['Cell Phone', 'MiFi Device', 'Tablet', 'Computer', 'Radio', 'Cradlepoint'] as const;
 const deviceStatuses = ['Available', 'Assigned', 'Maintenance', 'Retired', 'Damaged', 'Lost'] as const;
 const deviceConditions = ['New', 'Good', 'Fair', 'Poor', 'Damaged'] as const;
 const deviceCarriers = ['Verizon', 'AT&T'] as const;
@@ -435,8 +435,34 @@ function cleanPhoneModelName(value: string): string {
     return 'Cradlepoint';
   }
 
-  if (/(verizon\s+jetpack|inseego)/iu.test(normalizedValue)) {
+  if (/(verizon\s+jetpack|vz\s+jetpack|jetpack|inseego|sonim\s+h?500|tcl\s+linkzone|orbic\s+speed)/iu.test(normalizedValue)) {
+    if (/sonim/iu.test(normalizedValue)) return 'Sonim H500 5G';
+    if (/tcl\s+linkzone/iu.test(normalizedValue)) return 'TCL Linkzone 5G';
+    if (/orbic\s+speed/iu.test(normalizedValue)) return 'Orbic Speed 5G';
     return normalizedValue.match(/inseego/iu) ? 'Inseego MiFi' : 'Verizon Jetpack';
+  }
+
+  const galaxyMatch = normalizedValue.match(/\b(?:samsung\s+)?galaxy\s+s\s*(\d{2})(?:\s*(ultra|plus|\+|fe))?/iu);
+  if (galaxyMatch) {
+    const variant = galaxyMatch[2]?.replace('+', 'Plus').replace(/\b\w/gu, (letter) => letter.toUpperCase()) || '';
+    return `Samsung Galaxy S${galaxyMatch[1]}${variant ? ` ${variant}` : ''}`;
+  }
+
+  const shorthandGalaxyMatch = normalizedValue.match(/\b(?:sam|samsung)?\s*s\s*(\d{2})(?:\s*(ultra|plus|\+|fe))?\b/iu);
+  if (shorthandGalaxyMatch && /galaxy|samsung|\bsam\b|\bblk\b|\bblack\b/iu.test(normalizedValue)) {
+    const variant = shorthandGalaxyMatch[2]?.replace('+', 'Plus').replace(/\b\w/gu, (letter) => letter.toUpperCase()) || '';
+    return `Samsung Galaxy S${shorthandGalaxyMatch[1]}${variant ? ` ${variant}` : ''}`;
+  }
+
+  const ipadSizeYearMatch = normalizedValue.match(/\b(?:ipad|ip)\s*(\d{1,2}(?:\.\d)?)\b.*\b(20\d{2}|\d{2})\b/iu);
+  if (ipadSizeYearMatch) {
+    const year = ipadSizeYearMatch[2].length === 2 ? `20${ipadSizeYearMatch[2]}` : ipadSizeYearMatch[2];
+    return `iPad ${ipadSizeYearMatch[1]}" ${year}`;
+  }
+
+  const ipadMatch = normalizedValue.match(/\b(?:ipad|ip)\b/iu);
+  if (ipadMatch) {
+    return 'iPad';
   }
 
   const iphoneMatch = normalizedValue.match(/\bi\s*phone\s*(\d{1,2})(e)?(?:\s*(pro\s*max|pro|plus|mini))?/iu);
@@ -457,15 +483,19 @@ function getImportedDeviceType(modelName: string): DeviceInput['type'] {
     return 'Cradlepoint';
   }
 
-  if (/(verizon\s+jetpack|inseego)/iu.test(modelName)) {
+  if (/(verizon\s+jetpack|vz\s+jetpack|jetpack|inseego|sonim\s+h?500|tcl\s+linkzone|orbic\s+speed)/iu.test(modelName)) {
     return 'MiFi Device';
+  }
+
+  if (/\b(ipad|tablet|tab\b|ip\s*\d{1,2}(?:\.\d)?)/iu.test(modelName)) {
+    return 'Tablet';
   }
 
   return 'Cell Phone';
 }
 
 function getGeneratedAssetTag(type: string, phoneNumber: string, imei: string, simNumber: string, rowNumber?: number): string {
-  const prefix = type === 'Cradlepoint' ? 'CRADLEPOINT' : type === 'MiFi Device' ? 'MIFI' : type === 'Cell Phone' ? 'PHONE' : normalizeLooseKey(type).toUpperCase() || 'DEVICE';
+  const prefix = type === 'Cradlepoint' ? 'CRADLEPOINT' : type === 'MiFi Device' ? 'MIFI' : type === 'Tablet' ? 'TABLET' : type === 'Cell Phone' ? 'PHONE' : normalizeLooseKey(type).toUpperCase() || 'DEVICE';
   const phoneDigits = normalizeDigits(phoneNumber);
   const imeiKey = normalizeLooseKey(imei);
   const simKey = normalizeLooseKey(simNumber);
@@ -537,7 +567,7 @@ function validateDevicePayload(body: Record<string, unknown>) {
   const imei = cleanString(body.imei, 100);
   const simNumber = cleanString(body.simNumber, 100);
   const assetTag = cleanString(body.assetTag, 100)
-    || (type === 'Cell Phone' || type === 'MiFi Device' ? getGeneratedAssetTag(type, phoneNumber, imei, simNumber) : '');
+    || (type === 'Cell Phone' || type === 'MiFi Device' || type === 'Tablet' ? getGeneratedAssetTag(type, phoneNumber, imei, simNumber) : '');
   const makeModel = cleanString(body.makeModel, 150);
   const status = cleanString(body.status, 50) || 'Available';
   const carrier = cleanString(body.carrier, 50) || 'Verizon';

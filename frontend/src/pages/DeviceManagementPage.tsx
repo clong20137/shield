@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, MouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, ArchiveX, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, Radio, RefreshCw, Router, Save, Smartphone, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
+import { AlertTriangle, ArchiveX, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, Radio, RefreshCw, Router, Save, Smartphone, Tablet, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, deviceService, DeviceRecord, PhoneImportType } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
 import { AppContextMenu, AppContextMenuPosition, shouldUseNativeContextMenu } from '../components/AppContextMenu';
@@ -27,7 +27,7 @@ type PhoneImportProgress = {
   status: 'queued' | 'processing' | 'completed' | 'failed';
 };
 
-const deviceTypes: DeviceType[] = ['Cell Phone', 'MiFi Device', 'Computer', 'Radio', 'Cradlepoint'];
+const deviceTypes: DeviceType[] = ['Cell Phone', 'MiFi Device', 'Tablet', 'Computer', 'Radio', 'Cradlepoint'];
 const deviceStatuses: DeviceStatus[] = ['Available', 'Assigned', 'Maintenance', 'Damaged', 'Lost', 'Retired'];
 const deviceCarriers: DeviceCarrier[] = ['Verizon', 'AT&T'];
 const deviceConditions = ['Excellent', 'Good', 'Fair', 'Poor', 'Damaged'];
@@ -75,6 +75,7 @@ const defaultDeviceForm: DeviceForm = {
 const deviceIconMap = {
   'Cell Phone': Smartphone,
   'MiFi Device': Router,
+  Tablet,
   Computer: Laptop,
   Radio,
   Cradlepoint: Wifi,
@@ -130,7 +131,7 @@ function cleanDeviceFormForType(form: DeviceForm): DeviceForm {
     cleanedForm.routerId = '';
   }
 
-  if (form.type === 'Cell Phone') {
+  if (form.type === 'Cell Phone' || form.type === 'Tablet') {
     cleanedForm.radioId = '';
     cleanedForm.hostname = '';
     cleanedForm.routerId = '';
@@ -143,6 +144,7 @@ function shouldShowDeviceField(type: DeviceType, field: DeviceConditionalField):
   const hiddenFieldsByType: Record<DeviceType, DeviceConditionalField[]> = {
     'Cell Phone': ['radioId', 'hostname', 'routerId'],
     'MiFi Device': ['radioId'],
+    Tablet: ['radioId', 'hostname', 'routerId'],
     Computer: ['phoneNumber', 'imei', 'simNumber', 'radioId'],
     Radio: ['phoneNumber', 'imei', 'hostname', 'routerId'],
     Cradlepoint: ['phoneNumber', 'imei', 'simNumber', 'radioId'],
@@ -291,7 +293,7 @@ function getDeviceHealthChips(device: DeviceRecord): Array<{ label: string; tone
 }
 
 function getDeviceDisplayName(device: DeviceRecord): string {
-  if (device.type === 'Cell Phone' || device.type === 'Cradlepoint') {
+  if (device.type === 'Cell Phone' || device.type === 'Tablet' || device.type === 'Cradlepoint') {
     return device.makeModel || device.type;
   }
 
@@ -301,7 +303,7 @@ function getDeviceDisplayName(device: DeviceRecord): string {
 function getDeviceDisplayMeta(device: DeviceRecord): string {
   const details: string[] = [device.type];
 
-  if ((device.type === 'Cell Phone' || device.type === 'Cradlepoint') && device.phoneNumber) {
+  if ((device.type === 'Cell Phone' || device.type === 'Tablet' || device.type === 'Cradlepoint') && device.phoneNumber) {
     details.push(device.phoneNumber);
   } else if (device.makeModel && device.makeModel !== getDeviceDisplayName(device)) {
     details.push(device.makeModel);
@@ -1421,7 +1423,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete All Device Records</h2>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Delete all phone, MiFi, and Cradlepoint records? This cannot be undone.
+              Delete all phone, MiFi, tablet, and Cradlepoint records? This cannot be undone.
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setIsDeleteAllRecordsConfirmOpen(false)} className="btn-secondary" aria-label="Cancel delete all records" title="Cancel">

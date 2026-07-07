@@ -245,9 +245,9 @@ export class DeviceModel {
       const [rows] = await conn.query<DeviceRow[]>(
         `SELECT ${deviceColumns}
         FROM devices
-        WHERE \`type\` IN (?, ?, ?)
+        WHERE \`type\` IN (?, ?, ?, ?)
         ORDER BY \`type\`, \`assignedTo\`, \`assetTag\``,
-        ['Cell Phone', 'MiFi Device', 'Cradlepoint']
+        ['Cell Phone', 'MiFi Device', 'Tablet', 'Cradlepoint']
       );
 
       return rows;
@@ -259,7 +259,7 @@ export class DeviceModel {
   static async deletePhoneDevices(): Promise<number> {
     const conn = await pool.getConnection();
     try {
-      const [result] = await conn.query<ResultSetHeader>('DELETE FROM devices WHERE `type` IN (?, ?, ?)', ['Cell Phone', 'MiFi Device', 'Cradlepoint']);
+      const [result] = await conn.query<ResultSetHeader>('DELETE FROM devices WHERE `type` IN (?, ?, ?, ?)', ['Cell Phone', 'MiFi Device', 'Tablet', 'Cradlepoint']);
       return result.affectedRows;
     } finally {
       conn.release();

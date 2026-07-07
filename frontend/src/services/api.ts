@@ -902,7 +902,7 @@ export interface ErrorLogResponse {
 
 export interface DeviceRecord {
   id: string;
-  type: 'Cell Phone' | 'MiFi Device' | 'Computer' | 'Radio' | 'Cradlepoint';
+  type: 'Cell Phone' | 'MiFi Device' | 'Tablet' | 'Computer' | 'Radio' | 'Cradlepoint';
   assetTag: string;
   makeModel: string;
   serialNumber: string;
