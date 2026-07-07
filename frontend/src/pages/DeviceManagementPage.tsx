@@ -1,7 +1,7 @@
 import { ChangeEvent, FormEvent, MouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, ArchiveX, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, Radio, RefreshCw, Router, Save, Smartphone, Tablet, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
-import { authService, AuthAccount, deviceService, DeviceRecord, PhoneImportType } from '../services/api';
+import { authService, AuthAccount, DeviceReportMonthlySnapshot, deviceService, DeviceRecord, PhoneImportType, reportService } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
 import { AppContextMenu, AppContextMenuPosition, shouldUseNativeContextMenu } from '../components/AppContextMenu';
 
@@ -412,6 +412,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [phoneImportType, setPhoneImportType] = useState<PhoneImportType>('verizon-phone');
   const [phoneImportReportMonth, setPhoneImportReportMonth] = useState(getCurrentReportMonth);
   const [isPhoneImportSetupOpen, setIsPhoneImportSetupOpen] = useState(false);
+  const [deviceReportSnapshots, setDeviceReportSnapshots] = useState<DeviceReportMonthlySnapshot[]>([]);
+  const [deviceReportSnapshotsLoading, setDeviceReportSnapshotsLoading] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
@@ -427,6 +429,24 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const canManageDevices = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('devices:manage'));
   const canDeleteAllDevices = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('devices:delete-all'));
   const actor = { actorId: currentUser?.id, actorName: currentUser?.displayName || currentUser?.email };
+
+  const loadDeviceReportSnapshots = useCallback(async () => {
+    if (!canManageDevices) {
+      setDeviceReportSnapshots([]);
+      return;
+    }
+
+    setDeviceReportSnapshotsLoading(true);
+    try {
+      const response = await reportService.getDeviceManagementReports();
+      setDeviceReportSnapshots(response.data.monthlySnapshots || []);
+    } catch (err) {
+      console.error('Failed to load device report snapshots:', err);
+      setDeviceReportSnapshots([]);
+    } finally {
+      setDeviceReportSnapshotsLoading(false);
+    }
+  }, [canManageDevices]);
 
   const loadRegisteredUsers = useCallback(async () => {
     if (!currentUser || !canManageDevices || isUserLoadInFlightRef.current) {
@@ -849,6 +869,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         skippedCount: importJob.summary.skippedRows.length,
       });
       await loadDevices(false);
+      await loadDeviceReportSnapshots();
     } catch (err) {
       console.error('Failed to import phones:', err);
       setError(`Failed to import ${selectedImport.label}. Check columns, phone numbers, and duplicate asset tags.`);
@@ -862,6 +883,12 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     pendingPhoneImportTypeRef.current = phoneImportType;
     setIsPhoneImportSetupOpen(false);
     window.setTimeout(() => phoneImportInputRef.current?.click(), 0);
+  };
+
+  const openPhoneImportSetup = () => {
+    setIsPhoneImportSetupOpen(true);
+    setIsExportMenuOpen(false);
+    void loadDeviceReportSnapshots();
   };
 
   const bulkStatusUpdate = async (status: DeviceStatus) => {
@@ -927,6 +954,13 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const selectedPhoneImportOption = phoneImportOptions.find((option) => option.value === phoneImportType) || phoneImportOptions[0];
   const reportMonthRailOptions = useMemo(() => getReportMonthRailOptions(phoneImportReportMonth), [phoneImportReportMonth]);
   const reportMonthYear = getReportMonthYear(phoneImportReportMonth);
+  const existingReportMonthKeys = useMemo(
+    () => new Set(deviceReportSnapshots.map((snapshot) => `${snapshot.carrier}|${snapshot.reportMonth}`)),
+    [deviceReportSnapshots],
+  );
+  const selectedExistingReportSnapshot = deviceReportSnapshots.find(
+    (snapshot) => snapshot.carrier === selectedPhoneImportOption.label && snapshot.reportMonth === phoneImportReportMonth,
+  );
   const exportOptions: Array<{ value: DeviceExportScope; label: string; count: number }> = [
     { value: 'All', label: 'All', count: devices.length },
     { value: 'Verizon', label: 'Verizon', count: devices.filter((device) => device.carrier === 'Verizon').length },
@@ -1059,10 +1093,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => {
-                      setIsPhoneImportSetupOpen(true);
-                      setIsExportMenuOpen(false);
-                    }}
+                    onClick={openPhoneImportSetup}
                     className="btn-secondary h-10 w-10 justify-center p-0"
                     aria-label="Import device report"
                     title="Import device report"
@@ -1475,25 +1506,40 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                       <ChevronRight size={16} />
                     </button>
                   </div>
+                  {deviceReportSnapshotsLoading && (
+                    <p className="mb-2 rounded bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 dark:bg-blue-950/40 dark:text-blue-100">Checking existing reports...</p>
+                  )}
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-12">
-                    {reportMonthRailOptions.map((month) => (
-                      <button
-                        key={month.value}
-                        type="button"
-                        onClick={() => setPhoneImportReportMonth(month.value)}
-                        className={`rounded px-2 py-2.5 text-xs font-black uppercase transition ${
-                          phoneImportReportMonth === month.value
-                            ? 'bg-primary-500 text-white shadow-sm'
-                            : 'bg-white text-gray-600 hover:bg-primary-50 hover:text-primary-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100'
-                        }`}
-                        aria-pressed={phoneImportReportMonth === month.value}
-                      >
-                        {month.label}
-                      </button>
-                    ))}
+                    {reportMonthRailOptions.map((month) => {
+                      const alreadyHasReport = existingReportMonthKeys.has(`${selectedPhoneImportOption.label}|${month.value}`);
+                      return (
+                        <button
+                          key={month.value}
+                          type="button"
+                          onClick={() => setPhoneImportReportMonth(month.value)}
+                          className={`rounded px-2 py-2 text-xs font-black uppercase transition ${
+                            phoneImportReportMonth === month.value
+                              ? 'bg-primary-500 text-white shadow-sm'
+                              : alreadyHasReport
+                                ? 'bg-amber-50 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-900'
+                                : 'bg-white text-gray-600 hover:bg-primary-50 hover:text-primary-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100'
+                          }`}
+                          aria-pressed={phoneImportReportMonth === month.value}
+                          title={alreadyHasReport ? `${selectedPhoneImportOption.label} report already exists` : undefined}
+                        >
+                          <span className="block">{month.label}</span>
+                          {alreadyHasReport && <span className={`mt-0.5 block text-[9px] leading-none ${phoneImportReportMonth === month.value ? 'text-white/80' : 'text-amber-600 dark:text-amber-200'}`}>Saved</span>}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </Field>
+              {selectedExistingReportSnapshot && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                  A {selectedPhoneImportOption.label} report already exists for {new Date(`${phoneImportReportMonth}-01T00:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}. Uploading a file here will overwrite that report snapshot.
+                </div>
+              )}
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" onClick={() => setIsPhoneImportSetupOpen(false)} className="btn-secondary" aria-label="Cancel import setup" title="Cancel">
@@ -1501,7 +1547,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               </button>
               <button type="button" onClick={beginPhoneImport} className="btn-primary" aria-label="Choose report file" title="Choose File">
                 <Upload size={16} />
-                <span>Choose File</span>
+                <span>{selectedExistingReportSnapshot ? 'Overwrite Report' : 'Choose File'}</span>
               </button>
             </div>
           </div>
