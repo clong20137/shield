@@ -962,6 +962,7 @@ export interface PhoneImportResponse {
   totalRows: number;
   createdCount: number;
   updatedCount: number;
+  deletedCount: number;
   matchedCount: number;
   unmatchedRows: Array<{ rowNumber: number; reason: string; row: Record<string, unknown> }>;
   skippedRows: Array<{ rowNumber: number; reason: string; row: Record<string, unknown> }>;

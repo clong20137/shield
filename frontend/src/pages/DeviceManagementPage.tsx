@@ -17,6 +17,7 @@ type PhoneImportSummary = {
   totalRows: number;
   createdCount: number;
   updatedCount: number;
+  deletedCount: number;
   matchedCount: number;
   unmatchedCount: number;
   skippedCount: number;
@@ -357,6 +358,26 @@ function loadCollapsedInventoryTypes(): Record<string, boolean> {
 function getCurrentReportMonth(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getReportMonthYear(reportMonth: string): number {
+  const parsedYear = Number(reportMonth.slice(0, 4));
+  return Number.isFinite(parsedYear) && parsedYear > 1900 ? parsedYear : new Date().getFullYear();
+}
+
+function getReportMonthRailOptions(reportMonth: string) {
+  const year = getReportMonthYear(reportMonth);
+  return Array.from({ length: 12 }, (_, index) => {
+    const value = `${year}-${String(index + 1).padStart(2, '0')}`;
+    const label = new Date(`${value}-01T00:00:00`).toLocaleDateString(undefined, { month: 'short' });
+    return { value, label };
+  });
+}
+
+function shiftReportMonthYear(reportMonth: string, offset: number): string {
+  const year = getReportMonthYear(reportMonth) + offset;
+  const month = reportMonth.slice(5, 7) || '01';
+  return `${year}-${month}`;
 }
 
 function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null }) {
@@ -822,6 +843,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         totalRows: importJob.summary.totalRows,
         createdCount: importJob.summary.createdCount,
         updatedCount: importJob.summary.updatedCount,
+        deletedCount: importJob.summary.deletedCount || 0,
         matchedCount: importJob.summary.matchedCount,
         unmatchedCount: importJob.summary.unmatchedRows.length,
         skippedCount: importJob.summary.skippedRows.length,
@@ -903,6 +925,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setPageContextMenu({ x: event.clientX, y: event.clientY });
   };
   const selectedPhoneImportOption = phoneImportOptions.find((option) => option.value === phoneImportType) || phoneImportOptions[0];
+  const reportMonthRailOptions = useMemo(() => getReportMonthRailOptions(phoneImportReportMonth), [phoneImportReportMonth]);
+  const reportMonthYear = getReportMonthYear(phoneImportReportMonth);
   const exportOptions: Array<{ value: DeviceExportScope; label: string; count: number }> = [
     { value: 'All', label: 'All', count: devices.length },
     { value: 'Verizon', label: 'Verizon', count: devices.filter((device) => device.carrier === 'Verizon').length },
@@ -928,7 +952,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
       )}
       {phoneImportSummary && (
         <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-100">
-          {selectedPhoneImportOption.label} import complete: {phoneImportSummary.createdCount} created, {phoneImportSummary.updatedCount} updated, {phoneImportSummary.matchedCount} matched, {phoneImportSummary.unmatchedCount} unmatched, {phoneImportSummary.skippedCount} skipped from {phoneImportSummary.totalRows} rows.
+          {selectedPhoneImportOption.label} import complete: {phoneImportSummary.createdCount} created, {phoneImportSummary.updatedCount} updated, {phoneImportSummary.deletedCount} removed, {phoneImportSummary.matchedCount} matched, {phoneImportSummary.unmatchedCount} unmatched, {phoneImportSummary.skippedCount} skipped from {phoneImportSummary.totalRows} rows.
         </div>
       )}
       {loading && <div className="loading">Loading device inventory...</div>}
@@ -1429,12 +1453,46 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 </select>
               </Field>
               <Field label="Report Month">
-                <input
-                  type="month"
-                  value={phoneImportReportMonth}
-                  onChange={(event) => setPhoneImportReportMonth(event.target.value || getCurrentReportMonth())}
-                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-                />
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-950">
+                  <div className="mb-2 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setPhoneImportReportMonth((current) => shiftReportMonthYear(current, -1))}
+                      className="btn-secondary h-8 w-8 justify-center p-0"
+                      aria-label="Previous report year"
+                      title="Previous Year"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <span className="text-sm font-black text-gray-800 dark:text-gray-100">{reportMonthYear}</span>
+                    <button
+                      type="button"
+                      onClick={() => setPhoneImportReportMonth((current) => shiftReportMonthYear(current, 1))}
+                      className="btn-secondary h-8 w-8 justify-center p-0"
+                      aria-label="Next report year"
+                      title="Next Year"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-6 gap-1 sm:grid-cols-12">
+                    {reportMonthRailOptions.map((month) => (
+                      <button
+                        key={month.value}
+                        type="button"
+                        onClick={() => setPhoneImportReportMonth(month.value)}
+                        className={`rounded px-2 py-2 text-xs font-black uppercase transition ${
+                          phoneImportReportMonth === month.value
+                            ? 'bg-primary-500 text-white shadow-sm'
+                            : 'bg-white text-gray-600 hover:bg-primary-50 hover:text-primary-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100'
+                        }`}
+                        aria-pressed={phoneImportReportMonth === month.value}
+                      >
+                        {month.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </Field>
             </div>
             <div className="mt-6 flex justify-end gap-2">

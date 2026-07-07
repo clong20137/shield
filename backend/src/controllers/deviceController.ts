@@ -30,6 +30,7 @@ type PhoneImportSummary = {
   totalRows: number;
   createdCount: number;
   updatedCount: number;
+  deletedCount: number;
   matchedCount: number;
   unmatchedRows: Array<{ rowNumber: number; reason: string; row: PhoneImportRow }>;
   skippedRows: Array<{ rowNumber: number; reason: string; row: PhoneImportRow }>;
@@ -686,6 +687,7 @@ function createEmptyPhoneImportSummary(totalRows: number): PhoneImportSummary {
     totalRows,
     createdCount: 0,
     updatedCount: 0,
+    deletedCount: 0,
     matchedCount: 0,
     unmatchedRows: [],
     skippedRows: [],
@@ -703,9 +705,10 @@ async function processPhoneImportRows(
   },
 ) {
   const importType = detectPhoneImportType(rows, options.importType || 'verizon-phone');
+  const importCarrier = getCarrierForImportType(importType);
   const users = await UserModel.getAllUsers(10000, 0, true);
   const userMatcher = buildUserMatcher(users);
-  const existingPhones = await DeviceModel.listImportManagedDevices();
+  const existingPhones = (await DeviceModel.listImportManagedDevices()).filter((device) => device.carrier === importCarrier);
   const deviceMatcher = new Map<string, Device>();
   existingPhones.forEach((device) => {
     buildDeviceMatchKey(device).forEach((key) => {
@@ -717,6 +720,7 @@ async function processPhoneImportRows(
 
   const summary = createEmptyPhoneImportSummary(rows.length);
   const changedDeviceIds = new Set<string>();
+  const uploadedDeviceIds = new Set<string>();
 
   for (const [index, row] of rows.entries()) {
     const rowNumber = index + 2;
@@ -775,6 +779,7 @@ async function processPhoneImportRows(
       if (updated) {
         summary.updatedCount += 1;
         changedDeviceIds.add(updated.id);
+        uploadedDeviceIds.add(updated.id);
         buildDeviceMatchKey(updated).forEach((key) => deviceMatcher.set(key, updated));
       }
     } else {
@@ -788,12 +793,33 @@ async function processPhoneImportRows(
       });
       summary.createdCount += 1;
       changedDeviceIds.add(created.id);
+      uploadedDeviceIds.add(created.id);
       buildDeviceMatchKey(created).forEach((key) => deviceMatcher.set(key, created));
     }
 
     options.onProgress?.(index + 1, summary);
     if (options.shouldYield && (index + 1) % PHONE_IMPORT_JOB_CHUNK_SIZE === 0) {
       await waitForImportJobYield();
+    }
+  }
+
+  for (const existingDevice of existingPhones) {
+    if (uploadedDeviceIds.has(existingDevice.id)) {
+      continue;
+    }
+
+    const deleted = await DeviceModel.deleteDevice(existingDevice.id, {
+      action: 'Phone Import Removed',
+      actorId: options.actorId,
+      actorName: options.actorName,
+      assignedTo: existingDevice.assignedTo,
+      status: existingDevice.status,
+      notes: `${importCarrier} report import removed this device because it was not present in the uploaded report.`,
+    });
+
+    if (deleted) {
+      summary.deletedCount += 1;
+      changedDeviceIds.add(existingDevice.id);
     }
   }
 
