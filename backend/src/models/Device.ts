@@ -215,6 +215,23 @@ export class DeviceModel {
     }
   }
 
+  static async listImportManagedDevices(): Promise<Device[]> {
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.query<DeviceRow[]>(
+        `SELECT ${deviceColumns}
+        FROM devices
+        WHERE \`type\` IN (?, ?, ?)
+        ORDER BY \`type\`, \`assignedTo\`, \`assetTag\``,
+        ['Cell Phone', 'MiFi Device', 'Cradlepoint']
+      );
+
+      return rows;
+    } finally {
+      conn.release();
+    }
+  }
+
   static async deletePhoneDevices(): Promise<number> {
     const conn = await pool.getConnection();
     try {

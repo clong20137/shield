@@ -462,7 +462,7 @@ async function processPhoneImportRows(
   const importType = options.importType || 'verizon-phone';
   const users = await UserModel.getAllUsers(10000, 0, true);
   const userMatcher = buildUserMatcher(users);
-  const existingPhones = await DeviceModel.listPhoneDevices();
+  const existingPhones = await DeviceModel.listImportManagedDevices();
   const deviceMatcher = new Map<string, Device>();
   existingPhones.forEach((device) => {
     buildDeviceMatchKey(device).forEach((key) => {
