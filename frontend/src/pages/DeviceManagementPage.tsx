@@ -36,8 +36,8 @@ const DEVICE_TABLE_MAX_HEIGHT = 620;
 const PHONE_IMPORT_POLL_MS = 900;
 const INVENTORY_TREE_COLLAPSE_KEY = 'shield_device_inventory_tree_collapsed';
 const phoneImportOptions: Array<{ value: PhoneImportType; label: string; accept: string }> = [
-  { value: 'verizon-phone', label: 'Verizon Phone CSV', accept: '.csv' },
-  { value: 'att-firstnet', label: 'AT&T FirstNet XLSX', accept: '.xlsx,.xls,.csv' },
+  { value: 'verizon-phone', label: 'Verizon', accept: '.csv' },
+  { value: 'att-firstnet', label: 'AT&T', accept: '.xlsx,.xls,.csv' },
 ];
 
 const defaultDeviceForm: DeviceForm = {
