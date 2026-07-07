@@ -161,7 +161,7 @@ type DailyGraphType = 'line' | 'bar';
 type DeviceReportDimension = 'type' | 'status' | 'carrier' | 'condition' | 'model' | 'cost';
 type DailyCompareMode = 'none' | 'user' | 'district';
 type ReportType = 'trooper-daily' | 'cpar' | 'devices';
-type TrooperDailyTab = 'graph' | 'table' | 'exports';
+type TrooperDailyTab = 'graph' | 'table';
 type DailyCompareItem = {
   id: string;
   type: 'user' | 'district';
@@ -232,7 +232,6 @@ const DEVICE_REPORT_TOTAL_SNAPSHOT_KEY = 'shield_device_report_total_snapshot';
 const trooperDailyTabs: Array<{ value: TrooperDailyTab; label: string }> = [
   { value: 'graph', label: 'Graph' },
   { value: 'table', label: 'Table' },
-  { value: 'exports', label: 'Exports' },
 ];
 
 const reportWorkspaces: Array<{
@@ -244,7 +243,7 @@ const reportWorkspaces: Array<{
   {
     value: 'trooper-daily',
     label: 'Trooper Dailies',
-    description: 'Daily activity analytics, review queue, and exports.',
+    description: 'Daily activity analytics and review queue.',
     icon: ClipboardList,
   },
   {
@@ -659,6 +658,7 @@ const ReportsPage: React.FC<{
   const [isAnalyticsFilterOpen, setIsAnalyticsFilterOpen] = useState(false);
   const [isSavedGraphToolsOpen, setIsSavedGraphToolsOpen] = useState(false);
   const [isCompareToolsOpen, setIsCompareToolsOpen] = useState(false);
+  const [isGraphFocusMode, setIsGraphFocusMode] = useState(false);
   const [deviceReport, setDeviceReport] = useState<DeviceManagementReportResponse | null>(null);
   const [deviceReportLoading, setDeviceReportLoading] = useState(false);
   const [deviceReportError, setDeviceReportError] = useState<string | null>(null);
@@ -1525,6 +1525,31 @@ const ReportsPage: React.FC<{
     </div>
   );
 
+  const renderTrooperDailyExportControls = () => (
+    <div className="flex flex-wrap items-center gap-2">
+      <select
+        value={dailyExportFormat}
+        onChange={(event) => setDailyExportFormat(event.target.value as DailyExportFormat)}
+        className="h-9 rounded border border-gray-300 bg-white px-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
+        aria-label="Trooper Daily export format"
+      >
+        <option value="csv">CSV</option>
+        <option value="pdf">PDF</option>
+        <option value="xls">XLS</option>
+      </select>
+      <button
+        type="button"
+        onClick={exportTrooperDailies}
+        className="btn-secondary"
+        disabled={dailyExporting}
+        aria-label="Export Trooper Daily reports"
+        title={dailyExporting ? 'Exporting' : 'Export'}
+      >
+        <Download size={16} />
+      </button>
+    </div>
+  );
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -1567,20 +1592,16 @@ const ReportsPage: React.FC<{
             <h2>Trooper Daily Reports</h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {dailyScope === 'all'
-                ? 'Search submitted Trooper Dailies by user, email, PE number, badge, rank, or district.'
-                : `Search your submitted Trooper Dailies${currentUser?.displayName ? `, ${currentUser.displayName}` : ''}.`}
+                ? 'Graph activity trends or review submitted reports.'
+                : `View your submitted Trooper Dailies${currentUser?.displayName ? `, ${currentUser.displayName}` : ''}.`}
             </p>
           </div>
-          <span className="rounded bg-accent/10 px-3 py-1 text-sm font-bold text-accent">
-            {dailyTotal.toLocaleString()} result{dailyTotal === 1 ? '' : 's'}
-          </span>
         </div>
 
         <div className="mb-5 flex flex-wrap gap-x-6 gap-y-2 border-b border-gray-200 pb-4 text-sm dark:border-gray-800">
           {[
             ['Reports', dailyAnalytics?.totals?.totalReports ?? dailyTotal],
             ['Total Hours', formatMetric(Number(dailyAnalytics?.totals?.totalHours || 0), 1)],
-            ['Avg. Hours', formatMetric(Number(dailyAnalytics?.totals?.averageHours || 0), 1)],
             ['Troopers', dailyAnalytics?.totals?.uniqueTroopers ?? 0],
           ].map(([label, value]) => (
             <span key={label} className="font-semibold text-gray-500 dark:text-gray-400">
@@ -1736,7 +1757,7 @@ const ReportsPage: React.FC<{
           ) : dailyAnalytics ? (
             <>
               <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
-                <div className="mb-3 grid grid-cols-1 gap-2 xl:grid-cols-[minmax(14rem,0.9fr)_minmax(0,1.6fr)_auto_auto_auto] xl:items-center">
+                <div className="mb-3 grid grid-cols-1 gap-2 xl:grid-cols-[minmax(14rem,0.9fr)_minmax(0,1.6fr)_auto_auto_auto_auto] xl:items-center">
                   <div className="min-w-0">
                     <select
                       value={selectedTrend?.key || selectedAnalyticsMetric}
@@ -1795,6 +1816,18 @@ const ReportsPage: React.FC<{
                       title="Saved Views"
                     >
                       <Save size={16} />
+                    </button>
+                  </div>
+                  <div className="flex justify-start xl:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsGraphFocusMode((open) => !open)}
+                      className={`btn-secondary ${isGraphFocusMode ? 'border-primary-500 text-primary-600 dark:text-primary-300' : ''}`}
+                      aria-pressed={isGraphFocusMode}
+                      aria-label="Toggle graph focus mode"
+                      title={isGraphFocusMode ? 'Exit Focus' : 'Focus Graph'}
+                    >
+                      <BarChart3 size={16} />
                     </button>
                   </div>
                   <div className="flex justify-start xl:justify-end">
@@ -2015,8 +2048,8 @@ const ReportsPage: React.FC<{
                         ))}
                       </div>
                     )}
-                    <div ref={analyticsChartRef} className="h-[26rem] w-full">
-                      <AnalyticsChart series={chartSeries} graphType={dailyGraphType} height={420} />
+                    <div ref={analyticsChartRef} className={`${isGraphFocusMode ? 'h-[34rem]' : 'h-[26rem]'} w-full`}>
+                      <AnalyticsChart series={chartSeries} graphType={dailyGraphType} height={isGraphFocusMode ? 540 : 420} />
                     </div>
                   </>
                 ) : (
@@ -2037,35 +2070,6 @@ const ReportsPage: React.FC<{
         </section>
         )}
 
-        {activeTrooperDailyTab === 'exports' && (
-          <section className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/60">
-            <div className="mb-4">
-              <h3 className="text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Exports</h3>
-              <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
-                Export uses the current table filters for search, date range, and district.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={dailyExportFormat}
-                onChange={(event) => setDailyExportFormat(event.target.value as DailyExportFormat)}
-                className="min-w-28 rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-                aria-label="Export format"
-              >
-                <option value="csv">CSV</option>
-                <option value="pdf">PDF</option>
-                <option value="xls">XLS</option>
-              </select>
-              <button type="button" onClick={exportTrooperDailies} className="btn-secondary" disabled={dailyExporting} aria-label="Export Trooper Daily reports" title={dailyExporting ? 'Exporting' : 'Export'}>
-                <Download size={16} />
-              </button>
-              <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
-                {dailyTotal.toLocaleString()} matching report{dailyTotal === 1 ? '' : 's'}
-              </span>
-            </div>
-          </section>
-        )}
-
         {activeTrooperDailyTab === 'table' && (
         <>
         {dailyError && <div className="error">{dailyError}</div>}
@@ -2075,9 +2079,10 @@ const ReportsPage: React.FC<{
           <>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">
-                Page {dailyPage.toLocaleString()} of {dailyTotalPages.toLocaleString()}
+                {dailyTotal.toLocaleString()} matching report{dailyTotal === 1 ? '' : 's'} - Page {dailyPage.toLocaleString()} of {dailyTotalPages.toLocaleString()}
               </p>
               <div className="flex flex-wrap items-center gap-2">
+                {renderTrooperDailyExportControls()}
                 <select
                   value={dailyPageSize}
                   onChange={(event) => changeDailyPageSize(Number(event.target.value))}
