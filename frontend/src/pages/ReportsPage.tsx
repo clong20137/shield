@@ -657,6 +657,8 @@ const ReportsPage: React.FC<{
   const [activeTrooperDailyTab, setActiveTrooperDailyTab] = useState<TrooperDailyTab>('graph');
   const [isTableFilterOpen, setIsTableFilterOpen] = useState(false);
   const [isAnalyticsFilterOpen, setIsAnalyticsFilterOpen] = useState(false);
+  const [isSavedGraphToolsOpen, setIsSavedGraphToolsOpen] = useState(false);
+  const [isCompareToolsOpen, setIsCompareToolsOpen] = useState(false);
   const [deviceReport, setDeviceReport] = useState<DeviceManagementReportResponse | null>(null);
   const [deviceReportLoading, setDeviceReportLoading] = useState(false);
   const [deviceReportError, setDeviceReportError] = useState<string | null>(null);
@@ -1667,27 +1669,28 @@ const ReportsPage: React.FC<{
         )}
 
         {activeTrooperDailyTab === 'graph' && (
-        <section className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/60">
+        <section className="mb-5 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-gray-100">
-                <BarChart3 size={20} className="text-accent" /> Live Trooper Daily Analytics
+              <h3 className="flex items-center gap-2 text-base font-black text-gray-900 dark:text-gray-100">
+                <BarChart3 size={18} className="text-accent" /> Trooper Daily Analytics
               </h3>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {canViewAllTrooperDailies ? 'View overall data, search a user, or narrow the graph to a district.' : 'View your submitted Trooper Daily analytics.'}
+              <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                {canViewAllTrooperDailies ? 'Graph daily activity by metric, range, user, or district.' : 'Graph your submitted Trooper Dailies.'}
               </p>
             </div>
-            {dailyAnalytics?.generatedAt && (
-              <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {dailyAnalytics?.generatedAt && (
+                <>
                 {dailyAnalyticsLoading && (
                   <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold uppercase text-accent">Updating</span>
                 )}
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-bold uppercase text-gray-500 shadow-sm dark:bg-gray-900 dark:text-gray-400">
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold uppercase text-gray-500 dark:bg-gray-950 dark:text-gray-400">
                   Updated {new Date(dailyAnalytics.generatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                 </span>
-              </div>
-            )}
-            {canViewAllTrooperDailies && (
+                </>
+              )}
+              {canViewAllTrooperDailies && (
               <button
                 type="button"
                 onClick={() => setIsAnalyticsFilterOpen((open) => !open)}
@@ -1698,7 +1701,8 @@ const ReportsPage: React.FC<{
               >
                 <Search size={16} /> <ChevronDown size={14} className={`transition ${isAnalyticsFilterOpen ? 'rotate-180' : ''}`} />
               </button>
-            )}
+              )}
+            </div>
           </div>
 
           {canViewAllTrooperDailies && isAnalyticsFilterOpen && (
@@ -1731,13 +1735,13 @@ const ReportsPage: React.FC<{
             <div className="loading">Loading Trooper Daily analytics...</div>
           ) : dailyAnalytics ? (
             <>
-              <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <div className="mb-4 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(14rem,0.9fr)_minmax(0,1.6fr)_auto_auto] xl:items-center">
+              <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+                <div className="mb-3 grid grid-cols-1 gap-2 xl:grid-cols-[minmax(14rem,0.9fr)_minmax(0,1.6fr)_auto_auto_auto] xl:items-center">
                   <div className="min-w-0">
                     <select
                       value={selectedTrend?.key || selectedAnalyticsMetric}
                       onChange={(event) => setSelectedAnalyticsMetric(event.target.value)}
-                      className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
+                      className="h-9 w-full rounded border border-gray-300 bg-white px-3 text-sm font-semibold dark:border-gray-700 dark:bg-gray-950"
                       aria-label="Graph metric"
                     >
                       {Object.entries(groupedFieldTrends).map(([section, trends]) => (
@@ -1755,7 +1759,7 @@ const ReportsPage: React.FC<{
                         key={range.value}
                         type="button"
                         onClick={() => applyDailyAnalyticsRange(range.value)}
-                        className={`rounded border px-3 py-2 text-xs font-black uppercase tracking-wide transition ${
+                        className={`rounded border px-2.5 py-1.5 text-xs font-black uppercase tracking-wide transition ${
                           dailyAnalyticsRange === range.value
                             ? 'border-accent bg-accent text-white'
                             : 'border-gray-300 bg-white text-gray-700 hover:border-accent/60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
@@ -1771,7 +1775,7 @@ const ReportsPage: React.FC<{
                         key={type.value}
                         type="button"
                         onClick={() => setDailyGraphType(type.value)}
-                        className={`rounded border px-3 py-2 text-xs font-black uppercase tracking-wide transition ${
+                        className={`rounded border px-2.5 py-1.5 text-xs font-black uppercase tracking-wide transition ${
                           dailyGraphType === type.value
                             ? 'border-primary-500 bg-primary-500 text-white'
                             : 'border-gray-300 bg-white text-gray-700 hover:border-primary-500/60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200'
@@ -1782,11 +1786,24 @@ const ReportsPage: React.FC<{
                     ))}
                   </div>
                   <div className="flex justify-start xl:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsSavedGraphToolsOpen((open) => !open)}
+                      className="btn-secondary"
+                      aria-expanded={isSavedGraphToolsOpen}
+                      aria-label="Toggle saved graph views"
+                      title="Saved Views"
+                    >
+                      <Save size={16} />
+                    </button>
+                  </div>
+                  <div className="flex justify-start xl:justify-end">
                     {renderAnalyticsExportDropdown()}
                   </div>
                 </div>
 
-                <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                {isSavedGraphToolsOpen && (
+                <div className="mb-3 flex flex-wrap items-center gap-2 rounded border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-950">
                   <select
                     value={selectedSavedGraphViewId}
                     onChange={(event) => applySavedGraphView(event.target.value)}
@@ -1812,15 +1829,32 @@ const ReportsPage: React.FC<{
                     <Trash2 size={16} />
                   </button>
                 </div>
+                )}
 
                 {canViewAllTrooperDailies ? (
                   <>
-                    <section className="relative z-40 mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
+                      <button
+                        type="button"
+                        onClick={() => setIsCompareToolsOpen((open) => !open)}
+                        className="btn-secondary"
+                        aria-expanded={isCompareToolsOpen}
+                        aria-label="Toggle comparison tools"
+                        title="Compare"
+                      >
+                        <BarChart3 size={16} />
+                        {compareItems.length > 0 ? `${compareItems.length} compared` : 'Compare'}
+                        <ChevronDown size={14} className={`transition ${isCompareToolsOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {compareAnalyticsLoading && (
+                        <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-black uppercase text-accent">Updating comparisons</span>
+                      )}
+                    </div>
+
+                    {isCompareToolsOpen && (
+                    <section className="relative z-40 mb-4 rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                         <h5 className="text-sm font-black uppercase tracking-wide text-gray-700 dark:text-gray-200">Compare</h5>
-                        {compareAnalyticsLoading && (
-                          <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-black uppercase text-accent">Updating</span>
-                        )}
                       </div>
 
                       <div className="grid grid-cols-1 gap-3 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-start">
@@ -1947,6 +1981,7 @@ const ReportsPage: React.FC<{
                         </div>
                       )}
                     </section>
+                    )}
                     {compareAnalyticsError && <div className="error mb-4">{compareAnalyticsError}</div>}
                   </>
                 ) : null}
