@@ -343,13 +343,13 @@ export async function initializeDatabase() {
   await pool.query(`
     INSERT IGNORE INTO roles (\`id\`, \`name\`, \`permissions\`)
     VALUES
-      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","account:profile-picture","presence:incognito","presence:view-incognito","media:view","media:upload","media:edit","media:delete","devices:manage","calendar:manage","calendar:view-profiles","fleet:bookings:manage","fleet:vehicles:manage","fleet:inventory:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:receive","messages:send","desktop:start-with-windows","desktop:minimize-to-tray","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","district-feed:post","bugs:manage","admin:access","admin:general","admin:permissions","admin:achievements","admin:create-user","admin:media","admin:alerts","admin:bugs","admin:audit","admin:errors"]'),
+      ('role-administrator', 'administrator', '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","account:profile-picture","presence:incognito","presence:view-incognito","media:view","media:upload","media:edit","media:delete","devices:manage","devices:delete-all","calendar:manage","calendar:view-profiles","fleet:bookings:manage","fleet:vehicles:manage","fleet:inventory:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:receive","messages:send","desktop:start-with-windows","desktop:minimize-to-tray","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","district-feed:post","bugs:manage","admin:access","admin:general","admin:permissions","admin:achievements","admin:create-user","admin:media","admin:alerts","admin:bugs","admin:audit","admin:errors"]'),
       ('role-user', 'user', '["users:view","account:profile-picture","calendar:manage","messages:receive","messages:send","desktop:start-with-windows","desktop:minimize-to-tray"]')
   `);
 
   await pool.query(`
     UPDATE roles
-    SET \`permissions\` = '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","account:profile-picture","presence:incognito","presence:view-incognito","media:view","media:upload","media:edit","media:delete","devices:manage","calendar:manage","calendar:view-profiles","fleet:bookings:manage","fleet:vehicles:manage","fleet:inventory:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:receive","messages:send","desktop:start-with-windows","desktop:minimize-to-tray","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","district-feed:post","bugs:manage","admin:access","admin:general","admin:permissions","admin:achievements","admin:create-user","admin:media","admin:alerts","admin:bugs","admin:audit","admin:errors"]'
+    SET \`permissions\` = '["users:view","users:create","users:edit","users:view-hidden","users:profile-picture","account:profile-picture","presence:incognito","presence:view-incognito","media:view","media:upload","media:edit","media:delete","devices:manage","devices:delete-all","calendar:manage","calendar:view-profiles","fleet:bookings:manage","fleet:vehicles:manage","fleet:inventory:manage","reports:trooper-dailies","reports:cpar","audit:view","roles:manage","messages:receive","messages:send","desktop:start-with-windows","desktop:minimize-to-tray","alerts:send","dashboard:manage","dashboard:create","dashboard:edit","dashboard:delete","district-feed:post","bugs:manage","admin:access","admin:general","admin:permissions","admin:achievements","admin:create-user","admin:media","admin:alerts","admin:bugs","admin:audit","admin:errors"]'
     WHERE \`name\` = 'administrator'
   `);
 
@@ -930,6 +930,27 @@ export async function initializeDatabase() {
   await ensureIndex('devices', 'idx_devices_condition', '`condition`');
   await ensureIndex('devices', 'idx_devices_maintenance_asset', '`maintenanceDueDate`, `assetTag`');
   await ensureIndex('devices', 'idx_devices_replacement_asset', '`replacementDueDate`, `assetTag`');
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS device_report_snapshots (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`reportMonth\` VARCHAR(7) NOT NULL,
+      \`carrier\` VARCHAR(50) NOT NULL,
+      \`importType\` VARCHAR(50) NOT NULL,
+      \`totalDevices\` INT NOT NULL DEFAULT 0,
+      \`assignedDevices\` INT NOT NULL DEFAULT 0,
+      \`unassignedDevices\` INT NOT NULL DEFAULT 0,
+      \`availableDevices\` INT NOT NULL DEFAULT 0,
+      \`possibleInactiveDevices\` INT NOT NULL DEFAULT 0,
+      \`estimatedMonthlyTotal\` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      \`dataJson\` LONGTEXT,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY \`uq_device_report_snapshots_month_carrier\` (\`reportMonth\`, \`carrier\`),
+      INDEX \`idx_device_report_snapshots_month\` (\`reportMonth\`),
+      INDEX \`idx_device_report_snapshots_carrier\` (\`carrier\`)
+    )
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS device_events (

@@ -52,6 +52,7 @@ const permissionGroups = [
     description: 'Daily work tools and inventory operations.',
     permissions: [
       { key: 'devices:manage', label: 'Manage devices' },
+      { key: 'devices:delete-all', label: 'Delete all device records' },
       { key: 'calendar:manage', label: 'Manage calendar' },
       { key: 'calendar:view-profiles', label: 'View profile calendars' },
       { key: 'messages:receive', label: 'Receive messages' },

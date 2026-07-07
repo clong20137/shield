@@ -800,6 +800,18 @@ export interface DeviceReportCarrierGroup extends DeviceReportGroup {
   carrier: string;
 }
 
+export interface DeviceReportMonthlySnapshot {
+  reportMonth: string;
+  carrier: string;
+  importType: string;
+  totalDevices: number;
+  assignedDevices: number;
+  unassignedDevices: number;
+  availableDevices: number;
+  possibleInactiveDevices: number;
+  estimatedMonthlyTotal: number;
+}
+
 export interface DeviceCostBreakdown {
   label: string;
   count: number;
@@ -829,6 +841,7 @@ export interface DeviceManagementReportResponse {
   byStatusCarrier?: DeviceReportCarrierGroup[];
   byModelCarrier?: DeviceReportCarrierGroup[];
   byConditionCarrier?: DeviceReportCarrierGroup[];
+  monthlySnapshots?: DeviceReportMonthlySnapshot[];
   costEstimate?: {
     estimatedMonthlyTotal: number;
     estimatedAnnualTotal: number;
@@ -964,6 +977,7 @@ export interface PhoneImportJob {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  reportMonth?: string | null;
 }
 
 export type PhoneImportType = 'verizon-phone' | 'att-firstnet';
@@ -1513,12 +1527,12 @@ export const deviceService = {
   exportPhones: () =>
     api.get<Blob>('/devices/phones/export', { responseType: 'blob' }),
 
-  importPhones: (payload: { rows: Record<string, string>[]; actorId?: string; actorName?: string; importType?: PhoneImportType }) =>
+  importPhones: (payload: { rows: Record<string, string>[]; actorId?: string; actorName?: string; importType?: PhoneImportType; reportMonth?: string }) =>
     api.post<PhoneImportResponse>('/devices/phones/import', payload, { timeout: 60000 }),
-  startPhoneImportJob: (csvText: string, actor?: { actorId?: string; actorName?: string }, importType: PhoneImportType = 'verizon-phone') =>
+  startPhoneImportJob: (csvText: string, actor?: { actorId?: string; actorName?: string }, importType: PhoneImportType = 'verizon-phone', reportMonth?: string) =>
     api.post<PhoneImportJob>('/devices/phones/import-jobs', csvText, {
       headers: { 'Content-Type': 'text/csv' },
-      params: { ...actor, importType },
+      params: { ...actor, importType, reportMonth },
       timeout: 60000,
     }),
   getPhoneImportJob: (jobId: string) =>

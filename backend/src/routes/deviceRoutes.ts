@@ -11,7 +11,7 @@ router.get('/phones/export', requirePermission('devices:manage'), DeviceControll
 router.post('/phones/import-jobs', requirePermission('devices:manage'), express.text({ type: ['text/csv', 'text/plain'], limit: '10mb' }), DeviceController.startPhoneImportJob);
 router.get('/phones/import-jobs/:jobId', requirePermission('devices:manage'), DeviceController.getPhoneImportJob);
 router.post('/phones/import', requirePermission('devices:manage'), DeviceController.importPhones);
-router.delete('/phones', requirePermission('devices:manage'), DeviceController.deletePhones);
+router.delete('/phones', requirePermission('devices:delete-all'), DeviceController.deletePhones);
 router.get('/', requirePermission('devices:manage'), DeviceController.listDevices);
 router.post('/', requirePermission('devices:manage'), DeviceController.createDevice);
 router.get('/:id/history', requirePermission('devices:manage'), DeviceController.listDeviceEvents);

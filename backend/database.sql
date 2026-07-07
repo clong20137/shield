@@ -177,6 +177,25 @@ CREATE TABLE IF NOT EXISTS device_events (
   INDEX `idx_device_events_device_created` (`deviceId`, `createdAt`)
 );
 
+CREATE TABLE IF NOT EXISTS device_report_snapshots (
+  `id` VARCHAR(36) PRIMARY KEY,
+  `reportMonth` VARCHAR(7) NOT NULL,
+  `carrier` VARCHAR(50) NOT NULL,
+  `importType` VARCHAR(50) NOT NULL,
+  `totalDevices` INT NOT NULL DEFAULT 0,
+  `assignedDevices` INT NOT NULL DEFAULT 0,
+  `unassignedDevices` INT NOT NULL DEFAULT 0,
+  `availableDevices` INT NOT NULL DEFAULT 0,
+  `possibleInactiveDevices` INT NOT NULL DEFAULT 0,
+  `estimatedMonthlyTotal` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `dataJson` LONGTEXT,
+  `createdAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uq_device_report_snapshots_month_carrier` (`reportMonth`, `carrier`),
+  INDEX `idx_device_report_snapshots_month` (`reportMonth`),
+  INDEX `idx_device_report_snapshots_carrier` (`carrier`)
+);
+
 CREATE TABLE IF NOT EXISTS import_jobs (
   `id` VARCHAR(36) PRIMARY KEY,
   `type` VARCHAR(50) NOT NULL,

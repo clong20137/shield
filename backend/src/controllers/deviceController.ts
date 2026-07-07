@@ -33,6 +33,7 @@ type PhoneImportSummary = {
   matchedCount: number;
   unmatchedRows: Array<{ rowNumber: number; reason: string; row: PhoneImportRow }>;
   skippedRows: Array<{ rowNumber: number; reason: string; row: PhoneImportRow }>;
+  reportMonth?: string | null;
 };
 type UserMatcher = {
   departmentPhones: Map<string, string>;
@@ -53,6 +54,7 @@ type PhoneImportJob = {
   updatedAt: string;
   completedAt: string | null;
   importType: PhoneImportType;
+  reportMonth: string | null;
 };
 interface ImportJobRow extends RowDataPacket {
   id: string;
@@ -68,6 +70,20 @@ interface ImportJobRow extends RowDataPacket {
   createdAt: Date | string;
   updatedAt: Date | string;
   completedAt: Date | string | null;
+}
+
+interface DeviceReportSnapshotSummaryRow extends RowDataPacket {
+  totalDevices: number;
+  assignedDevices: number;
+  unassignedDevices: number;
+  availableDevices: number;
+  possibleInactiveDevices: number;
+  estimatedMonthlyTotal: number | string;
+}
+
+interface DeviceReportSnapshotGroupRow extends RowDataPacket {
+  label: string;
+  count: number;
 }
 
 const phoneExportHeaders = [
@@ -115,6 +131,28 @@ function normalizeLooseKey(value: unknown): string {
 
 function normalizePhoneImportType(value: unknown): PhoneImportType {
   return normalizeLooseKey(value) === 'attfirstnet' ? 'att-firstnet' : 'verizon-phone';
+}
+
+function normalizeReportMonth(value: unknown): string | null {
+  const raw = String(value || '').trim();
+  if (/^\d{4}-\d{2}$/u.test(raw)) {
+    return raw;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/u.test(raw)) {
+    return raw.slice(0, 7);
+  }
+
+  return null;
+}
+
+function getReportMonthForToday(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getCarrierForImportType(importType: PhoneImportType): 'Verizon' | 'AT&T' {
+  return importType === 'att-firstnet' ? 'AT&T' : 'Verizon';
 }
 
 function detectPhoneImportType(rows: PhoneImportRow[], requestedType: PhoneImportType): PhoneImportType {
@@ -762,6 +800,81 @@ async function processPhoneImportRows(
   return { summary, changedDeviceCount: changedDeviceIds.size };
 }
 
+async function getDeviceReportSnapshotGroups(carrier: string, column: 'type' | 'status' | 'makeModel' | 'condition') {
+  const [rows] = await pool.query<DeviceReportSnapshotGroupRow[]>(
+    `SELECT COALESCE(NULLIF(\`${column}\`, ''), 'Unknown') AS label, COUNT(*) AS count
+     FROM devices
+     WHERE \`carrier\` = ?
+     GROUP BY COALESCE(NULLIF(\`${column}\`, ''), 'Unknown')
+     ORDER BY count DESC, label`,
+    [carrier],
+  );
+
+  return rows.map((row) => ({
+    label: row.label || 'Unknown',
+    count: Number(row.count) || 0,
+  }));
+}
+
+async function saveDeviceReportSnapshot(reportMonth: string, importType: PhoneImportType) {
+  const carrier = getCarrierForImportType(importType);
+  const [summaryRows] = await pool.query<DeviceReportSnapshotSummaryRow[]>(
+    `SELECT
+       COUNT(*) AS totalDevices,
+       SUM(CASE WHEN COALESCE(\`assignedTo\`, '') <> '' THEN 1 ELSE 0 END) AS assignedDevices,
+       SUM(CASE WHEN COALESCE(\`assignedTo\`, '') = '' THEN 1 ELSE 0 END) AS unassignedDevices,
+       SUM(CASE WHEN \`status\` = 'Available' THEN 1 ELSE 0 END) AS availableDevices,
+       SUM(CASE WHEN COALESCE(\`possibleInactive\`, 0) = 1 THEN 1 ELSE 0 END) AS possibleInactiveDevices,
+       SUM(COALESCE(\`monthlyCharge\`, 0)) AS estimatedMonthlyTotal
+     FROM devices
+     WHERE \`carrier\` = ?`,
+    [carrier],
+  );
+  const summary = summaryRows[0] || {
+    totalDevices: 0,
+    assignedDevices: 0,
+    unassignedDevices: 0,
+    availableDevices: 0,
+    possibleInactiveDevices: 0,
+    estimatedMonthlyTotal: 0,
+  };
+  const dataJson = JSON.stringify({
+    byType: await getDeviceReportSnapshotGroups(carrier, 'type'),
+    byStatus: await getDeviceReportSnapshotGroups(carrier, 'status'),
+    byModel: await getDeviceReportSnapshotGroups(carrier, 'makeModel'),
+    byCondition: await getDeviceReportSnapshotGroups(carrier, 'condition'),
+  });
+
+  await pool.query<ResultSetHeader>(
+    `INSERT INTO device_report_snapshots (
+       \`id\`, \`reportMonth\`, \`carrier\`, \`importType\`, \`totalDevices\`, \`assignedDevices\`,
+       \`unassignedDevices\`, \`availableDevices\`, \`possibleInactiveDevices\`, \`estimatedMonthlyTotal\`, \`dataJson\`
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       \`importType\` = VALUES(\`importType\`),
+       \`totalDevices\` = VALUES(\`totalDevices\`),
+       \`assignedDevices\` = VALUES(\`assignedDevices\`),
+       \`unassignedDevices\` = VALUES(\`unassignedDevices\`),
+       \`availableDevices\` = VALUES(\`availableDevices\`),
+       \`possibleInactiveDevices\` = VALUES(\`possibleInactiveDevices\`),
+       \`estimatedMonthlyTotal\` = VALUES(\`estimatedMonthlyTotal\`),
+       \`dataJson\` = VALUES(\`dataJson\`)`,
+    [
+      uuidv4(),
+      reportMonth,
+      carrier,
+      importType,
+      Number(summary.totalDevices) || 0,
+      Number(summary.assignedDevices) || 0,
+      Number(summary.unassignedDevices) || 0,
+      Number(summary.availableDevices) || 0,
+      Number(summary.possibleInactiveDevices) || 0,
+      Number(summary.estimatedMonthlyTotal) || 0,
+      dataJson,
+    ],
+  );
+}
+
 function getPublicPhoneImportJob(job: PhoneImportJob) {
   return {
     id: job.id,
@@ -773,6 +886,7 @@ function getPublicPhoneImportJob(job: PhoneImportJob) {
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
     completedAt: job.completedAt,
+    reportMonth: job.reportMonth,
   };
 }
 
@@ -795,6 +909,7 @@ function importJobRowToPhoneJob(row: ImportJobRow): PhoneImportJob {
     updatedAt: toIsoDateTime(row.updatedAt) || new Date().toISOString(),
     completedAt: toIsoDateTime(row.completedAt),
     importType,
+    reportMonth: summary.reportMonth ? normalizeReportMonth(summary.reportMonth) : null,
   };
 }
 
@@ -811,7 +926,7 @@ async function insertPhoneImportJob(job: PhoneImportJob) {
       job.actorId || null,
       job.actorName || null,
       JSON.stringify(job.rows),
-      JSON.stringify(job.summary),
+      JSON.stringify({ ...job.summary, reportMonth: job.reportMonth }),
       job.processedRows,
       job.totalRows,
       job.error,
@@ -824,7 +939,7 @@ async function updatePhoneImportJob(job: PhoneImportJob, includePayload = false)
   const payloadSql = includePayload ? ', `payloadJson` = ?' : '';
   const params: Array<string | number | Date | null> = [
     job.status,
-    JSON.stringify(job.summary),
+    JSON.stringify({ ...job.summary, reportMonth: job.reportMonth }),
     job.processedRows,
     job.totalRows,
     job.error,
@@ -903,6 +1018,9 @@ async function runPhoneImportJob(jobId: string) {
     job.status = 'completed';
     job.completedAt = new Date().toISOString();
     job.updatedAt = job.completedAt;
+    if (job.reportMonth) {
+      await saveDeviceReportSnapshot(job.reportMonth, job.importType);
+    }
     job.rows = [];
     await updatePhoneImportJob(job, true);
 
@@ -1036,12 +1154,16 @@ export class DeviceController {
       const actorId = cleanString(req.body?.actorId, 36);
       const actorName = cleanString(req.body?.actorName, 150);
       const importType = detectPhoneImportType(rows, normalizePhoneImportType(req.body?.importType));
+      const reportMonth = normalizeReportMonth(req.body?.reportMonth);
 
       if (rows.length === 0) {
         return res.status(400).json({ error: 'Import rows are required' });
       }
 
       const result = await processPhoneImportRows(rows, { actorId, actorName, importType });
+      if (reportMonth) {
+        await saveDeviceReportSnapshot(reportMonth, importType);
+      }
       if (result.changedDeviceCount > 0) {
         broadcastAppEvent({ type: 'device-updated', entityId: 'phone-import' });
       }
@@ -1063,6 +1185,7 @@ export class DeviceController {
       const actorId = cleanString(req.query.actorId, 36);
       const actorName = cleanString(req.query.actorName, 150);
       const importType = detectPhoneImportType(rows, normalizePhoneImportType(req.query.importType));
+      const reportMonth = normalizeReportMonth(req.query.reportMonth) || getReportMonthForToday();
 
       if (rows.length === 0) {
         return res.status(400).json({ error: 'Phone import CSV is empty.' });
@@ -1083,6 +1206,7 @@ export class DeviceController {
         updatedAt: now,
         completedAt: null,
         importType,
+        reportMonth,
       };
 
       phoneImportJobs.set(job.id, job);

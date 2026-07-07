@@ -354,6 +354,11 @@ function loadCollapsedInventoryTypes(): Record<string, boolean> {
   }
 }
 
+function getCurrentReportMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
 function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null }) {
   const [devices, setDevices] = useState<DeviceRecord[]>([]);
   const [registeredUsers, setRegisteredUsers] = useState<AuthAccount[]>([]);
@@ -384,6 +389,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [phoneImportSummary, setPhoneImportSummary] = useState<PhoneImportSummary | null>(null);
   const [phoneImportProgress, setPhoneImportProgress] = useState<PhoneImportProgress | null>(null);
   const [phoneImportType, setPhoneImportType] = useState<PhoneImportType>('verizon-phone');
+  const [phoneImportReportMonth, setPhoneImportReportMonth] = useState(getCurrentReportMonth);
   const [isPhoneImportMenuOpen, setIsPhoneImportMenuOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -398,6 +404,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const pendingPhoneImportTypeRef = useRef<PhoneImportType>('verizon-phone');
 
   const canManageDevices = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('devices:manage'));
+  const canDeleteAllDevices = currentUser?.role === 'administrator' || Boolean(currentUser?.permissions?.includes('devices:delete-all'));
   const actor = { actorId: currentUser?.id, actorName: currentUser?.displayName || currentUser?.email };
 
   const loadRegisteredUsers = useCallback(async () => {
@@ -707,7 +714,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   };
 
   const deleteAllDeviceRecords = async () => {
-    if (!canManageDevices) return;
+    if (!canDeleteAllDevices) return;
 
     try {
       setError(null);
@@ -786,7 +793,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         return;
       }
 
-      const response = await deviceService.startPhoneImportJob(csvText, actor, activeImportType);
+      const response = await deviceService.startPhoneImportJob(csvText, actor, activeImportType, phoneImportReportMonth);
       let importJob = response.data;
       setPhoneImportProgress({
         processedRows: importJob.processedRows,
@@ -980,6 +987,17 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                   <Plus size={16} />
                 </button>
               )}
+              {canDeleteAllDevices && (
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteAllRecordsConfirmOpen(true)}
+                  className="btn-danger h-10 w-10 justify-center p-0"
+                  title="Delete all device records"
+                  aria-label="Delete all device records"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
               <div className="relative">
                 <button
                   type="button"
@@ -1016,15 +1034,14 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 )}
               </div>
               {canManageDevices && (
-                <button
-                  type="button"
-                  onClick={() => setIsDeleteAllRecordsConfirmOpen(true)}
-                  className="btn-danger h-10 w-10 justify-center p-0"
-                  title="Delete all device records"
-                  aria-label="Delete all device records"
-                >
-                  <Trash2 size={16} />
-                </button>
+                <input
+                  type="month"
+                  value={phoneImportReportMonth}
+                  onChange={(event) => setPhoneImportReportMonth(event.target.value || getCurrentReportMonth())}
+                  className="h-10 rounded border border-gray-300 bg-white px-3 text-sm font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                  aria-label="Report month"
+                  title="Report month"
+                />
               )}
               {canManageDevices && (
                 <div className="relative">
@@ -1418,7 +1435,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         </div>,
         document.body,
       )}
-      {isDeleteAllRecordsConfirmOpen && createPortal(
+      {canDeleteAllDevices && isDeleteAllRecordsConfirmOpen && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/45 px-4 pt-[12dvh]">
           <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete All Device Records</h2>

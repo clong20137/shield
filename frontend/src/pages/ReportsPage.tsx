@@ -14,7 +14,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { AuthAccount, DeviceManagementReportResponse, DeviceReportCarrierGroup, DeviceReportGroup, reportService, TrooperDailyReportEntry, TrooperDailyAnalyticsResponse, User, userService } from '../services/api';
+import { AuthAccount, DeviceManagementReportResponse, DeviceReportCarrierGroup, DeviceReportGroup, DeviceReportMonthlySnapshot, reportService, TrooperDailyReportEntry, TrooperDailyAnalyticsResponse, User, userService } from '../services/api';
 import { districtOptions } from '../constants/districts';
 import { downloadTrooperDailiesCsv, downloadTrooperDailiesPdf, downloadTrooperDailiesXls } from '../utils/trooperDailyExport';
 
@@ -160,6 +160,7 @@ type DailyAnalyticsExportFormat = 'csv' | 'pdf' | 'png';
 type DailyAnalyticsRange = '1d' | '7d' | '1m' | '3m' | '6m' | '1y' | 'custom';
 type DailyGraphType = 'line' | 'bar';
 type DeviceReportDimension = 'type' | 'status' | 'carrier' | 'condition' | 'model' | 'cost';
+type DeviceTrendMetric = 'totalDevices' | 'assignedDevices' | 'unassignedDevices' | 'possibleInactiveDevices' | 'estimatedMonthlyTotal';
 type DailyCompareMode = 'none' | 'user' | 'district';
 type ReportType = 'trooper-daily' | 'cpar' | 'devices';
 type TrooperDailyTab = 'graph' | 'table';
@@ -215,6 +216,14 @@ const deviceReportDimensions: Array<{
   { value: 'condition', label: 'Condition', color: '#059669', valueLabel: 'Devices' },
   { value: 'model', label: 'Model', color: '#7c3aed', valueLabel: 'Devices' },
   { value: 'cost', label: 'Monthly Cost', color: '#0f766e', valueLabel: 'Monthly Cost' },
+];
+
+const deviceTrendMetrics: Array<{ value: DeviceTrendMetric; label: string; valueLabel: string }> = [
+  { value: 'totalDevices', label: 'Total Devices', valueLabel: '' },
+  { value: 'assignedDevices', label: 'Assigned', valueLabel: '' },
+  { value: 'unassignedDevices', label: 'Unassigned', valueLabel: '' },
+  { value: 'possibleInactiveDevices', label: 'Possible Inactive', valueLabel: '' },
+  { value: 'estimatedMonthlyTotal', label: 'Monthly Cost', valueLabel: '' },
 ];
 
 const carrierReportColors: Record<string, string> = {
@@ -704,6 +713,8 @@ const ReportsPage: React.FC<{
   const [deviceReportLoading, setDeviceReportLoading] = useState(false);
   const [deviceReportError, setDeviceReportError] = useState<string | null>(null);
   const [deviceReportDimension, setDeviceReportDimension] = useState<DeviceReportDimension>('type');
+  const [deviceTrendMetric, setDeviceTrendMetric] = useState<DeviceTrendMetric>('totalDevices');
+  const [deviceTrendGraphType, setDeviceTrendGraphType] = useState<DailyGraphType>('bar');
   const [deviceReportTotalDelta, setDeviceReportTotalDelta] = useState(0);
   const [trooperDailies, setTrooperDailies] = useState<TrooperDailyReportEntry[]>([]);
   const [dailySearch, setDailySearch] = useState('');
@@ -1546,6 +1557,35 @@ const ReportsPage: React.FC<{
               }))
               : []
     : [];
+  const selectedDeviceTrendMetric = deviceTrendMetrics.find((metric) => metric.value === deviceTrendMetric) || deviceTrendMetrics[0];
+  const monthlyDeviceSnapshots: DeviceReportMonthlySnapshot[] = deviceReport?.monthlySnapshots || [];
+  const deviceTrendSeries: ChartSeries[] = deviceReportCarrierOrder
+    .filter((carrier) => monthlyDeviceSnapshots.some((snapshot) => snapshot.carrier === carrier))
+    .map((carrier) => ({
+      name: carrier,
+      color: carrierReportColors[carrier.toLowerCase()] || '#1a365d',
+      points: monthlyDeviceSnapshots
+        .filter((snapshot) => snapshot.carrier === carrier)
+        .map((snapshot) => ({
+          label: snapshot.reportMonth,
+          value: Number(snapshot[deviceTrendMetric]) || 0,
+        })),
+    }));
+  monthlyDeviceSnapshots
+    .map((snapshot) => snapshot.carrier)
+    .filter((carrier, index, carriers) => !deviceReportCarrierOrder.includes(carrier) && carriers.indexOf(carrier) === index)
+    .forEach((carrier, index) => {
+      deviceTrendSeries.push({
+        name: carrier,
+        color: compareSeriesColors[index % compareSeriesColors.length],
+        points: monthlyDeviceSnapshots
+          .filter((snapshot) => snapshot.carrier === carrier)
+          .map((snapshot) => ({
+            label: snapshot.reportMonth,
+            value: Number(snapshot[deviceTrendMetric]) || 0,
+          })),
+      });
+    });
 
   const renderAnalyticsExportDropdown = () => (
     <div className="relative z-[100]">
@@ -2336,6 +2376,50 @@ const ReportsPage: React.FC<{
                 colorByLabel={selectedDeviceReportDimension.value === 'carrier' ? (label) => carrierReportColors[label.toLowerCase()] : undefined}
                 valueLabel={selectedDeviceReportDimension.valueLabel}
               />
+              <section className="mt-5 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Monthly Report Comparison</h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Uses the month selected when Verizon or AT&amp;T reports are uploaded.</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={deviceTrendMetric}
+                      onChange={(event) => setDeviceTrendMetric(event.target.value as DeviceTrendMetric)}
+                      className="h-9 rounded border border-gray-300 bg-white px-3 text-sm font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                      aria-label="Monthly comparison metric"
+                    >
+                      {deviceTrendMetrics.map((metric) => (
+                        <option key={metric.value} value={metric.value}>{metric.label}</option>
+                      ))}
+                    </select>
+                    <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-gray-950" role="tablist" aria-label="Monthly comparison graph type">
+                      {dailyGraphTypes.map((type) => (
+                        <button
+                          key={type.value}
+                          type="button"
+                          onClick={() => setDeviceTrendGraphType(type.value)}
+                          className={`rounded px-3 py-1.5 text-xs font-black uppercase tracking-wide transition ${
+                            deviceTrendGraphType === type.value
+                              ? 'bg-primary-500 text-white shadow-sm'
+                              : 'text-gray-600 hover:bg-white hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-gray-100'
+                          }`}
+                          role="tab"
+                          aria-selected={deviceTrendGraphType === type.value}
+                        >
+                          {type.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <AnalyticsChart
+                  series={deviceTrendSeries}
+                  graphType={deviceTrendGraphType}
+                  height={340}
+                  valueLabel={selectedDeviceTrendMetric.valueLabel}
+                />
+              </section>
             </>
           ) : (
             <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No device report data available.</div>

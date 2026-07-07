@@ -55,6 +55,18 @@ interface DeviceCostGroupRow extends RowDataPacket {
   monthlyChargeTotal: number;
 }
 
+interface DeviceReportMonthlySnapshotRow extends RowDataPacket {
+  reportMonth: string;
+  carrier: string;
+  importType: string;
+  totalDevices: number;
+  assignedDevices: number;
+  unassignedDevices: number;
+  availableDevices: number;
+  possibleInactiveDevices: number;
+  estimatedMonthlyTotal: number | string;
+}
+
 type DeviceCostBreakdown = {
   label: string;
   count: number;
@@ -521,9 +533,8 @@ export class ReportController {
       const [modelRows] = await conn.query<DeviceReportGroupRow[]>(
         `SELECT COALESCE(NULLIF(\`makeModel\`, ''), 'Unknown') AS label, COUNT(*) AS count
         FROM devices
-        GROUP BY label
-        ORDER BY count DESC, label
-        LIMIT 12`,
+        GROUP BY COALESCE(NULLIF(\`makeModel\`, ''), 'Unknown')
+        ORDER BY count DESC, label`,
       );
       const [conditionRows] = await conn.query<DeviceReportGroupRow[]>(
         `SELECT COALESCE(NULLIF(\`condition\`, ''), 'Unknown') AS label, COUNT(*) AS count
@@ -561,7 +572,6 @@ export class ReportController {
           FROM devices
           GROUP BY COALESCE(NULLIF(\`makeModel\`, ''), 'Unknown')
           ORDER BY total DESC, modelLabel
-          LIMIT 12
         ) top_models ON top_models.modelLabel = COALESCE(NULLIF(d.\`makeModel\`, ''), 'Unknown')
         GROUP BY
           COALESCE(NULLIF(d.\`makeModel\`, ''), 'Unknown'),
@@ -586,6 +596,20 @@ export class ReportController {
           SUM(COALESCE(\`monthlyCharge\`, 0)) AS monthlyChargeTotal
         FROM devices
         GROUP BY type, carrier, makeModel`,
+      );
+      const [monthlySnapshotRows] = await conn.query<DeviceReportMonthlySnapshotRow[]>(
+        `SELECT
+          \`reportMonth\`,
+          \`carrier\`,
+          \`importType\`,
+          \`totalDevices\`,
+          \`assignedDevices\`,
+          \`unassignedDevices\`,
+          \`availableDevices\`,
+          \`possibleInactiveDevices\`,
+          \`estimatedMonthlyTotal\`
+        FROM device_report_snapshots
+        ORDER BY \`reportMonth\` ASC, \`carrier\` ASC`,
       );
 
       const mapGroup = (rows: DeviceReportGroupRow[]) => rows.map((row) => ({
@@ -631,6 +655,17 @@ export class ReportController {
         byModelCarrier: mapCarrierGroup(modelCarrierRows),
         byConditionCarrier: mapCarrierGroup(conditionCarrierRows),
         costEstimate,
+        monthlySnapshots: monthlySnapshotRows.map((row) => ({
+          reportMonth: row.reportMonth,
+          carrier: row.carrier || 'Unknown',
+          importType: row.importType || '',
+          totalDevices: Number(row.totalDevices) || 0,
+          assignedDevices: Number(row.assignedDevices) || 0,
+          unassignedDevices: Number(row.unassignedDevices) || 0,
+          availableDevices: Number(row.availableDevices) || 0,
+          possibleInactiveDevices: Number(row.possibleInactiveDevices) || 0,
+          estimatedMonthlyTotal: Number(row.estimatedMonthlyTotal) || 0,
+        })),
       };
 
       setCachedDeviceReport(response);
