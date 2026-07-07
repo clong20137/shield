@@ -249,10 +249,10 @@ function resolveAssignedTo(row: PhoneImportRow, matcher: Map<string, string>): {
   }
 
   const candidates = [
+    normalizeDigits(number),
     normalizeKey(identity),
     normalizeLooseKey(identity),
     normalizeDigits(identity),
-    normalizeDigits(number),
   ].filter(Boolean);
 
   for (const candidate of candidates) {
@@ -499,9 +499,12 @@ async function processPhoneImportRows(
     const existingDevice = matchKeys.map((key) => deviceMatcher.get(key)).find(Boolean);
 
     if (existingDevice) {
+      const resolvedAssignedTo = assignment.matched || validation.value.assignedTo ? validation.value.assignedTo : existingDevice.assignedTo;
       const mergedDevice = {
         ...existingDevice,
         ...validation.value,
+        assignedTo: resolvedAssignedTo,
+        status: resolvedAssignedTo ? 'Assigned' : validation.value.status,
         serialNumber: validation.value.serialNumber || existingDevice.serialNumber,
         location: validation.value.location || existingDevice.location,
         notes: validation.value.notes || existingDevice.notes,
