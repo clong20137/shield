@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Camera, ChevronDown, Download, ExternalLink, EyeOff, Image, KeyRound, Laptop, LogOut, Power, QrCode, RefreshCw, Save, ShieldCheck, Smartphone, UserCircle, Volume2, X } from 'lucide-react';
 import { AuthAccount, AuthSession, DeviceRecord, MediaLibraryItem, NotificationSound, TwoFactorSetupResponse, authService, deviceService, getAssetUrl, handleAssetImageError, performanceEvaluationService, userService } from '../services/api';
 import { ProfilePictureMediaPicker } from '../components/ProfilePictureMediaPicker';
+import { DeviceUsageSummary } from '../components/DeviceUsageSummary';
 import { downloadPerformanceEvaluationPdf } from '../utils/performanceEvaluationPdf';
 
 const appBasePath = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/u, '');
@@ -920,36 +921,39 @@ export function AccountSettingsPage({
           ) : assignedDevices.length === 0 ? (
             <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No devices are assigned to you.</div>
           ) : (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {assignedDevices.map((device) => (
-                <article key={device.id} className="rounded border border-gray-200 p-3 dark:border-gray-800">
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-gray-900 dark:text-gray-100">{device.assetTag}</p>
-                      <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{device.type} - {device.makeModel}</p>
+            <div className="space-y-3">
+              <DeviceUsageSummary devices={assignedDevices} />
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {assignedDevices.map((device) => (
+                  <article key={device.id} className="rounded border border-gray-200 p-3 dark:border-gray-800">
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-gray-900 dark:text-gray-100">{device.assetTag}</p>
+                        <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{device.type} - {device.makeModel}</p>
+                      </div>
+                      <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold text-accent">{device.status}</span>
                     </div>
-                    <span className="rounded bg-accent/10 px-2 py-1 text-xs font-bold text-accent">{device.status}</span>
-                  </div>
-                  <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-                    <div>
-                      <dt className="text-xs font-bold uppercase text-gray-400">Serial</dt>
-                      <dd className="truncate text-gray-700 dark:text-gray-200">{device.serialNumber || 'N/A'}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs font-bold uppercase text-gray-400">Location</dt>
-                      <dd className="truncate text-gray-700 dark:text-gray-200">{device.location || 'N/A'}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs font-bold uppercase text-gray-400">Phone</dt>
-                      <dd className="truncate text-gray-700 dark:text-gray-200">{device.phoneNumber || 'N/A'}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs font-bold uppercase text-gray-400">Replacement Due</dt>
-                      <dd className="truncate text-gray-700 dark:text-gray-200">{device.replacementDueDate || 'N/A'}</dd>
-                    </div>
-                  </dl>
-                </article>
-              ))}
+                    <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                      <div>
+                        <dt className="text-xs font-bold uppercase text-gray-400">Serial</dt>
+                        <dd className="truncate text-gray-700 dark:text-gray-200">{device.serialNumber || 'N/A'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-bold uppercase text-gray-400">Location</dt>
+                        <dd className="truncate text-gray-700 dark:text-gray-200">{device.location || 'N/A'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-bold uppercase text-gray-400">Phone</dt>
+                        <dd className="truncate text-gray-700 dark:text-gray-200">{device.phoneNumber || 'N/A'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-bold uppercase text-gray-400">Replacement Due</dt>
+                        <dd className="truncate text-gray-700 dark:text-gray-200">{device.replacementDueDate || 'N/A'}</dd>
+                      </div>
+                    </dl>
+                  </article>
+                ))}
+              </div>
             </div>
           )}
         </section>

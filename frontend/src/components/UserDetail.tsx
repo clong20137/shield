@@ -3,6 +3,7 @@ import { CalendarDays, Check, ChevronLeft, ChevronRight, Copy, Download, Externa
 import { AuthAccount, CalendarEntry, calendarService, DeviceRecord, deviceService, getAssetFullImageUrl, getAssetThumbnailUrl, handleAssetImageError, handleAssetThumbnailError, MileageSummary, mileageService, User } from '../services/api';
 import { subscribeMessageRealtime } from '../services/realtime';
 import { getCachedPresence, getLastOnlineLabel, getPresenceSnapshot, parsePresenceRealtimeEvent, PresenceDisplayStatus, PresenceState, subscribePresenceCache, syncPresenceFromPayload } from '../utils/presence';
+import { DeviceUsageSummary } from './DeviceUsageSummary';
 import { RankBadge } from './RankBadge';
 
 interface UserDetailProps {
@@ -776,6 +777,7 @@ export const UserDetail: React.FC<UserDetailProps> = ({ user, onClose, onEdit, o
             <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No devices are assigned to this user.</div>
           ) : (
             <div className="space-y-3">
+              <DeviceUsageSummary devices={assignedDevices} />
               {assignedDevices.map((device) => (
                 <article key={device.id} className="rounded border border-gray-200 p-3 dark:border-gray-800">
                   <div className="flex flex-wrap items-start justify-between gap-3">
