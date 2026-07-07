@@ -337,6 +337,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [pageContextMenu, setPageContextMenu] = useState<AppContextMenuPosition | null>(null);
   const [devicePendingDelete, setDevicePendingDelete] = useState<DeviceRecord | null>(null);
   const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false);
+  const [isDeleteAllRecordsConfirmOpen, setIsDeleteAllRecordsConfirmOpen] = useState(false);
   const [eventNotes, setEventNotes] = useState('');
   const [assigneeSearch, setAssigneeSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -665,6 +666,22 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     }
   };
 
+  const deleteAllDeviceRecords = async () => {
+    if (!canManageDevices) return;
+
+    try {
+      setError(null);
+      const response = await deviceService.deletePhones();
+      setSelectedDevices([]);
+      setIsDeleteAllRecordsConfirmOpen(false);
+      setDeviceNotice(`Deleted ${response.data.deletedCount} device record${response.data.deletedCount === 1 ? '' : 's'}.`);
+      await loadDevices(false);
+    } catch (err) {
+      console.error('Failed to delete all device records:', err);
+      setError('Failed to delete all device records.');
+    }
+  };
+
   const exportCsv = () => {
     const headers = [
       'type',
@@ -912,6 +929,17 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <Download size={16} />
               </button>
               {canManageDevices && (
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteAllRecordsConfirmOpen(true)}
+                  className="btn-danger h-10 w-10 justify-center p-0"
+                  title="Delete all device records"
+                  aria-label="Delete all device records"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
+              {canManageDevices && (
                 <div className="relative">
                   <button
                     type="button"
@@ -986,7 +1014,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             <button type="button" onClick={() => setIsBulkDeleteConfirmOpen(true)} className="btn-danger" aria-label="Delete selected devices" title="Delete Selected"><Trash2 size={16} /><span>Delete</span></button>
             <button type="button" onClick={() => bulkStatusUpdate('Maintenance')} className="btn-secondary" aria-label="Move selected to maintenance" title="Maintenance"><Wrench size={16} /></button>
             <button type="button" onClick={() => bulkStatusUpdate('Retired')} className="btn-secondary" aria-label="Retire selected devices" title="Retire"><ArchiveX size={16} /></button>
-            <button type="button" onClick={() => setSelectedDevices([])} className="btn-secondary" aria-label="Clear selected devices" title="Clear"><X size={16} /></button>
           </div>
         )}
 
@@ -1280,6 +1307,26 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                 <span>Cancel</span>
               </button>
               <button type="button" onClick={() => void deleteSelectedDevices()} className="btn-danger" aria-label="Delete selected devices" title="Delete Selected">
+                <Trash2 size={16} />
+                <span>Delete All</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+      {isDeleteAllRecordsConfirmOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/45 px-4 pt-[12dvh]">
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete All Device Records</h2>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Delete all phone, MiFi, and Cradlepoint records? This cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setIsDeleteAllRecordsConfirmOpen(false)} className="btn-secondary" aria-label="Cancel delete all records" title="Cancel">
+                <span>Cancel</span>
+              </button>
+              <button type="button" onClick={() => void deleteAllDeviceRecords()} className="btn-danger" aria-label="Delete all device records" title="Delete All Records">
                 <Trash2 size={16} />
                 <span>Delete All</span>
               </button>
