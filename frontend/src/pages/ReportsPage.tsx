@@ -256,6 +256,7 @@ const compareSeriesColors = [
 const LIVE_REPORT_REFRESH_MS = 15_000;
 const SAVED_REPORT_GRAPH_VIEWS_KEY = 'shield_saved_report_graph_views';
 const DEVICE_REPORT_TOTAL_SNAPSHOT_KEY = 'shield_device_report_total_snapshot';
+const REPORT_CHART_ANIMATION_MS = 4_800;
 
 const trooperDailyTabs: Array<{ value: TrooperDailyTab; label: string }> = [
   { value: 'graph', label: 'Graph' },
@@ -607,7 +608,16 @@ const AnalyticsChart: React.FC<{
             />
             {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12, fontWeight: 800, paddingTop: 8 }} />}
             {series.map((item, index) => (
-              <Bar key={item.name} dataKey={`series-${index}`} name={item.name} fill={item.color} radius={[5, 5, 0, 0]} maxBarSize={42} />
+              <Bar
+                key={item.name}
+                dataKey={`series-${index}`}
+                name={item.name}
+                fill={item.color}
+                radius={[5, 5, 0, 0]}
+                maxBarSize={42}
+                animationDuration={REPORT_CHART_ANIMATION_MS}
+                animationEasing="ease-out"
+              />
             ))}
             {data.length > 8 && <Brush dataKey="displayLabel" height={24} travellerWidth={10} stroke="rgb(157 134 92)" />}
           </BarChart>
@@ -632,6 +642,8 @@ const AnalyticsChart: React.FC<{
                 dot={{ r: 4, strokeWidth: 2, fill: '#ffffff' }}
                 activeDot={{ r: 7, strokeWidth: 2 }}
                 connectNulls
+                animationDuration={REPORT_CHART_ANIMATION_MS}
+                animationEasing="ease-out"
               />
             ))}
             {data.length > 8 && <Brush dataKey="displayLabel" height={24} travellerWidth={10} stroke="rgb(157 134 92)" />}
@@ -703,6 +715,8 @@ const DeviceReportBarChart: React.FC<{
                   maxBarSize={34}
                   cursor={onDrillDown ? 'pointer' : undefined}
                   onClick={(entry) => onDrillDown?.(String(entry?.payload?.label || ''), carrier)}
+                  animationDuration={REPORT_CHART_ANIMATION_MS}
+                  animationEasing="ease-out"
                 />
               ))
             ) : (
@@ -712,6 +726,8 @@ const DeviceReportBarChart: React.FC<{
                 radius={[6, 6, 0, 0]}
                 cursor={onDrillDown ? 'pointer' : undefined}
                 onClick={(entry) => onDrillDown?.(String(entry?.payload?.label || ''))}
+                animationDuration={REPORT_CHART_ANIMATION_MS}
+                animationEasing="ease-out"
               >
                 {chartData.map((item) => (
                   <Cell key={String(item.label)} fill={colorByLabel?.(String(item.label)) || color} />
