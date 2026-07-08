@@ -6,6 +6,7 @@ export interface ToastMessage {
   id: number;
   type: ToastType;
   message: string;
+  count?: number;
 }
 
 const toastStyles: Record<ToastType, string> = {
@@ -48,6 +49,11 @@ export function ToastHost({ toasts }: { toasts: ToastMessage[] }) {
                   </p>
                 )}
               </div>
+              {toast.count && toast.count > 1 && (
+                <span className="mt-0.5 rounded-full bg-gray-900/10 px-2 py-0.5 text-xs font-black text-gray-700 dark:bg-white/10 dark:text-gray-200">
+                  x{toast.count}
+                </span>
+              )}
             </div>
           </div>
         );

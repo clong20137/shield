@@ -104,7 +104,7 @@ export function NotificationCenterMenu({
                             </button>
                           )}
                         </div>
-                        <div className={`mt-3 grid gap-1 rounded border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900 ${isAdministrator ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                        <div className={`app-segmented mt-3 grid ${isAdministrator ? 'grid-cols-3' : 'grid-cols-2'}`}>
                           {[
                             { id: 'unread' as const, label: 'Unread', count: unreadNotificationCount },
                             ...(isAdministrator ? [{ id: 'bugs' as const, label: 'Bugs', count: openBugCount }] : []),
@@ -114,10 +114,10 @@ export function NotificationCenterMenu({
                               key={tab.id}
                               type="button"
                               onClick={() => setNotificationCenterTab(tab.id)}
-                              className={`rounded px-2 py-2 text-xs font-bold transition ${
+                              className={`app-segmented-button rounded px-2 py-2 ${
                                 notificationCenterTab === tab.id
-                                  ? 'bg-primary-500 text-white shadow-sm'
-                                  : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'
+                                  ? 'app-segmented-button-active'
+                                  : ''
                               }`}
                             >
                               {tab.label} <span className={notificationCenterTab === tab.id ? 'text-white' : 'text-gray-400 dark:text-gray-500'}>{tab.count}</span>
@@ -127,7 +127,7 @@ export function NotificationCenterMenu({
                       </div>
                       <div className="max-h-[70dvh] overflow-y-auto p-2">
                         {!hasNotificationCenterItems ? (
-                          <div className="px-5 py-10 text-center">
+                          <div className="empty-state px-5 py-10">
                             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary-500 dark:bg-gray-800 dark:text-gray-100">
                               <Bell size={20} />
                             </div>
@@ -152,10 +152,10 @@ export function NotificationCenterMenu({
                               </button>
                             )}
                             {notificationCenterTab === 'bugs' && (!isAdministrator || openBugCount === 0) && (
-                              <div className="px-5 py-8 text-center text-sm font-semibold text-gray-500 dark:text-gray-400">No bug reports need review.</div>
+                              <div className="empty-state px-5 py-8 text-sm">No bug reports need review.</div>
                             )}
                             {notificationCenterTab === 'unread' && unreadUserNotifications.length === 0 && (
-                              <div className="px-5 py-8 text-center text-sm font-semibold text-gray-500 dark:text-gray-400">No unread notifications.</div>
+                              <div className="empty-state px-5 py-8 text-sm">No unread notifications.</div>
                             )}
                             {notificationCenterTab === 'unread' && unreadUserNotifications.map((notification) => (
                               <button
@@ -184,7 +184,7 @@ export function NotificationCenterMenu({
                               </button>
                             ))}
                             {notificationCenterTab === 'recent' && notifications.length === 0 && (
-                              <div className="px-5 py-8 text-center text-sm font-semibold text-gray-500 dark:text-gray-400">No recent activity.</div>
+                              <div className="empty-state px-5 py-8 text-sm">No recent activity.</div>
                             )}
                             {notificationCenterTab === 'recent' && notifications.map((notification) => {
                               const title = notification.type === 'success' ? 'Done' : notification.type === 'error' ? 'Needs attention' : 'Heads up';
@@ -201,7 +201,11 @@ export function NotificationCenterMenu({
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-start justify-between gap-2">
                                     <p className="truncate font-bold text-gray-800 dark:text-gray-100">{title}</p>
-                                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" aria-label="New notification" />
+                                    {notification.count && notification.count > 1 ? (
+                                      <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-xs font-black text-accent">x{notification.count}</span>
+                                    ) : (
+                                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" aria-label="New notification" />
+                                    )}
                                   </div>
                                   <p className="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">{getPlainNotificationMessage(notification.message)}</p>
                                   <p className="mt-2 text-xs font-bold uppercase tracking-wide text-accent">Just now</p>

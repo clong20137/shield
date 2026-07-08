@@ -3227,6 +3227,7 @@ function App() {
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const rateLimitToastRef = useRef(0);
+  const activeToastKeysRef = useRef<Record<string, number>>({});
   const desktopUpdateToastRef = useRef<Record<string, number>>({});
   const desktopUpdateCheckIsManualRef = useRef(false);
   const desktopUpdateCheckedAccountRef = useRef<string | null>(null);
@@ -3603,13 +3604,30 @@ function App() {
     }
 
     const id = Date.now();
-    const toast = { id, type, message };
-    setToasts((currentToasts) => [...currentToasts, toast]);
+    const toastKey = `${type}:${message.trim().toLowerCase()}`;
+    const activeToastId = activeToastKeysRef.current[toastKey];
+    if (activeToastId) {
+      setToasts((currentToasts) => currentToasts.map((toast) => (
+        toast.id === activeToastId ? { ...toast, count: (toast.count || 1) + 1 } : toast
+      )));
+      const shouldSaveRepeatToNotifications = options.saveToNotifications ?? type === 'error';
+      if (shouldSaveRepeatToNotifications) {
+        setNotifications((currentNotifications) => currentNotifications.map((notification) => (
+          notification.id === activeToastId ? { ...notification, count: (notification.count || 1) + 1 } : notification
+        )));
+      }
+      return;
+    }
+
+    activeToastKeysRef.current[toastKey] = id;
+    const toast: ToastMessage = { id, type, message, count: 1 };
+    setToasts((currentToasts) => [...currentToasts, toast].slice(-4));
     const shouldSaveToNotifications = options.saveToNotifications ?? type === 'error';
     if (shouldSaveToNotifications) {
       setNotifications((currentNotifications) => [toast, ...currentNotifications].slice(0, 20));
     }
     window.setTimeout(() => {
+      delete activeToastKeysRef.current[toastKey];
       setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== id));
     }, 4500);
   };

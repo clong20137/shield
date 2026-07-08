@@ -75,7 +75,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-5 mb-8 dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+    <div className="app-surface mb-8 p-5">
       <form onSubmit={handleSearch} className="flex gap-2 mb-4">
         <input
           ref={inputRef}
@@ -100,7 +100,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       </form>
 
       {showFilters && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-gray-300 dark:border-gray-700">
+        <div className="app-filter-panel grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <select
             value={filters.rank}
             onChange={(e) => handleFilterChange('rank', e.target.value)}

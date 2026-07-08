@@ -112,20 +112,20 @@ export function AdminConsolePage({
         <div className="empty-state">You do not have access to any Admin Console tools.</div>
       ) : (
       <>
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+      <div className="app-page-header">
         <div>
-          <p className="text-sm font-black uppercase tracking-[0.16em] text-accent">Administration</p>
-          <h1 className="mt-1 text-3xl font-black text-gray-900 dark:text-gray-100">Admin Console</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage settings, permissions, users, media, alerts, audit history, and system health.</p>
+          <p className="app-page-kicker">Administration</p>
+          <h1>Admin Console</h1>
+          <p className="app-page-subtitle">Manage settings, permissions, users, media, alerts, audit history, and system health.</p>
         </div>
-        <div className="flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-700 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200">
+        <div className="app-summary-item flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-200">
           <ActiveIcon size={17} className="text-accent" />
           {activeTabConfig?.label || 'Admin'}
         </div>
       </div>
 
       <div className="grid min-h-[calc(100dvh-18rem)] gap-5 xl:grid-cols-[17rem_minmax(0,1fr)]">
-        <aside className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <aside className="app-surface p-3">
           <nav className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-1" aria-label="Admin console navigation">
             {visibleTabs.map((tab) => {
               const Icon = tab.icon;
@@ -148,7 +148,7 @@ export function AdminConsolePage({
           </nav>
         </aside>
 
-        <section className="min-w-0 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5">
+        <section className="app-surface min-w-0 p-4 sm:p-5">
           <Suspense fallback={<div className="loading">Loading admin tools...</div>}>
             {currentTab === 'general' && (
               <PermissionsPage

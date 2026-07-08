@@ -102,7 +102,7 @@ export function ErrorLogPage() {
 
       {error && <div className="error">{error}</div>}
 
-      <form onSubmit={searchLogs} className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_160px_auto]">
+      <form onSubmit={searchLogs} className="app-filter-panel mb-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_160px_auto]">
         <input
           value={filters.q || ''}
           onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))}
@@ -130,8 +130,8 @@ export function ErrorLogPage() {
         <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No errors found.</div>
       ) : (
         <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="bg-primary-500 text-white">
+          <table className="app-data-table w-full min-w-[760px] text-left text-sm">
+            <thead>
               <tr>
                 <th className="px-3 py-3">Time</th>
                 <th className="px-3 py-3">Level</th>

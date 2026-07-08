@@ -229,17 +229,18 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
   return (
     <div>
       {!isModalView && (
-        <div className="mb-8">
+        <div className="app-page-header">
           <div>
+            <p className="app-page-kicker">Security</p>
             <h1>Audit Log</h1>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Search, review, and export administrative activity.</p>
+            <p className="app-page-subtitle">Search, review, and export administrative activity.</p>
           </div>
         </div>
       )}
 
       {error && <div className="error">{error}</div>}
 
-      <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+      <section className="app-surface p-5">
         <div className="mb-5 flex flex-col gap-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
             <form onSubmit={submitSearch} className="flex min-w-0 flex-1 gap-2">
@@ -302,7 +303,7 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="app-filter-panel grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <select
               value={filters.action || ''}
               onChange={(event) => updateFilter('action', event.target.value)}
@@ -349,7 +350,7 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
             />
           </div>
 
-          <div className="flex flex-col gap-3 text-sm text-gray-500 dark:text-gray-400 sm:flex-row sm:items-center sm:justify-between">
+          <div className="app-pagination-bar text-gray-500 dark:text-gray-400">
             <span>
               Showing {pageStart}-{pageEnd} of {response.total.toLocaleString()} entries
             </span>
@@ -374,7 +375,7 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
           <div className="empty-state">No audit log entries match those filters.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1050px] border-collapse text-left text-sm">
+            <table className="app-data-table w-full min-w-[1050px] border-collapse text-left text-sm">
               <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-950 dark:text-gray-400">
                 <tr className="border-b border-gray-200 dark:border-gray-800">
                   <th className="px-3 py-3">Time</th>

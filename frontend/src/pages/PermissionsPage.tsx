@@ -540,10 +540,11 @@ function PermissionsPage({
   return (
     <div>
       {!isModalView && (
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
+      <div className="app-page-header">
         <div>
+          <p className="app-page-kicker">Access Control</p>
           <h1>Permissions</h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          <p className="app-page-subtitle">
             Manage account access levels for administrators and users.
           </p>
         </div>
@@ -556,7 +557,7 @@ function PermissionsPage({
       {error && <div className="error">{error}</div>}
 
       {(section === 'all' || section === 'permissions') && (
-      <section className="mb-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+      <section className="app-surface mb-8 p-5">
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-gray-100">
@@ -577,16 +578,16 @@ function PermissionsPage({
           <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">Access review is not available.</div>
         ) : (
           <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="app-summary-strip md:grid-cols-4 xl:grid-cols-4">
               {[
                 ['Accounts', accessReview.summary.totalAccounts],
                 ['Admins', accessReview.summary.administratorAccounts],
                 ['MFA Missing', accessReview.summary.mfaMissingAccounts],
                 ['Active Sessions', accessReview.summary.activeSessions],
               ].map(([label, value]) => (
-                <div key={label} className="rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
-                  <span className="block text-xs font-bold uppercase tracking-[0.14em] text-gray-400">{label}</span>
-                  <span className="mt-1 block text-2xl font-bold text-gray-900 dark:text-gray-100">{value}</span>
+                <div key={label} className="app-summary-item">
+                  <span className="app-summary-label">{label}</span>
+                  <span className="app-summary-value text-2xl">{value}</span>
                 </div>
               ))}
             </div>
@@ -610,7 +611,7 @@ function PermissionsPage({
       )}
 
       {(section === 'all' || section === 'permissions') && (
-      <section className="mb-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+      <section className="app-surface mb-8 p-5">
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
             <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950 dark:text-amber-200 dark:ring-amber-900">
@@ -711,7 +712,7 @@ function PermissionsPage({
           </button>
         </div>
       )}
-      <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+      <section className="app-surface p-5">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2>Role Definitions</h2>
@@ -746,7 +747,7 @@ function PermissionsPage({
       )}
 
       {(section === 'all' || section === 'settings') && (
-      <section className="mt-8 rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+      <section className="app-surface mt-8 p-5">
         <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>

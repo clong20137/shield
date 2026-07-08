@@ -75,7 +75,7 @@ export default function TCodeOptionsPage({ onToast, getErrorMessage }: TCodeOpti
   };
 
   return (
-    <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+    <section className="app-surface p-5">
       <div className="mb-5">
         <h2>T-Code Options</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
