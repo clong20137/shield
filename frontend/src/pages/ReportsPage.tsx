@@ -2499,11 +2499,7 @@ const ReportsPage: React.FC<{
             <div className="loading">Loading Device Management Reports...</div>
           ) : deviceReport ? (
             <>
-              <div className="app-toolbar mb-5">
-                <div className="min-w-0">
-                  <p className="app-summary-label">Chart Controls</p>
-                  <p className="mt-1 text-sm font-semibold text-gray-500 dark:text-gray-400">Choose the carrier, chart focus, comparison metric, and time window.</p>
-                </div>
+              <div className="app-toolbar reports-chart-controls mb-5">
                 <div className="app-toolbar-actions">
                   <div className="app-segmented" role="tablist" aria-label="Device report carrier">
                     {availableDeviceReportCarriers.map((carrier) => (
@@ -2523,36 +2519,60 @@ const ReportsPage: React.FC<{
                       </button>
                     ))}
                   </div>
-                  <select
-                    value={deviceReportDimension}
-                    onChange={(event) => setDeviceReportDimension(event.target.value as DeviceReportDimension)}
-                    className="h-10 rounded border border-gray-300 bg-white px-3 text-sm font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                    aria-label="Device report chart focus"
-                  >
+                  <div className="app-segmented" role="tablist" aria-label="Device report chart focus">
                     {deviceReportDimensions.map((dimension) => (
-                      <option key={dimension.value} value={dimension.value}>{dimension.label}</option>
+                      <button
+                        key={dimension.value}
+                        type="button"
+                        onClick={() => setDeviceReportDimension(dimension.value)}
+                        className={`app-segmented-button ${
+                          deviceReportDimension === dimension.value
+                            ? 'app-segmented-button-active'
+                            : ''
+                        }`}
+                        role="tab"
+                        aria-selected={deviceReportDimension === dimension.value}
+                      >
+                        {dimension.label}
+                      </button>
                     ))}
-                  </select>
-                  <select
-                    value={deviceTrendMetric}
-                    onChange={(event) => setDeviceTrendMetric(event.target.value as DeviceTrendMetric)}
-                    className="h-10 rounded border border-gray-300 bg-white px-3 text-sm font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                    aria-label="Monthly comparison metric"
-                  >
+                  </div>
+                  <div className="app-segmented" role="tablist" aria-label="Monthly comparison metric">
                     {deviceTrendMetrics.map((metric) => (
-                      <option key={metric.value} value={metric.value}>{metric.label}</option>
+                      <button
+                        key={metric.value}
+                        type="button"
+                        onClick={() => setDeviceTrendMetric(metric.value)}
+                        className={`app-segmented-button ${
+                          deviceTrendMetric === metric.value
+                            ? 'app-segmented-button-active'
+                            : ''
+                        }`}
+                        role="tab"
+                        aria-selected={deviceTrendMetric === metric.value}
+                      >
+                        {metric.label}
+                      </button>
                     ))}
-                  </select>
-                  <select
-                    value={deviceTrendRange}
-                    onChange={(event) => setDeviceTrendRange(event.target.value as DeviceTrendRange)}
-                    className="h-10 rounded border border-gray-300 bg-white px-3 text-sm font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                    aria-label="Monthly comparison range"
-                  >
+                  </div>
+                  <div className="app-segmented" role="tablist" aria-label="Monthly comparison range">
                     {deviceTrendRanges.map((range) => (
-                      <option key={range.value} value={range.value}>{range.label}</option>
+                      <button
+                        key={range.value}
+                        type="button"
+                        onClick={() => setDeviceTrendRange(range.value)}
+                        className={`app-segmented-button ${
+                          deviceTrendRange === range.value
+                            ? 'app-segmented-button-active'
+                            : ''
+                        }`}
+                        role="tab"
+                        aria-selected={deviceTrendRange === range.value}
+                      >
+                        {range.label}
+                      </button>
                     ))}
-                  </select>
+                  </div>
                   <div className="app-segmented" role="tablist" aria-label="Monthly comparison graph type">
                     {dailyGraphTypes.map((type) => (
                       <button
