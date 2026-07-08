@@ -103,7 +103,7 @@ export class FleetVehicleController {
             .slice(0, 500),
         ),
       );
-      const operators: Array<{ id: string; displayName: string; email: string; peNumber: string }> = [];
+      const operators: Array<{ id: string; displayName: string; email: string; peNumber: string; rank: string }> = [];
 
       for (const peNumber of peNumbers) {
         const user = await UserModel.getUserByPeNumber(peNumber);
@@ -113,6 +113,7 @@ export class FleetVehicleController {
             displayName: `${user.firstName} ${user.lastName}`.trim() || user.email,
             email: user.email,
             peNumber: user.peNumber,
+            rank: user.rank || '',
           });
         }
       }
