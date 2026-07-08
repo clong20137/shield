@@ -1,151 +1,67 @@
 import { Request, Response } from 'express';
-import { PDFParse } from 'pdf-parse';
+import * as XLSX from 'xlsx';
 import { FleetVehicleInput, FleetVehicleModel } from '../models/FleetVehicle';
 import { broadcastAppEvent } from '../services/appEvents';
 import { getSessionAccount } from '../middleware/authSession';
 import { AuditLogModel } from '../models/AuditLog';
 
 type ParsedFleetVehicleRow = Omit<FleetVehicleInput, 'assignedUserId' | 'source'>;
-
-const titleWords = new Set([
-  'CAPT',
-  'CAPTAIN',
-  'CPL',
-  'CORPORAL',
-  'DET',
-  'DETECTIVE',
-  'LT',
-  'LIEUTENANT',
-  'MAJ',
-  'MAJOR',
-  'OFFICER',
-  'SGT',
-  'SERGEANT',
-  'TFC',
-  'TROOPER',
-]);
+type FleetVehicleImportRow = Record<string, unknown>;
 
 function cleanCell(value: unknown, maxLength = 150): string {
   return String(value ?? '').replace(/\s+/gu, ' ').trim().slice(0, maxLength);
 }
 
-function normalizeLine(line: string): string {
-  return cleanCell(line.replace(/\t/gu, ' '), 500);
+function normalizeLooseKey(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]/gu, '');
 }
 
-function isHeaderOrFooterLine(line: string): boolean {
-  const normalized = line.toLowerCase();
-  return (
-    !line ||
-    normalized.includes('unit number') ||
-    normalized.includes('operator name') ||
-    /^page\s+\d+/iu.test(line) ||
-    /^generated\b/iu.test(line)
-  );
+function getRowValue(row: FleetVehicleImportRow, aliases: string[], maxLength = 150): string {
+  const normalizedAliases = new Set(aliases.map(normalizeLooseKey));
+  const matchingKey = Object.keys(row).find((key) => normalizedAliases.has(normalizeLooseKey(key)));
+  return cleanCell(matchingKey ? row[matchingKey] : '', maxLength);
 }
 
-function getTitleStartIndex(tokens: string[], peIndex: number): number {
-  const fallbackIndex = Math.max(peIndex + 1, tokens.length - 3);
-  for (let index = peIndex + 1; index < tokens.length; index += 1) {
-    if (titleWords.has(tokens[index].replace(/[^a-z]/giu, '').toUpperCase())) {
-      return index;
-    }
+function parseFleetVehicleWorkbook(buffer: Buffer) {
+  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false });
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) {
+    return { parsedRows: [], skippedRows: [{ lineNumber: 1, reason: 'Workbook does not contain a worksheet', text: '' }], rawRowCount: 0 };
   }
 
-  return fallbackIndex;
-}
-
-function splitModelAndDepartment(tokens: string[], peIndex: number): { model: string; districtDepartment: string } {
-  const betweenMakeAndPe = tokens.slice(4, peIndex);
-  if (betweenMakeAndPe.length <= 1) {
-    return { model: betweenMakeAndPe.join(' '), districtDepartment: '' };
-  }
-
-  const departmentIndex = betweenMakeAndPe.findIndex((token, index) => (
-    index > 0 &&
-    (
-      /^D(?:IST)?\d+/iu.test(token) ||
-      /^DEPT$/iu.test(token) ||
-      /^\d{2,3}$/u.test(token) ||
-      /^[A-Z]{2,6}$/u.test(token)
-    )
-  ));
-
-  if (departmentIndex > 0) {
-    return {
-      model: betweenMakeAndPe.slice(0, departmentIndex).join(' '),
-      districtDepartment: betweenMakeAndPe.slice(departmentIndex).join(' '),
-    };
-  }
-
-  return {
-    model: betweenMakeAndPe.slice(0, -1).join(' '),
-    districtDepartment: betweenMakeAndPe.slice(-1).join(' '),
-  };
-}
-
-function parseFleetVehicleLine(line: string): ParsedFleetVehicleRow | null {
-  const normalizedLine = normalizeLine(line);
-  if (isHeaderOrFooterLine(normalizedLine)) {
-    return null;
-  }
-
-  const tokens = normalizedLine.split(/\s+/u).filter(Boolean);
-  const yearIndex = tokens.findIndex((token, index) => index >= 2 && /^(?:19|20)\d{2}$/u.test(token));
-  if (tokens.length < 8 || yearIndex < 2 || yearIndex > 3) {
-    return null;
-  }
-
-  const peIndex = tokens.findIndex((token, index) => index > yearIndex + 2 && /^(?:PE)?\d{3,8}$/iu.test(token));
-  if (peIndex < 0) {
-    return null;
-  }
-
-  const titleStartIndex = getTitleStartIndex(tokens, peIndex);
-  const titleTokens = tokens.slice(peIndex + 1, titleStartIndex);
-  const operatorTokens = tokens.slice(titleStartIndex);
-  const { model, districtDepartment } = splitModelAndDepartment(tokens, peIndex);
-
-  return {
-    unitNumber: cleanCell(tokens.slice(0, yearIndex - 1).join(' '), 100),
-    license: cleanCell(tokens[yearIndex - 1], 100),
-    year: cleanCell(tokens[yearIndex], 10),
-    make: cleanCell(tokens[yearIndex + 1], 100),
-    model: cleanCell(model, 150),
-    districtDepartment: cleanCell(districtDepartment, 150),
-    peNumber: cleanCell(tokens[peIndex].replace(/^PE/iu, ''), 50),
-    title: cleanCell(titleTokens.join(' '), 150),
-    operatorName: cleanCell(operatorTokens.join(' '), 150),
-  };
-}
-
-function parseFleetVehicleText(text: string) {
-  const normalizedText = text
-    .replace(/\r/gu, '\n')
-    .replace(/\u00a0/gu, ' ')
-    .replace(/[ ]{2,}/gu, ' ');
-  const rawLines = normalizedText.split(/\n+/u).map(normalizeLine).filter(Boolean);
+  const worksheet = workbook.Sheets[firstSheetName];
+  const rows = XLSX.utils.sheet_to_json<FleetVehicleImportRow>(worksheet, {
+    defval: '',
+    raw: false,
+  });
   const parsedRows: ParsedFleetVehicleRow[] = [];
   const skippedRows: Array<{ lineNumber: number; reason: string; text: string }> = [];
 
-  rawLines.forEach((line, index) => {
-    if (isHeaderOrFooterLine(line)) {
-      return;
-    }
+  rows.forEach((row, index) => {
+    const parsedRow = {
+      unitNumber: getRowValue(row, ['Unit Number', 'Unit'], 100),
+      license: getRowValue(row, ['License', 'License Plate', 'Plate'], 100),
+      year: getRowValue(row, ['Year'], 10),
+      make: getRowValue(row, ['Make'], 100),
+      model: getRowValue(row, ['Model'], 150),
+      districtDepartment: getRowValue(row, ['Dist / Dept', 'Dist Dept', 'District Department', 'District/Department'], 150),
+      peNumber: getRowValue(row, ['PE #', 'PE Number', 'PE'], 50).replace(/^PE\s*/iu, ''),
+      title: getRowValue(row, ['Title'], 150),
+      operatorName: getRowValue(row, ['Operator Name', 'Operator'], 150),
+    };
 
-    const parsedRow = parseFleetVehicleLine(line);
-    if (parsedRow?.unitNumber && parsedRow.license && parsedRow.year) {
+    if (parsedRow.unitNumber) {
       parsedRows.push(parsedRow);
-    } else if (/(?:19|20)\d{2}/u.test(line)) {
+    } else {
       skippedRows.push({
-        lineNumber: index + 1,
-        reason: 'Could not map the PDF text into vehicle columns',
-        text: line.slice(0, 240),
+        lineNumber: index + 2,
+        reason: 'Missing Unit Number',
+        text: Object.values(row).map((value) => cleanCell(value, 40)).filter(Boolean).join(' | ').slice(0, 240),
       });
     }
   });
 
-  return { parsedRows, skippedRows: skippedRows.slice(0, 50), rawLineCount: rawLines.length };
+  return { parsedRows, skippedRows: skippedRows.slice(0, 50), rawRowCount: rows.length };
 }
 
 export class FleetVehicleController {
@@ -167,21 +83,18 @@ export class FleetVehicleController {
     }
   }
 
-  static async importPdf(req: Request, res: Response) {
+  static async importSpreadsheet(req: Request, res: Response) {
     try {
       if (!req.file?.buffer) {
-        return res.status(400).json({ error: 'Upload a vehicle inventory PDF' });
+        return res.status(400).json({ error: 'Upload a vehicle inventory XLSX file' });
       }
 
       const account = await getSessionAccount(req);
-      const parser = new PDFParse({ data: req.file.buffer });
-      const pdfData = await parser.getText();
-      await parser.destroy();
-      const { parsedRows, skippedRows, rawLineCount } = parseFleetVehicleText(pdfData.text || '');
+      const { parsedRows, skippedRows, rawRowCount } = parseFleetVehicleWorkbook(req.file.buffer);
       const importRows: FleetVehicleInput[] = parsedRows.map((row) => ({
         ...row,
         assignedUserId: null,
-        source: 'pdf',
+        source: 'xlsx',
       }));
       const result = await FleetVehicleModel.upsertMany(importRows);
 
@@ -194,6 +107,7 @@ export class FleetVehicleController {
         details: JSON.stringify({
           fileName: req.file.originalname,
           totalRows: parsedRows.length,
+          rawRowCount,
           skippedRows: skippedRows.length,
           createdCount: result.createdCount,
           updatedCount: result.updatedCount,
@@ -204,13 +118,14 @@ export class FleetVehicleController {
       broadcastAppEvent({ type: 'fleet-vehicles-updated' });
       return res.json({
         totalRows: parsedRows.length,
-        rawLineCount,
+        rawLineCount: rawRowCount,
+        rawRowCount,
         skippedRows,
         ...result,
       });
     } catch (error) {
-      console.error('Fleet vehicle PDF import error:', error);
-      return res.status(500).json({ error: 'Failed to import fleet vehicle PDF' });
+      console.error('Fleet vehicle XLSX import error:', error);
+      return res.status(500).json({ error: 'Failed to import fleet vehicle XLSX' });
     }
   }
 }

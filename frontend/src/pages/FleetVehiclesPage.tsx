@@ -34,6 +34,7 @@ export default function FleetVehiclesPage({ currentUser }: FleetVehiclesPageProp
   const [error, setError] = useState('');
 
   const canManageFleetVehicles = hasPermission(currentUser, 'fleet:vehicles:manage');
+  const canImportFleetVehicles = canManageFleetVehicles && hasPermission(currentUser, 'admin:access');
 
   const loadVehicles = useCallback(async () => {
     if (!canManageFleetVehicles) {
@@ -67,7 +68,7 @@ export default function FleetVehiclesPage({ currentUser }: FleetVehiclesPageProp
     unmatched: vehicles.filter((vehicle) => !vehicle.assignedUserId).length,
   }), [vehicles]);
 
-  const handlePdfChange = async (event: ChangeEvent<HTMLInputElement>) => {
+  const handleSpreadsheetChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) {
@@ -80,12 +81,12 @@ export default function FleetVehiclesPage({ currentUser }: FleetVehiclesPageProp
     setError('');
 
     try {
-      const response = await fleetVehicleService.importPdf(file, setUploadProgress);
+      const response = await fleetVehicleService.importSpreadsheet(file, setUploadProgress);
       setUploadProgress(100);
       setImportResult(response.data);
       await loadVehicles();
     } catch (importError) {
-      setError(getErrorMessage(importError, 'Failed to import the vehicle PDF.'));
+      setError(getErrorMessage(importError, 'Failed to import the vehicle spreadsheet.'));
     } finally {
       setIsImporting(false);
     }
@@ -103,23 +104,25 @@ export default function FleetVehiclesPage({ currentUser }: FleetVehiclesPageProp
 
   return (
     <main className="app-page space-y-5">
-      <input ref={fileInputRef} className="hidden" type="file" accept="application/pdf,.pdf" onChange={handlePdfChange} />
+      <input ref={fileInputRef} className="hidden" type="file" accept=".xlsx,.xls" onChange={handleSpreadsheetChange} />
 
       <header className="app-page-header">
         <div>
           <p className="app-page-kicker">Fleet</p>
           <h1 className="app-page-title">Vehicle Inventory</h1>
-          <p className="app-page-subtitle">Import the agency vehicle PDF and link operators by PE number when Shield has a matching user.</p>
+          <p className="app-page-subtitle">Review agency vehicles and link operators by PE number when Shield has a matching user.</p>
         </div>
         <div className="flex items-center gap-2">
           <button type="button" className="btn-secondary inline-flex items-center gap-2" onClick={() => void loadVehicles()} disabled={isLoading}>
             <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
             Refresh
           </button>
-          <button type="button" className="btn-primary inline-flex items-center gap-2" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
-            <FileUp size={18} />
-            Upload PDF
-          </button>
+          {canImportFleetVehicles && (
+            <button type="button" className="btn-primary inline-flex items-center gap-2" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
+              <FileUp size={18} />
+              Upload XLSX
+            </button>
+          )}
         </div>
       </header>
 
@@ -163,7 +166,7 @@ export default function FleetVehiclesPage({ currentUser }: FleetVehiclesPageProp
             <div className="mt-3 max-h-36 overflow-auto rounded border border-green-200 bg-white/70 p-2 text-xs dark:border-green-900 dark:bg-gray-950/40">
               {importResult.skippedRows.slice(0, 8).map((row) => (
                 <p key={`${row.lineNumber}-${row.text}`} className="truncate">
-                  Line {row.lineNumber}: {row.text}
+                  Row {row.lineNumber}: {row.text}
                 </p>
               ))}
             </div>
@@ -249,8 +252,8 @@ export default function FleetVehiclesPage({ currentUser }: FleetVehiclesPageProp
                 <Upload size={22} />
               </div>
               <div>
-                <p className="font-black text-gray-900 dark:text-gray-100">Importing vehicle PDF</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Extracting rows and matching PE numbers.</p>
+                <p className="font-black text-gray-900 dark:text-gray-100">Importing vehicle spreadsheet</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Reading rows and matching PE numbers.</p>
               </div>
             </div>
             <div className="mt-5 h-3 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">

@@ -431,6 +431,7 @@ export interface FleetVehicleListResponse {
 export interface FleetVehicleImportResponse {
   totalRows: number;
   rawLineCount: number;
+  rawRowCount?: number;
   createdCount: number;
   updatedCount: number;
   matchedCount: number;
@@ -1633,7 +1634,7 @@ export const fleetVehicleService = {
   getAll: (params?: { q?: string; page?: number; pageSize?: number }) =>
     api.get<FleetVehicleListResponse>('/fleet/vehicles', { params }),
 
-  importPdf: (file: File, onProgress?: (progress: number) => void) => {
+  importSpreadsheet: (file: File, onProgress?: (progress: number) => void) => {
     const formData = new FormData();
     formData.append('file', file);
     return api.post<FleetVehicleImportResponse>('/fleet/vehicles/import', formData, {

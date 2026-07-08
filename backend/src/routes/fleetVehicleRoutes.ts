@@ -5,20 +5,28 @@ import { requirePermission } from '../middleware/permissions';
 
 const router = Router();
 
-const vehiclePdfUpload = multer({
+const vehicleSpreadsheetUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 35 * 1024 * 1024 },
   fileFilter: (_req, file, callback) => {
-    if (file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf')) {
+    const fileName = file.originalname.toLowerCase();
+    const isSpreadsheet = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+    if (isSpreadsheet) {
       callback(null, true);
       return;
     }
 
-    callback(new Error('Only PDF uploads are allowed'));
+    callback(new Error('Only XLSX or XLS uploads are allowed'));
   },
 });
 
 router.get('/vehicles', requirePermission('fleet:vehicles:manage'), FleetVehicleController.list);
-router.post('/vehicles/import', requirePermission('fleet:vehicles:manage'), vehiclePdfUpload.single('file'), FleetVehicleController.importPdf);
+router.post(
+  '/vehicles/import',
+  requirePermission('fleet:vehicles:manage'),
+  requirePermission('admin:access'),
+  vehicleSpreadsheetUpload.single('file'),
+  FleetVehicleController.importSpreadsheet,
+);
 
 export default router;
