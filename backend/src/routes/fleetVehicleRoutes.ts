@@ -24,7 +24,6 @@ router.get('/vehicles', requirePermission('fleet:vehicles:manage'), FleetVehicle
 router.post(
   '/vehicles/import',
   requirePermission('fleet:vehicles:manage'),
-  requirePermission('admin:access'),
   vehicleSpreadsheetUpload.single('file'),
   FleetVehicleController.importSpreadsheet,
 );

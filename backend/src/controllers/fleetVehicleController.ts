@@ -7,6 +7,7 @@ import { AuditLogModel } from '../models/AuditLog';
 
 type ParsedFleetVehicleRow = Omit<FleetVehicleInput, 'assignedUserId' | 'source'>;
 type FleetVehicleImportRow = Record<string, unknown>;
+type WorksheetCellValue = string | number | boolean | Date | null | undefined;
 
 function cleanCell(value: unknown, maxLength = 150): string {
   return String(value ?? '').replace(/\s+/gu, ' ').trim().slice(0, maxLength);
@@ -22,6 +23,34 @@ function getRowValue(row: FleetVehicleImportRow, aliases: string[], maxLength = 
   return cleanCell(matchingKey ? row[matchingKey] : '', maxLength);
 }
 
+function buildRowsFromWorksheet(worksheet: XLSX.WorkSheet): { rows: FleetVehicleImportRow[]; headerRowIndex: number } {
+  const sheetRows = XLSX.utils.sheet_to_json<WorksheetCellValue[]>(worksheet, {
+    blankrows: false,
+    defval: '',
+    header: 1,
+    raw: false,
+  });
+  const headerRowIndex = sheetRows.findIndex((row, index) => {
+    if (index > 20) {
+      return false;
+    }
+
+    const normalizedHeaders = new Set(row.map(normalizeLooseKey));
+    return normalizedHeaders.has('unitno') && normalizedHeaders.has('license');
+  });
+  const safeHeaderRowIndex = headerRowIndex >= 0 ? headerRowIndex : 0;
+  const headers = sheetRows[safeHeaderRowIndex].map((header, index) => cleanCell(header, 100) || `Column ${index + 1}`);
+  const dataRows = sheetRows.slice(safeHeaderRowIndex + 1);
+
+  return {
+    headerRowIndex: safeHeaderRowIndex,
+    rows: dataRows.map((row) => headers.reduce<FleetVehicleImportRow>((record, header, index) => {
+      record[header] = row[index] ?? '';
+      return record;
+    }, {})).filter((row) => Object.values(row).some((value) => cleanCell(value))),
+  };
+}
+
 function parseFleetVehicleWorkbook(buffer: Buffer) {
   const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false });
   const firstSheetName = workbook.SheetNames[0];
@@ -30,16 +59,13 @@ function parseFleetVehicleWorkbook(buffer: Buffer) {
   }
 
   const worksheet = workbook.Sheets[firstSheetName];
-  const rows = XLSX.utils.sheet_to_json<FleetVehicleImportRow>(worksheet, {
-    defval: '',
-    raw: false,
-  });
+  const { rows, headerRowIndex } = buildRowsFromWorksheet(worksheet);
   const parsedRows: ParsedFleetVehicleRow[] = [];
   const skippedRows: Array<{ lineNumber: number; reason: string; text: string }> = [];
 
   rows.forEach((row, index) => {
     const parsedRow = {
-      unitNumber: getRowValue(row, ['Unit Number', 'Unit'], 100),
+      unitNumber: getRowValue(row, ['UNIT NO', 'Unit No', 'Unit Number', 'Unit'], 100),
       license: getRowValue(row, ['License', 'License Plate', 'Plate'], 100),
       year: getRowValue(row, ['Year'], 10),
       make: getRowValue(row, ['Make'], 100),
@@ -54,8 +80,8 @@ function parseFleetVehicleWorkbook(buffer: Buffer) {
       parsedRows.push(parsedRow);
     } else {
       skippedRows.push({
-        lineNumber: index + 2,
-        reason: 'Missing Unit Number',
+        lineNumber: headerRowIndex + index + 2,
+        reason: 'Missing UNIT NO',
         text: Object.values(row).map((value) => cleanCell(value, 40)).filter(Boolean).join(' | ').slice(0, 240),
       });
     }

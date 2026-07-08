@@ -34,7 +34,6 @@ export default function FleetVehiclesPage({ currentUser }: FleetVehiclesPageProp
   const [error, setError] = useState('');
 
   const canManageFleetVehicles = hasPermission(currentUser, 'fleet:vehicles:manage');
-  const canImportFleetVehicles = canManageFleetVehicles && hasPermission(currentUser, 'admin:access');
 
   const loadVehicles = useCallback(async () => {
     if (!canManageFleetVehicles) {
@@ -117,12 +116,10 @@ export default function FleetVehiclesPage({ currentUser }: FleetVehiclesPageProp
             <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
             Refresh
           </button>
-          {canImportFleetVehicles && (
-            <button type="button" className="btn-primary inline-flex items-center gap-2" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
-              <FileUp size={18} />
-              Upload XLSX
-            </button>
-          )}
+          <button type="button" className="btn-primary inline-flex items-center gap-2" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
+            <FileUp size={18} />
+            Upload XLSX
+          </button>
         </div>
       </header>
 
