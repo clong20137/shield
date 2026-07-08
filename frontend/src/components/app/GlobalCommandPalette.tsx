@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, Bug, Calculator, CalendarDays, ClipboardList, Command, Flag, Laptop, LayoutDashboard, LockKeyhole, LucideIcon, Mail, Search, Shield, UserCircle, UserPlus, X } from 'lucide-react';
+import { BarChart3, Bug, Calculator, CalendarDays, Car, ClipboardList, Command, Flag, Laptop, LayoutDashboard, LockKeyhole, LucideIcon, Mail, Search, Shield, UserCircle, UserPlus, X } from 'lucide-react';
 import type { AdminConsoleTab } from '../../pages/AdminConsolePage';
 
 function isEditableKeyboardTarget(target: EventTarget | null): boolean {
@@ -204,6 +204,19 @@ export function GlobalCommandPalette({
           keywords: ['equipment', 'radio', 'phone', 'asset'],
           icon: Laptop,
           action: () => navigate('/devices'),
+        },
+      );
+    }
+
+    if (canUsePermission('fleet:vehicles:manage')) {
+      items.push(
+        {
+          id: 'fleet-vehicles',
+          label: 'Fleet Vehicles',
+          detail: 'Import and review vehicle inventory.',
+          keywords: ['fleet', 'vehicle', 'unit', 'license', 'operator'],
+          icon: Car,
+          action: () => navigate('/fleet/vehicles'),
         },
       );
     }

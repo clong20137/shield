@@ -932,6 +932,42 @@ export async function initializeDatabase() {
   await ensureIndex('devices', 'idx_devices_replacement_asset', '`replacementDueDate`, `assetTag`');
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS fleet_vehicles (
+      \`id\` VARCHAR(36) PRIMARY KEY,
+      \`unitNumber\` VARCHAR(100) NOT NULL,
+      \`license\` VARCHAR(100),
+      \`year\` VARCHAR(10),
+      \`make\` VARCHAR(100),
+      \`model\` VARCHAR(150),
+      \`districtDepartment\` VARCHAR(150),
+      \`peNumber\` VARCHAR(50),
+      \`title\` VARCHAR(150),
+      \`operatorName\` VARCHAR(150),
+      \`assignedUserId\` VARCHAR(36),
+      \`source\` VARCHAR(50) NOT NULL DEFAULT 'pdf',
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY \`uq_fleet_vehicles_unit\` (\`unitNumber\`),
+      INDEX \`idx_fleet_vehicles_license\` (\`license\`),
+      INDEX \`idx_fleet_vehicles_pe\` (\`peNumber\`),
+      INDEX \`idx_fleet_vehicles_assigned_user\` (\`assignedUserId\`)
+    )
+  `);
+  await ensureColumn('fleet_vehicles', 'license', '`license` VARCHAR(100)');
+  await ensureColumn('fleet_vehicles', 'year', '`year` VARCHAR(10)');
+  await ensureColumn('fleet_vehicles', 'make', '`make` VARCHAR(100)');
+  await ensureColumn('fleet_vehicles', 'model', '`model` VARCHAR(150)');
+  await ensureColumn('fleet_vehicles', 'districtDepartment', '`districtDepartment` VARCHAR(150)');
+  await ensureColumn('fleet_vehicles', 'peNumber', '`peNumber` VARCHAR(50)');
+  await ensureColumn('fleet_vehicles', 'title', '`title` VARCHAR(150)');
+  await ensureColumn('fleet_vehicles', 'operatorName', '`operatorName` VARCHAR(150)');
+  await ensureColumn('fleet_vehicles', 'assignedUserId', '`assignedUserId` VARCHAR(36)');
+  await ensureColumn('fleet_vehicles', 'source', "`source` VARCHAR(50) NOT NULL DEFAULT 'pdf'");
+  await ensureIndex('fleet_vehicles', 'idx_fleet_vehicles_license', '`license`');
+  await ensureIndex('fleet_vehicles', 'idx_fleet_vehicles_pe', '`peNumber`');
+  await ensureIndex('fleet_vehicles', 'idx_fleet_vehicles_assigned_user', '`assignedUserId`');
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS device_report_snapshots (
       \`id\` VARCHAR(36) PRIMARY KEY,
       \`reportMonth\` VARCHAR(7) NOT NULL,

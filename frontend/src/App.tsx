@@ -1,5 +1,5 @@
 import { CSSProperties, FormEvent, ReactNode, lazy, startTransition, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, BarChart3, Bell, Bug, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Download, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Minus, Moon, RefreshCw, Save, Search, Settings, Shield, Sun, UserCircle, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Bug, CalendarDays, Car, CheckCircle2, ChevronLeft, ChevronRight, Download, Laptop, LayoutDashboard, LockKeyhole, LogOut, LucideIcon, Mail, Minus, Moon, RefreshCw, Save, Search, Settings, Shield, Sun, UserCircle, X } from 'lucide-react';
 import { BrowserRouter as Router, NavLink, useNavigate } from 'react-router-dom';
 import type { AdminConsoleTab } from './pages/AdminConsolePage';
 import { ToastHost, ToastMessage, ToastType } from './components/ToastHost';
@@ -1338,18 +1338,22 @@ function SidebarLink({ to, label, compact, icon: Icon }: SidebarLinkProps) {
 
 interface MobileNavigationProps {
   canManageDevices: boolean;
+  canManageFleetVehicles: boolean;
   unreadMessages: number;
   showCalendar: boolean;
 }
 
 function MobileNavigation({
   canManageDevices,
+  canManageFleetVehicles,
   unreadMessages,
   showCalendar,
 }: MobileNavigationProps) {
   const navItems = [
     { to: '/', label: 'Home', icon: LayoutDashboard },
-    canManageDevices
+    canManageFleetVehicles
+      ? { to: '/fleet/vehicles', label: 'Fleet', icon: Car }
+      : canManageDevices
       ? { to: '/devices', label: 'Devices', icon: Laptop }
       : { to: '/search', label: 'Search', icon: Search },
     { to: '/reports', label: 'Reports', icon: BarChart3 },
@@ -4999,6 +5003,7 @@ function App() {
     hasPermission('admin:access')
   ));
   const canManageDevices = hasPermission('devices:manage');
+  const canManageFleetVehicles = hasPermission('fleet:vehicles:manage');
   const getDefaultAdminConsoleTab = (): AdminConsoleTab => {
     if (hasPermission('admin:general') && hasPermission('roles:manage')) return 'general';
     if (hasPermission('admin:permissions') && hasPermission('roles:manage')) return 'permissions';
@@ -6204,6 +6209,7 @@ function App() {
             <nav data-onboarding-target="navigation" className="flex shrink-0 flex-col gap-1.5 px-3 py-2">
               <SidebarLink to="/" label="Dashboard" compact={isSidebarCollapsed} icon={LayoutDashboard} />
               {canManageDevices && <SidebarLink to="/devices" label="Devices" compact={isSidebarCollapsed} icon={Laptop} />}
+              {canManageFleetVehicles && <SidebarLink to="/fleet/vehicles" label="Fleet Vehicles" compact={isSidebarCollapsed} icon={Car} />}
               <SidebarLink to="/reports" label="Reports" compact={isSidebarCollapsed} icon={BarChart3} />
             </nav>
 
@@ -6445,6 +6451,7 @@ function App() {
           </div>
           <MobileNavigation
             canManageDevices={canManageDevices}
+            canManageFleetVehicles={canManageFleetVehicles}
             unreadMessages={messageUnreadCount}
             showCalendar={showCalendar}
           />

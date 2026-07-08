@@ -402,6 +402,41 @@ export interface ProfilePictureDeleteAllResponse {
   done: boolean;
 }
 
+export interface FleetVehicleRecord {
+  id: string;
+  unitNumber: string;
+  license: string;
+  year: string;
+  make: string;
+  model: string;
+  districtDepartment: string;
+  peNumber: string;
+  title: string;
+  operatorName: string;
+  assignedUserId: string | null;
+  assignedUserName: string;
+  assignedUserEmail: string;
+  source: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FleetVehicleListResponse {
+  data: FleetVehicleRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface FleetVehicleImportResponse {
+  totalRows: number;
+  rawLineCount: number;
+  createdCount: number;
+  updatedCount: number;
+  matchedCount: number;
+  skippedRows: Array<{ lineNumber: number; reason: string; text: string }>;
+}
+
 export interface MediaLibraryItem {
   id: string;
   folder: string;
@@ -1592,6 +1627,26 @@ export const deviceService = {
 
   delete: (id: string, actor?: { actorId?: string; actorName?: string; eventNotes?: string }) =>
     api.delete(`/devices/${id}`, { data: actor }),
+};
+
+export const fleetVehicleService = {
+  getAll: (params?: { q?: string; page?: number; pageSize?: number }) =>
+    api.get<FleetVehicleListResponse>('/fleet/vehicles', { params }),
+
+  importPdf: (file: File, onProgress?: (progress: number) => void) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<FleetVehicleImportResponse>('/fleet/vehicles/import', formData, {
+      timeout: 90000,
+      onUploadProgress: (event) => {
+        if (!event.total || !onProgress) {
+          return;
+        }
+
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      },
+    });
+  },
 };
 
 const MESSAGE_REQUEST_OPTIONS = { timeout: 20000 };

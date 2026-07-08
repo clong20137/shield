@@ -9,6 +9,7 @@ export type AppEventType =
   | 'device-updated'
   | 'error-updated'
   | 'fleet-booking-updated'
+  | 'fleet-vehicles-updated'
   | 'permission-updated'
   | 'notification-created'
   | 'notification-updated'
