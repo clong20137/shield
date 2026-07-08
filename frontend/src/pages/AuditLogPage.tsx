@@ -461,7 +461,7 @@ function AuditLogPage({ isModalView = false }: { isModalView?: boolean }) {
       </section>
 
       {selectedLog && (
-        <div className="modal-backdrop fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4" onClick={() => setSelectedLog(null)}>
+        <div className="modal-backdrop fixed inset-0 z-[80] flex items-start justify-center bg-black/45 pt-[8dvh]" onClick={() => setSelectedLog(null)}>
           <div className="modal-window max-h-[90dvh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900" onClick={(event) => event.stopPropagation()}>
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>

@@ -541,7 +541,7 @@ function PerformanceEvaluationsPage({ currentUser, onToast, getErrorMessage, com
       )}
 
       {isCreateOpen && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-[6dvh]">
           <div className="modal-window flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white p-4 shadow-2xl dark:bg-gray-900 sm:p-5">
             <div className="mb-4 flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
               <div>

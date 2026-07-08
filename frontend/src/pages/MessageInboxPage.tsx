@@ -3703,7 +3703,7 @@ function MessageInboxPage({ currentUser, onToast, isModalView = false, targetRec
       )}
 
       {selectedMentionUser && (
-        <div className="modal-backdrop fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4">
+        <div className="modal-backdrop fixed inset-0 z-[90] flex items-start justify-center bg-black/45 pt-[6dvh]">
           <div className="modal-window max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-lg">
             <UserDetail
               user={selectedMentionUser}

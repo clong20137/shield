@@ -928,8 +928,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       />
 
       {bulkActionMode === 'message' && (
-        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/45 p-4">
-          <form onSubmit={handleBulkMessage} className="w-full max-w-2xl rounded-lg bg-white shadow-2xl ring-1 ring-black/10 dark:bg-gray-900 dark:ring-white/10">
+        <div className="modal-backdrop fixed inset-0 z-[75] flex items-start justify-center bg-black/45 pt-[8dvh]">
+          <form onSubmit={handleBulkMessage} className="modal-window w-full max-w-2xl bg-white shadow-2xl ring-1 ring-black/10 dark:bg-gray-900 dark:ring-white/10">
             <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Message Selected Users</h2>
@@ -973,8 +973,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       )}
 
       {bulkActionMode === 'update' && (
-        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/45 p-4">
-          <form onSubmit={handleBulkUpdate} className="w-full max-w-3xl rounded-lg bg-white shadow-2xl ring-1 ring-black/10 dark:bg-gray-900 dark:ring-white/10">
+        <div className="modal-backdrop fixed inset-0 z-[75] flex items-start justify-center bg-black/45 pt-[8dvh]">
+          <form onSubmit={handleBulkUpdate} className="modal-window w-full max-w-3xl bg-white shadow-2xl ring-1 ring-black/10 dark:bg-gray-900 dark:ring-white/10">
             <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Bulk Update Users</h2>
@@ -1359,8 +1359,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       )}
 
       {messageRecipient && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-          <form onSubmit={handleSendMessage} className="w-full max-w-xl rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900">
+        <div className="modal-backdrop fixed inset-0 z-[60] flex items-start justify-center bg-black/60 pt-[10dvh]">
+          <form onSubmit={handleSendMessage} className="modal-window w-full max-w-xl bg-white p-6 shadow-xl dark:bg-gray-900">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2>Send Message</h2>

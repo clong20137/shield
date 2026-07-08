@@ -1022,7 +1022,7 @@ function PermissionsPage({
       )}
 
       {isCreateRoleModalOpen && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-[8dvh]">
           <form onSubmit={createRole} className="modal-window w-full max-w-3xl rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
             <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
               <div>
@@ -1071,7 +1071,7 @@ function PermissionsPage({
         </div>
       )}
       {editingRole && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-6 sm:p-8 lg:p-10">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-[6dvh]">
           <form onSubmit={saveRoleEdit} className="modal-window my-6 max-h-[calc(100vh-3rem)] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900 sm:my-8 sm:max-h-[calc(100vh-4rem)] sm:p-8 lg:my-10 lg:max-h-[calc(100vh-5rem)]">
             <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-gray-800">
               <div>

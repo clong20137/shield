@@ -111,8 +111,8 @@ export function ProfilePictureMediaPicker({
   }
 
   return (
-    <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
-      <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-950">
+    <div className="modal-backdrop fixed inset-0 z-[1300] flex items-start justify-center bg-black/50 pt-[6dvh]" role="dialog" aria-modal="true">
+      <div className="modal-window flex max-h-[88dvh] w-full max-w-5xl flex-col overflow-hidden border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-950">
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-200 p-4 dark:border-gray-800">
           <div className="min-w-0">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">Choose Profile Picture</h3>

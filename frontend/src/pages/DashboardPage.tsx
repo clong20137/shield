@@ -364,7 +364,7 @@ export function DashboardCalendar() {
       </div>
 
       {selectedDate && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-[8dvh]">
           <div className="modal-window max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
@@ -2515,7 +2515,7 @@ function DistrictFeedWidget({
         )}
       </div>
       {postPendingDelete && createPortal((
-        <div className="modal-backdrop fixed inset-0 z-[140] flex items-center justify-center bg-black/45 p-4" onClick={() => setPostPendingDelete(null)}>
+        <div className="modal-backdrop fixed inset-0 z-[140] flex items-start justify-center bg-black/45 pt-[12dvh]" onClick={() => setPostPendingDelete(null)}>
           <div className="modal-window w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900" onClick={(event) => event.stopPropagation()}>
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Delete District Post</h2>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Remove "{postPendingDelete.title}" from the {postPendingDelete.district} feed?</p>
