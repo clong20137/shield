@@ -113,7 +113,7 @@ export const UserTable: React.FC<UserTableProps> = ({
 
   return (
     <>
-    <div className="bg-white rounded-lg shadow overflow-hidden dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+    <div className="app-surface overflow-hidden">
       <div
         className="overflow-auto"
         style={viewportHeight ? { maxHeight: viewportHeight } : undefined}
@@ -123,7 +123,7 @@ export const UserTable: React.FC<UserTableProps> = ({
           }
         }}
       >
-        <table className="w-full border-collapse">
+        <table className="app-data-table w-full border-collapse">
           <thead className="sticky top-0 z-10">
             <tr className="bg-primary-500 text-white">
               {canSelectUsers && (

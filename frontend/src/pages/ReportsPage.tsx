@@ -1755,15 +1755,16 @@ const ReportsPage: React.FC<{
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div className="app-page-header">
         <div>
-          <h1 className="mb-2">Reports & Analytics</h1>
-          <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">{activeReportWorkspace.description}</p>
+          <p className="app-page-kicker">Analytics</p>
+          <h1>Reports & Analytics</h1>
+          <p className="app-page-subtitle">{activeReportWorkspace.description}</p>
         </div>
         <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-black uppercase tracking-wide text-accent">{selectedReportTitle}</span>
       </div>
 
-      <section className="mb-6 flex flex-wrap gap-2 rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900" aria-label="Report workspace selector">
+      <section className="app-segmented mb-6" aria-label="Report workspace selector">
         {reportWorkspaces.map((workspace) => {
           const WorkspaceIcon = workspace.icon;
           const isSelected = selectedReportType === workspace.value;
@@ -1773,10 +1774,10 @@ const ReportsPage: React.FC<{
               key={workspace.value}
               type="button"
               onClick={() => setSelectedReportType(workspace.value)}
-              className={`group flex items-center gap-2 rounded px-3 py-2 text-left text-sm font-black transition ${
+              className={`app-segmented-button flex items-center gap-2 ${
                 isSelected
-                  ? 'bg-primary-500 text-white shadow-sm'
-                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                  ? 'app-segmented-button-active'
+                  : ''
               }`}
               aria-pressed={isSelected}
               title={workspace.description}
@@ -1789,7 +1790,7 @@ const ReportsPage: React.FC<{
       </section>
 
       {selectedReportType === 'trooper-daily' ? (
-      <section className="mb-8 rounded-lg border border-gray-200 bg-white p-5 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
+      <section className="app-surface mb-8 p-5">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2>Trooper Daily Reports</h2>
@@ -2306,7 +2307,7 @@ const ReportsPage: React.FC<{
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="app-data-table w-full text-sm">
               <thead>
                 <tr className="border-b-2 border-gray-300 dark:border-gray-700">
                   <th className="px-3 py-3 text-left font-semibold">Date</th>
@@ -2405,25 +2406,26 @@ const ReportsPage: React.FC<{
         )}
       </section>
       ) : selectedReportType === 'devices' ? (
-        <section className="mb-8 rounded-lg border border-gray-200 bg-white p-5 shadow dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
+        <section className="app-surface mb-8 p-5">
           <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
             <div>
+              <p className="app-page-kicker">Inventory Analytics</p>
               <h2>Device Management Reports</h2>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Pick a view and the graph updates.
+                Start with the graph, then drill into inventory only when a number needs attention.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-gray-950" role="tablist" aria-label="Device report view">
+              <div className="app-segmented" role="tablist" aria-label="Device report view">
                 {deviceReportDimensions.map((dimension) => (
                   <button
                     key={dimension.value}
                     type="button"
                     onClick={() => setDeviceReportDimension(dimension.value)}
-                    className={`rounded px-3 py-1.5 text-xs font-black uppercase tracking-wide transition ${
+                    className={`app-segmented-button ${
                       deviceReportDimension === dimension.value
-                        ? 'bg-primary-500 text-white shadow-sm'
-                        : 'text-gray-600 hover:bg-white hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-gray-100'
+                        ? 'app-segmented-button-active'
+                        : ''
                     }`}
                     role="tab"
                     aria-selected={deviceReportDimension === dimension.value}
@@ -2448,9 +2450,11 @@ const ReportsPage: React.FC<{
             <div className="loading">Loading Device Management Reports...</div>
           ) : deviceReport ? (
             <>
-              <div className="mb-5 flex flex-wrap gap-x-6 gap-y-2 border-b border-gray-200 pb-4 text-sm dark:border-gray-800">
-                <span className="font-semibold text-gray-500 dark:text-gray-400">
-                  Total <strong className="ml-1 text-gray-900 dark:text-gray-100">{formatMetric(deviceReport.summary.totalDevices)}</strong>
+              <div className="app-summary-strip mb-5">
+                <div className="app-summary-item">
+                  <span className="app-summary-label">Total Devices</span>
+                  <span className="app-summary-value">
+                    {formatMetric(deviceReport.summary.totalDevices)}
                   {deviceReportTotalDelta !== 0 && (
                     <span className={`ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-black ${
                       deviceReportTotalDelta > 0
@@ -2461,24 +2465,29 @@ const ReportsPage: React.FC<{
                       {formatMetric(Math.abs(deviceReportTotalDelta))}
                     </span>
                   )}
-                </span>
-                <span className="font-semibold text-gray-500 dark:text-gray-400">
-                  Assigned <strong className="ml-1 text-gray-900 dark:text-gray-100">{formatMetric(deviceReport.summary.assignedDevices)}</strong>
-                </span>
-                <span className="font-semibold text-gray-500 dark:text-gray-400">
-                  Unassigned <strong className="ml-1 text-gray-900 dark:text-gray-100">{formatMetric(deviceReport.summary.unassignedDevices)}</strong>
-                </span>
+                  </span>
+                </div>
+                <div className="app-summary-item">
+                  <span className="app-summary-label">Assigned</span>
+                  <span className="app-summary-value">{formatMetric(deviceReport.summary.assignedDevices)}</span>
+                </div>
+                <div className="app-summary-item">
+                  <span className="app-summary-label">Unassigned</span>
+                  <span className="app-summary-value">{formatMetric(deviceReport.summary.unassignedDevices)}</span>
+                </div>
                 <button
                   type="button"
                   onClick={() => openDeviceInventoryDrilldown({ possibleInactive: true })}
-                  className="font-semibold text-red-600 transition hover:text-red-700 dark:text-red-300 dark:hover:text-red-200"
+                  className="app-summary-item text-left transition hover:border-red-200 hover:bg-red-50 dark:hover:border-red-900 dark:hover:bg-red-950/40"
                   title="Open possible inactive devices"
                 >
-                  Possible inactive <strong className="ml-1">{formatMetric(deviceReport.summary.possibleInactiveDevices)}</strong>
+                  <span className="app-summary-label text-red-500 dark:text-red-300">Possible Inactive</span>
+                  <span className="app-summary-value text-red-600 dark:text-red-200">{formatMetric(deviceReport.summary.possibleInactiveDevices)}</span>
                 </button>
-                <span className="font-semibold text-gray-500 dark:text-gray-400">
-                  Est. monthly <strong className="ml-1 text-gray-900 dark:text-gray-100">{formatCurrency(deviceReport.costEstimate?.estimatedMonthlyTotal || 0)}</strong>
-                </span>
+                <div className="app-summary-item">
+                  <span className="app-summary-label">Est. Monthly</span>
+                  <span className="app-summary-value">{formatCurrency(deviceReport.costEstimate?.estimatedMonthlyTotal || 0)}</span>
+                </div>
               </div>
 
               <DeviceReportBarChart
@@ -2490,7 +2499,7 @@ const ReportsPage: React.FC<{
                 valueLabel={selectedDeviceReportDimension.valueLabel}
                 onDrillDown={selectedDeviceReportDimension.value === 'cost' ? undefined : openDeviceReportBarDrilldown}
               />
-              <section className="mt-5 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+              <section className="app-surface mt-5 p-4">
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Monthly Report Comparison</h3>
@@ -2517,16 +2526,16 @@ const ReportsPage: React.FC<{
                         <option key={metric.value} value={metric.value}>{metric.label}</option>
                       ))}
                     </select>
-                    <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-gray-950" role="tablist" aria-label="Monthly comparison graph type">
+                    <div className="app-segmented" role="tablist" aria-label="Monthly comparison graph type">
                       {dailyGraphTypes.map((type) => (
                         <button
                           key={type.value}
                           type="button"
                           onClick={() => setDeviceTrendGraphType(type.value)}
-                          className={`rounded px-3 py-1.5 text-xs font-black uppercase tracking-wide transition ${
+                          className={`app-segmented-button ${
                             deviceTrendGraphType === type.value
-                              ? 'bg-primary-500 text-white shadow-sm'
-                              : 'text-gray-600 hover:bg-white hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-gray-100'
+                              ? 'app-segmented-button-active'
+                              : ''
                           }`}
                           role="tab"
                           aria-selected={deviceTrendGraphType === type.value}

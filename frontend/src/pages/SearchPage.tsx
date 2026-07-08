@@ -840,7 +840,13 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
 
   return (
     <div>
-      <h1 className="mb-8">Search Users</h1>
+      <div className="app-page-header">
+        <div>
+          <p className="app-page-kicker">Directory</p>
+          <h1>Search Users</h1>
+          <p className="app-page-subtitle">Find people by name, email, PE number, badge, radio, phone number, or ID.</p>
+        </div>
+      </div>
       
       {error && <div className="error">{error}</div>}
       
@@ -885,7 +891,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ currentUser, onToast }) => {
       )}
 
       {users.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-gray-950">
+        <div className="app-pagination-bar mb-4">
           <span className="text-gray-500 dark:text-gray-400">Showing {pageStart}-{pageEnd}{hasMoreUsers ? '+' : ''}</span>
           <div className="flex flex-wrap items-center gap-2">
             <select

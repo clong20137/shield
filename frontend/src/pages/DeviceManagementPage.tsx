@@ -1,7 +1,7 @@
 import { ChangeEvent, FormEvent, MouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArchiveX, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, Radio, RefreshCw, Router, Save, Smartphone, Tablet, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
+import { AlertTriangle, ArchiveX, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Download, Laptop, MapPinOff, PackageCheck, Pencil, Plus, Radio, RefreshCw, Router, Save, Search, Smartphone, Tablet, Trash2, Upload, UserCheck, Wifi, Wrench, X } from 'lucide-react';
 import { authService, AuthAccount, DeviceReportMonthlySnapshot, deviceService, DeviceRecord, PhoneImportType, reportService } from '../services/api';
 import { FloatingWindow } from '../components/FloatingWindow';
 import { AppContextMenu, AppContextMenuPosition, shouldUseNativeContextMenu } from '../components/AppContextMenu';
@@ -423,6 +423,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const [deviceReportSnapshots, setDeviceReportSnapshots] = useState<DeviceReportMonthlySnapshot[]>([]);
   const [deviceReportSnapshotsLoading, setDeviceReportSnapshotsLoading] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isInventoryFiltersOpen, setIsInventoryFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
   const [deviceTableScrollTop, setDeviceTableScrollTop] = useState(0);
@@ -1029,13 +1030,22 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     { value: 'Verizon', label: 'Verizon', count: devices.filter((device) => device.carrier === 'Verizon').length },
     { value: 'AT&T', label: 'AT&T', count: devices.filter((device) => device.carrier === 'AT&T').length },
   ];
+  const activeInventoryFilterCount = [
+    filter !== 'All',
+    modelFilter !== 'All',
+    statusFilter !== 'All',
+    carrierFilter !== 'All',
+    possibleInactiveOnly,
+    Boolean(assignedUserFilter),
+  ].filter(Boolean).length;
 
   return (
     <div onContextMenu={openPageContextMenu}>
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-3 lg:pr-56">
+      <div className="app-page-header lg:pr-56">
         <div>
+          <p className="app-page-kicker">Inventory</p>
           <h1>Device Management</h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          <p className="app-page-subtitle">
             Track assigned equipment, maintenance, inventory status, and ownership history.
           </p>
         </div>
@@ -1091,13 +1101,13 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         collapsedTypes={collapsedInventoryTypes}
         onToggleType={toggleInventoryType}
       />
-      <section className="rounded-lg bg-white p-5 shadow dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-gray-800">
+      <section className="app-surface p-5">
         <div className="mb-5 flex flex-col gap-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2>Inventory</h2>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Search inventory, filter lifecycle status, and manage device imports.
+                Search first, then open filters only when you need to narrow the view.
               </p>
             </div>
             <div className="flex flex-wrap justify-start gap-2 sm:justify-end">
@@ -1175,7 +1185,68 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
             </div>
           </div>
 
-          <div className="grid w-full grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:grid-cols-2 xl:grid-cols-[1.1fr_1fr_1fr_0.9fr_1fr_auto_1.4fr] dark:border-gray-800 dark:bg-gray-950">
+          <div className="app-summary-strip xl:grid-cols-5">
+            <div className="app-summary-item">
+              <span className="app-summary-label">Devices</span>
+              <span className="app-summary-value">{totalDevices.toLocaleString()}</span>
+            </div>
+            <div className="app-summary-item">
+              <span className="app-summary-label">Showing</span>
+              <span className="app-summary-value">{devices.length.toLocaleString()}</span>
+            </div>
+            <div className="app-summary-item">
+              <span className="app-summary-label">Page</span>
+              <span className="app-summary-value">{safePage} of {totalPages}</span>
+            </div>
+            <div className="app-summary-item">
+              <span className="app-summary-label">Selected</span>
+              <span className="app-summary-value">{selectedDevices.length.toLocaleString()}</span>
+            </div>
+            <div className="app-summary-item">
+              <span className="app-summary-label">Filters</span>
+              <span className="app-summary-value">{activeInventoryFilterCount || 'None'}</span>
+            </div>
+          </div>
+
+          <div className="app-toolbar">
+            <input value={query} onChange={(event) => { setPage(1); setQuery(event.target.value); }} placeholder="Search inventory by user, model, phone, IMEI, or SIM" className="h-10 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 lg:max-w-xl" />
+            <div className="app-toolbar-actions">
+              <button
+                type="button"
+                onClick={() => setIsInventoryFiltersOpen((open) => !open)}
+                className="btn-secondary h-10 gap-2 px-3"
+                aria-expanded={isInventoryFiltersOpen}
+                aria-label="Toggle inventory filters"
+                title="Filters"
+              >
+                <Search size={16} />
+                <span className="text-xs font-black">{activeInventoryFilterCount ? `${activeInventoryFilterCount} active` : 'Filters'}</span>
+                <ChevronDown size={14} className={`transition ${isInventoryFiltersOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {activeInventoryFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilter('All');
+                    setModelFilter('All');
+                    setStatusFilter('All');
+                    setCarrierFilter('All');
+                    setAssignedUserFilter('');
+                    setPossibleInactiveOnly(false);
+                    setPage(1);
+                  }}
+                  className="btn-secondary h-10 px-3"
+                  aria-label="Clear inventory filters"
+                  title="Clear Filters"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {isInventoryFiltersOpen && (
+          <div className="app-filter-panel grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[1.1fr_1fr_1fr_0.9fr_1fr_auto]">
             <select value={filter} onChange={(event) => { setPage(1); setFilter(event.target.value as DeviceType | 'All'); }} className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
               <option>All</option>
               {deviceTypes.map((type) => <option key={type}>{type}</option>)}
@@ -1218,8 +1289,8 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               <AlertTriangle size={15} />
               <span className="whitespace-nowrap">Possible inactive</span>
             </label>
-            <input value={query} onChange={(event) => { setPage(1); setQuery(event.target.value); }} placeholder="Search inventory" className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
           </div>
+          )}
           {assignedUserFilter && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
               <span>Reviewing devices assigned to a deactivated account.</span>
@@ -1250,7 +1321,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
           <div className="empty-state rounded border border-dashed border-gray-300 dark:border-gray-700">No devices match this view.</div>
         ) : (
           <>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-gray-950">
+          <div className="app-pagination-bar mb-4">
             <span className="text-gray-500 dark:text-gray-400">
               Showing {pageStart}-{pageEnd} of {totalDevices}{isFiltering ? ' - Updating...' : ''}
             </span>
@@ -1328,7 +1399,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               }
             }}
           >
-            <table className="w-full min-w-[820px] border-collapse text-left">
+            <table className="app-data-table w-full min-w-[820px] border-collapse text-left">
               <thead className="sticky top-0 z-10 bg-white dark:bg-gray-900">
                 <tr className="border-b border-gray-200 text-xs font-bold uppercase tracking-wide text-gray-500 dark:border-gray-800 dark:text-gray-400">
                   <th className="w-10 px-2 py-2"><input type="checkbox" checked={paginatedDevices.length > 0 && paginatedDevices.every((device) => selectedDevices.includes(device.id))} onChange={(event) => setSelectedDevices(event.target.checked ? Array.from(new Set([...selectedDevices, ...paginatedDevices.map((device) => device.id)])) : selectedDevices.filter((id) => !paginatedDevices.some((device) => device.id === id)))} /></th>
