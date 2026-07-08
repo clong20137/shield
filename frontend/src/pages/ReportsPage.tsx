@@ -162,6 +162,8 @@ type DailyAnalyticsRange = '1d' | '7d' | '1m' | '3m' | '6m' | '1y' | 'custom';
 type DailyGraphType = 'line' | 'bar';
 type DeviceReportDimension = 'type' | 'status' | 'carrier' | 'condition' | 'model' | 'cost';
 type DeviceTrendMetric = 'totalDevices' | 'assignedDevices' | 'unassignedDevices' | 'possibleInactiveDevices' | 'estimatedMonthlyTotal';
+type DeviceReportCarrierFilter = 'All' | string;
+type DeviceTrendRange = 'current' | 'previous' | '3m' | '6m' | 'ytd' | 'all';
 type DailyCompareMode = 'none' | 'user' | 'district';
 type ReportType = 'trooper-daily' | 'cpar' | 'devices';
 type TrooperDailyTab = 'graph' | 'table';
@@ -225,6 +227,15 @@ const deviceTrendMetrics: Array<{ value: DeviceTrendMetric; label: string; value
   { value: 'unassignedDevices', label: 'Unassigned', valueLabel: '' },
   { value: 'possibleInactiveDevices', label: 'Possible Inactive', valueLabel: '' },
   { value: 'estimatedMonthlyTotal', label: 'Monthly Cost', valueLabel: 'currency' },
+];
+
+const deviceTrendRanges: Array<{ value: DeviceTrendRange; label: string }> = [
+  { value: 'current', label: 'Current' },
+  { value: 'previous', label: 'Previous Month' },
+  { value: '3m', label: 'Last 3 Months' },
+  { value: '6m', label: 'Last 6 Months' },
+  { value: 'ytd', label: 'Year to Date' },
+  { value: 'all', label: 'All' },
 ];
 
 const carrierReportColors: Record<string, string> = {
@@ -732,7 +743,9 @@ const ReportsPage: React.FC<{
   const [deviceReportLoading, setDeviceReportLoading] = useState(false);
   const [deviceReportError, setDeviceReportError] = useState<string | null>(null);
   const [deviceReportDimension, setDeviceReportDimension] = useState<DeviceReportDimension>('type');
+  const [deviceReportCarrierFilter, setDeviceReportCarrierFilter] = useState<DeviceReportCarrierFilter>('All');
   const [deviceTrendMetric, setDeviceTrendMetric] = useState<DeviceTrendMetric>('totalDevices');
+  const [deviceTrendRange, setDeviceTrendRange] = useState<DeviceTrendRange>('6m');
   const [deviceTrendGraphType, setDeviceTrendGraphType] = useState<DailyGraphType>('bar');
   const [deviceReportTotalDelta, setDeviceReportTotalDelta] = useState(0);
   const [isDeviceReportDeleteModalOpen, setIsDeviceReportDeleteModalOpen] = useState(false);
@@ -1545,24 +1558,51 @@ const ReportsPage: React.FC<{
     onToast('success', `Graph ${format.toUpperCase()} export ready.`);
   };
 
+  const aggregateCarrierGroups = (items: DeviceReportCarrierGroup[]): DeviceReportGroup[] => Array.from(
+    items.reduce((groups, item) => {
+      groups.set(item.label, (groups.get(item.label) || 0) + Number(item.count || 0));
+      return groups;
+    }, new Map<string, number>()),
+  ).map(([label, count]) => ({ label, count }));
+  const filterCarrierGroups = (items: DeviceReportCarrierGroup[]) =>
+    deviceReportCarrierFilter === 'All'
+      ? items
+      : items.filter((item) => item.carrier === deviceReportCarrierFilter);
+  const getLatestDeviceReportMonth = (snapshots: DeviceReportMonthlySnapshot[]) => snapshots
+    .map((snapshot) => snapshot.reportMonth)
+    .sort()
+    .at(-1) || '';
+  const shiftDeviceReportMonth = (month: string, offset: number) => {
+    const [year, monthNumber] = month.split('-').map(Number);
+    if (!year || !monthNumber) return month;
+    const date = new Date(year, monthNumber - 1 + offset, 1);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  };
+  const filterDeviceTrendSnapshots = (snapshots: DeviceReportMonthlySnapshot[]) => {
+    const carrierFiltered = deviceReportCarrierFilter === 'All'
+      ? snapshots
+      : snapshots.filter((snapshot) => snapshot.carrier === deviceReportCarrierFilter);
+    const latestMonth = getLatestDeviceReportMonth(carrierFiltered);
+    if (!latestMonth || deviceTrendRange === 'all') return carrierFiltered;
+
+    if (deviceTrendRange === 'current') {
+      return carrierFiltered.filter((snapshot) => snapshot.reportMonth === latestMonth);
+    }
+    if (deviceTrendRange === 'previous') {
+      const previousMonth = shiftDeviceReportMonth(latestMonth, -1);
+      return carrierFiltered.filter((snapshot) => snapshot.reportMonth === previousMonth);
+    }
+    if (deviceTrendRange === 'ytd') {
+      const latestYear = latestMonth.slice(0, 4);
+      return carrierFiltered.filter((snapshot) => snapshot.reportMonth.startsWith(`${latestYear}-`));
+    }
+
+    const monthCount = deviceTrendRange === '3m' ? 3 : 6;
+    const startMonth = shiftDeviceReportMonth(latestMonth, -(monthCount - 1));
+    return carrierFiltered.filter((snapshot) => snapshot.reportMonth >= startMonth && snapshot.reportMonth <= latestMonth);
+  };
   const selectedDeviceReportDimension = deviceReportDimensions.find((dimension) => dimension.value === deviceReportDimension) || deviceReportDimensions[0];
-  const selectedDeviceReportData: DeviceReportGroup[] = deviceReport
-    ? deviceReportDimension === 'type'
-      ? deviceReport.byType
-      : deviceReportDimension === 'status'
-        ? deviceReport.byStatus
-        : deviceReportDimension === 'carrier'
-          ? deviceReport.byCarrier
-          : deviceReportDimension === 'condition'
-            ? deviceReport.byCondition
-            : deviceReportDimension === 'model'
-              ? deviceReport.byModel
-              : (deviceReport.costEstimate?.breakdown || []).map((item) => ({
-                label: item.label,
-                count: item.monthlyTotal,
-              }))
-    : [];
-  const selectedDeviceReportCarrierData: DeviceReportCarrierGroup[] = deviceReport
+  const baseDeviceReportCarrierData: DeviceReportCarrierGroup[] = deviceReport
     ? deviceReportDimension === 'type'
       ? deviceReport.byTypeCarrier || []
       : deviceReportDimension === 'status'
@@ -1579,28 +1619,55 @@ const ReportsPage: React.FC<{
               }))
               : []
     : [];
+  const selectedDeviceReportCarrierData: DeviceReportCarrierGroup[] = filterCarrierGroups(baseDeviceReportCarrierData);
+  const selectedDeviceReportData: DeviceReportGroup[] = deviceReport
+    ? deviceReportCarrierFilter !== 'All' && selectedDeviceReportCarrierData.length > 0
+      ? aggregateCarrierGroups(selectedDeviceReportCarrierData)
+      : deviceReportDimension === 'type'
+      ? deviceReport.byType
+      : deviceReportDimension === 'status'
+        ? deviceReport.byStatus
+        : deviceReportDimension === 'carrier'
+          ? deviceReportCarrierFilter === 'All'
+            ? deviceReport.byCarrier
+            : deviceReport.byCarrier.filter((item) => item.label === deviceReportCarrierFilter)
+          : deviceReportDimension === 'condition'
+            ? deviceReport.byCondition
+            : deviceReportDimension === 'model'
+              ? deviceReport.byModel
+              : (deviceReport.costEstimate?.breakdown || []).map((item) => ({
+                label: item.label,
+                count: item.monthlyTotal,
+              }))
+    : [];
   const selectedDeviceTrendMetric = deviceTrendMetrics.find((metric) => metric.value === deviceTrendMetric) || deviceTrendMetrics[0];
   const monthlyDeviceSnapshots: DeviceReportMonthlySnapshot[] = deviceReport?.monthlySnapshots || [];
+  const filteredMonthlyDeviceSnapshots = filterDeviceTrendSnapshots(monthlyDeviceSnapshots);
+  const availableDeviceReportCarriers = [
+    'All',
+    ...deviceReportCarrierOrder.filter((carrier) => monthlyDeviceSnapshots.some((snapshot) => snapshot.carrier === carrier) || deviceReport?.byCarrier.some((item) => item.label === carrier)),
+    ...(deviceReport?.byCarrier.map((item) => item.label).filter((carrier) => !deviceReportCarrierOrder.includes(carrier)) || []),
+  ].filter((carrier, index, carriers) => carriers.indexOf(carrier) === index);
   const deviceTrendSeries: ChartSeries[] = deviceReportCarrierOrder
-    .filter((carrier) => monthlyDeviceSnapshots.some((snapshot) => snapshot.carrier === carrier))
+    .filter((carrier) => filteredMonthlyDeviceSnapshots.some((snapshot) => snapshot.carrier === carrier))
     .map((carrier) => ({
       name: carrier,
       color: carrierReportColors[carrier.toLowerCase()] || '#1a365d',
-      points: monthlyDeviceSnapshots
+      points: filteredMonthlyDeviceSnapshots
         .filter((snapshot) => snapshot.carrier === carrier)
         .map((snapshot) => ({
           label: snapshot.reportMonth,
           value: Number(snapshot[deviceTrendMetric]) || 0,
         })),
     }));
-  monthlyDeviceSnapshots
+  filteredMonthlyDeviceSnapshots
     .map((snapshot) => snapshot.carrier)
     .filter((carrier, index, carriers) => !deviceReportCarrierOrder.includes(carrier) && carriers.indexOf(carrier) === index)
     .forEach((carrier, index) => {
       deviceTrendSeries.push({
         name: carrier,
         color: compareSeriesColors[index % compareSeriesColors.length],
-        points: monthlyDeviceSnapshots
+        points: filteredMonthlyDeviceSnapshots
           .filter((snapshot) => snapshot.carrier === carrier)
           .map((snapshot) => ({
             label: snapshot.reportMonth,
@@ -2416,24 +2483,6 @@ const ReportsPage: React.FC<{
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="app-segmented" role="tablist" aria-label="Device report view">
-                {deviceReportDimensions.map((dimension) => (
-                  <button
-                    key={dimension.value}
-                    type="button"
-                    onClick={() => setDeviceReportDimension(dimension.value)}
-                    className={`app-segmented-button ${
-                      deviceReportDimension === dimension.value
-                        ? 'app-segmented-button-active'
-                        : ''
-                    }`}
-                    role="tab"
-                    aria-selected={deviceReportDimension === dimension.value}
-                  >
-                    {dimension.label}
-                  </button>
-                ))}
-              </div>
               {deviceReportLoading && (
                 <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold uppercase text-accent">Updating</span>
               )}
@@ -2450,6 +2499,81 @@ const ReportsPage: React.FC<{
             <div className="loading">Loading Device Management Reports...</div>
           ) : deviceReport ? (
             <>
+              <div className="app-toolbar mb-5">
+                <div className="min-w-0">
+                  <p className="app-summary-label">Chart Controls</p>
+                  <p className="mt-1 text-sm font-semibold text-gray-500 dark:text-gray-400">Choose the carrier, chart focus, comparison metric, and time window.</p>
+                </div>
+                <div className="app-toolbar-actions">
+                  <div className="app-segmented" role="tablist" aria-label="Device report carrier">
+                    {availableDeviceReportCarriers.map((carrier) => (
+                      <button
+                        key={carrier}
+                        type="button"
+                        onClick={() => setDeviceReportCarrierFilter(carrier)}
+                        className={`app-segmented-button ${
+                          deviceReportCarrierFilter === carrier
+                            ? 'app-segmented-button-active'
+                            : ''
+                        }`}
+                        role="tab"
+                        aria-selected={deviceReportCarrierFilter === carrier}
+                      >
+                        {carrier}
+                      </button>
+                    ))}
+                  </div>
+                  <select
+                    value={deviceReportDimension}
+                    onChange={(event) => setDeviceReportDimension(event.target.value as DeviceReportDimension)}
+                    className="h-10 rounded border border-gray-300 bg-white px-3 text-sm font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    aria-label="Device report chart focus"
+                  >
+                    {deviceReportDimensions.map((dimension) => (
+                      <option key={dimension.value} value={dimension.value}>{dimension.label}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={deviceTrendMetric}
+                    onChange={(event) => setDeviceTrendMetric(event.target.value as DeviceTrendMetric)}
+                    className="h-10 rounded border border-gray-300 bg-white px-3 text-sm font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    aria-label="Monthly comparison metric"
+                  >
+                    {deviceTrendMetrics.map((metric) => (
+                      <option key={metric.value} value={metric.value}>{metric.label}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={deviceTrendRange}
+                    onChange={(event) => setDeviceTrendRange(event.target.value as DeviceTrendRange)}
+                    className="h-10 rounded border border-gray-300 bg-white px-3 text-sm font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    aria-label="Monthly comparison range"
+                  >
+                    {deviceTrendRanges.map((range) => (
+                      <option key={range.value} value={range.value}>{range.label}</option>
+                    ))}
+                  </select>
+                  <div className="app-segmented" role="tablist" aria-label="Monthly comparison graph type">
+                    {dailyGraphTypes.map((type) => (
+                      <button
+                        key={type.value}
+                        type="button"
+                        onClick={() => setDeviceTrendGraphType(type.value)}
+                        className={`app-segmented-button ${
+                          deviceTrendGraphType === type.value
+                            ? 'app-segmented-button-active'
+                            : ''
+                        }`}
+                        role="tab"
+                        aria-selected={deviceTrendGraphType === type.value}
+                      >
+                        {type.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <div className="app-summary-strip mb-5">
                 <div className="app-summary-item">
                   <span className="app-summary-label">Total Devices</span>
@@ -2503,7 +2627,9 @@ const ReportsPage: React.FC<{
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Monthly Report Comparison</h3>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Uses the month selected when Verizon or AT&amp;T reports are uploaded.</p>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      {deviceTrendRanges.find((range) => range.value === deviceTrendRange)?.label || 'Selected range'} comparison for {deviceReportCarrierFilter === 'All' ? 'all carriers' : deviceReportCarrierFilter}.
+                    </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <button
@@ -2516,34 +2642,6 @@ const ReportsPage: React.FC<{
                     >
                       <Trash2 size={15} />
                     </button>
-                    <select
-                      value={deviceTrendMetric}
-                      onChange={(event) => setDeviceTrendMetric(event.target.value as DeviceTrendMetric)}
-                      className="h-9 rounded border border-gray-300 bg-white px-3 text-sm font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                      aria-label="Monthly comparison metric"
-                    >
-                      {deviceTrendMetrics.map((metric) => (
-                        <option key={metric.value} value={metric.value}>{metric.label}</option>
-                      ))}
-                    </select>
-                    <div className="app-segmented" role="tablist" aria-label="Monthly comparison graph type">
-                      {dailyGraphTypes.map((type) => (
-                        <button
-                          key={type.value}
-                          type="button"
-                          onClick={() => setDeviceTrendGraphType(type.value)}
-                          className={`app-segmented-button ${
-                            deviceTrendGraphType === type.value
-                              ? 'app-segmented-button-active'
-                              : ''
-                          }`}
-                          role="tab"
-                          aria-selected={deviceTrendGraphType === type.value}
-                        >
-                          {type.label}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 </div>
                 <AnalyticsChart
