@@ -23,6 +23,9 @@ type PhoneImportSummary = {
   matchedCount: number;
   unmatchedCount: number;
   skippedCount: number;
+  carrierLabel: string;
+  reportMonth: string;
+  forceInventorySync: boolean;
 };
 type PhoneImportProgress = {
   processedRows: number;
@@ -930,6 +933,9 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         matchedCount: importJob.summary.matchedCount,
         unmatchedCount: importJob.summary.unmatchedRows.length,
         skippedCount: importJob.summary.skippedRows.length,
+        carrierLabel: selectedImport.label,
+        reportMonth: phoneImportReportMonth,
+        forceInventorySync: forcePhoneImportInventorySync,
       });
       await loadDevices(false);
       await loadDeviceReportSnapshots();
@@ -993,6 +999,16 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
     setPage(1);
   };
 
+  const reviewUnassignedImports = () => {
+    setFilter('All');
+    setStatusFilter('Unassigned');
+    setCarrierFilter('All');
+    setModelFilter('All');
+    setPossibleInactiveOnly(false);
+    setSelectedDevices([]);
+    setPage(1);
+  };
+
   const toggleInventoryType = useCallback((type: DeviceType) => {
     setCollapsedInventoryTypes((current) => {
       const next = { ...current, [type]: !current[type] };
@@ -1018,6 +1034,7 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
   const selectedPhoneImportOption = phoneImportOptions.find((option) => option.value === phoneImportType) || phoneImportOptions[0];
   const reportMonthRailOptions = useMemo(() => getReportMonthRailOptions(phoneImportReportMonth), [phoneImportReportMonth]);
   const reportMonthYear = getReportMonthYear(phoneImportReportMonth);
+  const selectedReportMonthLabel = new Date(`${phoneImportReportMonth}-01T00:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   const existingReportMonthKeys = useMemo(
     () => new Set(deviceReportSnapshots.map((snapshot) => `${snapshot.carrier}|${snapshot.reportMonth}`)),
     [deviceReportSnapshots],
@@ -1058,14 +1075,29 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         </div>
       )}
       {phoneImportSummary && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-100">
-          {selectedPhoneImportOption.label} import complete: {phoneImportSummary.createdCount} created, {phoneImportSummary.updatedCount} updated, {phoneImportSummary.deletedCount} removed, {phoneImportSummary.matchedCount} matched, {phoneImportSummary.unmatchedCount} unmatched, {phoneImportSummary.skippedCount} skipped from {phoneImportSummary.totalRows} rows.
+        <div className="app-surface mb-4 overflow-hidden border-green-200 dark:border-green-900">
+          <div className="flex flex-col gap-3 border-l-4 border-green-500 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-black text-green-800 dark:text-green-100">
+                {phoneImportSummary.carrierLabel} import complete for {new Date(`${phoneImportSummary.reportMonth}-01T00:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+              </p>
+              <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                {phoneImportSummary.createdCount} created - {phoneImportSummary.updatedCount} updated - {phoneImportSummary.deletedCount} removed - {phoneImportSummary.matchedCount} matched - {phoneImportSummary.unmatchedCount} unmatched - {phoneImportSummary.skippedCount} skipped from {phoneImportSummary.totalRows} rows.
+              </p>
+            </div>
+            {phoneImportSummary.unmatchedCount > 0 && (
+              <button type="button" onClick={reviewUnassignedImports} className="btn-secondary shrink-0" aria-label="Review unassigned imported devices" title="Review Unassigned">
+                <UserCheck size={16} />
+                <span>Review Unassigned</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
       {loading && <div className="loading">Loading device inventory...</div>}
       {phoneImportProgress && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/45 px-4 pt-[12dvh]">
-          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
+          <div className="modal-window w-full max-w-lg rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded bg-primary-100 text-primary-700 dark:bg-primary-950 dark:text-primary-100">
                 <Upload size={20} />
@@ -1076,6 +1108,21 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                   {phoneImportProgress.status === 'queued' ? 'Queued for processing' : 'Processing on the server'}
                 </p>
               </div>
+            </div>
+            <div className="mb-4 grid grid-cols-3 gap-2 text-xs font-black uppercase tracking-wide">
+              {[
+                { label: 'Queued', active: phoneImportProgress.status === 'queued' },
+                { label: 'Processing', active: phoneImportProgress.status === 'processing' },
+                { label: 'Review', active: phoneImportProgress.status === 'completed' },
+              ].map(({ label, active }) => (
+                <div key={label} className={`rounded border px-2 py-2 text-center ${
+                  active
+                    ? 'border-primary-300 bg-primary-50 text-primary-700 dark:border-primary-800 dark:bg-primary-950/50 dark:text-primary-100'
+                    : 'border-gray-200 bg-gray-50 text-gray-400 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-500'
+                }`}>
+                  {label}
+                </div>
+              ))}
             </div>
             <div className="mb-2 flex justify-between text-sm font-semibold text-gray-700 dark:text-gray-300">
               <span>{phoneImportProgress.processedRows} of {phoneImportProgress.totalRows} rows</span>
@@ -1674,31 +1721,72 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
         document.body,
       )}
       {canManageDevices && isPhoneImportSetupOpen && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/45 px-4 pt-[12dvh]">
-          <div className="w-full max-w-3xl rounded-lg bg-white p-5 shadow-2xl dark:bg-gray-900">
-            <div className="mb-5 flex items-start justify-between gap-4">
+        <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/45 px-4 pt-[6dvh]">
+          <div className="modal-window flex max-h-[88dvh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl dark:bg-gray-900">
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Import Device Report</h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Choose the carrier and the month this report represents.</p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Choose the carrier, reporting month, inventory behavior, then upload the file.</p>
               </div>
               <button type="button" onClick={() => setIsPhoneImportSetupOpen(false)} className="btn-secondary h-9 w-9 justify-center p-0" aria-label="Close import setup" title="Close">
                 <X size={16} />
               </button>
             </div>
-            <div className="space-y-4">
-              <Field label="Carrier">
-                <select
-                  value={phoneImportType}
-                  onChange={(event) => setPhoneImportType(event.target.value as PhoneImportType)}
-                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
-                >
-                  {phoneImportOptions.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Report Month">
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+              <div className="mb-4 grid gap-2 sm:grid-cols-4">
+                {[
+                  ['1', 'Carrier'],
+                  ['2', 'Month'],
+                  ['3', 'Inventory'],
+                  ['4', 'Upload'],
+                ].map(([step, label]) => (
+                  <div key={step} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-950">
+                    <span className="block text-[11px] font-black uppercase tracking-wide text-gray-400">Step {step}</span>
+                    <span className="mt-0.5 block text-sm font-black text-gray-800 dark:text-gray-100">{label}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+                <section className="app-surface p-4">
+                  <p className="app-summary-label">Carrier</p>
+                  <div className="mt-3 grid gap-2">
+                    {phoneImportOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setPhoneImportType(option.value)}
+                        className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left text-sm font-black transition ${
+                          phoneImportType === option.value
+                            ? 'border-primary-500 bg-primary-50 text-primary-700 ring-2 ring-primary-500/15 dark:bg-primary-950/40 dark:text-primary-100'
+                            : 'border-gray-200 bg-white text-gray-700 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200'
+                        }`}
+                      >
+                        <span>{option.label}</span>
+                        {phoneImportType === option.value && <CheckCircle2 size={17} />}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs font-semibold text-gray-500 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-400">
+                    {selectedPhoneImportOption.label === 'Verizon'
+                      ? 'CSV upload. Rows marked Wireless Number status = Not Active are ignored and removed from live inventory if missing.'
+                      : 'XLSX, XLS, or CSV upload. Wireless Number is matched to department phone first, then user name.'}
+                  </div>
+                </section>
+
+                <section className="app-surface p-4">
+                  <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="app-summary-label">Report Month</p>
+                      <p className="mt-1 text-sm font-black text-gray-900 dark:text-gray-100">{selectedReportMonthLabel}</p>
+                    </div>
+                    {selectedExistingReportSnapshot && (
+                      <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-black uppercase text-green-800 dark:bg-green-950/50 dark:text-green-100">
+                        Existing report
+                      </span>
+                    )}
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
                   <div className="mb-3 flex items-center justify-between">
                     <button
                       type="button"
@@ -1752,33 +1840,51 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
                     })}
                   </div>
                 </div>
-              </Field>
+                </section>
+              </div>
+
               {selectedExistingReportSnapshot && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-                  A {selectedPhoneImportOption.label} report already exists for {new Date(`${phoneImportReportMonth}-01T00:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}. Uploading a file here will overwrite that report snapshot.
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                  A {selectedPhoneImportOption.label} report already exists for {selectedReportMonthLabel}. Uploading a file here will overwrite that report snapshot.
                 </div>
               )}
-              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 bg-white px-3 py-3 text-sm dark:border-gray-800 dark:bg-gray-950">
-                <input
-                  type="checkbox"
-                  checked={forcePhoneImportInventorySync}
-                  onChange={(event) => setForcePhoneImportInventorySync(event.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                <span>
-                  <span className="block font-black text-gray-900 dark:text-gray-100">Override into actual inventory</span>
-                  <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">Use this report to update live devices even if a newer report already exists.</span>
-                </span>
-              </label>
+
+              <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+                <label className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 text-sm transition ${
+                  forcePhoneImportInventorySync
+                    ? 'border-primary-300 bg-primary-50 text-primary-800 dark:border-primary-800 dark:bg-primary-950/40 dark:text-primary-100'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-accent dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200'
+                }`}>
+                  <input
+                    type="checkbox"
+                    checked={forcePhoneImportInventorySync}
+                    onChange={(event) => setForcePhoneImportInventorySync(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span>
+                    <span className="block font-black">Override into actual inventory</span>
+                    <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">Use this report to update live devices even if a newer report already exists. Older reports still save as comparison snapshots unless this is selected.</span>
+                  </span>
+                </label>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs font-semibold text-gray-500 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-400">
+                  <span className="block font-black uppercase tracking-wide text-gray-400">File type</span>
+                  <span className="mt-1 block text-sm text-gray-800 dark:text-gray-100">{selectedPhoneImportOption.accept.replace(/\./gu, '').toUpperCase()}</span>
+                </div>
+              </div>
             </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <button type="button" onClick={() => setIsPhoneImportSetupOpen(false)} className="btn-secondary" aria-label="Cancel import setup" title="Cancel">
-                <span>Cancel</span>
-              </button>
-              <button type="button" onClick={beginPhoneImport} className="btn-primary" aria-label="Choose report file" title="Choose File">
-                <Upload size={16} />
-                <span>{selectedExistingReportSnapshot ? 'Overwrite Report' : 'Choose File'}</span>
-              </button>
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-5 py-4 dark:border-gray-800 dark:bg-gray-950">
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                Upload will process in the background and show progress at the top of the screen.
+              </p>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setIsPhoneImportSetupOpen(false)} className="btn-secondary" aria-label="Cancel import setup" title="Cancel">
+                  <span>Cancel</span>
+                </button>
+                <button type="button" onClick={beginPhoneImport} className="btn-primary" aria-label="Choose report file" title="Choose File">
+                  <Upload size={16} />
+                  <span>{selectedExistingReportSnapshot ? 'Overwrite Report' : 'Choose File'}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>,
