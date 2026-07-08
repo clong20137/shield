@@ -1733,20 +1733,6 @@ function DeviceManagementPage({ currentUser }: { currentUser: AuthAccount | null
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-              <div className="mb-4 grid gap-2 sm:grid-cols-4">
-                {[
-                  ['1', 'Carrier'],
-                  ['2', 'Month'],
-                  ['3', 'Inventory'],
-                  ['4', 'Upload'],
-                ].map(([step, label]) => (
-                  <div key={step} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-950">
-                    <span className="block text-[11px] font-black uppercase tracking-wide text-gray-400">Step {step}</span>
-                    <span className="mt-0.5 block text-sm font-black text-gray-800 dark:text-gray-100">{label}</span>
-                  </div>
-                ))}
-              </div>
-
               <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
                 <section className="app-surface p-4">
                   <p className="app-summary-label">Carrier</p>
