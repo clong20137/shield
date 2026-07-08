@@ -24,8 +24,8 @@ interface PermissionsPageProps {
 
 const permissionGroups = [
   {
-    title: 'Users & Profiles',
-    description: 'Directory access, profile editing, and account creation.',
+    title: 'User Management',
+    description: 'Directory access, account creation, profile editing, and presence controls.',
     permissions: [
       { key: 'users:view', label: 'View users' },
       { key: 'users:create', label: 'Create users' },
@@ -38,58 +38,70 @@ const permissionGroups = [
     ],
   },
   {
-    title: 'Media Library',
-    description: 'Photo library browsing, uploads, folder management, and deletion.',
-    permissions: [
-      { key: 'media:view', label: 'View media library' },
-      { key: 'media:upload', label: 'Upload media' },
-      { key: 'media:edit', label: 'Create/rename folders and images' },
-      { key: 'media:delete', label: 'Delete images and folders' },
-    ],
-  },
-  {
-    title: 'Operations',
-    description: 'Daily work tools and inventory operations.',
+    title: 'Device Management',
+    description: 'Agency device inventory, assignment, imports, and protected deletion tools.',
     permissions: [
       { key: 'devices:manage', label: 'Manage devices' },
       { key: 'devices:delete-all', label: 'Delete all device records' },
-      { key: 'calendar:manage', label: 'Manage calendar' },
-      { key: 'calendar:view-profiles', label: 'View profile calendars' },
-      { key: 'messages:receive', label: 'Receive messages' },
-      { key: 'messages:send', label: 'Send messages' },
-      { key: 'desktop:start-with-windows', label: 'Use Start with Windows' },
-      { key: 'desktop:minimize-to-tray', label: 'Use minimize to system tray' },
-      { key: 'alerts:send', label: 'Send urgent alerts' },
-      { key: 'district-feed:post', label: 'Post district feed updates' },
-    ],
-  },
-  {
-    title: 'Fleet',
-    description: 'Fleet app calendar, vehicle, and inventory module access.',
-    permissions: [
-      { key: 'fleet:bookings:manage', label: 'View and manage Fleet booking calendar' },
-      { key: 'fleet:vehicles:manage', label: 'Access and manage Fleet vehicles page' },
-      { key: 'fleet:inventory:manage', label: 'Access and manage Fleet inventory page' },
     ],
   },
   {
     title: 'Reports & Reviews',
-    description: 'Submitted reports, CPAR workflows, and review access.',
+    description: 'Report dashboards, Trooper Daily reviews, and evaluation workflows.',
     permissions: [
       { key: 'reports:trooper-dailies', label: 'View/review Trooper Daily reports' },
       { key: 'reports:cpar', label: 'Create CPAR reports' },
     ],
   },
   {
-    title: 'Administration',
-    description: 'System controls, audit history, posts, and issue tracking.',
+    title: 'Messaging & Alerts',
+    description: 'Direct messaging, urgent alerts, and communications access.',
     permissions: [
-      { key: 'roles:manage', label: 'Manage roles' },
-      { key: 'audit:view', label: 'View audit log' },
+      { key: 'messages:receive', label: 'Receive messages' },
+      { key: 'messages:send', label: 'Send messages' },
+      { key: 'alerts:send', label: 'Send urgent alerts' },
+    ],
+  },
+  {
+    title: 'Calendar & Fleet',
+    description: 'Shield calendars, profile activity, and Fleet module access.',
+    permissions: [
+      { key: 'calendar:manage', label: 'Manage calendar' },
+      { key: 'calendar:view-profiles', label: 'View profile calendars' },
+      { key: 'fleet:bookings:manage', label: 'View and manage Fleet booking calendar' },
+      { key: 'fleet:vehicles:manage', label: 'Access and manage Fleet vehicles page' },
+      { key: 'fleet:inventory:manage', label: 'Access and manage Fleet inventory page' },
+    ],
+  },
+  {
+    title: 'Content & Media',
+    description: 'Dashboard posts, district feed updates, and media library management.',
+    permissions: [
+      { key: 'media:view', label: 'View media library' },
+      { key: 'media:upload', label: 'Upload media' },
+      { key: 'media:edit', label: 'Create/rename folders and images' },
+      { key: 'media:delete', label: 'Delete images and folders' },
       { key: 'dashboard:manage', label: 'Manage dashboard posts' },
       { key: 'dashboard:create', label: 'Create news and updates' },
       { key: 'dashboard:edit', label: 'Edit news and updates' },
       { key: 'dashboard:delete', label: 'Delete news and updates' },
+      { key: 'district-feed:post', label: 'Post district feed updates' },
+    ],
+  },
+  {
+    title: 'Desktop Preferences',
+    description: 'Local desktop app behavior and user-controlled workstation settings.',
+    permissions: [
+      { key: 'desktop:start-with-windows', label: 'Use Start with Windows' },
+      { key: 'desktop:minimize-to-tray', label: 'Use minimize to system tray' },
+    ],
+  },
+  {
+    title: 'Admin & Security',
+    description: 'Role administration, audit history, system review, and issue tracking.',
+    permissions: [
+      { key: 'roles:manage', label: 'Manage roles' },
+      { key: 'audit:view', label: 'View audit log' },
       { key: 'bugs:manage', label: 'Manage bug tracker' },
     ],
   },
@@ -121,7 +133,28 @@ function PermissionChecklist({
   const [permissionSearch, setPermissionSearch] = useState('');
   const query = permissionSearch.trim().toLowerCase();
   const selectedSet = useMemo(() => new Set(selectedPermissions), [selectedPermissions]);
-  const visibleGroups = permissionGroups
+  const knownPermissionKeys = useMemo(
+    () => new Set(permissionGroups.flatMap((group) => group.permissions.map((permission) => permission.key))),
+    [],
+  );
+  const workflowGroups = useMemo(() => {
+    const unknownPermissions = selectedPermissions
+      .filter((permissionKey) => !knownPermissionKeys.has(permissionKey))
+      .map((permissionKey) => ({ key: permissionKey, label: permissionKey }));
+
+    return unknownPermissions.length > 0
+      ? [
+          ...permissionGroups,
+          {
+            title: 'Other Permissions',
+            description: 'Legacy or custom permission keys currently assigned to this role.',
+            permissions: unknownPermissions,
+          },
+        ]
+      : permissionGroups;
+  }, [knownPermissionKeys, selectedPermissions]);
+  const totalKnownPermissions = permissionGroups.reduce((total, group) => total + group.permissions.length, 0);
+  const visibleGroups = workflowGroups
     .map((group) => ({
       ...group,
       permissions: group.permissions.filter((permission) =>
@@ -152,12 +185,26 @@ function PermissionChecklist({
 
   return (
     <div className="space-y-3">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {permissionGroups.map((group) => {
+          const selectedCount = group.permissions.filter((permission) => selectedSet.has(permission.key)).length;
+          return (
+            <div key={group.title} className="rounded border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-950">
+              <span className="block truncate text-xs font-black text-gray-700 dark:text-gray-200">{group.title}</span>
+              <span className="mt-1 block text-[11px] font-semibold text-gray-400">
+                {selectedCount} of {group.permissions.length} selected
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
       <label className="relative block">
         <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
         <input
           value={permissionSearch}
           onChange={(event) => setPermissionSearch(event.target.value)}
-          placeholder="Search permissions..."
+          placeholder={`Search ${totalKnownPermissions} permissions by workflow, name, or key...`}
           className="w-full rounded border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-gray-700 dark:bg-gray-950"
         />
       </label>
@@ -206,6 +253,20 @@ function PermissionChecklist({
             </section>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function LiveAccessSyncNotice({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={`flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-100 ${compact ? 'px-3 py-2 text-xs' : 'px-4 py-3 text-sm'}`}>
+      <ShieldCheck size={compact ? 16 : 18} className="mt-0.5 shrink-0" />
+      <div>
+        <span className="block font-black">Live access sync</span>
+        <span className="mt-0.5 block font-semibold text-emerald-800/80 dark:text-emerald-100/80">
+          Saved role changes refresh connected users automatically, including navigation and page access.
+        </span>
       </div>
     </div>
   );
@@ -718,6 +779,7 @@ function PermissionsPage({
             <h2>Role Definitions</h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Edit the permissions each role grants. User assignment now lives on each user profile.</p>
           </div>
+          <LiveAccessSyncNotice compact />
           <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
             {roles.map((role) => (
               <button key={role.id} type="button" onClick={() => openEditRole(role)} className="flex items-center justify-between gap-3 rounded border border-gray-200 bg-gray-50 px-3 py-3 text-left text-sm text-gray-700 hover:border-accent hover:text-accent dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200" aria-label={`Edit ${role.name} role`} title={`Edit ${role.name}`}>
@@ -1051,6 +1113,10 @@ function PermissionsPage({
               />
             </label>
 
+            <div className="mb-4">
+              <LiveAccessSyncNotice />
+            </div>
+
             <div>
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Permissions</span>
@@ -1092,6 +1158,10 @@ function PermissionsPage({
                 autoFocus
               />
             </label>
+
+            <div className="mb-4">
+              <LiveAccessSyncNotice />
+            </div>
 
             <div>
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
