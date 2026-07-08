@@ -11,7 +11,6 @@ const DashboardPage = lazy(() => import('../../pages/DashboardPage'));
 const DashboardPostPage = lazy(() => import('../../pages/DashboardPostPage'));
 const AdminConsolePage = lazy(() => import('../../pages/AdminConsolePage'));
 const DeviceManagementPage = lazy(() => import('../../pages/DeviceManagementPage'));
-const FleetVehiclesPage = lazy(() => import('../../pages/FleetVehiclesPage'));
 const MessageInboxPage = lazy(() => import('../../pages/MessageInboxPage'));
 const CalendarPage = lazy(() => import('../../pages/CalendarPage'));
 const PerformanceEvaluationsPage = lazy(() => import('../../pages/PerformanceEvaluationsPage'));
@@ -120,7 +119,6 @@ export function AppRoutes({
             />
           )}
           <Route path="/devices" element={<DeviceManagementPage currentUser={currentUser} />} />
-          <Route path="/fleet/vehicles" element={<FleetVehiclesPage currentUser={currentUser} />} />
           {currentUser && (
             <Route
               path="/evaluations"

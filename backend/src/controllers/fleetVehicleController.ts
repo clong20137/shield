@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as XLSX from 'xlsx';
 import { FleetVehicleInput, FleetVehicleModel } from '../models/FleetVehicle';
+import { UserModel } from '../models/User';
 import { broadcastAppEvent } from '../services/appEvents';
 import { getSessionAccount } from '../middleware/authSession';
 import { AuditLogModel } from '../models/AuditLog';
@@ -91,6 +92,38 @@ function parseFleetVehicleWorkbook(buffer: Buffer) {
 }
 
 export class FleetVehicleController {
+  static async lookupOperatorsByPe(req: Request, res: Response) {
+    try {
+      const rawPeNumbers: unknown[] = Array.isArray(req.body?.peNumbers) ? req.body.peNumbers : [];
+      const peNumbers = Array.from(
+        new Set(
+          rawPeNumbers
+            .map((value: unknown) => cleanCell(value, 50).replace(/^PE\s*/iu, ''))
+            .filter((value): value is string => Boolean(value))
+            .slice(0, 500),
+        ),
+      );
+      const operators: Array<{ id: string; displayName: string; email: string; peNumber: string }> = [];
+
+      for (const peNumber of peNumbers) {
+        const user = await UserModel.getUserByPeNumber(peNumber);
+        if (user?.id) {
+          operators.push({
+            id: user.id,
+            displayName: `${user.firstName} ${user.lastName}`.trim() || user.email,
+            email: user.email,
+            peNumber: user.peNumber,
+          });
+        }
+      }
+
+      return res.json({ operators });
+    } catch (error) {
+      console.error('Fleet operator PE lookup error:', error);
+      return res.status(500).json({ error: 'Failed to look up Fleet operators' });
+    }
+  }
+
   static async list(req: Request, res: Response) {
     try {
       const { q, page, pageSize } = req.query;
