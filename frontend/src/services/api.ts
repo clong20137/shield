@@ -702,6 +702,28 @@ export interface CalendarEntry {
 
 export type CalendarEntryPayload = Omit<CalendarEntry, 'id' | 'reviewStatus' | 'reviewNotes' | 'reviewedBy' | 'reviewedByName' | 'reviewedAt' | 'createdAt' | 'updatedAt'>;
 
+export interface FleetBookingCalendarPayload {
+  bookingId: string;
+  ownerAccountId: string;
+  title: string;
+  serviceType?: string;
+  startAt: string;
+  endAt: string;
+  location?: string;
+  vehicleLabel?: string;
+  vehicle?: string;
+  status: 'requested' | 'approved' | 'denied' | 'canceled' | string;
+  notes?: string;
+  reminderLeadMinutes?: number;
+}
+
+export interface FleetBookingCalendarSyncResponse {
+  calendarEntry?: CalendarEntry;
+  reminder?: Reminder | null;
+  deletedCalendarEntries?: number;
+  deletedReminders?: number;
+}
+
 export interface CalendarShortcut {
   id: string;
   ownerAccountId?: string;
@@ -1490,6 +1512,12 @@ export const calendarService = {
 
   delete: (id: string, actor?: { accountId?: string; actorId?: string; actorName?: string }) =>
     api.delete(`/calendar/${id}`, { data: actor }),
+
+  syncFleetBooking: (booking: FleetBookingCalendarPayload) =>
+    api.put<FleetBookingCalendarSyncResponse>(`/calendar/fleet-bookings/${encodeURIComponent(booking.bookingId)}`, booking),
+
+  deleteFleetBooking: (bookingId: string, ownerAccountId: string) =>
+    api.delete<FleetBookingCalendarSyncResponse>(`/calendar/fleet-bookings/${encodeURIComponent(bookingId)}`, { data: { ownerAccountId } }),
 
   getShortcuts: () =>
     api.get<CalendarShortcut[]>('/calendar/shortcuts'),

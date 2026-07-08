@@ -5163,6 +5163,7 @@ function App() {
     const dashboardUpdatedHandler = handleRealtimeAppUpdate('dashboard-updated');
     const deviceUpdatedHandler = handleRealtimeAppUpdate('device-updated');
     const errorUpdatedHandler = handleRealtimeAppUpdate('error-updated');
+    const fleetBookingUpdatedHandler = handleRealtimeAppUpdate('fleet-booking-updated');
     const mediaUpdatedHandler = handleRealtimeAppUpdate('media-updated');
     const mileageUpdatedHandler = handleRealtimeAppUpdate('mileage-updated');
     const performanceEvaluationUpdatedHandler = handleRealtimeAppUpdate('performance-evaluation-updated');
@@ -5224,6 +5225,7 @@ function App() {
       subscribeAppRealtime('dashboard-updated', dashboardUpdatedHandler),
       subscribeAppRealtime('device-updated', deviceUpdatedHandler),
       subscribeAppRealtime('error-updated', errorUpdatedHandler),
+      subscribeAppRealtime('fleet-booking-updated', fleetBookingUpdatedHandler),
       subscribeAppRealtime('media-updated', mediaUpdatedHandler),
       subscribeAppRealtime('mileage-updated', mileageUpdatedHandler),
       subscribeAppRealtime('performance-evaluation-updated', performanceEvaluationUpdatedHandler),
